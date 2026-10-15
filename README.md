@@ -10,6 +10,14 @@ The initial implementation includes a native Flow server (src/main.flow), a smal
 
 The browser can open and save source files, choose a local project folder, lazily browse its source tree, create a source file in the project root, refresh the tree, search project files for literal text with exact match navigation, run the selected text or whole buffer as Flow, R or Python, and display captured stdout/stderr. Project operations use the browser File System Access API and are unavailable in browsers without folder-picker support. Python and R use a **fresh interpreter per execution**; these are not persistent notebook sessions.
 
+### Editor find and replace
+
+Use Ctrl/⌘+F to focus the in-buffer literal search, F3 / Shift+F3 for next/previous matches, and Ctrl/⌘+H to focus replacement. The source pane has Replace and Replace all controls, plus a case-sensitive option. Replacement text is literal (no regular-expression substitutions). Operations run locally in the browser; they never send the document to the execution API. The editor search is limited to 2 MiB and 10,000 matches; Replace all refuses to modify a truncated match set.
+
+Run the additional pure-module tests with:
+
+    node --test tests/editor_find.test.js
+
 ## Build and launch
 
 Requirements: [Flow 2.x](https://github.com/flooooooooooow/flow) installed as flow, a C11 compiler available as cc, POSIX macOS/Linux and a recent browser. Python 3 and R are optional **runtime executables** for their respective execution modes.

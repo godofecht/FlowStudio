@@ -34,6 +34,10 @@ class Element {
   click() { return this.fire("click"); }
   focus() { this.focused = true; }
   setSelectionRange(start, end) { this.selectionStart = start; this.selectionEnd = end; }
+  setRangeText(text, start, end) {
+    this.value = this.value.slice(0, start) + text + this.value.slice(end);
+    this.setSelectionRange(start + text.length, start + text.length);
+  }
 }
 function file(name, initial = "") {
   let content = initial;
@@ -68,7 +72,9 @@ function workspace(folder) {
     "source", "language", "console", "resultStatus", "fileLabel", "dirty",
     "cursor", "run", "open", "save", "clear", "fallbackOpen", "runtimeInfo",
     "projectTree", "folder", "newFile", "refreshProject",
-    "projectSearch", "caseSensitive", "searchProject", "searchResults"
+    "projectSearch", "caseSensitive", "searchProject", "searchResults",
+    "editorFind", "editorReplace", "findNext", "findPrevious",
+    "replaceOne", "replaceAll", "editorCaseSensitive", "editorFindCount"
   ];
   for (const id of ids) elements.set(id, new Element());
   elements.get("source").value = "initial";
@@ -99,9 +105,10 @@ function workspace(folder) {
     },
     Blob, URL, setTimeout, console
   });
-  assert.equal(scripts.length, 2, "Expected embedded project module and workspace script");
+  assert.equal(scripts.length, 3, "Expected project, editor-find and workspace scripts");
   vm.runInContext(scripts[0], context, { filename: "project-embedded.js" });
-  vm.runInContext(scripts[1], context, { filename: "workspace.js" });
+  vm.runInContext(scripts[1], context, { filename: "editor-find-embedded.js" });
+  vm.runInContext(scripts[2], context, { filename: "workspace.js" });
   return {
     el: id => elements.get(id), document, fetches,
     setDiscard: value => { allowDiscard = value; },
@@ -111,6 +118,8 @@ function workspace(folder) {
 
 test("embedded project module exactly mirrors tested standalone source", () => {
   assert.equal(scripts[0].trim(), projectSource);
+  const findSource = fs.readFileSync(path.join(root, "web/editor_find.js"), "utf8").trimEnd();
+  assert.equal(scripts[1].trim(), findSource);
   assert.match(html, /id="projectTree"/);
   assert.match(html, /id="folder"/);
   assert.match(html, /id="newFile"/);
@@ -236,4 +245,64 @@ test("search does not send local project contents to execution API", async () =>
   await app.el("searchProject").fire("click");
   assert.equal(app.fetches.length, 0);
   assert.equal(app.el("searchResults").children.length, 2);
+});
+
+
+test("in-buffer find navigates matches with wrapping and case option", () => {
+  const app = workspace(directory("empty"));
+  app.el("source").value = "cat Cat cat";
+  app.el("editorFind").value = "cat";
+  app.el("editorFind").fire("input");
+  assert.equal(app.el("editorFindCount").textContent, "3 matches");
+  app.el("findNext").fire("click");
+  assert.equal(app.el("source").selectionStart, 0);
+  app.el("findNext").fire("click");
+  assert.equal(app.el("source").selectionStart, 4);
+  app.el("findPrevious").fire("click");
+  assert.equal(app.el("source").selectionStart, 0);
+  app.el("editorCaseSensitive").checked = true;
+  app.el("editorCaseSensitive").fire("change");
+  assert.equal(app.el("editorFindCount").textContent, "2 matches");
+  assert.equal(app.fetches.length, 0);
+});
+
+test("replace current and replace all edit buffer without saving or executing", () => {
+  const app = workspace(directory("empty"));
+  app.el("source").value = "cat cat Cat";
+  app.el("editorFind").value = "cat";
+  app.el("editorReplace").value = "$&";
+  app.el("findNext").fire("click");
+  app.el("replaceOne").fire("click");
+  assert.equal(app.el("source").value, "$& cat Cat");
+  assert.equal(app.el("dirty").hidden, false);
+  app.el("editorReplace").value = "dog";
+  app.el("replaceAll").fire("click");
+  assert.equal(app.el("source").value, "$& dog dog");
+  assert.equal(app.el("editorFindCount").textContent, "0 matches");
+  assert.equal(app.fetches.length, 0);
+});
+
+test("replace-all limit prevents partial source mutation", () => {
+  const app = workspace(directory("empty"));
+  app.el("source").value = "x".repeat(10001);
+  app.el("editorFind").value = "x";
+  app.el("editorReplace").value = "y";
+  app.el("replaceAll").fire("click");
+  assert.equal(app.el("source").value, "x".repeat(10001));
+  assert.match(app.el("resultStatus").textContent, /10,000 matches/);
+  assert.equal(app.fetches.length, 0);
+});
+
+test("Ctrl+F populates selected text and focuses editor find", () => {
+  const app = workspace(directory("empty"));
+  app.el("source").value = "alpha beta";
+  app.el("source").setSelectionRange(6, 10);
+  let prevented = false;
+  app.document.listeners.keydown({
+    ctrlKey: true, metaKey: false, key: "f",
+    preventDefault() { prevented = true; }
+  });
+  assert.equal(prevented, true);
+  assert.equal(app.el("editorFind").value, "beta");
+  assert.equal(app.el("editorFind").focused, true);
 });

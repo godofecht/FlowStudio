@@ -51,6 +51,11 @@ footer { padding: 5px 14px; display: flex; justify-content: space-between; gap: 
  .main { min-height: 90dvh; grid-template-columns: 1fr; grid-template-rows: 36vh 16vh 25vh 16vh; }
  footer { flex-wrap: wrap; }
 }
+.editor-find { display:flex; gap:6px; flex-wrap:wrap; align-items:center; padding:7px 10px; border-bottom:1px solid #30394e; }
+.editor-find input[type="text"] { min-width:95px; max-width:220px; flex:1; background:#101520; color:#e6eeff; border:1px solid #3a4762; border-radius:5px; padding:5px 7px; }
+.editor-find label { font-size:12px; color:#c2cee4; }
+.editor-find button { padding:5px 8px; font-size:12px; }
+#editorFindCount { font-size:12px; color:#afc4e6; }
 </style>
 </head>
 <body>
@@ -71,6 +76,8 @@ footer { padding: 5px 14px; display: flex; justify-content: space-between; gap: 
 <div class="main">
   <section class="panel" aria-label="Source editor">
     <h2>Source <span id="fileLabel">untitled.flow</span><span id="dirty" hidden> • modified</span></h2>
+    <div class="editor-find"><input id="editorFind" type="text" aria-label="Find text"><button id="findNext">Next</button></div>
+    <label for="editorReplace">Replace with</label><input id="editorReplace" type="text" aria-label="Replacement text"><button id="replaceOne">Replace</button><button id="replaceAll">Replace all</button><button id="findPrevious">Previous</button><label><input id="editorCaseSensitive" type="checkbox"> Match case</label><span id="editorFindCount" role="status" aria-live="polite"></span>
     <textarea id="source" spellcheck="false" aria-label="Source code editor">function main() -> i32 {
     println("Hello from FlowStudio")
     return 0
@@ -285,6 +292,73 @@ global.FlowStudioProject = api;
 })(globalThis);
 </script>
 <!-- END EMBEDDED PROJECT MODULE -->
+<!-- BEGIN EMBEDDED EDITOR FIND MODULE: mirrors web/editor_find.js -->
+<script>
+/* Literal in-buffer find and replace. Pure operations: no filesystem or network access. */
+(function (global) {
+"use strict";
+const MAX_QUERY = 256;
+const MAX_REPLACEMENT = 10000;
+const MAX_SOURCE = 2 * 1024 * 1024;
+const MAX_MATCHES = 10000;
+function validate(text, query) {
+  if (typeof text !== "string" || text.length > MAX_SOURCE)
+    throw new Error("Editor search supports buffers up to 2 MiB.");
+  if (typeof query !== "string" || query.length < 1 || query.length > MAX_QUERY)
+    throw new Error("Find text must be 1–256 characters.");
+}
+function findMatches(text, query, options = {}) {
+  if (query === "") return { matches: [], truncated: false };
+  validate(text, query);
+  const escaped = [...query].map(ch => "\\^$.*+?()[]{}|".includes(ch) ? "\\" + ch : ch).join("");
+  const regex = new RegExp(escaped, options.caseSensitive ? "gu" : "giu");
+  const matches = [];
+  for (const hit of text.matchAll(regex)) {
+    if (matches.length === MAX_MATCHES) return { matches, truncated: true };
+    matches.push({ index: hit.index, end: hit.index + hit[0].length });
+  }
+  return { matches, truncated: false };
+}
+function nextMatch(matches, start, end, backwards = false) {
+  if (matches.length === 0) return null;
+  if (backwards) {
+    for (let i = matches.length - 1; i >= 0; i--)
+      if (matches[i].end <= start) return matches[i];
+    return matches[matches.length - 1];
+  }
+  for (const match of matches) if (match.index >= end) return match;
+  return matches[0];
+}
+function replaceSelection(text, query, replacement, start, end, options = {}) {
+  if (typeof replacement !== "string" || replacement.length > MAX_REPLACEMENT)
+    throw new Error("Replacement must be at most 10,000 characters.");
+  const result = findMatches(text, query, options);
+  const hit = result.matches.find(match => match.index === start && match.end === end);
+  if (!hit) return { value: text, replaced: false, start, end };
+  return { value: text.slice(0, start) + replacement + text.slice(end),
+    replaced: true, start, end: start + replacement.length };
+}
+function replaceAll(text, query, replacement, options = {}) {
+  if (typeof replacement !== "string" || replacement.length > MAX_REPLACEMENT)
+    throw new Error("Replacement must be at most 10,000 characters.");
+  const result = findMatches(text, query, options);
+  if (result.truncated) throw new Error("More than 10,000 matches; narrow the query before replacing.");
+  let position = 0;
+  const parts = [];
+  for (const match of result.matches) {
+    parts.push(text.slice(position, match.index), replacement);
+    position = match.end;
+  }
+  parts.push(text.slice(position));
+  return { value: parts.join(""), count: result.matches.length,
+    firstIndex: result.matches.length ? result.matches[0].index : -1 };
+}
+const api = { findMatches, nextMatch, replaceSelection, replaceAll };
+if (typeof module !== "undefined" && module.exports) module.exports = api;
+global.FlowStudioEditorFind = api;
+})(globalThis);
+</script>
+<!-- END EMBEDDED EDITOR FIND MODULE -->
 <script>
 "use strict";
 const el = id => document.getElementById(id);
@@ -297,6 +371,93 @@ let filename = "untitled.flow";
 let projectPath = null;
 let dirty = false;
 let creatingProjectFile = false;
+
+
+function currentFind() {
+  return FlowStudioEditorFind.findMatches(src.value, el("editorFind").value,
+    { caseSensitive: el("editorCaseSensitive").checked });
+}
+function updateFindCount() {
+  try {
+    const query = el("editorFind").value;
+    const result = currentFind();
+    el("editorFindCount").textContent = query ?
+      result.matches.length + (result.truncated ? "+" : "") + " matches" : "";
+  } catch (error) {
+    el("editorFindCount").textContent = error.message || String(error);
+  }
+}
+function findInEditor(backwards = false) {
+  try {
+    if (!el("editorFind").value) {
+      status("Enter text to find.", "error");
+      return;
+    }
+    const result = currentFind();
+    const hit = FlowStudioEditorFind.nextMatch(result.matches,
+      src.selectionStart, src.selectionEnd, backwards);
+    if (!hit) {
+      status("No matches in current file.", "error");
+      return;
+    }
+    src.focus();
+    src.setSelectionRange(hit.index, hit.end);
+    updateCursor();
+    status("Match at offset " + hit.index + (result.truncated ? " (first 10,000 matches)" : ""), "ok");
+  } catch (error) {
+    status(error.message || String(error), "error");
+  }
+}
+
+
+function replaceCurrent() {
+  try {
+    const query = el("editorFind").value;
+    if (!query) { status("Enter text to replace.", "error"); return; }
+    const replacement = el("editorReplace").value;
+    const result = FlowStudioEditorFind.replaceSelection(src.value, query, replacement,
+      src.selectionStart, src.selectionEnd,
+      { caseSensitive: el("editorCaseSensitive").checked });
+    if (!result.replaced) { findInEditor(false); return; }
+    if (result.value !== src.value) {
+      if (typeof src.setRangeText === "function")
+        src.setRangeText(replacement, result.start, src.selectionEnd, "end");
+      else src.value = result.value;
+      markDirty(true);
+    }
+    src.setSelectionRange(result.end, result.end);
+    updateCursor();
+    updateFindCount();
+    findInEditor(false);
+  } catch (error) {
+    status(error.message || String(error), "error");
+  }
+}
+function replaceAllInEditor() {
+  try {
+    const query = el("editorFind").value;
+    if (!query) { status("Enter text to replace.", "error"); return; }
+    const result = FlowStudioEditorFind.replaceAll(src.value, query,
+      el("editorReplace").value, { caseSensitive: el("editorCaseSensitive").checked });
+    if (result.count === 0) {
+      status("No matches in current file.", "error");
+      return;
+    }
+    if (result.value !== src.value) {
+      if (typeof src.setRangeText === "function")
+        src.setRangeText(result.value, 0, src.value.length, "end");
+      else src.value = result.value;
+      markDirty(true);
+    }
+    src.focus();
+    src.setSelectionRange(result.firstIndex, result.firstIndex);
+    updateCursor();
+    updateFindCount();
+    status("Replaced " + result.count + " matches in current file.", "ok");
+  } catch (error) {
+    status(error.message || String(error), "error");
+  }
+}
 
 function status(message, state = "") {
   resultStatus.textContent = message;
@@ -358,6 +519,7 @@ async function openEditorHandle(handle, path = null, skipDirtyCheck = false) {
   language.value = inferLanguage(file.name);
   markDirty(false);
   updateCursor();
+  updateFindCount();
   status("Opened " + (path || file.name), "ok");
   return true;
 }
@@ -508,7 +670,18 @@ el("projectSearch").addEventListener("keydown", event => {
   }
 });
 
-src.addEventListener("input", () => { markDirty(true); updateCursor(); });
+
+el("editorFind").addEventListener("input", updateFindCount);
+el("editorCaseSensitive").addEventListener("change", updateFindCount);
+el("editorFind").addEventListener("keydown", event => {
+  if (event.key === "Enter") { event.preventDefault(); findInEditor(event.shiftKey); }
+});
+el("findNext").addEventListener("click", () => findInEditor(false));
+el("findPrevious").addEventListener("click", () => findInEditor(true));
+el("replaceOne").addEventListener("click", replaceCurrent);
+el("replaceAll").addEventListener("click", replaceAllInEditor);
+
+src.addEventListener("input", () => { markDirty(true); updateCursor(); updateFindCount(); });
 src.addEventListener("click", updateCursor);
 src.addEventListener("keyup", updateCursor);
 language.addEventListener("change", () => {
@@ -528,10 +701,29 @@ el("fallbackOpen").addEventListener("change", async event => {
   setFilename(file.name);
   language.value = inferLanguage(file.name);
   markDirty(false);
+  updateFindCount();
   status("Opened " + file.name, "ok");
   event.target.value = "";
 });
 document.addEventListener("keydown", event => {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") {
+    event.preventDefault();
+    const selection = src.value.slice(src.selectionStart, src.selectionEnd);
+    if (selection.length > 0 && selection.length <= 256) el("editorFind").value = selection;
+    updateFindCount();
+    el("editorFind").focus();
+    return;
+  }
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "h") {
+    event.preventDefault();
+    el("editorReplace").focus();
+    return;
+  }
+  if (event.key === "F3" && el("editorFind").value) {
+    event.preventDefault();
+    findInEditor(event.shiftKey);
+    return;
+  }
   if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
     event.preventDefault();
     if (!el("run").disabled) run();

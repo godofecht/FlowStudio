@@ -1,0 +1,1 @@
+2026-10-15: Verified the existing FlowStudio transport builds as standalone C. Flow end-to-end verification remains pending.

@@ -15,7 +15,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Persistent REPL/session | missing | Incremental variables and package state persist until reset |
 | Variable inspector | missing | Nested objects / types / dimensions inspectable and refresh after execution |
 | Plot viewer | missing | png/svg plot history, zoom, save and deterministic device lifecycle |
-| Project explorer | missing | Open project, tree navigation, safe rename/delete |
+| Project explorer | partial / DOM-tested | Open project, tree navigation, source-file creation and save; safe rename/delete still missing |
 | Data viewer | missing | Interactive sortable/filterable tabular datasets including missing values |
 | Completion / language server | missing | R, Flow and Python completion/diagnostics |
 | Packages pane | missing | List, install, update with environment-aware package sources |
@@ -47,6 +47,14 @@ Result: **15/15 passing** (0.133 seconds on the validation host). Cases cover GE
 **Build-path correction:** scripts/build.sh now invokes the Flow repository's documented `flow tool compiler/scripts/flowc_emit.flow --strict` command rather than the unsupported `flow build ... --c -o ...` form. The command was confirmed against the current Flow CLI implementation, but not executed with the Flow compiler.
 
 **Still unverified:** native Flow compile/link and actual three-language execution. Flow and R are not installed on the validation host; outbound GitHub DNS resolution was unavailable. Browser interaction and macOS have not been tested. PR #1 remains draft. Do not promote any Flow/R/Python parity feature to verified based on the C-only tests.
+
+## Validation log — 2026-10-15 (browser project integration)
+
+The four-pane workspace now embeds the same project explorer source as web/project.js and connects folder selection, tree navigation, source-file opening, new-file creation, refresh, and saves to the existing editor. The browser-scoped File System Access API is used; no arbitrary filesystem paths are sent to the Flow server. Switching files asks for confirmation if the buffer has unsaved edits. The editor retains the selected file handle for saves.
+
+Static V8 evaluation of the **actual committed HTML scripts** passed 18 assertions: both script parse checks, embedded-module/source equivalence, directory listing, R/Python language inference, exact file-handle opening, path label, unsaved-change refusal, saving, new-file creation, selected-text request payload, execution intent header and console update. A six-test Node DOM suite was committed in tests/workspace_browser.test.js; it has not yet been run through Node's test runner on a checked-out repository. These checks use mocked browser handles, not a physical browser or OS file picker.
+
+**Remaining limits:** Flow native compile/link, served-browser interaction, real OS file permissions, actual language execution, macOS compatibility and filesystem conflict handling remain unverified. The project explorer does not implement rename/delete and is not an RStudio project parser. Do not treat DOM-mock passes as full feature parity.
 
 ## Next implementation order
 

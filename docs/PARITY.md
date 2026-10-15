@@ -16,7 +16,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Variable inspector | missing | Nested objects / types / dimensions inspectable and refresh after execution |
 | Plot viewer | missing | png/svg plot history, zoom, save and deterministic device lifecycle |
 | Project explorer | partial / DOM-tested | Open project, tree navigation, source-file creation and save; safe rename/delete still missing |
-| Data viewer | missing | Interactive sortable/filterable tabular datasets including missing values |
+| Data viewer | parser-only / Node-tested; not integrated into IDE | Interactive sortable/filterable tabular datasets including missing values |
 | Completion / language server | missing | R, Flow and Python completion/diagnostics |
 | Packages pane | missing | List, install, update with environment-aware package sources |
 | Git pane | missing | Status, diff, stage, commit and branch operations |

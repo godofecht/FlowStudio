@@ -22,6 +22,8 @@ class Element {
     this.selectionEnd = 0;
     this.hidden = false;
     this.disabled = false;
+    this.checked = false;
+    this.focused = false;
     this.open = false;
     this.scrollTop = 0;
   }
@@ -30,6 +32,8 @@ class Element {
   addEventListener(event, fn) { this.listeners[event] = fn; }
   fire(event, payload = {}) { return this.listeners[event]?.(payload); }
   click() { return this.fire("click"); }
+  focus() { this.focused = true; }
+  setSelectionRange(start, end) { this.selectionStart = start; this.selectionEnd = end; }
 }
 function file(name, initial = "") {
   let content = initial;
@@ -63,7 +67,8 @@ function workspace(folder) {
   const ids = [
     "source", "language", "console", "resultStatus", "fileLabel", "dirty",
     "cursor", "run", "open", "save", "clear", "fallbackOpen", "runtimeInfo",
-    "projectTree", "folder", "newFile", "refreshProject"
+    "projectTree", "folder", "newFile", "refreshProject",
+    "projectSearch", "caseSensitive", "searchProject", "searchResults"
   ];
   for (const id of ids) elements.set(id, new Element());
   elements.get("source").value = "initial";
@@ -180,4 +185,55 @@ test("new-file action rejects unsupported filenames without creating files", asy
   await app.el("newFile").fire("click");
   assert.match(app.el("resultStatus").textContent, /Invalid/);
   assert.equal(app.el("projectTree").children.length, 1);
+});
+
+
+test("project-wide search navigates to exact match with editor selection", async () => {
+  const folder = directory("research", [
+    ["analysis.R", file("analysis.R", "x <- 1\nx <- 2\n")]
+  ]);
+  const app = workspace(folder);
+  await app.el("folder").fire("click");
+  app.el("projectSearch").value = "x <- 2";
+  await app.el("searchProject").fire("click");
+  const results = app.el("searchResults");
+  assert.equal(results.children.length, 2);
+  assert.match(results.children[0].textContent, /1 matches in 1 files/);
+  assert.match(results.children[1].textContent, /analysis\.R:2:1/);
+  await results.children[1].fire("click");
+  assert.equal(app.el("source").value, "x <- 1\nx <- 2\n");
+  assert.equal(app.el("source").selectionStart, 7);
+  assert.equal(app.el("source").selectionEnd, 13);
+  assert.equal(app.el("cursor").textContent, "Ln 2, Col 1");
+  assert.equal(app.el("source").focused, true);
+});
+
+test("search navigation preserves unsaved source edits when switching is declined", async () => {
+  const folder = directory("research", [
+    ["a.flow", file("a.flow", "needle")],
+    ["b.flow", file("b.flow", "needle")]
+  ]);
+  const app = workspace(folder);
+  await app.el("folder").fire("click");
+  await app.el("projectTree").children[1].fire("click");
+  app.el("source").value = "unsaved changes";
+  app.el("source").fire("input");
+  app.el("projectSearch").value = "needle";
+  await app.el("searchProject").fire("click");
+  app.setDiscard(false);
+  await app.el("searchResults").children[2].fire("click");
+  assert.equal(app.el("source").value, "unsaved changes");
+  assert.equal(app.el("dirty").hidden, false);
+});
+
+test("search does not send local project contents to execution API", async () => {
+  const folder = directory("research", [
+    ["secret.flow", file("secret.flow", "private searchable content")]
+  ]);
+  const app = workspace(folder);
+  await app.el("folder").fire("click");
+  app.el("projectSearch").value = "private";
+  await app.el("searchProject").fire("click");
+  assert.equal(app.fetches.length, 0);
+  assert.equal(app.el("searchResults").children.length, 2);
 });

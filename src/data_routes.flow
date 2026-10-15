@@ -1,0 +1,22 @@
+# Explicit read-only browser asset routes. Never map arbitrary URLs to disk.
+export struct StaticAsset {
+    path: string,
+    mime: string,
+    found: bool
+}
+
+export function data_route(url: string) -> StaticAsset {
+    if url == "/data" or url == "/data.html" {
+        return StaticAsset { path: "web/data.html", mime: "text/html; charset=utf-8", found: true }
+    }
+    if url == "/data_viewer.js" {
+        return StaticAsset { path: "web/data_viewer.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/data_page.js" {
+        return StaticAsset { path: "web/data_page.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/index.html" {
+        return StaticAsset { path: "web/index.html", mime: "text/html; charset=utf-8", found: true }
+    }
+    return StaticAsset { path: "", mime: "", found: false }
+}

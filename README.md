@@ -8,7 +8,7 @@ A **Flow-first scientific IDE** intended to become a capable successor to RStudi
 
 The initial implementation includes a native Flow server (src/main.flow), a small POSIX sockets/temp-file bridge (src/http_bridge.c), and a four-pane browser workspace (web/index.html).
 
-The browser can open and save source files, run the selected text or whole buffer as Flow, R or Python, and display captured stdout/stderr. Python and R use a **fresh interpreter per execution**; these are not persistent notebook sessions.
+The browser can open and save source files, choose a local project folder, lazily browse its source tree, create a source file in the project root, refresh the tree, run the selected text or whole buffer as Flow, R or Python, and display captured stdout/stderr. Project operations use the browser File System Access API and are unavailable in browsers without folder-picker support. Python and R use a **fresh interpreter per execution**; these are not persistent notebook sessions.
 
 ## Build and launch
 
@@ -25,7 +25,11 @@ For a running server, test the HTTP API and installed language runtimes:
 
     python3 tests/http_smoke.py
 
-The build script performs a C syntax check, invokes Flow's documented C-generation compiler path and links the socket transport. These commands are provided for reproducibility; **no successful Flow compiler run is claimed in this initial commit** because the Flow toolchain is not installed in the authoring environment. Build and integration fixes are the highest-priority next milestone.
+For browser-logic tests without a running server (Node.js 20+):
+
+    node --test tests/project_browser.test.js tests/workspace_browser.test.js
+
+The build script performs a C syntax check, invokes Flow's documented C-generation compiler path and links the socket transport. These commands are provided for reproducibility; **no successful Flow compiler run is claimed** because the Flow toolchain is not installed in the authoring environment. Build and integration fixes are the highest-priority next milestone.
 
 ### Native transport regression tests
 

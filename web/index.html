@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>FlowStudio — Scientific IDE</title>
+<style>
+:root { font: 14px/1.45 system-ui, -apple-system, sans-serif; color: #e8edf5; background: #10141e; }
+* { box-sizing: border-box; }
+body { margin: 0; height: 100dvh; display: flex; flex-direction: column; }
+button,select,textarea { font: inherit; }
+button,select { background: #273044; border: 1px solid #3a4762; color: #f2f6ff; border-radius: 6px; padding: 7px 11px; cursor: pointer; }
+button:hover,select:hover { border-color: #8baaf4; }
+button:focus-visible,select:focus-visible,textarea:focus-visible { outline: 2px solid #80a5fe; outline-offset: 1px; }
+button:disabled { opacity: .5; cursor: wait; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; border-bottom: 1px solid #39435b; padding: 10px 16px; background: #171e2c; }
+.brand { font-size: 17px; font-weight: 700; letter-spacing: -.02em; }
+.brand b { color: #85b3ff; }
+.toolbar { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; }
+.primary { background: #315fbf; border-color: #3f72dc; }
+.main { display: grid; flex: 1; min-height: 0; grid-template-columns: minmax(0, 2fr) minmax(255px, 1fr); grid-template-rows: minmax(180px, 58fr) minmax(130px, 42fr); gap: 5px; background: #080c14; padding: 5px; }
+.panel { display: flex; flex-direction: column; overflow: hidden; min-width: 0; min-height: 0; background: #171e2a; border: 1px solid #2c3950; border-radius: 7px; }
+.panel > h2 { font-size: 12px; color: #b9c7e2; text-transform: uppercase; letter-spacing: .08em; margin: 0; padding: 10px 13px; border-bottom: 1px solid #30394e; }
+.panel .body { flex: 1; min-height: 0; padding: 11px 13px; }
+textarea { flex: 1; resize: none; width: 100%; min-height: 0; padding: 15px 17px; background: #101520; border: 0; color: #e6eeff; font: 14px/1.65 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; tab-size: 4; }
+pre { margin: 0; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 12.5px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace; height: 100%; }
+kbd { background: #333f55; padding: 2px 4px; border-radius: 4px; font: inherit; }
+.muted { color: #a4b0c6; }
+.hint { font-size: 13px; max-width: 45ch; }
+footer { padding: 5px 14px; display: flex; justify-content: space-between; gap: 15px; font-size: 12px; background: #192337; color: #a7b8d6; }
+#resultStatus[data-state="error"] { color: #ffb8ad; }
+#resultStatus[data-state="ok"] { color: #93deb3; }
+#fileLabel { color: #b9cae5; font-size: 12px; }
+#console { color: #c8daee; }
+@media (max-width: 790px) {
+ body { min-height: 100dvh; height: auto; }
+ .main { min-height: 90dvh; grid-template-columns: 1fr; grid-template-rows: 36vh 16vh 25vh 16vh; }
+ footer { flex-wrap: wrap; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><b>◈</b> FlowStudio <span class="muted">/ developer preview</span></div>
+  <div class="toolbar" aria-label="Editor actions">
+    <label for="language">Runtime</label>
+    <select id="language" aria-label="Execution language"><option value="flow">Flow</option><option value="r">R</option><option value="python">Python</option></select>
+    <button id="open">Open file</button>
+    <button id="save">Save file</button>
+    <button id="run" class="primary" title="Run selection or entire buffer (Ctrl/⌘+Enter)">▶ Run</button>
+    <input id="fallbackOpen" type="file" accept=".flow,.R,.r,.py,.txt" hidden>
+  </div>
+</header>
+<div class="main">
+  <section class="panel" aria-label="Source editor">
+    <h2>Source <span id="fileLabel">untitled.flow</span><span id="dirty" hidden> • modified</span></h2>
+    <textarea id="source" spellcheck="false" aria-label="Source code editor">function main() -> i32 {
+    println("Hello from FlowStudio")
+    return 0
+}
+</textarea>
+  </section>
+  <section class="panel" aria-label="Environment">
+    <h2>Environment / History</h2>
+    <div class="body">
+      <p id="runtimeInfo">Flow execution available when Flow is installed.</p>
+      <p class="muted hint">Variable inspection and persistent language sessions are planned. Each execution currently starts a fresh subprocess.</p>
+      <p class="muted hint">The IDE executes code with your local OS permissions. Only run code you trust.</p>
+    </div>
+  </section>
+  <section class="panel" aria-label="Console output">
+    <h2>Console <button id="clear" style="float:right;padding:1px 7px;font-size:11px">Clear</button></h2>
+    <div class="body"><pre id="console" role="log" aria-live="polite">Ready. Press Ctrl/⌘+Enter to execute selection or buffer.
+</pre></div>
+  </section>
+  <section class="panel" aria-label="Plot preview">
+    <h2>Plots / Files / Help</h2>
+    <div class="body">
+      <p class="muted">Plots are not yet captured. Native SVG/PNG plot routing, datasets, and help will be implemented in later milestones.</p>
+      <p class="hint">Open and save work with the browser file picker on supported browsers; a download fallback is provided elsewhere.</p>
+      <p class="muted">FlowStudio is an independent Flow-first IDE, not an RStudio source port.</p>
+    </div>
+  </section>
+</div>
+<footer><span id="resultStatus" role="status">Idle</span><span>Local: 127.0.0.1:8751 · <span id="cursor">Ln 1, Col 1</span> · Ctrl/⌘+S Save · Ctrl/⌘+Enter Run</span></footer>
+<script>
+"use strict";
+const el = id => document.getElementById(id);
+const src = el("source");
+const language = el("language");
+const consolePane = el("console");
+const resultStatus = el("resultStatus");
+let fileHandle = null;
+let filename = "untitled.flow";
+let dirty = false;
+
+function status(message, state = "") {
+  resultStatus.textContent = message;
+  resultStatus.dataset.state = state;
+}
+function extension(lang) {
+  return lang === "r" ? "R" : lang === "python" ? "py" : "flow";
+}
+function inferLanguage(name) {
+  if (/\.r$/i.test(name)) return "r";
+  if (/\.py$/i.test(name)) return "python";
+  if (/\.flow$/i.test(name)) return "flow";
+  return language.value;
+}
+function setFilename(name) {
+  filename = name;
+  el("fileLabel").textContent = name;
+}
+function markDirty(isDirty) {
+  dirty = isDirty;
+  el("dirty").hidden = !isDirty;
+}
+function updateCursor() {
+  const before = src.value.slice(0, src.selectionStart);
+  const lines = before.split("\n");
+  el("cursor").textContent = "Ln " + lines.length + ", Col " + (lines[lines.length - 1].length + 1);
+}
+async function run() {
+  const selection = src.value.substring(src.selectionStart, src.selectionEnd);
+  const code = selection.length ? selection : src.value;
+  el("run").disabled = true;
+  status("Running " + language.value + " …");
+  consolePane.textContent += "\n> " + (selection ? "[selection]" : "[buffer]") + " (" + language.value + ")\n";
+  try {
+    const response = await fetch("/api/run/" + language.value, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain; charset=utf-8", "X-FlowStudio-Intent": "run" },
+      body: code
+    });
+    const output = await response.text();
+    consolePane.textContent += output + "\n";
+    status(response.ok ? "Finished" : "HTTP error " + response.status, response.ok ? "ok" : "error");
+  } catch (error) {
+    consolePane.textContent += String(error) + "\n";
+    status("Execution request failed", "error");
+  } finally {
+    el("run").disabled = false;
+    consolePane.scrollTop = consolePane.scrollHeight;
+  }
+}
+async function openFile() {
+  if (dirty && !confirm("Discard unsaved editor changes?")) return;
+  try {
+    if (typeof window.showOpenFilePicker === "function") {
+      const handles = await window.showOpenFilePicker({ multiple: false });
+      if (!handles.length) return;
+      const handle = handles[0];
+      const file = await handle.getFile();
+      src.value = await file.text();
+      fileHandle = handle;
+      setFilename(file.name);
+      language.value = inferLanguage(file.name);
+      markDirty(false);
+      status("Opened " + file.name, "ok");
+    } else {
+      el("fallbackOpen").click();
+    }
+  } catch (error) {
+    if (error.name !== "AbortError") status(String(error), "error");
+  }
+}
+async function saveFile() {
+  const name = filename.startsWith("untitled.") ? "untitled." + extension(language.value) : filename;
+  try {
+    if (typeof window.showSaveFilePicker === "function") {
+      if (!fileHandle) fileHandle = await window.showSaveFilePicker({ suggestedName: name });
+      const writable = await fileHandle.createWritable();
+      await writable.write(src.value);
+      await writable.close();
+      setFilename(fileHandle.name);
+    } else {
+      const blob = new Blob([src.value], {type: "text/plain; charset=utf-8"});
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = name;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+    markDirty(false);
+    status("Saved " + filename, "ok");
+  } catch (error) {
+    if (error.name !== "AbortError") status(String(error), "error");
+  }
+}
+src.addEventListener("input", () => { markDirty(true); updateCursor(); });
+src.addEventListener("click", updateCursor);
+src.addEventListener("keyup", updateCursor);
+language.addEventListener("change", () => {
+  if (filename.startsWith("untitled.")) setFilename("untitled." + extension(language.value));
+  el("runtimeInfo").textContent = "Selected runtime: " + language.value + ". Each execution is independent.";
+});
+el("run").addEventListener("click", run);
+el("open").addEventListener("click", openFile);
+el("save").addEventListener("click", saveFile);
+el("clear").addEventListener("click", () => { consolePane.textContent = ""; });
+el("fallbackOpen").addEventListener("change", async event => {
+  const file = event.target.files[0];
+  if (!file) return;
+  src.value = await file.text();
+  fileHandle = null;
+  setFilename(file.name);
+  language.value = inferLanguage(file.name);
+  markDirty(false);
+  status("Opened " + file.name, "ok");
+  event.target.value = "";
+});
+document.addEventListener("keydown", event => {
+  if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+    event.preventDefault();
+    if (!el("run").disabled) run();
+  }
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+    event.preventDefault();
+    saveFile();
+  }
+});
+</script>
+</body>
+</html>

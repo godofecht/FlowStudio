@@ -27,6 +27,14 @@ For a running server, test the HTTP API and installed language runtimes:
 
 The build script performs a C syntax check, invokes Flow's documented C-generation compiler path and links the socket transport. These commands are provided for reproducibility; **no successful Flow compiler run is claimed in this initial commit** because the Flow toolchain is not installed in the authoring environment. Build and integration fixes are the highest-priority next milestone.
 
+### Native transport regression tests
+
+Stop any FlowStudio process already using port 8751, then run:
+
+    python3 tests/transport_smoke.py
+
+This builds the real POSIX transport with a small test-only router and exercises its request handling on loopback. It **does not require the Flow compiler** and **does not prove that FlowStudio itself builds**. The suite has 15 cases for Host/origin validation, request framing and size limits, and valid HTTP responses. On Linux x86-64 with GCC 14.2.0 and Python 3.13.5, all 15 passed on 15 October 2026.
+
 ## Architecture
 
     browser (HTML/CSS/JS)

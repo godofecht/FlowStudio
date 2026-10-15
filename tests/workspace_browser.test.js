@@ -179,5 +179,5 @@ test("new-file action rejects unsupported filenames without creating files", asy
   app.setNewFilename("../bad.flow");
   await app.el("newFile").fire("click");
   assert.match(app.el("resultStatus").textContent, /Invalid/);
-  assert.equal(app.el("projectTree").children.length, 2);
+  assert.equal(app.el("projectTree").children.length, 1);
 });

@@ -1,0 +1,16 @@
+# Run: flow run src/stats_smoke.flow
+import .stats { NumericSummary, summary_empty, summary_add, summary_variance }
+
+function main() -> i32 {
+    let mut s: NumericSummary = summary_empty()
+    s = summary_add(s, 1.0)
+    s = summary_add(s, 2.0)
+    s = summary_add(s, 3.0)
+    s = summary_add(s, 4.0)
+    if s.count != 4 { return 1 }
+    if s.mean < 2.499999 or s.mean > 2.500001 { return 2 }
+    if s.minimum != 1.0 or s.maximum != 4.0 { return 3 }
+    let v: f64 = summary_variance(s)
+    if v < 1.666665 or v > 1.666668 { return 4 }
+    return 0
+}

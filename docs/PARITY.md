@@ -21,7 +21,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Packages pane | missing | List, install, update with environment-aware package sources |
 | Git pane | missing | Status, diff, stage, commit and branch operations |
 | Help pane | missing | Context-aware language/function docs |
-| Find / replace / cross-file search | missing | Editor and workspace search with incremental results |
+| Find / replace / cross-file search | partial / V8-tested | Read-only project-wide literal search with exact file/line/column navigation implemented; editor find/replace and incremental indexing missing |
 | R Markdown / Quarto | missing | Render notebook with inline plots and HTML export |
 | Source debugger | missing | Breakpoints, stack, variables, step execution |
 | Remote/server mode | missing | Authenticated, origin-aware multi-user sessions with isolation |
@@ -55,6 +55,16 @@ The four-pane workspace now embeds the same project explorer source as web/proje
 Static V8 evaluation of the **actual committed HTML scripts** passed 18 assertions: both script parse checks, embedded-module/source equivalence, directory listing, R/Python language inference, exact file-handle opening, path label, unsaved-change refusal, saving, new-file creation, selected-text request payload, execution intent header and console update. A six-test Node DOM suite was committed in tests/workspace_browser.test.js. Both committed browser test suites (11 tests total) were also executed in V8 using a Node-compatible test/assert/fs/vm shim against their exact fetched source; **11/11 passed** after correcting an incorrect empty-tree expectation. The real Node test runner has not yet been run against a checked-out repository. These checks use mocked browser handles, not a physical browser or OS file picker.
 
 **Remaining limits:** Flow native compile/link, served-browser interaction, real OS file permissions, actual language execution, macOS compatibility and filesystem conflict handling remain unverified. The project explorer does not implement rename/delete and is not an RStudio project parser. Do not treat DOM-mock passes as full feature parity.
+
+## Validation log — 2026-10-15 (project-wide search)
+
+Added read-only, browser File System Access API project search in web/project.js and the served web/index.html workspace. Results include the exact browser file handle, path, line, column, source offset and preview; selecting a result opens the source and selects the match in the editor. The existing unsaved-change confirmation is respected. Search content remains in the browser and is not sent to the execution HTTP API.
+
+Limits: 256-character literal queries; 500 entries per directory, 12 directory levels, 1000 searched files, 1 MiB per file and 200 matches. Search is case-insensitive by default with an explicit case-sensitive option. Large files are skipped and truncation is reported. Regex metacharacters are treated as literal text; no arbitrary regular expression execution is exposed.
+
+**Validation:** V8 evaluated the exact committed project module and 8 new test cases (8/8 passed). A Node-compatible V8 test/assert/vm harness evaluated the exact committed browser HTML scripts and 9 workspace integration tests (9/9 passed), including search navigation, unsaved-file protection and no HTTP transfer of search contents. These are **mocked browser and filesystem handles**, not physical-browser integration. The tests are committed in tests/project_search.test.js and tests/workspace_browser.test.js. A real Node.js test runner, OS file-picker interaction, Flow compilation, and Flow/R/Python execution remain unverified.
+
+**Remaining:** in-buffer find/replace, indexed incremental search, renaming/deleting project files, filesystem conflict handling and all other unimplemented parity features.
 
 ## Next implementation order
 

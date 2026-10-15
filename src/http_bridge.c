@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <unistd.h>
@@ -95,24 +96,37 @@ int fs_listen(int port)
     return fd;
 }
 
-static int fs_header_is(const char *name, const char *value)
+static const char *fs_header_value(const char *name)
 {
-    const char *p = strstr(fs_headers, name);
-    if (!p) return 0;
-    p += strlen(name);
-    return strncmp(p, value, strlen(value)) == 0 &&
-        (p[strlen(value)] == '\r' || p[strlen(value)] == '\n');
+    size_t expected = strlen(name);
+    const char *p = strstr(fs_headers, "\r\n");
+    while (p && p[2] != '\r' && p[2] != '\n' && p[2] != '\0')
+    {
+        p += 2;
+        const char *end = strstr(p, "\r\n");
+        if (!end) break;
+        const char *colon = memchr(p, ':', (size_t)(end - p));
+        if (colon && (size_t)(colon - p) == expected &&
+            strncasecmp(p, name, expected) == 0)
+        {
+            const char *value = colon + 1;
+            while (value < end && (*value == ' ' || *value == '\t')) value++;
+            return value;
+        }
+        p = end;
+    }
+    return NULL;
 }
 
 int fs_intent_allowed(void)
 {
-    /* Browsers cannot send this custom header cross-origin without CORS,
-       and the server never responds to a CORS preflight with permission. */
-    if (!fs_header_is("\r\nX-FlowStudio-Intent: ", "run")) return 0;
-    const char *origin = strstr(fs_headers, "\r\nOrigin: ");
+    /* A custom header requires a CORS preflight from other browser origins;
+       this server never grants cross-origin requests. */
+    const char *intent = fs_header_value("X-FlowStudio-Intent");
+    if (!intent || strncmp(intent, "run\r\n", 5) != 0) return 0;
+    const char *origin = fs_header_value("Origin");
     if (origin)
     {
-        origin += strlen("\r\nOrigin: ");
         if (strncmp(origin, "http://127.0.0.1:8751\r\n", 23) != 0 &&
             strncmp(origin, "http://localhost:8751\r\n", 23) != 0)
             return 0;
@@ -155,13 +169,12 @@ int fs_read_request(int listener)
 
     if (strcmp(fs_http_method, "POST") == 0)
     {
-        const char *field = strstr(fs_headers, "\r\nContent-Length: ");
+        const char *field = fs_header_value("Content-Length");
         if (!field)
         {
             fs_reply(411, "text/plain", "Content-Length required");
             return 0;
         }
-        field += strlen("\r\nContent-Length: ");
         char *end = NULL;
         long length = strtol(field, &end, 10);
         if (!end || end == field || length < 0 || length > FS_BODY_LIMIT ||

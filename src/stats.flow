@@ -1,0 +1,34 @@
+# Streaming numeric summaries for FlowStudio datasets.
+# Welford updates avoid cancellation in sum-of-squares variance.
+
+export struct NumericSummary {
+    count: i64,
+    mean: f64,
+    m2: f64,
+    minimum: f64,
+    maximum: f64
+}
+
+export function summary_empty() -> NumericSummary {
+    return NumericSummary { count: 0, mean: 0.0, m2: 0.0, minimum: 0.0, maximum: 0.0 }
+}
+
+export function summary_add(s: NumericSummary, value: f64) -> NumericSummary {
+    if s.count == 0 {
+        return NumericSummary { count: 1, mean: value, m2: 0.0, minimum: value, maximum: value }
+    }
+    let n: i64 = s.count + 1
+    let delta: f64 = value - s.mean
+    let next_mean: f64 = s.mean + delta / (n as f64)
+    let next_m2: f64 = s.m2 + delta * (value - next_mean)
+    let mut minimum: f64 = s.minimum
+    let mut maximum: f64 = s.maximum
+    if value < minimum { minimum = value }
+    if value > maximum { maximum = value }
+    return NumericSummary { count: n, mean: next_mean, m2: next_m2, minimum: minimum, maximum: maximum }
+}
+
+export function summary_variance(s: NumericSummary) -> f64 {
+    if s.count < 2 { return 0.0 }
+    return s.m2 / ((s.count - 1) as f64)
+}

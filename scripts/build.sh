@@ -13,7 +13,7 @@ command -v cc >/dev/null 2>&1 || {
 
 mkdir -p build
 cc -std=c11 -Wall -Wextra -Werror -fsyntax-only src/http_bridge.c
-flow build src/main.flow --c -o build/flowstudio-generated.c
+flow tool compiler/scripts/flowc_emit.flow --strict src/main.flow build/flowstudio-generated.c
 cc -std=c11 -O2 -pthread build/flowstudio-generated.c src/http_bridge.c -lm -o build/flowstudio
 echo "Built build/flowstudio"
 echo "Start it from the repository root: ./build/flowstudio"

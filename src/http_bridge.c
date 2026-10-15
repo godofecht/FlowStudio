@@ -68,6 +68,12 @@ void fs_reply(int code, const char *content_type, const char *body)
         (void)fs_write_all(fs_client, header, (size_t)n);
         (void)fs_write_all(fs_client, body, strlen(body));
     }
+    /* Early rejection can leave unread request bytes in the socket. Drain
+       already-buffered bytes after shutting down writes, avoiding an RST
+       that would otherwise hide the HTTP error response from the client. */
+    (void)shutdown(fs_client, SHUT_WR);
+    char discard[4096];
+    while (recv(fs_client, discard, sizeof(discard), MSG_DONTWAIT) > 0) {}
     close(fs_client);
     fs_client = -1;
 }
@@ -118,19 +124,45 @@ static const char *fs_header_value(const char *name)
     return NULL;
 }
 
+/* Exact header matching prevents suffix/prefix confusion. */
+static int fs_header_equals(const char *name, const char *expected, int fold_case)
+{
+    const char *value = fs_header_value(name);
+    if (!value) return 0;
+    size_t n = strlen(expected);
+    const char *end = strstr(value, "\r\n");
+    if (!end || (size_t)(end - value) != n) return 0;
+    return (fold_case ? strncasecmp(value, expected, n) : strncmp(value, expected, n)) == 0;
+}
+
+/* Multiple instances of framing/security headers are not accepted. */
+static int fs_header_count(const char *name)
+{
+    int count = 0;
+    size_t n = strlen(name);
+    const char *line = strstr(fs_headers, "\r\n");
+    while (line && line[2] != '\r' && line[2] != '\n' && line[2] != '\0')
+    {
+        line += 2;
+        const char *end = strstr(line, "\r\n");
+        if (!end) break;
+        const char *colon = memchr(line, ':', (size_t)(end - line));
+        if (colon && (size_t)(colon - line) == n && strncasecmp(line, name, n) == 0)
+            count++;
+        line = end;
+    }
+    return count;
+}
+
 int fs_intent_allowed(void)
 {
     /* A custom header requires a CORS preflight from other browser origins;
        this server never grants cross-origin requests. */
-    const char *intent = fs_header_value("X-FlowStudio-Intent");
-    if (!intent || strncmp(intent, "run\r\n", 5) != 0) return 0;
-    const char *origin = fs_header_value("Origin");
-    if (origin)
-    {
-        if (strncmp(origin, "http://127.0.0.1:8751\r\n", 23) != 0 &&
-            strncmp(origin, "http://localhost:8751\r\n", 23) != 0)
-            return 0;
-    }
+    if (!fs_header_equals("X-FlowStudio-Intent", "run", 0)) return 0;
+    if (fs_header_value("Origin") &&
+        !fs_header_equals("Origin", "http://127.0.0.1:8751", 0) &&
+        !fs_header_equals("Origin", "http://localhost:8751", 0))
+        return 0;
     return 1;
 }
 
@@ -164,6 +196,24 @@ int fs_read_request(int listener)
         sscanf(fs_headers, "%11s %255s HTTP/%*s", fs_http_method, fs_http_path) != 2)
     {
         fs_reply(400, "text/plain", "Malformed request");
+        return 0;
+    }
+
+    /* DNS rebinding defence: never serve executable endpoints under an
+       arbitrary Host header, even if DNS resolves that host to loopback. */
+    if ((!fs_header_equals("Host", "127.0.0.1:8751", 1) &&
+         !fs_header_equals("Host", "localhost:8751", 1)) ||
+        fs_header_count("Host") != 1)
+    {
+        fs_reply(403, "text/plain", "Invalid Host header");
+        return 0;
+    }
+    if (fs_header_value("Transfer-Encoding") ||
+        fs_header_count("Content-Length") > 1 ||
+        fs_header_count("Origin") > 1 ||
+        fs_header_count("X-FlowStudio-Intent") > 1)
+    {
+        fs_reply(400, "text/plain", "Ambiguous request headers");
         return 0;
     }
 

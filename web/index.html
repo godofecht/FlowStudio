@@ -260,8 +260,8 @@ async function run() {
     consolePane.scrollTop = consolePane.scrollHeight;
   }
 }
-async function openEditorHandle(handle, path = null) {
-  if (dirty && !creatingProjectFile && !confirm("Discard unsaved editor changes?")) return false;
+async function openEditorHandle(handle, path = null, skipDirtyCheck = false) {
+  if (dirty && !skipDirtyCheck && !creatingProjectFile && !confirm("Discard unsaved editor changes?")) return false;
   const file = await handle.getFile();
   const content = await file.text();
   src.value = content;
@@ -280,13 +280,7 @@ async function openFile() {
     if (typeof window.showOpenFilePicker === "function") {
       const handles = await window.showOpenFilePicker({ multiple: false });
       if (!handles.length) return;
-      const wasDirty = dirty;
-      dirty = false; // User already confirmed; avoid prompting twice.
-      try {
-        await openEditorHandle(handles[0]);
-      } finally {
-        if (fileHandle !== handles[0]) dirty = wasDirty;
-      }
+      await openEditorHandle(handles[0], null, true);
     } else {
       el("fallbackOpen").click();
     }

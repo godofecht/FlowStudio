@@ -40,6 +40,12 @@ footer { padding: 5px 14px; display: flex; justify-content: space-between; gap: 
 #projectTree .project-children { display: flex; flex-direction: column; gap: 4px; margin: 4px 0 5px 8px; }
 #projectTree .project-file { display: block; text-align: left; width: 100%; overflow-wrap: anywhere; }
 #projectTree .project-file:focus-visible { outline-offset: -2px; }
+
+.project-search { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; }
+.project-search input[type="search"] { background: #101520; color: #e6eeff; border: 1px solid #3a4762; border-radius: 6px; padding: 7px; flex: 1; min-width: 110px; }
+.project-search label { color: #c2cee4; font-size: 12px; }
+#searchResults { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+#searchResults button { text-align: left; white-space: normal; overflow-wrap: anywhere; width: 100%; font: 12px/1.5 ui-monospace, monospace; }
 @media (max-width: 790px) {
  body { min-height: 100dvh; height: auto; }
  .main { min-height: 90dvh; grid-template-columns: 1fr; grid-template-rows: 36vh 16vh 25vh 16vh; }
@@ -87,6 +93,14 @@ footer { padding: 5px 14px; display: flex; justify-content: space-between; gap: 
   <section class="panel" aria-label="Plot preview">
     <h2>Project / Files</h2>
     <div class="body project-body">
+
+      <div class="project-search" role="search" aria-label="Search project files">
+        <label for="projectSearch">Find in project</label>
+        <input id="projectSearch" type="search" maxlength="256" placeholder="Literal text" aria-label="Find in project">
+        <label><input id="caseSensitive" type="checkbox"> Case</label>
+        <button id="searchProject" type="button">Find all</button>
+      </div>
+      <div id="searchResults" aria-live="polite" aria-label="Project search results"></div>
       <div id="projectTree" role="navigation" aria-label="Project files"><p class="muted">Open a folder to browse source files.</p></div>
       <p class="muted hint">Plots, datasets and help are planned; this panel currently contains the project explorer.</p>
     </div>
@@ -400,7 +414,10 @@ const project = FlowStudioProject.createProjectExplorer({
     ? options => window.showDirectoryPicker(options)
     : null
 });
-el("folder").addEventListener("click", () => project.choose());
+el("folder").addEventListener("click", async () => {
+  const chosen = await project.choose();
+  if (chosen) { ++searchRevision; el("searchResults").replaceChildren(); }
+});
 el("refreshProject").addEventListener("click", () => project.refresh());
 el("newFile").addEventListener("click", async () => {
   if (!project.hasProject()) {
@@ -423,6 +440,74 @@ el("newFile").addEventListener("click", async () => {
     creatingProjectFile = false;
   }
 });
+
+let searchRevision = 0;
+async function runProjectSearch() {
+  const token = ++searchRevision;
+  const resultsNode = el("searchResults");
+  resultsNode.replaceChildren();
+  const query = el("projectSearch").value;
+  if (!project.hasProject()) {
+    status("Open a project folder before searching.", "error");
+    return;
+  }
+  if (!query.trim()) {
+    status("Enter text to find in the project.", "error");
+    return;
+  }
+  el("searchProject").disabled = true;
+  status("Searching project …");
+  try {
+    const caseSensitive = el("caseSensitive").checked;
+    const result = await project.search(query, { caseSensitive });
+    if (token !== searchRevision) return;
+    const summary = document.createElement("p");
+    summary.className = "muted hint";
+    summary.textContent = result.matches.length + " matches in " + result.scannedFiles +
+      " files" + (result.skippedLarge ? "; " + result.skippedLarge + " large files skipped" : "") +
+      (result.truncated ? "; result limit reached" : "");
+    resultsNode.append(summary);
+    for (const hit of result.matches) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = hit.path + ":" + hit.line + ":" + hit.column + "  " + hit.preview.trim();
+      button.title = "Open " + hit.path + " at line " + hit.line;
+      button.addEventListener("click", async () => {
+        try {
+          const opened = await openEditorHandle(hit.handle, hit.path);
+          if (!opened) return;
+          const selected = src.value.slice(hit.index, hit.index + hit.length);
+          const equal = caseSensitive ? selected === query :
+            selected.toLowerCase() === query.toLowerCase();
+          if (!equal) {
+            status("File changed since search; search again.", "error");
+            return;
+          }
+          src.focus();
+          src.setSelectionRange(hit.index, hit.index + hit.length);
+          updateCursor();
+        } catch (error) {
+          status(error.message || String(error), "error");
+        }
+      });
+      resultsNode.append(button);
+    }
+    status("Found " + result.matches.length + " project matches.", "ok");
+  } catch (error) {
+    if (token === searchRevision && error.name !== "AbortError")
+      status(error.message || String(error), "error");
+  } finally {
+    if (token === searchRevision) el("searchProject").disabled = false;
+  }
+}
+el("searchProject").addEventListener("click", runProjectSearch);
+el("projectSearch").addEventListener("keydown", event => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    runProjectSearch();
+  }
+});
+
 src.addEventListener("input", () => { markDirty(true); updateCursor(); });
 src.addEventListener("click", updateCursor);
 src.addEventListener("keyup", updateCursor);

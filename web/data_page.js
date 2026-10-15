@@ -27,3 +27,33 @@ function render() {
   });
   el("grid").replaceChildren(table);
 }
+
+async function loadFile(file) {
+  if (!file) return;
+  try {
+    const delimiter = FlowStudioData.delimiterForName(file.name);
+    if (file.size > FlowStudioData.MAX_BYTES) throw new Error("File exceeds 8 MiB");
+    const parsed = FlowStudioData.parseDelimited(await file.text(), delimiter);
+    data = parsed; page = 0; sort = null; descending = false;
+    el("filter").value = ""; el("filter").disabled = false;
+    render();
+    el("status").textContent = "Loaded " + file.name;
+  } catch (error) {
+    el("status").textContent = error.message || String(error);
+  }
+}
+el("open").addEventListener("click", async () => {
+  if (typeof window.showOpenFilePicker !== "function") { el("fallback").click(); return; }
+  try {
+    const handles = await window.showOpenFilePicker({multiple:false});
+    if (handles.length) await loadFile(await handles[0].getFile());
+  } catch (error) {
+    if (error.name !== "AbortError") el("status").textContent = String(error);
+  }
+});
+el("fallback").addEventListener("change", async event => {
+  await loadFile(event.target.files[0]); event.target.value = "";
+});
+el("filter").addEventListener("input", () => { page = 0; render(); });
+el("previous").addEventListener("click", () => { page--; render(); });
+el("next").addEventListener("click", () => { page++; render(); });

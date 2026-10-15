@@ -33,6 +33,13 @@ footer { padding: 5px 14px; display: flex; justify-content: space-between; gap: 
 #resultStatus[data-state="ok"] { color: #93deb3; }
 #fileLabel { color: #b9cae5; font-size: 12px; }
 #console { color: #c8daee; }
+.project-body { overflow-y: auto; }
+#projectTree { display: flex; flex-direction: column; gap: 5px; }
+#projectTree details { padding-left: 9px; border-left: 1px solid #39465f; }
+#projectTree summary { cursor: pointer; padding: 5px 0; }
+#projectTree .project-children { display: flex; flex-direction: column; gap: 4px; margin: 4px 0 5px 8px; }
+#projectTree .project-file { display: block; text-align: left; width: 100%; overflow-wrap: anywhere; }
+#projectTree .project-file:focus-visible { outline-offset: -2px; }
 @media (max-width: 790px) {
  body { min-height: 100dvh; height: auto; }
  .main { min-height: 90dvh; grid-template-columns: 1fr; grid-template-rows: 36vh 16vh 25vh 16vh; }
@@ -47,6 +54,8 @@ footer { padding: 5px 14px; display: flex; justify-content: space-between; gap: 
     <label for="language">Runtime</label>
     <select id="language" aria-label="Execution language"><option value="flow">Flow</option><option value="r">R</option><option value="python">Python</option></select>
     <button id="folder">Open folder</button>
+    <button id="newFile" title="Create a new source file in the opened project">New file</button>
+    <button id="refreshProject" title="Refresh project tree">Refresh</button>
     <button id="open">Open file</button>
     <button id="save">Save file</button>
     <button id="run" class="primary" title="Run selection or entire buffer (Ctrl/⌘+Enter)">▶ Run</button>
@@ -76,11 +85,10 @@ footer { padding: 5px 14px; display: flex; justify-content: space-between; gap: 
 </pre></div>
   </section>
   <section class="panel" aria-label="Plot preview">
-    <h2>Plots / Files / Help</h2>
-    <div class="body">
-      <p class="muted">Plots are not yet captured. Native SVG/PNG plot routing, datasets, and help will be implemented in later milestones.</p>
-      <p class="hint">Open and save work with the browser file picker on supported browsers; a download fallback is provided elsewhere.</p>
-      <p class="muted">FlowStudio is an independent Flow-first IDE, not an RStudio source port.</p>
+    <h2>Project / Files</h2>
+    <div class="body project-body">
+      <div id="projectTree" role="navigation" aria-label="Project files"><p class="muted">Open a folder to browse source files.</p></div>
+      <p class="muted hint">Plots, datasets and help are planned; this panel currently contains the project explorer.</p>
     </div>
   </section>
 </div>

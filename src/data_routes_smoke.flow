@@ -1,0 +1,8 @@
+import .data_routes { data_route }
+
+function main() -> i32 {
+    if not data_route("/data").found { return 1 }
+    if not data_route("/data_viewer.js").found { return 2 }
+    if data_route("/missing").found { return 3 }
+    return 0
+}

@@ -8,7 +8,7 @@ A **Flow-first scientific IDE** intended to become a capable successor to RStudi
 
 The initial implementation includes a native Flow server (src/main.flow), a small POSIX sockets/temp-file bridge (src/http_bridge.c), and a four-pane browser workspace (web/index.html).
 
-The browser can open and save source files, choose a local project folder, lazily browse its source tree, create a source file in the project root, refresh the tree, run the selected text or whole buffer as Flow, R or Python, and display captured stdout/stderr. Project operations use the browser File System Access API and are unavailable in browsers without folder-picker support. Python and R use a **fresh interpreter per execution**; these are not persistent notebook sessions.
+The browser can open and save source files, choose a local project folder, lazily browse its source tree, create a source file in the project root, refresh the tree, search project files for literal text with exact match navigation, run the selected text or whole buffer as Flow, R or Python, and display captured stdout/stderr. Project operations use the browser File System Access API and are unavailable in browsers without folder-picker support. Python and R use a **fresh interpreter per execution**; these are not persistent notebook sessions.
 
 ## Build and launch
 
@@ -27,7 +27,7 @@ For a running server, test the HTTP API and installed language runtimes:
 
 For browser-logic tests without a running server (Node.js 20+):
 
-    node --test tests/project_browser.test.js tests/workspace_browser.test.js
+    node --test tests/project_browser.test.js tests/project_search.test.js tests/workspace_browser.test.js
 
 The build script performs a C syntax check, invokes Flow's documented C-generation compiler path and links the socket transport. These commands are provided for reproducibility; **no successful Flow compiler run is claimed** because the Flow toolchain is not installed in the authoring environment. Build and integration fixes are the highest-priority next milestone.
 
@@ -38,6 +38,10 @@ Stop any FlowStudio process already using port 8751, then run:
     python3 tests/transport_smoke.py
 
 This builds the real POSIX transport with a small test-only router and exercises its request handling on loopback. It **does not require the Flow compiler** and **does not prove that FlowStudio itself builds**. The suite has 15 cases for Host/origin validation, request framing and size limits, and valid HTTP responses. On Linux x86-64 with GCC 14.2.0 and Python 3.13.5, all 15 passed on 15 October 2026.
+
+### Project search
+
+Open a folder, enter a literal query under **Find in project**, and select **Find all**. Matches appear with file paths and line/column locations. Selecting a result opens that file and highlights the match. Unsaved editor changes are never silently discarded. Search reads browser-granted local handles only; it does not send project contents to the Flow server. Search limits are documented in the parity matrix.
 
 ## Architecture
 

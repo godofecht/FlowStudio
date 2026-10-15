@@ -207,7 +207,9 @@ const consolePane = el("console");
 const resultStatus = el("resultStatus");
 let fileHandle = null;
 let filename = "untitled.flow";
+let projectPath = null;
 let dirty = false;
+let creatingProjectFile = false;
 
 function status(message, state = "") {
   resultStatus.textContent = message;
@@ -222,9 +224,9 @@ function inferLanguage(name) {
   if (/\.flow$/i.test(name)) return "flow";
   return language.value;
 }
-function setFilename(name) {
+function setFilename(name, label = name) {
   filename = name;
-  el("fileLabel").textContent = name;
+  el("fileLabel").textContent = label;
 }
 function markDirty(isDirty) {
   dirty = isDirty;
@@ -258,20 +260,33 @@ async function run() {
     consolePane.scrollTop = consolePane.scrollHeight;
   }
 }
+async function openEditorHandle(handle, path = null) {
+  if (dirty && !creatingProjectFile && !confirm("Discard unsaved editor changes?")) return false;
+  const file = await handle.getFile();
+  const content = await file.text();
+  src.value = content;
+  fileHandle = handle;
+  projectPath = path;
+  setFilename(file.name, path || file.name);
+  language.value = inferLanguage(file.name);
+  markDirty(false);
+  updateCursor();
+  status("Opened " + (path || file.name), "ok");
+  return true;
+}
 async function openFile() {
   if (dirty && !confirm("Discard unsaved editor changes?")) return;
   try {
     if (typeof window.showOpenFilePicker === "function") {
       const handles = await window.showOpenFilePicker({ multiple: false });
       if (!handles.length) return;
-      const handle = handles[0];
-      const file = await handle.getFile();
-      src.value = await file.text();
-      fileHandle = handle;
-      setFilename(file.name);
-      language.value = inferLanguage(file.name);
-      markDirty(false);
-      status("Opened " + file.name, "ok");
+      const wasDirty = dirty;
+      dirty = false; // User already confirmed; avoid prompting twice.
+      try {
+        await openEditorHandle(handles[0]);
+      } finally {
+        if (fileHandle !== handles[0]) dirty = wasDirty;
+      }
     } else {
       el("fallbackOpen").click();
     }
@@ -282,12 +297,19 @@ async function openFile() {
 async function saveFile() {
   const name = filename.startsWith("untitled.") ? "untitled." + extension(language.value) : filename;
   try {
-    if (typeof window.showSaveFilePicker === "function") {
-      if (!fileHandle) fileHandle = await window.showSaveFilePicker({ suggestedName: name });
+    if (fileHandle && typeof fileHandle.createWritable === "function") {
       const writable = await fileHandle.createWritable();
       await writable.write(src.value);
       await writable.close();
-      setFilename(fileHandle.name);
+      setFilename(fileHandle.name, projectPath || fileHandle.name);
+    } else if (typeof window.showSaveFilePicker === "function") {
+      const handle = await window.showSaveFilePicker({ suggestedName: name });
+      const writable = await handle.createWritable();
+      await writable.write(src.value);
+      await writable.close();
+      fileHandle = handle;
+      projectPath = null;
+      setFilename(handle.name);
     } else {
       const blob = new Blob([src.value], {type: "text/plain; charset=utf-8"});
       const url = URL.createObjectURL(blob);
@@ -298,11 +320,42 @@ async function saveFile() {
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
     markDirty(false);
-    status("Saved " + filename, "ok");
+    status("Saved " + name, "ok");
   } catch (error) {
     if (error.name !== "AbortError") status(String(error), "error");
   }
 }
+const project = FlowStudioProject.createProjectExplorer({
+  tree: el("projectTree"),
+  status,
+  openHandle: openEditorHandle,
+  picker: typeof window.showDirectoryPicker === "function"
+    ? options => window.showDirectoryPicker(options)
+    : null
+});
+el("folder").addEventListener("click", () => project.choose());
+el("refreshProject").addEventListener("click", () => project.refresh());
+el("newFile").addEventListener("click", async () => {
+  if (!project.hasProject()) {
+    status("Open a project folder first.", "error");
+    return;
+  }
+  const name = window.prompt("New source filename", "untitled." + extension(language.value));
+  if (name === null) return;
+  if (!FlowStudioProject.validFilename(name)) {
+    status("Invalid or unsupported source filename.", "error");
+    return;
+  }
+  if (dirty && !confirm("Discard unsaved editor changes?")) return;
+  creatingProjectFile = true;
+  try {
+    await project.create(name);
+  } catch (error) {
+    status(error.message || String(error), "error");
+  } finally {
+    creatingProjectFile = false;
+  }
+});
 src.addEventListener("input", () => { markDirty(true); updateCursor(); });
 src.addEventListener("click", updateCursor);
 src.addEventListener("keyup", updateCursor);
@@ -319,6 +372,7 @@ el("fallbackOpen").addEventListener("change", async event => {
   if (!file) return;
   src.value = await file.text();
   fileHandle = null;
+  projectPath = null;
   setFilename(file.name);
   language.value = inferLanguage(file.name);
   markDirty(false);

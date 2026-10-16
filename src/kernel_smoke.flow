@@ -1,0 +1,18 @@
+import .kernel_session { KernelSession, KernelResult, kernel_open, kernel_eval, kernel_inspect, kernel_reset, kernel_close }
+
+function main() -> i32 {
+    let session: KernelSession = kernel_open("python")
+    if not session.started { return 1 }
+    let initial: KernelResult = kernel_eval(session, "counter = 41")
+    if not initial.ok { return 2 }
+    let incremented: KernelResult = kernel_eval(session, "counter += 1\nprint(counter)")
+    if not incremented.ok or incremented.output != "42\n" { return 3 }
+    let inspected: KernelResult = kernel_inspect(session)
+    if not inspected.ok { return 4 }
+    let fresh: KernelSession = kernel_reset(session)
+    if not fresh.started { return 5 }
+    let missing: KernelResult = kernel_eval(fresh, "print(counter)")
+    if missing.ok { return 6 }
+    kernel_close(fresh)
+    return 0
+}

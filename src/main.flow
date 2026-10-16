@@ -1,12 +1,13 @@
 # FlowStudio: first native IDE/server executable.
 # Requires the current Flow 2.x compiler and POSIX transport shim.
 #
-# This is a single-process, localhost-only development preview. It does not
-# sandbox executed code or persist R/Python interpreter state.
+# This is a single-process, localhost-only development preview. Executed code
+# is trusted; persistent Python/R sessions are not sandboxed.
 
 import std.process { ProcCmd, ProcResult, proc_cmd, proc_arg, proc_input, proc_timeout_ms, proc_run }
 import std.io { FileRead, io_read_text }
 import .data_routes { StaticAsset, data_route }
+import .kernel_session { KernelSession, KernelResult, kernel_open, kernel_eval, kernel_inspect, kernel_reset }
 
 extern {
     function fs_listen(port: i32) -> i32
@@ -25,56 +26,64 @@ function eq(a: string, b: string) -> bool {
     return strcmp(a, b) == 0
 }
 
-function execute(language: string, code: string) -> string {
-    let mut command: ptr<ProcCmd> = proc_cmd("python3")
-    let mut temp_path: string = ""
-
-    if eq(language, "r") {
-        command = proc_cmd("R")
-        proc_arg(command, "--vanilla")
-        proc_arg(command, "--slave")
-        proc_input(command, code)
-    } elif eq(language, "python") {
-        proc_arg(command, "-")
-        proc_input(command, code)
-    } elif eq(language, "flow") {
-        temp_path = fs_write_temp_flow(code)
-        if eq(temp_path, "") {
-            return "FlowStudio: unable to create temporary Flow source file."
-        }
-        command = proc_cmd("flow")
-        proc_arg(command, "run")
-        proc_arg(command, temp_path)
-    } else {
-        return "Unsupported language."
+# Flow execution remains one-shot. Python/R use the persistent kernel bridge.
+function execute_flow(code: string) -> string {
+    let temp_path: string = fs_write_temp_flow(code)
+    if eq(temp_path, "") {
+        return "FlowStudio: unable to create temporary Flow source file."
     }
-
-    # proc_run executes argv directly with posix_spawnp; no shell interpolation.
-    # A timeout kills the process group, including its children.
+    let command: ptr<ProcCmd> = proc_cmd("flow")
+    proc_arg(command, "run")
+    proc_arg(command, temp_path)
     proc_timeout_ms(command, 15000)
     let result: ptr<ProcResult> = proc_run(command)
-
-    if not eq(temp_path, "") {
-        let _removed: i32 = unlink(temp_path)
-    }
+    let _removed: i32 = unlink(temp_path)
 
     let mut output: string = result.stdout
-    if not eq(result.stderr, "") {
-        output = output + result.stderr
-    }
-    if not eq(result.error, "") {
-        output = output + "\nProcess error: " + result.error
-    }
-    if result.timed_out {
-        output = output + "\nExecution stopped after 15 seconds."
-    }
-    if result.exit_code != 0 {
-        output = output + "\nProcess exited unsuccessfully."
-    }
-    if eq(output, "") {
-        return "(No output)"
-    }
+    if not eq(result.stderr, "") { output = output + result.stderr }
+    if not eq(result.error, "") { output = output + "\nProcess error: " + result.error }
+    if result.timed_out { output = output + "\nExecution stopped after 15 seconds." }
+    if result.exit_code != 0 { output = output + "\nProcess exited unsuccessfully." }
+    if eq(output, "") { return "(No output)" }
     return output
+}
+
+function run_kernel(language: string, code: string) -> string {
+    let session: KernelSession = kernel_open(language)
+    if not session.started {
+        return "Interpreter unavailable: install the selected language runtime."
+    }
+    let result: KernelResult = kernel_eval(session, code)
+    if eq(result.output, "") { return "(No output)" }
+    return result.output
+}
+
+function inspect_kernel(language: string) -> void {
+    let session: KernelSession = kernel_open(language)
+    if not session.started {
+        fs_reply(500, "text/plain; charset=utf-8", "Interpreter unavailable")
+        return
+    }
+    let result: KernelResult = kernel_inspect(session)
+    if result.ok {
+        fs_reply(200, "application/json; charset=utf-8", result.output)
+    } else {
+        fs_reply(500, "text/plain; charset=utf-8", result.output)
+    }
+}
+
+function reset_kernel(language: string) -> void {
+    let session: KernelSession = kernel_open(language)
+    if not session.started {
+        fs_reply(500, "text/plain; charset=utf-8", "Interpreter unavailable")
+        return
+    }
+    let restarted: KernelSession = kernel_reset(session)
+    if restarted.started {
+        fs_reply(200, "text/plain; charset=utf-8", "Session reset")
+    } else {
+        fs_reply(500, "text/plain; charset=utf-8", "Session restart failed")
+    }
 }
 
 function send_editor() -> void {
@@ -98,7 +107,7 @@ function dispatch() -> void {
         fs_reply(200, "text/plain; charset=utf-8", "FlowStudio ready")
         return
     }
-    # Only explicit read-only assets can be served; never use the URL as a file path.
+    # Only explicit, read-only asset paths are served; never use URL as a file path.
     if eq(method, "GET") {
         let asset: StaticAsset = data_route(path)
         if asset.found {
@@ -113,17 +122,21 @@ function dispatch() -> void {
     }
     if eq(method, "POST") and fs_intent_allowed() == 1 {
         if eq(path, "/api/run/flow") {
-            fs_reply(200, "text/plain; charset=utf-8", execute("flow", fs_body()))
+            fs_reply(200, "text/plain; charset=utf-8", execute_flow(fs_body()))
             return
         }
         if eq(path, "/api/run/r") {
-            fs_reply(200, "text/plain; charset=utf-8", execute("r", fs_body()))
+            fs_reply(200, "text/plain; charset=utf-8", run_kernel("r", fs_body()))
             return
         }
         if eq(path, "/api/run/python") {
-            fs_reply(200, "text/plain; charset=utf-8", execute("python", fs_body()))
+            fs_reply(200, "text/plain; charset=utf-8", run_kernel("python", fs_body()))
             return
         }
+        if eq(path, "/api/inspect/python") { inspect_kernel("python"); return }
+        if eq(path, "/api/inspect/r") { inspect_kernel("r"); return }
+        if eq(path, "/api/reset/python") { reset_kernel("python"); return }
+        if eq(path, "/api/reset/r") { reset_kernel("r"); return }
     }
     fs_reply(404, "text/plain; charset=utf-8", "Unknown route or disallowed request")
 }

@@ -1,0 +1,58 @@
+# FlowStudio persistent interpreter orchestration.
+# OS process spawning and bounded pipe I/O live in kernel_bridge.c.
+# This is intentionally separate from the existing one-shot execution route.
+
+extern {
+    function fs_kernel_start(language: string) -> i32
+    function fs_kernel_eval(id: i32, source: string) -> string
+    function fs_kernel_inspect(id: i32) -> string
+    function fs_kernel_reset(id: i32) -> i32
+    function fs_kernel_close(id: i32) -> void
+    function fs_kernel_ok() -> i32
+}
+
+export struct KernelSession {
+    id: i32,
+    language: string,
+    started: bool
+}
+
+export struct KernelResult {
+    output: string,
+    ok: bool
+}
+
+export function kernel_open(language: string) -> KernelSession {
+    let id: i32 = fs_kernel_start(language)
+    return KernelSession { id: id, language: language, started: id > 0 }
+}
+
+export function kernel_eval(session: KernelSession, source: string) -> KernelResult {
+    if not session.started {
+        return KernelResult { output: "Kernel not started", ok: false }
+    }
+    let output: string = fs_kernel_eval(session.id, source)
+    return KernelResult { output: output, ok: fs_kernel_ok() == 1 }
+}
+
+export function kernel_inspect(session: KernelSession) -> KernelResult {
+    if not session.started {
+        return KernelResult { output: "Kernel not started", ok: false }
+    }
+    let output: string = fs_kernel_inspect(session.id)
+    return KernelResult { output: output, ok: fs_kernel_ok() == 1 }
+}
+
+export function kernel_reset(session: KernelSession) -> KernelSession {
+    if not session.started {
+        return kernel_open(session.language)
+    }
+    let restarted: bool = fs_kernel_reset(session.id) == 1
+    return KernelSession { id: session.id, language: session.language, started: restarted }
+}
+
+export function kernel_close(session: KernelSession) -> void {
+    if session.started {
+        fs_kernel_close(session.id)
+    }
+}

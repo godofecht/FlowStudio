@@ -7,16 +7,16 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Feature | 2026-10-15 state | Minimum acceptance criterion |
 | --- | --- | --- |
 | Four-pane IDE shell | unverified | Source, environment, console and plots render; keyboard/accessibility checks |
-| File open / save | unverified | Native file-picker and download fallback round-trip UTF-8 |
+| File open / save | partial / conflict-aware browser saves unit-tested; physical browser unverified | Native file-picker and download fallback round-trip UTF-8 |
 | Flow source execution | unverified | Compile and run valid code; surface diagnostics for invalid code |
 | R source execution | partial / unverified | Run via installed R; preserve state across evaluations |
 | Python source execution | partial / unverified | Run via installed Python; preserve state across evaluations |
 | Editor selection execution | unverified | Selection runs without accidentally executing entire buffer |
-| Persistent REPL/session | missing | Incremental variables and package state persist until reset |
-| Variable inspector | missing | Nested objects / types / dimensions inspectable and refresh after execution |
-| Plot viewer | partial / Node-tested standalone PNG import, history, zoom and save; not served by Flow | png/svg plot history, zoom, save and deterministic device lifecycle |
+| Persistent REPL/session | partial / native Python bridge tested; Flow integration unverified | Incremental variables and package state persist until reset |
+| Variable inspector | partial / standalone browser and native kernel tests; not wired into editor | Nested objects / types / dimensions inspectable and refresh after execution |
+| Plot viewer | partial / Node-tested standalone PNG import, history, zoom and save; allowlisted in Flow router; native server unverified | png/svg plot history, zoom, save and deterministic device lifecycle |
 | Project explorer | partial / DOM-tested | Open project, tree navigation, source-file creation and save; safe rename/delete still missing |
-| Data viewer | browser-local CSV/TSV preview / Node+V8-tested; not integrated into Flow HTTP router | Interactive sortable/filterable tabular datasets including missing values |
+| Data viewer | browser-local CSV/TSV preview / Node+V8-tested; allowlisted in Flow router; native server unverified | Interactive sortable/filterable tabular datasets including missing values |
 | Completion / language server | missing | R, Flow and Python completion/diagnostics |
 | Packages pane | missing | List, install, update with environment-aware package sources |
 | Git pane | missing | Status, diff, stage, commit and branch operations |
@@ -95,3 +95,7 @@ Validation: 8/8 Node.js 22.16.0 parser tests passed in a local working copy; 2/2
 ## Quality gate
 
 No feature advances to verified without recorded exact commands, versions, sample inputs, expected and actual outputs, exit codes and operating systems. Numerical results from R and Flow must be compared with explicitly justified absolute/relative error tolerances; performance claims require reproducible cold/warm measurements. Never infer acceptance from a visual screenshot or from an unexecuted example.
+
+## Integration checkpoint — 2026-10-16
+
+The pending persistent-kernel integration adds Flow-owned Python/R session dispatch, a narrow POSIX C process bridge, bounded framed communication, reset/inspect routes, and native regression tests. The code was validated in an isolated Linux x86-64 source archive with GCC 14.2.0 and Python 3.13.5: 12 of 13 native kernel tests passed and one R test was skipped because R is unavailable. Strict C11 syntax checking, Python bytecode compilation and shell syntax checking passed. Three of four integration-contract tests passed in the isolated archive; the fourth requires `src/data_routes.flow` from the full repository and was not rerun in that isolated archive. No native Flow compiler, HTTP server, macOS or physical-browser validation occurred. **Treat persistent sessions as partial and not independently end-to-end verified.**

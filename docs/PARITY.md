@@ -14,7 +14,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Editor selection execution | unverified | Selection runs without accidentally executing entire buffer |
 | Persistent REPL/session | missing | Incremental variables and package state persist until reset |
 | Variable inspector | missing | Nested objects / types / dimensions inspectable and refresh after execution |
-| Plot viewer | missing | png/svg plot history, zoom, save and deterministic device lifecycle |
+| Plot viewer | partial / Node-tested standalone PNG import, history, zoom and save; not served by Flow | png/svg plot history, zoom, save and deterministic device lifecycle |
 | Project explorer | partial / DOM-tested | Open project, tree navigation, source-file creation and save; safe rename/delete still missing |
 | Data viewer | browser-local CSV/TSV preview / Node+V8-tested; not integrated into Flow HTTP router | Interactive sortable/filterable tabular datasets including missing values |
 | Completion / language server | missing | R, Flow and Python completion/diagnostics |

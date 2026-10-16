@@ -56,6 +56,11 @@ footer { padding: 5px 14px; display: flex; justify-content: space-between; gap: 
 .editor-find label { font-size:12px; color:#c2cee4; }
 .editor-find button { padding:5px 8px; font-size:12px; }
 #editorFindCount { font-size:12px; color:#afc4e6; }
+.environment-controls {display:flex;gap:7px;flex-wrap:wrap;margin:8px 0}
+#environmentVariables {overflow:auto;max-height:calc(100% - 125px)}
+.environment-table {width:100%;border-collapse:collapse;font-size:12px;text-align:left}
+.environment-table th,.environment-table td {border-bottom:1px solid #35425b;padding:5px;overflow-wrap:anywhere;max-width:200px}
+.environment-table th {color:#b9c7e2}
 </style>
 </head>
 <body>
@@ -88,7 +93,10 @@ footer { padding: 5px 14px; display: flex; justify-content: space-between; gap: 
     <h2>Environment / History</h2>
     <div class="body">
       <p id="runtimeInfo">Flow execution available when Flow is installed.</p>
-      <p class="muted hint">Variable inspection and persistent language sessions are planned. Each execution currently starts a fresh subprocess.</p>
+      <div class="environment-controls"><button id="inspectEnvironment" type="button">Inspect variables</button><button id="resetEnvironment" type="button">Reset session</button></div>
+      <p id="environmentStatus" class="muted hint" role="status" aria-live="polite">Select Python or R to inspect a persistent session.</p>
+      <div id="environmentVariables" aria-label="Session environment"></div>
+      <p class="muted hint">Python/R sessions are persistent but experimental. Flow variable inspection is not implemented.</p>
       <p class="muted hint">The IDE executes code with your local OS permissions. Only run code you trust.</p>
     </div>
   </section>
@@ -361,6 +369,95 @@ global.FlowStudioEditorFind = api;
 <!-- END EMBEDDED EDITOR FIND MODULE -->
 <script>
 "use strict";
+/* BEGIN EMBEDDED ENVIRONMENT MODULE: mirrors web/environment.js */
+/* FlowStudio environment inspection: browser-side rendering only.
+ * Expects the JSON schema returned by /api/inspect/{python,r}.
+ */
+(function (root) {
+  "use strict";
+
+  const MAX_VARIABLES = 200;
+  const MAX_NAME = 256;
+  const MAX_PREVIEW = 160;
+
+  function normalize(payload) {
+    if (!payload || !Array.isArray(payload.variables)) {
+      throw new TypeError("Invalid environment response");
+    }
+    return payload.variables.slice(0, MAX_VARIABLES).map(item => ({
+      name: String(item.name ?? "").slice(0, MAX_NAME),
+      type: String(item.type ?? "").slice(0, MAX_NAME),
+      preview: String(item.preview ?? "").slice(0, MAX_PREVIEW)
+    }));
+  }
+
+  function render(container, payload, doc = document) {
+    const variables = normalize(payload);
+    const table = doc.createElement("table");
+    table.className = "environment-table";
+    table.setAttribute("aria-label", "Session variables");
+
+    const heading = doc.createElement("thead");
+    const headerRow = doc.createElement("tr");
+    for (const title of ["Name", "Type", "Value"]) {
+      const th = doc.createElement("th");
+      th.textContent = title;
+      th.scope = "col";
+      headerRow.append(th);
+    }
+    heading.append(headerRow);
+    table.append(heading);
+
+    const body = doc.createElement("tbody");
+    for (const item of variables) {
+      const row = doc.createElement("tr");
+      for (const key of ["name", "type", "preview"]) {
+        const cell = doc.createElement("td");
+        cell.textContent = item[key];
+        cell.title = item[key];
+        row.append(cell);
+      }
+      body.append(row);
+    }
+    table.append(body);
+    container.replaceChildren(table);
+    return variables.length;
+  }
+
+  async function inspect(language, fetcher = fetch) {
+    if (language !== "python" && language !== "r") {
+      throw new RangeError("Only Python and R have persistent environments");
+    }
+    const response = await fetcher("/api/inspect/" + language, {
+      method: "POST",
+      headers: {"X-FlowStudio-Intent": "run"}
+    });
+    if (!response.ok) {
+      throw new Error("Inspection failed (HTTP " + response.status + "): " +
+        (await response.text()).slice(0, 300));
+    }
+    return normalize(await response.json());
+  }
+
+  async function reset(language, fetcher = fetch) {
+    if (language !== "python" && language !== "r") {
+      throw new RangeError("Only Python and R have persistent environments");
+    }
+    const response = await fetcher("/api/reset/" + language, {
+      method: "POST",
+      headers: {"X-FlowStudio-Intent": "run"}
+    });
+    if (!response.ok) {
+      throw new Error("Session reset failed (HTTP " + response.status + ")");
+    }
+    return response.text();
+  }
+
+  const api = Object.freeze({normalize, render, inspect, reset});
+  root.FlowStudioEnvironment = api;
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+})(typeof globalThis !== "undefined" ? globalThis : this);
+/* END EMBEDDED ENVIRONMENT MODULE */
 const el = id => document.getElementById(id);
 const src = el("source");
 const language = el("language");
@@ -485,14 +582,78 @@ function updateCursor() {
   const lines = before.split("\n");
   el("cursor").textContent = "Ln " + lines.length + ", Col " + (lines[lines.length - 1].length + 1);
 }
+
+let environmentRevision = 0;
+let environmentBusy = false;
+function environmentSupported(runtime = language.value) {
+  return runtime === "python" || runtime === "r";
+}
+function updateEnvironmentButtons() {
+  const enabled = environmentSupported() && !environmentBusy;
+  el("inspectEnvironment").disabled = !enabled;
+  el("resetEnvironment").disabled = !enabled;
+}
+function syncEnvironmentRuntime() {
+  ++environmentRevision;
+  el("environmentVariables").replaceChildren();
+  el("environmentStatus").textContent = environmentSupported()
+    ? "Inspect to view the current " + language.value + " session."
+    : "Flow variable inspection is not available.";
+  updateEnvironmentButtons();
+}
+async function refreshEnvironment(runtime = language.value) {
+  if (!environmentSupported(runtime) || environmentBusy) return false;
+  const revision = ++environmentRevision;
+  environmentBusy = true;
+  updateEnvironmentButtons();
+  try {
+    const variables = await FlowStudioEnvironment.inspect(runtime);
+    if (revision !== environmentRevision || language.value !== runtime) return false;
+    FlowStudioEnvironment.render(el("environmentVariables"), {variables});
+    el("environmentStatus").textContent = variables.length + " variables in " + runtime + " session.";
+    return true;
+  } catch (error) {
+    if (revision === environmentRevision && language.value === runtime) {
+      el("environmentVariables").replaceChildren();
+      el("environmentStatus").textContent = error.message || String(error);
+    }
+    return false;
+  } finally {
+    environmentBusy = false;
+    updateEnvironmentButtons();
+  }
+}
+async function resetEnvironment() {
+  const runtime = language.value;
+  if (!environmentSupported(runtime) || environmentBusy) return false;
+  const revision = ++environmentRevision;
+  environmentBusy = true;
+  updateEnvironmentButtons();
+  try {
+    await FlowStudioEnvironment.reset(runtime);
+    if (revision !== environmentRevision || language.value !== runtime) return false;
+    el("environmentVariables").replaceChildren();
+    el("environmentStatus").textContent = runtime + " session reset; inspect to view its variables.";
+    return true;
+  } catch (error) {
+    if (revision === environmentRevision && language.value === runtime)
+      el("environmentStatus").textContent = error.message || String(error);
+    return false;
+  } finally {
+    environmentBusy = false;
+    updateEnvironmentButtons();
+  }
+}
+
 async function run() {
   const selection = src.value.substring(src.selectionStart, src.selectionEnd);
   const code = selection.length ? selection : src.value;
+  const runtime = language.value;
   el("run").disabled = true;
-  status("Running " + language.value + " …");
-  consolePane.textContent += "\n> " + (selection ? "[selection]" : "[buffer]") + " (" + language.value + ")\n";
+  status("Running " + runtime + " …");
+  consolePane.textContent += "\n> " + (selection ? "[selection]" : "[buffer]") + " (" + runtime + ")\n";
   try {
-    const response = await fetch("/api/run/" + language.value, {
+    const response = await fetch("/api/run/" + runtime, {
       method: "POST",
       headers: { "Content-Type": "text/plain; charset=utf-8", "X-FlowStudio-Intent": "run" },
       body: code
@@ -500,6 +661,8 @@ async function run() {
     const output = await response.text();
     consolePane.textContent += output + "\n";
     status(response.ok ? "Finished" : "HTTP error " + response.status, response.ok ? "ok" : "error");
+    if (response.ok && environmentSupported(runtime) && language.value === runtime)
+      await refreshEnvironment(runtime);
   } catch (error) {
     consolePane.textContent += String(error) + "\n";
     status("Execution request failed", "error");
@@ -517,6 +680,7 @@ async function openEditorHandle(handle, path = null, skipDirtyCheck = false) {
   projectPath = path;
   setFilename(file.name, path || file.name);
   language.value = inferLanguage(file.name);
+  syncEnvironmentRuntime();
   markDirty(false);
   updateCursor();
   updateFindCount();
@@ -686,8 +850,11 @@ src.addEventListener("click", updateCursor);
 src.addEventListener("keyup", updateCursor);
 language.addEventListener("change", () => {
   if (filename.startsWith("untitled.")) setFilename("untitled." + extension(language.value));
-  el("runtimeInfo").textContent = "Selected runtime: " + language.value + ". Each execution is independent.";
+  el("runtimeInfo").textContent = "Selected runtime: " + language.value + (environmentSupported() ? ". Persistent local session." : ". One-shot execution.");
+  syncEnvironmentRuntime();
 });
+el("inspectEnvironment").addEventListener("click", () => refreshEnvironment());
+el("resetEnvironment").addEventListener("click", resetEnvironment);
 el("run").addEventListener("click", run);
 el("open").addEventListener("click", openFile);
 el("save").addEventListener("click", saveFile);
@@ -700,11 +867,13 @@ el("fallbackOpen").addEventListener("change", async event => {
   projectPath = null;
   setFilename(file.name);
   language.value = inferLanguage(file.name);
+  syncEnvironmentRuntime();
   markDirty(false);
   updateFindCount();
   status("Opened " + file.name, "ok");
   event.target.value = "";
 });
+syncEnvironmentRuntime();
 document.addEventListener("keydown", event => {
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") {
     event.preventDefault();

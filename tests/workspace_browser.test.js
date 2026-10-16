@@ -30,6 +30,7 @@ class Element {
   append(...nodes) { this.children.push(...nodes); }
   replaceChildren(...nodes) { this.children = nodes; }
   addEventListener(event, fn) { this.listeners[event] = fn; }
+  setAttribute(name, value) { (this.attributes ||= {})[name] = value; }
   fire(event, payload = {}) { return this.listeners[event]?.(payload); }
   click() { return this.fire("click"); }
   focus() { this.focused = true; }
@@ -74,7 +75,8 @@ function workspace(folder) {
     "projectTree", "folder", "newFile", "refreshProject",
     "projectSearch", "caseSensitive", "searchProject", "searchResults",
     "editorFind", "editorReplace", "findNext", "findPrevious",
-    "replaceOne", "replaceAll", "editorCaseSensitive", "editorFindCount"
+    "replaceOne", "replaceAll", "editorCaseSensitive", "editorFindCount",
+    "inspectEnvironment", "resetEnvironment", "environmentVariables", "environmentStatus"
   ];
   for (const id of ids) elements.set(id, new Element());
   elements.get("source").value = "initial";
@@ -101,7 +103,11 @@ function workspace(folder) {
     confirm: () => allowDiscard,
     fetch: async (url, options) => {
       fetches.push({ url, options });
-      return { ok: true, status: 200, text: async () => "ran" };
+      if (url.startsWith("/api/inspect/")) return {
+        ok: true, status: 200,
+        json: async () => ({variables: [{name: "counter", type: "int", preview: "42"}]})
+      };
+      return { ok: true, status: 200, text: async () => url.startsWith("/api/reset/") ? "Session reset" : "ran" };
     },
     Blob, URL, setTimeout, console
   });
@@ -120,6 +126,8 @@ test("embedded project module exactly mirrors tested standalone source", () => {
   assert.equal(scripts[0].trim(), projectSource);
   const findSource = fs.readFileSync(path.join(root, "web/editor_find.js"), "utf8").trimEnd();
   assert.equal(scripts[1].trim(), findSource);
+  const environmentSource = fs.readFileSync(path.join(root, "web/environment.js"), "utf8").trimEnd();
+  assert.ok(scripts[2].includes(environmentSource), "Served environment module must mirror tested source");
   assert.match(html, /id="projectTree"/);
   assert.match(html, /id="folder"/);
   assert.match(html, /id="newFile"/);
@@ -179,8 +187,9 @@ test("selection execution sends selected code with required request intent", asy
   app.el("source").selectionStart = 0;
   app.el("source").selectionEnd = 12;
   await app.el("run").fire("click");
-  assert.equal(app.fetches.length, 1);
+  assert.equal(app.fetches.length, 2);
   assert.equal(app.fetches[0].url, "/api/run/python");
+  assert.equal(app.fetches[1].url, "/api/inspect/python");
   assert.equal(app.fetches[0].options.body, 'print("one")');
   assert.equal(app.fetches[0].options.headers["X-FlowStudio-Intent"], "run");
   assert.match(app.el("console").textContent, /ran/);
@@ -305,4 +314,46 @@ test("Ctrl+F populates selected text and focuses editor find", () => {
   assert.equal(prevented, true);
   assert.equal(app.el("editorFind").value, "beta");
   assert.equal(app.el("editorFind").focused, true);
+});
+
+test("environment panel inspects Python variables via authorized HTTP", async () => {
+  const app = workspace(directory("empty"));
+  assert.equal(app.el("inspectEnvironment").disabled, true);
+  app.el("language").value = "python";
+  app.el("language").fire("change");
+  await app.el("inspectEnvironment").fire("click");
+  assert.equal(app.fetches[0].url, "/api/inspect/python");
+  assert.equal(app.fetches[0].options.method, "POST");
+  assert.equal(app.fetches[0].options.headers["X-FlowStudio-Intent"], "run");
+  const table = app.el("environmentVariables").children[0];
+  assert.equal(table.children[1].children[0].children[0].textContent, "counter");
+  assert.equal(table.children[1].children[0].children[2].textContent, "42");
+});
+
+test("reset clears stale environment and invokes session reset", async () => {
+  const app = workspace(directory("empty"));
+  app.el("language").value = "r";
+  app.el("language").fire("change");
+  await app.el("inspectEnvironment").fire("click");
+  assert.equal(app.el("environmentVariables").children.length, 1);
+  await app.el("resetEnvironment").fire("click");
+  assert.equal(app.fetches[1].url, "/api/reset/r");
+  assert.equal(app.fetches[1].options.headers["X-FlowStudio-Intent"], "run");
+  assert.equal(app.el("environmentVariables").children.length, 0);
+  assert.match(app.el("environmentStatus").textContent, /session reset/);
+});
+
+test("Python run refreshes environment while Flow remains uninspectable", async () => {
+  const app = workspace(directory("empty"));
+  app.el("language").value = "python";
+  app.el("language").fire("change");
+  await app.el("run").fire("click");
+  assert.deepEqual(app.fetches.map(x => x.url), ["/api/run/python", "/api/inspect/python"]);
+  app.el("language").value = "flow";
+  app.el("language").fire("change");
+  assert.equal(app.el("environmentVariables").children.length, 0);
+  assert.equal(app.el("inspectEnvironment").disabled, true);
+  await app.el("run").fire("click");
+  assert.equal(app.fetches[2].url, "/api/run/flow");
+  assert.equal(app.fetches.length, 3);
 });

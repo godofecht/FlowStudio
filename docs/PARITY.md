@@ -13,7 +13,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Python source execution | partial / unverified | Run via installed Python; preserve state across evaluations |
 | Editor selection execution | unverified | Selection runs without accidentally executing entire buffer |
 | Persistent REPL/session | partial / native Python bridge tested; Flow integration unverified | Incremental variables and package state persist until reset |
-| Variable inspector | partial / standalone browser and native kernel tests; not wired into editor | Nested objects / types / dimensions inspectable and refresh after execution |
+| Variable inspector | partial / wired to served editor; mocked DOM tested, native Flow/physical browser unverified | Nested objects / types / dimensions inspectable and refresh after execution |
 | Plot viewer | partial / Node-tested standalone PNG import, history, zoom and save; allowlisted in Flow router; native server unverified | png/svg plot history, zoom, save and deterministic device lifecycle |
 | Project explorer | partial / DOM-tested | Open project, tree navigation, source-file creation and save; safe rename/delete still missing |
 | Data viewer | browser-local CSV/TSV preview / Node+V8-tested; allowlisted in Flow router; native server unverified | Interactive sortable/filterable tabular datasets including missing values |
@@ -99,3 +99,7 @@ No feature advances to verified without recorded exact commands, versions, sampl
 ## Integration checkpoint — 2026-10-16
 
 The pending persistent-kernel integration adds Flow-owned Python/R session dispatch, a narrow POSIX C process bridge, bounded framed communication, reset/inspect routes, and native regression tests. The code was validated in an isolated Linux x86-64 source archive with GCC 14.2.0 and Python 3.13.5: 12 of 13 native kernel tests passed and one R test was skipped because R is unavailable. Strict C11 syntax checking, Python bytecode compilation and shell syntax checking passed. Three of four integration-contract tests passed in the isolated archive; the fourth requires `src/data_routes.flow` from the full repository and was not rerun in that isolated archive. No native Flow compiler, HTTP server, macOS or physical-browser validation occurred. **Treat persistent sessions as partial and not independently end-to-end verified.**
+
+## Environment panel integration — 2026-10-16
+
+The served workspace embeds the exact `web/environment.js` module and exposes Python/R inspection and reset controls. Successful Python/R runs refresh the variable table; runtime changes invalidate stale responses, Flow inspection remains disabled, and reset clears displayed variables. The backend remains experimental. Native Flow compilation, physical-browser validation and real R execution remain unverified.

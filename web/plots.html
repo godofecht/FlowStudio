@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FlowStudio — Local Plot History</title>
+<style>
+:root { color-scheme:dark; font:15px/1.5 system-ui,sans-serif; background:#10141e; color:#edf3ff }
+body { max-width:1100px; margin:0 auto; padding:20px }
+header { display:flex; flex-wrap:wrap; align-items:center; gap:12px }
+button,input,a { font:inherit }
+button,a { color:#eaf1ff; background:#293b60; border:1px solid #6881b7; border-radius:6px; padding:6px 10px }
+button:focus-visible,a:focus-visible,input:focus-visible { outline:3px solid #8ab6ff }
+main { display:grid; grid-template-columns:minmax(170px,240px) minmax(0,1fr); gap:16px; margin-top:16px }
+#plotHistory { display:flex; flex-direction:column; gap:6px; max-height:75vh; overflow:auto }
+#plotHistory button { text-align:left; overflow-wrap:anywhere }
+#plotHistory [aria-pressed=true] { border-color:#a8c8ff; background:#365b92 }
+#plotCanvas { overflow:auto; min-height:50vh; border:1px solid #455a7e; border-radius:8px; padding:10px; background:#fff; color:#222 }
+#plotImage { max-width:none; height:auto; display:block }
+#plotImage[hidden],#plotEmpty[hidden],#plotSave[hidden] { display:none }
+@media(max-width:650px){ main { grid-template-columns:1fr } #plotHistory { max-height:25vh } }
+</style>
+</head>
+<body>
+<header><h1>FlowStudio Plot History</h1><label>Import PNG plots <input id="plotFiles" type="file" accept="image/png,.png" multiple></label>
+<label>Zoom <input id="plotZoom" type="range" min="25" max="400" value="100" step="25"></label>
+<a id="plotSave" download hidden>Save selected</a><button id="plotClear" type="button">Clear history</button></header>
+<p id="plotStatus" role="status" aria-live="polite"></p>
+<main><nav id="plotHistory" aria-label="Plot history"></nav><section id="plotCanvas" aria-label="Plot preview"><p id="plotEmpty">Import PNG plots to view them here. Files remain in your browser.</p><img id="plotImage" alt="" hidden></section></main>
+<script src="plot_history.js"></script>
+<script src="plot_page.js"></script>
+<script>FlowStudioPlotPage.mount();</script>
+</body>
+</html>

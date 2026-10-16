@@ -7,7 +7,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Feature | 2026-10-15 state | Minimum acceptance criterion |
 | --- | --- | --- |
 | Four-pane IDE shell | unverified | Source, environment, console and plots render; keyboard/accessibility checks |
-| File open / save | unverified | Native file-picker and download fallback round-trip UTF-8 |
+| File open / save | partial / Node-tested save primitive and V8-mock integration; native/browser unverified | Native file-picker and download fallback round-trip UTF-8 |
 | Flow source execution | unverified | Compile and run valid code; surface diagnostics for invalid code |
 | R source execution | partial / unverified | Run via installed R; preserve state across evaluations |
 | Python source execution | partial / unverified | Run via installed Python; preserve state across evaluations |
@@ -95,3 +95,11 @@ Validation: 8/8 Node.js 22.16.0 parser tests passed in a local working copy; 2/2
 ## Quality gate
 
 No feature advances to verified without recorded exact commands, versions, sample inputs, expected and actual outputs, exit codes and operating systems. Numerical results from R and Flow must be compared with explicitly justified absolute/relative error tolerances; performance claims require reproducible cold/warm measurements. Never infer acceptance from a visual screenshot or from an unexecuted example.
+
+## Validation log — 2026-10-16 (conflict-aware editor saves)
+
+The editor records source content on open and checks for external modifications before writing. A conflict preserves the external file and the unsaved editor buffer. A successful write refreshes the baseline; edits made while a save is pending remain marked dirty. Browser fallback downloads do not clear the dirty indicator or claim an in-place save. The implementation is browser-local, and file content is not uploaded to the Flow server.
+
+Validation: the standalone `web/file_save.js` module passed 7/7 Node.js 22.16.0 tests locally. The exact committed browser workspace and its 13 existing tests passed 13/13 using a V8 Node-compatible mocked browser harness. A separate V8 interaction check exercised external edits, write refusal, dirty-state retention and two successive saves. These are mock tests, not physical-browser, native Flow or R/Python execution tests.
+
+Limits: read/compare/write is not an OS-level atomic compare-and-swap; concurrent external modifications during the write window remain possible. Native Flow compilation and live HTTP integration remain unverified. RStudio parity is incomplete.

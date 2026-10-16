@@ -3,6 +3,10 @@ import .data_routes { data_route }
 function main() -> i32 {
     if not data_route("/data").found { return 1 }
     if not data_route("/data_viewer.js").found { return 2 }
-    if data_route("/missing").found { return 3 }
+    if not data_route("/plots").found { return 3 }
+    if not data_route("/plots.html").found { return 4 }
+    if not data_route("/plot_history.js").found { return 5 }
+    if not data_route("/plot_page.js").found { return 6 }
+    if data_route("/missing").found { return 7 }
     return 0
 }

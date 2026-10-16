@@ -6,6 +6,7 @@
 
 import std.process { ProcCmd, ProcResult, proc_cmd, proc_arg, proc_input, proc_timeout_ms, proc_run }
 import std.io { FileRead, io_read_text }
+import .data_routes { StaticAsset, data_route }
 
 extern {
     function fs_listen(port: i32) -> i32
@@ -96,6 +97,19 @@ function dispatch() -> void {
     if eq(method, "GET") and eq(path, "/health") {
         fs_reply(200, "text/plain; charset=utf-8", "FlowStudio ready")
         return
+    }
+    # Only explicit read-only assets can be served; never use the URL as a file path.
+    if eq(method, "GET") {
+        let asset: StaticAsset = data_route(path)
+        if asset.found {
+            let file: FileRead = io_read_text(asset.path)
+            if file.ok {
+                fs_reply(200, asset.mime, file.data)
+            } else {
+                fs_reply(500, "text/plain; charset=utf-8", "Static asset unavailable")
+            }
+            return
+        }
     }
     if eq(method, "POST") and fs_intent_allowed() == 1 {
         if eq(path, "/api/run/flow") {

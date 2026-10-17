@@ -90,8 +90,28 @@ function mount(doc = document, request = fetch) {
       editorCell.disabled = false;
     }
   }
+  let storage = null;
+  try { storage = root.localStorage || null; } catch (_) {}
   const controller = root.FlowStudioConsole.create(submit, () => language.value,
-    message => status(message, "error"));
+    message => status(message, "error"), {storage});
+  if (output.parentElement && doc.createElement) {
+    const label = doc.createElement("label"), box = doc.createElement("input");
+    box.id = "consoleRememberHistory";
+    box.type = "checkbox";
+    box.checked = controller.isPersisting();
+    box.addEventListener("change", () => {
+      if (!controller.setPersistence(box.checked)) box.checked = controller.isPersisting();
+    });
+    label.append(box, " Remember command history on this device");
+    const clear = doc.createElement("button");
+    clear.id = "consoleClearHistory";
+    clear.type = "button";
+    clear.textContent = "Clear selected runtime history";
+    clear.addEventListener("click", () => {
+      if (controller.clearHistory(language.value)) status("Console history cleared", "ok");
+    });
+    output.parentElement.append(label, clear);
+  }
   input.addEventListener("keydown", event => {
     syncLanguage();
     if (event.isComposing) return;

@@ -29,7 +29,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Diagnostics / profiling | missing | Resource/time tracing and useful language-specific diagnostics |
 | Cross-platform packaging | missing | Installable signed/reproducible macOS and Linux releases |
 | Accessibility | partial / unverified | Full keyboard navigation, screen reader labels, resize and contrast checks |
-| RStudio project import | missing | Open and preserve basic .Rproj project settings |
+| RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
 
 ## First milestone: an honest executable slice
 
@@ -138,3 +138,8 @@ execution, Linux/macOS end-to-end acceptance and RStudio parity remain unverifie
 ## Conflict-aware browser source saves — 2026-10-17
 
 The served four-pane editor now embeds the existing tested web/file_save.js module. Opening a file records its text baseline; saving re-reads the browser-granted file and refuses to overwrite a changed baseline. Successful saves update the baseline. Save-as reads the selected destination before writing, and fallback imports clear stale file handles. Failures preserve the unsaved editor buffer and report an error. This is best-effort conflict detection, **not an atomic compare-and-swap**: another process could still modify the file between the comparison and createWritable. Browser File System Access permissions, actual OS races and macOS are not validated. Existing 7 isolated file-save tests and new workspace wiring assertions cover the local contract; full served-browser acceptance remains pending.
+
+
+## RStudio project metadata editor — 2026-10-17
+
+FlowStudio now serves a browser-local `/rproj` editor for existing `.Rproj` files. It parses supported settings, preserves unknown fields, comments, BOM, ordering and CRLF, validates edits, and uses the existing conflict-aware File System Access save implementation. Browsers without writable file handles download the modified file instead. Parsing and saving never execute project contents or send them to the HTTP backend. Node.js parser and mocked DOM tests passed 8/8 locally; actual Flow server build, physical-browser interaction and macOS remain unverified. This is not full RStudio project import: package environments, build configuration and R session settings are not applied.

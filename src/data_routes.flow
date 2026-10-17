@@ -39,6 +39,18 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/console_page.js" {
         return StaticAsset { path: "web/console_page.js", mime: "text/javascript; charset=utf-8", found: true }
     }
+    if url == "/rproj" or url == "/rproj.html" {
+        return StaticAsset { path: "web/rproj.html", mime: "text/html; charset=utf-8", found: true }
+    }
+    if url == "/rproj.js" {
+        return StaticAsset { path: "web/rproj.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/rproj_page.js" {
+        return StaticAsset { path: "web/rproj_page.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/file_save.js" {
+        return StaticAsset { path: "web/file_save.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
     if url == "/workspace_console.js" {
         return StaticAsset { path: "web/workspace_console.js", mime: "text/javascript; charset=utf-8", found: true }
     }

@@ -14,9 +14,9 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Editor selection execution | unverified | Selection runs without accidentally executing entire buffer |
 | Persistent REPL/session | missing | Incremental variables and package state persist until reset |
 | Variable inspector | missing | Nested objects / types / dimensions inspectable and refresh after execution |
-| Plot viewer | partial / Node-tested standalone PNG import, history, zoom and save; not served by Flow | png/svg plot history, zoom, save and deterministic device lifecycle |
+| Plot viewer | partial / Node-tested PNG import and integrated workspace tab; native unverified | png/svg plot history, zoom, save and deterministic device lifecycle |
 | Project explorer | partial / DOM-tested | Open project, tree navigation, source-file creation and save; safe rename/delete still missing |
-| Data viewer | browser-local CSV/TSV preview / Node+V8-tested; not integrated into Flow HTTP router | Interactive sortable/filterable tabular datasets including missing values |
+| Data viewer | partial / browser-local CSV/TSV viewer integrated as workspace tab; native unverified | Interactive sortable/filterable tabular datasets including missing values |
 | Completion / language server | missing | R, Flow and Python completion/diagnostics |
 | Packages pane | missing | List, install, update with environment-aware package sources |
 | Git pane | missing | Status, diff, stage, commit and branch operations |
@@ -143,3 +143,9 @@ The served four-pane editor now embeds the existing tested web/file_save.js modu
 ## RStudio project metadata editor — 2026-10-17
 
 FlowStudio now serves a browser-local `/rproj` editor for existing `.Rproj` files. It parses supported settings, preserves unknown fields, comments, BOM, ordering and CRLF, validates edits, and uses the existing conflict-aware File System Access save implementation. Browsers without writable file handles download the modified file instead. Parsing and saving never execute project contents or send them to the HTTP backend. Node.js parser and mocked DOM tests passed 8/8 locally; actual Flow server build, physical-browser interaction and macOS remain unverified. This is not full RStudio project import: package environments, build configuration and R session settings are not applied.
+
+## Workspace Plots/Data tabs — 2026-10-17
+
+The Flow-owned router now serves a keyboard-operable Files/Plots/Data tab controller in the fourth pane. Plots and Data reuse the existing same-origin, browser-local PNG history and CSV/TSV viewers in lazy-loaded iframes; no file contents are uploaded to the server. The native HTTP transport allows same-origin frames while rejecting cross-origin framing (X-Frame-Options: SAMEORIGIN and CSP frame-ancestors 'self').
+
+**Partial / unverified:** five Node controller tests and three integration-transform tests passed locally on Linux x86-64. Native Flow compile/link, HTTP/browser acceptance and macOS validation were not run. There is no automatic plot capture from language runtimes or in-memory dataset inspector. This does not meet RStudio parity.

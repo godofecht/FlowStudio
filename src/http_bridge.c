@@ -61,7 +61,8 @@ void fs_reply(int code, const char *content_type, const char *body)
         "Content-Length: %zu\r\n"
         "Cache-Control: no-store\r\n"
         "X-Content-Type-Options: nosniff\r\n"
-        "X-Frame-Options: DENY\r\n"
+        "X-Frame-Options: SAMEORIGIN\r\n"
+        "Content-Security-Policy: frame-ancestors 'self'\r\n"
         "Referrer-Policy: no-referrer\r\n"
         "Connection: close\r\n\r\n",
         code, reason, content_type, strlen(body));

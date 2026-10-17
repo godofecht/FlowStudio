@@ -51,6 +51,9 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/file_save.js" {
         return StaticAsset { path: "web/file_save.js", mime: "text/javascript; charset=utf-8", found: true }
     }
+    if url == "/workspace_tabs.js" {
+        return StaticAsset { path: "web/workspace_tabs.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
     if url == "/workspace_console.js" {
         return StaticAsset { path: "web/workspace_console.js", mime: "text/javascript; charset=utf-8", found: true }
     }

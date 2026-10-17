@@ -10,6 +10,7 @@ function main() -> i32 {
     if not data_route("/console").found { return 7 }
     if not data_route("/console.js").found { return 8 }
     if not data_route("/console_page.js").found { return 9 }
-    if data_route("/missing").found { return 10 }
+    if not data_route("/workspace_console.js").found { return 10 }
+    if data_route("/missing").found { return 11 }
     return 0
 }

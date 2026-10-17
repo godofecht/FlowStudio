@@ -39,5 +39,8 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/console_page.js" {
         return StaticAsset { path: "web/console_page.js", mime: "text/javascript; charset=utf-8", found: true }
     }
+    if url == "/workspace_console.js" {
+        return StaticAsset { path: "web/workspace_console.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
     return StaticAsset { path: "", mime: "", found: false }
 }

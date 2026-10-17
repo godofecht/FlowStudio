@@ -114,3 +114,23 @@ macOS arm64. No parity milestone is promoted.
 ## Percent source cells — 2026-10-17
 
 The source editor recognizes `# %%` code boundaries and `# %% [markdown]` non-executable boundaries. Run cell and Ctrl/⌘+Shift+Enter send only the active code cell through the existing Flow-owned `/api/run/{language}` route. UTF-8 payloads exceeding 128 KiB are rejected client-side; server request bounds remain authoritative. This is **not** a notebook renderer, and cells **do not share interpreter state**: each server execution still starts a new process. Markers inside multiline strings are not lexically disambiguated. **Validation (2026-10-17, Linux x86-64):** `node --test tests/source_cells.test.js` passed 8/8 with Node.js 22.16.0 against the locally prepared parser. The exact committed parser and workspace test sources were also executed in a V8 Node-compatible harness: 25/25 passed (8 parser and 17 mocked workspace). The four embedded HTML scripts passed V8 syntax checks, and mocked cell execution submitted only the active cell. This is not a native or physical-browser acceptance test. Native Flow compilation, real Flow/R/Python HTTP execution, browser interaction and macOS remain unverified.
+
+## Validation log — 2026-10-17 (Flow-served integrated console)
+
+The Flow server now injects two allowlisted JavaScript assets into the existing
+four-pane editor response. A browser-side controller creates the interactive
+console input within the existing console panel and sends commands through the
+existing Flow-owned execution endpoints. It shares the editor runtime selection,
+console output and execution status; source execution and console submissions
+are serialized in the browser. Console history and draft buffers are separated
+by runtime. HTTP execution failures are displayed without erasing submitted
+commands. The Flow application continues to run each command in a fresh
+subprocess; **interpreter state does not persist between submissions**.
+
+Nine isolated Node.js regression tests passed against
+`web/workspace_console.js` and `web/console.js` using mocked DOM and HTTP
+responses. The integration was tested with an isolated DOM/HTTP mock, not a native server.
+Run `python3 tests/console_integration_http_smoke.py` against the native
+FlowStudio executable to verify the served HTML and assets.
+**Native Flow compilation, served-browser interaction, actual interpreter
+execution, Linux/macOS end-to-end acceptance and RStudio parity remain unverified.**

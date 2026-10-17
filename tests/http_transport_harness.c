@@ -24,6 +24,21 @@ int main(void)
         {
             fs_reply(200, "text/plain", "healthy");
         }
+        else if (strcmp(fs_method(), "GET") == 0 &&
+                 strcmp(fs_path(), "/status/422") == 0)
+        {
+            fs_reply(422, "text/plain", "execution failed");
+        }
+        else if (strcmp(fs_method(), "GET") == 0 &&
+                 strcmp(fs_path(), "/status/503") == 0)
+        {
+            fs_reply(503, "text/plain", "interpreter unavailable");
+        }
+        else if (strcmp(fs_method(), "GET") == 0 &&
+                 strcmp(fs_path(), "/status/504") == 0)
+        {
+            fs_reply(504, "text/plain", "execution timed out");
+        }
         else if (strcmp(fs_method(), "POST") == 0 &&
                  strcmp(fs_path(), "/api/run/python") == 0 && fs_intent_allowed())
         {

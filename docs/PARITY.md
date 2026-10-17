@@ -95,3 +95,17 @@ Validation: 8/8 Node.js 22.16.0 parser tests passed in a local working copy; 2/2
 ## Quality gate
 
 No feature advances to verified without recorded exact commands, versions, sample inputs, expected and actual outputs, exit codes and operating systems. Numerical results from R and Flow must be compared with explicitly justified absolute/relative error tolerances; performance claims require reproducible cold/warm measurements. Never infer acceptance from a visual screenshot or from an unexecuted example.
+
+## Execution failure propagation — 2026-10-17
+
+The Flow-owned execution router now distinguishes successful subprocess completion
+(HTTP 200), a nonzero child exit (422), a spawn/runtime failure (503), and
+execution timeout (504). The native C transport maps each status to its HTTP
+reason phrase, and the browser reports execution failures as errors.
+The live HTTP smoke suite asserts Python runtime exceptions and syntax errors,
+plus R/Flow failures when those interpreters are installed. The transport
+harness exercises all three failure status codes.
+
+**Validation status: partial / unverified.** The actual Flow 2.x application
+has not been compiled and exercised through live HTTP on Linux x86-64 and
+macOS arm64. No parity milestone is promoted.

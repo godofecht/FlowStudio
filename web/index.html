@@ -499,7 +499,12 @@ async function run() {
     });
     const output = await response.text();
     consolePane.textContent += output + "\n";
-    status(response.ok ? "Finished" : "HTTP error " + response.status, response.ok ? "ok" : "error");
+    const message = response.ok ? "Finished" :
+      response.status === 422 ? "Execution failed" :
+      response.status === 503 ? "Interpreter unavailable" :
+      response.status === 504 ? "Execution timed out" :
+      "HTTP error " + response.status;
+    status(message, response.ok ? "ok" : "error");
   } catch (error) {
     consolePane.textContent += String(error) + "\n";
     status("Execution request failed", "error");

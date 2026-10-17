@@ -25,7 +25,12 @@ function eq(a: string, b: string) -> bool {
     return strcmp(a, b) == 0
 }
 
-function execute(language: string, code: string) -> string {
+struct ExecutionResult {
+    status: i32,
+    output: string
+}
+
+function execute(language: string, code: string) -> ExecutionResult {
     let mut command: ptr<ProcCmd> = proc_cmd("python3")
     let mut temp_path: string = ""
 
@@ -40,13 +45,13 @@ function execute(language: string, code: string) -> string {
     } elif eq(language, "flow") {
         temp_path = fs_write_temp_flow(code)
         if eq(temp_path, "") {
-            return "FlowStudio: unable to create temporary Flow source file."
+            return ExecutionResult { status: 500, output: "FlowStudio: unable to create temporary Flow source file." }
         }
         command = proc_cmd("flow")
         proc_arg(command, "run")
         proc_arg(command, temp_path)
     } else {
-        return "Unsupported language."
+        return ExecutionResult { status: 400, output: "Unsupported language." }
     }
 
     # proc_run executes argv directly with posix_spawnp; no shell interpolation.
@@ -72,9 +77,23 @@ function execute(language: string, code: string) -> string {
         output = output + "\nProcess exited unsuccessfully."
     }
     if eq(output, "") {
-        return "(No output)"
+        output = "(No output)"
     }
-    return output
+    if result.timed_out {
+        return ExecutionResult { status: 504, output: output }
+    }
+    if not eq(result.error, "") {
+        return ExecutionResult { status: 503, output: output }
+    }
+    if result.exit_code != 0 {
+        return ExecutionResult { status: 422, output: output }
+    }
+    return ExecutionResult { status: 200, output: output }
+}
+
+function send_execution(language: string, code: string) -> void {
+    let result: ExecutionResult = execute(language, code)
+    fs_reply(result.status, "text/plain; charset=utf-8", result.output)
 }
 
 function send_editor() -> void {
@@ -113,15 +132,15 @@ function dispatch() -> void {
     }
     if eq(method, "POST") and fs_intent_allowed() == 1 {
         if eq(path, "/api/run/flow") {
-            fs_reply(200, "text/plain; charset=utf-8", execute("flow", fs_body()))
+            send_execution("flow", fs_body())
             return
         }
         if eq(path, "/api/run/r") {
-            fs_reply(200, "text/plain; charset=utf-8", execute("r", fs_body()))
+            send_execution("r", fs_body())
             return
         }
         if eq(path, "/api/run/python") {
-            fs_reply(200, "text/plain; charset=utf-8", execute("python", fs_body()))
+            send_execution("python", fs_body())
             return
         }
     }

@@ -50,7 +50,10 @@ void fs_reply(int code, const char *content_type, const char *body)
         code == 403 ? "Forbidden" :
         code == 404 ? "Not Found" :
         code == 411 ? "Length Required" :
-        code == 413 ? "Payload Too Large" : "Internal Server Error";
+        code == 413 ? "Payload Too Large" :
+        code == 422 ? "Unprocessable Content" :
+        code == 503 ? "Service Unavailable" :
+        code == 504 ? "Gateway Timeout" : "Internal Server Error";
     char header[1024];
     int n = snprintf(header, sizeof(header),
         "HTTP/1.1 %d %s\r\n"

@@ -59,3 +59,21 @@ test("does not save invalid project files or silently overwrite", async () => {
   assert.equal(f.writes.length,0);
   assert.equal(f.ids.fileName.textContent, "");
 });
+test("refuses external modification during project settings save", async () => {
+  const f = fixture();
+  f.env.FlowStudioFileSave = require("../web/file_save.js");
+  const page = mount(f.doc, f.env);
+  let disk = "Version: 1.0\nNumSpacesForTab: 2\n";
+  let writes = 0;
+  const handle = {
+    getFile: async () => ({name:"analysis.Rproj",size:Buffer.byteLength(disk),text:async()=>disk}),
+    createWritable: async () => ({write:async next => {disk = next; writes++;},close:async()=>{}})
+  };
+  await page.load(await handle.getFile(), handle);
+  f.ids.fields.querySelectorAll("input").find(x=>x.name==="NumSpacesForTab").value = "4";
+  disk = "Version: 1.0\nNumSpacesForTab: 8\n";
+  await f.ids.settings.listeners.submit({preventDefault(){}});
+  assert.equal(writes,0);
+  assert.match(f.ids.status.textContent,/changed on disk/);
+  assert.equal(f.ids.status.dataset.error,"true");
+});

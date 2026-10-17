@@ -402,12 +402,59 @@ global.FlowStudioSourceCells = api;
 <!-- END EMBEDDED SOURCE CELLS MODULE -->
 <script>
 "use strict";
+/* BEGIN EMBEDDED FILE SAVE MODULE: mirrors web/file_save.js */
+/* FlowStudio browser-local conflict-aware source saves. */
+(function (global) {
+"use strict";
+const MAX_BYTES = 2 * 1024 * 1024;
+class FileConflictError extends Error {
+  constructor() {
+    super("The file changed on disk since it was opened. Reload it or save a separate copy.");
+    this.name = "FileConflictError";
+  }
+}
+async function readSnapshot(handle) {
+  if (!handle || typeof handle.getFile !== "function")
+    throw new TypeError("A readable file handle is required.");
+  const file = await handle.getFile();
+  if (file.size > MAX_BYTES) throw new RangeError("Source file exceeds the 2 MiB limit.");
+  const text = await file.text();
+  if (new Blob([text]).size > MAX_BYTES)
+    throw new RangeError("Source file exceeds the 2 MiB limit.");
+  return text;
+}
+async function writeIfUnchanged(handle, baseline, source) {
+  if (typeof baseline !== "string" || typeof source !== "string")
+    throw new TypeError("Source and baseline must be strings.");
+  if (new Blob([source]).size > MAX_BYTES)
+    throw new RangeError("Source file exceeds the 2 MiB limit.");
+  if (!handle || typeof handle.createWritable !== "function")
+    throw new TypeError("A writable file handle is required.");
+  if (await readSnapshot(handle) !== baseline) throw new FileConflictError();
+  const stream = await handle.createWritable();
+  try {
+    await stream.write(source);
+    await stream.close();
+  } catch (error) {
+    if (typeof stream.abort === "function") {
+      try { await stream.abort(); } catch (_) { /* Preserve original failure. */ }
+    }
+    throw error;
+  }
+  return source;
+}
+const api = { readSnapshot, writeIfUnchanged, FileConflictError, MAX_BYTES };
+if (typeof module !== "undefined" && module.exports) module.exports = api;
+global.FlowStudioFileSave = api;
+})(globalThis);
+/* END EMBEDDED FILE SAVE MODULE */
 const el = id => document.getElementById(id);
 const src = el("source");
 const language = el("language");
 const consolePane = el("console");
 const resultStatus = el("resultStatus");
 let fileHandle = null;
+let fileBaseline = null;
 let filename = "untitled.flow";
 let projectPath = null;
 let dirty = false;
@@ -580,17 +627,17 @@ async function runCell() {
 
 async function openEditorHandle(handle, path = null, skipDirtyCheck = false) {
   if (dirty && !skipDirtyCheck && !creatingProjectFile && !confirm("Discard unsaved editor changes?")) return false;
-  const file = await handle.getFile();
-  const content = await file.text();
+  const content = await FlowStudioFileSave.readSnapshot(handle);
   src.value = content;
   fileHandle = handle;
+  fileBaseline = content;
   projectPath = path;
-  setFilename(file.name, path || file.name);
-  language.value = inferLanguage(file.name);
+  setFilename(handle.name, path || handle.name);
+  language.value = inferLanguage(handle.name);
   markDirty(false);
   updateCursor();
   updateFindCount();
-  status("Opened " + (path || file.name), "ok");
+  status("Opened " + (path || handle.name), "ok");
   return true;
 }
 async function openFile() {
@@ -611,16 +658,14 @@ async function saveFile() {
   const name = filename.startsWith("untitled.") ? "untitled." + extension(language.value) : filename;
   try {
     if (fileHandle && typeof fileHandle.createWritable === "function") {
-      const writable = await fileHandle.createWritable();
-      await writable.write(src.value);
-      await writable.close();
+      fileBaseline = await FlowStudioFileSave.writeIfUnchanged(fileHandle, fileBaseline, src.value);
       setFilename(fileHandle.name, projectPath || fileHandle.name);
     } else if (typeof window.showSaveFilePicker === "function") {
       const handle = await window.showSaveFilePicker({ suggestedName: name });
-      const writable = await handle.createWritable();
-      await writable.write(src.value);
-      await writable.close();
+      const baseline = await FlowStudioFileSave.readSnapshot(handle);
+      const saved = await FlowStudioFileSave.writeIfUnchanged(handle, baseline, src.value);
       fileHandle = handle;
+      fileBaseline = saved;
       projectPath = null;
       setFilename(handle.name);
     } else {
@@ -768,6 +813,7 @@ el("fallbackOpen").addEventListener("change", async event => {
   if (!file) return;
   src.value = await file.text();
   fileHandle = null;
+  fileBaseline = null;
   projectPath = null;
   setFilename(file.name);
   language.value = inferLanguage(file.name);

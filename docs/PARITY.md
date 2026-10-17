@@ -7,7 +7,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Feature | 2026-10-15 state | Minimum acceptance criterion |
 | --- | --- | --- |
 | Four-pane IDE shell | unverified | Source, environment, console and plots render; keyboard/accessibility checks |
-| File open / save | unverified | Native file-picker and download fallback round-trip UTF-8 |
+| File open / save | partial / conflict-aware browser saves wired; physical browser and native unverified | Native file-picker and download fallback round-trip UTF-8 |
 | Flow source execution | unverified | Compile and run valid code; surface diagnostics for invalid code |
 | R source execution | partial / unverified | Run via installed R; preserve state across evaluations |
 | Python source execution | partial / unverified | Run via installed Python; preserve state across evaluations |
@@ -134,3 +134,7 @@ Run `python3 tests/console_integration_http_smoke.py` against the native
 FlowStudio executable to verify the served HTML and assets.
 **Native Flow compilation, served-browser interaction, actual interpreter
 execution, Linux/macOS end-to-end acceptance and RStudio parity remain unverified.**
+
+## Conflict-aware browser source saves — 2026-10-17
+
+The served four-pane editor now embeds the existing tested web/file_save.js module. Opening a file records its text baseline; saving re-reads the browser-granted file and refuses to overwrite a changed baseline. Successful saves update the baseline. Save-as reads the selected destination before writing, and fallback imports clear stale file handles. Failures preserve the unsaved editor buffer and report an error. This is best-effort conflict detection, **not an atomic compare-and-swap**: another process could still modify the file between the comparison and createWritable. Browser File System Access permissions, actual OS races and macOS are not validated. Existing 7 isolated file-save tests and new workspace wiring assertions cover the local contract; full served-browser acceptance remains pending.

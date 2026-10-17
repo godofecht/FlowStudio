@@ -30,5 +30,14 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/environment.js" {
         return StaticAsset { path: "web/environment.js", mime: "text/javascript; charset=utf-8", found: true }
     }
+    if url == "/console" or url == "/console.html" {
+        return StaticAsset { path: "web/console.html", mime: "text/html; charset=utf-8", found: true }
+    }
+    if url == "/console.js" {
+        return StaticAsset { path: "web/console.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/console_page.js" {
+        return StaticAsset { path: "web/console_page.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
     return StaticAsset { path: "", mime: "", found: false }
 }

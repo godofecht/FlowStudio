@@ -20,14 +20,14 @@ class AssetRoutesTest(unittest.TestCase):
 
     def test_declared_assets_exist(self):
         paths = re.findall(r'path: "(web/[^"]+)"', self.router)
-        self.assertEqual(len(paths), 8)
+        self.assertEqual(len(paths), 11)
         for path in paths:
             with self.subTest(path=path):
                 self.assertTrue((ROOT / path).is_file(), path)
                 self.assertNotIn("..", path)
 
     def test_plot_and_data_html_scripts_are_allowlisted(self):
-        for page in ("web/data.html", "web/plots.html"):
+        for page in ("web/data.html", "web/plots.html", "web/console.html"):
             html = (ROOT / page).read_text(encoding="utf-8")
             scripts = re.findall(r'<script src="(?:\./)?([^"/]+)"', html)
             self.assertGreaterEqual(len(scripts), 2)

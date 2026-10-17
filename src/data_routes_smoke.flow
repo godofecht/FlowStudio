@@ -7,6 +7,9 @@ function main() -> i32 {
     if not data_route("/plots.html").found { return 4 }
     if not data_route("/plot_history.js").found { return 5 }
     if not data_route("/plot_page.js").found { return 6 }
-    if data_route("/missing").found { return 7 }
+    if not data_route("/console").found { return 7 }
+    if not data_route("/console.js").found { return 8 }
+    if not data_route("/console_page.js").found { return 9 }
+    if data_route("/missing").found { return 10 }
     return 0
 }

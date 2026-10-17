@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>FlowStudio Data Viewer</title>
+<style>
+body{font:14px system-ui;background:#10141e;color:#e8edf5;margin:20px;color-scheme:dark}
+a{color:#a8c8ff}button,input{padding:7px;margin:3px;background:#26324a;color:inherit;border:1px solid #485879}
+#grid{overflow:auto;max-height:75vh}table{border-collapse:collapse;width:100%}
+td,th{padding:7px;border:1px solid #34415b;text-align:left;white-space:pre-wrap;overflow-wrap:anywhere}
+th{position:sticky;top:0;background:#24324a}.missing{color:#9aa8bf}
+</style></head>
+<body>
+<header><a href="./index.html">← Editor</a><h1>FlowStudio Data Viewer</h1><button id="open">Open CSV/TSV</button><input id="fallback" type="file" accept=".csv,.tsv" hidden></header>
+<label for="filter">Filter</label><input id="filter" type="search" maxlength="256" disabled>
+<button id="previous" disabled>Previous</button><button id="next" disabled>Next</button>
+<span id="summary" role="status" aria-live="polite">No dataset loaded.</span>
+<div id="grid" role="region" aria-label="Dataset table" tabindex="0"></div>
+<p id="status" role="status" aria-live="polite">Local-only CSV/TSV preview. Files are not uploaded.</p>
+<script src="./data_viewer.js"></script><script src="./data_page.js"></script>
+</body></html>

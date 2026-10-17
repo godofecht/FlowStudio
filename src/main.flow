@@ -1,0 +1,167 @@
+# FlowStudio: first native IDE/server executable.
+# Requires the current Flow 2.x compiler and POSIX transport shim.
+#
+# This is a single-process, localhost-only development preview. It does not
+# sandbox executed code or persist R/Python interpreter state.
+
+import std.process { ProcCmd, ProcResult, proc_cmd, proc_arg, proc_input, proc_timeout_ms, proc_run }
+import std.io { FileRead, io_read_text }
+import .data_routes { StaticAsset, data_route }
+
+extern {
+    function fs_listen(port: i32) -> i32
+    function fs_read_request(listener: i32) -> i32
+    function fs_method() -> string
+    function fs_path() -> string
+    function fs_body() -> string
+    function fs_intent_allowed() -> i32
+    function fs_reply(status: i32, content_type: string, body: string) -> void
+    function fs_write_temp_flow(code: string) -> string
+    function unlink(path: string) -> i32
+    function strcmp(a: string, b: string) -> i32
+}
+
+function eq(a: string, b: string) -> bool {
+    return strcmp(a, b) == 0
+}
+
+struct ExecutionResult {
+    status: i32,
+    output: string
+}
+
+function execute(language: string, code: string) -> ExecutionResult {
+    let mut command: ptr<ProcCmd> = proc_cmd("python3")
+    let mut temp_path: string = ""
+
+    if eq(language, "r") {
+        command = proc_cmd("R")
+        proc_arg(command, "--vanilla")
+        proc_arg(command, "--slave")
+        proc_input(command, code)
+    } elif eq(language, "python") {
+        proc_arg(command, "-")
+        proc_input(command, code)
+    } elif eq(language, "flow") {
+        temp_path = fs_write_temp_flow(code)
+        if eq(temp_path, "") {
+            return ExecutionResult { status: 500, output: "FlowStudio: unable to create temporary Flow source file." }
+        }
+        command = proc_cmd("flow")
+        proc_arg(command, "run")
+        proc_arg(command, temp_path)
+    } else {
+        return ExecutionResult { status: 400, output: "Unsupported language." }
+    }
+
+    # proc_run executes argv directly with posix_spawnp; no shell interpolation.
+    # A timeout kills the process group, including its children.
+    proc_timeout_ms(command, 15000)
+    let result: ptr<ProcResult> = proc_run(command)
+
+    if not eq(temp_path, "") {
+        let _removed: i32 = unlink(temp_path)
+    }
+
+    let mut output: string = result.stdout
+    if not eq(result.stderr, "") {
+        output = output + result.stderr
+    }
+    if not eq(result.error, "") {
+        output = output + "\nProcess error: " + result.error
+    }
+    if result.timed_out {
+        output = output + "\nExecution stopped after 15 seconds."
+    }
+    if result.exit_code != 0 {
+        output = output + "\nProcess exited unsuccessfully."
+    }
+    if eq(output, "") {
+        output = "(No output)"
+    }
+    if result.timed_out {
+        return ExecutionResult { status: 504, output: output }
+    }
+    if not eq(result.error, "") {
+        return ExecutionResult { status: 503, output: output }
+    }
+    if result.exit_code != 0 {
+        return ExecutionResult { status: 422, output: output }
+    }
+    return ExecutionResult { status: 200, output: output }
+}
+
+function send_execution(language: string, code: string) -> void {
+    let result: ExecutionResult = execute(language, code)
+    fs_reply(result.status, "text/plain; charset=utf-8", result.output)
+}
+
+function send_editor() -> void {
+    let page: FileRead = io_read_text("web/index.html")
+    if page.ok {
+        # Keep the tested editor HTML immutable; enhance its console at serve time.
+        # Both scripts are explicit allowlisted assets, never user-selected paths.
+        let html: string = s_replace(page.data, "</body>", "<script src='/console.js'></script><script src='/workspace_console.js'></script></body>")
+        fs_reply(200, "text/html; charset=utf-8", html)
+    } else {
+        fs_reply(500, "text/plain; charset=utf-8", "Could not read web/index.html. Run from the FlowStudio repository root.")
+    }
+}
+
+function dispatch() -> void {
+    let method: string = fs_method()
+    let path: string = fs_path()
+
+    if eq(method, "GET") and eq(path, "/") {
+        send_editor()
+        return
+    }
+    if eq(method, "GET") and eq(path, "/health") {
+        fs_reply(200, "text/plain; charset=utf-8", "FlowStudio ready")
+        return
+    }
+    # Only explicit read-only assets can be served; never use the URL as a file path.
+    if eq(method, "GET") {
+        let asset: StaticAsset = data_route(path)
+        if asset.found {
+            let file: FileRead = io_read_text(asset.path)
+            if file.ok {
+                fs_reply(200, asset.mime, file.data)
+            } else {
+                fs_reply(500, "text/plain; charset=utf-8", "Static asset unavailable")
+            }
+            return
+        }
+    }
+    if eq(method, "POST") and fs_intent_allowed() == 1 {
+        if eq(path, "/api/run/flow") {
+            send_execution("flow", fs_body())
+            return
+        }
+        if eq(path, "/api/run/r") {
+            send_execution("r", fs_body())
+            return
+        }
+        if eq(path, "/api/run/python") {
+            send_execution("python", fs_body())
+            return
+        }
+    }
+    fs_reply(404, "text/plain; charset=utf-8", "Unknown route or disallowed request")
+}
+
+function main() -> i32 {
+    let listener: i32 = fs_listen(8751)
+    if listener < 0 {
+        println("FlowStudio: unable to bind localhost port 8751.")
+        return 1
+    }
+    println("FlowStudio listening on http://127.0.0.1:8751")
+    println("Warning: executions have your user's local permissions. Do not run untrusted code.")
+    while true {
+        if fs_read_request(listener) == 1 {
+            dispatch()
+        }
+    }
+    return 0
+}

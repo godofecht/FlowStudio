@@ -70,7 +70,7 @@ function workspace(folder) {
   const elements = new Map();
   const ids = [
     "source", "language", "console", "resultStatus", "fileLabel", "dirty",
-    "cursor", "run", "open", "save", "clear", "fallbackOpen", "runtimeInfo",
+    "cursor", "run", "runCell", "open", "save", "clear", "fallbackOpen", "runtimeInfo",
     "projectTree", "folder", "newFile", "refreshProject",
     "projectSearch", "caseSensitive", "searchProject", "searchResults",
     "editorFind", "editorReplace", "findNext", "findPrevious",
@@ -105,10 +105,11 @@ function workspace(folder) {
     },
     Blob, URL, setTimeout, console
   });
-  assert.equal(scripts.length, 3, "Expected project, editor-find and workspace scripts");
+  assert.equal(scripts.length, 4, "Expected project, editor-find, cells and workspace scripts");
   vm.runInContext(scripts[0], context, { filename: "project-embedded.js" });
   vm.runInContext(scripts[1], context, { filename: "editor-find-embedded.js" });
-  vm.runInContext(scripts[2], context, { filename: "workspace.js" });
+  vm.runInContext(scripts[2], context, { filename: "source-cells-embedded.js" });
+  vm.runInContext(scripts[3], context, { filename: "workspace.js" });
   return {
     el: id => elements.get(id), document, fetches,
     setDiscard: value => { allowDiscard = value; },
@@ -120,6 +121,7 @@ test("embedded project module exactly mirrors tested standalone source", () => {
   assert.equal(scripts[0].trim(), projectSource);
   const findSource = fs.readFileSync(path.join(root, "web/editor_find.js"), "utf8").trimEnd();
   assert.equal(scripts[1].trim(), findSource);
+  assert.equal(scripts[2].trim(), fs.readFileSync(path.join(root, "web/source_cells.js"), "utf8").trimEnd());
   assert.match(html, /id="projectTree"/);
   assert.match(html, /id="folder"/);
   assert.match(html, /id="newFile"/);
@@ -305,4 +307,52 @@ test("Ctrl+F populates selected text and focuses editor find", () => {
   assert.equal(prevented, true);
   assert.equal(app.el("editorFind").value, "beta");
   assert.equal(app.el("editorFind").focused, true);
+});
+
+test("Run cell sends only the active percent cell through execution API", async () => {
+  const app = workspace(directory("empty"));
+  app.el("language").value = "python";
+  const source = "# %% first\nprint('one')\n# %% second\nprint('two')\n";
+  app.el("source").value = source;
+  app.el("source").setSelectionRange(source.indexOf("two"), source.indexOf("two"));
+  await app.el("runCell").fire("click");
+  assert.equal(app.fetches.length, 1);
+  assert.equal(app.fetches[0].url, "/api/run/python");
+  assert.equal(app.fetches[0].options.body, "print('two')\n");
+  assert.match(app.el("console").textContent, /\[cell 2\/2\]/);
+});
+test("Markdown and empty cells never execute", async () => {
+  const app = workspace(directory("empty"));
+  app.el("source").value = "# %% [markdown]\n# Title\n# %%\n";
+  app.el("source").setSelectionRange(5, 5);
+  await app.el("runCell").fire("click");
+  assert.equal(app.fetches.length, 0);
+  assert.match(app.el("resultStatus").textContent, /Markdown/);
+  app.el("source").setSelectionRange(app.el("source").value.length, app.el("source").value.length);
+  await app.el("runCell").fire("click");
+  assert.equal(app.fetches.length, 0);
+  assert.match(app.el("resultStatus").textContent, /empty/);
+});
+test("Cell execution rejects UTF-8 bodies over native HTTP limit", async () => {
+  const app = workspace(directory("empty"));
+  app.el("source").value = "# %%\n" + "λ".repeat(70000);
+  await app.el("runCell").fire("click");
+  assert.equal(app.fetches.length, 0);
+  assert.match(app.el("resultStatus").textContent, /128 KiB/);
+});
+test("Ctrl+Shift+Enter executes cell instead of selected text", async () => {
+  const app = workspace(directory("empty"));
+  app.el("language").value = "r";
+  const source = "# %%\nx <- 1\n# %%\ny <- 2\n";
+  app.el("source").value = source;
+  app.el("source").setSelectionRange(source.indexOf("y <-"), source.indexOf("y <-") + 1);
+  let prevented = false;
+  app.document.listeners.keydown({
+    ctrlKey: true, metaKey: false, shiftKey: true, key: "Enter",
+    preventDefault() { prevented = true; }
+  });
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(prevented, true);
+  assert.equal(app.fetches.length, 1);
+  assert.equal(app.fetches[0].options.body, "y <- 2\n");
 });

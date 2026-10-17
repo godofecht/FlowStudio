@@ -70,6 +70,7 @@ footer { padding: 5px 14px; display: flex; justify-content: space-between; gap: 
     <button id="open">Open file</button>
     <button id="save">Save file</button>
     <button id="run" class="primary" title="Run selection or entire buffer (Ctrl/⌘+Enter)">▶ Run</button>
+    <button id="runCell" title="Run current # %% cell (Ctrl/⌘+Shift+Enter)">Run cell</button>
     <input id="fallbackOpen" type="file" accept=".flow,.R,.r,.py,.txt" hidden>
   </div>
 </header>
@@ -113,7 +114,7 @@ footer { padding: 5px 14px; display: flex; justify-content: space-between; gap: 
     </div>
   </section>
 </div>
-<footer><span id="resultStatus" role="status">Idle</span><span>Local: 127.0.0.1:8751 · <span id="cursor">Ln 1, Col 1</span> · Ctrl/⌘+S Save · Ctrl/⌘+Enter Run</span></footer>
+<footer><span id="resultStatus" role="status">Idle</span><span>Local: 127.0.0.1:8751 · <span id="cursor">Ln 1, Col 1</span> · Ctrl/⌘+S Save · Ctrl/⌘+Enter Run · Ctrl/⌘+Shift+Enter Cell</span></footer>
 <!-- BEGIN EMBEDDED PROJECT MODULE: mirrors web/project.js -->
 <script>
 /* FlowStudio project explorer. Browser File System Access API only. */
@@ -359,6 +360,46 @@ global.FlowStudioEditorFind = api;
 })(globalThis);
 </script>
 <!-- END EMBEDDED EDITOR FIND MODULE -->
+<!-- BEGIN EMBEDDED SOURCE CELLS MODULE: mirrors web/source_cells.js -->
+<script>
+/* Percent-style source cells for Flow, R and Python. No source execution here. */
+(function (global) {
+"use strict";
+const MAX_SOURCE = 2 * 1024 * 1024;
+const MARKER = /^[ \t]*#[ \t]*%%(?:([ \t][^\r\n]*))?(?:\r?\n|$)/gm;
+
+function parseCells(source) {
+  if (typeof source !== "string" || source.length > MAX_SOURCE)
+    throw new Error("Cell navigation supports source buffers up to 2 MiB.");
+  const boundaries = [{ start: 0, codeStart: 0, kind: "code" }];
+  for (const match of source.matchAll(MARKER)) {
+    const label = (match[1] || "").trim().toLowerCase();
+    const kind = /^\[(?:markdown|md)\](?:\s|$)/.test(label) ? "markdown" : "code";
+    const boundary = { start: match.index, codeStart: match.index + match[0].length, kind };
+    if (match.index === 0) boundaries[0] = boundary;
+    else boundaries.push(boundary);
+  }
+  return boundaries.map((boundary, index) => {
+    const end = index + 1 < boundaries.length ? boundaries[index + 1].start : source.length;
+    return { index, count: boundaries.length, start: boundary.start, end,
+      kind: boundary.kind, code: source.slice(boundary.codeStart, end) };
+  });
+}
+
+function cellAt(source, offset) {
+  if (!Number.isInteger(offset) || offset < 0 || offset > source.length)
+    throw new RangeError("Cursor is outside the source buffer.");
+  const cells = parseCells(source);
+  for (let index = cells.length - 1; index >= 0; index--)
+    if (offset >= cells[index].start) return cells[index];
+  return cells[0];
+}
+const api = { parseCells, cellAt };
+if (typeof module !== "undefined" && module.exports) module.exports = api;
+global.FlowStudioSourceCells = api;
+})(globalThis);
+</script>
+<!-- END EMBEDDED SOURCE CELLS MODULE -->
 <script>
 "use strict";
 const el = id => document.getElementById(id);
@@ -485,12 +526,17 @@ function updateCursor() {
   const lines = before.split("\n");
   el("cursor").textContent = "Ln " + lines.length + ", Col " + (lines[lines.length - 1].length + 1);
 }
-async function run() {
-  const selection = src.value.substring(src.selectionStart, src.selectionEnd);
-  const code = selection.length ? selection : src.value;
+async function executeCode(code, label) {
+  if (el("run").disabled) return;
+  if (!code.trim()) { status("Current cell is empty.", "error"); return; }
+  if (new Blob([code]).size > 131072) {
+    status("Execution exceeds the server's 128 KiB request limit.", "error");
+    return;
+  }
   el("run").disabled = true;
+  el("runCell").disabled = true;
   status("Running " + language.value + " …");
-  consolePane.textContent += "\n> " + (selection ? "[selection]" : "[buffer]") + " (" + language.value + ")\n";
+  consolePane.textContent += "\n> " + label + " (" + language.value + ")\n";
   try {
     const response = await fetch("/api/run/" + language.value, {
       method: "POST",
@@ -510,9 +556,28 @@ async function run() {
     status("Execution request failed", "error");
   } finally {
     el("run").disabled = false;
+    el("runCell").disabled = false;
     consolePane.scrollTop = consolePane.scrollHeight;
   }
 }
+async function run() {
+  const selection = src.value.substring(src.selectionStart, src.selectionEnd);
+  return executeCode(selection.length ? selection : src.value,
+    selection.length ? "[selection]" : "[buffer]");
+}
+async function runCell() {
+  try {
+    const cell = FlowStudioSourceCells.cellAt(src.value, src.selectionStart);
+    if (cell.kind === "markdown") {
+      status("Markdown cell is not executable.", "error");
+      return;
+    }
+    return executeCode(cell.code, "[cell " + (cell.index + 1) + "/" + cell.count + "]");
+  } catch (error) {
+    status(error.message || String(error), "error");
+  }
+}
+
 async function openEditorHandle(handle, path = null, skipDirtyCheck = false) {
   if (dirty && !skipDirtyCheck && !creatingProjectFile && !confirm("Discard unsaved editor changes?")) return false;
   const file = await handle.getFile();
@@ -694,6 +759,7 @@ language.addEventListener("change", () => {
   el("runtimeInfo").textContent = "Selected runtime: " + language.value + ". Each execution is independent.";
 });
 el("run").addEventListener("click", run);
+el("runCell").addEventListener("click", runCell);
 el("open").addEventListener("click", openFile);
 el("save").addEventListener("click", saveFile);
 el("clear").addEventListener("click", () => { consolePane.textContent = ""; });
@@ -731,7 +797,7 @@ document.addEventListener("keydown", event => {
   }
   if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
     event.preventDefault();
-    if (!el("run").disabled) run();
+    if (!el("run").disabled) (event.shiftKey ? runCell() : run());
   }
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
     event.preventDefault();

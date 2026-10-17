@@ -22,6 +22,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Git pane | missing | Status, diff, stage, commit and branch operations |
 | Help pane | missing | Context-aware language/function docs |
 | Find / replace / cross-file search | partial / Node + V8-tested | Literal in-buffer find next/previous, single/all replacement and project-wide search implemented; incremental indexing, regex and physical-browser verification missing |
+| Percent-delimited source cells | partial / Node-tested; native execution unverified | Run only the active `# %%` code cell in Flow/R/Python; markdown and empty cells do not execute |
 | R Markdown / Quarto | missing | Render notebook with inline plots and HTML export |
 | Source debugger | missing | Breakpoints, stack, variables, step execution |
 | Remote/server mode | missing | Authenticated, origin-aware multi-user sessions with isolation |
@@ -109,3 +110,7 @@ harness exercises all three failure status codes.
 **Validation status: partial / unverified.** The actual Flow 2.x application
 has not been compiled and exercised through live HTTP on Linux x86-64 and
 macOS arm64. No parity milestone is promoted.
+
+## Percent source cells — 2026-10-17
+
+The source editor recognizes `# %%` code boundaries and `# %% [markdown]` non-executable boundaries. Run cell and Ctrl/⌘+Shift+Enter send only the active code cell through the existing Flow-owned `/api/run/{language}` route. UTF-8 payloads exceeding 128 KiB are rejected client-side; server request bounds remain authoritative. This is **not** a notebook renderer, and cells **do not share interpreter state**: each server execution still starts a new process. Markers inside multiline strings are not lexically disambiguated. Pure-parser Node tests and mocked-workspace tests cover routing and boundaries; physical browser, native Flow compilation, actual three-language execution and macOS remain unverified.

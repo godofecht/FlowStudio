@@ -43,8 +43,33 @@ function mount(doc = document, request = fetch) {
       button.disabled = false;
     }
   }
+  // History storage is opt-in and scoped to this browser, matching the main IDE.
+  let storage = null;
+  try { storage = root.localStorage || null; } catch (_) {}
   const consoleController = root.FlowStudioConsole.create(submit, () => language.value,
-    message => status(message, "error"));
+    message => status(message, "error"), {storage});
+  const controls = button.parentElement;
+  if (controls && doc.createElement && !el("consoleRememberHistory")) {
+    const label = doc.createElement("label");
+    const remember = doc.createElement("input");
+    remember.id = "consoleRememberHistory";
+    remember.type = "checkbox";
+    remember.checked = consoleController.isPersisting();
+    remember.addEventListener("change", () => {
+      if (!consoleController.setPersistence(remember.checked))
+        remember.checked = consoleController.isPersisting();
+    });
+    label.append(remember, " Remember command history on this device");
+    const clear = doc.createElement("button");
+    clear.id = "consoleClearHistory";
+    clear.type = "button";
+    clear.textContent = "Clear selected runtime history";
+    clear.addEventListener("click", () => {
+      if (consoleController.clearHistory(language.value))
+        status("Console history cleared", "ok");
+    });
+    controls.append(label, clear);
+  }
   input.addEventListener("keydown", event => consoleController.keydown(event, input));
   button.addEventListener("click", () => { void consoleController.run(input); });
   el("consoleClear").addEventListener("click", () => { output.textContent = ""; });

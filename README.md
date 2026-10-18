@@ -1,5 +1,9 @@
 # FlowStudio
 
+[![CI](https://github.com/godofecht/FlowStudio/actions/workflows/ci.yml/badge.svg)](https://github.com/godofecht/FlowStudio/actions/workflows/ci.yml)
+
+**Version:** `0.1.0-alpha.1` (developer preview; canonical value in [`VERSION`](VERSION)). See [release notes](RELEASE_NOTES.md), [release packages](https://github.com/godofecht/FlowStudio/releases), and the [Pages documentation](https://godofecht.github.io/FlowStudio/). A preview package is published only after Linux and macOS CI gates qualify the same commit. Pages requires one-time repository configuration.
+
 A **Flow-first scientific IDE** intended to become a capable successor to RStudio. Flow is the application/session language; R and Python are supported as external language runtimes.
 
 **Current status:** early, unverified developer preview. This is **not** RStudio feature parity. Exact coverage and acceptance criteria are in [docs/PARITY.md](docs/PARITY.md).
@@ -51,6 +55,10 @@ This builds the real POSIX transport with a small test-only router and exercises
 
 Open a folder, enter a literal query under **Find in project**, and select **Find all**. Matches appear with file paths and line/column locations. Selecting a result opens that file and highlights the match. Unsaved editor changes are never silently discarded. Search reads browser-granted local handles only; it does not send project contents to the Flow server. Search limits are documented in the parity matrix.
 
+## Versioned native packages
+
+After a successful native build and acceptance test (`python3 scripts/verify_native.py`), run `sh scripts/package.sh` to create a platform-specific `.tar.gz` in `dist/`. The archive has `run.sh`, the compiled executable, web assets, docs, licence, README and VERSION. Its runtime must be run from its own extracted root; `flow` 2.x is an external runtime dependency for Flow execution. Release automation publishes Linux x86-64 and macOS arm64 archives plus a source archive and SHA256 checksums only after both CI platforms pass on `main`.
+
 ## Architecture
 
     browser (HTML/CSS/JS)
@@ -73,4 +81,4 @@ The native C shim is intentionally limited to OS-facing socket and temporary-fil
 
 ## Licensing
 
-This is a new independent codebase, not a translation of RStudio's AGPLv3 source. Flow itself has [separate licensing terms](https://github.com/flooooooooooow/flow/blob/main/LICENSE). No third-party RStudio source code is incorporated into this repository. A FlowStudio distribution licence has not yet been specified.
+This is a new independent codebase, not a translation of RStudio's AGPLv3 source. Flow itself has [separate licensing terms](https://github.com/flooooooooooow/flow/blob/main/LICENSE). No third-party RStudio source code is incorporated into this repository. The source and distributed preview are **all rights reserved**; see [LICENSE](LICENSE). External Flow, R and Python installations remain under their own terms.

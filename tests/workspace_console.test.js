@@ -30,8 +30,10 @@ function mount(reply = {ok:true,status:200,text:async () => "ok"}) {
 test("workspace exposes console controls and loads allowlisted modules",()=>{
   assert.match(html, /id="console"/);
   const server = fs.readFileSync(path.join(root, "src/main.flow"), "utf8");
-  assert.match(server, /s_replace\(page.data/);
-  assert.match(server, /workspace_console.js/);
+  assert.doesNotMatch(server, /\bs_replace\s*\(/);
+  assert.match(html, /<script src="\/workspace_console\.js"><\/script>/);
+  const routes = fs.readFileSync(path.join(root, "src/data_routes.flow"), "utf8");
+  assert.match(routes, /workspace_console\.js/);
 });
 test("interactive console submits exact code and shares output",async()=>{
   const app=mount();app.el("consoleInput").value="print('hello')";

@@ -56,7 +56,13 @@ function execute(language: string, code: string) -> ExecutionResult {
 
     # proc_run executes argv directly with posix_spawnp; no shell interpolation.
     # A timeout kills the process group, including its children.
-    proc_timeout_ms(command, 15000)
+    # A cold Flow compiler bootstrap can exceed the ordinary interpreter budget.
+    # Both budgets remain bounded by the native process-group timeout.
+    let mut deadline_ms: i32 = 15000
+    if eq(language, "flow") {
+        deadline_ms = 60000
+    }
+    proc_timeout_ms(command, deadline_ms)
     let result: ptr<ProcResult> = proc_run(command)
 
     if not eq(temp_path, "") {
@@ -71,7 +77,11 @@ function execute(language: string, code: string) -> ExecutionResult {
         output = output + "\nProcess error: " + result.error
     }
     if result.timed_out {
-        output = output + "\nExecution stopped after 15 seconds."
+        if eq(language, "flow") {
+            output = output + "\nFlow compilation or execution stopped after 60 seconds."
+        } else {
+            output = output + "\nExecution stopped after 15 seconds."
+        }
     }
     if result.exit_code != 0 {
         output = output + "\nProcess exited unsuccessfully."

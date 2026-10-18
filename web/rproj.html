@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FlowStudio — RStudio project settings</title>
+<style>
+:root {font: 15px/1.5 system-ui,sans-serif;color:#e8edf5;background:#10141e}
+body {max-width:800px;margin:2rem auto;padding:0 1rem}
+a {color:#9fc3ff}
+fieldset {border:1px solid #44536e;border-radius:8px;margin:1rem 0;padding:1rem}
+label {display:grid;grid-template-columns:minmax(190px,1fr) 2fr;align-items:center;gap:1rem;margin:.65rem 0}
+select,input,button {font:inherit;padding:.5rem;background:#273044;color:#fff;border:1px solid #536483;border-radius:5px}
+button {cursor:pointer;margin:.3rem .5rem .3rem 0}
+button:disabled {opacity:.5;cursor:not-allowed}
+:focus-visible {outline:2px solid #9fc3ff;outline-offset:2px}
+#status {min-height:2rem;white-space:pre-wrap}
+#status[data-error="true"] {color:#ffb8ad}
+@media(max-width:600px){label{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<p><a href="/">← FlowStudio editor</a></p>
+<h1>RStudio project settings</h1>
+<p>Open an existing <code>.Rproj</code> file, inspect its options and save selected changes. Unknown fields and comments are preserved. This does not execute R code or alter package environments.</p>
+<button id="openProject" type="button">Open .Rproj</button>
+<input id="fallbackProject" type="file" accept=".Rproj,.rproj" hidden>
+<p id="fileName">No project selected</p>
+<form id="settings" aria-label="RStudio project settings"><fieldset id="fields" disabled><legend>Project configuration</legend></fieldset>
+<button id="saveProject" type="submit" disabled>Save project</button>
+<button id="resetChanges" type="button" disabled>Discard changes</button></form>
+<p id="status" role="status" aria-live="polite"></p>
+<script src="/file_save.js"></script>
+<script src="/rproj.js"></script>
+<script src="/rproj_page.js"></script>
+</body>
+</html>

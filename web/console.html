@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FlowStudio — Interactive Console</title>
+<style>
+:root { color-scheme: dark; font: 15px/1.5 system-ui,sans-serif; background:#10141e; color:#edf3ff }
+body { max-width:1100px; margin:0 auto; padding:20px }
+header { display:flex; flex-wrap:wrap; align-items:center; gap:12px }
+button,select,a,textarea { font:inherit }
+button,select,a { color:#eaf1ff; background:#293b60; border:1px solid #6881b7; border-radius:6px; padding:6px 10px }
+a { text-decoration:none }
+button:focus-visible,a:focus-visible,select:focus-visible,textarea:focus-visible { outline:3px solid #8ab6ff }
+main { display:flex; flex-direction:column; gap:12px; height:75vh; min-height:380px }
+#consoleOutput { flex:1; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; border:1px solid #455a7e; border-radius:8px; background:#141e2e; padding:12px; margin:0; font:13px/1.6 ui-monospace,monospace }
+#consoleInput { width:100%; box-sizing:border-box; min-height:80px; resize:vertical; border:1px solid #6881b7; border-radius:6px; padding:10px; color:#edf3ff; background:#101b2a; font:13px/1.5 ui-monospace,monospace }
+#consoleStatus { min-height:1.5em }
+#consoleStatus[data-state="error"] { color:#ffb8ad }
+#consoleStatus[data-state="ok"] { color:#93deb3 }
+.controls { display:flex; align-items:center; gap:12px; flex-wrap:wrap }
+.hint { color:#b7c7e1; font-size:13px }
+</style>
+</head>
+<body>
+<header><h1>FlowStudio Console</h1><a href="/">Source editor</a>
+<label for="consoleLanguage">Runtime</label><select id="consoleLanguage"><option value="flow">Flow</option><option value="r">R</option><option value="python">Python</option></select>
+<button id="consoleClear" type="button">Clear output</button></header>
+<p class="hint">Local execution only. Each submission starts a new interpreter process; variables do not persist. Only run trusted code.</p>
+<main>
+<pre id="consoleOutput" role="log" aria-live="polite">Console ready. Select a runtime and enter code.</pre>
+<label for="consoleInput">Code</label>
+<textarea id="consoleInput" spellcheck="false" aria-label="Console command" placeholder="Enter to execute; Shift+Enter for newline"></textarea>
+<div class="controls"><button id="consoleRun" type="button">Execute</button><span class="hint">Enter: run · Shift+Enter: newline · ↑/↓: history</span></div>
+<p id="consoleStatus" role="status" aria-live="polite"></p>
+</main>
+<script src="console.js"></script>
+<script src="console_page.js"></script>
+<script>FlowStudioConsolePage.mount();</script>
+</body>
+</html>

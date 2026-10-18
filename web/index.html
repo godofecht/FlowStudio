@@ -1,0 +1,879 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>FlowStudio — Scientific IDE</title>
+<style>
+:root { font: 14px/1.45 system-ui, -apple-system, sans-serif; color: #e8edf5; background: #10141e; }
+* { box-sizing: border-box; }
+body { margin: 0; height: 100dvh; display: flex; flex-direction: column; }
+button,select,textarea { font: inherit; }
+button,select { background: #273044; border: 1px solid #3a4762; color: #f2f6ff; border-radius: 6px; padding: 7px 11px; cursor: pointer; }
+button:hover,select:hover { border-color: #8baaf4; }
+button:focus-visible,select:focus-visible,textarea:focus-visible { outline: 2px solid #80a5fe; outline-offset: 1px; }
+button:disabled { opacity: .5; cursor: wait; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; border-bottom: 1px solid #39435b; padding: 10px 16px; background: #171e2c; }
+.brand { font-size: 17px; font-weight: 700; letter-spacing: -.02em; }
+.brand b { color: #85b3ff; }
+.toolbar { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; }
+.primary { background: #315fbf; border-color: #3f72dc; }
+.main { display: grid; flex: 1; min-height: 0; grid-template-columns: minmax(0, 2fr) minmax(255px, 1fr); grid-template-rows: minmax(180px, 58fr) minmax(130px, 42fr); gap: 5px; background: #080c14; padding: 5px; }
+.panel { display: flex; flex-direction: column; overflow: hidden; min-width: 0; min-height: 0; background: #171e2a; border: 1px solid #2c3950; border-radius: 7px; }
+.panel > h2 { font-size: 12px; color: #b9c7e2; text-transform: uppercase; letter-spacing: .08em; margin: 0; padding: 10px 13px; border-bottom: 1px solid #30394e; }
+.panel .body { flex: 1; min-height: 0; padding: 11px 13px; }
+textarea { flex: 1; resize: none; width: 100%; min-height: 0; padding: 15px 17px; background: #101520; border: 0; color: #e6eeff; font: 14px/1.65 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; tab-size: 4; }
+pre { margin: 0; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 12.5px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace; height: 100%; }
+kbd { background: #333f55; padding: 2px 4px; border-radius: 4px; font: inherit; }
+.muted { color: #a4b0c6; }
+.hint { font-size: 13px; max-width: 45ch; }
+footer { padding: 5px 14px; display: flex; justify-content: space-between; gap: 15px; font-size: 12px; background: #192337; color: #a7b8d6; }
+#resultStatus[data-state="error"] { color: #ffb8ad; }
+#resultStatus[data-state="ok"] { color: #93deb3; }
+#fileLabel { color: #b9cae5; font-size: 12px; }
+#console { color: #c8daee; }
+.project-body { overflow-y: auto; }
+#projectTree { display: flex; flex-direction: column; gap: 5px; }
+#projectTree details { padding-left: 9px; border-left: 1px solid #39465f; }
+#projectTree summary { cursor: pointer; padding: 5px 0; }
+#projectTree .project-children { display: flex; flex-direction: column; gap: 4px; margin: 4px 0 5px 8px; }
+#projectTree .project-file { display: block; text-align: left; width: 100%; overflow-wrap: anywhere; }
+#projectTree .project-file:focus-visible { outline-offset: -2px; }
+
+.project-search { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; }
+.project-search input[type="search"] { background: #101520; color: #e6eeff; border: 1px solid #3a4762; border-radius: 6px; padding: 7px; flex: 1; min-width: 110px; }
+.project-search label { color: #c2cee4; font-size: 12px; }
+#searchResults { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+#searchResults button { text-align: left; white-space: normal; overflow-wrap: anywhere; width: 100%; font: 12px/1.5 ui-monospace, monospace; }
+@media (max-width: 790px) {
+ body { min-height: 100dvh; height: auto; }
+ .main { min-height: 90dvh; grid-template-columns: 1fr; grid-template-rows: 36vh 16vh 25vh 16vh; }
+ footer { flex-wrap: wrap; }
+}
+.editor-find { display:flex; gap:6px; flex-wrap:wrap; align-items:center; padding:7px 10px; border-bottom:1px solid #30394e; }
+.editor-find input[type="text"] { min-width:95px; max-width:220px; flex:1; background:#101520; color:#e6eeff; border:1px solid #3a4762; border-radius:5px; padding:5px 7px; }
+.editor-find label { font-size:12px; color:#c2cee4; }
+.editor-find button { padding:5px 8px; font-size:12px; }
+#editorFindCount { font-size:12px; color:#afc4e6; }
+
+.workspace-tabs { display:flex; gap:5px; padding:6px 9px; border-bottom:1px solid #30394e; }
+.workspace-tabs button { flex:1; min-width:0; padding:5px; }
+.workspace-tabs [aria-selected="true"] { border-color:#8baaf4; background:#31518b; }
+.workspace-frame { flex:1; min-height:0; overflow:hidden; }
+.workspace-frame iframe { display:block; width:100%; height:100%; border:0; background:#10141e; }
+[hidden] { display:none !important; }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><b>◈</b> FlowStudio <span class="muted">/ developer preview</span></div>
+  <div class="toolbar" aria-label="Editor actions">
+    <label for="language">Runtime</label>
+    <select id="language" aria-label="Execution language"><option value="flow">Flow</option><option value="r">R</option><option value="python">Python</option></select>
+    <button id="folder">Open folder</button>
+    <button id="newFile" title="Create a new source file in the opened project">New file</button>
+    <button id="refreshProject" title="Refresh project tree">Refresh</button>
+    <a href="/rproj" aria-label="Edit RStudio project settings">RStudio project</a>
+    <button id="open">Open file</button>
+    <button id="save">Save file</button>
+    <button id="run" class="primary" title="Run selection or entire buffer (Ctrl/⌘+Enter)">▶ Run</button>
+    <button id="runCell" title="Run current # %% cell (Ctrl/⌘+Shift+Enter)">Run cell</button>
+    <input id="fallbackOpen" type="file" accept=".flow,.R,.r,.py,.txt" hidden>
+  </div>
+</header>
+<div class="main">
+  <section class="panel" aria-label="Source editor">
+    <h2>Source <span id="fileLabel">untitled.flow</span><span id="dirty" hidden> • modified</span></h2>
+    <div class="editor-find"><input id="editorFind" type="text" aria-label="Find text"><button id="findNext">Next</button>
+    <label for="editorReplace">Replace with</label><input id="editorReplace" type="text" aria-label="Replacement text"><button id="replaceOne">Replace</button><button id="replaceAll">Replace all</button><button id="findPrevious">Previous</button><label><input id="editorCaseSensitive" type="checkbox"> Match case</label><span id="editorFindCount" role="status" aria-live="polite"></span></div>
+    <textarea id="source" spellcheck="false" aria-label="Source code editor">function main() -> i32 {
+    println("Hello from FlowStudio")
+    return 0
+}
+</textarea>
+  </section>
+  <section class="panel" aria-label="Environment">
+    <h2>Environment / History</h2>
+    <div class="body">
+      <p id="runtimeInfo">Flow execution available when Flow is installed.</p>
+      <p class="muted hint">Variable inspection and persistent language sessions are planned. Each execution currently starts a fresh subprocess.</p>
+      <p class="muted hint">The IDE executes code with your local OS permissions. Only run code you trust.</p>
+    </div>
+  </section>
+  <section class="panel" aria-label="Console output">
+    <h2>Console <button id="clear" style="float:right;padding:1px 7px;font-size:11px">Clear</button></h2>
+    <div class="body"><pre id="console" role="log" aria-live="polite">Ready. Press Ctrl/⌘+Enter to execute selection or buffer.
+</pre></div>
+  </section>
+  <section class="panel" aria-label="Project, plots and data">
+    <h2>Project / Plots / Data</h2>
+    <div class="workspace-tabs" role="tablist" aria-label="Workspace views">
+      <button type="button" id="tab-files" role="tab" aria-controls="view-files" aria-selected="true" tabindex="0">Files</button>
+      <button type="button" id="tab-plots" role="tab" aria-controls="view-plots" aria-selected="false" tabindex="-1">Plots</button>
+      <button type="button" id="tab-data" role="tab" aria-controls="view-data" aria-selected="false" tabindex="-1">Data</button>
+    </div>
+    <div class="body project-body" id="view-files" role="tabpanel" aria-labelledby="tab-files">
+
+      <div class="project-search" role="search" aria-label="Search project files">
+        <label for="projectSearch">Find in project</label>
+        <input id="projectSearch" type="search" maxlength="256" placeholder="Literal text" aria-label="Find in project">
+        <label><input id="caseSensitive" type="checkbox"> Case</label>
+        <button id="searchProject" type="button">Find all</button>
+      </div>
+      <div id="searchResults" aria-live="polite" aria-label="Project search results"></div>
+      <div id="projectTree" role="navigation" aria-label="Project files"><p class="muted">Open a folder to browse source files.</p></div>
+      <p class="muted hint">Project files remain local to your browser. Plot and data viewers accept locally selected files.</p>
+    </div>
+    <div id="view-plots" class="workspace-frame" role="tabpanel" aria-labelledby="tab-plots" hidden>
+      <iframe title="Local plot history" loading="lazy"></iframe>
+    </div>
+    <div id="view-data" class="workspace-frame" role="tabpanel" aria-labelledby="tab-data" hidden>
+      <iframe title="Local CSV and TSV data viewer" loading="lazy"></iframe>
+    </div>
+  </section>
+</div>
+<footer><span id="resultStatus" role="status">Idle</span><span>Local: 127.0.0.1:8751 · <span id="cursor">Ln 1, Col 1</span> · Ctrl/⌘+S Save · Ctrl/⌘+Enter Run · Ctrl/⌘+Shift+Enter Cell</span></footer>
+<!-- BEGIN EMBEDDED PROJECT MODULE: mirrors web/project.js -->
+<script>
+/* FlowStudio project explorer. Browser File System Access API only. */
+(function (global) {
+"use strict";
+const editable = /\.(flow|r|py|txt|md|qmd|rmd|csv|tsv|json|toml|yaml|yml|rproj)$/i;
+function validFilename(name) {
+  if (typeof name !== "string" || name.length === 0 || name.length > 255 ||
+      name === "." || name === ".." || !editable.test(name) ||
+      name.includes("/") || name.includes("\\")) return false;
+  for (const char of name) if (char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127) return false;
+  return true;
+}
+
+/* Bounded, read-only literal search over browser-granted project files. */
+async function searchProject(root, query, options = {}) {
+  if (!root || root.kind !== "directory") throw new Error("Open a project folder first.");
+  if (typeof query !== "string" || !query.trim() || query.length > 256)
+    throw new Error("Search for 1–256 characters.");
+  const MAX_DEPTH = 12, MAX_FILES = 1000, MAX_MATCHES = 200;
+  const MAX_BYTES = 1024 * 1024, MAX_ENTRIES = 500;
+  const metacharacters = "\\^$.*+?()[]{}|";
+  const literal = [...query].map(ch => metacharacters.includes(ch) ? "\\" + ch : ch).join("");
+  const expression = new RegExp(literal, options.caseSensitive ? "g" : "gi");
+  const matches = [];
+  let scannedFiles = 0, skippedLarge = 0, truncated = false;
+  function checkAbort() {
+    if (options.signal && options.signal.aborted) {
+      const error = new Error("Search cancelled");
+      error.name = "AbortError";
+      throw error;
+    }
+  }
+  async function walk(directory, prefix, depth) {
+    checkAbort();
+    if (depth > MAX_DEPTH) { truncated = true; return; }
+    const entries = [];
+    for await (const [name, handle] of directory.entries()) {
+      checkAbort();
+      if (entries.length >= MAX_ENTRIES) { truncated = true; break; }
+      entries.push({ name, handle });
+    }
+    entries.sort((a, b) => a.name.localeCompare(b.name));
+    for (const { name, handle } of entries) {
+      checkAbort();
+      if (matches.length >= MAX_MATCHES || scannedFiles >= MAX_FILES) {
+        truncated = true;
+        return;
+      }
+      const path = prefix + "/" + name;
+      if (handle.kind === "directory") {
+        await walk(handle, path, depth + 1);
+        continue;
+      }
+      if (handle.kind !== "file" || !editable.test(name)) continue;
+      const file = await handle.getFile();
+      checkAbort();
+      if (file.size > MAX_BYTES) { skippedLarge++; continue; }
+      const source = await file.text();
+      checkAbort();
+      if (source.length > MAX_BYTES) { skippedLarge++; continue; }
+      scannedFiles++;
+      let line = 1, lineStart = 0;
+      for (const found of source.matchAll(expression)) {
+        checkAbort();
+        if (matches.length >= MAX_MATCHES) { truncated = true; return; }
+        const index = found.index;
+        let newline = source.indexOf("\n", lineStart);
+        while (newline >= 0 && newline < index) {
+          line++;
+          lineStart = newline + 1;
+          newline = source.indexOf("\n", lineStart);
+        }
+        const lineEnd = newline < 0 ? source.length : newline;
+        matches.push({
+          path, handle, index, length: found[0].length,
+          line, column: index - lineStart + 1,
+          preview: source.slice(lineStart, Math.min(lineEnd, lineStart + 180))
+        });
+      }
+    }
+  }
+  await walk(root, root.name, 0);
+  return { matches, scannedFiles, skippedLarge, truncated };
+}
+
+function createProjectExplorer({ tree, status, openHandle, picker }) {
+  let root = null, revision = 0;
+  const element = (tag, text) => {
+    const node = document.createElement(tag);
+    if (text !== undefined) node.textContent = text;
+    return node;
+  };
+  function error(err) {
+    if (err && err.name !== "AbortError") status(err.message || String(err), "error");
+  }
+  async function populate(dir, parent, prefix, depth, token) {
+    if (token !== revision) return;
+    if (depth > 12) { parent.append(element("p", "Depth limit reached.")); return; }
+    const entries = [];
+    for await (const [name, handle] of dir.entries()) {
+      if (token !== revision) return;
+      if (entries.length >= 500) { parent.append(element("p", "First 500 entries only.")); break; }
+      if (handle.kind === "directory" || (handle.kind === "file" && editable.test(name))) {
+        entries.push({ name, handle });
+      }
+    }
+    entries.sort((a, b) => (a.handle.kind === "directory" ? 0 : 1) -
+      (b.handle.kind === "directory" ? 0 : 1) || a.name.localeCompare(b.name));
+    for (const { name, handle } of entries) {
+      if (token !== revision) return;
+      const path = prefix + "/" + name;
+      if (handle.kind === "directory") {
+        const details = element("details"), summary = element("summary", "Folder: " + name);
+        const children = element("div");
+        children.className = "project-children";
+        details.append(summary, children);
+        let loaded = false;
+        details.addEventListener("toggle", async () => {
+          if (!details.open || loaded || token !== revision) return;
+          loaded = true;
+          try { await populate(handle, children, path, depth + 1, token); }
+          catch (err) { loaded = false; error(err); }
+        });
+        parent.append(details);
+      } else {
+        const button = element("button", "File: " + name);
+        button.type = "button";
+        button.className = "project-file";
+        button.title = path;
+        button.addEventListener("click", async () => {
+          try { await openHandle(handle, path); } catch (err) { error(err); }
+        });
+        parent.append(button);
+      }
+    }
+    if (entries.length === 0 && parent.children.length === 0) {
+      parent.append(element("p", "No supported source files."));
+    }
+  }
+  async function refresh() {
+    const token = ++revision;
+    tree.replaceChildren();
+    if (!root) { tree.append(element("p", "Choose a folder.")); return; }
+    tree.append(element("p", "Project: " + root.name));
+    try { await populate(root, tree, root.name, 0, token); }
+    catch (err) { error(err); }
+  }
+  async function choose() {
+    if (typeof picker !== "function") {
+      status("This browser does not support local folder access.", "error");
+      return false;
+    }
+    try {
+      const handle = await picker({ mode: "read" });
+      if (!handle || handle.kind !== "directory") throw new Error("Not a directory");
+      root = handle;
+      await refresh();
+      status("Opened project " + root.name, "ok");
+      return true;
+    } catch (err) { error(err); return false; }
+  }
+  async function create(name) {
+    if (!root) throw new Error("Open a project first.");
+    if (!validFilename(name)) throw new Error("Invalid source filename.");
+    const handle = await root.getFileHandle(name, { create: true });
+    const opened = await openHandle(handle, root.name + "/" + name);
+    await refresh();
+    return opened;
+  }
+  return { choose, refresh, create, search: (query, options) => searchProject(root, query, options), hasProject: () => root !== null };
+}
+const api = { createProjectExplorer, validFilename, searchProject };
+if (typeof module !== "undefined" && module.exports) module.exports = api;
+global.FlowStudioProject = api;
+})(globalThis);
+</script>
+<!-- END EMBEDDED PROJECT MODULE -->
+<!-- BEGIN EMBEDDED EDITOR FIND MODULE: mirrors web/editor_find.js -->
+<script>
+/* Literal in-buffer find and replace. Pure operations: no filesystem or network access. */
+(function (global) {
+"use strict";
+const MAX_QUERY = 256;
+const MAX_REPLACEMENT = 10000;
+const MAX_SOURCE = 2 * 1024 * 1024;
+const MAX_MATCHES = 10000;
+function validate(text, query) {
+  if (typeof text !== "string" || text.length > MAX_SOURCE)
+    throw new Error("Editor search supports buffers up to 2 MiB.");
+  if (typeof query !== "string" || query.length < 1 || query.length > MAX_QUERY)
+    throw new Error("Find text must be 1–256 characters.");
+}
+function findMatches(text, query, options = {}) {
+  if (query === "") return { matches: [], truncated: false };
+  validate(text, query);
+  const escaped = [...query].map(ch => "\\^$.*+?()[]{}|".includes(ch) ? "\\" + ch : ch).join("");
+  const regex = new RegExp(escaped, options.caseSensitive ? "gu" : "giu");
+  const matches = [];
+  for (const hit of text.matchAll(regex)) {
+    if (matches.length === MAX_MATCHES) return { matches, truncated: true };
+    matches.push({ index: hit.index, end: hit.index + hit[0].length });
+  }
+  return { matches, truncated: false };
+}
+function nextMatch(matches, start, end, backwards = false) {
+  if (matches.length === 0) return null;
+  if (backwards) {
+    for (let i = matches.length - 1; i >= 0; i--)
+      if (matches[i].end <= start) return matches[i];
+    return matches[matches.length - 1];
+  }
+  for (const match of matches) if (match.index >= end) return match;
+  return matches[0];
+}
+function replaceSelection(text, query, replacement, start, end, options = {}) {
+  if (typeof replacement !== "string" || replacement.length > MAX_REPLACEMENT)
+    throw new Error("Replacement must be at most 10,000 characters.");
+  const result = findMatches(text, query, options);
+  const hit = result.matches.find(match => match.index === start && match.end === end);
+  if (!hit) return { value: text, replaced: false, start, end };
+  return { value: text.slice(0, start) + replacement + text.slice(end),
+    replaced: true, start, end: start + replacement.length };
+}
+function replaceAll(text, query, replacement, options = {}) {
+  if (typeof replacement !== "string" || replacement.length > MAX_REPLACEMENT)
+    throw new Error("Replacement must be at most 10,000 characters.");
+  const result = findMatches(text, query, options);
+  if (result.truncated) throw new Error("More than 10,000 matches; narrow the query before replacing.");
+  let position = 0;
+  const parts = [];
+  for (const match of result.matches) {
+    parts.push(text.slice(position, match.index), replacement);
+    position = match.end;
+  }
+  parts.push(text.slice(position));
+  return { value: parts.join(""), count: result.matches.length,
+    firstIndex: result.matches.length ? result.matches[0].index : -1 };
+}
+const api = { findMatches, nextMatch, replaceSelection, replaceAll };
+if (typeof module !== "undefined" && module.exports) module.exports = api;
+global.FlowStudioEditorFind = api;
+})(globalThis);
+</script>
+<!-- END EMBEDDED EDITOR FIND MODULE -->
+<!-- BEGIN EMBEDDED SOURCE CELLS MODULE: mirrors web/source_cells.js -->
+<script>
+/* Percent-style source cells for Flow, R and Python. No source execution here. */
+(function (global) {
+"use strict";
+const MAX_SOURCE = 2 * 1024 * 1024;
+const MARKER = /^[ \t]*#[ \t]*%%(?:([ \t][^\r\n]*))?(?:\r?\n|$)/gm;
+
+function parseCells(source) {
+  if (typeof source !== "string" || source.length > MAX_SOURCE)
+    throw new Error("Cell navigation supports source buffers up to 2 MiB.");
+  const boundaries = [{ start: 0, codeStart: 0, kind: "code" }];
+  for (const match of source.matchAll(MARKER)) {
+    const label = (match[1] || "").trim().toLowerCase();
+    const kind = /^\[(?:markdown|md)\](?:\s|$)/.test(label) ? "markdown" : "code";
+    const boundary = { start: match.index, codeStart: match.index + match[0].length, kind };
+    if (match.index === 0) boundaries[0] = boundary;
+    else boundaries.push(boundary);
+  }
+  return boundaries.map((boundary, index) => {
+    const end = index + 1 < boundaries.length ? boundaries[index + 1].start : source.length;
+    return { index, count: boundaries.length, start: boundary.start, end,
+      kind: boundary.kind, code: source.slice(boundary.codeStart, end) };
+  });
+}
+
+function cellAt(source, offset) {
+  if (!Number.isInteger(offset) || offset < 0 || offset > source.length)
+    throw new RangeError("Cursor is outside the source buffer.");
+  const cells = parseCells(source);
+  for (let index = cells.length - 1; index >= 0; index--)
+    if (offset >= cells[index].start) return cells[index];
+  return cells[0];
+}
+const api = { parseCells, cellAt };
+if (typeof module !== "undefined" && module.exports) module.exports = api;
+global.FlowStudioSourceCells = api;
+})(globalThis);
+</script>
+<!-- END EMBEDDED SOURCE CELLS MODULE -->
+<script>
+"use strict";
+/* BEGIN EMBEDDED FILE SAVE MODULE: mirrors web/file_save.js */
+/* FlowStudio browser-local conflict-aware source saves. */
+(function (global) {
+"use strict";
+const MAX_BYTES = 2 * 1024 * 1024;
+class FileConflictError extends Error {
+  constructor() {
+    super("The file changed on disk since it was opened. Reload it or save a separate copy.");
+    this.name = "FileConflictError";
+  }
+}
+async function readSnapshot(handle) {
+  if (!handle || typeof handle.getFile !== "function")
+    throw new TypeError("A readable file handle is required.");
+  const file = await handle.getFile();
+  if (file.size > MAX_BYTES) throw new RangeError("Source file exceeds the 2 MiB limit.");
+  const text = await file.text();
+  if (new Blob([text]).size > MAX_BYTES)
+    throw new RangeError("Source file exceeds the 2 MiB limit.");
+  return text;
+}
+async function writeIfUnchanged(handle, baseline, source) {
+  if (typeof baseline !== "string" || typeof source !== "string")
+    throw new TypeError("Source and baseline must be strings.");
+  if (new Blob([source]).size > MAX_BYTES)
+    throw new RangeError("Source file exceeds the 2 MiB limit.");
+  if (!handle || typeof handle.createWritable !== "function")
+    throw new TypeError("A writable file handle is required.");
+  if (await readSnapshot(handle) !== baseline) throw new FileConflictError();
+  const stream = await handle.createWritable();
+  try {
+    await stream.write(source);
+    await stream.close();
+  } catch (error) {
+    if (typeof stream.abort === "function") {
+      try { await stream.abort(); } catch (_) { /* Preserve original failure. */ }
+    }
+    throw error;
+  }
+  return source;
+}
+const api = { readSnapshot, writeIfUnchanged, FileConflictError, MAX_BYTES };
+if (typeof module !== "undefined" && module.exports) module.exports = api;
+global.FlowStudioFileSave = api;
+})(globalThis);
+/* END EMBEDDED FILE SAVE MODULE */
+const el = id => document.getElementById(id);
+const src = el("source");
+const language = el("language");
+const consolePane = el("console");
+const resultStatus = el("resultStatus");
+let fileHandle = null;
+let fileBaseline = null;
+let filename = "untitled.flow";
+let projectPath = null;
+let dirty = false;
+let creatingProjectFile = false;
+
+
+function currentFind() {
+  return FlowStudioEditorFind.findMatches(src.value, el("editorFind").value,
+    { caseSensitive: el("editorCaseSensitive").checked });
+}
+function updateFindCount() {
+  try {
+    const query = el("editorFind").value;
+    const result = currentFind();
+    el("editorFindCount").textContent = query ?
+      result.matches.length + (result.truncated ? "+" : "") + " matches" : "";
+  } catch (error) {
+    el("editorFindCount").textContent = error.message || String(error);
+  }
+}
+function findInEditor(backwards = false) {
+  try {
+    if (!el("editorFind").value) {
+      status("Enter text to find.", "error");
+      return;
+    }
+    const result = currentFind();
+    const hit = FlowStudioEditorFind.nextMatch(result.matches,
+      src.selectionStart, src.selectionEnd, backwards);
+    if (!hit) {
+      status("No matches in current file.", "error");
+      return;
+    }
+    src.focus();
+    src.setSelectionRange(hit.index, hit.end);
+    updateCursor();
+    status("Match at offset " + hit.index + (result.truncated ? " (first 10,000 matches)" : ""), "ok");
+  } catch (error) {
+    status(error.message || String(error), "error");
+  }
+}
+
+
+function replaceCurrent() {
+  try {
+    const query = el("editorFind").value;
+    if (!query) { status("Enter text to replace.", "error"); return; }
+    const replacement = el("editorReplace").value;
+    const result = FlowStudioEditorFind.replaceSelection(src.value, query, replacement,
+      src.selectionStart, src.selectionEnd,
+      { caseSensitive: el("editorCaseSensitive").checked });
+    if (!result.replaced) { findInEditor(false); return; }
+    if (result.value !== src.value) {
+      if (typeof src.setRangeText === "function")
+        src.setRangeText(replacement, result.start, src.selectionEnd, "end");
+      else src.value = result.value;
+      markDirty(true);
+    }
+    src.setSelectionRange(result.end, result.end);
+    updateCursor();
+    updateFindCount();
+    findInEditor(false);
+  } catch (error) {
+    status(error.message || String(error), "error");
+  }
+}
+function replaceAllInEditor() {
+  try {
+    const query = el("editorFind").value;
+    if (!query) { status("Enter text to replace.", "error"); return; }
+    const result = FlowStudioEditorFind.replaceAll(src.value, query,
+      el("editorReplace").value, { caseSensitive: el("editorCaseSensitive").checked });
+    if (result.count === 0) {
+      status("No matches in current file.", "error");
+      return;
+    }
+    if (result.value !== src.value) {
+      if (typeof src.setRangeText === "function")
+        src.setRangeText(result.value, 0, src.value.length, "end");
+      else src.value = result.value;
+      markDirty(true);
+    }
+    src.focus();
+    src.setSelectionRange(result.firstIndex, result.firstIndex);
+    updateCursor();
+    updateFindCount();
+    status("Replaced " + result.count + " matches in current file.", "ok");
+  } catch (error) {
+    status(error.message || String(error), "error");
+  }
+}
+
+function status(message, state = "") {
+  resultStatus.textContent = message;
+  resultStatus.dataset.state = state;
+}
+function extension(lang) {
+  return lang === "r" ? "R" : lang === "python" ? "py" : "flow";
+}
+function inferLanguage(name) {
+  if (/\.r$/i.test(name)) return "r";
+  if (/\.py$/i.test(name)) return "python";
+  if (/\.flow$/i.test(name)) return "flow";
+  return language.value;
+}
+function setFilename(name, label = name) {
+  filename = name;
+  el("fileLabel").textContent = label;
+}
+function markDirty(isDirty) {
+  dirty = isDirty;
+  el("dirty").hidden = !isDirty;
+}
+function updateCursor() {
+  const before = src.value.slice(0, src.selectionStart);
+  const lines = before.split("\n");
+  el("cursor").textContent = "Ln " + lines.length + ", Col " + (lines[lines.length - 1].length + 1);
+}
+async function executeCode(code, label) {
+  if (el("run").disabled) return;
+  if (!code.trim()) { status("Current cell is empty.", "error"); return; }
+  if (new Blob([code]).size > 131072) {
+    status("Execution exceeds the server's 128 KiB request limit.", "error");
+    return;
+  }
+  el("run").disabled = true;
+  el("runCell").disabled = true;
+  status("Running " + language.value + " …");
+  consolePane.textContent += "\n> " + label + " (" + language.value + ")\n";
+  try {
+    const response = await fetch("/api/run/" + language.value, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain; charset=utf-8", "X-FlowStudio-Intent": "run" },
+      body: code
+    });
+    const output = await response.text();
+    consolePane.textContent += output + "\n";
+    const message = response.ok ? "Finished" :
+      response.status === 422 ? "Execution failed" :
+      response.status === 503 ? "Interpreter unavailable" :
+      response.status === 504 ? "Execution timed out" :
+      "HTTP error " + response.status;
+    status(message, response.ok ? "ok" : "error");
+  } catch (error) {
+    consolePane.textContent += String(error) + "\n";
+    status("Execution request failed", "error");
+  } finally {
+    el("run").disabled = false;
+    el("runCell").disabled = false;
+    consolePane.scrollTop = consolePane.scrollHeight;
+  }
+}
+async function run() {
+  const selection = src.value.substring(src.selectionStart, src.selectionEnd);
+  return executeCode(selection.length ? selection : src.value,
+    selection.length ? "[selection]" : "[buffer]");
+}
+async function runCell() {
+  try {
+    const cell = FlowStudioSourceCells.cellAt(src.value, src.selectionStart);
+    if (cell.kind === "markdown") {
+      status("Markdown cell is not executable.", "error");
+      return;
+    }
+    return executeCode(cell.code, "[cell " + (cell.index + 1) + "/" + cell.count + "]");
+  } catch (error) {
+    status(error.message || String(error), "error");
+  }
+}
+
+async function openEditorHandle(handle, path = null, skipDirtyCheck = false) {
+  if (dirty && !skipDirtyCheck && !creatingProjectFile && !confirm("Discard unsaved editor changes?")) return false;
+  const content = await FlowStudioFileSave.readSnapshot(handle);
+  src.value = content;
+  fileHandle = handle;
+  fileBaseline = content;
+  projectPath = path;
+  setFilename(handle.name, path || handle.name);
+  language.value = inferLanguage(handle.name);
+  markDirty(false);
+  updateCursor();
+  updateFindCount();
+  status("Opened " + (path || handle.name), "ok");
+  return true;
+}
+async function openFile() {
+  if (dirty && !confirm("Discard unsaved editor changes?")) return;
+  try {
+    if (typeof window.showOpenFilePicker === "function") {
+      const handles = await window.showOpenFilePicker({ multiple: false });
+      if (!handles.length) return;
+      await openEditorHandle(handles[0], null, true);
+    } else {
+      el("fallbackOpen").click();
+    }
+  } catch (error) {
+    if (error.name !== "AbortError") status(String(error), "error");
+  }
+}
+async function saveFile() {
+  const name = filename.startsWith("untitled.") ? "untitled." + extension(language.value) : filename;
+  try {
+    if (fileHandle && typeof fileHandle.createWritable === "function") {
+      fileBaseline = await FlowStudioFileSave.writeIfUnchanged(fileHandle, fileBaseline, src.value);
+      setFilename(fileHandle.name, projectPath || fileHandle.name);
+    } else if (typeof window.showSaveFilePicker === "function") {
+      const handle = await window.showSaveFilePicker({ suggestedName: name });
+      const baseline = await FlowStudioFileSave.readSnapshot(handle);
+      const saved = await FlowStudioFileSave.writeIfUnchanged(handle, baseline, src.value);
+      fileHandle = handle;
+      fileBaseline = saved;
+      projectPath = null;
+      setFilename(handle.name);
+    } else {
+      const blob = new Blob([src.value], {type: "text/plain; charset=utf-8"});
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = name;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+    markDirty(false);
+    status("Saved " + name, "ok");
+  } catch (error) {
+    if (error.name !== "AbortError") status(String(error), "error");
+  }
+}
+const project = FlowStudioProject.createProjectExplorer({
+  tree: el("projectTree"),
+  status,
+  openHandle: openEditorHandle,
+  picker: typeof window.showDirectoryPicker === "function"
+    ? options => window.showDirectoryPicker(options)
+    : null
+});
+el("folder").addEventListener("click", async () => {
+  const chosen = await project.choose();
+  if (chosen) { ++searchRevision; el("searchResults").replaceChildren(); }
+});
+el("refreshProject").addEventListener("click", () => project.refresh());
+el("newFile").addEventListener("click", async () => {
+  if (!project.hasProject()) {
+    status("Open a project folder first.", "error");
+    return;
+  }
+  const name = window.prompt("New source filename", "untitled." + extension(language.value));
+  if (name === null) return;
+  if (!FlowStudioProject.validFilename(name)) {
+    status("Invalid or unsupported source filename.", "error");
+    return;
+  }
+  if (dirty && !confirm("Discard unsaved editor changes?")) return;
+  creatingProjectFile = true;
+  try {
+    await project.create(name);
+  } catch (error) {
+    status(error.message || String(error), "error");
+  } finally {
+    creatingProjectFile = false;
+  }
+});
+
+let searchRevision = 0;
+async function runProjectSearch() {
+  const token = ++searchRevision;
+  const resultsNode = el("searchResults");
+  resultsNode.replaceChildren();
+  const query = el("projectSearch").value;
+  if (!project.hasProject()) {
+    status("Open a project folder before searching.", "error");
+    return;
+  }
+  if (!query.trim()) {
+    status("Enter text to find in the project.", "error");
+    return;
+  }
+  el("searchProject").disabled = true;
+  status("Searching project …");
+  try {
+    const caseSensitive = el("caseSensitive").checked;
+    const result = await project.search(query, { caseSensitive });
+    if (token !== searchRevision) return;
+    const summary = document.createElement("p");
+    summary.className = "muted hint";
+    summary.textContent = result.matches.length + " matches in " + result.scannedFiles +
+      " files" + (result.skippedLarge ? "; " + result.skippedLarge + " large files skipped" : "") +
+      (result.truncated ? "; result limit reached" : "");
+    resultsNode.append(summary);
+    for (const hit of result.matches) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = hit.path + ":" + hit.line + ":" + hit.column + "  " + hit.preview.trim();
+      button.title = "Open " + hit.path + " at line " + hit.line;
+      button.addEventListener("click", async () => {
+        try {
+          const opened = await openEditorHandle(hit.handle, hit.path);
+          if (!opened) return;
+          const selected = src.value.slice(hit.index, hit.index + hit.length);
+          const equal = caseSensitive ? selected === query :
+            selected.toLowerCase() === query.toLowerCase();
+          if (!equal) {
+            status("File changed since search; search again.", "error");
+            return;
+          }
+          src.focus();
+          src.setSelectionRange(hit.index, hit.index + hit.length);
+          updateCursor();
+        } catch (error) {
+          status(error.message || String(error), "error");
+        }
+      });
+      resultsNode.append(button);
+    }
+    status("Found " + result.matches.length + " project matches.", "ok");
+  } catch (error) {
+    if (token === searchRevision && error.name !== "AbortError")
+      status(error.message || String(error), "error");
+  } finally {
+    if (token === searchRevision) el("searchProject").disabled = false;
+  }
+}
+el("searchProject").addEventListener("click", runProjectSearch);
+el("projectSearch").addEventListener("keydown", event => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    runProjectSearch();
+  }
+});
+
+
+el("editorFind").addEventListener("input", updateFindCount);
+el("editorCaseSensitive").addEventListener("change", updateFindCount);
+el("editorFind").addEventListener("keydown", event => {
+  if (event.key === "Enter") { event.preventDefault(); findInEditor(event.shiftKey); }
+});
+el("findNext").addEventListener("click", () => findInEditor(false));
+el("findPrevious").addEventListener("click", () => findInEditor(true));
+el("replaceOne").addEventListener("click", replaceCurrent);
+el("replaceAll").addEventListener("click", replaceAllInEditor);
+
+src.addEventListener("input", () => { markDirty(true); updateCursor(); updateFindCount(); });
+src.addEventListener("click", updateCursor);
+src.addEventListener("keyup", updateCursor);
+language.addEventListener("change", () => {
+  if (filename.startsWith("untitled.")) setFilename("untitled." + extension(language.value));
+  el("runtimeInfo").textContent = "Selected runtime: " + language.value + ". Each execution is independent.";
+});
+el("run").addEventListener("click", run);
+el("runCell").addEventListener("click", runCell);
+el("open").addEventListener("click", openFile);
+el("save").addEventListener("click", saveFile);
+el("clear").addEventListener("click", () => { consolePane.textContent = ""; });
+el("fallbackOpen").addEventListener("change", async event => {
+  const file = event.target.files[0];
+  if (!file) return;
+  src.value = await file.text();
+  fileHandle = null;
+  fileBaseline = null;
+  projectPath = null;
+  setFilename(file.name);
+  language.value = inferLanguage(file.name);
+  markDirty(false);
+  updateFindCount();
+  status("Opened " + file.name, "ok");
+  event.target.value = "";
+});
+document.addEventListener("keydown", event => {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") {
+    event.preventDefault();
+    const selection = src.value.slice(src.selectionStart, src.selectionEnd);
+    if (selection.length > 0 && selection.length <= 256) el("editorFind").value = selection;
+    updateFindCount();
+    el("editorFind").focus();
+    return;
+  }
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "h") {
+    event.preventDefault();
+    el("editorReplace").focus();
+    return;
+  }
+  if (event.key === "F3" && el("editorFind").value) {
+    event.preventDefault();
+    findInEditor(event.shiftKey);
+    return;
+  }
+  if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+    event.preventDefault();
+    if (!el("run").disabled) (event.shiftKey ? runCell() : run());
+  }
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+    event.preventDefault();
+    saveFile();
+  }
+});
+</script>
+<script src="/editor_recovery.js"></script>
+<script src="/workspace_tabs.js"></script>
+<script>FlowStudioWorkspaceTabs.mount();</script>
+<script src="/console.js"></script>
+<script src="/workspace_console.js"></script>
+</body>
+</html>

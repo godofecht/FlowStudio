@@ -1,0 +1,5 @@
+import std.io { FileRead, io_read_text }
+
+export function read_data_viewer() -> FileRead {
+    return io_read_text("web/data.html")
+}

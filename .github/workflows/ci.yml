@@ -1,0 +1,75 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  quality:
+    name: Source and transport / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-14]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: JavaScript module, DOM and source contract suites
+        run: node --test tests/*.test.js
+      - name: Python syntax and verification harness
+        run: |
+          python3 -m py_compile scripts/*.py tests/*.py
+          python3 -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Real C transport tests
+        run: |
+          python3 tests/transport_smoke.py
+          python3 tests/embedding_headers_smoke.py
+  native:
+    name: Native Flow compile and HTTP / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: linux-x86_64
+          - os: macos-14
+            target: darwin-arm64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Pin Flow 2.0.0 toolchain
+        uses: actions/checkout@v4
+        with:
+          repository: flooooooooooow/flow
+          ref: v2.0.0
+          path: .flow-toolchain
+      - name: Expose Flow executable
+        shell: bash
+        run: echo "$GITHUB_WORKSPACE/.flow-toolchain" >> "$GITHUB_PATH"
+      - name: Confirm compiler and build exact checked-out source
+        run: |
+          flow version
+          python3 scripts/verify_native.py
+      - name: Package verified executable
+        run: sh scripts/package.sh
+      - name: Archive qualified platform build
+        uses: actions/upload-artifact@v4
+        with:
+          name: flowstudio-${{ matrix.target }}
+          path: dist/flowstudio-*.tar.gz
+          if-no-files-found: error
+          retention-days: 30

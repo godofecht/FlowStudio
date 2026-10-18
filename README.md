@@ -71,7 +71,7 @@ After a successful native build and acceptance test (`python3 scripts/verify_nat
              |
        Flow / R / Python
 
-Current API: GET /, GET /health, POST /api/run/flow, POST /api/run/r and POST /api/run/python. POST sends UTF-8 source text and requires an X-FlowStudio-Intent: run request header. Each subprocess has a 15-second timeout and captured output. No shell command-string evaluation is used.
+Current API: GET /, GET /health, POST /api/run/flow, POST /api/run/r and POST /api/run/python. POST sends UTF-8 source text and requires an X-FlowStudio-Intent: run request header. Python and R subprocesses have a 15-second timeout; Flow has a 60-second compile-and-run budget to accommodate cold compiler start. All processes have bounded, captured output. No shell command-string evaluation is used.
 
 ## Security and scope
 

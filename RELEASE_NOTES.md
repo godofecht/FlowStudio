@@ -10,6 +10,6 @@ Packages contain a verified native executable and checked-in web/docs assets. Ex
 
 ## Safety and limitations
 
-This is **not RStudio feature parity** and **not a sandbox**. Do not expose the HTTP server publicly or execute untrusted code. The browser file picker is subject to host/browser support. R/Python currently start fresh processes, not persistent interpreter sessions. The release qualification gate compiles the real Flow router on both platforms and runs live HTTP smoke; it does not certify all user-interface and RStudio parity features.
+This is **not RStudio feature parity** and **not a sandbox**. Do not expose the HTTP server publicly or execute untrusted code. The browser file picker is subject to host/browser support. R/Python currently start fresh processes, not persistent interpreter sessions. Python and R executions are capped at 15 seconds; Flow compile-and-run executions are capped at 60 seconds to account for a cold compiler. The release qualification gate compiles the real Flow router on both platforms and runs live HTTP smoke; it does not certify all user-interface and RStudio parity features.
 
 Versioned archives and SHA256SUMS are published only after all configured cross-platform CI jobs pass. Code remains independently implemented, without RStudio source.

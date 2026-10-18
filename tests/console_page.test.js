@@ -21,12 +21,15 @@ function mount(reply = {ok:true,status:200,text:async () => "ok"}, storage = nul
     });
   }
   elements.get("consoleLanguage").value = "python";
-  elements.get("consoleRun").parentElement = {append(...nodes) {
-    for (const node of nodes) if (node.id) elements.set(node.id, node);
-  }};
+  function register(node) {
+    if (!node || typeof node !== "object") return;
+    if (node.id) elements.set(node.id, node);
+    for (const child of node.children || []) register(child);
+  }
+  elements.get("consoleRun").parentElement = {append(...nodes) { nodes.forEach(register); }};
   function createElement() {
-    return {listeners:{}, addEventListener(name,fn){this.listeners[name]=fn;},
-      fire(name){this.listeners[name]?.();}, append(){}};
+    return {listeners:{},children:[],addEventListener(name,fn){this.listeners[name]=fn;},
+      fire(name){this.listeners[name]?.();},append(...nodes){this.children.push(...nodes);}};
   }
   const document = {getElementById:id=>elements.get(id),createElement};
   const requests = [];

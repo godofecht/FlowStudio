@@ -21,7 +21,7 @@ def request(method: str, path: str, body: str | None = None,
         ROOT + path, data=data, method=method, headers=headers or {}
     )
     try:
-        with urllib.request.urlopen(req, timeout=25) as reply:
+        with urllib.request.urlopen(req, timeout=80 if path == "/api/run/flow" else 25) as reply:
             return reply.status, reply.read().decode("utf-8")
     except urllib.error.HTTPError as exc:
         return exc.code, exc.read().decode("utf-8")

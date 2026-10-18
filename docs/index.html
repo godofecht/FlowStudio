@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="FlowStudio is a Flow-first scientific IDE for Flow, R and Python workflows.">
+<title>FlowStudio — Flow-first scientific IDE</title>
+<style>
+:root{color-scheme:dark;--bg:#10131f;--surface:#1b2134;--line:#384763;--ink:#f2f6ff;--muted:#b7c6e0;--link:#a5d3ff}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 80% 10%,#243957 0,transparent 48%),var(--bg);color:var(--ink);font:16px/1.65 system-ui,-apple-system,sans-serif}a{color:var(--link)}a:focus-visible{outline:3px solid #ffde85;outline-offset:3px}
+header,main,footer{max-width:980px;margin:auto;padding:1.5rem}nav{display:flex;gap:1.3rem;flex-wrap:wrap}nav a{font-weight:600}
+.hero{padding:4rem 0 3rem}h1{font-size:clamp(2.6rem,8vw,5rem);line-height:1.1;letter-spacing:-.04em;margin:0 0 1.3rem}h2{font-size:1.45rem;line-height:1.35}
+.kicker{color:#b8d0ff;text-transform:uppercase;letter-spacing:.16em;font-size:.84rem;font-weight:700}
+.lede{font-size:clamp(1.1rem,3vw,1.4rem);max-width:680px;color:var(--muted)}.buttons{display:flex;gap:1rem;flex-wrap:wrap;margin-top:2rem}.buttons a{display:inline-block;padding:.65rem 1rem;border:1px solid #789ac2;border-radius:.65rem;text-decoration:none;font-weight:650;background:#283756}.buttons a:first-child{background:#d9eeff;color:#142334}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1rem}.card{padding:1.3rem;border:1px solid var(--line);border-radius:1rem;background:var(--surface)}.card p{color:var(--muted)}.status{border-left:3px solid #f9c77f;padding:.7rem 1.1rem;background:#302b28;color:#ffefd7}pre{overflow-x:auto;padding:1.3rem;background:#080e18;border-radius:.65rem;border:1px solid var(--line)}footer{margin-top:3rem;color:var(--muted);border-top:1px solid var(--line)}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<header><nav aria-label="Primary navigation"><a href="#overview">Overview</a><a href="#getting-started">Getting started</a><a href="https://github.com/godofecht/FlowStudio">Source</a><a href="https://github.com/godofecht/FlowStudio/releases">Releases</a></nav></header>
+<main id="overview">
+<section class="hero"><p class="kicker">Developer preview · v0.1.0-alpha.1</p><h1>FlowStudio</h1><p class="lede">A Flow-first scientific workspace. Edit, explore and run Flow, R and Python locally, with a Flow-native execution core and an independent browser interface.</p><div class="buttons"><a href="https://github.com/godofecht/FlowStudio/releases">Find a release</a><a href="https://github.com/godofecht/FlowStudio/blob/main/docs/PARITY.md">Feature parity tracker</a></div></section>
+<p class="status" role="note"><strong>Early preview.</strong> Not RStudio feature parity. Untrusted code is not sandboxed; the native server must remain on localhost. The hosted site is documentation only, not a public execution service.</p>
+<section aria-labelledby="features"><h2 id="features">Inside the workspace</h2><div class="cards"><article class="card"><h2>Source and projects</h2><p>Browser-mediated file access, basic editor operations, source cells, find/replace and project search.</p></article><article class="card"><h2>Flow-owned execution</h2><p>Flow routes execution of Flow, R and Python source through a loopback-only native HTTP server.</p></article><article class="card"><h2>Scientific workflows</h2><p>Early console, tabular-viewer and plot interfaces, with documented verification gaps.</p></article></div></section>
+<section id="getting-started"><h2>Getting started</h2><p>Download a package for macOS arm64 or Linux x86-64 from the versioned GitHub Release. Extract it and run from the extracted directory:</p><pre><code>./run.sh</code></pre><p>Open <code>http://127.0.0.1:8751</code>. Flow 2.x is required for executing Flow code; Python and R are separately installed as needed. See the <a href="https://github.com/godofecht/FlowStudio/blob/main/README.md">README</a> for build and test instructions and the <a href="https://github.com/godofecht/FlowStudio/blob/main/RELEASE_NOTES.md">release notes</a> for limitations.</p></section>
+</main><footer>FlowStudio · independently implemented · <a href="https://github.com/godofecht/FlowStudio/blob/main/LICENSE">Distribution terms</a> · <a href="https://github.com/godofecht/FlowStudio/actions/workflows/ci.yml">CI evidence</a></footer>
+</body>
+</html>

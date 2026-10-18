@@ -99,10 +99,9 @@ function send_execution(language: string, code: string) -> void {
 function send_editor() -> void {
     let page: FileRead = io_read_text("web/index.html")
     if page.ok {
-        # Keep the tested editor HTML immutable; enhance its console at serve time.
-        # Both scripts are explicit allowlisted assets, never user-selected paths.
-        let html: string = s_replace(page.data, "</body>", "<script src='/console.js'></script><script src='/workspace_console.js'></script></body>")
-        fs_reply(200, "text/html; charset=utf-8", html)
+        # Serve the same checked-in editor at / and /index.html. The page
+        # loads its allowlisted scripts in dependency order.
+        fs_reply(200, "text/html; charset=utf-8", page.data)
     } else {
         fs_reply(500, "text/plain; charset=utf-8", "Could not read web/index.html. Run from the FlowStudio repository root.")
     }

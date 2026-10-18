@@ -161,6 +161,14 @@ function createProjectExplorer({ tree, status, openHandle, picker }) {
   async function create(name) {
     if (!root) throw new Error("Open a project first.");
     if (!validFilename(name)) throw new Error("Invalid source filename.");
+    // File creation must never silently reopen an existing project file.
+    // This is best-effort: the browser API does not offer exclusive create.
+    try {
+      const existing = await root.getFileHandle(name);
+      if (existing) throw new Error("Source file already exists: " + name);
+    } catch (err) {
+      if (!err || err.name !== "NotFoundError") throw err;
+    }
     const handle = await root.getFileHandle(name, { create: true });
     const opened = await openHandle(handle, root.name + "/" + name);
     await refresh();

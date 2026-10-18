@@ -54,4 +54,4 @@ jobs:
           fi
           gh release create "$tag" dist/*.tar.gz dist/SHA256SUMS \
             --target "$VERIFIED_SHA" --title "FlowStudio $tag (developer preview)" \
-            --notes-file RELEASE_NOTES.md --prerelease --verify-tag=false
+            --notes-file RELEASE_NOTES.md --prerelease

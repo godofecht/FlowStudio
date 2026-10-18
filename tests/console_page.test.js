@@ -9,7 +9,7 @@ const html = fs.readFileSync(path.join(root, "web/console.html"), "utf8");
 const scripts = ["console.js", "console_page.js"].map(name =>
   fs.readFileSync(path.join(root, "web", name), "utf8"));
 
-function mount(reply = {ok:true,status:200,text:async () => "ok"}) {
+function mount(reply = {ok:true,status:200,text:async () => "ok"}, storage = null) {
   const elements = new Map();
   for (const id of ["consoleInput","consoleOutput","consoleLanguage","consoleRun",
       "consoleClear","consoleStatus"]) {
@@ -21,9 +21,16 @@ function mount(reply = {ok:true,status:200,text:async () => "ok"}) {
     });
   }
   elements.get("consoleLanguage").value = "python";
-  const document = {getElementById:id=>elements.get(id)};
+  elements.get("consoleRun").parentElement = {append(...nodes) {
+    for (const node of nodes) if (node.id) elements.set(node.id, node);
+  }};
+  function createElement() {
+    return {listeners:{}, addEventListener(name,fn){this.listeners[name]=fn;},
+      fire(name){this.listeners[name]?.();}, append(){}};
+  }
+  const document = {getElementById:id=>elements.get(id),createElement};
   const requests = [];
-  const context = vm.createContext({document,TextEncoder,console});
+  const context = vm.createContext({document,TextEncoder,console,localStorage:storage});
   for (const source of scripts) vm.runInContext(source, context);
   const controller = context.FlowStudioConsolePage.mount(document,async (url,options) => {
     requests.push({url,options});
@@ -65,4 +72,22 @@ test("switching languages preserves unfinished drafts", () => {
   app.el("consoleLanguage").value = "python";
   app.el("consoleLanguage").fire("change");
   assert.equal(app.el("consoleInput").value,"python draft");
+});
+
+test("standalone console opt-in persists commands and disabling erases them", async () => {
+  const data = new Map();
+  const storage = {getItem:k=>data.get(k)??null,
+    setItem:(k,v)=>data.set(k,String(v)),removeItem:k=>data.delete(k)};
+  const a = mount(undefined, storage);
+  assert.equal(a.controller.isPersisting(), false);
+  a.el("consoleRememberHistory").checked = true;
+  a.el("consoleRememberHistory").fire("change");
+  a.el("consoleInput").value = "x = 12";
+  assert.equal(await a.controller.run(a.el("consoleInput")), true);
+  const b = mount(undefined, storage);
+  assert.equal(b.controller.isPersisting(), true);
+  assert.deepEqual(Array.from(b.controller.history("python")), ["x = 12"]);
+  b.el("consoleRememberHistory").checked = false;
+  b.el("consoleRememberHistory").fire("change");
+  assert.equal(data.size, 0);
 });

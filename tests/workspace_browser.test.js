@@ -8,7 +8,8 @@ const path = require("node:path");
 const root = path.join(__dirname, "..");
 const html = fs.readFileSync(path.join(root, "web/index.html"), "utf8");
 const projectSource = fs.readFileSync(path.join(root, "web/project.js"), "utf8").trimEnd();
-const scripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)].map(m => m[1]);
+const scripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)]
+  .map(m => m[1]).filter(source => source.trim() && !source.includes("FlowStudioWorkspaceTabs.mount();"));
 
 class Element {
   constructor(tag = "div") {

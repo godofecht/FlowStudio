@@ -28,6 +28,7 @@
 
     let revision = 0;
     let busy = false;
+    let pendingReset = null;
     function selected() { return language.value === "python" || language.value === "r"; }
     function sync() {
       const enabled = selected();
@@ -43,6 +44,7 @@
     }
 
     async function refresh(name = language.value) {
+      if (pendingReset && pendingReset.name === name) return false;
       const token = ++revision;
       if (name !== language.value || !selected()) { busy = false; sync(); return false; }
       busy = true;
@@ -69,12 +71,14 @@
       const name = language.value;
       if (!selected() || busy) return false;
       const token = ++revision;
+      pendingReset = {name, token};
       busy = true;
       sync();
       message.textContent = "Resetting " + name + " …";
       try {
         await api.reset(name, fetcher);
         if (token !== revision || language.value !== name) return false;
+        pendingReset = null;
         busy = false;
         return await refresh(name);
       } catch (error) {
@@ -83,6 +87,10 @@
         }
         return false;
       } finally {
+        if (pendingReset && pendingReset.token === token) {
+          pendingReset = null;
+          if (token !== revision && language.value === name) void refresh(name);
+        }
         if (token === revision && language.value === name) {
           busy = false;
           sync();

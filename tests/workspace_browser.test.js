@@ -365,7 +365,7 @@ test("fallback notebook import populates unsaved Python source without retaining
   const app = workspace(directory("empty"));
   const notebook = JSON.stringify({nbformat:4,nbformat_minor:5,
     metadata:{kernelspec:{name:"python3",language:"python"}},
-    cells:[{cell_type:"code",source:"answer = 42\\n",outputs:[{output_type:"stream",text:"42"}]},
+    cells:[{cell_type:"code",source:"answer = 42\n",outputs:[{output_type:"stream",text:"42"}]},
       {cell_type:"markdown",source:"# Title"}]});
   const input = app.el("fallbackOpen");
   input.files = [{name:"analysis.ipynb",size:Buffer.byteLength(notebook),
@@ -373,7 +373,7 @@ test("fallback notebook import populates unsaved Python source without retaining
   await input.fire("change",{target:input});
   assert.equal(app.el("language").value,"python");
   assert.equal(app.el("fileLabel").textContent,"analysis.py");
-  assert.equal(app.el("source").value,"# %%\\nanswer = 42\\n# %% [markdown]\\n# # Title");
+  assert.equal(app.el("source").value,"# %%\nanswer = 42\n# %% [markdown]\n# # Title");
   assert.equal(app.el("dirty").hidden,false);
   assert.match(app.el("resultStatus").textContent,/1 saved outputs discarded/);
   assert.equal(input.value,"");

@@ -54,6 +54,49 @@ def main() -> None:
     )
     assert status == 200 and "flowstudio-python-ok" in output, (status, output)
 
+    # State persists across HTTP requests, survives language exceptions, and resets.
+    status, _ = request("POST", "/api/inspect/python", "")
+    assert status == 404, status
+    status, _ = request("POST", "/api/reset/python", "",
+                        {"X-FlowStudio-Intent": "run", "Origin": "http://attacker.invalid"})
+    assert status == 404, status
+
+    status, output = request("POST", "/api/run/python", "flowstudio_counter = 41", accepted_headers)
+    assert status == 200, (status, output)
+    status, output = request("POST", "/api/run/python",
+                             "flowstudio_counter += 1\nprint(flowstudio_counter)", accepted_headers)
+    assert status == 200 and output.strip() == "42", (status, output)
+    status, output = request("POST", "/api/inspect/python", "", accepted_headers)
+    assert status == 200, (status, output)
+    import json
+    variables = json.loads(output)["variables"]
+    assert any(v["name"] == "flowstudio_counter" and v["type"] == "int"
+               for v in variables), variables
+    status, output = request("POST", "/api/run/python", "raise ValueError('expected')", accepted_headers)
+    assert status == 422 and "ValueError" in output, (status, output)
+    status, output = request("POST", "/api/run/python", "print(flowstudio_counter)", accepted_headers)
+    assert status == 200 and output.strip() == "42", (status, output)
+    status, output = request("POST", "/api/reset/python", "", accepted_headers)
+    assert status == 200, (status, output)
+    status, output = request("POST", "/api/run/python", "print(flowstudio_counter)", accepted_headers)
+    assert status == 422 and "NameError" in output, (status, output)
+    status, output = request("POST", "/api/inspect/python", "", accepted_headers)
+    assert status == 200 and not any(v["name"] == "flowstudio_counter"
+                                     for v in json.loads(output)["variables"]), (status, output)
+
+    if shutil.which("R"):
+        status, output = request("POST", "/api/run/r", "flowstudio_counter <- 41", accepted_headers)
+        assert status == 200, (status, output)
+        status, output = request("POST", "/api/run/r", "flowstudio_counter + 1", accepted_headers)
+        assert status == 200 and "42" in output, (status, output)
+        status, output = request("POST", "/api/inspect/r", "", accepted_headers)
+        assert status == 200 and any(v["name"] == "flowstudio_counter"
+                                     for v in json.loads(output)["variables"]), (status, output)
+        status, output = request("POST", "/api/reset/r", "", accepted_headers)
+        assert status == 200, (status, output)
+        status, output = request("POST", "/api/run/r", "flowstudio_counter", accepted_headers)
+        assert status == 422, (status, output)
+
     if shutil.which("R"):
         status, output = request("POST", "/api/run/r",
                                  'cat("flowstudio-r-ok\\n")',

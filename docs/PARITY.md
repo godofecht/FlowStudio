@@ -153,3 +153,21 @@ The Flow-owned router now serves a keyboard-operable Files/Plots/Data tab contro
 ## Validation log — 2026-10-18 (draft recovery asset integration)
 
 Published `web/editor_recovery.js` as the explicit `/editor_recovery.js` asset route, and loaded the controller once after the editor's DOM and existing script are ready. Added `tests/test_recovery_wiring.py` to check route allowlisting, correct script placement and controller API presence. Static fetched-source checks confirmed all six corresponding invariants; the new Python unittest and physical browser recovery workflow have not yet been executed. This does not verify that draft persistence works in a real browser or that the native Flow server compiles. The recovery controller retains its earlier isolated tests, but no new parity feature is marked verified here.
+
+## Persistent interpreter HTTP wiring — 2026-10-19 (candidate)
+
+The Flow-owned dispatcher now routes R and Python source execution to the
+existing native persistent interpreter bridge. Added explicit same-origin,
+intent-gated POST inspection and reset routes, and live HTTP regression cases
+for state persistence, exception recovery, inspection and reset. The Flow
+execution path remains separate. Both HTTP listener and accepted sockets
+are marked FD_CLOEXEC before child interpreters are spawned.
+
+**Status: partial / native integration unverified.** Local candidate-level
+transformation and mock browser tests do not establish a passing Flow compile
+or live HTTP acceptance. R is optional in the smoke test, and has not been
+independently accepted on both target platforms. Session ownership is shared
+by all local clients, not isolated per project or user. Interpreter IPC
+failures/timeouts are currently reported as HTTP 422 by the dispatcher;
+proper 503/504 mapping remains a follow-up. The editor environment panel is
+not yet connected to the inspection/reset endpoints. No RStudio parity claim.

@@ -2,11 +2,12 @@
 # Requires the current Flow 2.x compiler and POSIX transport shim.
 #
 # This is a single-process, localhost-only development preview. It does not
-# sandbox executed code or persist R/Python interpreter state.
+# sandbox executed code. Python/R sessions persist for the lifetime of this loopback server.
 
 import std.process { ProcCmd, ProcResult, proc_cmd, proc_arg, proc_input, proc_timeout_ms, proc_run }
 import std.io { FileRead, io_read_text }
 import .data_routes { StaticAsset, data_route }
+import .kernel_session { KernelSession, KernelResult, kernel_open, kernel_eval, kernel_inspect, kernel_reset }
 
 extern {
     function fs_listen(port: i32) -> i32
@@ -106,6 +107,50 @@ function send_execution(language: string, code: string) -> void {
     fs_reply(result.status, "text/plain; charset=utf-8", result.output)
 }
 
+# Persistent R and Python interpreter ownership remains in the Flow dispatcher.
+# Sessions are shared by clients of this single local process, not isolated users.
+function send_kernel_execution(language: string, code: string) -> void {
+    let session: KernelSession = kernel_open(language)
+    if not session.started {
+        fs_reply(503, "text/plain; charset=utf-8", "Persistent interpreter unavailable")
+        return
+    }
+    let result: KernelResult = kernel_eval(session, code)
+    if result.ok {
+        fs_reply(200, "text/plain; charset=utf-8", result.output)
+    } else {
+        fs_reply(422, "text/plain; charset=utf-8", result.output)
+    }
+}
+
+function send_kernel_inspection(language: string) -> void {
+    let session: KernelSession = kernel_open(language)
+    if not session.started {
+        fs_reply(503, "text/plain; charset=utf-8", "Persistent interpreter unavailable")
+        return
+    }
+    let result: KernelResult = kernel_inspect(session)
+    if result.ok {
+        fs_reply(200, "application/json; charset=utf-8", result.output)
+    } else {
+        fs_reply(503, "text/plain; charset=utf-8", result.output)
+    }
+}
+
+function send_kernel_reset(language: string) -> void {
+    let session: KernelSession = kernel_open(language)
+    if not session.started {
+        fs_reply(503, "text/plain; charset=utf-8", "Persistent interpreter unavailable")
+        return
+    }
+    let restarted: KernelSession = kernel_reset(session)
+    if restarted.started {
+        fs_reply(200, "text/plain; charset=utf-8", "Session reset")
+    } else {
+        fs_reply(503, "text/plain; charset=utf-8", "Interpreter restart failed")
+    }
+}
+
 function send_editor() -> void {
     let page: FileRead = io_read_text("web/index.html")
     if page.ok {
@@ -148,11 +193,27 @@ function dispatch() -> void {
             return
         }
         if eq(path, "/api/run/r") {
-            send_execution("r", fs_body())
+            send_kernel_execution("r", fs_body())
             return
         }
         if eq(path, "/api/run/python") {
-            send_execution("python", fs_body())
+            send_kernel_execution("python", fs_body())
+            return
+        }
+        if eq(path, "/api/inspect/python") {
+            send_kernel_inspection("python")
+            return
+        }
+        if eq(path, "/api/inspect/r") {
+            send_kernel_inspection("r")
+            return
+        }
+        if eq(path, "/api/reset/python") {
+            send_kernel_reset("python")
+            return
+        }
+        if eq(path, "/api/reset/r") {
+            send_kernel_reset("r")
             return
         }
     }

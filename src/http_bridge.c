@@ -9,6 +9,7 @@
 #endif
 #include <arpa/inet.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <netinet/in.h>
 #include <signal.h>
 #include <stdio.h>
@@ -82,6 +83,13 @@ void fs_reply(int code, const char *content_type, const char *body)
     fs_client = -1;
 }
 
+/* Kernel children must never inherit the listening or accepted HTTP sockets. */
+static int fs_set_cloexec(int fd)
+{
+    int flags = fcntl(fd, F_GETFD);
+    return flags >= 0 && fcntl(fd, F_SETFD, flags | FD_CLOEXEC) == 0;
+}
+
 int fs_listen(int port)
 {
     if (port <= 0 || port > 65535) return -1;
@@ -89,6 +97,7 @@ int fs_listen(int port)
 
     int fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0) return -1;
+    if (!fs_set_cloexec(fd)) { close(fd); return -1; }
     int reuse = 1;
     (void)setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
 
@@ -174,6 +183,12 @@ int fs_read_request(int listener)
 {
     fs_client = accept(listener, NULL, NULL);
     if (fs_client < 0) return 0;
+    if (!fs_set_cloexec(fs_client))
+    {
+        close(fs_client);
+        fs_client = -1;
+        return 0;
+    }
 
     struct timeval tv = { 10, 0 };
     (void)setsockopt(fs_client, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));

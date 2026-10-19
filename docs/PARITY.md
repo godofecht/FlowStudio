@@ -276,7 +276,10 @@ handle, preventing accidental overwrite of notebook JSON on Save. Saved
 execution outputs are discarded and counted; malformed notebooks leave the
 existing editor buffer untouched. Discard confirmation applies to both paths.
 
-**Status: partial / unverified end-to-end.** Browser-mock regression tests were
-added for conversion, no-overwrite, invalid JSON and unsaved-buffer protection.
-Physical-browser acceptance, native Flow server, macOS and Linux builds and
-Jupyter execution remain outstanding.
+**Status: partial / simulated-browser validated.** The exact published HTML
+and importer passed V8 DOM simulations for Python fallback import, R native
+picker import, original notebook handle isolation on Save, invalid JSON
+rejection and unsaved-buffer preservation. JavaScript syntax checks passed.
+Browser-mock regression tests cover these cases and single discard confirmation.
+The Node test runner, physical browser, native Flow server, macOS/Linux builds
+and Jupyter execution remain unverified.

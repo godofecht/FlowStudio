@@ -687,9 +687,9 @@ async function openNotebookFile(file, skipDirtyCheck = false) {
   return true;
 }
 async function openFile() {
-  if (dirty && !confirm("Discard unsaved editor changes?")) return;
   try {
     if (typeof window.showOpenFilePicker === "function") {
+      if (dirty && !confirm("Discard unsaved editor changes?")) return;
       const handles = await window.showOpenFilePicker({ multiple: false });
       if (!handles.length) return;
       const selected = await handles[0].getFile();

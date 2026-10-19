@@ -82,6 +82,7 @@ function workspace(folder) {
   elements.get("language").value = "flow";
   elements.get("console").textContent = "Ready";
   let allowDiscard = true;
+  let discardCount = 0;
   let nextFilename = "created.flow";
   const fetches = [];
   const document = {
@@ -99,7 +100,7 @@ function workspace(folder) {
   };
   const context = vm.createContext({
     window, document,
-    confirm: () => allowDiscard,
+    confirm: () => { discardCount++; return allowDiscard; },
     fetch: async (url, options) => {
       fetches.push({ url, options });
       return { ok: true, status: 200, text: async () => "ran" };
@@ -116,6 +117,7 @@ function workspace(folder) {
   return {
     el: id => elements.get(id), document, fetches,
     setDiscard: value => { allowDiscard = value; },
+    getDiscardCount: () => discardCount,
     setNewFilename: value => { nextFilename = value; },
     setOpenPicker: fn => { window.showOpenFilePicker = fn; }
   };
@@ -407,4 +409,17 @@ test("invalid notebook and declined discard preserve current editor contents", a
   await input.fire("change",{target:input});
   assert.equal(app.el("source").value,"unsaved");
   assert.match(app.el("resultStatus").textContent,/Invalid notebook JSON/);
+});
+
+test("fallback file picker confirms dirty changes once, after selection", async () => {
+  const app = workspace(directory("empty"));
+  app.el("source").value = "unsaved";
+  app.el("source").fire("input");
+  await app.el("open").fire("click");
+  assert.equal(app.getDiscardCount(), 0);
+  const input = app.el("fallbackOpen");
+  input.files = [{name:"next.py",text:async()=>"print(42)"}];
+  await input.fire("change",{target:input});
+  assert.equal(app.getDiscardCount(), 1);
+  assert.equal(app.el("source").value, "print(42)");
 });

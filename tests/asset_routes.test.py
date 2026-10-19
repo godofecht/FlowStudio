@@ -19,7 +19,7 @@ class AssetRoutesTest(unittest.TestCase):
 
     def test_declared_assets_exist_and_are_unique(self):
         paths = re.findall(r'path: "(web/[^"]+)"', self.router)
-        self.assertEqual(len(paths), 25)
+        self.assertEqual(len(paths), 29)
         self.assertEqual(len(paths), len(set(paths)))
         for name in paths:
             with self.subTest(path=name):
@@ -27,7 +27,7 @@ class AssetRoutesTest(unittest.TestCase):
                 self.assertNotIn("..", name)
 
     def test_viewer_scripts_are_allowlisted(self):
-        for page in ("web/data.html", "web/plots.html", "web/console.html", "web/notebook.html"):
+        for page in ("web/data.html", "web/plots.html", "web/console.html", "web/notebook.html", "web/packages.html"):
             html = (ROOT / page).read_text(encoding="utf-8")
             scripts = re.findall(r'<script src="(?:\./)?/?([^"/]+)"', html)
             self.assertGreaterEqual(len(scripts), 2)

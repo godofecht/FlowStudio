@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FlowStudio — Installed Packages</title>
+<style>
+:root {font:15px/1.5 system-ui,sans-serif;color:#e8edf5;background:#10141e}
+body {max-width:1000px;margin:0 auto;padding:20px}
+header,.controls {display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+header {justify-content:space-between} a {color:#9fc3ff}
+button,select,input {font:inherit;padding:8px;background:#171e2a;color:inherit;border:1px solid #475675;border-radius:5px}
+:focus-visible {outline:2px solid #80a5fe;outline-offset:2px}
+table {border-collapse:collapse;width:100%;margin-top:16px}th,td {text-align:left;border-bottom:1px solid #39465f;padding:6px;overflow-wrap:anywhere}
+</style>
+</head>
+<body>
+<header><h1>Installed packages</h1><a href="/">Back to FlowStudio</a></header>
+<p>Read-only inventory from the local persistent Python or R interpreter. No package installation or update is performed. Inspecting packages executes a fixed query in the selected interpreter and may initialize its session.</p>
+<div class="controls"><label for="packageLanguage">Runtime</label>
+<select id="packageLanguage"><option value="python">Python</option><option value="r">R</option></select>
+<button id="packageRefresh" type="button">Refresh</button>
+<label for="packageSearch">Filter</label><input id="packageSearch" type="search" placeholder="Package or version"></div>
+<p id="packageStatus" role="status" aria-live="polite">Choose Refresh to inspect packages.</p>
+<table id="packageTable" aria-label="Installed packages"></table>
+<script src="/packages_queries.js"></script>
+<script src="/packages.js"></script>
+<script src="/packages_page.js"></script>
+</body>
+</html>

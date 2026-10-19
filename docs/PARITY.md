@@ -18,7 +18,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Project explorer | partial / DOM-tested | Open project, tree navigation, source-file creation and save; safe rename/delete still missing |
 | Data viewer | partial / browser-local CSV/TSV viewer integrated as workspace tab; native unverified | Interactive sortable/filterable tabular datasets including missing values |
 | Completion / language server | missing | R, Flow and Python completion/diagnostics |
-| Packages pane | missing | List, install, update with environment-aware package sources |
+| Packages pane | partial / read-only installed Python/R inventory; native/browser unverified | List, install, update with environment-aware package sources |
 | Git pane | missing | Status, diff, stage, commit and branch operations |
 | Help pane | missing | Context-aware language/function docs |
 | Find / replace / cross-file search | partial / Node + V8-tested | Literal in-buffer find next/previous, single/all replacement and project-wide search implemented; incremental indexing, regex and physical-browser verification missing |
@@ -237,3 +237,19 @@ new results. Unsupported kernels and raw cells are rejected.
 malformed inputs, unsupported kernels, saved-output omission and size limits.
 The native Flow server, physical-browser import, macOS and notebook execution
 remain independently unverified; this does not satisfy RStudio parity.
+
+## Read-only Python/R package inventory — 2026-10-19
+
+A Flow-allowlisted /packages page queries installed package names and versions
+through the existing persistent interpreter execution endpoints. Python uses
+importlib.metadata; R uses base installed.packages(). The fixed source does not
+install, update or remove packages. The page provides bounded filtering,
+deduplication, safe text rendering and stale-response protection. The main IDE
+links to the page.
+
+**Status: partial / local Node-tested only.** Eight controller tests passed
+locally, including Python namespace isolation and stale-request cancellation;
+a Python source probe enumerated installed distributions.
+Native Flow server routing, live HTTP execution, actual R execution,
+macOS and physical-browser acceptance remain unverified. Package
+installation/update and environment-specific library management are missing.

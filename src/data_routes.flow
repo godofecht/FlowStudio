@@ -30,6 +30,9 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/environment.js" {
         return StaticAsset { path: "web/environment.js", mime: "text/javascript; charset=utf-8", found: true }
     }
+    if url == "/workspace_environment.js" {
+        return StaticAsset { path: "web/workspace_environment.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
     if url == "/console" or url == "/console.html" {
         return StaticAsset { path: "web/console.html", mime: "text/html; charset=utf-8", found: true }
     }

@@ -12,8 +12,8 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | R source execution | partial / unverified | Run via installed R; preserve state across evaluations |
 | Python source execution | partial / unverified | Run via installed Python; preserve state across evaluations |
 | Editor selection execution | unverified | Selection runs without accidentally executing entire buffer |
-| Persistent REPL/session | missing | Incremental variables and package state persist until reset |
-| Variable inspector | missing | Nested objects / types / dimensions inspectable and refresh after execution |
+| Persistent REPL/session | partial / Python/R worker and HTTP routes; native cross-platform verification pending | Incremental variables and package state persist until reset |
+| Variable inspector | partial / browser wiring and basic Python/R values; browser acceptance pending | Nested objects / types / dimensions inspectable and refresh after execution |
 | Plot viewer | partial / Node-tested PNG import and integrated workspace tab; native unverified | png/svg plot history, zoom, save and deterministic device lifecycle |
 | Project explorer | partial / DOM-tested | Open project, tree navigation, source-file creation and save; safe rename/delete still missing |
 | Data viewer | partial / browser-local CSV/TSV viewer integrated as workspace tab; native unverified | Interactive sortable/filterable tabular datasets including missing values |
@@ -171,3 +171,20 @@ by all local clients, not isolated per project or user. Interpreter IPC
 failures/timeouts are currently reported as HTTP 422 by the dispatcher;
 proper 503/504 mapping remains a follow-up. The editor environment panel is
 not yet connected to the inspection/reset endpoints. No RStudio parity claim.
+
+## Persistent environment integration — 2026-10-19
+
+The Flow-owned asset allowlist serves `/environment.js` and `/workspace_environment.js`.
+The four-pane editor loads the inspector after the console and refreshes Python/R
+variables following successful execution or a language exception (HTTP 200/422).
+The interactive console uses the same refresh hook. The execution language is
+captured before asynchronous HTTP dispatch, avoiding a runtime-switch mismatch.
+The panel provides explicit refresh/reset controls; R and Python kernels remain
+shared by all clients of this localhost process and must not be exposed remotely.
+
+**Status: partial.** Isolated Node controller tests and source-wiring contracts
+are not physical-browser acceptance. The Flow-owned server and persistent
+HTTP endpoints require Linux/macOS integration verification on this exact branch.
+Kernel timeout/error classification, nested variable inspection, project-scoped
+session isolation, plotting, package management, debugging and full RStudio parity
+remain incomplete.

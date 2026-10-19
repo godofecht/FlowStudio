@@ -74,6 +74,11 @@ function mount(doc = document, request = fetch) {
         body: code
       });
       append((await response.text()) + "\n");
+      if (response.status === 200 || response.status === 422) {
+        const environment = root.FlowStudioWorkspaceEnvironment;
+        if (environment && typeof environment.afterExecution === "function")
+          void environment.afterExecution(name);
+      }
       status(response.ok ? "Finished" :
         response.status === 422 ? "Execution failed" :
         response.status === 503 ? "Interpreter unavailable" :

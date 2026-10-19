@@ -97,7 +97,7 @@ footer { padding: 5px 14px; display: flex; justify-content: space-between; gap: 
     <h2>Environment / History</h2>
     <div class="body">
       <p id="runtimeInfo">Flow execution available when Flow is installed.</p>
-      <p class="muted hint">Variable inspection and persistent language sessions are planned. Each execution currently starts a fresh subprocess.</p>
+      <p class="muted hint">R and Python use persistent local interpreters shared by clients of this loopback server. Flow runs independently. Sessions are not sandboxed or isolated per user.</p>
       <p class="muted hint">The IDE executes code with your local OS permissions. Only run code you trust.</p>
     </div>
   </section>
@@ -601,10 +601,11 @@ async function executeCode(code, label) {
   }
   el("run").disabled = true;
   el("runCell").disabled = true;
-  status("Running " + language.value + " …");
-  consolePane.textContent += "\n> " + label + " (" + language.value + ")\n";
+  const executionLanguage = language.value;
+  status("Running " + executionLanguage + " …");
+  consolePane.textContent += "\n> " + label + " (" + executionLanguage + ")\n";
   try {
-    const response = await fetch("/api/run/" + language.value, {
+    const response = await fetch("/api/run/" + executionLanguage, {
       method: "POST",
       headers: { "Content-Type": "text/plain; charset=utf-8", "X-FlowStudio-Intent": "run" },
       body: code
@@ -617,6 +618,11 @@ async function executeCode(code, label) {
       response.status === 504 ? "Execution timed out" :
       "HTTP error " + response.status;
     status(message, response.ok ? "ok" : "error");
+    if (response.status === 200 || response.status === 422) {
+      const environment = window.FlowStudioWorkspaceEnvironment;
+      if (environment && typeof environment.afterExecution === "function")
+        void environment.afterExecution(executionLanguage);
+    }
   } catch (error) {
     consolePane.textContent += String(error) + "\n";
     status("Execution request failed", "error");
@@ -820,7 +826,6 @@ src.addEventListener("click", updateCursor);
 src.addEventListener("keyup", updateCursor);
 language.addEventListener("change", () => {
   if (filename.startsWith("untitled.")) setFilename("untitled." + extension(language.value));
-  el("runtimeInfo").textContent = "Selected runtime: " + language.value + ". Each execution is independent.";
 });
 el("run").addEventListener("click", run);
 el("runCell").addEventListener("click", runCell);
@@ -875,5 +880,7 @@ document.addEventListener("keydown", event => {
 <script>FlowStudioWorkspaceTabs.mount();</script>
 <script src="/console.js"></script>
 <script src="/workspace_console.js"></script>
+<script src="/environment.js"></script>
+<script src="/workspace_environment.js"></script>
 </body>
 </html>

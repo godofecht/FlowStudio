@@ -12,7 +12,7 @@ A **Flow-first scientific IDE** intended to become a capable successor to RStudi
 
 The initial implementation includes a native Flow server (src/main.flow), a small POSIX sockets/temp-file bridge (src/http_bridge.c), and a four-pane browser workspace (web/index.html).
 
-The browser can open and save source files, choose a local project folder, lazily browse its source tree, create a source file in the project root, refresh the tree, search project files for literal text with exact match navigation, run the selected text or whole buffer as Flow, R or Python, and display captured stdout/stderr. Project operations use the browser File System Access API and are unavailable in browsers without folder-picker support. Python and R use a **fresh interpreter per execution**; these are not persistent notebook sessions.
+The browser can open and save source files, choose a local project folder, lazily browse its source tree, create a source file in the project root, refresh the tree, search project files for literal text with exact match navigation, run the selected text or whole buffer as Flow, R or Python, and display captured stdout/stderr. Project operations use the browser File System Access API and are unavailable in browsers without folder-picker support. Python and R use persistent local interpreter sessions shared by clients of this loopback server; they are not sandboxed or isolated per user/project. Flow execution remains independent.
 
 ### Editor find and replace
 
@@ -71,7 +71,7 @@ After a successful native build and acceptance test (`python3 scripts/verify_nat
              |
        Flow / R / Python
 
-Current API: GET /, GET /health, POST /api/run/flow, POST /api/run/r and POST /api/run/python. POST sends UTF-8 source text and requires an X-FlowStudio-Intent: run request header. Python and R subprocesses have a 15-second timeout; Flow has a 60-second compile-and-run budget to accommodate cold compiler start. All processes have bounded, captured output. No shell command-string evaluation is used.
+Current API: GET /, GET /health, POST /api/run/{flow,r,python}, POST /api/inspect/{r,python}, and POST /api/reset/{r,python}. POST sends UTF-8 source text and requires an X-FlowStudio-Intent: run request header. Persistent Python/R kernel IPC requests have a 5-second deadline; Flow has a 60-second compile-and-run budget to accommodate cold compiler start. All processes have bounded, captured output. No shell command-string evaluation is used.
 
 ## Security and scope
 

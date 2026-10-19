@@ -264,3 +264,19 @@ next request creates a new one. Inspection propagates native failures.
 **Partial, not verified parity:** native Flow build, live HTTP and R acceptance
 on both Linux and macOS are still required. The HTTP smoke suite covers
 oversize, timeout and recovery, but passing a transport-only test is insufficient.
+
+## Jupyter notebook import directly into the workspace — 2026-10-19
+
+The existing Open action now accepts Jupyter v4 Python/R notebooks through
+both the native File System Access picker and the fallback file input. The
+browser-local importer validates the notebook and converts code/markdown cells
+to editable percent-delimited source. The converted buffer is marked unsaved,
+named .py or .R, and deliberately detached from the original .ipynb file
+handle, preventing accidental overwrite of notebook JSON on Save. Saved
+execution outputs are discarded and counted; malformed notebooks leave the
+existing editor buffer untouched. Discard confirmation applies to both paths.
+
+**Status: partial / unverified end-to-end.** Browser-mock regression tests were
+added for conversion, no-overwrite, invalid JSON and unsaved-buffer protection.
+Physical-browser acceptance, native Flow server, macOS and Linux builds and
+Jupyter execution remain outstanding.

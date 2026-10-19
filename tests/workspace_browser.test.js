@@ -104,17 +104,20 @@ function workspace(folder) {
       fetches.push({ url, options });
       return { ok: true, status: 200, text: async () => "ran" };
     },
-    Blob, URL, setTimeout, console
+    Blob, URL, TextEncoder, setTimeout, console
   });
   assert.equal(scripts.length, 4, "Expected project, editor-find, cells and workspace scripts");
   vm.runInContext(scripts[0], context, { filename: "project-embedded.js" });
   vm.runInContext(scripts[1], context, { filename: "editor-find-embedded.js" });
   vm.runInContext(scripts[2], context, { filename: "source-cells-embedded.js" });
+  vm.runInContext(fs.readFileSync(path.join(root, "web/notebook_import.js"), "utf8"),
+    context, {filename:"notebook_import.js"});
   vm.runInContext(scripts[3], context, { filename: "workspace.js" });
   return {
     el: id => elements.get(id), document, fetches,
     setDiscard: value => { allowDiscard = value; },
-    setNewFilename: value => { nextFilename = value; }
+    setNewFilename: value => { nextFilename = value; },
+    setOpenPicker: fn => { window.showOpenFilePicker = fn; }
   };
 }
 
@@ -356,4 +359,52 @@ test("Ctrl+Shift+Enter executes cell instead of selected text", async () => {
   assert.equal(prevented, true);
   assert.equal(app.fetches.length, 1);
   assert.equal(app.fetches[0].options.body, "y <- 2\n");
+});
+
+test("fallback notebook import populates unsaved Python source without retaining JSON handle", async () => {
+  const app = workspace(directory("empty"));
+  const notebook = JSON.stringify({nbformat:4,nbformat_minor:5,
+    metadata:{kernelspec:{name:"python3",language:"python"}},
+    cells:[{cell_type:"code",source:"answer = 42\\n",outputs:[{output_type:"stream",text:"42"}]},
+      {cell_type:"markdown",source:"# Title"}]});
+  const input = app.el("fallbackOpen");
+  input.files = [{name:"analysis.ipynb",size:Buffer.byteLength(notebook),
+    text:async()=>notebook}];
+  await input.fire("change",{target:input});
+  assert.equal(app.el("language").value,"python");
+  assert.equal(app.el("fileLabel").textContent,"analysis.py");
+  assert.equal(app.el("source").value,"# %%\\nanswer = 42\\n# %% [markdown]\\n# # Title");
+  assert.equal(app.el("dirty").hidden,false);
+  assert.match(app.el("resultStatus").textContent,/1 saved outputs discarded/);
+  assert.equal(input.value,"");
+  assert.equal(app.fetches.length,0);
+});
+
+test("native picker notebook conversion never overwrites original notebook on Save", async () => {
+  const original = JSON.stringify({nbformat:4,metadata:{kernelspec:{name:"ir",language:"R"}},
+    cells:[{cell_type:"code",source:"x <- 7",outputs:[]}]});
+  const handle = file("study.ipynb",original);
+  const app = workspace(directory("empty"));
+  app.setOpenPicker(async()=>[handle]);
+  await app.el("open").fire("click");
+  assert.equal(app.el("language").value,"r");
+  assert.equal(app.el("fileLabel").textContent,"study.R");
+  assert.equal(app.el("dirty").hidden,false);
+  await app.el("save").fire("click");
+  assert.equal(handle.content,original);
+});
+
+test("invalid notebook and declined discard preserve current editor contents", async () => {
+  const app = workspace(directory("empty"));
+  app.el("source").value="unsaved";
+  app.el("source").fire("input");
+  const input = app.el("fallbackOpen");
+  input.files=[{name:"bad.ipynb",size:4,text:async()=>"{bad"}];
+  app.setDiscard(false);
+  await input.fire("change",{target:input});
+  assert.equal(app.el("source").value,"unsaved");
+  app.setDiscard(true);
+  await input.fire("change",{target:input});
+  assert.equal(app.el("source").value,"unsaved");
+  assert.match(app.el("resultStatus").textContent,/Invalid notebook JSON/);
 });

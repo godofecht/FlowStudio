@@ -667,13 +667,36 @@ async function openEditorHandle(handle, path = null, skipDirtyCheck = false) {
   status("Opened " + (path || handle.name), "ok");
   return true;
 }
+async function openNotebookFile(file, skipDirtyCheck = false) {
+  if (dirty && !skipDirtyCheck && !confirm("Discard unsaved editor changes?")) return false;
+  if (file.size > 2 * 1024 * 1024) throw new Error("Notebook exceeds the 2 MiB import limit.");
+  const notebook = FlowStudioNotebookImport.importNotebook(await file.text());
+  // A converted notebook is a new, unsaved source buffer. Never retain the
+  // .ipynb handle: Save must not overwrite notebook JSON with plain source.
+  src.value = notebook.source;
+  fileHandle = null;
+  fileBaseline = null;
+  projectPath = null;
+  setFilename(file.name.replace(/\.ipynb$/i, notebook.language === "r" ? ".R" : ".py"));
+  language.value = notebook.language;
+  markDirty(true);
+  updateCursor();
+  updateFindCount();
+  status("Imported " + notebook.cells + " notebook cells; " +
+    notebook.discardedOutputs + " saved outputs discarded. Save as source.", "ok");
+  return true;
+}
 async function openFile() {
   if (dirty && !confirm("Discard unsaved editor changes?")) return;
   try {
     if (typeof window.showOpenFilePicker === "function") {
       const handles = await window.showOpenFilePicker({ multiple: false });
       if (!handles.length) return;
-      await openEditorHandle(handles[0], null, true);
+      const selected = await handles[0].getFile();
+      if (/\.ipynb$/i.test(selected.name))
+        await openNotebookFile(selected, true);
+      else
+        await openEditorHandle(handles[0], null, true);
     } else {
       el("fallbackOpen").click();
     }
@@ -837,16 +860,27 @@ el("clear").addEventListener("click", () => { consolePane.textContent = ""; });
 el("fallbackOpen").addEventListener("change", async event => {
   const file = event.target.files[0];
   if (!file) return;
-  src.value = await file.text();
-  fileHandle = null;
-  fileBaseline = null;
-  projectPath = null;
-  setFilename(file.name);
-  language.value = inferLanguage(file.name);
-  markDirty(false);
-  updateFindCount();
-  status("Opened " + file.name, "ok");
-  event.target.value = "";
+  try {
+    if (/\.ipynb$/i.test(file.name)) {
+      await openNotebookFile(file);
+      return;
+    }
+    if (dirty && !confirm("Discard unsaved editor changes?")) return;
+    src.value = await file.text();
+    fileHandle = null;
+    fileBaseline = null;
+    projectPath = null;
+    setFilename(file.name);
+    language.value = inferLanguage(file.name);
+    markDirty(false);
+    updateCursor();
+    updateFindCount();
+    status("Opened " + file.name, "ok");
+  } catch (error) {
+    status(error.message || String(error), "error");
+  } finally {
+    event.target.value = "";
+  }
 });
 document.addEventListener("keydown", event => {
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") {
@@ -884,6 +918,7 @@ document.addEventListener("keydown", event => {
 <script src="/workspace_console.js"></script>
 <script src="/environment.js"></script>
 <script src="/workspace_environment.js"></script>
+<script src="/notebook_import.js"></script>
 <script src="/notebook_export.js"></script>
 <script src="/workspace_notebook.js"></script>
 </body>

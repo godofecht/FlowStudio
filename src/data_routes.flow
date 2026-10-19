@@ -33,6 +33,18 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/workspace_environment.js" {
         return StaticAsset { path: "web/workspace_environment.js", mime: "text/javascript; charset=utf-8", found: true }
     }
+    if url == "/notebook" or url == "/notebook.html" {
+        return StaticAsset { path: "web/notebook.html", mime: "text/html; charset=utf-8", found: true }
+    }
+    if url == "/source_cells.js" {
+        return StaticAsset { path: "web/source_cells.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/notebook_export.js" {
+        return StaticAsset { path: "web/notebook_export.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/notebook_page.js" {
+        return StaticAsset { path: "web/notebook_page.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
     if url == "/console" or url == "/console.html" {
         return StaticAsset { path: "web/console.html", mime: "text/html; charset=utf-8", found: true }
     }

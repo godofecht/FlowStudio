@@ -23,6 +23,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Help pane | missing | Context-aware language/function docs |
 | Find / replace / cross-file search | partial / Node + V8-tested | Literal in-buffer find next/previous, single/all replacement and project-wide search implemented; incremental indexing, regex and physical-browser verification missing |
 | Percent-delimited source cells | partial / Node-tested; native execution unverified | Run only the active `# %%` code cell in Flow/R/Python; markdown and empty cells do not execute |
+| Jupyter notebook export | partial / Node-tested; served browser unverified | Convert Python/R percent-delimited code and markdown cells into valid nbformat 4; execute exported notebook independently |
 | R Markdown / Quarto | missing | Render notebook with inline plots and HTML export |
 | Source debugger | missing | Breakpoints, stack, variables, step execution |
 | Remote/server mode | missing | Authenticated, origin-aware multi-user sessions with isolation |
@@ -188,3 +189,19 @@ HTTP endpoints require Linux/macOS integration verification on this exact branch
 Kernel timeout/error classification, nested variable inspection, project-scoped
 session isolation, plotting, package management, debugging and full RStudio parity
 remain incomplete.
+
+## Python/R percent-source to Jupyter notebook export — 2026-10-19
+
+A new Flow-allowlisted local `/notebook` page imports Python or R source or
+accepts pasted text, parses the existing `# %%` code and markdown boundaries,
+and downloads a Jupyter Notebook v4.5 JSON file with appropriate Python 3 or
+IRkernel metadata. The page uses browser-local file reading and downloads; it
+never sends source to the server or executes code. Outputs are intentionally
+empty, and Flow notebook export is explicitly unsupported without a Flow kernel.
+
+**Status: partial.** Seven isolated Node tests passed for notebook structure,
+Unicode, markdown conversion, source bounds and filename normalization. Two
+additional mocked-controller tests passed locally. Real served-browser
+acceptance, exported notebook execution, R kernel installation, native Flow
+compilation and macOS acceptance remain unverified. This is not Quarto or
+R Markdown rendering and does not establish RStudio parity.

@@ -13,7 +13,7 @@ test("Flow allowlists both persistent environment scripts", () => {
     assert.ok(routes.includes('path: "web/' + name + '"'));
   }
   const paths = [...routes.matchAll(/path: "(web\/[^"]+)"/g)].map(m => m[1]);
-  assert.equal(paths.length, 19);
+  assert.equal(paths.length, 23);
   assert.equal(new Set(paths).size, paths.length);
   for (const file of paths) assert.ok(fs.existsSync(path.join(root, file)), file);
 });

@@ -79,6 +79,7 @@ footer { padding: 5px 14px; display: flex; justify-content: space-between; gap: 
     <button id="save">Save file</button>
     <button id="run" class="primary" title="Run selection or entire buffer (Ctrl/⌘+Enter)">▶ Run</button>
     <button id="runCell" title="Run current # %% cell (Ctrl/⌘+Shift+Enter)">Run cell</button>
+    <button id="exportNotebook" type="button" title="Export current Python/R buffer to Jupyter .ipynb">Export notebook</button>
     <input id="fallbackOpen" type="file" accept=".flow,.R,.r,.py,.txt" hidden>
   </div>
 </header>
@@ -882,5 +883,7 @@ document.addEventListener("keydown", event => {
 <script src="/workspace_console.js"></script>
 <script src="/environment.js"></script>
 <script src="/workspace_environment.js"></script>
+<script src="/notebook_export.js"></script>
+<script src="/workspace_notebook.js"></script>
 </body>
 </html>

@@ -19,7 +19,7 @@ class AssetRoutesTest(unittest.TestCase):
 
     def test_declared_assets_exist_and_are_unique(self):
         paths = re.findall(r'path: "(web/[^"]+)"', self.router)
-        self.assertEqual(len(paths), 23)
+        self.assertEqual(len(paths), 24)
         self.assertEqual(len(paths), len(set(paths)))
         for name in paths:
             with self.subTest(path=name):

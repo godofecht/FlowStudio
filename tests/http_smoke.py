@@ -84,6 +84,16 @@ def main() -> None:
     assert status == 200 and not any(v["name"] == "flowstudio_counter"
                                      for v in json.loads(output)["variables"]), (status, output)
 
+    # The persistent kernel has a stricter source limit than the HTTP transport.
+    status, output = request("POST", "/api/run/python", "x" * 65537, accepted_headers)
+    assert status == 413 and "64 KiB" in output, (status, output)
+    status, output = request("POST", "/api/run/python", "print(1234)", accepted_headers)
+    assert status == 200 and output.strip() == "1234", (status, output)
+    status, output = request("POST", "/api/run/python", "while True: pass", accepted_headers)
+    assert status == 504 and "timed out" in output, (status, output)
+    status, output = request("POST", "/api/run/python", "print(5678)", accepted_headers)
+    assert status == 200 and output.strip() == "5678", (status, output)
+
     if shutil.which("R"):
         status, output = request("POST", "/api/run/r", "flowstudio_counter <- 41", accepted_headers)
         assert status == 200, (status, output)

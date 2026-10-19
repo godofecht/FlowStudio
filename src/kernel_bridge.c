@@ -24,12 +24,27 @@ typedef struct { pid_t pid; int input; int output; } FsKernel;
 static FsKernel fs_kernels[2] = {{0, -1, -1}, {0, -1, -1}};
 static char fs_response[FS_KERNEL_MAX_OUTPUT + 1];
 static int fs_success = 0;
+static int fs_http_status = 503;
 static int fs_registered = 0;
+
+static int64_t fs_clock_ms(void);
+
+static void fs_error_status(int status, const char *message)
+{
+    fs_success = 0;
+    fs_http_status = status;
+    snprintf(fs_response, sizeof(fs_response), "%s", message);
+}
 
 static void fs_error(const char *message)
 {
-    fs_success = 0;
-    snprintf(fs_response, sizeof(fs_response), "%s", message);
+    fs_error_status(503, message);
+}
+
+static void fs_io_error(const char *message, int64_t deadline)
+{
+    int64_t now = fs_clock_ms();
+    fs_error_status(now >= deadline && now >= 0 ? 504 : 503, message);
 }
 
 static int64_t fs_clock_ms(void)
@@ -199,6 +214,7 @@ int fs_kernel_start(const char *language)
     kernel->input = to_child[1];
     kernel->output = from_child[0];
     fs_success = 1;
+    fs_http_status = 200;
     fs_response[0] = 0;
     return id;
 }
@@ -211,12 +227,12 @@ static const char *fs_exchange(int id, char command, const char *source)
     size_t length = strlen(source);
     if (length > FS_KERNEL_MAX_CODE)
     {
-        fs_error("Source exceeds the 64 KiB request limit");
+        fs_error_status(413, "Source exceeds the 64 KiB request limit");
         return fs_response;
     }
     if (command != 'E' && length != 0)
     {
-        fs_error("Invalid kernel command payload");
+        fs_error_status(400, "Invalid kernel command payload");
         return fs_response;
     }
     FsKernel *kernel = &fs_kernels[id - 1];
@@ -233,14 +249,14 @@ static const char *fs_exchange(int id, char command, const char *source)
         !fs_write_deadline(kernel->input, header, (size_t)count, deadline) ||
         !fs_write_deadline(kernel->input, source, length, deadline))
     {
-        fs_error("Interpreter input failed or timed out; session closed");
+        fs_io_error("Interpreter input failed or timed out; session closed", deadline);
         fs_stop(kernel);
         return fs_response;
     }
     char response_header[48];
     if (!fs_read_header(kernel->output, response_header, sizeof(response_header), deadline))
     {
-        fs_error("Interpreter response failed or timed out; session closed");
+        fs_io_error("Interpreter response failed or timed out; session closed", deadline);
         fs_stop(kernel);
         return fs_response;
     }
@@ -263,12 +279,13 @@ static const char *fs_exchange(int id, char command, const char *source)
     }
     if (!fs_read_deadline(kernel->output, fs_response, (size_t)bytes, deadline))
     {
-        fs_error("Interpreter output failed or timed out; session closed");
+        fs_io_error("Interpreter output failed or timed out; session closed", deadline);
         fs_stop(kernel);
         return fs_response;
     }
     fs_response[bytes] = 0;
     fs_success = good;
+    fs_http_status = good ? 200 : 422;
     return fs_response;
 }
 
@@ -285,6 +302,11 @@ const char *fs_kernel_inspect(int id)
 int fs_kernel_ok(void)
 {
     return fs_success;
+}
+
+int fs_kernel_status(void)
+{
+    return fs_http_status;
 }
 
 int fs_kernel_reset(int id)

@@ -253,3 +253,14 @@ a Python source probe enumerated installed distributions.
 Native Flow server routing, live HTTP execution, actual R execution,
 macOS and physical-browser acceptance remain unverified. Package
 installation/update and environment-specific library management are missing.
+
+## Persistent kernel HTTP error classification — 2026-10-19
+
+The Flow-owned dispatcher now preserves native kernel HTTP status: 200 success,
+422 interpreter exception, 413 source over 64 KiB, 503 unavailable/broken
+interpreter and 504 IPC deadline exceeded. Timeout closes the kernel and the
+next request creates a new one. Inspection propagates native failures.
+
+**Partial, not verified parity:** native Flow build, live HTTP and R acceptance
+on both Linux and macOS are still required. The HTTP smoke suite covers
+oversize, timeout and recovery, but passing a transport-only test is insufficient.

@@ -116,11 +116,7 @@ function send_kernel_execution(language: string, code: string) -> void {
         return
     }
     let result: KernelResult = kernel_eval(session, code)
-    if result.ok {
-        fs_reply(200, "text/plain; charset=utf-8", result.output)
-    } else {
-        fs_reply(422, "text/plain; charset=utf-8", result.output)
-    }
+    fs_reply(result.status, "text/plain; charset=utf-8", result.output)
 }
 
 function send_kernel_inspection(language: string) -> void {
@@ -130,10 +126,10 @@ function send_kernel_inspection(language: string) -> void {
         return
     }
     let result: KernelResult = kernel_inspect(session)
-    if result.ok {
+    if result.status == 200 {
         fs_reply(200, "application/json; charset=utf-8", result.output)
     } else {
-        fs_reply(503, "text/plain; charset=utf-8", result.output)
+        fs_reply(result.status, "text/plain; charset=utf-8", result.output)
     }
 }
 

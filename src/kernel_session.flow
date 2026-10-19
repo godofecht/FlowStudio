@@ -9,6 +9,7 @@ extern {
     function fs_kernel_reset(id: i32) -> i32
     function fs_kernel_close(id: i32) -> void
     function fs_kernel_ok() -> i32
+    function fs_kernel_status() -> i32
 }
 
 export struct KernelSession {
@@ -19,7 +20,8 @@ export struct KernelSession {
 
 export struct KernelResult {
     output: string,
-    ok: bool
+    ok: bool,
+    status: i32
 }
 
 export function kernel_open(language: string) -> KernelSession {
@@ -29,18 +31,18 @@ export function kernel_open(language: string) -> KernelSession {
 
 export function kernel_eval(session: KernelSession, source: string) -> KernelResult {
     if not session.started {
-        return KernelResult { output: "Kernel not started", ok: false }
+        return KernelResult { output: "Kernel not started", ok: false, status: 503 }
     }
     let output: string = fs_kernel_eval(session.id, source)
-    return KernelResult { output: output, ok: fs_kernel_ok() == 1 }
+    return KernelResult { output: output, ok: fs_kernel_ok() == 1, status: fs_kernel_status() }
 }
 
 export function kernel_inspect(session: KernelSession) -> KernelResult {
     if not session.started {
-        return KernelResult { output: "Kernel not started", ok: false }
+        return KernelResult { output: "Kernel not started", ok: false, status: 503 }
     }
     let output: string = fs_kernel_inspect(session.id)
-    return KernelResult { output: output, ok: fs_kernel_ok() == 1 }
+    return KernelResult { output: output, ok: fs_kernel_ok() == 1, status: fs_kernel_status() }
 }
 
 export function kernel_reset(session: KernelSession) -> KernelSession {

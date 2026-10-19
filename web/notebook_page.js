@@ -6,14 +6,22 @@ let sourceFilename = "untitled.py";
 async function importSource(file) {
   if (!file) return;
   if (file.size > 2 * 1024 * 1024) throw new Error("Source file exceeds 2 MiB.");
+  const notebookFile = /\.ipynb$/i.test(file.name);
   const lang = /\.py$/i.test(file.name) ? "python" : /\.r$/i.test(file.name) ? "r" : null;
-  if (!lang) throw new Error("Only Python .py and R .R source files can be imported.");
+  if (!notebookFile && !lang)
+    throw new Error("Only Python .py, R .R and Jupyter .ipynb files can be imported.");
   const text = await file.text();
-  FlowStudioSourceCells.parseCells(text);
-  el("source").value = text;
-  el("language").value = lang;
-  sourceFilename = file.name;
-  el("status").textContent = "Loaded " + file.name;
+  const converted = notebookFile ? FlowStudioNotebookImport.importNotebook(text) : null;
+  const source = converted ? converted.source : text;
+  FlowStudioSourceCells.parseCells(source);
+  el("source").value = source;
+  el("language").value = converted ? converted.language : lang;
+  sourceFilename = notebookFile ?
+    file.name.replace(/\.ipynb$/i, converted.language === "r" ? ".R" : ".py") : file.name;
+  el("status").textContent = converted ?
+    "Imported " + converted.cells + " notebook cells from " + file.name +
+      " (discarded " + converted.discardedOutputs + " saved outputs)." :
+    "Loaded " + file.name;
 }
 
 function exportNotebook() {

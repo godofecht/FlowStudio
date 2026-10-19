@@ -223,3 +223,17 @@ markdown cells, size/language guards, URL cleanup and serving contracts.
 Native Flow compilation, real served-browser interaction, R kernel execution,
 Linux/macOS end-to-end acceptance and independent notebook execution remain
 unverified. No RStudio parity criterion is promoted.
+
+## Jupyter v4 notebook source import — 2026-10-19
+
+The local notebook page now imports Python/R Jupyter v4 `.ipynb` files into
+percent-delimited source, preserving code and markdown cells, and re-exports
+source-only notebooks. Import validates kernel metadata, source shape, cell count,
+2 MiB size bounds and ambiguous embedded percent-cell boundaries. Stored
+execution outputs are deliberately discarded, not executed or represented as
+new results. Unsupported kernels and raw cells are rejected.
+
+**Status: partial / Node-tested.** Unit tests cover Python/R round-trips,
+malformed inputs, unsupported kernels, saved-output omission and size limits.
+The native Flow server, physical-browser import, macOS and notebook execution
+remain independently unverified; this does not satisfy RStudio parity.

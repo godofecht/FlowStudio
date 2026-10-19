@@ -42,6 +42,9 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/notebook_export.js" {
         return StaticAsset { path: "web/notebook_export.js", mime: "text/javascript; charset=utf-8", found: true }
     }
+    if url == "/notebook_import.js" {
+        return StaticAsset { path: "web/notebook_import.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
     if url == "/notebook_page.js" {
         return StaticAsset { path: "web/notebook_page.js", mime: "text/javascript; charset=utf-8", found: true }
     }

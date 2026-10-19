@@ -14,6 +14,14 @@ The initial implementation includes a native Flow server (src/main.flow), a smal
 
 The browser can open and save source files, choose a local project folder, lazily browse its source tree, create a source file in the project root, refresh the tree, search project files for literal text with exact match navigation, run the selected text or whole buffer as Flow, R or Python, and display captured stdout/stderr. Project operations use the browser File System Access API and are unavailable in browsers without folder-picker support. Python and R use persistent local interpreter sessions shared by clients of this loopback server; they are not sandboxed or isolated per user/project. Flow execution remains independent.
 
+### Notebook import and export (Python/R)
+
+The local `/notebook` page accepts Python/R source and Jupyter v4 `.ipynb`
+files. Notebook import converts code and markdown cells to `# %%` source,
+rejects unsupported kernels and cell formats, and deliberately drops stored
+execution outputs. No notebook code is executed or uploaded. Import is limited
+to 2 MiB and 1000 cells; physical-browser acceptance is pending.
+
 ### Notebook export (Python/R)
 
 Open `http://127.0.0.1:8751/notebook` after starting FlowStudio. Import a

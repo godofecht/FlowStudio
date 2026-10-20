@@ -15,7 +15,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Persistent REPL/session | partial / Python/R worker and HTTP routes; native cross-platform verification pending | Incremental variables and package state persist until reset |
 | Variable inspector | partial / browser wiring and basic Python/R values; browser acceptance pending | Nested objects / types / dimensions inspectable and refresh after execution |
 | Plot viewer | partial / Node-tested PNG import and integrated workspace tab; native unverified | png/svg plot history, zoom, save and deterministic device lifecycle |
-| Project explorer | partial / Node+V8-tested browser file deletion, native/browser unverified | Open project, tree navigation, source-file creation and save; safe rename still missing |
+| Project explorer | partial / V8-tested file deletion; Node runner and physical browser unverified | Open project, tree navigation, source-file creation and save; safe rename still missing |
 | Data viewer | partial / browser-local CSV/TSV viewer integrated as workspace tab; native unverified | Interactive sortable/filterable tabular datasets including missing values |
 | Completion / language server | missing | R, Flow and Python completion/diagnostics |
 | Packages pane | partial / read-only installed Python/R inventory; native/browser unverified | List, install, update with environment-aware package sources |
@@ -320,3 +320,8 @@ external modifications between handle verification and removal remain possible.
 **Status: partial.** Unit and mocked-DOM tests cover deletion, refusal and
 editor detachment; actual browser permissions, physical-browser acceptance,
 Flow native compilation and macOS remain unverified. Rename is not implemented.
+
+**Local test scope (20 October):** 8/8 project-module tests and 24/24
+workspace DOM tests passed under a V8 Node-API shim using the exact published
+JavaScript and embedded project module. This is not a native Node test run,
+physical-browser acceptance or Flow compilation.

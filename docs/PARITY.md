@@ -27,7 +27,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | R Markdown / Quarto | missing | Render notebook with inline plots and HTML export |
 | Source debugger | missing | Breakpoints, stack, variables, step execution |
 | Remote/server mode | missing | Authenticated, origin-aware multi-user sessions with isolation |
-| Diagnostics / profiling | partial / Python traceback-to-source navigation Node-tested; native/browser unverified | Resource/time tracing and useful language-specific diagnostics |
+| Diagnostics / profiling | partial / Python traceback-to-source navigation locally tested; native/browser unverified | Resource/time tracing and useful language-specific diagnostics |
 | Cross-platform packaging | missing | Installable signed/reproducible macOS and Linux releases |
 | Accessibility | partial / unverified | Full keyboard navigation, screen reader labels, resize and contrast checks |
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
@@ -313,7 +313,7 @@ The line is mapped back to the exact executed buffer, selection or percent cell;
 changes to the source after execution invalidate navigation rather than jumping
 to a stale location. The parser is bounded to 1 MiB and ignores unrelated frames.
 
-**Status: partial.** Eight Node tests cover frame selection, bounds, CRLF,
+**Status: partial.** Seven local Node tests and eight V8 executions of the exact published tests cover frame selection, bounds, CRLF,
 selection and cell offsets, stale-source rejection, and embedded module parity.
 This is not Flow/R diagnostics, profiling, a debugger or physical-browser
 acceptance. Native Flow compilation and cross-platform end-to-end verification

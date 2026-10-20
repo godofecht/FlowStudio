@@ -88,7 +88,7 @@ function workspace(folder) {
     "projectTree", "folder", "newFile", "deleteFile", "refreshProject",
     "projectSearch", "caseSensitive", "projectWholeWord", "searchProject", "searchResults",
     "editorFind", "editorReplace", "findNext", "findPrevious",
-    "replaceOne", "replaceAll", "editorCaseSensitive", "editorFindCount"
+    "replaceOne", "replaceAll", "editorCaseSensitive", "editorWholeWord", "editorFindCount"
   ];
   for (const id of ids) elements.set(id, new Element());
   elements.get("source").value = "initial";
@@ -482,7 +482,10 @@ test("delete file rejects dirty editor and cancelled confirmation", async () => 
   assert.match(app.el("resultStatus").textContent, /unsaved/);
   app.el("source").value = "x <- 7";
   app.el("source").fire("input");
+  await app.el("save").fire("click");
+  assert.equal(app.el("dirty").hidden, true);
   app.setDiscard(false);
   await app.el("deleteFile").fire("click");
+  assert.equal(app.getDiscardCount(), 1);
   assert.equal(await folder.getFileHandle("analysis.R"), target);
 });

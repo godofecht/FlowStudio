@@ -53,3 +53,19 @@ test("refuses truncated replace-all atomically", () => {
   assert.equal(findMatches(source, "x").truncated, true);
   assert.throws(() => replaceAll(source, "x", "y"), /10,000 matches/);
 });
+
+test("whole-word matching skips identifier substrings and partial words", () => {
+  assert.deepEqual(findMatches("cat catalog _cat cat_ scat cat", "cat", {wholeWord:true}).matches.map(m => m.index), [0,27]);
+  assert.equal(findMatches("cat catalog _cat cat_ scat cat", "cat").matches.length, 6);
+});
+test("whole-word boundaries are Unicode-aware including astral letters and marks", () => {
+  assert.deepEqual(findMatches("éfoo foo🙂 foo𝒜 foo_ foo", "foo", {wholeWord:true}).matches.map(m => m.index), [5,22]);
+  assert.deepEqual(findMatches("foo\u0301 foo", "foo", {wholeWord:true}).matches.map(m => m.index), [5]);
+});
+test("whole-word replacement only changes complete tokens", () => {
+  assert.equal(replaceAll("cat scatter cat_ CAT", "cat", "dog", {wholeWord:true}).value, "dog scatter cat_ dog");
+  assert.equal(replaceSelection("cat_", "cat", "dog", 0, 3, {wholeWord:true}).replaced, false);
+});
+test("whole-word mode retains literal punctuation", () => {
+  assert.deepEqual(findMatches("x a.b a.b2", "a.b", {wholeWord:true}).matches.map(m => m.index), [2]);
+});

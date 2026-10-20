@@ -283,3 +283,15 @@ rejection and unsaved-buffer preservation. JavaScript syntax checks passed.
 Browser-mock regression tests cover these cases and single discard confirmation.
 The Node test runner, physical browser, native Flow server, macOS/Linux builds
 and Jupyter execution remain unverified.
+
+## Whole-word editor find/replace — 2026-10-20
+
+The served source editor adds a **Whole word** search toggle, using Unicode
+letter, number, combining-mark and underscore boundaries. It applies to
+forward/backward navigation, current-selection replacement and replace-all.
+The editor's embedded find module mirrors the independently tested module.
+
+**Status: partial / locally Node-tested.** Five focused local whole-word
+cases passed, covering identifiers, Unicode boundaries, combining marks,
+literal punctuation and replacement. Native Flow compilation, served browser
+interaction and macOS acceptance remain unverified.

@@ -5,6 +5,8 @@ const MAX_QUERY = 256;
 const MAX_REPLACEMENT = 10000;
 const MAX_SOURCE = 2 * 1024 * 1024;
 const MAX_MATCHES = 10000;
+const WORD_START = /^[\p{L}\p{N}\p{M}_]/u;
+const WORD_END = /[\p{L}\p{N}\p{M}_]$/u;
 function validate(text, query) {
   if (typeof text !== "string" || text.length > MAX_SOURCE)
     throw new Error("Editor search supports buffers up to 2 MiB.");
@@ -18,8 +20,12 @@ function findMatches(text, query, options = {}) {
   const regex = new RegExp(escaped, options.caseSensitive ? "gu" : "giu");
   const matches = [];
   for (const hit of text.matchAll(regex)) {
+    const end = hit.index + hit[0].length;
+    if (options.wholeWord &&
+        (WORD_END.test(text.slice(Math.max(0, hit.index - 2), hit.index)) ||
+         WORD_START.test(text.slice(end, end + 2)))) continue;
     if (matches.length === MAX_MATCHES) return { matches, truncated: true };
-    matches.push({ index: hit.index, end: hit.index + hit[0].length });
+    matches.push({ index: hit.index, end });
   }
   return { matches, truncated: false };
 }

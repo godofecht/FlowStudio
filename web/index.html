@@ -88,7 +88,7 @@ footer { padding: 5px 14px; display: flex; justify-content: space-between; gap: 
   <section class="panel" aria-label="Source editor">
     <h2>Source <span id="fileLabel">untitled.flow</span><span id="dirty" hidden> • modified</span></h2>
     <div class="editor-find"><input id="editorFind" type="text" aria-label="Find text"><button id="findNext">Next</button>
-    <label for="editorReplace">Replace with</label><input id="editorReplace" type="text" aria-label="Replacement text"><button id="replaceOne">Replace</button><button id="replaceAll">Replace all</button><button id="findPrevious">Previous</button><label><input id="editorCaseSensitive" type="checkbox"> Match case</label><span id="editorFindCount" role="status" aria-live="polite"></span></div>
+    <label for="editorReplace">Replace with</label><input id="editorReplace" type="text" aria-label="Replacement text"><button id="replaceOne">Replace</button><button id="replaceAll">Replace all</button><button id="findPrevious">Previous</button><label><input id="editorCaseSensitive" type="checkbox"> Match case</label><label><input id="editorWholeWord" type="checkbox"> Whole word</label><span id="editorFindCount" role="status" aria-live="polite"></span></div>
     <textarea id="source" spellcheck="false" aria-label="Source code editor">function main() -> i32 {
     println("Hello from FlowStudio")
     return 0
@@ -323,6 +323,8 @@ const MAX_QUERY = 256;
 const MAX_REPLACEMENT = 10000;
 const MAX_SOURCE = 2 * 1024 * 1024;
 const MAX_MATCHES = 10000;
+const WORD_START = /^[\p{L}\p{N}\p{M}_]/u;
+const WORD_END = /[\p{L}\p{N}\p{M}_]$/u;
 function validate(text, query) {
   if (typeof text !== "string" || text.length > MAX_SOURCE)
     throw new Error("Editor search supports buffers up to 2 MiB.");
@@ -336,8 +338,12 @@ function findMatches(text, query, options = {}) {
   const regex = new RegExp(escaped, options.caseSensitive ? "gu" : "giu");
   const matches = [];
   for (const hit of text.matchAll(regex)) {
+    const end = hit.index + hit[0].length;
+    if (options.wholeWord &&
+        (WORD_END.test(text.slice(Math.max(0, hit.index - 2), hit.index)) ||
+         WORD_START.test(text.slice(end, end + 2)))) continue;
     if (matches.length === MAX_MATCHES) return { matches, truncated: true };
-    matches.push({ index: hit.index, end: hit.index + hit[0].length });
+    matches.push({ index: hit.index, end });
   }
   return { matches, truncated: false };
 }
@@ -484,7 +490,7 @@ let creatingProjectFile = false;
 
 function currentFind() {
   return FlowStudioEditorFind.findMatches(src.value, el("editorFind").value,
-    { caseSensitive: el("editorCaseSensitive").checked });
+    { caseSensitive: el("editorCaseSensitive").checked, wholeWord: el("editorWholeWord").checked });
 }
 function updateFindCount() {
   try {
@@ -526,7 +532,7 @@ function replaceCurrent() {
     const replacement = el("editorReplace").value;
     const result = FlowStudioEditorFind.replaceSelection(src.value, query, replacement,
       src.selectionStart, src.selectionEnd,
-      { caseSensitive: el("editorCaseSensitive").checked });
+      { caseSensitive: el("editorCaseSensitive").checked, wholeWord: el("editorWholeWord").checked });
     if (!result.replaced) { findInEditor(false); return; }
     if (result.value !== src.value) {
       if (typeof src.setRangeText === "function")
@@ -547,7 +553,7 @@ function replaceAllInEditor() {
     const query = el("editorFind").value;
     if (!query) { status("Enter text to replace.", "error"); return; }
     const result = FlowStudioEditorFind.replaceAll(src.value, query,
-      el("editorReplace").value, { caseSensitive: el("editorCaseSensitive").checked });
+      el("editorReplace").value, { caseSensitive: el("editorCaseSensitive").checked, wholeWord: el("editorWholeWord").checked });
     if (result.count === 0) {
       status("No matches in current file.", "error");
       return;
@@ -838,6 +844,7 @@ el("projectSearch").addEventListener("keydown", event => {
 
 el("editorFind").addEventListener("input", updateFindCount);
 el("editorCaseSensitive").addEventListener("change", updateFindCount);
+el("editorWholeWord").addEventListener("change", updateFindCount);
 el("editorFind").addEventListener("keydown", event => {
   if (event.key === "Enter") { event.preventDefault(); findInEditor(event.shiftKey); }
 });

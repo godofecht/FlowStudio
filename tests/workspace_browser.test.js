@@ -42,8 +42,9 @@ class Element {
 }
 function file(name, initial = "") {
   let content = initial;
-  return {
+  const handle = {
     kind: "file", name,
+    async isSameEntry(other) { return other === handle; },
     get content() { return content; },
     async getFile() { return { name, text: async () => content }; },
     async createWritable() {
@@ -54,6 +55,7 @@ function file(name, initial = "") {
       };
     }
   };
+  return handle;
 }
 function directory(name, children = []) {
   const entries = new Map(children);
@@ -62,8 +64,19 @@ function directory(name, children = []) {
     async *entries() { yield* entries.entries(); },
     async getFileHandle(name, options = {}) {
       if (!entries.has(name) && options.create) entries.set(name, file(name));
+      const handle = entries.get(name);
+      if (!handle || handle.kind !== "file") throw new Error("File not found");
+      return handle;
+    },
+    async getDirectoryHandle(name) {
+      const handle = entries.get(name);
+      if (!handle || handle.kind !== "directory") throw new Error("Folder not found");
+      return handle;
+    },
+    async requestPermission() { return "granted"; },
+    async removeEntry(name) {
       if (!entries.has(name)) throw new Error("File not found");
-      return entries.get(name);
+      entries.delete(name);
     }
   };
 }
@@ -72,7 +85,7 @@ function workspace(folder) {
   const ids = [
     "source", "language", "console", "resultStatus", "fileLabel", "dirty",
     "cursor", "run", "runCell", "open", "save", "clear", "fallbackOpen", "runtimeInfo",
-    "projectTree", "folder", "newFile", "refreshProject",
+    "projectTree", "folder", "newFile", "deleteFile", "refreshProject",
     "projectSearch", "caseSensitive", "projectWholeWord", "searchProject", "searchResults",
     "editorFind", "editorReplace", "findNext", "findPrevious",
     "replaceOne", "replaceAll", "editorCaseSensitive", "editorFindCount"
@@ -438,4 +451,38 @@ test("project whole-word search uses the browser checkbox and preserves exact na
   assert.equal(app.el("source").value, "cat catalog cat");
   assert.equal(app.el("source").selectionStart, 12);
   assert.equal(app.el("source").selectionEnd, 15);
+});
+
+test("delete file requires confirmation and detaches the deleted editor handle", async () => {
+  const target = file("analysis.R", "x <- 7");
+  const folder = directory("work", [["analysis.R", target]]);
+  const app = workspace(folder);
+  await app.el("folder").fire("click");
+  await app.el("projectTree").children[1].fire("click");
+  assert.equal(app.el("source").value, "x <- 7");
+  await app.el("deleteFile").fire("click");
+  await assert.rejects(folder.getFileHandle("analysis.R"), /not found/);
+  assert.equal(app.el("source").value, "");
+  assert.equal(app.el("fileLabel").textContent, "untitled.R");
+  assert.equal(app.el("dirty").hidden, true);
+  assert.equal(app.getDiscardCount(), 1);
+});
+
+test("delete file rejects dirty editor and cancelled confirmation", async () => {
+  const target = file("analysis.R", "x <- 7");
+  const folder = directory("work", [["analysis.R", target]]);
+  const app = workspace(folder);
+  await app.el("folder").fire("click");
+  await app.el("projectTree").children[1].fire("click");
+  app.el("source").value = "x <- 99";
+  app.el("source").fire("input");
+  await app.el("deleteFile").fire("click");
+  assert.equal(await folder.getFileHandle("analysis.R"), target);
+  assert.equal(app.getDiscardCount(), 0);
+  assert.match(app.el("resultStatus").textContent, /unsaved/);
+  app.el("source").value = "x <- 7";
+  app.el("source").fire("input");
+  app.setDiscard(false);
+  await app.el("deleteFile").fire("click");
+  assert.equal(await folder.getFileHandle("analysis.R"), target);
 });

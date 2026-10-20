@@ -15,7 +15,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Persistent REPL/session | partial / Python/R worker and HTTP routes; native cross-platform verification pending | Incremental variables and package state persist until reset |
 | Variable inspector | partial / browser wiring and basic Python/R values; browser acceptance pending | Nested objects / types / dimensions inspectable and refresh after execution |
 | Plot viewer | partial / Node-tested PNG import and integrated workspace tab; native unverified | png/svg plot history, zoom, save and deterministic device lifecycle |
-| Project explorer | partial / DOM-tested | Open project, tree navigation, source-file creation and save; safe rename/delete still missing |
+| Project explorer | partial / Node+V8-tested browser file deletion, native/browser unverified | Open project, tree navigation, source-file creation and save; safe rename still missing |
 | Data viewer | partial / browser-local CSV/TSV viewer integrated as workspace tab; native unverified | Interactive sortable/filterable tabular datasets including missing values |
 | Completion / language server | missing | R, Flow and Python completion/diagnostics |
 | Packages pane | partial / read-only installed Python/R inventory; native/browser unverified | List, install, update with environment-aware package sources |
@@ -304,3 +304,19 @@ or case-insensitive literal search. Search results retain file handles and
 source offsets; navigation rechecks boundaries against the opened file to
 avoid stale results. The feature retains the existing file, size, depth and
 result bounds. **Status: partial** pending real browser and native acceptance.
+
+## Browser-scoped project file deletion — 2026-10-20
+
+The workspace Delete file action targets only the currently opened project
+source file, requires a clean editor buffer and an explicit irreversible-action
+confirmation, and requests read-write permission from the browser. The explorer
+re-resolves the directory and verifies `isSameEntry` against the original file
+handle immediately before `removeEntry`. It refuses stale handles, traversal
+paths, unavailable APIs and denied permissions. After successful deletion the
+editor detaches the deleted handle, clears its buffer and refreshes the tree.
+The browser's File System Access API does not provide atomic compare-and-delete;
+external modifications between handle verification and removal remain possible.
+
+**Status: partial.** Unit and mocked-DOM tests cover deletion, refusal and
+editor detachment; actual browser permissions, physical-browser acceptance,
+Flow native compilation and macOS remain unverified. Rename is not implemented.

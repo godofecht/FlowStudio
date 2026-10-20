@@ -88,7 +88,7 @@ async function searchProject(root, query, options = {}) {
   return { matches, scannedFiles, skippedLarge, truncated };
 }
 
-function createProjectExplorer({ tree, status, openHandle, picker }) {
+function createProjectExplorer({ tree, status, openHandle, picker, onDeleted }) {
   let root = null, revision = 0;
   const element = (tag, text) => {
     const node = document.createElement(tag);
@@ -172,7 +172,43 @@ function createProjectExplorer({ tree, status, openHandle, picker }) {
     await refresh();
     return opened;
   }
-  return { choose, refresh, create, search: (query, options) => searchProject(root, query, options), hasProject: () => root !== null };
+
+  // Delete only the file handle that the editor actually opened. A path alone
+  // is never sufficient authority for destructive project operations.
+  async function deleteFile(path, expectedHandle) {
+    if (!root) throw new Error("Open a project first.");
+    if (typeof path !== "string" || !path.startsWith(root.name + "/"))
+      throw new Error("File is not in the opened project.");
+    const segments = path.slice(root.name.length + 1).split("/");
+    if (segments.length > 13 || segments.some(name => !name || name === "." ||
+        name === ".." || name.includes("\\") || [...name].some(ch => ch.charCodeAt(0) < 32)))
+      throw new Error("Invalid project file path.");
+    const name = segments.pop();
+    if (!validFilename(name)) throw new Error("Invalid project source filename.");
+    let directory = root;
+    for (const segment of segments) {
+      if (typeof directory.getDirectoryHandle !== "function")
+        throw new Error("Nested folder access is unavailable.");
+      directory = await directory.getDirectoryHandle(segment);
+    }
+    if (typeof directory.getFileHandle !== "function" ||
+        typeof directory.removeEntry !== "function" ||
+        typeof directory.requestPermission !== "function")
+      throw new Error("This browser does not support safe project deletion.");
+    if (await directory.requestPermission({ mode: "readwrite" }) !== "granted")
+      throw new Error("Write permission is required to delete project files.");
+    const current = await directory.getFileHandle(name);
+    if (!expectedHandle || expectedHandle.kind !== "file" ||
+        typeof current.isSameEntry !== "function" ||
+        !await current.isSameEntry(expectedHandle))
+      throw new Error("File changed since it was opened; reopen before deleting.");
+    await directory.removeEntry(name);
+    if (typeof onDeleted === "function") onDeleted(expectedHandle, path);
+    await refresh();
+    status("Deleted " + path, "ok");
+    return true;
+  }
+  return { choose, refresh, create, deleteFile, search: (query, options) => searchProject(root, query, options), hasProject: () => root !== null };
 }
 const api = { createProjectExplorer, validFilename, searchProject };
 if (typeof module !== "undefined" && module.exports) module.exports = api;

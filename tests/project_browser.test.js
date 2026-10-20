@@ -18,24 +18,39 @@ class FakeElement {
 }
 global.document = { createElement: tag => new FakeElement(tag) };
 
-function file(name) { return { kind: "file", name }; }
+function file(name) {
+  const handle = { kind: "file", name, async isSameEntry(other) { return other === handle; } };
+  return handle;
+}
 function dir(name, initial = []) {
   const entries = new Map(initial);
   return {
     kind: "directory", name,
     async *entries() { yield* entries.entries(); },
-    async getFileHandle(filename, { create }) {
+    async getFileHandle(filename, { create } = {}) {
       if (!entries.has(filename) && create) entries.set(filename, file(filename));
-      return entries.get(filename);
+      const handle = entries.get(filename);
+      if (!handle || handle.kind !== "file") throw new Error("File not found");
+      return handle;
+    },
+    async getDirectoryHandle(filename) {
+      const handle = entries.get(filename);
+      if (!handle || handle.kind !== "directory") throw new Error("Folder not found");
+      return handle;
+    },
+    async requestPermission() { return "granted"; },
+    async removeEntry(filename) {
+      if (!entries.has(filename)) throw new Error("File not found");
+      entries.delete(filename);
     },
   };
 }
-function setup(root, onOpen = async () => true) {
+function setup(root, onOpen = async () => true, onDeleted = () => {}) {
   const tree = new FakeElement("div");
   const statuses = [];
   const project = createProjectExplorer({
     tree, status: (...args) => statuses.push(args), openHandle: onOpen,
-    picker: async () => root,
+    picker: async () => root, onDeleted,
   });
   return { tree, statuses, project };
 }
@@ -100,4 +115,39 @@ test("folder picker failure leaves no project selected", async () => {
   assert.equal(await project.choose(), false);
   assert.equal(project.hasProject(), false);
   assert.deepEqual(errors, [["permission denied", "error"]]);
+});
+
+test("deletes the exact opened file in a nested browser-granted folder", async () => {
+  const target = file("model.py");
+  const nested = dir("src", [["model.py", target]]);
+  const root = dir("work", [["src", nested]]);
+  const deleted = [];
+  const { project, statuses } = setup(root, async () => true,
+    (handle, path) => deleted.push([handle, path]));
+  await project.choose();
+  assert.equal(await project.deleteFile("work/src/model.py", target), true);
+  assert.deepEqual(deleted, [[target, "work/src/model.py"]]);
+  await assert.rejects(nested.getFileHandle("model.py"), /not found/);
+  assert.deepEqual(statuses.at(-1), ["Deleted work/src/model.py", "ok"]);
+});
+
+test("refuses stale handles, traversal, and out-of-project deletion", async () => {
+  const target = file("model.py");
+  const root = dir("work", [["model.py", target]]);
+  const { project } = setup(root);
+  await project.choose();
+  await assert.rejects(project.deleteFile("work/model.py", file("model.py")), /changed/);
+  await assert.rejects(project.deleteFile("other/model.py", target), /opened project/);
+  await assert.rejects(project.deleteFile("work/../model.py", target), /Invalid project/);
+  assert.equal(await root.getFileHandle("model.py"), target);
+});
+
+test("requires explicit write permission and never deletes on denial", async () => {
+  const target = file("model.py");
+  const root = dir("work", [["model.py", target]]);
+  root.requestPermission = async () => "denied";
+  const { project } = setup(root);
+  await project.choose();
+  await assert.rejects(project.deleteFile("work/model.py", target), /Write permission/);
+  assert.equal(await root.getFileHandle("model.py"), target);
 });

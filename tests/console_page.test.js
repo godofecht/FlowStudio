@@ -46,6 +46,8 @@ test("console page serves external scripts and semantic input", () => {
   assert.match(html, /src="console_page.js"/);
   assert.match(html, /id="consoleInput"/);
   assert.match(html, /aria-live="polite"/);
+  assert.match(html, /Ctrl\/⌘\+R: search older commands/);
+  assert.match(html, /R and Python use persistent local interpreter sessions/);
 });
 test("console page submits exact code via Flow-owned HTTP endpoint", async () => {
   const app = mount();

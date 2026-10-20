@@ -31,7 +31,7 @@ function mount(doc = document, request = fetch) {
     button.type = "button";
     button.textContent = "Execute";
     const hint = doc.createElement("span");
-    hint.textContent = "Enter: run · Shift+Enter: newline · ↑/↓: history";
+    hint.textContent = "Enter: run · Shift+Enter: newline · ↑/↓: history · Ctrl/⌘+R: search";
     controls.append(button, hint);
     panel.append(label, input, controls);
   }

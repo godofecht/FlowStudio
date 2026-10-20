@@ -26,12 +26,12 @@ main { display:flex; flex-direction:column; gap:12px; height:75vh; min-height:38
 <header><h1>FlowStudio Console</h1><a href="/">Source editor</a>
 <label for="consoleLanguage">Runtime</label><select id="consoleLanguage"><option value="flow">Flow</option><option value="r">R</option><option value="python">Python</option></select>
 <button id="consoleClear" type="button">Clear output</button></header>
-<p class="hint">Local execution only. Each submission starts a new interpreter process; variables do not persist. Only run trusted code.</p>
+<p class="hint">Local execution only. Flow runs separately; R and Python use persistent local interpreter sessions. Only run trusted code.</p>
 <main>
 <pre id="consoleOutput" role="log" aria-live="polite">Console ready. Select a runtime and enter code.</pre>
 <label for="consoleInput">Code</label>
 <textarea id="consoleInput" spellcheck="false" aria-label="Console command" placeholder="Enter to execute; Shift+Enter for newline"></textarea>
-<div class="controls"><button id="consoleRun" type="button">Execute</button><span class="hint">Enter: run · Shift+Enter: newline · ↑/↓: history</span></div>
+<div class="controls"><button id="consoleRun" type="button">Execute</button><span class="hint">Enter: run · Shift+Enter: newline · ↑/↓: history · Ctrl/⌘+R: search older commands</span></div>
 <p id="consoleStatus" role="status" aria-live="polite"></p>
 </main>
 <script src="console.js"></script>

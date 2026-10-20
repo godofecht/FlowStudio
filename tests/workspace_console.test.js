@@ -140,6 +140,7 @@ test("mount creates accessible console controls inside existing editor panel", a
   assert.equal(elements.get("consoleInput")["aria-label"],"Interactive console command");
   assert.equal(elements.get("consoleExecute").textContent,"Execute");
   assert.equal(panel.style.flexDirection,"column");
+  assert.match(fs.readFileSync(path.join(root,"web/workspace_console.js"),"utf8"), /Ctrl\/⌘\+R: search/);
   elements.get("consoleInput").value="println(1)";
   assert.equal(await controller.run(elements.get("consoleInput")),true);
   assert.deepEqual(calls,[["/api/run/flow","println(1)"]]);

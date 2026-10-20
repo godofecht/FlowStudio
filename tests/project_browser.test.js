@@ -1,7 +1,7 @@
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { createProjectExplorer, validFilename } = require("../web/project.js");
+const { createProjectExplorer, validFilename, validFolderName } = require("../web/project.js");
 
 class FakeElement {
   constructor(tag) {
@@ -33,7 +33,8 @@ function dir(name, initial = []) {
       if (!handle || handle.kind !== "file") throw new Error("File not found");
       return handle;
     },
-    async getDirectoryHandle(filename) {
+    async getDirectoryHandle(filename, { create } = {}) {
+      if (!entries.has(filename) && create) entries.set(filename, dir(filename));
       const handle = entries.get(filename);
       if (!handle || handle.kind !== "directory") throw new Error("Folder not found");
       return handle;
@@ -150,4 +151,30 @@ test("requires explicit write permission and never deletes on denial", async () 
   await project.choose();
   await assert.rejects(project.deleteFile("work/model.py", target), /Write permission/);
   assert.equal(await root.getFileHandle("model.py"), target);
+});
+
+test("creates nested folders, rejects duplicates and traversal", async () => {
+  const nested = dir("src"), root = dir("work", [["src", nested]]);
+  const { project } = setup(root);
+  await project.choose();
+  assert.equal(await project.createFolder("src/generated"), true);
+  assert.equal((await nested.getDirectoryHandle("generated")).name, "generated");
+  await assert.rejects(project.createFolder("src/generated"), /already exists/);
+  await assert.rejects(project.createFolder("../escape"), /Invalid/);
+  await assert.rejects(project.createFolder("missing/child"), /not found/);
+});
+test("folder creation and new files require permission", async () => {
+  const root = dir("work", [["existing.flow", file("existing.flow")]]);
+  const { project } = setup(root);
+  await project.choose();
+  await assert.rejects(project.create("existing.flow"), /already exists/);
+  root.requestPermission = async () => "denied";
+  await assert.rejects(project.create("new.flow"), /Write permission/);
+  await assert.rejects(project.createFolder("new"), /Write permission/);
+  await assert.rejects(root.getFileHandle("new.flow"), /not found/);
+});
+test("folder path component validation", () => {
+  for (const name of ["", ".", "..", "a/b", "foo\\bar", "CON", "AUX.txt", "a:b", " bad", "bad ", "bad.", "x".repeat(256)])
+    assert.equal(validFolderName(name), false, name);
+  assert.equal(validFolderName("Données"), true);
 });

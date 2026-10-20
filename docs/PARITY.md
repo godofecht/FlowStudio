@@ -325,3 +325,14 @@ Flow native compilation and macOS remain unverified. Rename is not implemented.
 workspace DOM tests passed under a V8 Node-API shim using the exact published
 JavaScript and embedded project module. This is not a native Node test run,
 physical-browser acceptance or Flow compilation.
+
+## Project folder creation and safe new-file semantics — 2026-10-20
+
+The browser-granted project explorer can create root or nested folders when
+their parent exists. Path components and write permissions are checked.
+New-file creation refuses existing entries; neither operation sends paths
+to the Flow execution endpoint.
+
+**Partial / unverified:** The File System Access API does not offer atomic
+create-if-absent, so external filesystem changes can race the check. Mocked
+browser tests are not physical browser, Flow, R, Python or macOS acceptance.

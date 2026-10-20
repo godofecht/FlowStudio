@@ -12,6 +12,15 @@ function validFilename(name) {
   return true;
 }
 
+function validFolderName(name) {
+  if (typeof name !== "string" || name.length === 0 || name.length > 255 ||
+      name === "." || name === ".." || name.trim() !== name ||
+      /[\\/:*?"<>|]/.test(name) || /[. ]$/.test(name) ||
+      /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\..*)?$/i.test(name)) return false;
+  for (const char of name) if (char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127) return false;
+  return true;
+}
+
 /* Bounded, read-only literal search over browser-granted project files. */
 async function searchProject(root, query, options = {}) {
   if (!root || root.kind !== "directory") throw new Error("Open a project folder first.");
@@ -167,10 +176,45 @@ function createProjectExplorer({ tree, status, openHandle, picker, onDeleted }) 
   async function create(name) {
     if (!root) throw new Error("Open a project first.");
     if (!validFilename(name)) throw new Error("Invalid source filename.");
+    if (typeof root.entries !== "function" || typeof root.requestPermission !== "function")
+      throw new Error("This browser does not support safe source creation.");
+    if (await root.requestPermission({ mode: "readwrite" }) !== "granted")
+      throw new Error("Write permission is required to create source files.");
+    for await (const [existing] of root.entries()) {
+      if (existing === name) throw new Error("Project entry already exists.");
+    }
     const handle = await root.getFileHandle(name, { create: true });
     const opened = await openHandle(handle, root.name + "/" + name);
     await refresh();
     return opened;
+  }
+
+  async function createFolder(relativePath) {
+    if (!root) throw new Error("Open a project first.");
+    if (typeof relativePath !== "string") throw new Error("Invalid folder path.");
+    const parts = relativePath.split("/");
+    if (parts.length < 1 || parts.length > 12 || !parts.every(validFolderName))
+      throw new Error("Invalid project folder path.");
+    let parent = root;
+    for (const part of parts.slice(0, -1)) {
+      if (typeof parent.getDirectoryHandle !== "function")
+        throw new Error("Nested folder access is unavailable.");
+      parent = await parent.getDirectoryHandle(part);
+    }
+    if (typeof parent.entries !== "function" ||
+        typeof parent.getDirectoryHandle !== "function" ||
+        typeof parent.requestPermission !== "function")
+      throw new Error("This browser does not support project folder creation.");
+    if (await parent.requestPermission({ mode: "readwrite" }) !== "granted")
+      throw new Error("Write permission is required to create folders.");
+    const name = parts[parts.length - 1];
+    for await (const [existing] of parent.entries()) {
+      if (existing === name) throw new Error("Project entry already exists.");
+    }
+    await parent.getDirectoryHandle(name, { create: true });
+    await refresh();
+    status("Created folder " + root.name + "/" + relativePath, "ok");
+    return true;
   }
 
   // Delete only the file handle that the editor actually opened. A path alone
@@ -208,9 +252,9 @@ function createProjectExplorer({ tree, status, openHandle, picker, onDeleted }) 
     status("Deleted " + path, "ok");
     return true;
   }
-  return { choose, refresh, create, deleteFile, search: (query, options) => searchProject(root, query, options), hasProject: () => root !== null };
+  return { choose, refresh, create, createFolder, deleteFile, search: (query, options) => searchProject(root, query, options), hasProject: () => root !== null };
 }
-const api = { createProjectExplorer, validFilename, searchProject };
+const api = { createProjectExplorer, validFilename, validFolderName, searchProject };
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 global.FlowStudioProject = api;
 })(globalThis);

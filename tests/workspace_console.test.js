@@ -467,3 +467,22 @@ test("plot captures retain their source session and get distinct IDs across runs
   assert.match(app.el("console").innerHTML, /figure 1/);
   assert.match(app.el("console").innerHTML, /figure 2/);
 });
+
+test("integrated console Ctrl+R searches per-runtime history without execution", async () => {
+  const app = mount();
+  for (const code of ["print('one')", "print('two')"]) {
+    app.el("consoleInput").value = code;
+    await app.controller.run(app.el("consoleInput"));
+  }
+  app.el("consoleInput").value = "print";
+  let prevented = false, stopped = false;
+  app.el("consoleInput").fire("keydown", {key:"r",ctrlKey:true,
+    preventDefault(){prevented=true;},stopPropagation(){stopped=true;}});
+  assert.equal(prevented,true);
+  assert.equal(stopped,true);
+  assert.equal(app.el("consoleInput").value,"print('two')");
+  app.el("consoleInput").fire("keydown", {key:"r",ctrlKey:true,
+    preventDefault(){},stopPropagation(){}});
+  assert.equal(app.el("consoleInput").value,"print('one')");
+  assert.equal(app.requests.length,2);
+});

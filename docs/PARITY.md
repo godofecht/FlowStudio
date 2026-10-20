@@ -336,3 +336,17 @@ to the Flow execution endpoint.
 **Partial / unverified:** The File System Access API does not offer atomic
 create-if-absent, so external filesystem changes can race the check. Mocked
 browser tests are not physical browser, Flow, R, Python or macOS acceptance.
+
+## Nested project source creation — 2026-10-20
+
+Browser-granted project folders now accept source paths such as `src/analysis.py`
+when all parent directories already exist. Path components are validated,
+existing entries are rejected, and the destination parent must grant write
+permission. Failed or declined editor opening triggers identity-checked
+rollback; if rollback cannot safely complete, manual cleanup is reported.
+
+**Partial / unverified:** V8 mocked-browser behavioural checks cover nested
+creation, traversal/duplicate rejection, write permissions and rollback.
+Physical-browser, native Flow/R, live HTTP and macOS acceptance remain pending.
+File System Access does not guarantee atomic create-if-absent against other
+processes.

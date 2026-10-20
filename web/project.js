@@ -173,18 +173,56 @@ function createProjectExplorer({ tree, status, openHandle, picker, onDeleted }) 
       return true;
     } catch (err) { error(err); return false; }
   }
-  async function create(name) {
+  async function create(relativePath) {
     if (!root) throw new Error("Open a project first.");
-    if (!validFilename(name)) throw new Error("Invalid source filename.");
-    if (typeof root.entries !== "function" || typeof root.requestPermission !== "function")
+    if (typeof relativePath !== "string") throw new Error("Invalid source path.");
+    const parts = relativePath.split("/");
+    if (parts.length > 13 || !parts.slice(0, -1).every(validFolderName) ||
+        !validFilename(parts[parts.length - 1]))
+      throw new Error("Invalid project source path.");
+    let parent = root;
+    for (const segment of parts.slice(0, -1)) {
+      if (typeof parent.getDirectoryHandle !== "function")
+        throw new Error("Nested folder access is unavailable.");
+      parent = await parent.getDirectoryHandle(segment);
+    }
+    if (typeof parent.entries !== "function" ||
+        typeof parent.getFileHandle !== "function" ||
+        typeof parent.requestPermission !== "function")
       throw new Error("This browser does not support safe source creation.");
-    if (await root.requestPermission({ mode: "readwrite" }) !== "granted")
+    if (await parent.requestPermission({ mode: "readwrite" }) !== "granted")
       throw new Error("Write permission is required to create source files.");
-    for await (const [existing] of root.entries()) {
+    const name = parts[parts.length - 1];
+    for await (const [existing] of parent.entries()) {
       if (existing === name) throw new Error("Project entry already exists.");
     }
-    const handle = await root.getFileHandle(name, { create: true });
-    const opened = await openHandle(handle, root.name + "/" + name);
+    const handle = await parent.getFileHandle(name, { create: true });
+    async function rollback() {
+      if (typeof parent.removeEntry !== "function")
+        throw new Error("Browser cannot remove the new file.");
+      const current = await parent.getFileHandle(name);
+      if (typeof current.isSameEntry !== "function" ||
+          !await current.isSameEntry(handle))
+        throw new Error("New file handle changed before cleanup.");
+      await parent.removeEntry(name);
+    }
+    let opened;
+    try {
+      opened = await openHandle(handle, root.name + "/" + relativePath);
+    } catch (error) {
+      try { await rollback(); }
+      catch (cleanupError) {
+        throw new Error("File created but could not be opened or safely removed: " +
+          (cleanupError.message || String(cleanupError)), { cause: error });
+      }
+      await refresh();
+      throw error;
+    }
+    if (opened === false) {
+      await rollback();
+      await refresh();
+      return false;
+    }
     await refresh();
     return opened;
   }

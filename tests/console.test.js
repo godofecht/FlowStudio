@@ -70,3 +70,46 @@ test("keyboard handling respects Shift+Enter and composition", async () => {
   assert.equal(prevented, true);
   assert.deepEqual(calls, ["hello"]);
 });
+
+test("reverse search cycles older matches and restores the original draft", async () => {
+  const repl = create(async () => true, () => "python"), field = input();
+  for (const code of ["print(1)", "x = 1", "print(2)", "print(3)"]) {
+    field.value = code; await repl.run(field);
+  }
+  field.value = "print";
+  assert.equal(repl.reverseSearch(field), true);
+  assert.equal(field.value, "print(3)");
+  assert.equal(repl.reverseSearch(field), true);
+  assert.equal(field.value, "print(2)");
+  assert.equal(repl.reverseSearch(field), true);
+  assert.equal(field.value, "print(1)");
+  assert.equal(repl.reverseSearch(field), false);
+  for (const code of ["x = 1", "print(2)", "print(3)", "print"]) {
+    assert.equal(repl.navigate(field, 1), true);
+    assert.equal(field.value, code);
+  }
+});
+test("reverse search is runtime-scoped and restarts after editing", async () => {
+  let language = "r";
+  const repl = create(async () => true, () => language), field = input("mean(x)");
+  await repl.run(field);
+  language = "python"; field.value = "mean(values)"; await repl.run(field);
+  field.value = "mean";
+  assert.equal(repl.reverseSearch(field), true);
+  assert.equal(field.value, "mean(values)");
+  language = "r"; field.value = "mean";
+  assert.equal(repl.reverseSearch(field), true);
+  assert.equal(field.value, "mean(x)");
+  field.value = "missing";
+  assert.equal(repl.reverseSearch(field), false);
+  assert.equal(field.value, "missing");
+});
+test("Ctrl+R intercepts browser reload even with empty history", () => {
+  const repl = create(async () => true, () => "flow"), field = input("query");
+  let prevented = 0, stopped = 0;
+  assert.equal(repl.keydown({key:"r",ctrlKey:true,
+    preventDefault(){prevented++;},stopPropagation(){stopped++;}},field),true);
+  assert.equal(prevented,1);
+  assert.equal(stopped,1);
+  assert.equal(field.value,"query");
+});

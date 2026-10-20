@@ -11,6 +11,7 @@ function create(submit, language, onError = () => {}, options = {}) {
   const history = Object.fromEntries(languages.map(name => [name, []]));
   const drafts = Object.fromEntries(languages.map(name => [name, ""]));
   const positions = Object.fromEntries(languages.map(name => [name, 0]));
+  const reverse = Object.fromEntries(languages.map(name => [name, null]));
   const storage = options.storage || null;
   let busy = false, persisting = false;
   function entries(name) {
@@ -85,6 +86,7 @@ function create(submit, language, onError = () => {}, options = {}) {
     items.length = 0;
     drafts[name] = "";
     positions[name] = 0;
+    reverse[name] = null;
     if (storage) {
       try { storage.removeItem(storageKey(name)); }
       catch (error) { reportStorage(error); return false; }
@@ -106,6 +108,7 @@ function create(submit, language, onError = () => {}, options = {}) {
       if (items.length > MAX_HISTORY) items.shift();
       positions[name] = items.length;
       drafts[name] = "";
+      reverse[name] = null;
       store(name);
       if (input.value === code) input.value = "";
       return true;
@@ -115,7 +118,26 @@ function create(submit, language, onError = () => {}, options = {}) {
       busy = false;
     }
   }
+  // Search older commands without modifying stored history.
+  function reverseSearch(input) {
+    const name = language(), items = entries(name), previous = reverse[name];
+    const repeated = previous !== null && input.value === previous.value;
+    const query = repeated ? previous.query : input.value;
+    const start = repeated ? previous.index - 1 : items.length - 1;
+    for (let index = start; index >= 0; index--) {
+      if (!items[index].includes(query)) continue;
+      if (!repeated) drafts[name] = input.value;
+      positions[name] = index;
+      input.value = items[index];
+      input.setSelectionRange(input.value.length, input.value.length);
+      reverse[name] = {query, index, value: input.value};
+      return true;
+    }
+    onError("No older console command matches the search.");
+    return false;
+  }
   function navigate(input, direction) {
+    reverse[language()] = null;
     const name = language(), items = entries(name);
     if (!items.length) return false;
     let index = positions[name];
@@ -134,6 +156,13 @@ function create(submit, language, onError = () => {}, options = {}) {
   }
   function keydown(event, input) {
     if (event.isComposing) return false;
+    if ((event.ctrlKey || event.metaKey) && !event.altKey &&
+        event.key.toLowerCase() === "r") {
+      event.preventDefault();
+      if (event.stopPropagation) event.stopPropagation();
+      reverseSearch(input);
+      return true;
+    }
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       if (event.stopPropagation) event.stopPropagation();
@@ -151,7 +180,7 @@ function create(submit, language, onError = () => {}, options = {}) {
     }
     return false;
   }
-  return Object.freeze({run, navigate, keydown, setPersistence, clearHistory,
+  return Object.freeze({run, navigate, reverseSearch, keydown, setPersistence, clearHistory,
     isPersisting: () => persisting, isBusy: () => busy,
     history: name => Object.freeze([...entries(name)])});
 }

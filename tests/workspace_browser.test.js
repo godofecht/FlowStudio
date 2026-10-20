@@ -85,7 +85,7 @@ function workspace(folder) {
   const ids = [
     "source", "language", "console", "resultStatus", "fileLabel", "dirty",
     "cursor", "run", "runCell", "open", "save", "clear", "fallbackOpen", "runtimeInfo",
-    "projectTree", "folder", "newFile", "deleteFile", "refreshProject",
+    "projectTree", "folder", "newFile", "newFolder", "deleteFile", "refreshProject",
     "projectSearch", "caseSensitive", "projectWholeWord", "searchProject", "searchResults",
     "editorFind", "editorReplace", "findNext", "findPrevious",
     "replaceOne", "replaceAll", "editorCaseSensitive", "editorWholeWord", "editorFindCount"
@@ -488,4 +488,19 @@ test("delete file rejects dirty editor and cancelled confirmation", async () => 
   await app.el("deleteFile").fire("click");
   assert.equal(app.getDiscardCount(), 1);
   assert.equal(await folder.getFileHandle("analysis.R"), target);
+});
+
+test("new file button creates nested project source through the served editor", async () => {
+  const src = directory("src");
+  const app = workspace(directory("project", [["src", src]]));
+  await app.el("folder").fire("click");
+  app.setNewFilename("src/analysis.py");
+  await app.el("newFile").fire("click");
+  assert.equal((await src.getFileHandle("analysis.py")).name, "analysis.py");
+  assert.equal(app.el("fileLabel").textContent, "project/src/analysis.py");
+  assert.equal(app.el("language").value, "python");
+  app.setNewFilename("src/../escape.py");
+  await app.el("newFile").fire("click");
+  await assert.rejects(src.getFileHandle("escape.py"), /not found/);
+  assert.match(app.el("resultStatus").textContent, /Invalid or unsupported/);
 });

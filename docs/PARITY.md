@@ -350,3 +350,16 @@ creation, traversal/duplicate rejection, write permissions and rollback.
 Physical-browser, native Flow/R, live HTTP and macOS acceptance remain pending.
 File System Access does not guarantee atomic create-if-absent against other
 processes.
+
+## Nested project source creation: UI integration — 2026-10-20
+
+Fixed a mismatch between the project explorer's nested-file API and the served
+editor's New file validation. The editor now accepts validated relative source
+paths such as `src/analysis.py` while rejecting traversal, empty components,
+unsupported extensions, and invalid folder names. The validator is shared with
+the explorer, avoiding divergent acceptance rules. Regression tests cover the
+validator and New file button through the served editor's DOM harness.
+
+**Status: partial.** The browser file API still requires explicit directory
+permission and is unsupported by some browsers. Native FlowStudio HTTP
+acceptance, physical-browser file picker, and macOS arm64 remain unverified.

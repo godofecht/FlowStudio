@@ -21,6 +21,14 @@ function validFolderName(name) {
   return true;
 }
 
+function validProjectSourcePath(path) {
+  if (typeof path !== "string") return false;
+  const parts = path.split("/");
+  return parts.length <= 13 &&
+    parts.slice(0, -1).every(validFolderName) &&
+    validFilename(parts[parts.length - 1]);
+}
+
 /* Bounded, read-only literal search over browser-granted project files. */
 async function searchProject(root, query, options = {}) {
   if (!root || root.kind !== "directory") throw new Error("Open a project folder first.");
@@ -175,11 +183,9 @@ function createProjectExplorer({ tree, status, openHandle, picker, onDeleted }) 
   }
   async function create(relativePath) {
     if (!root) throw new Error("Open a project first.");
-    if (typeof relativePath !== "string") throw new Error("Invalid source path.");
-    const parts = relativePath.split("/");
-    if (parts.length > 13 || !parts.slice(0, -1).every(validFolderName) ||
-        !validFilename(parts[parts.length - 1]))
+    if (!validProjectSourcePath(relativePath))
       throw new Error("Invalid project source path.");
+    const parts = relativePath.split("/");
     let parent = root;
     for (const segment of parts.slice(0, -1)) {
       if (typeof parent.getDirectoryHandle !== "function")
@@ -292,7 +298,7 @@ function createProjectExplorer({ tree, status, openHandle, picker, onDeleted }) 
   }
   return { choose, refresh, create, createFolder, deleteFile, search: (query, options) => searchProject(root, query, options), hasProject: () => root !== null };
 }
-const api = { createProjectExplorer, validFilename, validFolderName, searchProject };
+const api = { createProjectExplorer, validFilename, validFolderName, validProjectSourcePath, searchProject };
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 global.FlowStudioProject = api;
 })(globalThis);

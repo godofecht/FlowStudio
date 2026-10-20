@@ -1,7 +1,7 @@
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {createProjectExplorer} = require("../web/project.js");
+const {createProjectExplorer, validProjectSourcePath} = require("../web/project.js");
 global.document = {createElement: tag => ({tag, children: [], textContent: "",
   append(...nodes) { this.children.push(...nodes); },
   replaceChildren(...nodes) { this.children = nodes; },
@@ -78,4 +78,13 @@ test("does not delete a file replaced during a failed editor read", async () => 
   });
   await assert.rejects(project.create("src/changed.py"), /safely removed/);
   assert.equal(src.has("changed.py"), true);
+});
+
+test("project source path validation accepts nested paths without traversal", () => {
+  for (const name of ["analysis.py", "src/analysis.py", "Données/été/plot.R", "a/b/c/main.flow"])
+    assert.equal(validProjectSourcePath(name), true, name);
+  for (const name of ["", "../escape.py", "src/../escape.py", "src//x.py",
+    "src\\\\evil.py", "src/a.exe", "src/.hidden", "/root.py",
+    "a/".repeat(13) + "main.py", "bad /x.py"])
+    assert.equal(validProjectSourcePath(name), false, name);
 });

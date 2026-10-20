@@ -31,6 +31,7 @@ kbd { background: #333f55; padding: 2px 4px; border-radius: 4px; font: inherit; 
 footer { padding: 5px 14px; display: flex; justify-content: space-between; gap: 15px; font-size: 12px; background: #192337; color: #a7b8d6; }
 #resultStatus[data-state="error"] { color: #ffb8ad; }
 #resultStatus[data-state="ok"] { color: #93deb3; }
+.jump-error { padding: 2px 6px; font-size: 12px; }
 #fileLabel { color: #b9cae5; font-size: 12px; }
 #console { color: #c8daee; }
 .project-body { overflow-y: auto; }
@@ -136,7 +137,7 @@ footer { padding: 5px 14px; display: flex; justify-content: space-between; gap: 
     </div>
   </section>
 </div>
-<footer><span id="resultStatus" role="status">Idle</span><span>Local: 127.0.0.1:8751 · <span id="cursor">Ln 1, Col 1</span> · Ctrl/⌘+S Save · Ctrl/⌘+Enter Run · Ctrl/⌘+Shift+Enter Cell</span></footer>
+<footer><span><span id="resultStatus" role="status">Idle</span> <button id="jumpError" class="jump-error" type="button" hidden>Go to error</button></span><span>Local: 127.0.0.1:8751 · <span id="cursor">Ln 1, Col 1</span> · Ctrl/⌘+S Save · Ctrl/⌘+Enter Run · Ctrl/⌘+Shift+Enter Cell</span></footer>
 <!-- BEGIN EMBEDDED PROJECT MODULE: mirrors web/project.js -->
 <script>
 /* FlowStudio project explorer. Browser File System Access API only. */
@@ -394,6 +395,44 @@ global.FlowStudioEditorFind = api;
 })(globalThis);
 </script>
 <!-- END EMBEDDED EDITOR FIND MODULE -->
+<!-- BEGIN EMBEDDED DIAGNOSTICS MODULE: mirrors web/diagnostics.js -->
+<script>
+/* FlowStudio source diagnostics: bounded parsing and exact source-range mapping. */
+(function (global) {
+"use strict";
+const MAX_OUTPUT = 1024 * 1024;
+function python(output) {
+  if (typeof output !== "string" || output.length > MAX_OUTPUT) return null;
+  const frames = /File ["']<FlowStudio Python>["'], line ([1-9][0-9]{0,5})(?=\D|$)/g;
+  let found, line = 0;
+  while ((found = frames.exec(output)) !== null) line = Number(found[1]);
+  return line ? { language: "python", line } : null;
+}
+function sourceRange(source, submitted, offset, diagnostic) {
+  if (typeof source !== "string" || typeof submitted !== "string" ||
+      !Number.isInteger(offset) || offset < 0 || offset > source.length ||
+      !diagnostic || !Number.isInteger(diagnostic.line) || diagnostic.line < 1 ||
+      source.slice(offset, offset + submitted.length) !== submitted) return null;
+  let local = 0;
+  for (let row = 1; row < diagnostic.line; row++) {
+    const newline = submitted.indexOf("\n", local);
+    if (newline < 0) return null;
+    local = newline + 1;
+  }
+  if (local > submitted.length) return null;
+  const newline = submitted.indexOf("\n", local);
+  const rawEnd = newline < 0 ? submitted.length : newline;
+  const end = rawEnd > local && submitted[rawEnd - 1] === "\r" ? rawEnd - 1 : rawEnd;
+  const start = offset + local;
+  const absoluteLine = source.slice(0, start).split("\n").length;
+  return { start, end: offset + end, line: absoluteLine };
+}
+const api = { python, sourceRange };
+if (typeof module !== "undefined" && module.exports) module.exports = api;
+global.FlowStudioDiagnostics = api;
+})(globalThis);
+</script>
+<!-- END EMBEDDED DIAGNOSTICS MODULE -->
 <!-- BEGIN EMBEDDED SOURCE CELLS MODULE: mirrors web/source_cells.js -->
 <script>
 /* Percent-style source cells for Flow, R and Python. No source execution here. */
@@ -607,13 +646,17 @@ function updateCursor() {
   const lines = before.split("\n");
   el("cursor").textContent = "Ln " + lines.length + ", Col " + (lines[lines.length - 1].length + 1);
 }
-async function executeCode(code, label) {
+async function executeCode(code, label, sourceOffset = 0) {
   if (el("run").disabled) return;
   if (!code.trim()) { status("Current cell is empty.", "error"); return; }
   if (new Blob([code]).size > 131072) {
     status("Execution exceeds the server's 128 KiB request limit.", "error");
     return;
   }
+  const executionSource = src.value;
+  const jumpError = el("jumpError");
+  jumpError.hidden = true;
+  jumpError.onclick = null;
   el("run").disabled = true;
   el("runCell").disabled = true;
   const executionLanguage = language.value;
@@ -627,6 +670,23 @@ async function executeCode(code, label) {
     });
     const output = await response.text();
     consolePane.textContent += output + "\n";
+    if (response.status === 422 && executionLanguage === "python") {
+      const diagnostic = FlowStudioDiagnostics.python(output);
+      const location = FlowStudioDiagnostics.sourceRange(executionSource, code, sourceOffset, diagnostic);
+      if (location) {
+        jumpError.hidden = false;
+        jumpError.onclick = () => {
+          if (src.value !== executionSource) {
+            status("Source changed since execution; rerun to locate the error.", "error");
+            return;
+          }
+          src.focus();
+          src.setSelectionRange(location.start, location.end);
+          updateCursor();
+          status("Python error at line " + location.line, "error");
+        };
+      }
+    }
     const message = response.ok ? "Finished" :
       response.status === 422 ? "Execution failed" :
       response.status === 503 ? "Interpreter unavailable" :
@@ -650,7 +710,7 @@ async function executeCode(code, label) {
 async function run() {
   const selection = src.value.substring(src.selectionStart, src.selectionEnd);
   return executeCode(selection.length ? selection : src.value,
-    selection.length ? "[selection]" : "[buffer]");
+    selection.length ? "[selection]" : "[buffer]", selection.length ? src.selectionStart : 0);
 }
 async function runCell() {
   try {
@@ -659,7 +719,8 @@ async function runCell() {
       status("Markdown cell is not executable.", "error");
       return;
     }
-    return executeCode(cell.code, "[cell " + (cell.index + 1) + "/" + cell.count + "]");
+    return executeCode(cell.code, "[cell " + (cell.index + 1) + "/" + cell.count + "]",
+      cell.end - cell.code.length);
   } catch (error) {
     status(error.message || String(error), "error");
   }

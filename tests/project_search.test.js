@@ -106,3 +106,21 @@ test("explorer exposes search only after folder selection", async () => {
   const result = await explorer.search("x <-");
   assert.equal(result.matches.length, 4);
 });
+
+
+test("whole-word project search ignores identifiers, respects Unicode boundaries", async () => {
+  const source = "cat catalog _cat cat_ scat cat\nfoo𝒜 foó foo";
+  const root = directory("p", [["words.py", file("words.py", source)]]);
+  const result = await searchProject(root, "cat", { wholeWord: true });
+  assert.deepEqual(result.matches.map(hit => hit.index), [0, 27]);
+  const unicode = await searchProject(root, "foo", { wholeWord: true });
+  assert.equal(unicode.matches.length, 1);
+  assert.equal(source.slice(unicode.matches[0].index, unicode.matches[0].index + 3), "foo");
+  assert.equal(unicode.matches[0].index, source.lastIndexOf("foo"));
+});
+
+test("whole-word project search handles punctuation literally and case sensitivity", async () => {
+  const root = directory("p", [["test.flow", file("test.flow", "a.b a.b2 A.B")]]); 
+  assert.equal((await searchProject(root, "a.b", {wholeWord:true})).matches.length, 2);
+  assert.equal((await searchProject(root, "a.b", {wholeWord:true,caseSensitive:true})).matches.length, 1);
+});

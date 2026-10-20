@@ -295,3 +295,12 @@ The editor's embedded find module mirrors the independently tested module.
 cases passed, covering identifiers, Unicode boundaries, combining marks,
 literal punctuation and replacement. Native Flow compilation, served browser
 interaction and macOS acceptance remain unverified.
+
+## Project-wide whole-word search — 2026-10-20
+
+The browser-granted project search now supports Unicode-aware whole-word
+matching (letters, numbers, combining marks, underscore) with case-sensitive
+or case-insensitive literal search. Search results retain file handles and
+source offsets; navigation rechecks boundaries against the opened file to
+avoid stale results. The feature retains the existing file, size, depth and
+result bounds. **Status: partial** pending real browser and native acceptance.

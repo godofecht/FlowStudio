@@ -73,7 +73,7 @@ function workspace(folder) {
     "source", "language", "console", "resultStatus", "fileLabel", "dirty",
     "cursor", "run", "runCell", "open", "save", "clear", "fallbackOpen", "runtimeInfo",
     "projectTree", "folder", "newFile", "refreshProject",
-    "projectSearch", "caseSensitive", "searchProject", "searchResults",
+    "projectSearch", "caseSensitive", "projectWholeWord", "searchProject", "searchResults",
     "editorFind", "editorReplace", "findNext", "findPrevious",
     "replaceOne", "replaceAll", "editorCaseSensitive", "editorFindCount"
   ];
@@ -422,4 +422,20 @@ test("fallback file picker confirms dirty changes once, after selection", async 
   await input.fire("change",{target:input});
   assert.equal(app.getDiscardCount(), 1);
   assert.equal(app.el("source").value, "print(42)");
+});
+
+
+test("project whole-word search uses the browser checkbox and preserves exact navigation", async () => {
+  const target = file("words.py", "cat catalog cat");
+  const app = workspace(directory("p", [["words.py", target]]));
+  await app.el("folder").fire("click");
+  app.el("projectSearch").value = "cat";
+  app.el("projectWholeWord").checked = true;
+  await app.el("searchProject").fire("click");
+  const buttons = app.el("searchResults").children.filter(node => node.tag === "button");
+  assert.equal(buttons.length, 2);
+  await buttons[1].fire("click");
+  assert.equal(app.el("source").value, "cat catalog cat");
+  assert.equal(app.el("source").selectionStart, 12);
+  assert.equal(app.el("source").selectionEnd, 15);
 });

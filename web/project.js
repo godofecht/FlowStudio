@@ -2,6 +2,8 @@
 (function (global) {
 "use strict";
 const editable = /\.(flow|r|py|txt|md|qmd|rmd|csv|tsv|json|toml|yaml|yml|rproj)$/i;
+const WORD_START = /^[\p{L}\p{N}\p{M}_]/u;
+const WORD_END = /[\p{L}\p{N}\p{M}_]$/u;
 function validFilename(name) {
   if (typeof name !== "string" || name.length === 0 || name.length > 255 ||
       name === "." || name === ".." || !editable.test(name) ||
@@ -19,7 +21,7 @@ async function searchProject(root, query, options = {}) {
   const MAX_BYTES = 1024 * 1024, MAX_ENTRIES = 500;
   const metacharacters = "\\^$.*+?()[]{}|";
   const literal = [...query].map(ch => metacharacters.includes(ch) ? "\\" + ch : ch).join("");
-  const expression = new RegExp(literal, options.caseSensitive ? "g" : "gi");
+  const expression = new RegExp(literal, options.caseSensitive ? "gu" : "giu");
   const matches = [];
   let scannedFiles = 0, skippedLarge = 0, truncated = false;
   function checkAbort() {
@@ -63,6 +65,10 @@ async function searchProject(root, query, options = {}) {
         checkAbort();
         if (matches.length >= MAX_MATCHES) { truncated = true; return; }
         const index = found.index;
+        const end = index + found[0].length;
+        if (options.wholeWord &&
+            (WORD_END.test(source.slice(Math.max(0, index - 2), index)) ||
+             WORD_START.test(source.slice(end, end + 2)))) continue;
         let newline = source.indexOf("\n", lineStart);
         while (newline >= 0 && newline < index) {
           line++;

@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FlowStudio Browser — Python scientific workspace</title>
+<style>
+:root{color-scheme:dark;font:14px/1.5 system-ui,sans-serif;background:#0e1421;color:#e6efff}
+*{box-sizing:border-box}body{margin:0;height:100dvh;display:flex;flex-direction:column}
+header,footer{background:#1b2940;padding:.6rem 1rem;display:flex;gap:.7rem;align-items:center;flex-wrap:wrap}
+header strong{font-size:1.2rem;margin-right:auto}main{display:grid;grid-template-columns:minmax(0,2fr) minmax(260px,1fr);grid-template-rows:56% 44%;flex:1;min-height:0;gap:6px;padding:6px}
+section{min-width:0;min-height:0;display:flex;flex-direction:column;background:#172238;border:1px solid #40506a;border-radius:8px;overflow:hidden}
+h2{font-size:1rem;margin:0;padding:.55rem .8rem;border-bottom:1px solid #40506a}
+button,select,input{background:#2b3c56;border:1px solid #7187a9;border-radius:5px;color:inherit;padding:.42rem}
+button{cursor:pointer}button:focus-visible,select:focus-visible,textarea:focus-visible,input:focus-visible{outline:3px solid #a8cdff;outline-offset:1px}
+textarea{background:#101b2c;color:inherit;border:0;resize:none;width:100%;height:100%;padding:1rem;font:14px/1.55 ui-monospace,monospace;tab-size:4}
+pre{white-space:pre-wrap;overflow:auto;overflow-wrap:anywhere;flex:1;margin:0;padding:1rem;font:13px/1.5 ui-monospace,monospace}
+#environment{overflow:auto;padding:1rem;flex:1}#workspace{overflow:auto;padding:.8rem;flex:1}#workspace table{border-collapse:collapse}#workspace th,#workspace td{padding:.2rem .5rem;border:1px solid #50617a}#workspace img{max-width:100%;height:auto}
+.muted{color:#b6c7df}#notice{color:#ffe3a6}footer{font-size:.85rem}
+@media(max-width:750px){body{height:auto;min-height:100dvh}main{grid-template-columns:1fr;grid-template-rows:45vh 20vh 30vh 25vh}}
+</style></head>
+<body>
+<header><strong>◈ FlowStudio <span class="muted">/ Browser</span></strong>
+<label for="language">Language</label><select id="language"><option value="python">Python (browser)</option><option value="flow">Flow (not yet browser executable)</option><option value="r">R (not yet browser executable)</option></select>
+<button id="open" type="button">Open</button><input id="file" type="file" accept=".py,.flow,.r,.R,.txt" hidden>
+<button id="save" type="button">Download source</button><button id="run" type="button">Run Ctrl+Enter</button><button id="reset" type="button">Reset Python</button>
+</header>
+<main>
+<section aria-label="Source editor"><h2>Source — <span id="filename">untitled.py</span></h2><textarea id="source" aria-label="Source code" spellcheck="false">x = 40
+print("Hello from browser Python!")
+x + 2</textarea></section>
+<section aria-label="Environment"><h2>Environment</h2><div id="environment" class="muted">Python runs entirely in a Web Worker using Pyodide. The runtime downloads on first use.</div></section>
+<section aria-label="Console"><h2>Console</h2><pre id="console" role="log" aria-live="polite">Ready. Python runs locally in your browser; Flow and R execution are not available in this static preview.</pre></section>
+<section aria-label="Data and plots"><h2>Plots and data</h2><div id="workspace"><p class="muted">Open a local CSV or PNG for a browser-only preview.</p><input id="previewfile" type="file" accept=".csv,.tsv,.png,.jpg,.jpeg,.webp"></div></section>
+</main>
+<footer><span id="notice" role="status">Static Pages preview — no remote code execution or uploaded source</span><a href="../">Project overview</a><a href="https://github.com/godofecht/FlowStudio">Source</a></footer>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+let worker, pending = new Map(), sequence = 0, busy = false, fileName = "untitled.py", imageURL = null;
+function startWorker() {
+  worker = new Worker("./python-worker.js");
+  worker.onmessage = ({data}) => {
+    const entry = pending.get(data.id);
+    if (entry) { pending.delete(data.id); entry(data); }
+  };
+  worker.onerror = event => {
+    for (const resolve of pending.values()) resolve({ok:false, output:"Python worker failed: " + (event.message || "unknown error")});
+    pending.clear();
+  };
+}
+function request(code) {
+  return new Promise(resolve => {
+    const id = ++sequence;
+    pending.set(id, resolve);
+    worker.postMessage({id, op:"run", code});
+  });
+}
+function notice(text) { $("notice").textContent = text; }
+async function run() {
+  if (busy) return;
+  if ($("language").value !== "python") {
+    notice("This language requires a future WebAssembly runtime or a local FlowStudio server.");
+    return;
+  }
+  const code = $("source").value;
+  if (new TextEncoder().encode(code).length > 65536) { notice("Maximum Python submission: 64 KiB."); return; }
+  busy = true; $("run").disabled = true;
+  notice("Executing in your browser — initial Pyodide download can take time.");
+  try {
+    const response = await request(code);
+    $("console").textContent += "\n>>> run\n" + (response.output || "(no output)") + "\n";
+    $("console").scrollTop = $("console").scrollHeight;
+    notice(response.ok ? "Python execution complete." : "Python reported an error.");
+    if (response.ok) {
+      const inspect = await request("print(', '.join(sorted(k for k in globals() if not k.startswith('_'))))");
+      if (inspect.ok) $("environment").textContent = inspect.output.trim() || "(No user variables)";
+    }
+  } catch(error) { notice("Execution unavailable: " + error.message); }
+  finally { busy = false; $("run").disabled = false; }
+}
+$("run").addEventListener("click", run);
+$("source").addEventListener("keydown", event => {
+  if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void run(); }
+});
+$("reset").addEventListener("click", () => {
+  worker.terminate();
+  for (const resolve of pending.values()) resolve({ok:false,output:"Session reset."});
+  pending.clear(); startWorker(); $("environment").textContent = "(New Python session)";
+  notice("Python state reset.");
+});
+$("open").addEventListener("click", () => $("file").click());
+$("file").addEventListener("change", async event => {
+  const file = event.target.files[0]; if (!file) return;
+  if (file.size > 2 * 1024 * 1024) { notice("File exceeds 2 MiB."); return; }
+  const source = await file.text();
+  if (source.includes("\0")) { notice("NUL bytes are not supported."); return; }
+  $("source").value = source; fileName = file.name; $("filename").textContent = fileName;
+  $("language").value = /\.py$/i.test(fileName) ? "python" : /\.flow$/i.test(fileName) ? "flow" : "r";
+  event.target.value = ""; notice("Opened local file " + fileName);
+});
+$("save").addEventListener("click", () => {
+  const blob = new Blob([$("source").value],{type:"text/plain;charset=utf-8"});
+  const url = URL.createObjectURL(blob), anchor = document.createElement("a");
+  anchor.href = url; anchor.download = fileName; anchor.click();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+});
+$("previewfile").addEventListener("change", async event => {
+  const file = event.target.files[0]; if (!file || file.size > 8*1024*1024) { notice("Preview limit is 8 MiB."); return; }
+  if (imageURL) { URL.revokeObjectURL(imageURL); imageURL = null; }
+  $("workspace").replaceChildren();
+  if (file.type.startsWith("image/")) {
+    imageURL = URL.createObjectURL(file); const img = document.createElement("img"); img.src=imageURL;img.alt=file.name;
+    $("workspace").append(img);
+  } else {
+    const text = await file.text(), sep = /\.tsv$/i.test(file.name) ? "\t" : ",";
+    const table = document.createElement("table");
+    for (const line of text.split(/\r\n|\n|\r/).slice(0,101)) {
+      const tr=document.createElement("tr");
+      for (const value of line.split(sep).slice(0,30)) {
+        const cell=document.createElement(table.rows.length ? "td" : "th");
+        cell.textContent=value;tr.append(cell);
+      }
+      table.append(tr);
+    }
+    $("workspace").append(table);
+    notice("Simple bounded delimited preview (quoted CSV fields are not interpreted).");
+  }
+});
+startWorker();
+</script>
+</body></html>

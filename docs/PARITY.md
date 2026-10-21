@@ -22,7 +22,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Git pane | missing | Status, diff, stage, commit and branch operations |
 | Help pane | missing | Context-aware language/function docs |
 | Find / replace / cross-file search | partial / Node + V8-tested | Literal in-buffer find next/previous, single/all replacement and project-wide search implemented; incremental indexing, regex and physical-browser verification missing |
-| Percent-delimited source cells | partial / Node-tested; native execution unverified | Run only the active `# %%` code cell in Flow/R/Python; markdown and empty cells do not execute |
+| Percent-delimited source cells | partial / Node-tested lexical boundaries and CR/LF/CRLF; native execution unverified | Run only the active `# %%` code cell in Flow/R/Python; markdown and empty cells do not execute |
 | R Markdown / Quarto | missing | Render notebook with inline plots and HTML export |
 | Source debugger | missing | Breakpoints, stack, variables, step execution |
 | Remote/server mode | missing | Authenticated, origin-aware multi-user sessions with isolation |
@@ -153,3 +153,9 @@ The Flow-owned router now serves a keyboard-operable Files/Plots/Data tab contro
 ## Validation log — 2026-10-18 (draft recovery asset integration)
 
 Published `web/editor_recovery.js` as the explicit `/editor_recovery.js` asset route, and loaded the controller once after the editor's DOM and existing script are ready. Added `tests/test_recovery_wiring.py` to check route allowlisting, correct script placement and controller API presence. Static fetched-source checks confirmed all six corresponding invariants; the new Python unittest and physical browser recovery workflow have not yet been executed. This does not verify that draft persistence works in a real browser or that the native Flow server compiles. The recovery controller retains its earlier isolated tests, but no new parity feature is marked verified here.
+
+## Source-cell lexical boundary fix — 2026-10-21 (Linux x86-64)
+
+`web/source_cells.js` now distinguishes `# %%` delimiters from matching text inside Python triple-quoted strings, R multiline strings/backtick names and conservatively tracked block comments. It preserves source offsets for CR-only, LF and CRLF line endings and rejects more than 10,000 cells. The scanner is intentionally conservative and is not a complete Flow/R/Python grammar.
+
+Local validation with Node.js 22.16.0: `node --test tests/source_cells.test.js tests/source_cells_lexical.test.js tests/source_cells_line_endings.test.js` passed **19/19** tests (existing eight reconstructed from the exact GitHub source, plus eleven new tests). The updated parser also passed 27/27 staged notebook import/controller tests, but notebook import is not included in this branch. No native Flow compilation, actual R/Flow/Python HTTP execution, physical-browser interaction or macOS validation was performed. **RStudio parity remains incomplete.**

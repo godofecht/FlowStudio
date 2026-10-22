@@ -14,17 +14,17 @@ button{cursor:pointer}button:focus-visible,select:focus-visible,textarea:focus-v
 textarea{background:#101b2c;color:inherit;border:0;resize:none;width:100%;height:100%;padding:1rem;font:14px/1.55 ui-monospace,monospace;tab-size:4}
 pre{white-space:pre-wrap;overflow:auto;overflow-wrap:anywhere;flex:1;margin:0;padding:1rem;font:13px/1.5 ui-monospace,monospace}
 #environment{overflow:auto;padding:1rem;flex:1}#environment table{border-collapse:collapse;width:100%}#environment th,#environment td{padding:.3rem .5rem;border:1px solid #50617a;text-align:left;overflow-wrap:anywhere}#workspace{overflow:auto;padding:.8rem;flex:1}#workspace table{border-collapse:collapse}#workspace th,#workspace td{padding:.2rem .5rem;border:1px solid #50617a}#workspace img{max-width:100%;height:auto}.workspace-tools{display:flex;gap:.4rem;flex-wrap:wrap;padding:.4rem}#workspace iframe{border:0;width:100%;height:100%;min-height:220px}
-.muted{color:#b6c7df}#notice{color:#ffe3a6}footer{font-size:.85rem}
+#projectTree{max-height:22vh;overflow:auto;padding:.35rem;display:flex;flex-direction:column;gap:.25rem}#projectTree .project-file{text-align:left;width:100%}#projectTree .project-children{padding-left:1rem;display:flex;flex-direction:column;gap:.25rem}#projectPanel{border-bottom:1px solid #40506a}#projectPanel summary{cursor:pointer;padding:.4rem .7rem}section[aria-label="Source editor"] textarea{flex:1;min-height:6rem;height:auto}.muted{color:#b6c7df}#notice{color:#ffe3a6}footer{font-size:.85rem}
 @media(max-width:750px){body{height:auto;min-height:100dvh}main{grid-template-columns:1fr;grid-template-rows:45vh 20vh 30vh 25vh}}
 </style></head>
 <body>
 <header><strong>◈ FlowStudio <span class="muted">/ Browser</span></strong>
 <label for="language">Language</label><select id="language"><option value="python">Python (browser)</option><option value="flow">Flow (not yet browser executable)</option><option value="r">R (not yet browser executable)</option></select>
-<button id="open" type="button">Open</button><input id="file" type="file" accept=".py,.flow,.r,.R,.txt" hidden>
+<button id="open" type="button">Open file</button><button id="openFolder" type="button">Open project folder</button><button id="newProjectFile" type="button">New project file</button><button id="saveProjectFile" type="button" disabled>Save to disk</button><input id="file" type="file" accept=".py,.flow,.r,.R,.txt" hidden>
 <button id="save" type="button">Download source</button><button id="run" type="button">Run Ctrl+Enter</button><button id="runSelection" type="button">Run selection Ctrl+Shift+Enter</button><button id="reset" type="button">Reset Python</button><button id="forgetDraft" type="button">Forget saved draft</button>
 </header>
 <main>
-<section aria-label="Source editor"><h2>Source — <span id="filename">untitled.py</span></h2><textarea id="source" aria-label="Source code" spellcheck="false">x = 40
+<section aria-label="Source editor"><h2>Source — <span id="filename">untitled.py</span></h2><details id="projectPanel"><summary>Project files</summary><div id="projectTree" aria-label="Project file explorer">Choose a folder to browse its files.</div></details><textarea id="source" aria-label="Source code" spellcheck="false">x = 40
 print("Hello from browser Python!")
 x + 2</textarea></section>
 <section aria-label="Environment"><h2>Environment</h2><div id="environment" class="muted">Python runs entirely in a Web Worker using Pyodide. The runtime downloads on first use.</div><div class="workspace-tools"><input id="packageName" type="text" aria-label="Python package name" placeholder="package==version" maxlength="120"><button id="installPackage" type="button">Install package</button><button id="listPackages" type="button">List packages</button></div><div id="packages" role="region" aria-label="Installed Python packages" style="overflow:auto;max-height:40%"></div></section>
@@ -36,6 +36,9 @@ x + 2</textarea></section>
 <script src="./packages_panel.js"></script>
 <script src="./draft_storage.js"></script>
 <script src="./source_selection.js"></script>
+<script src="./project.js"></script>
+<script src="./file_save.js"></script>
+<script src="./project_workspace.js"></script>
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
@@ -152,7 +155,8 @@ $("file").addEventListener("change", async event => {
   if (file.size > 2 * 1024 * 1024) { notice("File exceeds 2 MiB."); return; }
   const source = await file.text();
   if (source.includes("\0")) { notice("NUL bytes are not supported."); return; }
-  $("source").value = source; fileName = file.name; $("filename").textContent = fileName;
+  if (projectWorkspace.dirty() && !window.confirm("Discard unsaved editor changes?")) return;
+  $("source").value = source; projectWorkspace.notifyExternalOpen(); fileName = file.name; $("filename").textContent = fileName;
   $("language").value = /\.py$/i.test(fileName) ? "python" : /\.flow$/i.test(fileName) ? "flow" : "r";
   event.target.value = ""; notice("Opened local file " + fileName);
   queueDraft();
@@ -195,6 +199,18 @@ if (recovered) {
   $("language").value = recovered.language;
   notice("Recovered a browser-local source draft. Source is not uploaded.");
 }
+const projectWorkspace = FlowStudioProjectWorkspace.create({
+  projectApi: FlowStudioProject, fileSaveApi: FlowStudioFileSave,
+  source: $("source"), filename: $("filename"), language: $("language"),
+  tree: $("projectTree"), openFolderButton: $("openFolder"),
+  saveFileButton: $("saveProjectFile"), newFileButton: $("newProjectFile"),
+  status: notice, onDraft: queueDraft,
+  setFilename: (name, path) => { fileName = name; $("filename").textContent = path; },
+  picker: typeof window.showDirectoryPicker === "function"
+    ? options => window.showDirectoryPicker({...options, mode:"readwrite"}) : null,
+  confirmChange: message => window.confirm(message),
+  promptName: message => window.prompt(message)
+});
 startWorker();
 </script>
 </body></html>

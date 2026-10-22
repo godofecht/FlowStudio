@@ -15,7 +15,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Persistent REPL/session | partial / browser Python worker; native R/Python persistence missing | Incremental variables and package state persist until reset |
 | Variable inspector | partial / browser Python variables; nested inspection and dimensions missing | Nested objects / types / dimensions inspectable and refresh after execution |
 | Plot viewer | partial / Node-tested PNG import and integrated workspace tab; native unverified | png/svg plot history, zoom, save and deterministic device lifecycle |
-| Project explorer | partial / DOM-tested | Open project, tree navigation, source-file creation and save; safe rename/delete still missing |
+| Project explorer | partial / native DOM-tested; browser Pages project open/create/save Node-tested, physical-browser unverified | Open project, tree navigation, source-file creation and save; safe rename/delete still missing |
 | Data viewer | partial / browser-local CSV/TSV viewer integrated as workspace tab; native unverified | Interactive sortable/filterable tabular datasets including missing values |
 | Completion / language server | missing | R, Flow and Python completion/diagnostics |
 | Packages pane | partial / browser Python inventory and install; live Pyodide unverified | List, install, update with environment-aware package sources |
@@ -180,3 +180,28 @@ CPython 3.13.5 with Matplotlib, 4/4 tests passed with
 `python3 -m unittest discover -s tests -p test_plot_capture_limits.py`.
 Tests cover mock workers and DOM, not real Pyodide or a physical browser.
 No macOS acceptance or native Flow/R/Python end-to-end parity is claimed.
+
+## Browser project files and conflict-aware saves — 2026-10-22
+
+Draft PR #7 integrates the existing browser File System Access project explorer
+and conflict-aware source writer into the static Pages workspace. A user-granted
+project directory can be traversed lazily (bounded depth and entries), source
+files opened, and root-level source files created. Explicit disk saves compare
+the current file against the snapshot read on open or last successful save;
+external changes refuse overwrite. Switching project files checks for unsaved
+editor edits; opening an ordinary local file detaches the project write handle.
+The browser still offers the independent download-source fallback.
+
+Local validation: Node.js 22.16.0, 39/39 tests passed for the available
+browser-focused test fixture (including project controller and filesystem
+integration, selection, persistence and plot failure tests). The project and
+file-save modules are exact copies of the already committed native-web modules
+and have matching Git blob SHAs. The HTML fixture was reconstructed from a
+previously validated artifact and does not establish a full physical-browser
+acceptance test against the GitHub-hosted branch.
+
+Limitations: folder access requires a compatible browser with the File System
+Access API and explicit user permission; no cross-browser filesystem fallback,
+file rename/delete, durable handle restoration, native Flow execution from
+Pages, or verified browser/OS interaction is claimed. Native Flow remains the
+primary application/server backend; browser project operations are local only.

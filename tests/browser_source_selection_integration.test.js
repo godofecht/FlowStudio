@@ -9,6 +9,9 @@ const html = fs.readFileSync(path.join(base, "index.html"), "utf8");
 const script = html.match(/<script>\s*([\s\S]*?)<\/script>/)[1];
 const moduleSource = fs.readFileSync(path.join(base, "source_selection.js"), "utf8");
 const draftSource = fs.readFileSync(path.join(base, "draft_storage.js"), "utf8");
+const projectSource = fs.readFileSync(path.join(base, "project.js"), "utf8");
+const saveSource = fs.readFileSync(path.join(base, "file_save.js"), "utf8");
+const projectWorkspaceSource = fs.readFileSync(path.join(base, "project_workspace.js"), "utf8");
 
 function fixture(initialDraft = null) {
   const elements = new Map(), workers = [], storage = new Map(), windowListeners = new Map(), plotCalls = [];
@@ -29,6 +32,7 @@ function fixture(initialDraft = null) {
   const context = {TextEncoder, Worker, setTimeout, clearTimeout,
     localStorage: {getItem:key=>storage.get(key) || null, setItem:(key,value)=>storage.set(key,value), removeItem:key=>storage.delete(key)},
     addEventListener:(name,fn)=>windowListeners.set(name,fn),
+    confirm:()=>true, prompt:()=>null,
     document:{getElementById:element, createElement:()=>({setAttribute(){},append(){}})},
     FlowStudioPlotHistory:{create:()=>({append(plots){plotCalls.push(plots);},clear(){}})},
     FlowStudioPackages:{create:()=>({clear(){}})}
@@ -36,6 +40,9 @@ function fixture(initialDraft = null) {
   context.window = context;
   vm.runInNewContext(moduleSource, context);
   vm.runInNewContext(draftSource, context);
+  vm.runInNewContext(projectSource, context);
+  vm.runInNewContext(saveSource, context);
+  vm.runInNewContext(projectWorkspaceSource, context);
   vm.runInNewContext(script, context);
   const recovered = {source:element("source").value, filename:element("filename").textContent, language:element("language").value};
   const source = element("source");

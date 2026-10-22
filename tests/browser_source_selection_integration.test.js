@@ -8,6 +8,7 @@ const base = path.join(__dirname, "../docs/app");
 const html = fs.readFileSync(path.join(base, "index.html"), "utf8");
 const script = html.match(/<script>\s*([\s\S]*?)<\/script>/)[1];
 const moduleSource = fs.readFileSync(path.join(base, "source_selection.js"), "utf8");
+const cellSource = fs.readFileSync(path.join(base, "source_cells.js"), "utf8");
 const draftSource = fs.readFileSync(path.join(base, "draft_storage.js"), "utf8");
 const projectSource = fs.readFileSync(path.join(base, "project.js"), "utf8");
 const saveSource = fs.readFileSync(path.join(base, "file_save.js"), "utf8");
@@ -40,6 +41,7 @@ function fixture(initialDraft = null) {
   };
   context.window = context;
   vm.runInNewContext(moduleSource, context);
+  vm.runInNewContext(cellSource, context);
   vm.runInNewContext(draftSource, context);
   vm.runInNewContext(projectSource, context);
   vm.runInNewContext(saveSource, context);
@@ -162,4 +164,31 @@ test("cancelled local file switch preserves project buffer and resets picker", a
   await f.element("file").listeners.get("change")({target});
   assert.equal(f.source.value,"unsaved changes");
   assert.equal(target.value,"");
+});
+
+test("Run Cell submits only the active Python cell and refreshes the environment", async () => {
+  const f=fixture();
+  f.source.value="x=1\n# %%\nprint(x)\n";
+  f.source.selectionStart=f.source.value.indexOf("print");
+  f.click("runCell");
+  assert.equal(f.workers[0].messages.length,1);
+  assert.equal(f.workers[0].messages[0].code,"print(x)\n");
+  const id=f.workers[0].messages[0].id;
+  f.workers[0].onmessage({data:{id,ok:true,output:"1",plots:[]}});
+  await tick();
+  assert.equal(f.workers[0].messages[1].op,"inspect");
+  f.workers[0].onmessage({data:{id:f.workers[0].messages[1].id,ok:true,variables:[]}});
+  await tick();
+  assert.equal(f.element("runCell").disabled,false);
+});
+test("Run Cell rejects markdown and empty cells without posting code", () => {
+  const f=fixture();
+  f.source.value="# %% [markdown]\n# Heading\n# %%\n";
+  f.source.selectionStart=5;
+  f.click("runCell");
+  assert.equal(f.workers[0].messages.length,0);
+  assert.match(f.element("notice").textContent,/Markdown/);
+  f.source.selectionStart=f.source.value.length;
+  f.click("runCell");
+  assert.equal(f.workers[0].messages.length,0);
 });

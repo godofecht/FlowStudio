@@ -22,7 +22,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Git pane | missing | Status, diff, stage, commit and branch operations |
 | Help pane | missing | Context-aware language/function docs |
 | Find / replace / cross-file search | partial / Node + V8-tested | Literal in-buffer find next/previous, single/all replacement and project-wide search implemented; incremental indexing, regex and physical-browser verification missing |
-| Percent-delimited source cells | partial / Node-tested; native execution unverified | Run only the active `# %%` code cell in Flow/R/Python; markdown and empty cells do not execute |
+| Percent-delimited source cells | partial / browser Python Run Cell integrated; Node and real-browser validation pending; Flow/R browser execution unavailable | Run only the active `# %%` code cell in Flow/R/Python; markdown and empty cells do not execute |
 | R Markdown / Quarto | missing | Render notebook with inline plots and HTML export |
 | Source debugger | missing | Breakpoints, stack, variables, step execution |
 | Remote/server mode | missing | Authenticated, origin-aware multi-user sessions with isolation |
@@ -205,3 +205,7 @@ Access API and explicit user permission; no cross-browser filesystem fallback,
 file rename/delete, durable handle restoration, native Flow execution from
 Pages, or verified browser/OS interaction is claimed. Native Flow remains the
 primary application/server backend; browser project operations are local only.
+
+## Browser Python Run Cell — 2026-10-22
+
+Draft PR #7 adds a Run Cell button and Ctrl/Command+Alt+Enter. The active Python `# %%` code cell is submitted to the existing Pyodide worker without delimiter lines. Markdown and empty cells are rejected. The browser parser mirrors the lexical fix proposed on PR #6 (triple-quoted strings, R multiline strings, mixed newlines and a 10,000-cell bound). The parser is not a complete language grammar. Flow/R browser execution is not implemented. Browser and native end-to-end acceptance remain outstanding; no RStudio parity claim.

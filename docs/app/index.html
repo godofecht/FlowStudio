@@ -21,7 +21,7 @@ pre{white-space:pre-wrap;overflow:auto;overflow-wrap:anywhere;flex:1;margin:0;pa
 <header><strong>◈ FlowStudio <span class="muted">/ Browser</span></strong>
 <label for="language">Language</label><select id="language"><option value="python">Python (browser)</option><option value="flow">Flow (not yet browser executable)</option><option value="r">R (not yet browser executable)</option></select>
 <button id="open" type="button">Open file</button><button id="openFolder" type="button">Open project folder</button><button id="newProjectFile" type="button">New project file</button><button id="saveProjectFile" type="button" disabled>Save to disk</button><input id="file" type="file" accept=".py,.flow,.r,.R,.txt" hidden>
-<button id="save" type="button">Download source</button><button id="run" type="button">Run Ctrl+Enter</button><button id="runSelection" type="button">Run selection Ctrl+Shift+Enter</button><button id="reset" type="button">Reset Python</button><button id="forgetDraft" type="button">Forget saved draft</button>
+<button id="save" type="button">Download source</button><button id="run" type="button">Run Ctrl+Enter</button><button id="runSelection" type="button">Run selection Ctrl+Shift+Enter</button><button id="runCell" type="button">Run cell Ctrl+Alt+Enter</button><button id="reset" type="button">Reset Python</button><button id="forgetDraft" type="button">Forget saved draft</button>
 </header>
 <main>
 <section aria-label="Source editor"><h2>Source — <span id="filename">untitled.py</span></h2><details id="projectPanel"><summary>Project files</summary><div id="projectTree" aria-label="Project file explorer">Choose a folder to browse its files.</div></details><textarea id="source" aria-label="Source code" spellcheck="false">x = 40
@@ -36,6 +36,7 @@ x + 2</textarea></section>
 <script src="./packages_panel.js"></script>
 <script src="./draft_storage.js"></script>
 <script src="./source_selection.js"></script>
+<script src="./source_cells.js"></script>
 <script src="./project.js"></script>
 <script src="./file_save.js"></script>
 <script src="./project_workspace.js"></script>
@@ -98,22 +99,31 @@ function renderEnvironment(variables) {
   }
   target.append(table);
 }
-async function run(selectedOnly = false) {
+async function run(selectedOnly = false, activeCell = false) {
   if (busy) return;
   if ($("language").value !== "python") {
     notice("This language requires a future WebAssembly runtime or a local FlowStudio server.");
     return;
   }
-  const prepared = FlowStudioSourceSelection.prepare($("source"), selectedOnly);
+  let prepared;
+  if (activeCell) {
+    try {
+      const cell = FlowStudioSourceCells.cellAt($("source").value, $("source").selectionStart);
+      if (cell.kind !== "code") { notice("Markdown cells cannot be executed."); return; }
+      prepared = FlowStudioSourceSelection.prepare({value:cell.code}, false);
+    } catch (error) { notice("Cannot run cell: " + (error.message || String(error))); return; }
+  } else {
+    prepared = FlowStudioSourceSelection.prepare($("source"), selectedOnly);
+  }
   if (!prepared.ok) { notice(prepared.error); return; }
   const code = prepared.code;
   const generation = sessionGeneration;
-  busy = true; $("run").disabled = true; $("runSelection").disabled = true;
+  busy = true; $("run").disabled = true; $("runSelection").disabled = true; $("runCell").disabled = true;
   notice("Executing in your browser — initial Pyodide download can take time.");
   try {
     const response = await request("run", code);
     if (generation !== sessionGeneration) return;
-    $("console").textContent += (selectedOnly ? "\n>>> run selection\n" : "\n>>> run\n") + (response.output || "(no output)") + "\n";
+    $("console").textContent += (activeCell ? "\n>>> run cell\n" : selectedOnly ? "\n>>> run selection\n" : "\n>>> run\n") + (response.output || "(no output)") + "\n";
     $("console").scrollTop = $("console").scrollHeight;
     notice(response.ok ? "Python execution complete." : "Python reported an error.");
     if (Array.isArray(response.plots)) plotHistory.append(response.plots);
@@ -125,12 +135,14 @@ async function run(selectedOnly = false) {
       else notice("Environment inspection failed: " + inspect.output);
     }
   } catch(error) { notice("Execution unavailable: " + error.message); }
-  finally { busy = false; $("run").disabled = false; $("runSelection").disabled = false; }
+  finally { busy = false; $("run").disabled = false; $("runSelection").disabled = false; $("runCell").disabled = false; }
 }
 $("run").addEventListener("click", () => { void run(false); });
 $("runSelection").addEventListener("click", () => { void run(true); });
+$("runCell").addEventListener("click", () => { void run(false, true); });
 $("source").addEventListener("keydown", event => {
-  if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && event.shiftKey) { event.preventDefault(); void run(true); }
+  if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && event.altKey && !event.shiftKey) { event.preventDefault(); void run(false, true); }
+  else if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && event.shiftKey) { event.preventDefault(); void run(true); }
   else if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void run(false); }
 });
 $("source").addEventListener("input", queueDraft);

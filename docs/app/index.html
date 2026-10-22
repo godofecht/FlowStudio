@@ -14,7 +14,7 @@ button{cursor:pointer}button:focus-visible,select:focus-visible,textarea:focus-v
 textarea{background:#101b2c;color:inherit;border:0;resize:none;width:100%;height:100%;padding:1rem;font:14px/1.55 ui-monospace,monospace;tab-size:4}
 pre{white-space:pre-wrap;overflow:auto;overflow-wrap:anywhere;flex:1;margin:0;padding:1rem;font:13px/1.5 ui-monospace,monospace}
 #environment{overflow:auto;padding:1rem;flex:1}#environment table{border-collapse:collapse;width:100%}#environment th,#environment td{padding:.3rem .5rem;border:1px solid #50617a;text-align:left;overflow-wrap:anywhere}#workspace{overflow:auto;padding:.8rem;flex:1}#workspace table{border-collapse:collapse}#workspace th,#workspace td{padding:.2rem .5rem;border:1px solid #50617a}#workspace img{max-width:100%;height:auto}.workspace-tools{display:flex;gap:.4rem;flex-wrap:wrap;padding:.4rem}#workspace iframe{border:0;width:100%;height:100%;min-height:220px}
-#projectTree{max-height:22vh;overflow:auto;padding:.35rem;display:flex;flex-direction:column;gap:.25rem}#projectTree .project-file{text-align:left;width:100%}#projectTree .project-children{padding-left:1rem;display:flex;flex-direction:column;gap:.25rem}#projectPanel{border-bottom:1px solid #40506a}#projectPanel summary{cursor:pointer;padding:.4rem .7rem}section[aria-label="Source editor"] textarea{flex:1;min-height:6rem;height:auto}.muted{color:#b6c7df}#notice{color:#ffe3a6}footer{font-size:.85rem}
+#projectTree{max-height:22vh;overflow:auto;padding:.35rem;display:flex;flex-direction:column;gap:.25rem}#projectTree .project-file{text-align:left;width:100%}#projectTree .project-children{padding-left:1rem;display:flex;flex-direction:column;gap:.25rem}#projectPanel{border-bottom:1px solid #40506a}#projectPanel summary{cursor:pointer;padding:.4rem .7rem}section[aria-label="Source editor"] textarea{flex:1;min-height:6rem;height:auto}#consoleInput{height:5rem;flex:0 0 auto;border-top:1px solid #40506a;padding:.5rem}#consoleActions{display:flex;align-items:center;justify-content:space-between;gap:.5rem;padding:.35rem .6rem}.muted{color:#b6c7df}#notice{color:#ffe3a6}footer{font-size:.85rem}
 @media(max-width:750px){body{height:auto;min-height:100dvh}main{grid-template-columns:1fr;grid-template-rows:45vh 20vh 30vh 25vh}}
 </style></head>
 <body>
@@ -28,7 +28,7 @@ pre{white-space:pre-wrap;overflow:auto;overflow-wrap:anywhere;flex:1;margin:0;pa
 print("Hello from browser Python!")
 x + 2</textarea></section>
 <section aria-label="Environment"><h2>Environment</h2><div id="environment" class="muted">Python runs entirely in a Web Worker using Pyodide. The runtime downloads on first use.</div><div class="workspace-tools"><input id="packageName" type="text" aria-label="Python package name" placeholder="package==version" maxlength="120"><button id="installPackage" type="button">Install package</button><button id="listPackages" type="button">List packages</button></div><div id="packages" role="region" aria-label="Installed Python packages" style="overflow:auto;max-height:40%"></div></section>
-<section aria-label="Console"><h2>Console</h2><pre id="console" role="log" aria-live="polite">Ready. Python runs locally in your browser; Flow and R execution are not available in this static preview.</pre></section>
+<section aria-label="Console"><h2>Python console</h2><pre id="console" role="log" aria-live="polite">Ready. Python runs locally in your browser; Flow and R execution are not available in this static preview.</pre><textarea id="consoleInput" aria-label="Python console input" placeholder="Python expression or statement" spellcheck="false"></textarea><div id="consoleActions"><span class="muted">Enter: execute · Shift+Enter: newline · ↑: history</span><button id="submitConsole" type="button">Execute</button></div></section>
 <section aria-label="Data and plots"><h2>Plots and data</h2><div class="workspace-tools"><label for="previewfile">Open image</label><input id="previewfile" type="file" accept=".png,.jpg,.jpeg,.webp"><button id="dataViewer" type="button">Open CSV/TSV viewer</button></div><div id="workspace"><p class="muted">Local-only plots and tabular data.</p></div></section>
 </main>
 <footer><span id="notice" role="status">Static Pages preview — no remote code execution or uploaded source</span><a href="../">Project overview</a><a href="https://github.com/godofecht/FlowStudio">Source</a></footer>
@@ -37,6 +37,7 @@ x + 2</textarea></section>
 <script src="./draft_storage.js"></script>
 <script src="./source_selection.js"></script>
 <script src="./source_cells.js"></script>
+<script src="./console_repl.js"></script>
 <script src="./project.js"></script>
 <script src="./file_save.js"></script>
 <script src="./project_workspace.js"></script>
@@ -99,14 +100,16 @@ function renderEnvironment(variables) {
   }
   target.append(table);
 }
-async function run(selectedOnly = false, activeCell = false) {
-  if (busy) return;
-  if ($("language").value !== "python") {
+async function run(selectedOnly = false, activeCell = false, consoleCode = null) {
+  if (busy) { if (consoleCode !== null) notice("Python session is busy."); return false; }
+  if (consoleCode === null && $("language").value !== "python") {
     notice("This language requires a future WebAssembly runtime or a local FlowStudio server.");
     return;
   }
   let prepared;
-  if (activeCell) {
+  if (consoleCode !== null) {
+    prepared = FlowStudioSourceSelection.prepare({value:consoleCode}, false);
+  } else if (activeCell) {
     try {
       const cell = FlowStudioSourceCells.cellAt($("source").value, $("source").selectionStart);
       if (cell.kind !== "code") { notice("Markdown cells cannot be executed."); return; }
@@ -115,28 +118,31 @@ async function run(selectedOnly = false, activeCell = false) {
   } else {
     prepared = FlowStudioSourceSelection.prepare($("source"), selectedOnly);
   }
-  if (!prepared.ok) { notice(prepared.error); return; }
+  if (!prepared.ok) { notice(prepared.error); return false; }
   const code = prepared.code;
   const generation = sessionGeneration;
   busy = true; $("run").disabled = true; $("runSelection").disabled = true; $("runCell").disabled = true;
   notice("Executing in your browser — initial Pyodide download can take time.");
   try {
     const response = await request("run", code);
-    if (generation !== sessionGeneration) return;
-    $("console").textContent += (activeCell ? "\n>>> run cell\n" : selectedOnly ? "\n>>> run selection\n" : "\n>>> run\n") + (response.output || "(no output)") + "\n";
+    if (generation !== sessionGeneration) return false;
+    $("console").textContent += (consoleCode !== null ? "\n>>> python console\n" : activeCell ? "\n>>> run cell\n" : selectedOnly ? "\n>>> run selection\n" : "\n>>> run\n") + (response.output || "(no output)") + "\n";
     $("console").scrollTop = $("console").scrollHeight;
     notice(response.ok ? "Python execution complete." : "Python reported an error.");
     if (Array.isArray(response.plots)) plotHistory.append(response.plots);
     if (response.plotWarning) notice("Plot capture warning: " + response.plotWarning);
     if (response.ok || Array.isArray(response.plots)) {
       const inspect = await request("inspect");
-      if (generation !== sessionGeneration) return;
+      if (generation !== sessionGeneration) return false;
       if (inspect.ok) renderEnvironment(inspect.variables);
       else notice("Environment inspection failed: " + inspect.output);
     }
-  } catch(error) { notice("Execution unavailable: " + error.message); }
+    return true;
+  } catch(error) { notice("Execution unavailable: " + error.message); return false; }
   finally { busy = false; $("run").disabled = false; $("runSelection").disabled = false; $("runCell").disabled = false; }
 }
+const consoleREPL = FlowStudioConsoleREPL.create({input:$("consoleInput"), button:$("submitConsole"),
+  submit:code=>run(false, false, code), notice});
 $("run").addEventListener("click", () => { void run(false); });
 $("runSelection").addEventListener("click", () => { void run(true); });
 $("runCell").addEventListener("click", () => { void run(false, true); });

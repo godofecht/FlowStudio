@@ -31,7 +31,7 @@ test("Static preview clearly does not claim Flow or R execution", () => {
 });
 test("Submitted Python source is bounded; reset terminates worker", () => {
   assert.match(app, /length > 65536/);
-  assert.match(worker, /length > 65536/);
+  assert.match(worker, /new TextEncoder\(\)\.encode\(code\)\.length <= 65536/);
   assert.match(app, /worker\.terminate\(\)/);
 });
 test("All committed browser JavaScript parses in Node V8", () => {

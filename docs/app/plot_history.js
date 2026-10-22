@@ -12,7 +12,24 @@ function create(target) {
       image.alt = "Python figure " + item.number;
       image.src = "data:image/png;base64," + item.png;
       image.loading = "lazy";
+      image.setAttribute("style", "max-width:100%;height:auto");
       holder.append(image);
+      const save = document.createElement("a");
+      save.href = image.src;
+      save.download = "flowstudio-figure-" + item.number + ".png";
+      save.textContent = "Save figure " + item.number;
+      holder.append(save);
+      const zoom = document.createElement("button");
+      zoom.type = "button";
+      zoom.textContent = "Zoom figure " + item.number;
+      zoom.setAttribute("aria-pressed", "false");
+      let expanded = false;
+      zoom.onclick = () => {
+        expanded = !expanded;
+        image.setAttribute("style", expanded ? "max-width:none;height:auto" : "max-width:100%;height:auto");
+        zoom.setAttribute("aria-pressed", String(expanded));
+      };
+      holder.append(zoom);
     }
     target.replaceChildren(holder);
     current = holder;

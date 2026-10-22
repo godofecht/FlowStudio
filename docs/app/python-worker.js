@@ -5,6 +5,11 @@ let loading = null;
 let queued = 0;
 let serial = Promise.resolve();
 const MAX_QUEUED = 32;
+const MAX_OUTPUT = 131072;
+function boundedAppend(existing, text) {
+  const room = MAX_OUTPUT - existing.length;
+  return room > 0 ? existing + String(text).slice(0, room) : existing;
+}
 async function python() {
   if (runtime) return runtime;
   if (!loading) loading = (async () => {
@@ -23,15 +28,15 @@ async function handle(event) {
   let stdout = "", stderr = "";
   try {
     const py = await python();
-    py.setStdout({batched: text => { stdout += text + "\n"; }});
-    py.setStderr({batched: text => { stderr += text + "\n"; }});
+    py.setStdout({batched: text => { stdout = boundedAppend(stdout, text + "\n"); }});
+    py.setStderr({batched: text => { stderr = boundedAppend(stderr, text + "\n"); }});
     const value = await py.runPythonAsync(op === "inspect" ? "import json as _fs_json\n_fs_json.dumps([{\u0027name\u0027:k,\u0027type\u0027:type(v).__name__,\u0027preview\u0027:repr(v)[:160],\u0027shape\u0027:None} for k,v in list(globals().items()) if not k.startswith(\u0027_\u0027)][:100])" : code);
-    const rendered = value === undefined || value === null ? "" : String(value);
+    const rendered = value === undefined || value === null ? "" : String(value).slice(0, MAX_OUTPUT);
     if (value && typeof value.destroy === "function") value.destroy();
     if (op === "inspect") self.postMessage({id, ok:true, variables:JSON.parse(rendered)});
-    else self.postMessage({id, ok:true, output:(stdout + rendered + (stderr ? "\n" + stderr : "")).slice(0,131072)});
+    else self.postMessage({id, ok:true, output:(stdout + rendered + (stderr ? "\n" + stderr : "")).slice(0, MAX_OUTPUT)});
   } catch (error) {
-    self.postMessage({id, ok:false, output:(stdout + stderr + String(error)).slice(0,131072)});
+    self.postMessage({id, ok:false, output:(stdout + stderr + String(error).slice(0, MAX_OUTPUT)).slice(0, MAX_OUTPUT)});
   }
 };
 

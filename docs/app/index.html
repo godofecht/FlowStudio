@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>FlowStudio Browser — Python scientific workspace</title>
+<title>FlowStudio Browser — Flow, R and Python scientific workspace</title>
 <style>
 :root{color-scheme:dark;font:14px/1.5 system-ui,sans-serif;background:#0e1421;color:#e6efff}
 *{box-sizing:border-box}body{margin:0;height:100dvh;display:flex;flex-direction:column}
@@ -19,16 +19,16 @@ pre{white-space:pre-wrap;overflow:auto;overflow-wrap:anywhere;flex:1;margin:0;pa
 </style></head>
 <body>
 <header><strong>◈ FlowStudio <span class="muted">/ Browser</span></strong>
-<label for="language">Language</label><select id="language"><option value="python">Python (browser)</option><option value="flow">Flow (not yet browser executable)</option><option value="r">R (not yet browser executable)</option></select>
+<label for="language">Language</label><select id="language"><option value="python">Python (browser)</option><option value="flow">Flow (not yet browser executable)</option><option value="r">R (browser; webR 0.6.0)</option></select>
 <button id="open" type="button">Open file</button><button id="openFolder" type="button">Open project folder</button><button id="newProjectFile" type="button">New project file</button><button id="saveProjectFile" type="button" disabled>Save to disk</button><input id="file" type="file" accept=".py,.flow,.r,.R,.txt" hidden>
-<button id="save" type="button">Download source</button><button id="run" type="button">Run Ctrl+Enter</button><button id="runSelection" type="button">Run selection Ctrl+Shift+Enter</button><button id="runCell" type="button">Run cell Ctrl+Alt+Enter</button><button id="reset" type="button">Reset Python</button><button id="forgetDraft" type="button">Forget saved draft</button>
+<button id="save" type="button">Download source</button><button id="run" type="button">Run Ctrl+Enter</button><button id="runSelection" type="button">Run selection Ctrl+Shift+Enter</button><button id="runCell" type="button">Run cell Ctrl+Alt+Enter</button><button id="reset" type="button">Reset selected session</button><button id="forgetDraft" type="button">Forget saved draft</button>
 </header>
 <main>
 <section aria-label="Source editor"><h2>Source — <span id="filename">untitled.py</span></h2><details id="projectPanel"><summary>Project files</summary><div id="projectTree" aria-label="Project file explorer">Choose a folder to browse its files.</div></details><textarea id="source" aria-label="Source code" spellcheck="false">x = 40
 print("Hello from browser Python!")
 x + 2</textarea></section>
 <section aria-label="Environment"><h2>Environment</h2><div id="environment" class="muted">Python runs entirely in a Web Worker using Pyodide. The runtime downloads on first use.</div><div class="workspace-tools"><input id="packageName" type="text" aria-label="Python package name" placeholder="package==version" maxlength="120"><button id="installPackage" type="button">Install package</button><button id="listPackages" type="button">List packages</button></div><div id="packages" role="region" aria-label="Installed Python packages" style="overflow:auto;max-height:40%"></div></section>
-<section aria-label="Console"><h2>Python console</h2><pre id="console" role="log" aria-live="polite">Ready. Python runs locally in your browser; Flow and R execution are not available in this static preview.</pre><textarea id="consoleInput" aria-label="Python console input" placeholder="Python expression or statement" spellcheck="false"></textarea><div id="consoleActions"><span class="muted">Enter: execute · Shift+Enter: newline · ↑: history</span><button id="submitConsole" type="button">Execute</button></div></section>
+<section aria-label="Console"><h2>Python / R console</h2><pre id="console" role="log" aria-live="polite">Ready. Python and R run locally in your browser; Flow execution requires the native application.</pre><textarea id="consoleInput" aria-label="Python console input" placeholder="Python expression or statement" spellcheck="false"></textarea><div id="consoleActions"><span class="muted">Enter: execute · Shift+Enter: newline · ↑: history</span><button id="submitConsole" type="button">Execute</button></div></section>
 <section aria-label="Data and plots"><h2>Plots and data</h2><div class="workspace-tools"><label for="previewfile">Open image</label><input id="previewfile" type="file" accept=".png,.jpg,.jpeg,.webp"><button id="dataViewer" type="button">Open CSV/TSV viewer</button></div><div id="workspace"><p class="muted">Local-only plots and tabular data.</p></div></section>
 </main>
 <footer><span id="notice" role="status">Static Pages preview — no remote code execution or uploaded source</span><a href="../">Project overview</a><a href="https://github.com/godofecht/FlowStudio">Source</a></footer>
@@ -38,6 +38,7 @@ x + 2</textarea></section>
 <script src="./source_selection.js"></script>
 <script src="./source_cells.js"></script>
 <script src="./console_repl.js"></script>
+<script src="./r_session.js"></script>
 <script src="./project.js"></script>
 <script src="./file_save.js"></script>
 <script src="./project_workspace.js"></script>
@@ -46,6 +47,8 @@ x + 2</textarea></section>
 const $ = id => document.getElementById(id);
 let worker, pending = new Map(), sequence = 0, busy = false, fileName = "untitled.py", imageURL = null, sessionGeneration = 0;
 const plotHistory = FlowStudioPlotHistory.create($("workspace"));
+let rSession = null;
+function getRSession() { return rSession || (rSession = FlowStudioRSession.create()); }
 let draftStorage = null;
 try { draftStorage = window.localStorage; } catch (_) { /* private browsing may block storage */ }
 const drafts = FlowStudioDraftStorage.create(draftStorage, 300, () => notice("Draft could not be saved in this browser."));
@@ -78,7 +81,7 @@ function renderEnvironment(variables) {
   target.replaceChildren();
   if (!variables.length) { target.textContent = "(No user variables)"; return; }
   const table = document.createElement("table");
-  table.setAttribute("aria-label", "Python environment variables");
+  table.setAttribute("aria-label", $("language").value === "r" ? "R environment variables" : "Python environment variables");
   const head = document.createElement("tr");
   for (const title of ["Name", "Type", "Shape", "Value"]) {
     const cell = document.createElement("th");
@@ -102,7 +105,8 @@ function renderEnvironment(variables) {
 }
 async function run(selectedOnly = false, activeCell = false, consoleCode = null) {
   if (busy) { if (consoleCode !== null) notice("Python session is busy."); return false; }
-  if (consoleCode === null && $("language").value !== "python") {
+  const language = ["python", "r", "flow"].includes($("language").value) ? $("language").value : "python";
+  if (language !== "python" && language !== "r") {
     notice("This language requires a future WebAssembly runtime or a local FlowStudio server.");
     return;
   }
@@ -122,17 +126,18 @@ async function run(selectedOnly = false, activeCell = false, consoleCode = null)
   const code = prepared.code;
   const generation = sessionGeneration;
   busy = true; $("run").disabled = true; $("runSelection").disabled = true; $("runCell").disabled = true;
-  notice("Executing in your browser — initial Pyodide download can take time.");
+  notice(language === "r" ? "Executing R in your browser — initial webR download can take time." : "Executing in your browser — initial Pyodide download can take time.");
   try {
-    const response = await request("run", code);
+    const response = language === "r" ? await getRSession().run(code) : await request("run", code);
     if (generation !== sessionGeneration) return false;
-    $("console").textContent += (consoleCode !== null ? "\n>>> python console\n" : activeCell ? "\n>>> run cell\n" : selectedOnly ? "\n>>> run selection\n" : "\n>>> run\n") + (response.output || "(no output)") + "\n";
+    $("console").textContent += (consoleCode !== null ? "\n>>> " + language + " console\n" : activeCell ? "\n>>> run cell\n" : selectedOnly ? "\n>>> run selection\n" : "\n>>> run\n") + (response.output || "(no output)") + "\n";
     $("console").scrollTop = $("console").scrollHeight;
-    notice(response.ok ? "Python execution complete." : "Python reported an error.");
+    notice(response.ok ? language + " execution complete." : language + " reported an error.");
     if (Array.isArray(response.plots)) plotHistory.append(response.plots);
+    if (language === "r" && Array.isArray(response.images)) FlowStudioRSession.renderImages($("workspace"), response.images, document);
     if (response.plotWarning) notice("Plot capture warning: " + response.plotWarning);
-    if (response.ok || Array.isArray(response.plots)) {
-      const inspect = await request("inspect");
+    if (response.ok || Array.isArray(response.plots) || Array.isArray(response.images)) {
+      const inspect = language === "r" ? await getRSession().inspect() : await request("inspect");
       if (generation !== sessionGeneration) return false;
       if (inspect.ok) renderEnvironment(inspect.variables);
       else notice("Environment inspection failed: " + inspect.output);
@@ -160,6 +165,12 @@ $("forgetDraft").addEventListener("click", () => {
 });
 $("reset").addEventListener("click", () => {
   sessionGeneration++;
+  if ($("language").value === "r") {
+    if (rSession) rSession.reset();
+    $("environment").textContent = "(New R session)";
+    notice("R state reset.");
+    return;
+  }
   plotHistory.clear();
   packagePanel.clear();
   worker.terminate();

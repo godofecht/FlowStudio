@@ -9,11 +9,11 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Four-pane IDE shell | unverified | Source, environment, console and plots render; keyboard/accessibility checks |
 | File open / save | partial / conflict-aware browser saves wired; physical browser and native unverified | Native file-picker and download fallback round-trip UTF-8 |
 | Flow source execution | unverified | Compile and run valid code; surface diagnostics for invalid code |
-| R source execution | partial / unverified | Run via installed R; preserve state across evaluations |
+| R source execution | partial / browser webR 0.6.0 integrated, Node-mock tested; real webR and native R unverified | Run via installed R; preserve state across evaluations |
 | Python source execution | partial / unverified | Run via installed Python; preserve state across evaluations |
 | Editor selection execution | partial / Node-tested browser selection; native and physical-browser unverified | Selection runs without accidentally executing entire buffer |
-| Persistent REPL/session | partial / browser Python worker; native R/Python persistence missing | Incremental variables and package state persist until reset |
-| Variable inspector | partial / browser Python variables; nested inspection and dimensions missing | Nested objects / types / dimensions inspectable and refresh after execution |
+| Persistent REPL/session | partial / browser Python worker and browser webR session; native R/Python persistence missing | Incremental variables and package state persist until reset |
+| Variable inspector | partial / browser Python variables and browser R top-level metadata; nested inspection missing | Nested objects / types / dimensions inspectable and refresh after execution |
 | Plot viewer | partial / Node-tested PNG import and integrated workspace tab; native unverified | png/svg plot history, zoom, save and deterministic device lifecycle |
 | Project explorer | partial / native DOM-tested; browser Pages project open/create/save Node-tested, physical-browser unverified | Open project, tree navigation, source-file creation and save; safe rename/delete still missing |
 | Data viewer | partial / browser-local CSV/TSV viewer integrated as workspace tab; native unverified | Interactive sortable/filterable tabular datasets including missing values |
@@ -22,7 +22,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Git pane | missing | Status, diff, stage, commit and branch operations |
 | Help pane | missing | Context-aware language/function docs |
 | Find / replace / cross-file search | partial / Node + V8-tested | Literal in-buffer find next/previous, single/all replacement and project-wide search implemented; incremental indexing, regex and physical-browser verification missing |
-| Percent-delimited source cells | partial / browser Python Run Cell integrated; Node and real-browser validation pending; Flow/R browser execution unavailable | Run only the active `# %%` code cell in Flow/R/Python; markdown and empty cells do not execute |
+| Percent-delimited source cells | partial / browser Python Run Cell integrated; Node and real-browser validation pending; Flow browser execution unavailable; browser R unverified | Run only the active `# %%` code cell in Flow/R/Python; markdown and empty cells do not execute |
 | R Markdown / Quarto | missing | Render notebook with inline plots and HTML export |
 | Source debugger | missing | Breakpoints, stack, variables, step execution |
 | Remote/server mode | missing | Authenticated, origin-aware multi-user sessions with isolation |
@@ -209,3 +209,9 @@ primary application/server backend; browser project operations are local only.
 ## Browser Python Run Cell — 2026-10-22
 
 Draft PR #7 adds a Run Cell button and Ctrl/Command+Alt+Enter. The active Python `# %%` code cell is submitted to the existing Pyodide worker without delimiter lines. Markdown and empty cells are rejected. The browser parser mirrors the lexical fix proposed on PR #6 (triple-quoted strings, R multiline strings, mixed newlines and a 10,000-cell bound). The parser is not a complete language grammar. Flow/R browser execution is not implemented. Browser and native end-to-end acceptance remain outstanding; no RStudio parity claim.
+
+## Browser R interpreter integration — 2026-10-22
+
+The static Pages workspace now has an R execution path backed by pinned webR v0.6.0, using its PostMessage channel for hosts without cross-origin isolation. Editor, selection, percent-cell and console submissions share one persistent browser-local R interpreter, with serialized captureR evaluation, bounded output, global-environment inspection, canvas bitmap plot rendering and explicit session reset. Flow execution still requires the native Flow-owned server. This is actual webR API integration, not an R syntax simulator.
+
+Validation: six Node.js tests using a mocked webR API passed locally on Node 22.16.0. Static HTML integration and JavaScript syntax checks passed before publication. No live webR download, actual R execution, physical-browser interaction or macOS acceptance has been run; these capabilities remain **partial / unverified**. The PostMessage channel cannot interrupt running R code or support interactive readline/browser prompts. Package installation, persistent filesystem state, and robust plot history are not implemented for browser R.

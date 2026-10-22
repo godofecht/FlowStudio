@@ -10,7 +10,7 @@ const worker = fs.readFileSync(path.join(root, "docs/app/python-worker.js"), "ut
 const home = fs.readFileSync(path.join(root, "docs/index.html"), "utf8");
 test("Pages homepage links the actual browser workspace", () => {
   assert.match(home, /href="\.\/app\/"/);
-  assert.match(home, /Flow and R still require a native runtime/);
+  assert.match(home, /experimental R with webR/);
 });
 test("Browser workspace offers working local editor actions", () => {
   for (const id of ["source","language","console","environment","workspace","open","save","run","reset","file","previewfile"])
@@ -25,10 +25,10 @@ test("Python runs inside dedicated worker, not GitHub Pages server", () => {
   assert.match(worker, /runPythonAsync\(op === "inspect"/);
   assert.doesNotMatch(app, /fetch\("\/api\/execute/);
 });
-test("Static preview clearly does not claim Flow or R execution", () => {
+test("Static preview distinguishes native Flow from experimental browser R", () => {
   assert.match(app, /Flow \(not yet browser executable\)/);
-  assert.match(app, /R \(not yet browser executable\)/);
-  assert.match(app, /value !== "python"/);
+  assert.match(app, /R \(browser; webR 0\.6\.0\)/);
+  assert.match(app, /language !== "python" && language !== "r"/);
 });
 test("Submitted Python source is bounded; reset terminates worker", () => {
   const selection = fs.readFileSync(path.join(root, "docs/app/source_selection.js"), "utf8");

@@ -16,7 +16,8 @@ test("Browser workspace offers working local editor actions", () => {
   for (const id of ["source","language","console","environment","workspace","open","save","run","reset","file","previewfile"])
     assert.match(app, new RegExp('id="' + id + '"'));
   assert.match(app, /URL\.createObjectURL/);
-  assert.match(app, /\.addEventListener\("click", run\)/);
+  assert.match(app, /\$\("run"\)\.addEventListener\("click",/);
+  assert.match(app, /\$\("runSelection"\)\.addEventListener\("click",/);
 });
 test("Python runs inside dedicated worker, not GitHub Pages server", () => {
   assert.match(app, /new Worker\("\.\/python-worker\.js"\)/);
@@ -30,7 +31,10 @@ test("Static preview clearly does not claim Flow or R execution", () => {
   assert.match(app, /value !== "python"/);
 });
 test("Submitted Python source is bounded; reset terminates worker", () => {
-  assert.match(app, /length > 65536/);
+  const selection = fs.readFileSync(path.join(root, "docs/app/source_selection.js"), "utf8");
+  assert.match(app, /FlowStudioSourceSelection\.prepare/);
+  assert.match(selection, /MAX_SOURCE_BYTES = 65536/);
+  assert.match(selection, /new TextEncoder\(\)\.encode\(code\)\.length > MAX_SOURCE_BYTES/);
   assert.match(worker, /new TextEncoder\(\)\.encode\(code\)\.length <= 65536/);
   assert.match(app, /worker\.terminate\(\)/);
 });

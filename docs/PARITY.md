@@ -11,14 +11,14 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Flow source execution | unverified | Compile and run valid code; surface diagnostics for invalid code |
 | R source execution | partial / unverified | Run via installed R; preserve state across evaluations |
 | Python source execution | partial / unverified | Run via installed Python; preserve state across evaluations |
-| Editor selection execution | unverified | Selection runs without accidentally executing entire buffer |
-| Persistent REPL/session | missing | Incremental variables and package state persist until reset |
-| Variable inspector | missing | Nested objects / types / dimensions inspectable and refresh after execution |
+| Editor selection execution | partial / Node-tested browser selection; native and physical-browser unverified | Selection runs without accidentally executing entire buffer |
+| Persistent REPL/session | partial / browser Python worker; native R/Python persistence missing | Incremental variables and package state persist until reset |
+| Variable inspector | partial / browser Python variables; nested inspection and dimensions missing | Nested objects / types / dimensions inspectable and refresh after execution |
 | Plot viewer | partial / Node-tested PNG import and integrated workspace tab; native unverified | png/svg plot history, zoom, save and deterministic device lifecycle |
 | Project explorer | partial / DOM-tested | Open project, tree navigation, source-file creation and save; safe rename/delete still missing |
 | Data viewer | partial / browser-local CSV/TSV viewer integrated as workspace tab; native unverified | Interactive sortable/filterable tabular datasets including missing values |
 | Completion / language server | missing | R, Flow and Python completion/diagnostics |
-| Packages pane | missing | List, install, update with environment-aware package sources |
+| Packages pane | partial / browser Python inventory and install; live Pyodide unverified | List, install, update with environment-aware package sources |
 | Git pane | missing | Status, diff, stage, commit and branch operations |
 | Help pane | missing | Context-aware language/function docs |
 | Find / replace / cross-file search | partial / Node + V8-tested | Literal in-buffer find next/previous, single/all replacement and project-wide search implemented; incremental indexing, regex and physical-browser verification missing |
@@ -165,3 +165,18 @@ A static `docs/app/` four-pane browser IDE is now implemented on `feat/github-pa
 The Pages workspace now exposes the existing FlowStudio CSV/TSV parser and data-page controller as local static assets in `docs/app/`, rather than splitting lines/fields naively. It supports quoted CSV cells, escaped quotes, embedded newlines, BOM, duplicate column labels, bounded file sizes, filtering, numeric/text sorting, pagination and local file-picker fallback. The viewer is embedded in the workspace pane and the image input remains available after repeated imports; no dataset is sent to a server. Source modules were copied byte-for-byte from `web/data_viewer.js` and `web/data_page.js` using their existing Git blobs.
 
 **Verification:** six Node regression tests committed in `tests/browser_pages_data.test.js`; physical-browser behaviour and Pages deployment remain unverified until exercised. Flow and R are not yet browser executable, and native Flow remains the primary server/backend implementation. Do not mark RStudio data-viewer parity verified without the full browser and platform acceptance tests.
+
+## Browser selection, recovery and exception-safe plots — 2026-10-22
+
+Draft PR #7 now proposes exact Python selection execution (Ctrl/⌘+Shift+Enter),
+300 ms debounced browser-local source/filename/language recovery, and capture
+of Matplotlib figures even when source execution raises. Python environment
+inspection is also attempted after source errors. The existing Python package
+panel remains browser-only; Flow and R browser execution are not implemented.
+
+Linux local validation: Node.js 22.16.0, 24/24 tests passed with
+`node --test tests/browser_source_selection*.test.js tests/browser_draft_storage.test.js tests/browser_plot_failure.test.js`;
+CPython 3.13.5 with Matplotlib, 4/4 tests passed with
+`python3 -m unittest discover -s tests -p test_plot_capture_limits.py`.
+Tests cover mock workers and DOM, not real Pyodide or a physical browser.
+No macOS acceptance or native Flow/R/Python end-to-end parity is claimed.

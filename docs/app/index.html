@@ -21,7 +21,7 @@ pre{white-space:pre-wrap;overflow:auto;overflow-wrap:anywhere;flex:1;margin:0;pa
 <header><strong>◈ FlowStudio <span class="muted">/ Browser</span></strong>
 <label for="language">Language</label><select id="language"><option value="python">Python (browser)</option><option value="flow">Flow (not yet browser executable)</option><option value="r">R (not yet browser executable)</option></select>
 <button id="open" type="button">Open</button><input id="file" type="file" accept=".py,.flow,.r,.R,.txt" hidden>
-<button id="save" type="button">Download source</button><button id="run" type="button">Run Ctrl+Enter</button><button id="reset" type="button">Reset Python</button>
+<button id="save" type="button">Download source</button><button id="run" type="button">Run Ctrl+Enter</button><button id="runSelection" type="button">Run selection Ctrl+Shift+Enter</button><button id="reset" type="button">Reset Python</button><button id="forgetDraft" type="button">Forget saved draft</button>
 </header>
 <main>
 <section aria-label="Source editor"><h2>Source — <span id="filename">untitled.py</span></h2><textarea id="source" aria-label="Source code" spellcheck="false">x = 40
@@ -34,11 +34,16 @@ x + 2</textarea></section>
 <footer><span id="notice" role="status">Static Pages preview — no remote code execution or uploaded source</span><a href="../">Project overview</a><a href="https://github.com/godofecht/FlowStudio">Source</a></footer>
 <script src="./plot_history.js"></script>
 <script src="./packages_panel.js"></script>
+<script src="./draft_storage.js"></script>
+<script src="./source_selection.js"></script>
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
 let worker, pending = new Map(), sequence = 0, busy = false, fileName = "untitled.py", imageURL = null, sessionGeneration = 0;
 const plotHistory = FlowStudioPlotHistory.create($("workspace"));
+let draftStorage = null;
+try { draftStorage = window.localStorage; } catch (_) { /* private browsing may block storage */ }
+const drafts = FlowStudioDraftStorage.create(draftStorage, 300, () => notice("Draft could not be saved in this browser."));
 function startWorker() {
   worker = new Worker("./python-worker.js");
   worker.onmessage = ({data}) => {
@@ -60,6 +65,9 @@ function request(op, code) {
 function notice(text) { $("notice").textContent = text; }
 const packagePanel = FlowStudioPackages.create({document, request, notice, target:$("packages"),
   input:$("packageName"), installButton:$("installPackage"), listButton:$("listPackages")});
+function queueDraft() {
+  drafts.queue($("source").value, fileName, $("language").value);
+}
 function renderEnvironment(variables) {
   const target = $("environment");
   target.replaceChildren();
@@ -87,37 +95,47 @@ function renderEnvironment(variables) {
   }
   target.append(table);
 }
-async function run() {
+async function run(selectedOnly = false) {
   if (busy) return;
   if ($("language").value !== "python") {
     notice("This language requires a future WebAssembly runtime or a local FlowStudio server.");
     return;
   }
-  const code = $("source").value;
-  if (new TextEncoder().encode(code).length > 65536) { notice("Maximum Python submission: 64 KiB."); return; }
+  const prepared = FlowStudioSourceSelection.prepare($("source"), selectedOnly);
+  if (!prepared.ok) { notice(prepared.error); return; }
+  const code = prepared.code;
   const generation = sessionGeneration;
-  busy = true; $("run").disabled = true;
+  busy = true; $("run").disabled = true; $("runSelection").disabled = true;
   notice("Executing in your browser — initial Pyodide download can take time.");
   try {
     const response = await request("run", code);
     if (generation !== sessionGeneration) return;
-    $("console").textContent += "\n>>> run\n" + (response.output || "(no output)") + "\n";
+    $("console").textContent += (selectedOnly ? "\n>>> run selection\n" : "\n>>> run\n") + (response.output || "(no output)") + "\n";
     $("console").scrollTop = $("console").scrollHeight;
     notice(response.ok ? "Python execution complete." : "Python reported an error.");
     if (Array.isArray(response.plots)) plotHistory.append(response.plots);
     if (response.plotWarning) notice("Plot capture warning: " + response.plotWarning);
-    if (response.ok) {
+    if (response.ok || Array.isArray(response.plots)) {
       const inspect = await request("inspect");
       if (generation !== sessionGeneration) return;
       if (inspect.ok) renderEnvironment(inspect.variables);
-      else notice("Python ran, but environment inspection failed: " + inspect.output);
+      else notice("Environment inspection failed: " + inspect.output);
     }
   } catch(error) { notice("Execution unavailable: " + error.message); }
-  finally { busy = false; $("run").disabled = false; }
+  finally { busy = false; $("run").disabled = false; $("runSelection").disabled = false; }
 }
-$("run").addEventListener("click", run);
+$("run").addEventListener("click", () => { void run(false); });
+$("runSelection").addEventListener("click", () => { void run(true); });
 $("source").addEventListener("keydown", event => {
-  if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void run(); }
+  if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && event.shiftKey) { event.preventDefault(); void run(true); }
+  else if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void run(false); }
+});
+$("source").addEventListener("input", queueDraft);
+$("language").addEventListener("change", queueDraft);
+window.addEventListener("pagehide", () => drafts.flush());
+$("forgetDraft").addEventListener("click", () => {
+  drafts.clear();
+  notice("Saved local draft forgotten; current editor contents remain open.");
 });
 $("reset").addEventListener("click", () => {
   sessionGeneration++;
@@ -137,6 +155,7 @@ $("file").addEventListener("change", async event => {
   $("source").value = source; fileName = file.name; $("filename").textContent = fileName;
   $("language").value = /\.py$/i.test(fileName) ? "python" : /\.flow$/i.test(fileName) ? "flow" : "r";
   event.target.value = ""; notice("Opened local file " + fileName);
+  queueDraft();
 });
 $("save").addEventListener("click", () => {
   const blob = new Blob([$("source").value],{type:"text/plain;charset=utf-8"});
@@ -168,6 +187,14 @@ $("previewfile").addEventListener("change", event => {
   $("workspace").replaceChildren(img);
   notice("Showing " + file.name);
 });
+const recovered = drafts.read();
+if (recovered) {
+  $("source").value = recovered.source;
+  fileName = recovered.filename;
+  $("filename").textContent = fileName;
+  $("language").value = recovered.language;
+  notice("Recovered a browser-local source draft. Source is not uploaded.");
+}
 startWorker();
 </script>
 </body></html>

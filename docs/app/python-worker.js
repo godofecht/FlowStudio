@@ -29,6 +29,19 @@ async function preparePlotCapture(py) {
   py.FS.writeFile("flowstudio_plot_capture.py", source);
   plotCaptureLoaded = true;
 }
+async function capturePlots(py) {
+  try {
+    const raw = await py.runPythonAsync("_fs_plot_capture.capture()");
+    if (typeof raw !== "string" || raw.length > 4200000)
+      return {plots:[], warning:"Plot response exceeded size limit."};
+    const decoded = JSON.parse(raw);
+    if (!Array.isArray(decoded))
+      return {plots:[], warning:"Plot response was not an array."};
+    return {plots:decoded, warning:""};
+  } catch (error) {
+    return {plots:[], warning:String(error).slice(0, 300)};
+  }
+}
 async function handle(event) {
   const {id, op, code} = event.data || {};
   if (!Number.isSafeInteger(id)) return;
@@ -38,9 +51,10 @@ async function handle(event) {
     op === "inspect" || op === "packages" || validInstall)) {
     self.postMessage({id, ok:false, output:"Invalid execution request."}); return;
   }
-  let stdout = "", stderr = "";
+  let stdout = "", stderr = "", plotWarning = "";
+  let py = null;
   try {
-    const py = await python();
+    py = await python();
     if (op === "packages") {
       const raw = await py.runPythonAsync("import json as _fs_json\nimport importlib.metadata as _fs_md\n_fs_json.dumps(sorted([{'name':str(d.metadata.get('Name'))[:120],'version':str(d.version)[:80]} for d in _fs_md.distributions() if d.metadata.get('Name')], key=lambda p:p['name'].lower())[:500])");
       if (typeof raw !== "string" || raw.length > MAX_OUTPUT) throw new Error("Package inventory exceeds size limit.");
@@ -57,7 +71,7 @@ async function handle(event) {
       self.postMessage({id, ok:true, output:"Installed " + code});
       return;
     }
-    let plots = [], plotWarning = "";
+    let plots = [];
     if (op === "run") {
       await py.loadPackagesFromImports(code);
       try {
@@ -73,20 +87,22 @@ async function handle(event) {
     const rendered = value === undefined || value === null ? "" : String(value).slice(0, MAX_OUTPUT);
     if (value && typeof value.destroy === "function") value.destroy();
     if (op === "run" && plotCaptureLoaded) {
-      try {
-        const raw = await py.runPythonAsync("_fs_plot_capture.capture()");
-        if (typeof raw === "string" && raw.length <= 4200000) {
-          const decoded = JSON.parse(raw);
-          if (Array.isArray(decoded)) plots = decoded;
-        } else plotWarning = "Plot response exceeded size limit.";
-      } catch (error) {
-        plotWarning = String(error).slice(0, 300);
-      }
+      const captured = await capturePlots(py);
+      plots = captured.plots;
+      if (captured.warning) plotWarning = captured.warning;
     }
     if (op === "inspect") self.postMessage({id, ok:true, variables:JSON.parse(rendered)});
     else self.postMessage({id, ok:true, output:(stdout + rendered + (stderr ? "\n" + stderr : "")).slice(0, MAX_OUTPUT), plots, plotWarning});
   } catch (error) {
-    self.postMessage({id, ok:false, output:(stdout + stderr + String(error).slice(0, MAX_OUTPUT)).slice(0, MAX_OUTPUT)});
+    let plots = [];
+    if (op === "run" && py && plotCaptureLoaded) {
+      const captured = await capturePlots(py);
+      plots = captured.plots;
+      if (captured.warning) plotWarning = captured.warning;
+    }
+    self.postMessage({id, ok:false,
+      output:(stdout + stderr + String(error).slice(0, MAX_OUTPUT)).slice(0, MAX_OUTPUT),
+      plots, plotWarning});
   }
 };
 

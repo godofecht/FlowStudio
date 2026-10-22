@@ -14,6 +14,20 @@ MAX_PNG_BYTES = 1024 * 1024
 MAX_TOTAL_BYTES = 3 * 1024 * 1024
 
 
+class _LimitedBuffer(io.BytesIO):
+    """Stop PNG encoding before its in-memory output exceeds the budget."""
+
+    def __init__(self, limit):
+        super().__init__()
+        self.limit = max(0, limit)
+
+    def write(self, data):
+        if self.tell() + len(data) > self.limit:
+            raise OverflowError("Plot PNG exceeds the capture budget")
+        return super().write(data)
+
+
+
 def prepare():
     """Select the non-DOM Agg renderer when Matplotlib is available."""
     try:
@@ -35,10 +49,12 @@ def capture():
     total = 0
     try:
         for number in numbers[-MAX_FIGURES:]:
-            image = io.BytesIO()
-            pyplot.figure(number).savefig(image, format="png", dpi=85)
-            raw = image.getvalue()
-            if len(raw) > MAX_PNG_BYTES or total + len(raw) > MAX_TOTAL_BYTES:
+            try:
+                image = _LimitedBuffer(min(MAX_PNG_BYTES, MAX_TOTAL_BYTES - total))
+                pyplot.figure(number).savefig(image, format="png", dpi=85)
+                raw = image.getvalue()
+            except Exception:
+                # One broken or oversized figure must not hide subsequent plots.
                 continue
             total += len(raw)
             result.append({

@@ -32,10 +32,12 @@ x + 2</textarea></section>
 <section aria-label="Data and plots"><h2>Plots and data</h2><div class="workspace-tools"><label for="previewfile">Open image</label><input id="previewfile" type="file" accept=".png,.jpg,.jpeg,.webp"><button id="dataViewer" type="button">Open CSV/TSV viewer</button></div><div id="workspace"><p class="muted">Local-only plots and tabular data.</p></div></section>
 </main>
 <footer><span id="notice" role="status">Static Pages preview — no remote code execution or uploaded source</span><a href="../">Project overview</a><a href="https://github.com/godofecht/FlowStudio">Source</a></footer>
+<script src="./plot_history.js"></script>
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
 let worker, pending = new Map(), sequence = 0, busy = false, fileName = "untitled.py", imageURL = null, sessionGeneration = 0;
+const plotHistory = FlowStudioPlotHistory.create($("workspace"));
 function startWorker() {
   worker = new Worker("./python-worker.js");
   worker.onmessage = ({data}) => {
@@ -99,6 +101,8 @@ async function run() {
     $("console").textContent += "\n>>> run\n" + (response.output || "(no output)") + "\n";
     $("console").scrollTop = $("console").scrollHeight;
     notice(response.ok ? "Python execution complete." : "Python reported an error.");
+    if (Array.isArray(response.plots)) plotHistory.append(response.plots);
+    if (response.plotWarning) notice("Plot capture warning: " + response.plotWarning);
     if (response.ok) {
       const inspect = await request("inspect");
       if (generation !== sessionGeneration) return;
@@ -114,6 +118,7 @@ $("source").addEventListener("keydown", event => {
 });
 $("reset").addEventListener("click", () => {
   sessionGeneration++;
+  plotHistory.clear();
   worker.terminate();
   for (const resolve of pending.values()) resolve({ok:false,output:"Session reset."});
   pending.clear(); startWorker(); $("environment").textContent = "(New Python session)";

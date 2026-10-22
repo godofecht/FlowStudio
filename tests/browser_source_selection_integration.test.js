@@ -15,6 +15,7 @@ const projectWorkspaceSource = fs.readFileSync(path.join(base, "project_workspac
 
 function fixture(initialDraft = null) {
   const elements = new Map(), workers = [], storage = new Map(), windowListeners = new Map(), plotCalls = [];
+  let acceptSwitch = true;
   if (initialDraft) storage.set("flowstudio.browser.draft.v1", JSON.stringify(initialDraft));
   function element(id) {
     if (!elements.has(id)) elements.set(id, {
@@ -32,7 +33,7 @@ function fixture(initialDraft = null) {
   const context = {TextEncoder, Worker, setTimeout, clearTimeout,
     localStorage: {getItem:key=>storage.get(key) || null, setItem:(key,value)=>storage.set(key,value), removeItem:key=>storage.delete(key)},
     addEventListener:(name,fn)=>windowListeners.set(name,fn),
-    confirm:()=>true, prompt:()=>null,
+    confirm:()=>acceptSwitch, prompt:()=>null,
     document:{getElementById:element, createElement:()=>({setAttribute(){},append(){}})},
     FlowStudioPlotHistory:{create:()=>({append(plots){plotCalls.push(plots);},clear(){}})},
     FlowStudioPackages:{create:()=>({clear(){}})}
@@ -52,7 +53,8 @@ function fixture(initialDraft = null) {
   element("language").value = "python";
   function click(id) { return element(id).listeners.get("click")({}); }
   function keydown(props) { return source.listeners.get("keydown")({preventDefault(){},...props}); }
-  return {element, workers, source, click, keydown, storage, windowListeners, plotCalls, recovered};
+  return {element, workers, source, click, keydown, storage, windowListeners, plotCalls, recovered,
+    setConfirm:value=>{acceptSwitch=value;}};
 }
 async function tick() { await new Promise(resolve=>setImmediate(resolve)); }
 
@@ -150,4 +152,14 @@ test("saved source, filename and runtime recover at browser startup", () => {
   assert.equal(f.recovered.language,"python");
   assert.match(f.element("notice").textContent,/Recovered/);
   assert.equal(f.workers.length,1);
+});
+
+test("cancelled local file switch preserves project buffer and resets picker", async () => {
+  const f=fixture();
+  f.source.value="unsaved changes";
+  f.setConfirm(false);
+  const target={files:[{size:3,name:"test.py",text:async()=>"new"}],value:"test.py"};
+  await f.element("file").listeners.get("change")({target});
+  assert.equal(f.source.value,"unsaved changes");
+  assert.equal(target.value,"");
 });

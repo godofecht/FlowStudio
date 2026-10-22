@@ -192,7 +192,7 @@ external changes refuse overwrite. Switching project files checks for unsaved
 editor edits; opening an ordinary local file detaches the project write handle.
 The browser still offers the independent download-source fallback.
 
-Local validation: Node.js 22.16.0, 39/39 tests passed for the available
+Local validation: Node.js 22.16.0, 40/40 tests passed for the available
 browser-focused test fixture (including project controller and filesystem
 integration, selection, persistence and plot failure tests). The project and
 file-save modules are exact copies of the already committed native-web modules

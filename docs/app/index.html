@@ -152,13 +152,14 @@ $("reset").addEventListener("click", () => {
 $("open").addEventListener("click", () => $("file").click());
 $("file").addEventListener("change", async event => {
   const file = event.target.files[0]; if (!file) return;
+  event.target.value = ""; // permit selecting the same file after cancellation
   if (file.size > 2 * 1024 * 1024) { notice("File exceeds 2 MiB."); return; }
   const source = await file.text();
   if (source.includes("\0")) { notice("NUL bytes are not supported."); return; }
   if (projectWorkspace.dirty() && !window.confirm("Discard unsaved editor changes?")) return;
   $("source").value = source; projectWorkspace.notifyExternalOpen(); fileName = file.name; $("filename").textContent = fileName;
   $("language").value = /\.py$/i.test(fileName) ? "python" : /\.flow$/i.test(fileName) ? "flow" : "r";
-  event.target.value = ""; notice("Opened local file " + fileName);
+  notice("Opened local file " + fileName);
   queueDraft();
 });
 $("save").addEventListener("click", () => {

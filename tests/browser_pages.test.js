@@ -21,7 +21,7 @@ test("Browser workspace offers working local editor actions", () => {
 test("Python runs inside dedicated worker, not GitHub Pages server", () => {
   assert.match(app, /new Worker\("\.\/python-worker\.js"\)/);
   assert.match(worker, /importScripts\("https:\/\/cdn\.jsdelivr\.net\/pyodide\/v0\.27\.7\/full\/pyodide\.js"\)/);
-  assert.match(worker, /runPythonAsync\(code\)/);
+  assert.match(worker, /runPythonAsync\(op === "inspect"/);
   assert.doesNotMatch(app, /fetch\("\/api\/execute/);
 });
 test("Static preview clearly does not claim Flow or R execution", () => {

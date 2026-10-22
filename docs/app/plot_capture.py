@@ -27,7 +27,6 @@ class _LimitedBuffer(io.BytesIO):
         return super().write(data)
 
 
-
 def prepare():
     """Select the non-DOM Agg renderer when Matplotlib is available."""
     try:

@@ -2,7 +2,9 @@
 "use strict";
 let runtime = null;
 let loading = null;
-let generation = 0;
+let queued = 0;
+let serial = Promise.resolve();
+const MAX_QUEUED = 32;
 async function python() {
   if (runtime) return runtime;
   if (!loading) loading = (async () => {
@@ -12,7 +14,7 @@ async function python() {
   try { runtime = await loading; return runtime; }
   catch (error) { loading = null; throw error; }
 }
-self.onmessage = async event => {
+async function handle(event) {
   const {id, op, code} = event.data || {};
   if (!Number.isSafeInteger(id)) return;
   if (!((op === "run" && typeof code === "string" && new TextEncoder().encode(code).length <= 65536) || op === "inspect")) {
@@ -31,4 +33,17 @@ self.onmessage = async event => {
   } catch (error) {
     self.postMessage({id, ok:false, output:(stdout + stderr + String(error)).slice(0,131072)});
   }
+};
+
+/* Inspect and execute operations share one Python interpreter: never overlap them. */
+self.onmessage = event => {
+  const id = event.data && event.data.id;
+  if (queued >= MAX_QUEUED) {
+    if (Number.isSafeInteger(id)) self.postMessage({id, ok:false, output:"Python execution queue is full."});
+    return;
+  }
+  queued++;
+  serial = serial.then(() => handle(event)).catch(error => {
+    if (Number.isSafeInteger(id)) self.postMessage({id, ok:false, output:String(error)});
+  }).finally(() => { queued--; });
 };

@@ -44,7 +44,7 @@ test("Pages workspace retains image import and opens the full tabular viewer", (
 });
 test("Pages data viewer and workspace JavaScript parse in V8", () => {
   new vm.Script(controller, {filename:"docs/app/data_page.js"});
-  const scripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)];
+  const scripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)].map(x => x[1]).filter(x => x.trim());
   assert.equal(scripts.length, 1);
-  new vm.Script(scripts[0][1], {filename:"docs/app/index.html"});
+  new vm.Script(scripts[0], {filename:"docs/app/index.html"});
 });

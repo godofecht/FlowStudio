@@ -35,7 +35,8 @@ test("Submitted Python source is bounded; reset terminates worker", () => {
   assert.match(app, /worker\.terminate\(\)/);
 });
 test("All committed browser JavaScript parses in Node V8", () => {
-  const inline = [...app.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)].map(x => x[1]);
+  const inline = [...app.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)].map(x => x[1]).filter(x => x.trim());
+  assert.match(app, /<script src="\.\/plot_history\.js"><\/script>/);
   assert.equal(inline.length, 1);
   new vm.Script(inline[0], {filename:"docs/app/index.html inline JS"});
   new vm.Script(worker, {filename:"docs/app/python-worker.js"});

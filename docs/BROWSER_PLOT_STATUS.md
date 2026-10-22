@@ -4,7 +4,7 @@ The browser Python worker in `docs/app/python-worker.js` now attempts to install
 
 The new `docs/app/plot_history.js` module renders a bounded 12-figure history with DOM-created image elements. It can clear only the view it owns, preserving a separately opened CSV viewer.
 
-**Important:** The main `docs/app/index.html` does **not yet import or call** the plot history module. The worker capture path and plot-history module exist, but end-to-end rendering inside the IDE is still **unimplemented**. The pending UI integration must load the module before the inline workspace script, append `response.plots` after a successful execution, and clear history on Python reset. Do not mark plotting as browser-verified or RStudio-parity-complete.
+**Integration status:** The main `docs/app/index.html` now loads the plot-history module, appends validated `response.plots` to the workspace after Python execution, and clears the gallery on Python reset. The implementation has source-level validation only; a real Pyodide browser run with Matplotlib has not yet been completed. Do not mark plotting as browser-verified or RStudio-parity-complete.
 
 Validation scope: Node.js mocked-Pyodide worker regression tests and DOM-model history tests; CPython 3.13 Matplotlib helper tests; a Chromium DOM execution check for plot-history append and clear using an injected script (not the hosted page). The actual Pyodide runtime could not be exercised because network access to the runtime CDN was unavailable, and browser navigation to local HTTP/file URLs was blocked by the validation environment.
 

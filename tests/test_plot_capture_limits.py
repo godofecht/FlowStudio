@@ -10,12 +10,16 @@ spec = importlib.util.spec_from_file_location("flowstudio_plot_capture", MODULE)
 plot_capture = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(plot_capture)
 plot_capture.prepare()
-import matplotlib.pyplot as plt
+try:
+    import matplotlib.pyplot as plt
+except ImportError:
+    plt = None
 
 
 class PlotCaptureLimitsTests(unittest.TestCase):
     def tearDown(self):
-        plt.close("all")
+        if plt is not None:
+            plt.close("all")
 
     def test_limited_buffer_refuses_overflow_before_writing(self):
         output = plot_capture._LimitedBuffer(5)
@@ -24,6 +28,7 @@ class PlotCaptureLimitsTests(unittest.TestCase):
             output.write(b"def")
         self.assertEqual(output.getvalue(), b"abc")
 
+    @unittest.skipIf(plt is None, "Matplotlib is not installed")
     def test_oversized_png_is_skipped_and_figure_closed(self):
         plt.figure().add_subplot().plot([0, 1], [0, 1])
         original = plot_capture.MAX_PNG_BYTES
@@ -34,6 +39,7 @@ class PlotCaptureLimitsTests(unittest.TestCase):
         finally:
             plot_capture.MAX_PNG_BYTES = original
 
+    @unittest.skipIf(plt is None, "Matplotlib is not installed")
     def test_broken_figure_does_not_hide_other_figures(self):
         bad = plt.figure()
         def broken(*args, **kwargs):
@@ -46,6 +52,7 @@ class PlotCaptureLimitsTests(unittest.TestCase):
         self.assertTrue(base64.b64decode(images[0]["png"]).startswith(b"\x89PNG\r\n\x1a\n"))
         self.assertEqual(plt.get_fignums(), [])
 
+    @unittest.skipIf(plt is None, "Matplotlib is not installed")
     def test_total_budget_applies_during_encoding(self):
         plt.figure().add_subplot().plot([0, 1], [0, 1])
         original = plot_capture.MAX_TOTAL_BYTES

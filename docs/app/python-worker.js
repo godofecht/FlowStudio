@@ -32,12 +32,31 @@ async function preparePlotCapture(py) {
 async function handle(event) {
   const {id, op, code} = event.data || {};
   if (!Number.isSafeInteger(id)) return;
-  if (!((op === "run" && typeof code === "string" && new TextEncoder().encode(code).length <= 65536) || op === "inspect")) {
+  const validInstall = op === "install" && typeof code === "string" &&
+    /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}(?:==[0-9][A-Za-z0-9.!+_-]{0,39})?$/.test(code);
+  if (!((op === "run" && typeof code === "string" && new TextEncoder().encode(code).length <= 65536) ||
+    op === "inspect" || op === "packages" || validInstall)) {
     self.postMessage({id, ok:false, output:"Invalid execution request."}); return;
   }
   let stdout = "", stderr = "";
   try {
     const py = await python();
+    if (op === "packages") {
+      const raw = await py.runPythonAsync("import json as _fs_json\nimport importlib.metadata as _fs_md\n_fs_json.dumps(sorted([{'name':str(d.metadata.get('Name'))[:120],'version':str(d.version)[:80]} for d in _fs_md.distributions() if d.metadata.get('Name')], key=lambda p:p['name'].lower())[:500])");
+      if (typeof raw !== "string" || raw.length > MAX_OUTPUT) throw new Error("Package inventory exceeds size limit.");
+      const packages = JSON.parse(raw);
+      if (!Array.isArray(packages) || packages.length > 500 ||
+        !packages.every(item => item && typeof item.name === "string" && typeof item.version === "string"))
+        throw new Error("Invalid Python package inventory.");
+      self.postMessage({id, ok:true, packages});
+      return;
+    }
+    if (op === "install") {
+      await py.loadPackage("micropip");
+      await py.runPythonAsync("import micropip as _fs_micropip\nawait _fs_micropip.install(" + JSON.stringify(code) + ")");
+      self.postMessage({id, ok:true, output:"Installed " + code});
+      return;
+    }
     let plots = [], plotWarning = "";
     if (op === "run") {
       await py.loadPackagesFromImports(code);
@@ -71,7 +90,7 @@ async function handle(event) {
   }
 };
 
-/* Inspect and execute operations share one Python interpreter: never overlap them. */
+/* Execution, inspection and package changes share one interpreter: never overlap them. */
 self.onmessage = event => {
   const id = event.data && event.data.id;
   if (queued >= MAX_QUEUED) {

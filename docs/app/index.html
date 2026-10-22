@@ -27,12 +27,13 @@ pre{white-space:pre-wrap;overflow:auto;overflow-wrap:anywhere;flex:1;margin:0;pa
 <section aria-label="Source editor"><h2>Source — <span id="filename">untitled.py</span></h2><textarea id="source" aria-label="Source code" spellcheck="false">x = 40
 print("Hello from browser Python!")
 x + 2</textarea></section>
-<section aria-label="Environment"><h2>Environment</h2><div id="environment" class="muted">Python runs entirely in a Web Worker using Pyodide. The runtime downloads on first use.</div></section>
+<section aria-label="Environment"><h2>Environment</h2><div id="environment" class="muted">Python runs entirely in a Web Worker using Pyodide. The runtime downloads on first use.</div><div class="workspace-tools"><input id="packageName" type="text" aria-label="Python package name" placeholder="package==version" maxlength="120"><button id="installPackage" type="button">Install package</button><button id="listPackages" type="button">List packages</button></div><div id="packages" role="region" aria-label="Installed Python packages" style="overflow:auto;max-height:40%"></div></section>
 <section aria-label="Console"><h2>Console</h2><pre id="console" role="log" aria-live="polite">Ready. Python runs locally in your browser; Flow and R execution are not available in this static preview.</pre></section>
 <section aria-label="Data and plots"><h2>Plots and data</h2><div class="workspace-tools"><label for="previewfile">Open image</label><input id="previewfile" type="file" accept=".png,.jpg,.jpeg,.webp"><button id="dataViewer" type="button">Open CSV/TSV viewer</button></div><div id="workspace"><p class="muted">Local-only plots and tabular data.</p></div></section>
 </main>
 <footer><span id="notice" role="status">Static Pages preview — no remote code execution or uploaded source</span><a href="../">Project overview</a><a href="https://github.com/godofecht/FlowStudio">Source</a></footer>
 <script src="./plot_history.js"></script>
+<script src="./packages_panel.js"></script>
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
@@ -57,6 +58,8 @@ function request(op, code) {
   });
 }
 function notice(text) { $("notice").textContent = text; }
+const packagePanel = FlowStudioPackages.create({document, request, notice, target:$("packages"),
+  input:$("packageName"), installButton:$("installPackage"), listButton:$("listPackages")});
 function renderEnvironment(variables) {
   const target = $("environment");
   target.replaceChildren();
@@ -119,6 +122,7 @@ $("source").addEventListener("keydown", event => {
 $("reset").addEventListener("click", () => {
   sessionGeneration++;
   plotHistory.clear();
+  packagePanel.clear();
   worker.terminate();
   for (const resolve of pending.values()) resolve({ok:false,output:"Session reset."});
   pending.clear(); startWorker(); $("environment").textContent = "(New Python session)";

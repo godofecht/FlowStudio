@@ -40,3 +40,10 @@ test("All committed browser JavaScript parses in Node V8", () => {
   new vm.Script(inline[0], {filename:"docs/app/index.html inline JS"});
   new vm.Script(worker, {filename:"docs/app/python-worker.js"});
 });
+
+test("Python worker queues asynchronous inspection behind execution", () => {
+  assert.match(worker, /let serial = Promise\.resolve\(\)/);
+  assert.match(worker, /serial = serial\.then\(\(\) => handle\(event\)\)/);
+  assert.match(worker, /queued >= MAX_QUEUED/);
+  assert.match(worker, /queued--/);
+});

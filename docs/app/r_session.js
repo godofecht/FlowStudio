@@ -7,6 +7,15 @@ const CDN = "https://webr.r-wasm.org/v0.6.0/webr.mjs";
 const MAX_SOURCE_BYTES = 65536;
 const MAX_OUTPUT = 131072;
 const MAX_PLOTS = 8;
+const R_PACKAGE_NAME = /^[A-Za-z][A-Za-z0-9.]{0,79}$/;
+const PACKAGE_LIST = `local({
+  p <- utils::installed.packages()[, c("Package", "Version"), drop=FALSE]
+  n <- min(nrow(p), 1000L)
+  if (n == 0L) character(0) else vapply(seq_len(n), function(i) {
+    paste(utils::URLencode(p[i, 1L], reserved=TRUE),
+          utils::URLencode(p[i, 2L], reserved=TRUE), sep="\\t")
+  }, character(1))
+})`;
 const INSPECT = `local({
   n <- head(ls(envir=.GlobalEnv, all.names=FALSE), 100L)
   vapply(n, function(k) {
@@ -29,17 +38,24 @@ function create({load = () => import(CDN)} = {}) {
     if (runtime) return runtime;
     if (!loading) {
       const generation = epoch;
-      loading = (async () => {
+      const initializing = (async () => {
         const {WebR, ChannelType} = await load();
         const instance = new WebR({channelType: ChannelType.PostMessage});
-        await instance.init();
-        if (generation !== epoch) {
-          instance.close();
-          throw Error("R session was reset during initialization.");
+        try {
+          await instance.init();
+          if (generation !== epoch) throw Error("R session was reset during initialization.");
+          runtime = instance;
+          return instance;
+        } catch (error) {
+          try { await instance.close(); } catch (_) { /* preserve original initialization error */ }
+          throw error;
         }
-        runtime = instance;
-        return instance;
-      })().catch(error => { loading = null; throw error; });
+      })();
+      const guarded = initializing.catch(error => {
+        if (loading === guarded) loading = null;
+        throw error;
+      });
+      loading = guarded;
     }
     return loading;
   }
@@ -98,13 +114,51 @@ function create({load = () => import(CDN)} = {}) {
       } catch (error) { return {ok:false, output:String(error).slice(0, 300)}; }
     });
   }
+  async function packages() {
+    const generation = epoch;
+    return schedule(async () => {
+      if (generation !== epoch) return {ok:false, output:"R session reset."};
+      try {
+        const r = await get();
+        const rows = await r.evalRRaw(PACKAGE_LIST, "string[]");
+        if (generation !== epoch) return {ok:false, output:"R session reset."};
+        if (!Array.isArray(rows) || rows.length > 1000)
+          throw Error("Invalid R package inventory.");
+        const entries = rows.map(row => {
+          if (typeof row !== "string" || row.length > 512) throw Error("Invalid R package entry.");
+          const fields = row.split("\t");
+          if (fields.length !== 2) throw Error("Invalid R package fields.");
+          const [name, version] = fields.map(decodeURIComponent);
+          if (!R_PACKAGE_NAME.test(name) || name.includes("..") || name.endsWith(".") ||
+              !version || version.length > 80) throw Error("Invalid R package metadata.");
+          return {name, version};
+        });
+        return {ok:true, packages:entries};
+      } catch (error) { return {ok:false, output:String(error).slice(0, 300)}; }
+    });
+  }
+  async function installPackage(name) {
+    if (typeof name !== "string" || !R_PACKAGE_NAME.test(name) ||
+        name.includes("..") || name.endsWith("."))
+      return {ok:false, output:"Enter a valid R package name (no versions, URLs or paths)."};
+    const generation = epoch;
+    return schedule(async () => {
+      if (generation !== epoch) return {ok:false, output:"R session reset."};
+      try {
+        const r = await get();
+        await r.installPackages([name]);
+        if (generation !== epoch) return {ok:false, output:"R session reset."};
+        return {ok:true};
+      } catch (error) { return {ok:false, output:String(error).slice(0, 300)}; }
+    });
+  }
   function reset() {
     epoch++;
-    if (runtime) runtime.close();
+    if (runtime) { try { runtime.close(); } catch (_) { /* already closed */ } }
     runtime = null;
     loading = null;
   }
-  return Object.freeze({run, inspect, reset});
+  return Object.freeze({run, inspect, packages, installPackage, reset});
 }
 function renderImages(target, images, document) {
   if (!Array.isArray(images) || !images.length) return 0;

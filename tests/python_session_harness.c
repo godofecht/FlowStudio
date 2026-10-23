@@ -17,12 +17,12 @@ int main(void)
     a = fs_py_inspect();
     if (fs_py_status() != 200 || !strstr(a, "\"name\":\"value\"") ||
         !strstr(a, "\"type\":\"int\"")) return 9;
-    a = fs_py_run("class Dangerous:\\n    def __repr__(self):\\n        globals()['inspected'] = True\\n        return 'bad'\\nobj = Dangerous()\\ninspected = False");
+    a = fs_py_run("class Dangerous:\n    def __repr__(self):\n        globals()['inspected'] = True\n        return 'bad'\nobj = Dangerous()\ninspected = False");
     if (fs_py_status() != 200) return 10;
     a = fs_py_inspect();
     if (fs_py_status() != 200 || !strstr(a, "\"name\":\"obj\"")) return 11;
     a = fs_py_run("print(inspected)");
-    if (fs_py_status() != 200 || strcmp(a, "False\\n") != 0) return 12;
+    if (fs_py_status() != 200 || strcmp(a, "False\n") != 0) return 12;
     fs_py_reset();
     a = fs_py_inspect();
     if (fs_py_status() != 200 || strstr(a, "\"name\":\"value\"")) return 13;

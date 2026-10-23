@@ -18,7 +18,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Project explorer | partial / native DOM-tested; browser Pages project open/create/save Node-tested, physical-browser unverified | Open project, tree navigation, source-file creation and save; safe rename/delete still missing |
 | Data viewer | partial / browser-local CSV/TSV viewer integrated as workspace tab; native unverified | Interactive sortable/filterable tabular datasets including missing values |
 | Completion / language server | missing | R, Flow and Python completion/diagnostics |
-| Packages pane | partial / browser Python inventory and install; live Pyodide unverified | List, install, update with environment-aware package sources |
+| Packages pane | partial / browser Python inventory/install and webR 0.6.0 inventory/install; mocked Node tests, live interpreters unverified | List, install, update with environment-aware package sources |
 | Git pane | missing | Status, diff, stage, commit and branch operations |
 | Help pane | missing | Context-aware language/function docs |
 | Find / replace / cross-file search | partial / Node + V8-tested | Literal in-buffer find next/previous, single/all replacement and project-wide search implemented; incremental indexing, regex and physical-browser verification missing |
@@ -225,3 +225,24 @@ Run All Cells is now wired to the existing persistent Pyodide and webR runtimes.
 ## Browser Jupyter import/export integration — 2026-10-23
 
 The draft browser IDE now wires `notebook_format.js` and `notebook_io.js` into explicit Open/Export `.ipynb` controls. The implementation serializes Python/R source cells and bounded captured outputs, rejects unsupported notebook structures, and guards asynchronous file reads against concurrent execution. Node regression tests cover import/export, UI wiring, malformed data and the delayed-read race. This is **partial**, not verified RStudio parity: live Pyodide/webR, physical Chromium file picker/download, independent nbformat acceptance and native cross-platform qualification are outstanding for this integrated revision. No hosted CI configuration changes were made.
+
+## Browser R package management — 2026-10-23
+
+The browser Packages pane now dispatches to the selected interpreter: Python
+(Pyodide/micropip) or R (webR 0.6.0). The R session uses
+`utils::installed.packages()` for inventory and `WebR.installPackages([name])`
+for installation into the browser's active webR runtime. Commands are
+serialized with source execution and environment inspection. Input is
+restricted to package names, not arbitrary R expressions, URLs or paths.
+Language switches, file/notebook imports and resets invalidate stale package
+results; Flow package installation is unavailable in the browser.
+
+**Evidence:** 16 isolated Node.js tests passed locally on 2026-10-23 against
+the prepared R-session and package-panel modules, with mocked webR/Pyodide
+interpreter interfaces. Tests are committed to PR #7 for cross-platform CI.
+These tests verify API dispatch, serialization, invalid names, reset,
+initialization failure cleanup and stale-response protection. They do **not**
+prove actual package download, execution in Chromium, repository availability,
+persistent installed libraries after reload, or macOS/Linux native parity.
+The native Flow application remains the primary backend and is unchanged by
+this browser-only feature. The Packages pane remains **partial**.

@@ -2,7 +2,7 @@
 # Requires the current Flow 2.x compiler and POSIX transport shim.
 #
 # This is a single-process, localhost-only development preview. It does not
-# sandbox executed code. Python state persists in one local kernel; R is stateless.
+# sandbox executed code. Python and R retain separate local interpreter sessions.
 
 import std.process { ProcCmd, ProcResult, proc_cmd, proc_arg, proc_input, proc_timeout_ms, proc_run }
 import std.io { FileRead, io_read_text }
@@ -18,6 +18,9 @@ extern {
     function fs_reply(status: i32, content_type: string, body: string) -> void
     function fs_write_temp_flow(code: string) -> string
     function fs_make_temp_c() -> string
+    function fs_r_run(code: string) -> string
+    function fs_r_status() -> i32
+    function fs_r_reset() -> void
     function fs_py_run(code: string) -> string
     function fs_py_inspect() -> string
     function fs_py_status() -> i32
@@ -134,6 +137,11 @@ function send_execution(language: string, code: string) -> void {
     fs_reply(result.status, "text/plain; charset=utf-8", result.output)
 }
 
+function send_r(code: string) -> void {
+    let output: string = fs_r_run(code)
+    fs_reply(fs_r_status(), "text/plain; charset=utf-8", output)
+}
+
 function send_python(code: string) -> void {
     let output: string = fs_py_run(code)
     fs_reply(fs_py_status(), "text/plain; charset=utf-8", output)
@@ -200,7 +208,7 @@ function dispatch() -> void {
             return
         }
         if eq(path, "/api/run/r") {
-            send_execution("r", fs_body())
+            send_r(fs_body())
             return
         }
         if eq(path, "/api/run/python") {
@@ -209,6 +217,11 @@ function dispatch() -> void {
         }
         if eq(path, "/api/inspect/python") {
             send_python_environment()
+            return
+        }
+        if eq(path, "/api/reset/r") {
+            fs_r_reset()
+            fs_reply(200, "text/plain; charset=utf-8", "R session reset.")
             return
         }
         if eq(path, "/api/reset/python") {

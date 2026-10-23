@@ -26,6 +26,7 @@ const INSPECT = `local({
     paste(vapply(fields, utils::URLencode, character(1), reserved=TRUE), collapse="\\t")
   }, character(1))
 })`;
+const HELP_NAME = /^[A-Za-z][A-Za-z0-9._]{0,79}(?:::[A-Za-z][A-Za-z0-9._]{0,79})?$/;
 const TABLE_NAME = /^[A-Za-z][A-Za-z0-9._]{0,119}$/;
 function tableQuery(name) {
   return `local({
@@ -144,6 +145,36 @@ function create({load = () => import(CDN)} = {}) {
       }
     });
   }
+  async function help(name) {
+    if (typeof name !== "string" || name.length > 120 || !HELP_NAME.test(name))
+      return {ok:false, output:"Enter an R help topic or package::topic."};
+    const generation = epoch;
+    return schedule(async () => {
+      if (generation !== epoch) return {ok:false, output:"R session reset."};
+      try {
+        const r = await get();
+        const parts = name.split("::");
+        const topic = parts.length === 2 ? parts[1] : parts[0];
+        const packageArg = parts.length === 2 ? ", package=" + JSON.stringify(parts[0]) : "";
+        // Read installed Rd help; do not evaluate the topic as an R expression.
+        const query = 'local({ tryCatch({ h <- utils::help(' + JSON.stringify(topic) +
+          packageArg + '); if (length(h) == 0L) stop("No installed help for this topic"); ' +
+          'lines <- capture.output(tools::Rd2txt(utils:::.getHelpFile(h))); ' +
+          'c("ok", utils::URLencode(substr(paste(lines, collapse="\\n"), 1L, 12000L), reserved=TRUE)) ' +
+          '}, error=function(e) c("error", utils::URLencode(substr(conditionMessage(e), 1L, 300L), reserved=TRUE))) })';
+        const rows = await r.evalRRaw(query, "string[]");
+        if (generation !== epoch) return {ok:false, output:"R session reset."};
+        if (!Array.isArray(rows) || rows.length !== 2 ||
+            rows.some(row => typeof row !== "string" || row.length > 36000) ||
+            !["ok", "error"].includes(rows[0]))
+          throw Error("Invalid R help response.");
+        const value = decodeURIComponent(rows[1]);
+        if (rows[0] === "error") return {ok:false, output:value.slice(0, 300)};
+        if (value.length > 12000) throw Error("R help response exceeds limit.");
+        return {ok:true, name, doc:value};
+      } catch (error) { return {ok:false, output:String(error).slice(0, 300)}; }
+    });
+  }
   async function inspect() {
     const generation = epoch;
     return schedule(async () => {
@@ -240,7 +271,7 @@ function create({load = () => import(CDN)} = {}) {
     runtime = null;
     loading = null;
   }
-  return Object.freeze({run, checkSyntax, inspect, packages, installPackage, table, reset});
+  return Object.freeze({run, checkSyntax, help, inspect, packages, installPackage, table, reset});
 }
 function renderImages(target, images, document) {
   if (!Array.isArray(images) || !images.length) return 0;

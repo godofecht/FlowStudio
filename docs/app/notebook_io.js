@@ -11,9 +11,11 @@ function create(options) {
     if (!file) return;
     if (isBusy()) { notice("Wait for notebook execution to finish."); return; }
     if (file.size > format.MAX_JSON_BYTES) { notice("Notebook exceeds 4 MiB."); return; }
-    if (!canReplace()) return;
     try {
-      const imported = format.decode(await file.text());
+      const json = await file.text();
+      if (isBusy()) { notice("Wait for notebook execution to finish."); return; }
+      const imported = format.decode(json);
+      if (!canReplace()) return;
       await onImported(imported, file.name);
       notice("Notebook imported. Previous outputs and metadata were not loaded.");
     } catch (error) { notice("Notebook import failed: " + String(error.message || error)); }

@@ -15,7 +15,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Persistent REPL/session | partial / browser Python worker and browser webR session; native R/Python persistence missing | Incremental variables and package state persist until reset |
 | Variable inspector | partial / browser Python variables and browser R top-level metadata; nested inspection missing | Nested objects / types / dimensions inspectable and refresh after execution |
 | Plot viewer | partial / Node-tested PNG import and integrated workspace tab; native unverified | png/svg plot history, zoom, save and deterministic device lifecycle |
-| Project explorer | partial / native DOM-tested; browser Pages project open/create/save Node-tested, physical-browser unverified | Open project, tree navigation, source-file creation and save; safe rename/delete still missing |
+| Project explorer | partial / browser Pages open/create/save and confirmed active-file delete with baseline conflict checks; 10 regression tests V8-shim passed; physical-browser deletion unverified | Open project, tree navigation, source-file creation and save; scoped delete is implemented, safe rename and physical-browser acceptance remain missing |
 | Data viewer | partial / browser-local CSV/TSV viewer integrated as workspace tab; native unverified | Interactive sortable/filterable tabular datasets including missing values |
 | Completion / language server | missing | R, Flow and Python completion/diagnostics |
 | Packages pane | partial / browser Python inventory/install and webR 0.6.0 inventory/install; mocked Node tests, live interpreters unverified | List, install, update with environment-aware package sources |
@@ -246,3 +246,9 @@ prove actual package download, execution in Chromium, repository availability,
 persistent installed libraries after reload, or macOS/Linux native parity.
 The native Flow application remains the primary backend and is unchanged by
 this browser-only feature. The Packages pane remains **partial**.
+
+## Browser project file deletion — 2026-10-23
+
+The draft Pages workspace adds an explicit **Delete open project file** action for browser-granted project directories. The explorer supplies the opened file's parent directory handle, so deletion can target nested files without traversing outside the granted project. The operation refuses dirty buffers, requires explicit confirmation, checks the on-disk baseline twice, and checks file-handle identity when `isSameEntry` is supported. Saves and deletes are mutually excluded. On successful removal, the editor retains the source as a detached, unsaved copy. Switching project folders detaches the previous active file handle.
+
+**Evidence:** ten new regression cases in `tests/browser_project_delete.test.js` executed against the exact published modules using a V8 Node-compatible shim (10/10 passed). These cover successful removal, unsaved edits, external modification, replaced handles, cancellation, permission failures, save races, nested directories, project switching and browser UI wiring. The Node.js and native Flow cross-platform CI status for this revision must be checked separately; the V8 run is **not** physical-browser filesystem validation. Browser File System Access permission prompts and filesystem race windows between final check and `removeEntry` remain unverified. Rename, trash/undo and cross-browser file deletion are not implemented. The Flow 2.0 native server and CI definitions are unchanged.

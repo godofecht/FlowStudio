@@ -78,9 +78,9 @@ def main() -> None:
         assert status == 200 and "flowstudio-flow-ok" in output, (status, output)
 
         # Strict Flow-to-C compilation must never execute the submitted program.
-        check_source = ('function main() -> i32 {\\n'
-                        '    println("THIS-MUST-NOT-EXECUTE")\\n'
-                        '    return 0\\n}\\n')
+        check_source = ('function main() -> i32 {\n'
+                        '    println("THIS-MUST-NOT-EXECUTE")\n'
+                        '    return 0\n}\n')
         status, output = request("POST", "/api/check/flow",
                                  check_source, accepted_headers)
         assert status == 200 and "THIS-MUST-NOT-EXECUTE" not in output, (status, output)

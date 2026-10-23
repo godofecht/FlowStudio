@@ -12,7 +12,7 @@ A **Flow-first scientific IDE** intended to become a capable successor to RStudi
 
 The initial implementation includes a native Flow server (src/main.flow), a small POSIX sockets/temp-file bridge (src/http_bridge.c), and a four-pane browser workspace (web/index.html).
 
-The browser can open and save source files, choose a local project folder, lazily browse its source tree, create a source file in the project root, refresh the tree, search project files for literal text with exact match navigation, run the selected text or whole buffer as Flow, R or Python, and display captured stdout/stderr. Project operations use the browser File System Access API and are unavailable in browsers without folder-picker support. Python and R use a **fresh interpreter per execution**; these are not persistent notebook sessions.
+The browser can open and save source files, choose a local project folder, lazily browse its source tree, create a source file in the project root, refresh the tree, search project files for literal text with exact match navigation, run the selected text or whole buffer as Flow, R or Python, and display captured stdout/stderr. Project operations use the browser File System Access API and are unavailable in browsers without folder-picker support. The native server retains separate Python and R interpreter processes between evaluations, with explicit reset controls. These are single-user localhost sessions, not restart-persistent or remotely isolated kernels.
 
 ### Editor find and replace
 
@@ -24,7 +24,7 @@ Run the additional pure-module tests with:
 
 ## Build and launch
 
-Requirements: [Flow 2.x](https://github.com/flooooooooooow/flow) installed as flow, a C11 compiler available as cc, POSIX macOS/Linux and a recent browser. Python 3 and R are optional **runtime executables** for their respective execution modes.
+Requirements: [Flow 2.x](https://github.com/flooooooooooow/flow) installed as flow, a C11 compiler available as cc, POSIX macOS/Linux and a recent browser. Python 3 and Rscript are optional **runtime executables** for their respective execution modes.
 
 From the repository root:
 
@@ -71,13 +71,13 @@ After a successful native build and acceptance test (`python3 scripts/verify_nat
              |
        Flow / R / Python
 
-Current API: GET /, GET /health, POST /api/run/flow, POST /api/run/r and POST /api/run/python. POST sends UTF-8 source text and requires an X-FlowStudio-Intent: run request header. Python and R subprocesses have a 15-second timeout; Flow has a 60-second compile-and-run budget to accommodate cold compiler start. All processes have bounded, captured output. No shell command-string evaluation is used.
+Current API: GET /, GET /health, POST /api/run/flow, POST /api/run/r, POST /api/reset/r, POST /api/run/python, POST /api/inspect/python and POST /api/reset/python. POST sends UTF-8 source text and requires an X-FlowStudio-Intent: run request header. Persistent Python and R sessions each have a 15-second evaluation timeout and explicit reset; Flow has a 60-second compile-and-run budget to accommodate cold compiler start. All processes have bounded, captured output. No shell command-string evaluation is used.
 
 ## Security and scope
 
 **Code execution is not sandboxed.** Executed code has all the local permissions of the FlowStudio process; use trusted code only. The server binds to 127.0.0.1, rejects cross-origin browser execution and caps request size. Never expose this preview publicly or run it as root. A production remote service will require authenticated sessions and isolation before network exposure.
 
-The native C shim is intentionally limited to OS-facing socket and temporary-file operations; program routing and language execution are in Flow.
+The native C shims handle OS-facing sockets, temporary files and framed interpreter IPC; Flow owns routing and session operations. Python and R evaluation are performed by their respective language runtimes.
 
 ## Licensing
 

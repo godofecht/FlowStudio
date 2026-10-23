@@ -24,6 +24,8 @@ int main(void)
     if (fs_r_status() != 504 || !strstr(out, "timed out")) return 7;
     out = fs_r_run("cat('restarted\\n')");
     if (fs_r_status() != 200 || strcmp(out, "restarted\n") != 0) return 8;
+    out = fs_r_run("");
+    if (fs_r_status() != 200 || strcmp(out, "(No output)") != 0) return 9;
     fs_r_reset();
     puts("PASS: native persistent R, exceptions, reset, bounded output, timeout recovery");
     return 0;

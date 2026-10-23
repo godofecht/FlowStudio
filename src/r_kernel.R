@@ -88,25 +88,39 @@ inspect_workspace <- function() {
             truncated <- TRUE
             break
         }
-        # An active binding is arbitrary user code; never read it during inspection.
+        kind <- "unavailable"
+        size <- "null"
+        dimensions <- "null"
         if (bindingIsActive(name, workspace)) {
+            # An active binding may execute arbitrary user code when read.
             kind <- "active binding"
-            size <- "null"
         } else {
-            value <- get(name, envir = workspace, inherits = FALSE)
-            kind <- typeof(value)
-            # Only base vectors without an object class get a length snapshot.
-            # No S3/S4 length or print methods are invoked.
-            size <- if (!is.object(value) &&
-                kind %in% c("logical", "integer", "double", "complex",
-                            "character", "raw", "list")) {
-                as.character(base::length(value))
-            } else "null"
+            # A lazy promise can raise when forced. An inspection failure must
+            # not terminate the IPC loop or erase other variable metadata.
+            binding <- tryCatch(
+                list(ok = TRUE, value = get(name, envir = workspace, inherits = FALSE)),
+                error = function(error) list(ok = FALSE)
+            )
+            if (binding$ok) {
+                value <- binding$value
+                kind <- typeof(value)
+                if (!is.object(value) &&
+                    kind %in% c("logical", "integer", "double", "complex",
+                                "character", "raw", "list")) {
+                    size <- as.character(base::length(value))
+                }
+                # Read the raw dimension attribute, never dispatch dim() on
+                # user-defined objects. Bound dimensionality and JSON size.
+                shape <- attr(value, "dim", exact = TRUE)
+                if (is.integer(shape) && length(shape) > 0L &&
+                    length(shape) <= 8L && all(!is.na(shape)) && all(shape >= 0L)) {
+                    dimensions <- paste0("[", paste(shape, collapse = ","), "]")
+                }
+            }
         }
-        # Bounded source names and type strings, without evaluating their contents.
         entry <- paste0('{"name":', json_quote(substr(name, 1L, 160L)),
                         ',"type":', json_quote(substr(kind, 1L, 100L)),
-                        ',"size":', size, "}")
+                        ',"size":', size, ',"dimensions":', dimensions, "}")
         additional <- nchar(entry, type = "bytes") + if (length(entries)) 1L else 0L
         if (used + additional > 65000L) {
             truncated <- TRUE

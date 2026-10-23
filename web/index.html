@@ -641,7 +641,17 @@ async function refreshPythonEnvironment() {
   for (const variable of snapshot.variables) {
     if (!variable || typeof variable.name !== "string" || typeof variable.type !== "string") continue;
     const row = document.createElement("tr");
-    for (const value of [variable.name, variable.type, variable.size === null ? "—" : String(variable.size)]) {
+    // R arrays/matrices expose raw dimensions without invoking user methods.
+    // Ignore malformed shapes and retain the ordinary scalar/container size.
+    const shape = selectedLanguage === "r" && Array.isArray(variable.dimensions) &&
+      variable.dimensions.length > 0 && variable.dimensions.length <= 8 &&
+      variable.dimensions.every(dimension => Number.isInteger(dimension) &&
+        dimension >= 0 && dimension <= 2147483647)
+      ? variable.dimensions.join(" × ") : null;
+    const size = shape !== null ? shape :
+      (typeof variable.size === "number" && Number.isSafeInteger(variable.size) &&
+       variable.size >= 0 ? String(variable.size) : "—");
+    for (const value of [variable.name, variable.type, size]) {
       const cell = document.createElement("td");
       cell.textContent = value;
       row.append(cell);

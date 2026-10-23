@@ -19,6 +19,16 @@ int main(void)
     if (fs_r_status() != 200 || !strstr(out, "\"name\":\"value\"") ||
         !strstr(out, "\"type\":\"double\"") ||
         !strstr(out, "\"size\":1")) return failure(10, out);
+    out = fs_r_run("matrix_value <- matrix(1:6, nrow=2)\ndelayedAssign('broken', stop('forced promise'), assign.env=workspace)");
+    if (fs_r_status() != 200) return failure(14, out);
+    out = fs_r_inspect();
+    if (fs_r_status() != 200 ||
+        !strstr(out, "\"name\":\"matrix_value\",\"type\":\"integer\",\"size\":6,\"dimensions\":[2,3]") ||
+        !strstr(out, "\"name\":\"broken\",\"type\":\"unavailable\",\"size\":null,\"dimensions\":null"))
+        return failure(15, out);
+    /* Failed lazy binding must not crash the R kernel or lose prior state. */
+    out = fs_r_run("cat(value, '\\n', sep='')");
+    if (fs_r_status() != 200 || strcmp(out, "41\n") != 0) return failure(16, out);
     out = fs_r_run("value <- value + 1\ncat(value, '\\n', sep='')");
     if (fs_r_status() != 200 || strcmp(out, "42\n") != 0) return failure(2, out);
     out = fs_r_run("stop('expected failure')");

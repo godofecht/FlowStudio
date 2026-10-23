@@ -36,6 +36,8 @@ x + 2</textarea></section>
 </main>
 <footer><span id="notice" role="status">Static Pages preview — no remote code execution or uploaded source</span><a href="../">Project overview</a><a href="https://github.com/godofecht/FlowStudio">Source</a></footer>
 <script src="./plot_history.js"></script>
+<script src="./data_viewer.js"></script>
+<script src="./environment_data.js"></script>
 <script src="./packages_panel.js"></script>
 <script src="./draft_storage.js"></script>
 <script src="./source_selection.js"></script>
@@ -57,6 +59,7 @@ let worker, pending = new Map(), sequence = 0, busy = false, fileName = "untitle
 let notebookRunner = null, notebookOutput = null;
 let notebookEntries = [], notebookExecutionSource = null, notebookExecutionLanguage = null;
 const plotHistory = FlowStudioPlotHistory.create($("workspace"));
+const environmentData = FlowStudioEnvironmentData.create({target:$("workspace"), document, dataApi:FlowStudioData});
 let rSession = null;
 function getRSession() { return rSession || (rSession = FlowStudioRSession.create()); }
 let draftStorage = null;
@@ -91,14 +94,34 @@ const packagePanel = FlowStudioPackages.create({document, request, notice, targe
 function queueDraft() {
   drafts.queue($("source").value, fileName, $("language").value);
 }
+async function viewEnvironmentVariable(name) {
+  if (busy || notebookRunner?.isRunning()) { notice("Wait for execution to finish."); return; }
+  const language = $("language").value;
+  if (language !== "python" && language !== "r") {
+    notice("Tabular inspection requires a Python or R session."); return;
+  }
+  const generation = sessionGeneration;
+  setBusy(true);
+  notice("Reading a bounded table snapshot from the " + language + " session.");
+  try {
+    const result = language === "r" ? await getRSession().table(name) : await request("table", name);
+    if (generation !== sessionGeneration || $("language").value !== language) return;
+    if (!result.ok) { notice("Table inspection failed: " + (result.output || "Unknown error")); return; }
+    const rows = environmentData.show(name, result);
+    notice("Showing " + rows + " sampled rows from " + name + ".");
+  } catch (error) {
+    if (generation === sessionGeneration) notice("Table inspection failed: " + String(error.message || error));
+  } finally { if (generation === sessionGeneration) setBusy(false); }
+}
 function renderEnvironment(variables) {
+  environmentData.clear();
   const target = $("environment");
   target.replaceChildren();
   if (!variables.length) { target.textContent = "(No user variables)"; return; }
   const table = document.createElement("table");
   table.setAttribute("aria-label", $("language").value === "r" ? "R environment variables" : "Python environment variables");
   const head = document.createElement("tr");
-  for (const title of ["Name", "Type", "Shape", "Value"]) {
+  for (const title of ["Name", "Type", "Shape", "Value", "Data"]) {
     const cell = document.createElement("th");
     cell.scope = "col";
     cell.textContent = title;
@@ -114,6 +137,16 @@ function renderEnvironment(variables) {
       cell.textContent = String(value);
       row.append(cell);
     }
+    const action = document.createElement("td");
+    if (/(DataFrame|ndarray|list|tuple|data\\.frame|matrix|array)/i.test(String(variable.type))) {
+      const view = document.createElement("button");
+      view.type = "button";
+      view.textContent = "View";
+      view.setAttribute("aria-label", "View " + variable.name + " as table");
+      view.addEventListener("click", () => { void viewEnvironmentVariable(variable.name); });
+      action.append(view);
+    }
+    row.append(action);
     table.append(row);
   }
   target.append(table);
@@ -239,7 +272,7 @@ $("source").addEventListener("keydown", event => {
   else if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void run(false); }
 });
 $("source").addEventListener("input", () => { notebookEntries = []; queueDraft(); });
-$("language").addEventListener("change", () => { notebookEntries = []; packagePanel.updateLanguage?.(); queueDraft(); });
+$("language").addEventListener("change", () => { notebookEntries = []; environmentData.clear(); packagePanel.updateLanguage?.(); queueDraft(); });
 window.addEventListener("pagehide", () => drafts.flush());
 $("forgetDraft").addEventListener("click", () => {
   drafts.clear();
@@ -249,6 +282,7 @@ $("reset").addEventListener("click", () => {
   sessionGeneration++;
   notebookRunner?.cancel();
   notebookEntries = [];
+  environmentData.clear();
   setBusy(false);
   packagePanel.clear();
   if ($("language").value === "r") {

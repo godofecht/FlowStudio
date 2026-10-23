@@ -228,7 +228,7 @@ async function checkSyntax() {
     if (!issue) {
       const message = language + " check: " + (result.output || "Unknown error");
       notice(message.slice(0, 1024));
-      $("console").textContent += "\\n" + message.slice(0, 4096) + "\\n";
+      $("console").textContent += "\n" + message.slice(0, 4096) + "\n";
       return;
     }
     const message = language + " syntax: line " + issue.line + ", column " + issue.column + ": " + issue.message;

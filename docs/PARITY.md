@@ -15,7 +15,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Persistent REPL/session | partial / browser Python worker and browser webR session; native R/Python persistence missing | Incremental variables and package state persist until reset |
 | Variable inspector | partial / browser Python variables and browser R top-level metadata; nested inspection missing | Nested objects / types / dimensions inspectable and refresh after execution |
 | Plot viewer | partial / Node-tested PNG import and integrated workspace tab; native unverified | png/svg plot history, zoom, save and deterministic device lifecycle |
-| Project explorer | partial / browser Pages open/create/save and confirmed active-file delete with baseline conflict checks; 10 regression tests V8-shim passed; physical-browser deletion unverified | Open project, tree navigation, source-file creation and save; scoped delete is implemented, safe rename and physical-browser acceptance remain missing |
+| Project explorer | partial / browser Pages open/create/save and confirmed active-file delete with baseline conflict checks; 10 regression tests V8-shim passed; physical-browser deletion unverified | Open project, tree navigation, source-file creation and save; scoped delete is implemented, copy-verify-delete rename implemented with non-atomic filesystem race limits; physical-browser acceptance remains missing |
 | Data viewer | partial / browser-local CSV/TSV viewer integrated as workspace tab; native unverified | Interactive sortable/filterable tabular datasets including missing values |
 | Completion / language server | missing | R, Flow and Python completion/diagnostics |
 | Packages pane | partial / browser Python inventory/install and webR 0.6.0 inventory/install; mocked Node tests, live interpreters unverified | List, install, update with environment-aware package sources |
@@ -275,3 +275,24 @@ Physical-browser file-picker permissions, overwrite dialogs and real filesystem
 race windows remain **unverified**. Browser file creation and writes are not
 atomic compare-and-swap, and this is not full RStudio file-management parity.
 The native Flow 2.0 server and hosted CI definitions are unchanged.
+
+
+## Browser project source rename — 2026-10-23
+
+The browser project workspace now exposes a rename operation for an active,
+clean, project-scoped source file. It requires an explicitly granted parent
+directory handle, validates the new filename, rejects an existing destination,
+checks source handle identity and disk contents against the editor baseline,
+confirms the requested operation, copies the source to a new handle, verifies
+the copy, rechecks the original and then removes the old entry. On ambiguous
+post-copy failure, both copies are retained for manual recovery; a failed
+pre-copy write attempts to remove only its own unchanged empty destination.
+
+**Status: partial / locally tested primitive; physical browser unverified.**
+The 13 isolated Node.js regression tests passed locally on Node 22.16.0.
+Additional workspace integration tests are committed and await hosted CI.
+Browser File System Access has no atomic rename or compare-and-swap operation:
+another actor can create the destination between the final lookup and creation,
+or alter the original between the last comparison and removal. Do not use this
+operation as an atomic transactional rename or on concurrently edited files.
+The native Flow server is unchanged; Flow remains the primary native backend.

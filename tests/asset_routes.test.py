@@ -35,6 +35,20 @@ class AssetRoutesTest(unittest.TestCase):
                 self.assertIn('"/' + script + '"', self.router)
                 self.assertTrue((ROOT / "web" / script).is_file())
 
+    def test_native_browser_workspace_is_explicitly_allowlisted(self):
+        assets = set(re.findall(r'path: "(docs/app/[^"]+)"', self.router))
+        expected = {
+            str(path.relative_to(ROOT))
+            for path in (ROOT / "docs/app").iterdir()
+            if path.suffix in {".js", ".html", ".py"}
+        }
+        self.assertEqual(assets, expected)
+        self.assertIn('url == "/app/"', self.router)
+        self.assertIn('url == "/app/index.html"', self.router)
+        html = (ROOT / "docs/app/index.html").read_text(encoding="utf-8")
+        for script in re.findall(r'<script src="\\./([^"]+)"', html):
+            self.assertIn(f'url == "/app/{script}"', self.router)
+
     def test_unknown_routes_have_no_fallback(self):
         self.assertIn('return StaticAsset { path: "", mime: "", found: false }', self.router)
         self.assertNotIn('"/" + url', self.router)

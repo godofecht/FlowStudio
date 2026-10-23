@@ -3,6 +3,7 @@
 let runtime = null;
 let loading = null;
 let plotCaptureLoaded = false;
+let dataCaptureLoaded = false;
 let queued = 0;
 let serial = Promise.resolve();
 const MAX_QUEUED = 32;
@@ -29,6 +30,15 @@ async function preparePlotCapture(py) {
   py.FS.writeFile("flowstudio_plot_capture.py", source);
   plotCaptureLoaded = true;
 }
+async function prepareDataCapture(py) {
+  if (dataCaptureLoaded) return;
+  const response = await fetch("./data_capture.py");
+  if (!response.ok) throw Error("Table capture helper unavailable.");
+  const source = await response.text();
+  if (source.length > 16384) throw Error("Table capture helper exceeds size limit.");
+  py.FS.writeFile("flowstudio_data_capture.py", source);
+  dataCaptureLoaded = true;
+}
 async function capturePlots(py) {
   try {
     const raw = await py.runPythonAsync("_fs_plot_capture.capture()");
@@ -47,8 +57,10 @@ async function handle(event) {
   if (!Number.isSafeInteger(id)) return;
   const validInstall = op === "install" && typeof code === "string" &&
     /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}(?:==[0-9][A-Za-z0-9.!+_-]{0,39})?$/.test(code);
+  const validTable = op === "table" && typeof code === "string" &&
+    /^[A-Za-z_][A-Za-z0-9_]{0,119}$/.test(code);
   if (!((op === "run" && typeof code === "string" && new TextEncoder().encode(code).length <= 65536) ||
-    op === "inspect" || op === "packages" || validInstall)) {
+    op === "inspect" || op === "packages" || validInstall || validTable)) {
     self.postMessage({id, ok:false, output:"Invalid execution request."}); return;
   }
   let stdout = "", stderr = "", plotWarning = "";
@@ -69,6 +81,14 @@ async function handle(event) {
       await py.loadPackage("micropip");
       await py.runPythonAsync("import micropip as _fs_micropip\nawait _fs_micropip.install(" + JSON.stringify(code) + ")");
       self.postMessage({id, ok:true, output:"Installed " + code});
+      return;
+    }
+    if (op === "table") {
+      await prepareDataCapture(py);
+      const raw = await py.runPythonAsync("import flowstudio_data_capture as _fs_data_capture\n_fs_data_capture.capture(" +
+        JSON.stringify(code) + ", globals())");
+      if (typeof raw !== "string" || raw.length > 1048576) throw Error("Table preview exceeds 1 MiB.");
+      self.postMessage({id, ok:true, table:JSON.parse(raw)});
       return;
     }
     let plots = [];

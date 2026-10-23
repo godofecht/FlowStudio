@@ -47,7 +47,7 @@ test("rejects malformed, reordered, injected and excessive output", () => {
   assert.equal(recovery.save(store, "source", "flow", [entry(0)]), false);
   assert.equal(recovery.save(store, "source", "python", [entry(0)]), true);
   const record = JSON.parse(store.raw());
-  record.entries[0].output = "<img src=x onerror=alert(1)>";
+  record.entries[0].output = "x".repeat(131073);
   store.setItem(recovery.KEY, JSON.stringify(record));
   assert.equal(recovery.read(store, "source", "python"), null);
 });

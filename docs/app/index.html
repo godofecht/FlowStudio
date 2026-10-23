@@ -164,7 +164,7 @@ function renderEnvironment(variables) {
 async function run(selectedOnly = false, activeCell = false, consoleCode = null) {
   if (busy) { if (consoleCode !== null) notice("Python session is busy."); return false; }
   const language = ["python", "r", "flow"].includes($("language").value) ? $("language").value : "python";
-  if (language === "flow" && !FlowStudioNativeFlow.available()) {
+  if (language === "flow" && !globalThis.FlowStudioNativeFlow?.available?.()) {
     notice("Flow execution requires the native FlowStudio server at http://127.0.0.1:8751/app/. GitHub Pages does not run Flow.");
     return false;
   }
@@ -186,7 +186,7 @@ async function run(selectedOnly = false, activeCell = false, consoleCode = null)
   setBusy(true);
   notice(language === "flow" ? "Compiling and executing Flow with the native localhost server." : language === "r" ? "Executing R in your browser — initial webR download can take time." : "Executing in your browser — initial Pyodide download can take time.");
   try {
-    const response = language === "flow" ? await FlowStudioNativeFlow.run(code) : language === "r" ? await getRSession().run(code) : await request("run", code);
+    const response = language === "flow" ? await globalThis.FlowStudioNativeFlow.run(code) : language === "r" ? await getRSession().run(code) : await request("run", code);
     if (generation !== sessionGeneration) return false;
     $("console").textContent += (consoleCode !== null ? "\n>>> " + language + " console\n" : activeCell ? "\n>>> run cell\n" : selectedOnly ? "\n>>> run selection\n" : "\n>>> run\n") + (response.output || "(no output)") + "\n";
     $("console").scrollTop = $("console").scrollHeight;

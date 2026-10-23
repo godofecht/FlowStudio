@@ -134,9 +134,9 @@ function create({load = () => import(CDN)} = {}) {
         if (!Array.isArray(rows) || rows.length !== 1 || typeof rows[0] !== "string" ||
             rows[0].length > 4096) throw Error("Invalid R syntax diagnostic response.");
         if (rows[0] === "ok") return {ok:true, diagnostics:[]};
-        if (!rows[0].startsWith("error\\t")) throw Error("Invalid R syntax diagnostic response.");
+        if (!rows[0].startsWith("error\t")) throw Error("Invalid R syntax diagnostic response.");
         const message = decodeURIComponent(rows[0].slice(6)).slice(0, 300);
-        const match = message.match(/(?:<text>|[^\\s:]+):(\\d+):(\\d+):/);
+        const match = message.match(/(?:<text>|[^\s:]+):(\d+):(\d+):/);
         return {ok:false, diagnostics:[{message, line:match ? Number(match[1]) : 1,
           column:match ? Number(match[2]) : 1}]};
       } catch (error) {

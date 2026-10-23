@@ -392,3 +392,21 @@ test("native Python reset is gated by language and uses the intent-protected rou
   assert.equal(app.fetches[0].options.body, "");
   assert.match(app.el("resultStatus").textContent, /session reset/);
 });
+
+test("native R reset is intent-gated and does not reset Python", async () => {
+  const app = workspace(directory("project"));
+  await app.el("resetR").click();
+  assert.match(app.el("resultStatus").textContent, /Select R/);
+  assert.equal(app.fetches.length, 0);
+  app.el("language").value = "r";
+  await app.el("resetR").click();
+  assert.equal(app.fetches.length, 1);
+  assert.equal(app.fetches[0].url, "/api/reset/r");
+  assert.equal(app.fetches[0].options.method, "POST");
+  assert.equal(app.fetches[0].options.headers["X-FlowStudio-Intent"], "run");
+  assert.equal(app.fetches[0].options.body, "");
+  assert.match(app.el("resultStatus").textContent, /Native R session reset/);
+  assert.equal(app.el("run").disabled, false);
+  assert.equal(app.el("runCell").disabled, false);
+  assert.equal(app.el("resetR").disabled, false);
+});

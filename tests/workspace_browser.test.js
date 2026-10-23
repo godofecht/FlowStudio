@@ -71,7 +71,7 @@ function workspace(folder) {
   const elements = new Map();
   const ids = [
     "source", "language", "console", "resultStatus", "fileLabel", "dirty",
-    "cursor", "run", "runCell", "resetPython", "open", "save", "clear", "fallbackOpen", "runtimeInfo",
+    "cursor", "run", "runCell", "resetPython", "refreshPythonEnvironment", "pythonEnvironment", "open", "save", "clear", "fallbackOpen", "runtimeInfo",
     "projectTree", "folder", "newFile", "refreshProject",
     "projectSearch", "caseSensitive", "searchProject", "searchResults",
     "editorFind", "editorReplace", "findNext", "findPrevious",
@@ -84,6 +84,7 @@ function workspace(folder) {
   let allowDiscard = true;
   let nextFilename = "created.flow";
   const fetches = [];
+  const inspectionFetches = [];
   const document = {
     getElementById: id => {
       assert.ok(elements.has(id), "Missing element: " + id);
@@ -101,6 +102,11 @@ function workspace(folder) {
     window, document,
     confirm: () => allowDiscard,
     fetch: async (url, options) => {
+      if (url === "/api/inspect/python") {
+        inspectionFetches.push({ url, options });
+        return { ok: true, status: 200,
+          json: async () => ({ variables: [{ name: "value", type: "int", size: null }], truncated: false }) };
+      }
       fetches.push({ url, options });
       return { ok: true, status: 200, text: async () => "ran" };
     },
@@ -112,7 +118,7 @@ function workspace(folder) {
   vm.runInContext(scripts[2], context, { filename: "source-cells-embedded.js" });
   vm.runInContext(scripts[3], context, { filename: "workspace.js" });
   return {
-    el: id => elements.get(id), document, fetches,
+    el: id => elements.get(id), document, fetches, inspectionFetches,
     setDiscard: value => { allowDiscard = value; },
     setNewFilename: value => { nextFilename = value; }
   };
@@ -187,6 +193,20 @@ test("selection execution sends selected code with required request intent", asy
   assert.equal(app.fetches[0].options.body, 'print("one")');
   assert.equal(app.fetches[0].options.headers["X-FlowStudio-Intent"], "run");
   assert.match(app.el("console").textContent, /ran/);
+});
+
+test("native Python execution refreshes environment through intent-protected inspection", async () => {
+  const app = workspace(directory("empty"));
+  app.el("language").value = "python";
+  app.el("source").value = "value = 42";
+  await app.el("run").fire("click");
+  assert.equal(app.inspectionFetches.length, 1);
+  assert.equal(app.inspectionFetches[0].url, "/api/inspect/python");
+  assert.equal(app.inspectionFetches[0].options.headers["X-FlowStudio-Intent"], "run");
+  const table = app.el("pythonEnvironment").children[0];
+  assert.equal(table.tag, "table");
+  assert.equal(table.children[2].children[0].textContent, "value");
+  assert.equal(table.children[2].children[1].textContent, "int");
 });
 
 test("new-file action rejects unsupported filenames without creating files", async () => {

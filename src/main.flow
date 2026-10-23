@@ -17,6 +17,7 @@ extern {
     function fs_intent_allowed() -> i32
     function fs_reply(status: i32, content_type: string, body: string) -> void
     function fs_write_temp_flow(code: string) -> string
+    function fs_make_temp_c() -> string
     function unlink(path: string) -> i32
     function strcmp(a: string, b: string) -> i32
 }
@@ -30,9 +31,10 @@ struct ExecutionResult {
     output: string
 }
 
-function execute(language: string, code: string) -> ExecutionResult {
+function execute(language: string, code: string, check_only: bool) -> ExecutionResult {
     let mut command: ptr<ProcCmd> = proc_cmd("python3")
     let mut temp_path: string = ""
+    let mut output_path: string = ""
 
     if eq(language, "r") {
         command = proc_cmd("R")
@@ -48,8 +50,23 @@ function execute(language: string, code: string) -> ExecutionResult {
             return ExecutionResult { status: 500, output: "FlowStudio: unable to create temporary Flow source file." }
         }
         command = proc_cmd("flow")
-        proc_arg(command, "run")
-        proc_arg(command, temp_path)
+        if check_only {
+            output_path = fs_make_temp_c()
+            if eq(output_path, "") {
+                let _removed: i32 = unlink(temp_path)
+                return ExecutionResult { status: 500, output: "FlowStudio: unable to create temporary compiler output." }
+            }
+            # The documented strict Flow-to-C emitter performs parsing and
+            # type checking without linking or running the submitted program.
+            proc_arg(command, "tool")
+            proc_arg(command, "compiler/scripts/flowc_emit.flow")
+            proc_arg(command, "--strict")
+            proc_arg(command, temp_path)
+            proc_arg(command, output_path)
+        } else {
+            proc_arg(command, "run")
+            proc_arg(command, temp_path)
+        }
     } else {
         return ExecutionResult { status: 400, output: "Unsupported language." }
     }
@@ -67,6 +84,9 @@ function execute(language: string, code: string) -> ExecutionResult {
 
     if not eq(temp_path, "") {
         let _removed: i32 = unlink(temp_path)
+    }
+    if not eq(output_path, "") {
+        let _removed: i32 = unlink(output_path)
     }
 
     let mut output: string = result.stdout
@@ -87,7 +107,11 @@ function execute(language: string, code: string) -> ExecutionResult {
         output = output + "\nProcess exited unsuccessfully."
     }
     if eq(output, "") {
-        output = "(No output)"
+        if check_only {
+            output = "Flow compile check passed; source was not executed."
+        } else {
+            output = "(No output)"
+        }
     }
     if result.timed_out {
         return ExecutionResult { status: 504, output: output }
@@ -102,7 +126,12 @@ function execute(language: string, code: string) -> ExecutionResult {
 }
 
 function send_execution(language: string, code: string) -> void {
-    let result: ExecutionResult = execute(language, code)
+    let result: ExecutionResult = execute(language, code, false)
+    fs_reply(result.status, "text/plain; charset=utf-8", result.output)
+}
+
+function send_flow_check(code: string) -> void {
+    let result: ExecutionResult = execute("flow", code, true)
     fs_reply(result.status, "text/plain; charset=utf-8", result.output)
 }
 
@@ -143,6 +172,10 @@ function dispatch() -> void {
         }
     }
     if eq(method, "POST") and fs_intent_allowed() == 1 {
+        if eq(path, "/api/check/flow") {
+            send_flow_check(fs_body())
+            return
+        }
         if eq(path, "/api/run/flow") {
             send_execution("flow", fs_body())
             return

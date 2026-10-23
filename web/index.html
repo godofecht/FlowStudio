@@ -79,6 +79,7 @@ footer { padding: 5px 14px; display: flex; justify-content: space-between; gap: 
     <button id="save">Save file</button>
     <button id="run" class="primary" title="Run selection or entire buffer (Ctrl/⌘+Enter)">▶ Run</button>
     <button id="runCell" title="Run current # %% cell (Ctrl/⌘+Shift+Enter)">Run cell</button>
+    <button id="resetPython" type="button" title="Discard native Python variables and restart its interpreter">Reset Python</button>
     <input id="fallbackOpen" type="file" accept=".flow,.R,.r,.py,.txt" hidden>
   </div>
 </header>
@@ -97,7 +98,7 @@ footer { padding: 5px 14px; display: flex; justify-content: space-between; gap: 
     <h2>Environment / History</h2>
     <div class="body">
       <p id="runtimeInfo">Flow execution available when Flow is installed.</p>
-      <p class="muted hint">Variable inspection and persistent language sessions are planned. Each execution currently starts a fresh subprocess.</p>
+      <p class="muted hint">Native Python retains variables across runs until Reset Python; Flow and R executions are currently independent. Environment inspection is not yet available.</p>
       <p class="muted hint">The IDE executes code with your local OS permissions. Only run code you trust.</p>
     </div>
   </section>
@@ -820,10 +821,36 @@ src.addEventListener("click", updateCursor);
 src.addEventListener("keyup", updateCursor);
 language.addEventListener("change", () => {
   if (filename.startsWith("untitled.")) setFilename("untitled." + extension(language.value));
-  el("runtimeInfo").textContent = "Selected runtime: " + language.value + ". Each execution is independent.";
+  el("runtimeInfo").textContent = language.value === "python" ? "Native Python: persistent until Reset Python." :
+    "Selected runtime: " + language.value + ". Each execution is independent.";
 });
 el("run").addEventListener("click", run);
 el("runCell").addEventListener("click", runCell);
+el("resetPython").addEventListener("click", async () => {
+  if (language.value !== "python") {
+    status("Select Python before resetting its native session.", "error");
+    return;
+  }
+  if (el("run").disabled || el("resetPython").disabled) return;
+  el("run").disabled = true;
+  el("runCell").disabled = true;
+  el("resetPython").disabled = true;
+  try {
+    const response = await fetch("/api/reset/python", {
+      method: "POST",
+      headers: { "Content-Type": "text/plain; charset=utf-8", "X-FlowStudio-Intent": "run" },
+      body: ""
+    });
+    status(response.ok ? "Native Python session reset." : "Reset failed: HTTP " + response.status,
+      response.ok ? "ok" : "error");
+  } catch (error) {
+    status("Python reset unavailable: " + String(error), "error");
+  } finally {
+    el("run").disabled = false;
+    el("runCell").disabled = false;
+    el("resetPython").disabled = false;
+  }
+});
 el("open").addEventListener("click", openFile);
 el("save").addEventListener("click", saveFile);
 el("clear").addEventListener("click", () => { consolePane.textContent = ""; });

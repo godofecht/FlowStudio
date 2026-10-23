@@ -18,6 +18,9 @@ extern {
     function fs_reply(status: i32, content_type: string, body: string) -> void
     function fs_write_temp_flow(code: string) -> string
     function fs_make_temp_c() -> string
+    function fs_py_run(code: string) -> string
+    function fs_py_status() -> i32
+    function fs_py_reset() -> void
     function unlink(path: string) -> i32
     function strcmp(a: string, b: string) -> i32
 }
@@ -130,6 +133,11 @@ function send_execution(language: string, code: string) -> void {
     fs_reply(result.status, "text/plain; charset=utf-8", result.output)
 }
 
+function send_python(code: string) -> void {
+    let output: string = fs_py_run(code)
+    fs_reply(fs_py_status(), "text/plain; charset=utf-8", output)
+}
+
 function send_flow_check(code: string) -> void {
     let result: ExecutionResult = execute("flow", code, true)
     fs_reply(result.status, "text/plain; charset=utf-8", result.output)
@@ -185,7 +193,12 @@ function dispatch() -> void {
             return
         }
         if eq(path, "/api/run/python") {
-            send_execution("python", fs_body())
+            send_python(fs_body())
+            return
+        }
+        if eq(path, "/api/reset/python") {
+            fs_py_reset()
+            fs_reply(200, "text/plain; charset=utf-8", "Python session reset.")
             return
         }
     }

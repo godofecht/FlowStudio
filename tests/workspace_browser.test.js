@@ -71,7 +71,7 @@ function workspace(folder) {
   const elements = new Map();
   const ids = [
     "source", "language", "console", "resultStatus", "fileLabel", "dirty",
-    "cursor", "run", "runCell", "open", "save", "clear", "fallbackOpen", "runtimeInfo",
+    "cursor", "run", "runCell", "resetPython", "open", "save", "clear", "fallbackOpen", "runtimeInfo",
     "projectTree", "folder", "newFile", "refreshProject",
     "projectSearch", "caseSensitive", "searchProject", "searchResults",
     "editorFind", "editorReplace", "findNext", "findPrevious",
@@ -356,4 +356,19 @@ test("Ctrl+Shift+Enter executes cell instead of selected text", async () => {
   assert.equal(prevented, true);
   assert.equal(app.fetches.length, 1);
   assert.equal(app.fetches[0].options.body, "y <- 2\n");
+});
+
+test("native Python reset is gated by language and uses the intent-protected route", async () => {
+  const app = workspace(directory("empty"));
+  await app.el("resetPython").fire("click");
+  assert.equal(app.fetches.length, 0);
+  assert.match(app.el("resultStatus").textContent, /Select Python/);
+  app.el("language").value = "python";
+  await app.el("resetPython").fire("click");
+  assert.equal(app.fetches.length, 1);
+  assert.equal(app.fetches[0].url, "/api/reset/python");
+  assert.equal(app.fetches[0].options.method, "POST");
+  assert.equal(app.fetches[0].options.headers["X-FlowStudio-Intent"], "run");
+  assert.equal(app.fetches[0].options.body, "");
+  assert.match(app.el("resultStatus").textContent, /session reset/);
 });

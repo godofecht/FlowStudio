@@ -37,6 +37,13 @@ def main() -> None:
     status, _ = request("POST", "/api/run/python", 'print("bad")')
     assert status == 404, status
 
+    status, browser = request("GET", "/app/")
+    assert status == 200 and "FlowStudioNativeFlow.run(code)" in browser, (status, browser[:100])
+    status, client = request("GET", "/app/native_flow.js")
+    assert status == 200 and '"/api/run/flow"' in client, (status, client[:100])
+    status, _ = request("GET", "/app/not-a-real-asset.js")
+    assert status == 404, status
+
     accepted_headers = {"X-FlowStudio-Intent": "run"}
     status, _ = request(
         "POST", "/api/run/python", 'print("bad")',

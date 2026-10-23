@@ -23,13 +23,13 @@ function create({projectApi, fileSaveApi, source, filename, language, tree,
     saveFileButton.disabled = true;
   }
   async function openHandle(handle, path, parent) {
-    if (deleting) return false;
+    if (deleting || saving) return false;
     const approved = approvedCreate;
     approvedCreate = false;
     if (!approved && !confirmSwitch()) return false;
     // Read first: failures must not alter the existing editor or active handle.
     const text = await fileSaveApi.readSnapshot(handle);
-    if (deleting) return false;
+    if (deleting || saving) return false;
     if (text.includes("\0")) throw new Error("NUL bytes are not supported.");
     const name = path.slice(path.lastIndexOf("/") + 1);
     const extension = name.split(".").pop().toLowerCase();
@@ -53,8 +53,10 @@ function create({projectApi, fileSaveApi, source, filename, language, tree,
     tree, status: message => status(message), openHandle, picker
   });
   async function choose() {
-    if (deleting || saving) return false;
-    return project.choose();
+    if (deleting || saving || !confirmSwitch()) return false;
+    const opened = await project.choose();
+    if (opened) notifyExternalOpen();
+    return opened;
   }
   async function save() {
     if (saving || deleting) { status("File operation already running."); return false; }

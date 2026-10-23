@@ -38,6 +38,8 @@ function fixture(initialDraft = null) {
     confirm:()=>acceptSwitch, prompt:()=>null,
     document:{getElementById:element, createElement:()=>({setAttribute(){},append(){}})},
     FlowStudioPlotHistory:{create:()=>({append(plots){plotCalls.push(plots);},clear(){}})},
+    FlowStudioData:require("../docs/app/data_viewer.js"),
+    FlowStudioEnvironmentData:require("../docs/app/environment_data.js"),
     FlowStudioNotebookIO:require("../docs/app/notebook_io.js"),
     FlowStudioNotebookFormat:require("../docs/app/notebook_format.js"),
     FlowStudioPackages:{create:()=>({clear(){}})}

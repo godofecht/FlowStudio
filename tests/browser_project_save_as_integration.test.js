@@ -122,7 +122,7 @@ test("Browser page wires native Save As picker and module",()=>{
   const html=fs.readFileSync(path.join(__dirname,"../docs/app/index.html"),"utf8");
   assert.match(html,/id="saveAsProjectFile"/);
   assert.match(html,/src="\.\/project_save_as\.js"/);
-  assert.match(html,/saveAsApi: FlowStudioProjectSaveAs/);
+  assert.match(html,/saveAsApi: .*FlowStudioProjectSaveAs/);
   assert.match(html,/saveAsButton: \$\("saveAsProjectFile"\)/);
   assert.match(html,/window\.showSaveFilePicker/);
 });

@@ -105,5 +105,6 @@ test("Pages exposes syntax check control and diagnostic navigation", () => {
   assert.match(app, /request\("check", code\)/);
   assert.match(app, /code\.split\("\\n"\)/);
   assert.match(app, /setSelectionRange\(offset, offset\)/);
+  assert.match(app, /\$\("source"\)\.value !== code/);
   assert.match(app, /checkSyntax"\)\.addEventListener/);
 });

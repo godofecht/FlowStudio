@@ -7,6 +7,7 @@ No external Python dependencies.
 """
 from __future__ import annotations
 
+import json
 import shutil
 import urllib.error
 import urllib.request
@@ -72,6 +73,12 @@ def main() -> None:
     status, output = request("POST", "/api/run/python",
                              "print(flowstudio_persistent)", accepted_headers)
     assert status == 200 and output.strip() == "42", (status, output)
+    status, snapshot = request("POST", "/api/inspect/python", "", accepted_headers)
+    assert status == 200, (status, snapshot)
+    variables = {item["name"]: item for item in json.loads(snapshot)["variables"]}
+    assert variables["flowstudio_persistent"]["type"] == "int", variables
+    status, _ = request("POST", "/api/inspect/python", "")
+    assert status == 404, status
     status, output = request("POST", "/api/run/python",
                              "raise ValueError('session-error')", accepted_headers)
     assert status == 422 and "ValueError: session-error" in output, (status, output)
@@ -80,6 +87,10 @@ def main() -> None:
     assert status == 200 and output.strip() == "42", (status, output)
     status, output = request("POST", "/api/reset/python", "", accepted_headers)
     assert status == 200 and "reset" in output, (status, output)
+    status, snapshot = request("POST", "/api/inspect/python", "", accepted_headers)
+    assert status == 200, (status, snapshot)
+    assert not any(item["name"] == "flowstudio_persistent"
+                   for item in json.loads(snapshot)["variables"])
     status, output = request("POST", "/api/run/python",
                              "print('flowstudio_persistent' in globals())", accepted_headers)
     assert status == 200 and output.strip() == "False", (status, output)

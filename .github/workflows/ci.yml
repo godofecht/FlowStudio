@@ -57,13 +57,17 @@ jobs:
           repository: flooooooooooow/flow
           ref: v2.0.0
           path: .flow-toolchain
+      - name: Install R for real native kernel acceptance
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: 'release'
       - name: Expose Flow executable
         shell: bash
         run: echo "$GITHUB_WORKSPACE/.flow-toolchain" >> "$GITHUB_PATH"
       - name: Confirm compiler and build exact checked-out source
         run: |
           flow version
-          python3 scripts/verify_native.py
+          python3 scripts/verify_native.py --require-r
       - name: Package verified executable
         run: sh scripts/package.sh
       - name: Archive qualified platform build

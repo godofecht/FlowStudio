@@ -97,13 +97,31 @@ def main() -> None:
     status, _ = request("POST", "/api/reset/python", "")
     assert status == 404, status
 
-    if shutil.which("R"):
+    if shutil.which("Rscript"):
         status, output = request("POST", "/api/run/r",
-                                 'cat("flowstudio-r-ok\\n")',
+                                 'flowstudio_r_value <- 41; cat(flowstudio_r_value, "\\n")',
                                  accepted_headers)
-        assert status == 200 and "flowstudio-r-ok" in output, (status, output)
+        assert status == 200 and output.strip() == "41", (status, output)
+        status, output = request("POST", "/api/run/r",
+                                 'flowstudio_r_value <- flowstudio_r_value + 1; cat(flowstudio_r_value, "\\n")',
+                                 accepted_headers)
+        assert status == 200 and output.strip() == "42", (status, output)
+        status, output = request("POST", "/api/run/r",
+                                 'stop("expected native R error")', accepted_headers)
+        assert status == 422 and "expected native R error" in output, (status, output)
+        status, output = request("POST", "/api/run/r",
+                                 'cat(flowstudio_r_value, "\\n")', accepted_headers)
+        assert status == 200 and output.strip() == "42", (status, output)
+        status, output = request("POST", "/api/reset/r", "", accepted_headers)
+        assert status == 200 and "reset" in output, (status, output)
+        status, output = request("POST", "/api/run/r",
+                                 'cat(exists("flowstudio_r_value", inherits=FALSE), "\\n")',
+                                 accepted_headers)
+        assert status == 200 and output.strip() == "FALSE", (status, output)
+        status, _ = request("POST", "/api/reset/r", "")
+        assert status == 404, status
     else:
-        print("SKIP R interpreter: not installed")
+        print("SKIP native R persistence: Rscript is not installed")
 
     if shutil.which("flow"):
         code = 'function main() -> i32 {\n    println("flowstudio-flow-ok")\n    return 0\n}\n'

@@ -65,6 +65,27 @@ def main() -> None:
     )
     assert status == 200 and "flowstudio-python-ok" in output, (status, output)
 
+    # A single Python kernel retains variables between HTTP requests.
+    status, output = request("POST", "/api/run/python",
+                             "flowstudio_persistent = 40 + 2", accepted_headers)
+    assert status == 200, (status, output)
+    status, output = request("POST", "/api/run/python",
+                             "print(flowstudio_persistent)", accepted_headers)
+    assert status == 200 and output.strip() == "42", (status, output)
+    status, output = request("POST", "/api/run/python",
+                             "raise ValueError('session-error')", accepted_headers)
+    assert status == 422 and "ValueError: session-error" in output, (status, output)
+    status, output = request("POST", "/api/run/python",
+                             "print(flowstudio_persistent)", accepted_headers)
+    assert status == 200 and output.strip() == "42", (status, output)
+    status, output = request("POST", "/api/reset/python", "", accepted_headers)
+    assert status == 200 and "reset" in output, (status, output)
+    status, output = request("POST", "/api/run/python",
+                             "print('flowstudio_persistent' in globals())", accepted_headers)
+    assert status == 200 and output.strip() == "False", (status, output)
+    status, _ = request("POST", "/api/reset/python", "")
+    assert status == 404, status
+
     if shutil.which("R"):
         status, output = request("POST", "/api/run/r",
                                  'cat("flowstudio-r-ok\\n")',

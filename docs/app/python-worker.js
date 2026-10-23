@@ -62,7 +62,7 @@ async function handle(event) {
   const validCheck = op === "check" && typeof code === "string" &&
     code.length > 0 && new TextEncoder().encode(code).length <= 65536;
   const validHelp = op === "help" && typeof code === "string" && code.length <= 120 &&
-    /^[A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*){0,3}$/.test(code);
+    /^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*){0,3}$/.test(code);
   if (!((op === "run" && typeof code === "string" && new TextEncoder().encode(code).length <= 65536) ||
     op === "inspect" || op === "packages" || validInstall || validTable || validCheck || validHelp)) {
     self.postMessage({id, ok:false, output:"Invalid execution request."}); return;
@@ -110,7 +110,7 @@ async function handle(event) {
         "except (AttributeError, TypeError, ValueError) as _fs_help_error:",
         "    _fs_help_result = {'ok': False, 'output': str(_fs_help_error)[:300]}",
         "_fs_help_json.dumps(_fs_help_result)"
-      ].join("\\n");
+      ].join("\n");
       const raw = await py.runPythonAsync(query);
       if (typeof raw !== "string" || raw.length > 18000) throw Error("Invalid Python help response.");
       const result = JSON.parse(raw);

@@ -53,7 +53,7 @@ function create({projectApi, fileSaveApi, source, filename, language, tree,
     tree, status: message => status(message), openHandle, picker
   });
   async function choose() {
-    if (deleting || saving || !confirmSwitch()) return false;
+    if (deleting || saving) return false;
     const opened = await project.choose();
     if (opened) notifyExternalOpen();
     return opened;

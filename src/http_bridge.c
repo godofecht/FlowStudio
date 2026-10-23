@@ -263,6 +263,21 @@ const char *fs_method(void) { return fs_http_method; }
 const char *fs_path(void) { return fs_http_path; }
 const char *fs_body(void) { return fs_payload; }
 
+/* A unique, pre-created compiler output path; never execute generated C. */
+const char *fs_make_temp_c(void)
+{
+    static char path[64];
+    strcpy(path, "/tmp/flowstudio-check-XXXXXX.c");
+    int fd = mkstemps(path, 2);
+    if (fd < 0) return "";
+    if (close(fd) != 0)
+    {
+        unlink(path);
+        return "";
+    }
+    return path;
+}
+
 const char *fs_write_temp_flow(const char *code)
 {
     static char path[64];

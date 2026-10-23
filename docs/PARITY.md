@@ -71,9 +71,9 @@ The browser data/plots pane now includes a bounded help-topic lookup for Python 
 
 ## First milestone: an honest executable slice
 
-A Flow 2.x application in src/main.flow delegates only POSIX socket handling and temporary-file operations to src/http_bridge.c. Three request routes each run one language in a fresh child process, with an explicit 15-second process-group timeout. The browser workspace provides a text editor, selection execution, console output, and file opening/saving.
+A Flow 2.x application in src/main.flow delegates only POSIX socket handling and temporary-file operations to src/http_bridge.c. Flow execution and native R use bounded subprocesses; Python uses one bounded persistent kernel with reset and inspection. The browser workspace provides a text editor, selection execution, console output, and file opening/saving.
 
-The present slice is intentionally NOT a persistent interpreter, a full RStudio-compatible UI, a secure remote server or a plotting workstation. It binds to loopback only. Executed programs retain all the permissions of the user running the server. It must not be exposed to remote users or run with elevated privileges.
+The present slice is intentionally NOT a full RStudio-compatible UI, a secure remote server or a complete plotting workstation. It binds to loopback only. Executed programs retain all the permissions of the user running the server. It must not be exposed to remote users or run with elevated privileges.
 
 ## Validation log — 2026-10-15 (Linux x86-64)
 

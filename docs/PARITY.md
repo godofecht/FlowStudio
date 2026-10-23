@@ -16,7 +16,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Variable inspector | partial / browser Python variables and browser R top-level metadata; nested inspection missing | Nested objects / types / dimensions inspectable and refresh after execution |
 | Plot viewer | partial / Node-tested PNG import and integrated workspace tab; native unverified | png/svg plot history, zoom, save and deterministic device lifecycle |
 | Project explorer | partial / browser Pages open/create/save and confirmed active-file delete with baseline conflict checks; 10 regression tests V8-shim passed; physical-browser deletion unverified | Open project, tree navigation, source-file creation and save; scoped delete is implemented, copy-verify-delete rename implemented with non-atomic filesystem race limits; physical-browser acceptance remains missing |
-| Data viewer | partial / browser-local CSV/TSV viewer integrated as workspace tab; native unverified | Interactive sortable/filterable tabular datasets including missing values |
+| Data viewer | partial / CSV/TSV plus bounded Python/R environment table snapshots wired; real Pyodide/webR and physical browser unverified | Interactive sortable/filterable tabular datasets including missing values |
 | Completion / language server | missing | R, Flow and Python completion/diagnostics |
 | Packages pane | partial / browser Python inventory/install and webR 0.6.0 inventory/install; mocked Node tests, live interpreters unverified | List, install, update with environment-aware package sources |
 | Git pane | missing | Status, diff, stage, commit and branch operations |
@@ -296,3 +296,25 @@ another actor can create the destination between the final lookup and creation,
 or alter the original between the last comparison and removal. Do not use this
 operation as an atomic transactional rename or on concurrently edited files.
 The native Flow server is unchanged; Flow remains the primary native backend.
+
+## Browser in-memory Python/R tabular inspection — 2026-10-23
+
+The browser Environment pane now exposes **View** for Python DataFrame, NumPy
+2D array, lists of rows/records, and R data.frame/matrix values. A serialized
+kernel operation reads the selected variable by validated name (not arbitrary
+user-supplied expressions) and returns a read-only snapshot capped at 200 rows,
+32 columns, 160 characters per cell and 1 MiB of serialized data. The shared
+table viewer provides filtering, column sorting and pagination; it renders
+untrusted cells with textContent. Kernel reset and language changes invalidate
+the visible snapshot. R queries use the existing webR evaluation queue and
+Python uses the existing Pyodide worker queue.
+
+**Status: partial, not RStudio parity.** Local CPython 3.11+ unit tests of the
+real Python extraction helper passed 6/6; local Node 22.16.0 viewer tests
+passed 2/2 against a mocked data API. The committed browser integration,
+Python-worker protocol and webR query contracts are covered by new Node tests,
+but actual live Pyodide/webR data extraction and physical Chromium interaction
+are not yet independently verified. R extraction has not been run against an
+installed R interpreter in this environment. This is a bounded snapshot viewer,
+not an editable live DataFrame, database viewer, or native Flow table backend.
+No hosted CI definition was changed.

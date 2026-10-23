@@ -138,7 +138,7 @@ function renderEnvironment(variables) {
       row.append(cell);
     }
     const action = document.createElement("td");
-    if (/(DataFrame|ndarray|list|tuple|data\\.frame|matrix|array)/i.test(String(variable.type))) {
+    if (/(DataFrame|ndarray|list|tuple|data\.frame|matrix|array)/i.test(String(variable.type))) {
       const view = document.createElement("button");
       view.type = "button";
       view.textContent = "View";

@@ -25,13 +25,19 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Percent-delimited source cells | partial / browser Python Run Cell integrated; Node and real-browser validation pending; Flow browser execution unavailable; browser R unverified | Run only the active `# %%` code cell in Flow/R/Python; markdown and empty cells do not execute |
 | Sequential percent-cell notebooks | partial / Python and R Run All wired; Node-tested, live runtimes unverified | Execute cells in order, retain interpreter state, show per-cell output and stop on error |
 | Jupyter `.ipynb` import/export | partial / browser UI wired and Node regression coverage; physical-browser file round-trip and live Python/R kernels unverified | Import/export nbformat 4 Python/R code and Markdown cells through file picker/download; validate with nbformat; preserve source; verify live outputs in Chromium and cross-platform acceptance |
-| R Markdown / Quarto | missing | Render notebook with inline plots and HTML export |
+| R Markdown / Quarto | partial / offline HTML report export from Python/R percent-cell notebooks; no Quarto/R Markdown rendering | Render notebook with inline plots and HTML export; verify actual Quarto/R Markdown format compatibility |
 | Source debugger | missing | Breakpoints, stack, variables, step execution |
 | Remote/server mode | missing | Authenticated, origin-aware multi-user sessions with isolation |
 | Diagnostics / profiling | missing | Resource/time tracing and useful language-specific diagnostics |
 | Cross-platform packaging | missing | Installable signed/reproducible macOS and Linux releases |
 | Accessibility | partial / unverified | Full keyboard navigation, screen reader labels, resize and contrast checks |
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
+
+## 2026-10-23: offline notebook HTML report export
+
+The browser IDE can export an actual self-contained HTML document from Python/R percent-cell source, executed text outputs and PNG plots, using the same validated nbformat 4 encoding as Jupyter export. It includes a deliberately limited Markdown renderer (headings, lists and paragraphs), HTML escaping, bounded cell/output sizes, no external dependencies and a restrictive Content Security Policy. Output is included only when its source and language match the current editor. The export runs locally without uploading source or executing notebook cells.
+
+**Status: partial / V8-validated.** The report module, actual notebook codec and source-cell parser passed eight local V8 checks including Python/R escaping, outputs, PNG filtering, size refusal, IDE wiring and inline-script syntax. A committed Node regression suite adds four tests; Node CI and physical-browser download acceptance have not yet been independently confirmed. This is not Quarto or R Markdown rendering; rich Markdown, HTML widgets, interactive plots, document themes and PDF export are missing.
 
 ## 2026-10-23: browser installed-help lookup
 

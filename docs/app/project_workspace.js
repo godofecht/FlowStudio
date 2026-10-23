@@ -2,8 +2,8 @@
 (function (global) {
 "use strict";
 function create({projectApi, fileSaveApi, source, filename, language, tree,
-                 openFolderButton, saveFileButton, newFileButton, deleteFileButton, status,
-                 setFilename, onDraft, picker, confirmChange, promptName}) {
+                 openFolderButton, saveFileButton, saveAsButton, newFileButton, deleteFileButton, status,
+                 setFilename, onDraft, picker, saveAsPicker, saveAsApi, confirmChange, promptName}) {
   if (!projectApi || !fileSaveApi) throw new TypeError("Project and save APIs are required.");
   let activeHandle = null;
   let activeParent = null, activeName = null;
@@ -74,6 +74,42 @@ function create({projectApi, fileSaveApi, source, filename, language, tree,
       return false;
     } finally { saving = false; }
   }
+  async function saveAs() {
+    if (saving || deleting) { status("File operation already running."); return false; }
+    saving = true;
+    try {
+      if (!saveAsApi || typeof saveAsApi.save !== "function")
+        throw new Error("Save As controller unavailable.");
+      const result = await saveAsApi.save({
+        picker: saveAsPicker, fileSaveApi, validFilename: projectApi.validFilename,
+        filename: activeName || filename.textContent.split("/").pop() || "untitled.flow",
+        source: () => source.value, activeHandle, activeBaseline: diskBaseline,
+        confirmOverwrite: confirmChange
+      });
+      if (!result) return false;
+      activeHandle = result.handle;
+      // The selected file may be outside the opened project; do not grant
+      // project delete access without a verified parent directory handle.
+      activeParent = null;
+      activeName = result.name;
+      diskBaseline = result.source;
+      editorBaseline = result.source;
+      const extension = result.name.split(".").pop().toLowerCase();
+      if (extension === "py") language.value = "python";
+      else if (extension === "flow") language.value = "flow";
+      else if (extension === "r") language.value = "r";
+      setFilename(result.name, result.name);
+      saveFileButton.disabled = false;
+      if (deleteFileButton) deleteFileButton.disabled = true;
+      onDraft();
+      status("Saved as " + result.name + " on disk.");
+      return true;
+    } catch (error) {
+      if (error?.name !== "AbortError")
+        status("Save As failed: " + (error.message || String(error)));
+      return false;
+    } finally { saving = false; }
+  }
   async function createFile() {
     if (deleting || saving) { status("File operation already running."); return false; }
     if (!project.hasProject()) { status("Open a project folder first."); return false; }
@@ -130,11 +166,12 @@ function create({projectApi, fileSaveApi, source, filename, language, tree,
   }
   openFolderButton.addEventListener("click", () => { void choose(); });
   saveFileButton.addEventListener("click", () => { void save(); });
+  if (saveAsButton) saveAsButton.addEventListener("click", () => { void saveAs(); });
   newFileButton.addEventListener("click", () => { void createFile(); });
   if (deleteFileButton) deleteFileButton.addEventListener("click", () => { void deleteFile(); });
   saveFileButton.disabled = true;
   if (deleteFileButton) deleteFileButton.disabled = true;
-  return {project, choose, save, createFile, deleteFile, openHandle, notifyExternalOpen, dirty,
+  return {project, choose, save, saveAs, createFile, deleteFile, openHandle, notifyExternalOpen, dirty,
     hasActiveFile: () => activeHandle !== null};
 }
 const api = {create};

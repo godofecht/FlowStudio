@@ -22,6 +22,8 @@ mkdir -p "$stage/$name/bin"
 cp build/flowstudio "$stage/$name/bin/flowstudio"
 cp -R web "$stage/$name/web"
 cp -R docs "$stage/$name/docs"
+mkdir -p "$stage/$name/src"
+cp src/python_kernel.py "$stage/$name/src/python_kernel.py"
 cp VERSION README.md "$stage/$name/"
 if test -f LICENSE; then cp LICENSE "$stage/$name/"; fi
 cat > "$stage/$name/run.sh" <<'EOS'

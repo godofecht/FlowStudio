@@ -64,21 +64,80 @@ evaluate_source <- function(source) {
     list(success = success, payload = charToRaw(enc2utf8(output)))
 }
 
+
+# JSON encoding is deliberately dependency-free: jsonlite is not required.
+# Never serialize R values, call print(), or dispatch user-defined methods.
+json_quote <- function(value) {
+    points <- utf8ToInt(enc2utf8(value))
+    escaped <- vapply(points, function(point) {
+        if (point == 34L) return('\\"')
+        if (point == 92L) return('\\\\')
+        if (point < 32L) return(sprintf("\\u%04x", point))
+        intToUtf8(point)
+    }, character(1), USE.NAMES = FALSE)
+    paste0('"', paste0(escaped, collapse = ""), '"')
+}
+
+inspect_workspace <- function() {
+    names <- ls(envir = workspace, all.names = TRUE)
+    entries <- character(0)
+    used <- 35L
+    truncated <- FALSE
+    for (name in names) {
+        if (length(entries) >= 128L) {
+            truncated <- TRUE
+            break
+        }
+        # An active binding is arbitrary user code; never read it during inspection.
+        if (bindingIsActive(name, workspace)) {
+            kind <- "active binding"
+            size <- "null"
+        } else {
+            value <- get(name, envir = workspace, inherits = FALSE)
+            kind <- typeof(value)
+            # Only base vectors without an object class get a length snapshot.
+            # No S3/S4 length or print methods are invoked.
+            size <- if (!is.object(value) &&
+                kind %in% c("logical", "integer", "double", "complex",
+                            "character", "raw", "list")) {
+                as.character(base::length(value))
+            } else "null"
+        }
+        # Bounded source names and type strings, without evaluating their contents.
+        entry <- paste0('{"name":', json_quote(substr(name, 1L, 160L)),
+                        ',"type":', json_quote(substr(kind, 1L, 100L)),
+                        ',"size":', size, "}")
+        additional <- nchar(entry, type = "bytes") + if (length(entries)) 1L else 0L
+        if (used + additional > 65000L) {
+            truncated <- TRUE
+            break
+        }
+        entries <- c(entries, entry)
+        used <- used + additional
+    }
+    json <- paste0('{"variables":[', paste(entries, collapse = ","),
+                   '],"truncated":', if (truncated) "true" else "false", "}")
+    list(success = TRUE, payload = charToRaw(enc2utf8(json)))
+}
+
 repeat {
     header <- read_exact(9L)
     if (is.null(header)) break
     header_text <- rawToChar(header)
-    if (!grepl("^E[0-9a-f]{8}$", header_text)) break
+    if (!grepl("^[EI][0-9a-f]{8}$", header_text)) break
     length_text <- substr(header_text, 2L, 9L)
     length_value <- strtoi(length_text, base = 16L)
-    if (is.na(length_value) || length_value > MAX_SOURCE) break
+    if (is.na(length_value) || length_value > MAX_SOURCE ||
+        (substr(header_text, 1L, 1L) == "I" && length_value != 0L)) break
     payload <- read_exact(length_value)
     if (is.null(payload)) break
     source <- if (length(payload) == 0L) "" else tryCatch(
         iconv(rawToChar(payload), from = "UTF-8", to = "UTF-8", sub = NA_character_),
         error = function(error) NA_character_
     )
-    result <- if (is.na(source)) {
+    result <- if (substr(header_text, 1L, 1L) == "I") {
+        inspect_workspace()
+    } else if (is.na(source)) {
         list(success = FALSE, payload = charToRaw("Invalid UTF-8 source."))
     } else {
         evaluate_source(source)

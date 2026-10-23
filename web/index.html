@@ -100,7 +100,7 @@ footer { padding: 5px 14px; display: flex; justify-content: space-between; gap: 
     <div class="body">
       <p id="runtimeInfo">Flow execution available when Flow is installed.</p>
       <p class="muted hint">Native R and Python retain separate variables until their respective Reset controls. Flow runs are independent.</p>
-      <button id="refreshPythonEnvironment" type="button">Refresh Python variables</button>
+      <button id="refreshPythonEnvironment" type="button">Refresh selected environment</button>
       <div id="pythonEnvironment" aria-live="polite"><p class="muted">Select Python to inspect its native session.</p></div>
       <p class="muted hint">The IDE executes code with your local OS permissions. Only run code you trust.</p>
     </div>
@@ -606,28 +606,29 @@ function showPythonEnvironmentMessage(message) {
 }
 async function refreshPythonEnvironment() {
   const revision = ++environmentRevision;
-  if (language.value !== "python") {
-    showPythonEnvironmentMessage("Select Python to inspect its native session.");
+  const selectedLanguage = language.value;
+  if (selectedLanguage !== "python" && selectedLanguage !== "r") {
+    showPythonEnvironmentMessage("Select Python or R to inspect its native session.");
     return;
   }
-  const response = await fetch("/api/inspect/python", {
+  const response = await fetch("/api/inspect/" + selectedLanguage, {
     method: "POST",
     headers: { "Content-Type": "text/plain; charset=utf-8", "X-FlowStudio-Intent": "run" },
     body: ""
   });
   if (!response.ok) throw new Error("Environment inspection failed: HTTP " + response.status);
   const snapshot = await response.json();
-  if (revision !== environmentRevision || language.value !== "python") return;
+  if (revision !== environmentRevision || language.value !== selectedLanguage) return;
   if (!snapshot || !Array.isArray(snapshot.variables) || snapshot.variables.length > 128)
     throw new Error("Invalid environment response.");
   const pane = el("pythonEnvironment");
   if (snapshot.variables.length === 0) {
-    showPythonEnvironmentMessage("No user variables in the native Python session.");
+    showPythonEnvironmentMessage("No user variables in the native " + selectedLanguage + " session.");
     return;
   }
   const table = document.createElement("table");
   const caption = document.createElement("caption");
-  caption.textContent = "Native Python variables";
+  caption.textContent = "Native " + (selectedLanguage === "r" ? "R" : "Python") + " variables";
   table.append(caption);
   const header = document.createElement("tr");
   for (const label of ["Name", "Type", "Size"]) {
@@ -685,7 +686,7 @@ async function executeCode(code, label) {
     consolePane.textContent += String(error) + "\n";
     status("Execution request failed", "error");
   } finally {
-    if (language.value === "python") {
+    if (language.value === "python" || language.value === "r") {
       try { await refreshPythonEnvironment(); }
       catch (error) { showPythonEnvironmentMessage(error.message || String(error)); }
     }
@@ -888,8 +889,8 @@ src.addEventListener("click", updateCursor);
 src.addEventListener("keyup", updateCursor);
 language.addEventListener("change", () => {
   environmentRevision++;
-  showPythonEnvironmentMessage(language.value === "python" ?
-    "Refresh to inspect native Python variables." : "Select Python to inspect its native session.");
+  showPythonEnvironmentMessage(language.value === "python" || language.value === "r" ?
+    "Refresh to inspect native " + language.value + " variables." : "Select Python or R to inspect its native session.");
   if (filename.startsWith("untitled.")) setFilename("untitled." + extension(language.value));
   el("runtimeInfo").textContent = language.value === "python" ? "Native Python: persistent until Reset Python." :
     language.value === "r" ? "Native R: persistent until Reset R." :
@@ -918,6 +919,10 @@ el("resetR").addEventListener("click", async () => {
     });
     status(response.ok ? "Native R session reset." : "R reset failed: HTTP " + response.status,
       response.ok ? "ok" : "error");
+    if (response.ok) {
+      try { await refreshPythonEnvironment(); }
+      catch (error) { showPythonEnvironmentMessage(error.message || String(error)); }
+    }
   } catch (error) {
     status("R reset unavailable: " + String(error), "error");
   } finally {

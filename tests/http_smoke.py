@@ -106,6 +106,14 @@ def main() -> None:
                                  'flowstudio_r_value <- flowstudio_r_value + 1; cat(flowstudio_r_value, "\\n")',
                                  accepted_headers)
         assert status == 200 and output.strip() == "42", (status, output)
+        status, snapshot = request("POST", "/api/inspect/r", "", accepted_headers)
+        assert status == 200, (status, snapshot)
+        r_snapshot = json.loads(snapshot)
+        r_variables = {item["name"]: item for item in r_snapshot["variables"]}
+        assert r_variables["flowstudio_r_value"]["type"] == "double", r_variables
+        assert r_variables["flowstudio_r_value"]["size"] == 1, r_variables
+        status, _ = request("POST", "/api/inspect/r", "")
+        assert status == 404, status
         status, output = request("POST", "/api/run/r",
                                  'stop("expected native R error")', accepted_headers)
         assert status == 422 and "expected native R error" in output, (status, output)
@@ -114,6 +122,8 @@ def main() -> None:
         assert status == 200 and output.strip() == "42", (status, output)
         status, output = request("POST", "/api/reset/r", "", accepted_headers)
         assert status == 200 and "reset" in output, (status, output)
+        status, snapshot = request("POST", "/api/inspect/r", "", accepted_headers)
+        assert status == 200 and json.loads(snapshot)["variables"] == [], (status, snapshot)
         status, output = request("POST", "/api/run/r",
                                  'cat(exists("flowstudio_r_value", inherits=FALSE), "\\n")',
                                  accepted_headers)

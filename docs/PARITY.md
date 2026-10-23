@@ -13,7 +13,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Python source execution | partial / native persistent CPython kernel added; local C IPC and Flow-owned HTTP tested in Linux/macOS CI; physical-browser acceptance pending | Run via installed Python; preserve state across evaluations |
 | Editor selection execution | partial / Node-tested browser selection; native and physical-browser unverified | Selection runs without accidentally executing entire buffer |
 | Persistent REPL/session | partial / browser Pyodide/webR sessions; native Python process retention and reset added (local C harness and cross-platform Flow HTTP CI passed); native R persistent kernel passed real Rscript and Flow-owned HTTP acceptance on Linux/macOS CI | Incremental variables and package state persist until reset |
-| Variable inspector | partial / native Python bounded metadata snapshots and browser Python/R metadata; native R inspection and nested inspection missing; native HTTP CI passed on Linux/macOS; physical-browser acceptance pending | Nested objects / types / dimensions inspectable and refresh after execution |
+| Variable inspector | partial / native Python bounded metadata snapshots cross-platform HTTP accepted; native R metadata inspection implemented in PR (CI and physical-browser acceptance pending); browser Python/R metadata partial; nested inspection missing | Nested objects / types / dimensions inspectable and refresh after execution |
 | Plot viewer | partial / Node-tested PNG import and integrated workspace tab; native unverified | png/svg plot history, zoom, save and deterministic device lifecycle |
 | Project explorer | partial / browser Pages open/create/save and confirmed active-file delete with baseline conflict checks; 10 regression tests V8-shim passed; physical-browser deletion unverified | Open project, tree navigation, source-file creation and save; scoped delete is implemented, copy-verify-delete rename implemented with non-atomic filesystem race limits; physical-browser acceptance remains missing |
 | Data viewer | partial / CSV/TSV plus bounded Python/R environment table snapshots wired; real Pyodide/webR and physical browser unverified | Interactive sortable/filterable tabular datasets including missing values |
@@ -32,6 +32,12 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Cross-platform packaging | missing | Installable signed/reproducible macOS and Linux releases |
 | Accessibility | partial / unverified | Full keyboard navigation, screen reader labels, resize and contrast checks |
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
+
+## 2026-10-24: native R environment metadata inspection (pending acceptance)
+
+The Flow-owned localhost server now exposes intent-gated `POST /api/inspect/r`, backed by an `I` opcode in the persistent Rscript process. A bounded JSON response reports at most 128 variable names, R storage types, and base-vector lengths; active bindings are reported without evaluating their functions. The native editor refreshes the R environment after execution and reset and supports manual refresh. Output uses DOM `textContent`, not executable HTML. C IPC harness, live Flow HTTP acceptance, Node UI regression tests and protocol wiring tests were extended.
+
+**Status: partial / implementation committed, not independently accepted.** Real Rscript execution, Flow compilation and physical-browser acceptance for this change are pending. R lazy promises may be forced by base `get()` during inspection; this is not a side-effect-free debugger, recursive viewer, or remote isolation. The local server still runs arbitrary submitted code with the user's permissions. Promote to cross-platform HTTP accepted only after Ubuntu and macOS native jobs pass, and to browser verified only after Chromium interaction is tested.
 
 ## 2026-10-23: native persistent R session (cross-platform HTTP accepted)
 

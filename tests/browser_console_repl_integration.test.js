@@ -34,6 +34,7 @@ function fixture() {
     FlowStudioEnvironmentData:require("../docs/app/environment_data.js"),
     FlowStudioNotebookIO:require("../docs/app/notebook_io.js"),
     FlowStudioNotebookFormat:require("../docs/app/notebook_format.js"),
+    FlowStudioNotebookRecovery:require("../docs/app/notebook_recovery.js"),
     FlowStudioPackages:{create:()=>({clear(){}})},
     FlowStudioDraftStorage:{create:()=>({queue(){},flush(){},clear(){},read(){return null;}})},
     FlowStudioProjectWorkspace:{create:()=>({dirty(){return false;},notifyExternalOpen(){}})},

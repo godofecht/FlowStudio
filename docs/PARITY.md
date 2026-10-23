@@ -310,7 +310,7 @@ the visible snapshot. R queries use the existing webR evaluation queue and
 Python uses the existing Pyodide worker queue.
 
 **Status: partial, not RStudio parity.** Local CPython 3.11+ unit tests of the
-real Python extraction helper passed 6/6; local Node 22.16.0 viewer tests
+real Python extraction helper passed 9/9 (NumPy 2.3.5, pandas 2.2.3); local Node 22.16.0 viewer tests
 passed 2/2 against a mocked data API. The committed browser integration,
 Python-worker protocol and webR query contracts are covered by new Node tests,
 but actual live Pyodide/webR data extraction and physical Chromium interaction

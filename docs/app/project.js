@@ -127,7 +127,7 @@ function createProjectExplorer({ tree, status, openHandle, picker }) {
         button.className = "project-file";
         button.title = path;
         button.addEventListener("click", async () => {
-          try { await openHandle(handle, path); } catch (err) { error(err); }
+          try { await openHandle(handle, path, dir); } catch (err) { error(err); }
         });
         parent.append(button);
       }
@@ -162,7 +162,7 @@ function createProjectExplorer({ tree, status, openHandle, picker }) {
     if (!root) throw new Error("Open a project first.");
     if (!validFilename(name)) throw new Error("Invalid source filename.");
     const handle = await root.getFileHandle(name, { create: true });
-    const opened = await openHandle(handle, root.name + "/" + name);
+    const opened = await openHandle(handle, root.name + "/" + name, root);
     await refresh();
     return opened;
   }

@@ -20,5 +20,6 @@ class NativeRSessionTest(unittest.TestCase):
                 "-o", str(binary),
             ], cwd=ROOT, check=True, capture_output=True, text=True, timeout=30)
             result = subprocess.run([str(binary)], cwd=ROOT, capture_output=True,
-                                    text=True, timeout=45, check=True)
+                                    text=True, timeout=45, check=False)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("PASS: native persistent R", result.stdout)

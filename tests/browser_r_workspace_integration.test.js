@@ -36,6 +36,8 @@ function fixture() {
     localStorage:{getItem:()=>null,setItem(){},removeItem(){}},
     FlowStudioRSession:{create:()=>rSession,renderImages:()=>{rCalls.push(["plots"]);}},
     FlowStudioPlotHistory:{create:()=>({append(){},clear(){}})},
+    FlowStudioNotebookIO:require("../docs/app/notebook_io.js"),
+    FlowStudioNotebookFormat:require("../docs/app/notebook_format.js"),
     FlowStudioPackages:{create:()=>({clear(){}})},
     FlowStudioDraftStorage:{create:()=>({queue(){},flush(){},clear(){},read(){return null;}})},
     FlowStudioSourceSelection:{prepare:source=>({ok:true,code:source.value})},

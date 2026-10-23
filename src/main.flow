@@ -2,7 +2,7 @@
 # Requires the current Flow 2.x compiler and POSIX transport shim.
 #
 # This is a single-process, localhost-only development preview. It does not
-# sandbox executed code or persist R/Python interpreter state.
+# sandbox executed code. Python state persists in one local kernel; R is stateless.
 
 import std.process { ProcCmd, ProcResult, proc_cmd, proc_arg, proc_input, proc_timeout_ms, proc_run }
 import std.io { FileRead, io_read_text }

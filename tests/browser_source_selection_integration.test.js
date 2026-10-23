@@ -11,6 +11,7 @@ const moduleSource = fs.readFileSync(path.join(base, "source_selection.js"), "ut
 const cellSource = fs.readFileSync(path.join(base, "source_cells.js"), "utf8");
 const consoleSource = fs.readFileSync(path.join(base, "console_repl.js"), "utf8");
 const draftSource = fs.readFileSync(path.join(base, "draft_storage.js"), "utf8");
+const recoverySource = fs.readFileSync(path.join(base, "notebook_recovery.js"), "utf8");
 const projectSource = fs.readFileSync(path.join(base, "project.js"), "utf8");
 const saveSource = fs.readFileSync(path.join(base, "file_save.js"), "utf8");
 const projectWorkspaceSource = fs.readFileSync(path.join(base, "project_workspace.js"), "utf8");
@@ -48,6 +49,7 @@ function fixture(initialDraft = null) {
   vm.runInNewContext(moduleSource, context);
   vm.runInNewContext(cellSource, context);
   vm.runInNewContext(draftSource, context);
+  vm.runInNewContext(recoverySource, context);
   vm.runInNewContext(projectSource, context);
   vm.runInNewContext(saveSource, context);
   vm.runInNewContext(projectWorkspaceSource, context);

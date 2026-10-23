@@ -72,7 +72,7 @@ test("R percent-cell execution submits only the active code cell",async()=>{
   await f.tick();
   assert.deepEqual(f.rCalls[0],["run","x <- 42"]);
 });
-test("R reset is isolated from Python worker and Flow remains unavailable",async()=>{
+test("R reset is isolated from Python worker and Flow requires native localhost",async()=>{
   const f=fixture();
   f.element("language").value="r";
   f.element("source").value="x <- 42";
@@ -85,5 +85,5 @@ test("R reset is isolated from Python worker and Flow remains unavailable",async
   f.element("language").value="flow";
   f.element("run").click();
   assert.equal(f.workers[0].messages.length,0);
-  assert.match(f.element("notice").textContent,/future WebAssembly runtime/);
+  assert.match(f.element("notice").textContent,/native FlowStudio server/);
 });

@@ -26,7 +26,7 @@ test("Python runs inside dedicated worker, not GitHub Pages server", () => {
   assert.doesNotMatch(app, /fetch\("\/api\/execute/);
 });
 test("Static preview distinguishes native Flow from experimental browser R", () => {
-  assert.match(app, /Flow \(not yet browser executable\)/);
+  assert.match(app, /Flow \(native localhost only\)/);
   assert.match(app, /R \(browser; webR 0\.6\.0\)/);
   assert.match(app, /language !== "python" && language !== "r"/);
 });

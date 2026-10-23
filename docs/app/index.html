@@ -32,7 +32,7 @@ print("Hello from browser Python!")
 x + 2</textarea></section>
 <section aria-label="Environment"><h2>Environment</h2><div id="environment" class="muted">Python runs entirely in a Web Worker using Pyodide. The runtime downloads on first use.</div><div class="workspace-tools"><input id="packageName" type="text" aria-label="Python or R package name" placeholder="package==version" maxlength="120"><button id="installPackage" type="button">Install package</button><button id="listPackages" type="button">List packages</button></div><div id="packages" role="region" aria-label="Installed language packages" style="overflow:auto;max-height:40%"></div></section>
 <section aria-label="Console"><h2>Python / R console</h2><pre id="console" role="log" aria-live="polite">Ready. Python and R run locally in your browser; Flow execution requires the native application.</pre><textarea id="consoleInput" aria-label="Python console input" placeholder="Python expression or statement" spellcheck="false"></textarea><div id="consoleActions"><span class="muted">Enter: execute · Shift+Enter: newline · ↑: history</span><button id="submitConsole" type="button">Execute</button></div></section>
-<section aria-label="Data and plots"><h2>Plots and data</h2><div class="workspace-tools"><label for="previewfile">Open image</label><input id="previewfile" type="file" accept=".png,.jpg,.jpeg,.webp"><button id="dataViewer" type="button">Open CSV/TSV viewer</button></div><div id="workspace"><p class="muted">Local-only plots and tabular data.</p></div></section>
+<section aria-label="Data and plots"><h2>Plots and data</h2><div class="workspace-tools"><label for="previewfile">Open image</label><input id="previewfile" type="file" accept=".png,.jpg,.jpeg,.webp"><button id="dataViewer" type="button">Open CSV/TSV viewer</button><label for="helpQuery">Help topic</label><input id="helpQuery" type="text" maxlength="120" placeholder="len / stats::lm" aria-label="Installed Python or R help topic"><button id="lookupHelp" type="button">Help</button></div><div id="workspace"><p class="muted">Local-only plots and tabular data.</p></div></section>
 </main>
 <footer><span id="notice" role="status">Static Pages preview — no remote code execution or uploaded source</span><a href="../">Project overview</a><a href="https://github.com/godofecht/FlowStudio">Source</a></footer>
 <script src="./plot_history.js"></script>
@@ -44,6 +44,7 @@ x + 2</textarea></section>
 <script src="./source_cells.js"></script>
 <script src="./console_repl.js"></script>
 <script src="./r_session.js"></script>
+<script src="./help_panel.js"></script>
 <script src="./notebook_runner.js"></script>
 <script src="./notebook_format.js"></script>
 <script src="./notebook_io.js"></script>
@@ -86,11 +87,18 @@ function request(op, code) {
 function notice(text) { $("notice").textContent = text; }
 function setBusy(value) {
   busy = value;
-  for (const id of ["run", "runSelection", "runCell", "runNotebook", "checkSyntax"]) $(id).disabled = value;
+  for (const id of ["run", "runSelection", "runCell", "runNotebook", "checkSyntax", "lookupHelp"]) $(id).disabled = value;
 }
 const packagePanel = FlowStudioPackages.create({document, request, notice, target:$("packages"),
   input:$("packageName"), installButton:$("installPackage"), listButton:$("listPackages"),
   language:()=>$("language").value, rSession:getRSession});
+if (typeof FlowStudioHelpPanel !== "undefined") FlowStudioHelpPanel.create({
+  input:$("helpQuery"), button:$("lookupHelp"), target:$("workspace"), document, notice,
+  language:()=>$("language").value,
+  python:topic=>request("help", topic), r:topic=>getRSession().help(topic),
+  isBusy:()=>busy || !!notebookRunner?.isRunning(), setBusy,
+  generation:()=>sessionGeneration
+});
 function queueDraft() {
   drafts.queue($("source").value, fileName, $("language").value);
 }

@@ -19,6 +19,7 @@ extern {
     function fs_write_temp_flow(code: string) -> string
     function fs_make_temp_c() -> string
     function fs_r_run(code: string) -> string
+    function fs_r_inspect() -> string
     function fs_r_status() -> i32
     function fs_r_reset() -> void
     function fs_py_run(code: string) -> string
@@ -138,6 +139,16 @@ function send_python(code: string) -> void {
     fs_reply(fs_py_status(), "text/plain; charset=utf-8", output)
 }
 
+function send_r_environment() -> void {
+    let output: string = fs_r_inspect()
+    let status: i32 = fs_r_status()
+    if status == 200 {
+        fs_reply(200, "application/json; charset=utf-8", output)
+    } else {
+        fs_reply(status, "text/plain; charset=utf-8", output)
+    }
+}
+
 function send_python_environment() -> void {
     let output: string = fs_py_inspect()
     let status: i32 = fs_py_status()
@@ -204,6 +215,10 @@ function dispatch() -> void {
         }
         if eq(path, "/api/run/python") {
             send_python(fs_body())
+            return
+        }
+        if eq(path, "/api/inspect/r") {
+            send_r_environment()
             return
         }
         if eq(path, "/api/inspect/python") {

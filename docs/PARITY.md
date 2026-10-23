@@ -7,22 +7,24 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Feature | 2026-10-15 state | Minimum acceptance criterion |
 | --- | --- | --- |
 | Four-pane IDE shell | unverified | Source, environment, console and plots render; keyboard/accessibility checks |
-| File open / save | partial / conflict-aware browser saves wired; physical browser and native unverified | Native file-picker and download fallback round-trip UTF-8 |
+| File open / save | partial / conflict-aware browser saves and Save As picker wired; physical browser and native unverified | Native file-picker and download fallback round-trip UTF-8 |
 | Flow source execution | unverified | Compile and run valid code; surface diagnostics for invalid code |
-| R source execution | partial / unverified | Run via installed R; preserve state across evaluations |
+| R source execution | partial / browser webR 0.6.0 integrated, Node-mock tested; real webR and native R unverified | Run via installed R; preserve state across evaluations |
 | Python source execution | partial / unverified | Run via installed Python; preserve state across evaluations |
-| Editor selection execution | unverified | Selection runs without accidentally executing entire buffer |
-| Persistent REPL/session | missing | Incremental variables and package state persist until reset |
-| Variable inspector | missing | Nested objects / types / dimensions inspectable and refresh after execution |
+| Editor selection execution | partial / Node-tested browser selection; native and physical-browser unverified | Selection runs without accidentally executing entire buffer |
+| Persistent REPL/session | partial / browser Python worker and browser webR session; native R/Python persistence missing | Incremental variables and package state persist until reset |
+| Variable inspector | partial / browser Python variables and browser R top-level metadata; nested inspection missing | Nested objects / types / dimensions inspectable and refresh after execution |
 | Plot viewer | partial / Node-tested PNG import and integrated workspace tab; native unverified | png/svg plot history, zoom, save and deterministic device lifecycle |
-| Project explorer | partial / DOM-tested | Open project, tree navigation, source-file creation and save; safe rename/delete still missing |
-| Data viewer | partial / browser-local CSV/TSV viewer integrated as workspace tab; native unverified | Interactive sortable/filterable tabular datasets including missing values |
+| Project explorer | partial / browser Pages open/create/save and confirmed active-file delete with baseline conflict checks; 10 regression tests V8-shim passed; physical-browser deletion unverified | Open project, tree navigation, source-file creation and save; scoped delete is implemented, copy-verify-delete rename implemented with non-atomic filesystem race limits; physical-browser acceptance remains missing |
+| Data viewer | partial / CSV/TSV plus bounded Python/R environment table snapshots wired; real Pyodide/webR and physical browser unverified | Interactive sortable/filterable tabular datasets including missing values |
 | Completion / language server | missing | R, Flow and Python completion/diagnostics |
-| Packages pane | missing | List, install, update with environment-aware package sources |
+| Packages pane | partial / browser Python inventory/install and webR 0.6.0 inventory/install; mocked Node tests, live interpreters unverified | List, install, update with environment-aware package sources |
 | Git pane | missing | Status, diff, stage, commit and branch operations |
 | Help pane | missing | Context-aware language/function docs |
 | Find / replace / cross-file search | partial / Node + V8-tested | Literal in-buffer find next/previous, single/all replacement and project-wide search implemented; incremental indexing, regex and physical-browser verification missing |
-| Percent-delimited source cells | partial / Node-tested; native execution unverified | Run only the active `# %%` code cell in Flow/R/Python; markdown and empty cells do not execute |
+| Percent-delimited source cells | partial / browser Python Run Cell integrated; Node and real-browser validation pending; Flow browser execution unavailable; browser R unverified | Run only the active `# %%` code cell in Flow/R/Python; markdown and empty cells do not execute |
+| Sequential percent-cell notebooks | partial / Python and R Run All wired; Node-tested, live runtimes unverified | Execute cells in order, retain interpreter state, show per-cell output and stop on error |
+| Jupyter `.ipynb` import/export | partial / browser UI wired and Node regression coverage; physical-browser file round-trip and live Python/R kernels unverified | Import/export nbformat 4 Python/R code and Markdown cells through file picker/download; validate with nbformat; preserve source; verify live outputs in Chromium and cross-platform acceptance |
 | R Markdown / Quarto | missing | Render notebook with inline plots and HTML export |
 | Source debugger | missing | Breakpoints, stack, variables, step execution |
 | Remote/server mode | missing | Authenticated, origin-aware multi-user sessions with isolation |
@@ -153,3 +155,166 @@ The Flow-owned router now serves a keyboard-operable Files/Plots/Data tab contro
 ## Validation log — 2026-10-18 (draft recovery asset integration)
 
 Published `web/editor_recovery.js` as the explicit `/editor_recovery.js` asset route, and loaded the controller once after the editor's DOM and existing script are ready. Added `tests/test_recovery_wiring.py` to check route allowlisting, correct script placement and controller API presence. Static fetched-source checks confirmed all six corresponding invariants; the new Python unittest and physical browser recovery workflow have not yet been executed. This does not verify that draft persistence works in a real browser or that the native Flow server compiles. The recovery controller retains its earlier isolated tests, but no new parity feature is marked verified here.
+
+## Browser-first consolidation — 2026-10-21
+
+A static `docs/app/` four-pane browser IDE is now implemented on `feat/github-pages-browser-ide-20261021`, with source open/download, basic local CSV/TSV/image previews, and a persistent Python Pyodide Web Worker. Python executes on the user's device; the Pyodide 0.27.7 JavaScript runtime is downloaded from jsDelivr when first needed. Flow and R execution do **not** run in the GitHub Pages preview yet: they require real WebAssembly compilation/runtime integration. The CSV/TSV viewer in this preview uses a deliberately simple delimiter splitter and does not yet parse quoted CSV values. GitHub Pages is static hosting, not a remote execution server. This preview does not replace the Flow-owned native server, and does not satisfy full RStudio parity.
+
+**Verification:** GitHub source fetch confirmed all four published files and eight static integration contracts. A six-case Node regression suite is committed in `tests/browser_pages.test.js`, but has **not been run** against a local checkout, and real Pyodide execution, physical browser behaviour, hosted Pages deployment and cross-platform acceptance are **unverified**. Issue #3 documents Pages enablement: Settings → Pages → Build and deployment → GitHub Actions. The current Pages workflow uploads `docs/` from main and was not modified.
+
+## Browser data viewer consolidation — 2026-10-22
+
+The Pages workspace now exposes the existing FlowStudio CSV/TSV parser and data-page controller as local static assets in `docs/app/`, rather than splitting lines/fields naively. It supports quoted CSV cells, escaped quotes, embedded newlines, BOM, duplicate column labels, bounded file sizes, filtering, numeric/text sorting, pagination and local file-picker fallback. The viewer is embedded in the workspace pane and the image input remains available after repeated imports; no dataset is sent to a server. Source modules were copied byte-for-byte from `web/data_viewer.js` and `web/data_page.js` using their existing Git blobs.
+
+**Verification:** six Node regression tests committed in `tests/browser_pages_data.test.js`; physical-browser behaviour and Pages deployment remain unverified until exercised. Flow and R are not yet browser executable, and native Flow remains the primary server/backend implementation. Do not mark RStudio data-viewer parity verified without the full browser and platform acceptance tests.
+
+## Browser selection, recovery and exception-safe plots — 2026-10-22
+
+Draft PR #7 now proposes exact Python selection execution (Ctrl/⌘+Shift+Enter),
+300 ms debounced browser-local source/filename/language recovery, and capture
+of Matplotlib figures even when source execution raises. Python environment
+inspection is also attempted after source errors. The existing Python package
+panel remains browser-only; Flow and R browser execution are not implemented.
+
+Linux local validation: Node.js 22.16.0, 24/24 tests passed with
+`node --test tests/browser_source_selection*.test.js tests/browser_draft_storage.test.js tests/browser_plot_failure.test.js`;
+CPython 3.13.5 with Matplotlib, 4/4 tests passed with
+`python3 -m unittest discover -s tests -p test_plot_capture_limits.py`.
+Tests cover mock workers and DOM, not real Pyodide or a physical browser.
+No macOS acceptance or native Flow/R/Python end-to-end parity is claimed.
+
+## Browser project files and conflict-aware saves — 2026-10-22
+
+Draft PR #7 integrates the existing browser File System Access project explorer
+and conflict-aware source writer into the static Pages workspace. A user-granted
+project directory can be traversed lazily (bounded depth and entries), source
+files opened, and root-level source files created. Explicit disk saves compare
+the current file against the snapshot read on open or last successful save;
+external changes refuse overwrite. Switching project files checks for unsaved
+editor edits; opening an ordinary local file detaches the project write handle.
+The browser still offers the independent download-source fallback.
+
+Local validation: Node.js 22.16.0, 40/40 tests passed for the available
+browser-focused test fixture (including project controller and filesystem
+integration, selection, persistence and plot failure tests). The project and
+file-save modules are exact copies of the already committed native-web modules
+and have matching Git blob SHAs. The HTML fixture was reconstructed from a
+previously validated artifact and does not establish a full physical-browser
+acceptance test against the GitHub-hosted branch.
+
+Limitations: folder access requires a compatible browser with the File System
+Access API and explicit user permission; no cross-browser filesystem fallback,
+file rename/delete, durable handle restoration, native Flow execution from
+Pages, or verified browser/OS interaction is claimed. Native Flow remains the
+primary application/server backend; browser project operations are local only.
+
+## Browser Python Run Cell — 2026-10-22
+
+Draft PR #7 adds a Run Cell button and Ctrl/Command+Alt+Enter. The active Python `# %%` code cell is submitted to the existing Pyodide worker without delimiter lines. Markdown and empty cells are rejected. The browser parser mirrors the lexical fix proposed on PR #6 (triple-quoted strings, R multiline strings, mixed newlines and a 10,000-cell bound). The parser is not a complete language grammar. Flow/R browser execution is not implemented. Browser and native end-to-end acceptance remain outstanding; no RStudio parity claim.
+
+## Browser R interpreter integration — 2026-10-22
+
+The static Pages workspace now has an R execution path backed by pinned webR v0.6.0, using its PostMessage channel for hosts without cross-origin isolation. Editor, selection, percent-cell and console submissions share one persistent browser-local R interpreter, with serialized captureR evaluation, bounded output, global-environment inspection, canvas bitmap plot rendering and explicit session reset. Flow execution still requires the native Flow-owned server. This is actual webR API integration, not an R syntax simulator.
+
+Validation: six Node.js tests using a mocked webR API passed locally on Node 22.16.0. Static HTML integration and JavaScript syntax checks passed before publication. No live webR download, actual R execution, physical-browser interaction or macOS acceptance has been run; these capabilities remain **partial / unverified**. The PostMessage channel cannot interrupt running R code or support interactive readline/browser prompts. Package installation, persistent filesystem state, and robust plot history are not implemented for browser R.
+
+## Browser sequential Python/R percent-cell notebooks — 2026-10-23
+
+Run All Cells is now wired to the existing persistent Pyodide and webR runtimes. Python and R code cells execute sequentially; Markdown is displayed as escaped source text, bounded text and plots are shown per cell, errors stop execution, and reset invalidates stale results. Cancellation retains the execution lock until an in-flight interpreter call settles. Limits: 128 executable cells, 64 KiB per cell, 1 MiB aggregate text. The Node runner regression suite and inline JavaScript syntax check passed locally, but real interpreter execution in Chromium and full cross-platform validation remain unverified. This is partial notebook support, not R Markdown, Quarto or Jupyter parity; .ipynb persistence, rich MIME display and notebook HTML export are not part of this commit.
+
+## Browser Jupyter import/export integration — 2026-10-23
+
+The draft browser IDE now wires `notebook_format.js` and `notebook_io.js` into explicit Open/Export `.ipynb` controls. The implementation serializes Python/R source cells and bounded captured outputs, rejects unsupported notebook structures, and guards asynchronous file reads against concurrent execution. Node regression tests cover import/export, UI wiring, malformed data and the delayed-read race. This is **partial**, not verified RStudio parity: live Pyodide/webR, physical Chromium file picker/download, independent nbformat acceptance and native cross-platform qualification are outstanding for this integrated revision. No hosted CI configuration changes were made.
+
+## Browser R package management — 2026-10-23
+
+The browser Packages pane now dispatches to the selected interpreter: Python
+(Pyodide/micropip) or R (webR 0.6.0). The R session uses
+`utils::installed.packages()` for inventory and `WebR.installPackages([name])`
+for installation into the browser's active webR runtime. Commands are
+serialized with source execution and environment inspection. Input is
+restricted to package names, not arbitrary R expressions, URLs or paths.
+Language switches, file/notebook imports and resets invalidate stale package
+results; Flow package installation is unavailable in the browser.
+
+**Evidence:** 16 isolated Node.js tests passed locally on 2026-10-23 against
+the prepared R-session and package-panel modules, with mocked webR/Pyodide
+interpreter interfaces. Tests are committed to PR #7 for cross-platform CI.
+These tests verify API dispatch, serialization, invalid names, reset,
+initialization failure cleanup and stale-response protection. They do **not**
+prove actual package download, execution in Chromium, repository availability,
+persistent installed libraries after reload, or macOS/Linux native parity.
+The native Flow application remains the primary backend and is unchanged by
+this browser-only feature. The Packages pane remains **partial**.
+
+## Browser project file deletion — 2026-10-23
+
+The draft Pages workspace adds an explicit **Delete open project file** action for browser-granted project directories. The explorer supplies the opened file's parent directory handle, so deletion can target nested files without traversing outside the granted project. The operation refuses dirty buffers, requires explicit confirmation, checks the on-disk baseline twice, and checks file-handle identity when `isSameEntry` is supported. Saves and deletes are mutually excluded. On successful removal, the editor retains the source as a detached, unsaved copy. Switching project folders detaches the previous active file handle.
+
+**Evidence:** ten new regression cases in `tests/browser_project_delete.test.js` executed against the exact published modules using a V8 Node-compatible shim (10/10 passed). These cover successful removal, unsaved edits, external modification, replaced handles, cancellation, permission failures, save races, nested directories, project switching and browser UI wiring. The Node.js and native Flow cross-platform CI status for this revision must be checked separately; the V8 run is **not** physical-browser filesystem validation. Browser File System Access permission prompts and filesystem race windows between final check and `removeEntry` remain unverified. Rename, trash/undo and cross-browser file deletion are not implemented. The Flow 2.0 native server and CI definitions are unchanged.
+
+## Browser Save As via native file picker — 2026-10-23
+
+Draft PR #7 adds a browser-local Save As control using `showSaveFilePicker` when available.
+It writes the selected handle with the existing 2 MiB bounded, conflict-aware
+`writeIfUnchanged` implementation, preserves the old project file, confirms
+replacement of a selected destination, and keeps the original editor association
+when the picker is cancelled or a write fails. The active file's original disk
+baseline is reused when the selected handle refers to that same file. Saves,
+deletion, project switching and Save As are serialized by the workspace controller.
+A successful Save As attaches the selected file for subsequent disk saves but
+deliberately disables project-scoped deletion until the file is reopened through
+the project explorer, because a native file picker does not expose a verified
+parent directory handle.
+
+**Validation:** nine local Node.js 22.16.0 tests passed for the new Save As
+module against faithful copies of the existing file-save and filename validation
+contracts. Additional workspace integration tests are committed; check the
+current CI run separately before claiming cross-platform test success.
+Physical-browser file-picker permissions, overwrite dialogs and real filesystem
+race windows remain **unverified**. Browser file creation and writes are not
+atomic compare-and-swap, and this is not full RStudio file-management parity.
+The native Flow 2.0 server and hosted CI definitions are unchanged.
+
+
+## Browser project source rename — 2026-10-23
+
+The browser project workspace now exposes a rename operation for an active,
+clean, project-scoped source file. It requires an explicitly granted parent
+directory handle, validates the new filename, rejects an existing destination,
+checks source handle identity and disk contents against the editor baseline,
+confirms the requested operation, copies the source to a new handle, verifies
+the copy, rechecks the original and then removes the old entry. On ambiguous
+post-copy failure, both copies are retained for manual recovery; a failed
+pre-copy write attempts to remove only its own unchanged empty destination.
+
+**Status: partial / locally tested primitive; physical browser unverified.**
+The 13 isolated Node.js regression tests passed locally on Node 22.16.0.
+Additional workspace integration tests are committed and await hosted CI.
+Browser File System Access has no atomic rename or compare-and-swap operation:
+another actor can create the destination between the final lookup and creation,
+or alter the original between the last comparison and removal. Do not use this
+operation as an atomic transactional rename or on concurrently edited files.
+The native Flow server is unchanged; Flow remains the primary native backend.
+
+## Browser in-memory Python/R tabular inspection — 2026-10-23
+
+The browser Environment pane now exposes **View** for Python DataFrame, NumPy
+2D array, lists of rows/records, and R data.frame/matrix values. A serialized
+kernel operation reads the selected variable by validated name (not arbitrary
+user-supplied expressions) and returns a read-only snapshot capped at 200 rows,
+32 columns, 160 characters per cell and 1 MiB of serialized data. The shared
+table viewer provides filtering, column sorting and pagination; it renders
+untrusted cells with textContent. Kernel reset and language changes invalidate
+the visible snapshot. R queries use the existing webR evaluation queue and
+Python uses the existing Pyodide worker queue.
+
+**Status: partial, not RStudio parity.** Local CPython 3.11+ unit tests of the
+real Python extraction helper passed 9/9 (NumPy 2.3.5, pandas 2.2.3); local Node 22.16.0 viewer tests
+passed 2/2 against a mocked data API. The committed browser integration,
+Python-worker protocol and webR query contracts are covered by new Node tests,
+but actual live Pyodide/webR data extraction and physical Chromium interaction
+are not yet independently verified. R extraction has not been run against an
+installed R interpreter in this environment. This is a bounded snapshot viewer,
+not an editable live DataFrame, database viewer, or native Flow table backend.
+No hosted CI definition was changed.

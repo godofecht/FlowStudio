@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FlowStudio Browser — Flow, R and Python scientific workspace</title>
+<style>
+:root{color-scheme:dark;font:14px/1.5 system-ui,sans-serif;background:#0e1421;color:#e6efff}
+*{box-sizing:border-box}body{margin:0;height:100dvh;display:flex;flex-direction:column}
+header,footer{background:#1b2940;padding:.6rem 1rem;display:flex;gap:.7rem;align-items:center;flex-wrap:wrap}
+header strong{font-size:1.2rem;margin-right:auto}main{display:grid;grid-template-columns:minmax(0,2fr) minmax(260px,1fr);grid-template-rows:56% 44%;flex:1;min-height:0;gap:6px;padding:6px}
+section{min-width:0;min-height:0;display:flex;flex-direction:column;background:#172238;border:1px solid #40506a;border-radius:8px;overflow:hidden}
+h2{font-size:1rem;margin:0;padding:.55rem .8rem;border-bottom:1px solid #40506a}
+button,select,input{background:#2b3c56;border:1px solid #7187a9;border-radius:5px;color:inherit;padding:.42rem}
+button{cursor:pointer}button:focus-visible,select:focus-visible,textarea:focus-visible,input:focus-visible{outline:3px solid #a8cdff;outline-offset:1px}
+textarea{background:#101b2c;color:inherit;border:0;resize:none;width:100%;height:100%;padding:1rem;font:14px/1.55 ui-monospace,monospace;tab-size:4}
+pre{white-space:pre-wrap;overflow:auto;overflow-wrap:anywhere;flex:1;margin:0;padding:1rem;font:13px/1.5 ui-monospace,monospace}
+#environment{overflow:auto;padding:1rem;flex:1}#environment table{border-collapse:collapse;width:100%}#environment th,#environment td{padding:.3rem .5rem;border:1px solid #50617a;text-align:left;overflow-wrap:anywhere}#workspace{overflow:auto;padding:.8rem;flex:1}#workspace table{border-collapse:collapse}#workspace th,#workspace td{padding:.2rem .5rem;border:1px solid #50617a}#workspace img{max-width:100%;height:auto}.workspace-tools{display:flex;gap:.4rem;flex-wrap:wrap;padding:.4rem}#workspace iframe{border:0;width:100%;height:100%;min-height:220px}
+#projectTree{max-height:22vh;overflow:auto;padding:.35rem;display:flex;flex-direction:column;gap:.25rem}#projectTree .project-file{text-align:left;width:100%}#projectTree .project-children{padding-left:1rem;display:flex;flex-direction:column;gap:.25rem}#projectPanel{border-bottom:1px solid #40506a}#projectPanel summary{cursor:pointer;padding:.4rem .7rem}section[aria-label="Source editor"] textarea{flex:1;min-height:6rem;height:auto}#notebookOutput .notebook-cell{padding:.65rem;margin-bottom:.65rem;border:1px solid #40506a;border-radius:6px}
+#notebookOutput .notebook-cell pre{flex:none;max-height:20rem;overflow:auto;padding:.5rem}
+#notebookOutput .notebook-cell img{max-width:100%;height:auto}
+#consoleInput{height:5rem;flex:0 0 auto;border-top:1px solid #40506a;padding:.5rem}#consoleActions{display:flex;align-items:center;justify-content:space-between;gap:.5rem;padding:.35rem .6rem}.muted{color:#b6c7df}#notice{color:#ffe3a6}footer{font-size:.85rem}
+@media(max-width:750px){body{height:auto;min-height:100dvh}main{grid-template-columns:1fr;grid-template-rows:45vh 20vh 30vh 25vh}}
+</style></head>
+<body>
+<header><strong>◈ FlowStudio <span class="muted">/ Browser</span></strong>
+<label for="language">Language</label><select id="language"><option value="python">Python (browser)</option><option value="flow">Flow (not yet browser executable)</option><option value="r">R (browser; webR 0.6.0)</option></select>
+<button id="open" type="button">Open file</button><button id="openFolder" type="button">Open project folder</button><button id="newProjectFile" type="button">New project file</button><button id="saveProjectFile" type="button" disabled>Save to disk</button><button id="saveAsProjectFile" type="button">Save As…</button><button id="renameProjectFile" type="button" disabled>Rename open project file</button><button id="deleteProjectFile" type="button" disabled>Delete open project file</button><input id="file" type="file" accept=".py,.flow,.r,.R,.txt" hidden>
+<button id="save" type="button">Download source</button><button id="run" type="button">Run Ctrl+Enter</button><button id="runSelection" type="button">Run selection Ctrl+Shift+Enter</button><button id="runCell" type="button">Run cell Ctrl+Alt+Enter</button><button id="runNotebook" type="button">Run all Python/R cells</button><button id="openNotebook" type="button">Open .ipynb</button><input id="notebookFile" type="file" accept=".ipynb,application/x-ipynb+json" hidden><button id="saveNotebook" type="button">Export .ipynb</button><button id="reset" type="button">Reset selected session</button><button id="forgetDraft" type="button">Forget saved draft</button>
+</header>
+<main>
+<section aria-label="Source editor"><h2>Source — <span id="filename">untitled.py</span></h2><details id="projectPanel"><summary>Project files</summary><div id="projectTree" aria-label="Project file explorer">Choose a folder to browse its files.</div></details><textarea id="source" aria-label="Source code" spellcheck="false">x = 40
+print("Hello from browser Python!")
+x + 2</textarea></section>
+<section aria-label="Environment"><h2>Environment</h2><div id="environment" class="muted">Python runs entirely in a Web Worker using Pyodide. The runtime downloads on first use.</div><div class="workspace-tools"><input id="packageName" type="text" aria-label="Python or R package name" placeholder="package==version" maxlength="120"><button id="installPackage" type="button">Install package</button><button id="listPackages" type="button">List packages</button></div><div id="packages" role="region" aria-label="Installed language packages" style="overflow:auto;max-height:40%"></div></section>
+<section aria-label="Console"><h2>Python / R console</h2><pre id="console" role="log" aria-live="polite">Ready. Python and R run locally in your browser; Flow execution requires the native application.</pre><textarea id="consoleInput" aria-label="Python console input" placeholder="Python expression or statement" spellcheck="false"></textarea><div id="consoleActions"><span class="muted">Enter: execute · Shift+Enter: newline · ↑: history</span><button id="submitConsole" type="button">Execute</button></div></section>
+<section aria-label="Data and plots"><h2>Plots and data</h2><div class="workspace-tools"><label for="previewfile">Open image</label><input id="previewfile" type="file" accept=".png,.jpg,.jpeg,.webp"><button id="dataViewer" type="button">Open CSV/TSV viewer</button></div><div id="workspace"><p class="muted">Local-only plots and tabular data.</p></div></section>
+</main>
+<footer><span id="notice" role="status">Static Pages preview — no remote code execution or uploaded source</span><a href="../">Project overview</a><a href="https://github.com/godofecht/FlowStudio">Source</a></footer>
+<script src="./plot_history.js"></script>
+<script src="./data_viewer.js"></script>
+<script src="./environment_data.js"></script>
+<script src="./packages_panel.js"></script>
+<script src="./draft_storage.js"></script>
+<script src="./source_selection.js"></script>
+<script src="./source_cells.js"></script>
+<script src="./console_repl.js"></script>
+<script src="./r_session.js"></script>
+<script src="./notebook_runner.js"></script>
+<script src="./notebook_format.js"></script>
+<script src="./notebook_io.js"></script>
+<script src="./project.js"></script>
+<script src="./file_save.js"></script>
+<script src="./project_save_as.js"></script>
+<script src="./project_rename.js"></script>
+<script src="./project_workspace.js"></script>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+let worker, pending = new Map(), sequence = 0, busy = false, fileName = "untitled.py", imageURL = null, sessionGeneration = 0;
+let notebookRunner = null, notebookOutput = null;
+let notebookEntries = [], notebookExecutionSource = null, notebookExecutionLanguage = null;
+const plotHistory = FlowStudioPlotHistory.create($("workspace"));
+const environmentData = FlowStudioEnvironmentData.create({target:$("workspace"), document, dataApi:FlowStudioData});
+let rSession = null;
+function getRSession() { return rSession || (rSession = FlowStudioRSession.create()); }
+let draftStorage = null;
+try { draftStorage = window.localStorage; } catch (_) { /* private browsing may block storage */ }
+const drafts = FlowStudioDraftStorage.create(draftStorage, 300, () => notice("Draft could not be saved in this browser."));
+function startWorker() {
+  worker = new Worker("./python-worker.js");
+  worker.onmessage = ({data}) => {
+    const entry = pending.get(data.id);
+    if (entry) { pending.delete(data.id); entry(data); }
+  };
+  worker.onerror = event => {
+    for (const resolve of pending.values()) resolve({ok:false, output:"Python worker failed: " + (event.message || "unknown error")});
+    pending.clear();
+  };
+}
+function request(op, code) {
+  return new Promise(resolve => {
+    const id = ++sequence;
+    pending.set(id, resolve);
+    worker.postMessage({id, op, code});
+  });
+}
+function notice(text) { $("notice").textContent = text; }
+function setBusy(value) {
+  busy = value;
+  for (const id of ["run", "runSelection", "runCell", "runNotebook"]) $(id).disabled = value;
+}
+const packagePanel = FlowStudioPackages.create({document, request, notice, target:$("packages"),
+  input:$("packageName"), installButton:$("installPackage"), listButton:$("listPackages"),
+  language:()=>$("language").value, rSession:getRSession});
+function queueDraft() {
+  drafts.queue($("source").value, fileName, $("language").value);
+}
+async function viewEnvironmentVariable(name) {
+  if (busy || notebookRunner?.isRunning()) { notice("Wait for execution to finish."); return; }
+  const language = $("language").value;
+  if (language !== "python" && language !== "r") {
+    notice("Tabular inspection requires a Python or R session."); return;
+  }
+  const generation = sessionGeneration;
+  setBusy(true);
+  notice("Reading a bounded table snapshot from the " + language + " session.");
+  try {
+    const result = language === "r" ? await getRSession().table(name) : await request("table", name);
+    if (generation !== sessionGeneration || $("language").value !== language) return;
+    if (!result.ok) { notice("Table inspection failed: " + (result.output || "Unknown error")); return; }
+    const rows = environmentData.show(name, result);
+    notice("Showing " + rows + " sampled rows from " + name + ".");
+  } catch (error) {
+    if (generation === sessionGeneration) notice("Table inspection failed: " + String(error.message || error));
+  } finally { if (generation === sessionGeneration) setBusy(false); }
+}
+function renderEnvironment(variables) {
+  environmentData.clear();
+  const target = $("environment");
+  target.replaceChildren();
+  if (!variables.length) { target.textContent = "(No user variables)"; return; }
+  const table = document.createElement("table");
+  table.setAttribute("aria-label", $("language").value === "r" ? "R environment variables" : "Python environment variables");
+  const head = document.createElement("tr");
+  for (const title of ["Name", "Type", "Shape", "Value", "Data"]) {
+    const cell = document.createElement("th");
+    cell.scope = "col";
+    cell.textContent = title;
+    head.append(cell);
+  }
+  table.append(head);
+  for (const variable of variables) {
+    const row = document.createElement("tr");
+    const fields = [variable.name, variable.type,
+      Array.isArray(variable.shape) ? variable.shape.join(" × ") : "", variable.preview];
+    for (const value of fields) {
+      const cell = document.createElement("td");
+      cell.textContent = String(value);
+      row.append(cell);
+    }
+    const action = document.createElement("td");
+    if (/(DataFrame|ndarray|list|tuple|data\.frame|matrix|array)/i.test(String(variable.type))) {
+      const view = document.createElement("button");
+      view.type = "button";
+      view.textContent = "View";
+      view.setAttribute("aria-label", "View " + variable.name + " as table");
+      view.addEventListener("click", () => { void viewEnvironmentVariable(variable.name); });
+      action.append(view);
+    }
+    row.append(action);
+    table.append(row);
+  }
+  target.append(table);
+}
+async function run(selectedOnly = false, activeCell = false, consoleCode = null) {
+  if (busy) { if (consoleCode !== null) notice("Python session is busy."); return false; }
+  const language = ["python", "r", "flow"].includes($("language").value) ? $("language").value : "python";
+  if (language !== "python" && language !== "r") {
+    notice("This language requires a future WebAssembly runtime or a local FlowStudio server.");
+    return;
+  }
+  let prepared;
+  if (consoleCode !== null) {
+    prepared = FlowStudioSourceSelection.prepare({value:consoleCode}, false);
+  } else if (activeCell) {
+    try {
+      const cell = FlowStudioSourceCells.cellAt($("source").value, $("source").selectionStart);
+      if (cell.kind !== "code") { notice("Markdown cells cannot be executed."); return; }
+      prepared = FlowStudioSourceSelection.prepare({value:cell.code}, false);
+    } catch (error) { notice("Cannot run cell: " + (error.message || String(error))); return; }
+  } else {
+    prepared = FlowStudioSourceSelection.prepare($("source"), selectedOnly);
+  }
+  if (!prepared.ok) { notice(prepared.error); return false; }
+  const code = prepared.code;
+  const generation = sessionGeneration;
+  setBusy(true);
+  notice(language === "r" ? "Executing R in your browser — initial webR download can take time." : "Executing in your browser — initial Pyodide download can take time.");
+  try {
+    const response = language === "r" ? await getRSession().run(code) : await request("run", code);
+    if (generation !== sessionGeneration) return false;
+    $("console").textContent += (consoleCode !== null ? "\n>>> " + language + " console\n" : activeCell ? "\n>>> run cell\n" : selectedOnly ? "\n>>> run selection\n" : "\n>>> run\n") + (response.output || "(no output)") + "\n";
+    $("console").scrollTop = $("console").scrollHeight;
+    notice(response.ok ? language + " execution complete." : language + " reported an error.");
+    if (Array.isArray(response.plots)) plotHistory.append(response.plots);
+    if (language === "r" && Array.isArray(response.images)) FlowStudioRSession.renderImages($("workspace"), response.images, document);
+    if (response.plotWarning) notice("Plot capture warning: " + response.plotWarning);
+    if (response.ok || Array.isArray(response.plots) || Array.isArray(response.images)) {
+      const inspect = language === "r" ? await getRSession().inspect() : await request("inspect");
+      if (generation !== sessionGeneration) return false;
+      if (inspect.ok) renderEnvironment(inspect.variables);
+      else notice("Environment inspection failed: " + inspect.output);
+    }
+    return true;
+  } catch(error) { notice("Execution unavailable: " + error.message); return false; }
+  finally { if (generation === sessionGeneration) setBusy(false); }
+}
+function renderNotebookCell(entry) {
+  const card = document.createElement("div");
+  card.className = "notebook-cell";
+  const heading = document.createElement("h3");
+  heading.textContent = entry.kind === "markdown" ? "Markdown cell " + (entry.index + 1) :
+    "Cell " + (entry.index + 1) + (entry.ok ? " — complete" : " — failed");
+  card.append(heading);
+  const output = document.createElement("pre");
+  output.textContent = entry.kind === "markdown" ? entry.code :
+    entry.output + (entry.truncated ? "\n[Output truncated]" : "");
+  card.append(output);
+  if (entry.kind === "code") {
+    for (const plot of entry.plots) {
+      if (!plot || typeof plot.png !== "string" || plot.png.length > 1398104 ||
+          !plot.png.startsWith("iVBORw0KGgo") || !/^[A-Za-z0-9+/=]+$/.test(plot.png)) continue;
+      const image = document.createElement("img");
+      image.src = "data:image/png;base64," + plot.png;
+      image.alt = "Python plot from cell " + (entry.index + 1);
+      card.append(image);
+    }
+    if (entry.images.length) {
+      const plotBox = document.createElement("div");
+      FlowStudioRSession.renderImages(plotBox, entry.images, document);
+      card.append(plotBox);
+    }
+  }
+  notebookOutput.append(card);
+  if (entry.kind === "code") notebookEntries.push({index:entry.index, kind:entry.kind,
+    ok:entry.ok, output:entry.output, plots:entry.plots});
+}
+async function runNotebook() {
+  if (busy) { notice("An execution is already running."); return; }
+  const language = $("language").value;
+  if (language !== "python" && language !== "r") {
+    notice("Browser notebook execution supports Python/R; Flow requires the native application.");
+    return;
+  }
+  const generation = sessionGeneration;
+  notebookEntries = [];
+  notebookExecutionSource = $("source").value;
+  notebookExecutionLanguage = language;
+  notebookOutput = document.createElement("div");
+  notebookOutput.id = "notebookOutput";
+  notebookOutput.setAttribute("aria-label", "Notebook cell results");
+  $("workspace").replaceChildren(notebookOutput);
+  notebookRunner = FlowStudioNotebook.create({
+    parseCells: FlowStudioSourceCells.parseCells,
+    execute: (code, selectedLanguage) => selectedLanguage === "r" ? getRSession().run(code) : request("run", code),
+    onCell: renderNotebookCell, notice
+  });
+  setBusy(true);
+  try {
+    const result = await notebookRunner.run($("source").value, language);
+    if (generation !== sessionGeneration) return;
+    notice(result.ok ? "Notebook executed " + result.executed + " cells." :
+      "Notebook stopped after " + result.executed + " cells: " + result.error);
+    if (result.executed > 0) {
+      const inspect = language === "r" ? await getRSession().inspect() : await request("inspect");
+      if (generation !== sessionGeneration) return;
+      if (inspect.ok) renderEnvironment(inspect.variables);
+      else notice("Notebook environment inspection failed: " + inspect.output);
+    }
+  } catch (error) {
+    if (generation === sessionGeneration) notice("Notebook execution failed: " + String(error.message || error));
+  } finally { if (generation === sessionGeneration) setBusy(false); }
+}
+const consoleREPL = FlowStudioConsoleREPL.create({input:$("consoleInput"), button:$("submitConsole"),
+  submit:code=>run(false, false, code), notice});
+$("run").addEventListener("click", () => { void run(false); });
+$("runSelection").addEventListener("click", () => { void run(true); });
+$("runCell").addEventListener("click", () => { void run(false, true); });
+$("runNotebook").addEventListener("click", () => { void runNotebook(); });
+$("source").addEventListener("keydown", event => {
+  if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && event.altKey && !event.shiftKey) { event.preventDefault(); void run(false, true); }
+  else if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && event.shiftKey) { event.preventDefault(); void run(true); }
+  else if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void run(false); }
+});
+$("source").addEventListener("input", () => { notebookEntries = []; queueDraft(); });
+$("language").addEventListener("change", () => { notebookEntries = []; environmentData.clear(); packagePanel.updateLanguage?.(); queueDraft(); });
+window.addEventListener("pagehide", () => drafts.flush());
+$("forgetDraft").addEventListener("click", () => {
+  drafts.clear();
+  notice("Saved local draft forgotten; current editor contents remain open.");
+});
+$("reset").addEventListener("click", () => {
+  sessionGeneration++;
+  notebookRunner?.cancel();
+  notebookEntries = [];
+  environmentData.clear();
+  setBusy(false);
+  packagePanel.clear();
+  if ($("language").value === "r") {
+    if (rSession) rSession.reset();
+    $("environment").textContent = "(New R session)";
+    notice("R state reset.");
+    return;
+  }
+  plotHistory.clear();
+  worker.terminate();
+  for (const resolve of pending.values()) resolve({ok:false,output:"Session reset."});
+  pending.clear(); startWorker(); $("environment").textContent = "(New Python session)";
+  notice("Python state reset.");
+});
+$("open").addEventListener("click", () => $("file").click());
+$("file").addEventListener("change", async event => {
+  const file = event.target.files[0]; if (!file) return;
+  event.target.value = ""; // permit selecting the same file after cancellation
+  if (file.size > 2 * 1024 * 1024) { notice("File exceeds 2 MiB."); return; }
+  const source = await file.text();
+  if (source.includes("\0")) { notice("NUL bytes are not supported."); return; }
+  if (projectWorkspace.dirty() && !window.confirm("Discard unsaved editor changes?")) return;
+  $("source").value = source; notebookEntries = []; projectWorkspace.notifyExternalOpen(); fileName = file.name; $("filename").textContent = fileName;
+  $("language").value = /\.py$/i.test(fileName) ? "python" : /\.flow$/i.test(fileName) ? "flow" : "r";
+  packagePanel.updateLanguage?.();
+  notice("Opened local file " + fileName);
+  queueDraft();
+});
+$("save").addEventListener("click", () => {
+  const blob = new Blob([$("source").value],{type:"text/plain;charset=utf-8"});
+  const url = URL.createObjectURL(blob), anchor = document.createElement("a");
+  anchor.href = url; anchor.download = fileName; anchor.click();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+});
+$("dataViewer").addEventListener("click", () => {
+  if (imageURL) { URL.revokeObjectURL(imageURL); imageURL = null; }
+  const frame = document.createElement("iframe");
+  frame.src = "./data.html";
+  frame.title = "Local CSV and TSV data viewer";
+  $("workspace").replaceChildren(frame);
+  notice("CSV/TSV viewer ready. Select a local dataset inside the viewer.");
+});
+$("previewfile").addEventListener("change", event => {
+  const file = event.target.files[0];
+  event.target.value = "";
+  if (!file) return;
+  if (file.size > 8 * 1024 * 1024 || !/^image\/(?:png|jpeg|webp)$/.test(file.type)) {
+    notice("Only PNG, JPEG and WebP images up to 8 MiB can be previewed.");
+    return;
+  }
+  if (imageURL) URL.revokeObjectURL(imageURL);
+  imageURL = URL.createObjectURL(file);
+  const img = document.createElement("img");
+  img.src = imageURL;
+  img.alt = file.name;
+  $("workspace").replaceChildren(img);
+  notice("Showing " + file.name);
+});
+const recovered = drafts.read();
+if (recovered) {
+  $("source").value = recovered.source;
+  fileName = recovered.filename;
+  $("filename").textContent = fileName;
+  $("language").value = recovered.language;
+  packagePanel.updateLanguage?.();
+  notice("Recovered a browser-local source draft. Source is not uploaded.");
+}
+const projectWorkspace = FlowStudioProjectWorkspace.create({
+  projectApi: FlowStudioProject, fileSaveApi: FlowStudioFileSave,
+  saveAsApi: typeof FlowStudioProjectSaveAs === "undefined" ? null : FlowStudioProjectSaveAs,
+  projectRenameApi: typeof FlowStudioProjectRename === "undefined" ? null : FlowStudioProjectRename,
+  source: $("source"), filename: $("filename"), language: $("language"),
+  tree: $("projectTree"), openFolderButton: $("openFolder"),
+  saveFileButton: $("saveProjectFile"), saveAsButton: $("saveAsProjectFile"), newFileButton: $("newProjectFile"),
+   deleteFileButton: $("deleteProjectFile"), renameFileButton: $("renameProjectFile"),
+  status: notice, onDraft: queueDraft,
+  setFilename: (name, path) => { fileName = name; $("filename").textContent = path; notebookEntries = []; packagePanel.updateLanguage?.(); },
+  picker: typeof window.showDirectoryPicker === "function"
+    ? options => window.showDirectoryPicker({...options, mode:"readwrite"}) : null,
+  saveAsPicker: typeof window.showSaveFilePicker === "function"
+    ? options => window.showSaveFilePicker(options) : null,
+  confirmChange: message => window.confirm(message),
+  promptName: message => window.prompt(message)
+});
+FlowStudioNotebookIO.create({
+  openButton:$("openNotebook"), fileInput:$("notebookFile"), saveButton:$("saveNotebook"),
+  source:$("source"), language:$("language"), format:FlowStudioNotebookFormat,
+  parseCells:FlowStudioSourceCells.parseCells,
+  isBusy:()=>busy || !!notebookRunner?.isRunning(),
+  canReplace:()=>!projectWorkspace.dirty() || window.confirm("Discard unsaved editor changes?"),
+  onImported:async (imported, name)=>{
+    $("source").value = imported.source;
+    $("language").value = imported.language;
+    packagePanel.updateLanguage?.();
+    fileName = name.replace(/\.ipynb$/i, "") + (imported.language === "r" ? ".R" : ".py");
+    $("filename").textContent = name + " (imported notebook)";
+    projectWorkspace.notifyExternalOpen();
+    notebookEntries = [];
+    notebookExecutionSource = null;
+    if (notebookOutput) notebookOutput.replaceChildren();
+    queueDraft();
+  },
+  onExport:(json, name)=>{
+    const blob = new Blob([json], {type:"application/x-ipynb+json"});
+    const url = URL.createObjectURL(blob), anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = name;
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  },
+  getResults:(currentSource, selectedLanguage)=>
+    notebookExecutionSource === currentSource && notebookExecutionLanguage === selectedLanguage ? notebookEntries : [],
+  getFilename:()=>fileName,
+  notice
+});
+startWorker();
+</script>
+</body></html>

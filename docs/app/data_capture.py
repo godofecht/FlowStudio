@@ -49,15 +49,17 @@ def capture(name, namespace):
     elif isinstance(value, (list, tuple)) and value and all(isinstance(x, dict) for x in value[:MAX_ROWS]):
         total_rows = len(value)
         keys = []
+        overflow = False
         for item in value[:MAX_ROWS]:
             for key in item:
                 if key not in keys:
-                    keys.append(key)
-                    if len(keys) >= MAX_COLUMNS:
+                    if len(keys) == MAX_COLUMNS:
+                        overflow = True
                         break
-            if len(keys) >= MAX_COLUMNS:
+                    keys.append(key)
+            if overflow:
                 break
-        total_columns = len(keys)
+        total_columns = len(keys) + int(overflow)
         columns = [_text(key) for key in keys]
         rows = [[_text(item.get(key)) for key in keys] for item in value[:MAX_ROWS]]
     elif isinstance(value, (list, tuple)) and value and all(isinstance(x, (list, tuple)) for x in value[:MAX_ROWS]):

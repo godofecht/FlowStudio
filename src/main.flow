@@ -4,7 +4,7 @@
 # This is a single-process, localhost-only development preview. It does not
 # sandbox executed code. Python and R retain separate local interpreter sessions.
 
-import std.process { ProcCmd, ProcResult, proc_cmd, proc_arg, proc_input, proc_timeout_ms, proc_run }
+import std.process { ProcCmd, ProcResult, proc_cmd, proc_arg, proc_timeout_ms, proc_run }
 import std.io { FileRead, io_read_text }
 import .data_routes { StaticAsset, data_route }
 
@@ -39,24 +39,15 @@ struct ExecutionResult {
 }
 
 function execute(language: string, code: string, check_only: bool) -> ExecutionResult {
-    let mut command: ptr<ProcCmd> = proc_cmd("python3")
+    let mut command: ptr<ProcCmd> = proc_cmd("flow")
     let mut temp_path: string = ""
     let mut output_path: string = ""
 
-    if eq(language, "r") {
-        command = proc_cmd("R")
-        proc_arg(command, "--vanilla")
-        proc_arg(command, "--slave")
-        proc_input(command, code)
-    } elif eq(language, "python") {
-        proc_arg(command, "-")
-        proc_input(command, code)
-    } elif eq(language, "flow") {
+    if eq(language, "flow") {
         temp_path = fs_write_temp_flow(code)
         if eq(temp_path, "") {
             return ExecutionResult { status: 500, output: "FlowStudio: unable to create temporary Flow source file." }
         }
-        command = proc_cmd("flow")
         if check_only {
             output_path = fs_make_temp_c()
             if eq(output_path, "") {

@@ -20,7 +20,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Completion / language server | partial / browser Python AST and R parse-only syntax diagnostics wired; mocked V8/Node checks, live interpreters unverified; completion and Flow diagnostics missing | R, Flow and Python completion/diagnostics |
 | Packages pane | partial / browser Python inventory/install and webR 0.6.0 inventory/install; mocked Node tests, live interpreters unverified | List, install, update with environment-aware package sources |
 | Git pane | missing | Status, diff, stage, commit and branch operations |
-| Help pane | missing | Context-aware language/function docs |
+| Help pane | partial / browser Python live-global/builtin docstrings and installed R Rd help wired; Node/V8 contract tests, live Pyodide/webR and physical browser unverified; Flow help missing | Context-aware language/function docs |
 | Find / replace / cross-file search | partial / Node + V8-tested | Literal in-buffer find next/previous, single/all replacement and project-wide search implemented; incremental indexing, regex and physical-browser verification missing |
 | Percent-delimited source cells | partial / browser Python Run Cell integrated; Node and real-browser validation pending; Flow browser execution unavailable; browser R unverified | Run only the active `# %%` code cell in Flow/R/Python; markdown and empty cells do not execute |
 | Sequential percent-cell notebooks | partial / Python and R Run All wired; Node-tested, live runtimes unverified | Execute cells in order, retain interpreter state, show per-cell output and stop on error |
@@ -32,6 +32,12 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Cross-platform packaging | missing | Installable signed/reproducible macOS and Linux releases |
 | Accessibility | partial / unverified | Full keyboard navigation, screen reader labels, resize and contrast checks |
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
+
+## 2026-10-23: browser installed-help lookup
+
+The browser data/plots pane now includes a bounded help-topic lookup for Python identifiers (including static attribute resolution) and installed R `package::topic` documentation. Python requests run against the persistent Pyodide worker without evaluating the supplied topic as an expression or importing modules by name. R requests use the persistent webR session and installed Rd documentation. Help text is inserted using DOM textContent, not HTML. Requests are serialized with interpreter work and stale results are ignored on reset or language change. The helper limits identifiers and output sizes.
+
+**Status: partial.** Node/V8 regression coverage checks topic rejection, safe rendering, interpreter request contracts, and stale-result handling. Real Pyodide/webR help lookup in Chromium, Flow language documentation, native help and context-sensitive source-symbol integration remain unverified or missing.
 
 ## First milestone: an honest executable slice
 

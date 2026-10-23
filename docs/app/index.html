@@ -23,7 +23,7 @@ pre{white-space:pre-wrap;overflow:auto;overflow-wrap:anywhere;flex:1;margin:0;pa
 <body>
 <header><strong>◈ FlowStudio <span class="muted">/ Browser</span></strong>
 <label for="language">Language</label><select id="language"><option value="python">Python (browser)</option><option value="flow">Flow (not yet browser executable)</option><option value="r">R (browser; webR 0.6.0)</option></select>
-<button id="open" type="button">Open file</button><button id="openFolder" type="button">Open project folder</button><button id="newProjectFile" type="button">New project file</button><button id="saveProjectFile" type="button" disabled>Save to disk</button><input id="file" type="file" accept=".py,.flow,.r,.R,.txt" hidden>
+<button id="open" type="button">Open file</button><button id="openFolder" type="button">Open project folder</button><button id="newProjectFile" type="button">New project file</button><button id="saveProjectFile" type="button" disabled>Save to disk</button><button id="deleteProjectFile" type="button" disabled>Delete open project file</button><input id="file" type="file" accept=".py,.flow,.r,.R,.txt" hidden>
 <button id="save" type="button">Download source</button><button id="run" type="button">Run Ctrl+Enter</button><button id="runSelection" type="button">Run selection Ctrl+Shift+Enter</button><button id="runCell" type="button">Run cell Ctrl+Alt+Enter</button><button id="runNotebook" type="button">Run all Python/R cells</button><button id="openNotebook" type="button">Open .ipynb</button><input id="notebookFile" type="file" accept=".ipynb,application/x-ipynb+json" hidden><button id="saveNotebook" type="button">Export .ipynb</button><button id="reset" type="button">Reset selected session</button><button id="forgetDraft" type="button">Forget saved draft</button>
 </header>
 <main>
@@ -319,6 +319,7 @@ const projectWorkspace = FlowStudioProjectWorkspace.create({
   source: $("source"), filename: $("filename"), language: $("language"),
   tree: $("projectTree"), openFolderButton: $("openFolder"),
   saveFileButton: $("saveProjectFile"), newFileButton: $("newProjectFile"),
+   deleteFileButton: $("deleteProjectFile"),
   status: notice, onDraft: queueDraft,
   setFilename: (name, path) => { fileName = name; $("filename").textContent = path; notebookEntries = []; packagePanel.updateLanguage?.(); },
   picker: typeof window.showDirectoryPicker === "function"

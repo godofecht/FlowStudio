@@ -24,7 +24,7 @@ pre{white-space:pre-wrap;overflow:auto;overflow-wrap:anywhere;flex:1;margin:0;pa
 <header><strong>◈ FlowStudio <span class="muted">/ Browser</span></strong>
 <label for="language">Language</label><select id="language"><option value="python">Python (browser)</option><option value="flow">Flow (not yet browser executable)</option><option value="r">R (browser; webR 0.6.0)</option></select>
 <button id="open" type="button">Open file</button><button id="openFolder" type="button">Open project folder</button><button id="newProjectFile" type="button">New project file</button><button id="saveProjectFile" type="button" disabled>Save to disk</button><input id="file" type="file" accept=".py,.flow,.r,.R,.txt" hidden>
-<button id="save" type="button">Download source</button><button id="run" type="button">Run Ctrl+Enter</button><button id="runSelection" type="button">Run selection Ctrl+Shift+Enter</button><button id="runCell" type="button">Run cell Ctrl+Alt+Enter</button><button id="runNotebook" type="button">Run all Python/R cells</button><button id="reset" type="button">Reset selected session</button><button id="forgetDraft" type="button">Forget saved draft</button>
+<button id="save" type="button">Download source</button><button id="run" type="button">Run Ctrl+Enter</button><button id="runSelection" type="button">Run selection Ctrl+Shift+Enter</button><button id="runCell" type="button">Run cell Ctrl+Alt+Enter</button><button id="runNotebook" type="button">Run all Python/R cells</button><button id="openNotebook" type="button">Open .ipynb</button><input id="notebookFile" type="file" accept=".ipynb,application/x-ipynb+json" hidden><button id="saveNotebook" type="button">Export .ipynb</button><button id="reset" type="button">Reset selected session</button><button id="forgetDraft" type="button">Forget saved draft</button>
 </header>
 <main>
 <section aria-label="Source editor"><h2>Source — <span id="filename">untitled.py</span></h2><details id="projectPanel"><summary>Project files</summary><div id="projectTree" aria-label="Project file explorer">Choose a folder to browse its files.</div></details><textarea id="source" aria-label="Source code" spellcheck="false">x = 40
@@ -43,6 +43,8 @@ x + 2</textarea></section>
 <script src="./console_repl.js"></script>
 <script src="./r_session.js"></script>
 <script src="./notebook_runner.js"></script>
+<script src="./notebook_format.js"></script>
+<script src="./notebook_io.js"></script>
 <script src="./project.js"></script>
 <script src="./file_save.js"></script>
 <script src="./project_workspace.js"></script>
@@ -51,6 +53,7 @@ x + 2</textarea></section>
 const $ = id => document.getElementById(id);
 let worker, pending = new Map(), sequence = 0, busy = false, fileName = "untitled.py", imageURL = null, sessionGeneration = 0;
 let notebookRunner = null, notebookOutput = null;
+let notebookEntries = [], notebookExecutionSource = null, notebookExecutionLanguage = null;
 const plotHistory = FlowStudioPlotHistory.create($("workspace"));
 let rSession = null;
 function getRSession() { return rSession || (rSession = FlowStudioRSession.create()); }
@@ -182,6 +185,8 @@ function renderNotebookCell(entry) {
     }
   }
   notebookOutput.append(card);
+  if (entry.kind === "code") notebookEntries.push({index:entry.index, kind:entry.kind,
+    ok:entry.ok, output:entry.output, plots:entry.plots});
 }
 async function runNotebook() {
   if (busy) { notice("An execution is already running."); return; }
@@ -191,6 +196,9 @@ async function runNotebook() {
     return;
   }
   const generation = sessionGeneration;
+  notebookEntries = [];
+  notebookExecutionSource = $("source").value;
+  notebookExecutionLanguage = language;
   notebookOutput = document.createElement("div");
   notebookOutput.id = "notebookOutput";
   notebookOutput.setAttribute("aria-label", "Notebook cell results");
@@ -227,8 +235,8 @@ $("source").addEventListener("keydown", event => {
   else if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && event.shiftKey) { event.preventDefault(); void run(true); }
   else if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void run(false); }
 });
-$("source").addEventListener("input", queueDraft);
-$("language").addEventListener("change", queueDraft);
+$("source").addEventListener("input", () => { notebookEntries = []; queueDraft(); });
+$("language").addEventListener("change", () => { notebookEntries = []; queueDraft(); });
 window.addEventListener("pagehide", () => drafts.flush());
 $("forgetDraft").addEventListener("click", () => {
   drafts.clear();
@@ -237,6 +245,7 @@ $("forgetDraft").addEventListener("click", () => {
 $("reset").addEventListener("click", () => {
   sessionGeneration++;
   notebookRunner?.cancel();
+  notebookEntries = [];
   setBusy(false);
   if ($("language").value === "r") {
     if (rSession) rSession.reset();
@@ -259,7 +268,7 @@ $("file").addEventListener("change", async event => {
   const source = await file.text();
   if (source.includes("\0")) { notice("NUL bytes are not supported."); return; }
   if (projectWorkspace.dirty() && !window.confirm("Discard unsaved editor changes?")) return;
-  $("source").value = source; projectWorkspace.notifyExternalOpen(); fileName = file.name; $("filename").textContent = fileName;
+  $("source").value = source; notebookEntries = []; projectWorkspace.notifyExternalOpen(); fileName = file.name; $("filename").textContent = fileName;
   $("language").value = /\.py$/i.test(fileName) ? "python" : /\.flow$/i.test(fileName) ? "flow" : "r";
   notice("Opened local file " + fileName);
   queueDraft();
@@ -308,11 +317,41 @@ const projectWorkspace = FlowStudioProjectWorkspace.create({
   tree: $("projectTree"), openFolderButton: $("openFolder"),
   saveFileButton: $("saveProjectFile"), newFileButton: $("newProjectFile"),
   status: notice, onDraft: queueDraft,
-  setFilename: (name, path) => { fileName = name; $("filename").textContent = path; },
+  setFilename: (name, path) => { fileName = name; $("filename").textContent = path; notebookEntries = []; },
   picker: typeof window.showDirectoryPicker === "function"
     ? options => window.showDirectoryPicker({...options, mode:"readwrite"}) : null,
   confirmChange: message => window.confirm(message),
   promptName: message => window.prompt(message)
+});
+FlowStudioNotebookIO.create({
+  openButton:$("openNotebook"), fileInput:$("notebookFile"), saveButton:$("saveNotebook"),
+  source:$("source"), language:$("language"), format:FlowStudioNotebookFormat,
+  parseCells:FlowStudioSourceCells.parseCells,
+  isBusy:()=>busy || !!notebookRunner?.isRunning(),
+  canReplace:()=>!projectWorkspace.dirty() || window.confirm("Discard unsaved editor changes?"),
+  onImported:async (imported, name)=>{
+    $("source").value = imported.source;
+    $("language").value = imported.language;
+    fileName = name.replace(/\.ipynb$/i, "") + (imported.language === "r" ? ".R" : ".py");
+    $("filename").textContent = name + " (imported notebook)";
+    projectWorkspace.notifyExternalOpen();
+    notebookEntries = [];
+    notebookExecutionSource = null;
+    if (notebookOutput) notebookOutput.replaceChildren();
+    queueDraft();
+  },
+  onExport:(json, name)=>{
+    const blob = new Blob([json], {type:"application/x-ipynb+json"});
+    const url = URL.createObjectURL(blob), anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = name;
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  },
+  getResults:(currentSource, selectedLanguage)=>
+    notebookExecutionSource === currentSource && notebookExecutionLanguage === selectedLanguage ? notebookEntries : [],
+  getFilename:()=>fileName,
+  notice
 });
 startWorker();
 </script>

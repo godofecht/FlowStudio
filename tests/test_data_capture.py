@@ -32,6 +32,11 @@ class CaptureTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             capture("x", {"x": 5})
 
+    def test_many_record_columns_reports_truncation(self):
+        result = json.loads(capture("records", {"records": [{str(i): i for i in range(40)}]}))
+        self.assertTrue(result["truncated"])
+        self.assertEqual(len(result["columns"]), 32)
+
     def test_numpy_matrix(self):
         try:
             import numpy as np

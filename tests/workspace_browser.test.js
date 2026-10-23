@@ -105,7 +105,8 @@ function workspace(folder) {
       if (url === "/api/inspect/python" || url === "/api/inspect/r") {
         inspectionFetches.push({ url, options });
         return { ok: true, status: 200,
-          json: async () => ({ variables: [{ name: "value", type: url.endsWith("/r") ? "double" : "int", size: url.endsWith("/r") ? 1 : null }], truncated: false }) };
+          json: async () => ({ variables: [{ name: "value", type: url.endsWith("/r") ? "double" : "int",
+            size: url.endsWith("/r") ? 6 : null, dimensions: url.endsWith("/r") ? [2, 3] : null }], truncated: false }) };
       }
       fetches.push({ url, options });
       return { ok: true, status: 200, text: async () => "ran" };
@@ -423,7 +424,7 @@ test("native R execution and reset refresh bounded environment through Flow inte
   const table = app.el("pythonEnvironment").children[0];
   assert.equal(table.children[0].textContent, "Native R variables");
   assert.equal(table.children[2].children[1].textContent, "double");
-  assert.equal(table.children[2].children[2].textContent, "1");
+  assert.equal(table.children[2].children[2].textContent, "2 × 3");
   await app.el("resetR").fire("click");
   assert.equal(app.fetches[1].url, "/api/reset/r");
   assert.equal(app.inspectionFetches.length, 2);

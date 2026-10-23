@@ -60,5 +60,85 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/workspace_console.js" {
         return StaticAsset { path: "web/workspace_console.js", mime: "text/javascript; charset=utf-8", found: true }
     }
+    # Serve the same browser workspace under the native Flow-owned loopback server.
+    # Every asset is allowlisted; URL paths are never used as filesystem paths.
+    if url == "/app" or url == "/app/" or url == "/app/index.html" {
+        return StaticAsset { path: "docs/app/index.html", mime: "text/html; charset=utf-8", found: true }
+    }
+    if url == "/app/console_repl.js" {
+        return StaticAsset { path: "docs/app/console_repl.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/app/data.html" {
+        return StaticAsset { path: "docs/app/data.html", mime: "text/html; charset=utf-8", found: true }
+    }
+    if url == "/app/data_capture.py" {
+        return StaticAsset { path: "docs/app/data_capture.py", mime: "text/plain; charset=utf-8", found: true }
+    }
+    if url == "/app/data_page.js" {
+        return StaticAsset { path: "docs/app/data_page.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/app/data_viewer.js" {
+        return StaticAsset { path: "docs/app/data_viewer.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/app/draft_storage.js" {
+        return StaticAsset { path: "docs/app/draft_storage.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/app/environment_data.js" {
+        return StaticAsset { path: "docs/app/environment_data.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/app/file_save.js" {
+        return StaticAsset { path: "docs/app/file_save.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/app/help_panel.js" {
+        return StaticAsset { path: "docs/app/help_panel.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/app/native_flow.js" {
+        return StaticAsset { path: "docs/app/native_flow.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/app/notebook_format.js" {
+        return StaticAsset { path: "docs/app/notebook_format.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/app/notebook_io.js" {
+        return StaticAsset { path: "docs/app/notebook_io.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/app/notebook_report.js" {
+        return StaticAsset { path: "docs/app/notebook_report.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/app/notebook_runner.js" {
+        return StaticAsset { path: "docs/app/notebook_runner.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/app/packages_panel.js" {
+        return StaticAsset { path: "docs/app/packages_panel.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/app/plot_capture.py" {
+        return StaticAsset { path: "docs/app/plot_capture.py", mime: "text/plain; charset=utf-8", found: true }
+    }
+    if url == "/app/plot_history.js" {
+        return StaticAsset { path: "docs/app/plot_history.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/app/project.js" {
+        return StaticAsset { path: "docs/app/project.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/app/project_rename.js" {
+        return StaticAsset { path: "docs/app/project_rename.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/app/project_save_as.js" {
+        return StaticAsset { path: "docs/app/project_save_as.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/app/project_workspace.js" {
+        return StaticAsset { path: "docs/app/project_workspace.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/app/python-worker.js" {
+        return StaticAsset { path: "docs/app/python-worker.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/app/r_session.js" {
+        return StaticAsset { path: "docs/app/r_session.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/app/source_cells.js" {
+        return StaticAsset { path: "docs/app/source_cells.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/app/source_selection.js" {
+        return StaticAsset { path: "docs/app/source_selection.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
     return StaticAsset { path: "", mime: "", found: false }
 }

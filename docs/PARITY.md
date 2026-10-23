@@ -8,7 +8,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | --- | --- | --- |
 | Four-pane IDE shell | unverified | Source, environment, console and plots render; keyboard/accessibility checks |
 | File open / save | partial / conflict-aware browser saves and Save As picker wired; physical browser and native unverified | Native file-picker and download fallback round-trip UTF-8 |
-| Flow source execution | unverified | Compile and run valid code; surface diagnostics for invalid code |
+| Flow source execution | partial / native Flow subprocess route integrated into browser IDE at /app/; physical-browser acceptance pending | Compile and run valid code; surface diagnostics for invalid code |
 | R source execution | partial / browser webR 0.6.0 integrated, Node-mock tested; real webR and native R unverified | Run via installed R; preserve state across evaluations |
 | Python source execution | partial / unverified | Run via installed Python; preserve state across evaluations |
 | Editor selection execution | partial / Node-tested browser selection; native and physical-browser unverified | Selection runs without accidentally executing entire buffer |
@@ -32,6 +32,12 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Cross-platform packaging | missing | Installable signed/reproducible macOS and Linux releases |
 | Accessibility | partial / unverified | Full keyboard navigation, screen reader labels, resize and contrast checks |
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
+
+## 2026-10-23: native Flow execution from the browser workspace
+
+The Flow-owned native HTTP server now allowlists the actual `docs/app/` workspace at `http://127.0.0.1:8751/app/` (also `localhost`). The existing browser source/selection/cell/console execution path sends Flow source to the already-implemented `POST /api/run/flow` route, with the existing intent header and a bounded request. Compiler diagnostics and nonzero exit statuses return to the console; Flow has no persistent environment inspector or notebook Run All yet. Python and R continue to run in their browser-local persistent runtimes. GitHub Pages **does not** attempt native Flow execution and does not silently contact a local server.
+
+**Status: partial.** Added Node regression coverage for strict localhost origin gating, successful execution, compiler errors and input/output limits; extended native HTTP smoke with `/app/` asset loading and unknown-route rejection, and explicit-route completeness tests. These changes do not imply live browser acceptance or native interpreter persistence. Run `python3 scripts/verify_native.py` on both supported operating systems, then use a physical browser against `/app/` to qualify Flow source/selection/cell execution. The loopback server executes source with the local user's permissions; never expose it remotely.
 
 ## 2026-10-23: offline notebook HTML report export
 

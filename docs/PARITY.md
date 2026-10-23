@@ -9,11 +9,11 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Four-pane IDE shell | unverified | Source, environment, console and plots render; keyboard/accessibility checks |
 | File open / save | partial / conflict-aware browser saves and Save As picker wired; physical browser and native unverified | Native file-picker and download fallback round-trip UTF-8 |
 | Flow source execution | partial / native Flow subprocess route integrated into browser IDE at /app/; physical-browser acceptance pending | Compile and run valid code; surface diagnostics for invalid code |
-| R source execution | partial / browser webR 0.6.0 integrated, Node-mock tested; real webR and native R unverified | Run via installed R; preserve state across evaluations |
+| R source execution | partial / browser webR 0.6.0 integrated, Node-mock tested; real webR unverified; native persistent R implementation awaiting live Rscript acceptance | Run via installed R; preserve state across evaluations |
 | Python source execution | partial / native persistent CPython kernel added; local C IPC and Flow-owned HTTP tested in Linux/macOS CI; physical-browser acceptance pending | Run via installed Python; preserve state across evaluations |
 | Editor selection execution | partial / Node-tested browser selection; native and physical-browser unverified | Selection runs without accidentally executing entire buffer |
-| Persistent REPL/session | partial / browser Pyodide/webR sessions; native Python process retention and reset added (local C harness and cross-platform Flow HTTP CI passed); native R missing | Incremental variables and package state persist until reset |
-| Variable inspector | partial / native Python bounded metadata snapshots and browser Python/R metadata; native R and nested inspection missing; native HTTP CI passed on Linux/macOS; physical-browser acceptance pending | Nested objects / types / dimensions inspectable and refresh after execution |
+| Persistent REPL/session | partial / browser Pyodide/webR sessions; native Python process retention and reset added (local C harness and cross-platform Flow HTTP CI passed); native R kernel implementation awaiting real Rscript acceptance | Incremental variables and package state persist until reset |
+| Variable inspector | partial / native Python bounded metadata snapshots and browser Python/R metadata; native R inspection and nested inspection missing; native HTTP CI passed on Linux/macOS; physical-browser acceptance pending | Nested objects / types / dimensions inspectable and refresh after execution |
 | Plot viewer | partial / Node-tested PNG import and integrated workspace tab; native unverified | png/svg plot history, zoom, save and deterministic device lifecycle |
 | Project explorer | partial / browser Pages open/create/save and confirmed active-file delete with baseline conflict checks; 10 regression tests V8-shim passed; physical-browser deletion unverified | Open project, tree navigation, source-file creation and save; scoped delete is implemented, copy-verify-delete rename implemented with non-atomic filesystem race limits; physical-browser acceptance remains missing |
 | Data viewer | partial / CSV/TSV plus bounded Python/R environment table snapshots wired; real Pyodide/webR and physical browser unverified | Interactive sortable/filterable tabular datasets including missing values |
@@ -32,6 +32,12 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Cross-platform packaging | missing | Installable signed/reproducible macOS and Linux releases |
 | Accessibility | partial / unverified | Full keyboard navigation, screen reader labels, resize and contrast checks |
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
+
+## 2026-10-23: native persistent R session (PR acceptance pending)
+
+The Flow-owned localhost `POST /api/run/r` route now dispatches to a persistent `Rscript --vanilla` kernel using bounded length-framed stdin/fd3 IPC. Top-level expressions are parsed and evaluated in a retained R environment, with visible values, output, warnings and errors captured. Exceptions return HTTP 422 without discarding existing variables; `POST /api/reset/r` terminates the process group and starts a fresh environment on next use. Requests have a 128 KiB source/output limit and a 15-second deadline; disconnected or timed-out kernels are killed and reset. The native editor has an explicit Reset R control, and release packaging includes the R kernel.
+
+**Status: partial / not yet independently validated.** C transport, Flow routing, real-R IPC harness, native HTTP persistence/reset checks and browser wiring have been committed. The authoring environment has no Rscript or Flow executable, so no live R execution or Flow compilation is claimed here. Cross-platform CI must execute the real R harness and native HTTP smoke on Linux x86-64 and macOS arm64 before this capability can be marked CI-tested. Physical-browser acceptance, R environment inspection, package lifecycle, plots and asynchronous interruption remain missing. R code executes with the local user's permissions; this is not sandboxed or remote-session functionality.
 
 ## 2026-10-23: native Python environment inspection (cross-platform HTTP accepted)
 

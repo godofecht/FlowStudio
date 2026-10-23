@@ -59,14 +59,40 @@ async function handle(event) {
     /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}(?:==[0-9][A-Za-z0-9.!+_-]{0,39})?$/.test(code);
   const validTable = op === "table" && typeof code === "string" &&
     /^[A-Za-z_][A-Za-z0-9_]{0,119}$/.test(code);
+  const validCheck = op === "check" && typeof code === "string" &&
+    code.length > 0 && new TextEncoder().encode(code).length <= 65536;
   if (!((op === "run" && typeof code === "string" && new TextEncoder().encode(code).length <= 65536) ||
-    op === "inspect" || op === "packages" || validInstall || validTable)) {
+    op === "inspect" || op === "packages" || validInstall || validTable || validCheck)) {
     self.postMessage({id, ok:false, output:"Invalid execution request."}); return;
   }
   let stdout = "", stderr = "", plotWarning = "";
   let py = null;
   try {
     py = await python();
+    if (op === "check") {
+      // ast.parse validates without executing user source or importing its dependencies.
+      const query = [
+        "import ast as _fs_ast, json as _fs_json",
+        "_fs_source = " + JSON.stringify(code),
+        "try:",
+        "    _fs_ast.parse(_fs_source)",
+        "    _fs_check = {'ok': True, 'diagnostics': []}",
+        "except SyntaxError as _fs_error:",
+        "    _fs_check = {'ok': False, 'diagnostics': [{'message': str(_fs_error.msg)[:300], 'line': _fs_error.lineno or 1, 'column': _fs_error.offset or 1}]}",
+        "_fs_json.dumps(_fs_check)"
+      ].join("\n");
+      const raw = await py.runPythonAsync(query);
+      if (typeof raw !== "string" || raw.length > 4096) throw Error("Invalid syntax diagnostic response.");
+      const result = JSON.parse(raw);
+      if (!result || typeof result.ok !== "boolean" || !Array.isArray(result.diagnostics) ||
+          result.diagnostics.length > 1 || result.diagnostics.some(d =>
+            !d || typeof d.message !== "string" || d.message.length > 300 ||
+            !Number.isSafeInteger(d.line) || d.line < 1 ||
+            !Number.isSafeInteger(d.column) || d.column < 1))
+        throw Error("Invalid syntax diagnostic response.");
+      self.postMessage({id, ok:result.ok, diagnostics:result.diagnostics});
+      return;
+    }
     if (op === "packages") {
       const raw = await py.runPythonAsync("import json as _fs_json\nimport importlib.metadata as _fs_md\n_fs_json.dumps(sorted([{'name':str(d.metadata.get('Name'))[:120],'version':str(d.version)[:80]} for d in _fs_md.distributions() if d.metadata.get('Name')], key=lambda p:p['name'].lower())[:500])");
       if (typeof raw !== "string" || raw.length > MAX_OUTPUT) throw new Error("Package inventory exceeds size limit.");

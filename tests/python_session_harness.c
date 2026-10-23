@@ -22,7 +22,7 @@ int main(void)
     a = fs_py_run("while True: pass");
     if (fs_py_status() != 504 || !strstr(a, "timed out")) return 7;
     a = fs_py_run("print('restarted')");
-    if (fs_py_status() != 200 || strcmp(a, "restarted\\n") != 0) return 8;
+    if (fs_py_status() != 200 || strcmp(a, "restarted\n") != 0) return 8;
     fs_py_reset();
     puts("PASS: native persistent Python session, errors, reset, output cap, timeout recovery");
     return 0;

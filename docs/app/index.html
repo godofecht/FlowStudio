@@ -47,6 +47,7 @@ x + 2</textarea></section>
 <script src="./native_flow.js"></script>
 <script src="./help_panel.js"></script>
 <script src="./notebook_runner.js"></script>
+<script src="./notebook_recovery.js"></script>
 <script src="./notebook_format.js"></script>
 <script src="./notebook_report.js"></script>
 <script src="./notebook_io.js"></script>
@@ -61,6 +62,8 @@ const $ = id => document.getElementById(id);
 let worker, pending = new Map(), sequence = 0, busy = false, fileName = "untitled.py", imageURL = null, sessionGeneration = 0;
 let notebookRunner = null, notebookOutput = null;
 let notebookEntries = [], notebookExecutionSource = null, notebookExecutionLanguage = null;
+let notebookRecoveryFailed = false;
+function clearNotebookRecovery() { FlowStudioNotebookRecovery.clear(draftStorage); notebookRecoveryFailed = false; }
 const plotHistory = FlowStudioPlotHistory.create($("workspace"));
 const environmentData = FlowStudioEnvironmentData.create({target:$("workspace"), document, dataApi:FlowStudioData});
 let rSession = null;
@@ -274,8 +277,15 @@ function renderNotebookCell(entry) {
     }
   }
   notebookOutput.append(card);
-  if (entry.kind === "code") notebookEntries.push({index:entry.index, kind:entry.kind,
-    ok:entry.ok, output:entry.output, plots:entry.plots});
+  if (entry.kind === "code") {
+    notebookEntries.push({index:entry.index, kind:entry.kind,
+      ok:entry.ok, output:entry.output, truncated:entry.truncated === true, plots:entry.plots});
+    if (notebookExecutionSource !== null && !FlowStudioNotebookRecovery.save(
+      draftStorage, notebookExecutionSource, notebookExecutionLanguage, notebookEntries) && !notebookRecoveryFailed) {
+      notebookRecoveryFailed = true;
+      notice("Notebook output recovery unavailable (storage limit or disabled storage). Export .ipynb to retain results.");
+    }
+  }
 }
 async function runNotebook() {
   if (busy) { notice("An execution is already running."); return; }
@@ -285,6 +295,7 @@ async function runNotebook() {
     return;
   }
   const generation = sessionGeneration;
+  clearNotebookRecovery();
   notebookEntries = [];
   notebookExecutionSource = $("source").value;
   notebookExecutionLanguage = language;
@@ -325,8 +336,8 @@ $("source").addEventListener("keydown", event => {
   else if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && event.shiftKey) { event.preventDefault(); void run(true); }
   else if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void run(false); }
 });
-$("source").addEventListener("input", () => { notebookEntries = []; queueDraft(); });
-$("language").addEventListener("change", () => { notebookEntries = []; environmentData.clear(); packagePanel.updateLanguage?.(); queueDraft(); });
+$("source").addEventListener("input", () => { notebookEntries = []; clearNotebookRecovery(); queueDraft(); });
+$("language").addEventListener("change", () => { notebookEntries = []; clearNotebookRecovery(); environmentData.clear(); packagePanel.updateLanguage?.(); queueDraft(); });
 window.addEventListener("pagehide", () => drafts.flush());
 $("forgetDraft").addEventListener("click", () => {
   drafts.clear();
@@ -336,6 +347,7 @@ $("reset").addEventListener("click", () => {
   sessionGeneration++;
   notebookRunner?.cancel();
   notebookEntries = [];
+  clearNotebookRecovery();
   environmentData.clear();
   setBusy(false);
   packagePanel.clear();
@@ -359,7 +371,7 @@ $("file").addEventListener("change", async event => {
   const source = await file.text();
   if (source.includes("\0")) { notice("NUL bytes are not supported."); return; }
   if (projectWorkspace.dirty() && !window.confirm("Discard unsaved editor changes?")) return;
-  $("source").value = source; notebookEntries = []; projectWorkspace.notifyExternalOpen(); fileName = file.name; $("filename").textContent = fileName;
+  $("source").value = source; notebookEntries = []; clearNotebookRecovery(); projectWorkspace.notifyExternalOpen(); fileName = file.name; $("filename").textContent = fileName;
   $("language").value = /\.py$/i.test(fileName) ? "python" : /\.flow$/i.test(fileName) ? "flow" : "r";
   packagePanel.updateLanguage?.();
   notice("Opened local file " + fileName);
@@ -413,7 +425,7 @@ const projectWorkspace = FlowStudioProjectWorkspace.create({
   saveFileButton: $("saveProjectFile"), saveAsButton: $("saveAsProjectFile"), newFileButton: $("newProjectFile"),
    deleteFileButton: $("deleteProjectFile"), renameFileButton: $("renameProjectFile"),
   status: notice, onDraft: queueDraft,
-  setFilename: (name, path) => { fileName = name; $("filename").textContent = path; notebookEntries = []; packagePanel.updateLanguage?.(); },
+  setFilename: (name, path) => { fileName = name; $("filename").textContent = path; notebookEntries = []; clearNotebookRecovery(); packagePanel.updateLanguage?.(); },
   picker: typeof window.showDirectoryPicker === "function"
     ? options => window.showDirectoryPicker({...options, mode:"readwrite"}) : null,
   saveAsPicker: typeof window.showSaveFilePicker === "function"
@@ -435,6 +447,7 @@ FlowStudioNotebookIO.create({
     $("filename").textContent = name + " (imported notebook)";
     projectWorkspace.notifyExternalOpen();
     notebookEntries = [];
+    clearNotebookRecovery();
     notebookExecutionSource = null;
     if (notebookOutput) notebookOutput.replaceChildren();
     queueDraft();
@@ -474,6 +487,28 @@ $("exportReport").addEventListener("click", () => {
     notice("HTML report export failed: " + String(error.message || error));
   }
 });
+function restoreNotebookOutputs() {
+  const source = $("source").value, language = $("language").value;
+  const entries = FlowStudioNotebookRecovery.read(draftStorage, source, language);
+  if (!entries || !entries.length) return;
+  let cells;
+  try { cells = FlowStudioSourceCells.parseCells(source); }
+  catch (_) { return; }
+  const byIndex = new Map(entries.map(entry => [entry.index, entry]));
+  if (entries.some(entry => !cells.some(cell => cell.index === entry.index && cell.kind === "code"))) return;
+  notebookExecutionSource = source;
+  notebookExecutionLanguage = language;
+  notebookOutput = document.createElement("div");
+  notebookOutput.id = "notebookOutput";
+  notebookOutput.setAttribute("aria-label", "Recovered notebook cell results");
+  $("workspace").replaceChildren(notebookOutput);
+  for (const cell of cells) {
+    if (cell.kind === "markdown") renderNotebookCell({index:cell.index, kind:"markdown", code:cell.code});
+    else if (byIndex.has(cell.index)) renderNotebookCell({...byIndex.get(cell.index), images:[]});
+  }
+  notice("Recovered " + entries.length + " notebook cell outputs from this browser. Interpreter variables were not restored.");
+}
 startWorker();
+restoreNotebookOutputs();
 </script>
 </body></html>

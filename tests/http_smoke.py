@@ -112,6 +112,15 @@ def main() -> None:
         r_variables = {item["name"]: item for item in r_snapshot["variables"]}
         assert r_variables["flowstudio_r_value"]["type"] == "double", r_variables
         assert r_variables["flowstudio_r_value"]["size"] == 1, r_variables
+        status, output = request("POST", "/api/run/r",
+                                 "flowstudio_matrix <- matrix(1:6, nrow=2)",
+                                 accepted_headers)
+        assert status == 200, (status, output)
+        status, snapshot = request("POST", "/api/inspect/r", "", accepted_headers)
+        assert status == 200, (status, snapshot)
+        matrix_variables = {item["name"]: item for item in json.loads(snapshot)["variables"]}
+        assert matrix_variables["flowstudio_matrix"]["dimensions"] == [2, 3], matrix_variables
+        assert matrix_variables["flowstudio_r_value"]["dimensions"] is None, matrix_variables
         status, _ = request("POST", "/api/inspect/r", "")
         assert status == 404, status
         status, output = request("POST", "/api/run/r",

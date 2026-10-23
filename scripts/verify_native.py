@@ -7,6 +7,7 @@ This does not substitute a mock router for the actual Flow executable.
 from __future__ import annotations
 
 import argparse
+import shutil
 import os
 from pathlib import Path
 import signal
@@ -78,7 +79,7 @@ def _stop_process_group(proc: subprocess.Popen[bytes]) -> None:
 
 
 def verify(root: Path, port: int = 8751, build_timeout: int = 180,
-           startup_timeout: float = 15) -> None:
+           startup_timeout: float = 15, require_r: bool = False) -> None:
     root = root.resolve()
     build = root / "scripts/build.sh"
     binary = root / "build/flowstudio"
@@ -86,6 +87,20 @@ def verify(root: Path, port: int = 8751, build_timeout: int = 180,
     if not build.is_file() or not smoke.is_file():
         raise VerificationError("Missing scripts/build.sh or tests/http_smoke.py")
 
+    if require_r:
+        if not shutil.which("Rscript"):
+            raise VerificationError("Rscript is required for native R acceptance")
+        print("Real R IPC acceptance: tests/test_native_r_session.py", flush=True)
+        r_result = _command(
+            [sys.executable, "-m", "unittest", "discover", "-s", "tests",
+             "-p", "test_native_r_session.py", "-v"], root, 65
+        )
+        if r_result.stdout:
+            print(r_result.stdout, end="", flush=True)
+        if r_result.stderr:
+            print(r_result.stderr, end="", file=sys.stderr, flush=True)
+        if r_result.returncode != 0:
+            raise VerificationError("Real R IPC acceptance failed")
     _free_port(port)
     # Never accept a stale executable left by an earlier successful build.
     # Unlinking a symlink here also avoids following an unexpected target.
@@ -131,9 +146,10 @@ def verify(root: Path, port: int = 8751, build_timeout: int = 180,
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
+    parser.add_argument("--require-r", action="store_true", help="require real Rscript IPC acceptance")
     args = parser.parse_args()
     try:
-        verify(args.root)
+        verify(args.root, require_r=args.require_r)
     except VerificationError as exc:
         print(f"FAIL: {exc}", file=sys.stderr)
         return 1

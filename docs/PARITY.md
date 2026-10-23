@@ -13,7 +13,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Python source execution | partial / native persistent CPython kernel added; local C IPC and Flow-owned HTTP tested in Linux/macOS CI; physical-browser acceptance pending | Run via installed Python; preserve state across evaluations |
 | Editor selection execution | partial / Node-tested browser selection; native and physical-browser unverified | Selection runs without accidentally executing entire buffer |
 | Persistent REPL/session | partial / browser Pyodide/webR sessions; native Python process retention and reset added (local C harness and cross-platform Flow HTTP CI passed); native R missing | Incremental variables and package state persist until reset |
-| Variable inspector | partial / browser Python variables and browser R top-level metadata; nested inspection missing | Nested objects / types / dimensions inspectable and refresh after execution |
+| Variable inspector | partial / native Python bounded metadata snapshots and browser Python/R metadata; native R and nested inspection missing; cross-platform acceptance pending | Nested objects / types / dimensions inspectable and refresh after execution |
 | Plot viewer | partial / Node-tested PNG import and integrated workspace tab; native unverified | png/svg plot history, zoom, save and deterministic device lifecycle |
 | Project explorer | partial / browser Pages open/create/save and confirmed active-file delete with baseline conflict checks; 10 regression tests V8-shim passed; physical-browser deletion unverified | Open project, tree navigation, source-file creation and save; scoped delete is implemented, copy-verify-delete rename implemented with non-atomic filesystem race limits; physical-browser acceptance remains missing |
 | Data viewer | partial / CSV/TSV plus bounded Python/R environment table snapshots wired; real Pyodide/webR and physical browser unverified | Interactive sortable/filterable tabular datasets including missing values |
@@ -32,6 +32,12 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Cross-platform packaging | missing | Installable signed/reproducible macOS and Linux releases |
 | Accessibility | partial / unverified | Full keyboard navigation, screen reader labels, resize and contrast checks |
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
+
+## 2026-10-23: native Python environment inspection (pending acceptance)
+
+The Flow-owned localhost server exposes intent-gated `POST /api/inspect/python`, using a dedicated inspect opcode over the existing persistent CPython process IPC. Inspection reads namespace metadata without compiling/evaluating submitted source or invoking arbitrary object repr, len, property getters or user-defined methods. Responses contain at most 128 user variables with bounded names, type names and sizes for exact built-in containers; a truncation flag identifies limits. The native editor refreshes this table after execution and reset, with DOM text-only rendering and stale-response protection.
+
+**Status: partial / CI acceptance pending.** Native C harness, Python metadata unit tests and HTTP smoke tests were added. Real browser DOM acceptance and native R inspection remain missing. This is a local single-session view, not recursive inspection, rich object preview, or RStudio Server parity.
 
 ## 2026-10-23: native persistent Python session (in-progress acceptance)
 

@@ -317,7 +317,7 @@ if (recovered) {
 }
 const projectWorkspace = FlowStudioProjectWorkspace.create({
   projectApi: FlowStudioProject, fileSaveApi: FlowStudioFileSave,
-  saveAsApi: FlowStudioProjectSaveAs,
+  saveAsApi: typeof FlowStudioProjectSaveAs === "undefined" ? null : FlowStudioProjectSaveAs,
   source: $("source"), filename: $("filename"), language: $("language"),
   tree: $("projectTree"), openFolderButton: $("openFolder"),
   saveFileButton: $("saveProjectFile"), saveAsButton: $("saveAsProjectFile"), newFileButton: $("newProjectFile"),

@@ -30,6 +30,8 @@ function fixture() {
     FlowStudioConsoleREPL:consoleREPL,
     FlowStudioSourceCells:{cellAt:()=>({kind:"code",code:"print(1)"})},
     FlowStudioPlotHistory:{create:()=>({append(){},clear(){}})},
+    FlowStudioNotebookIO:require("../docs/app/notebook_io.js"),
+    FlowStudioNotebookFormat:require("../docs/app/notebook_format.js"),
     FlowStudioPackages:{create:()=>({clear(){}})},
     FlowStudioDraftStorage:{create:()=>({queue(){},flush(){},clear(){},read(){return null;}})},
     FlowStudioProjectWorkspace:{create:()=>({dirty(){return false;},notifyExternalOpen(){}})},

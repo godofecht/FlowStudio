@@ -2,8 +2,8 @@
 (function (global) {
 "use strict";
 function create({projectApi, fileSaveApi, source, filename, language, tree,
-                 openFolderButton, saveFileButton, saveAsButton, newFileButton, deleteFileButton, status,
-                 setFilename, onDraft, picker, saveAsPicker, saveAsApi, confirmChange, promptName}) {
+                 openFolderButton, saveFileButton, saveAsButton, newFileButton, deleteFileButton, renameFileButton, status,
+                 setFilename, onDraft, picker, saveAsPicker, saveAsApi, projectRenameApi, confirmChange, promptName}) {
   if (!projectApi || !fileSaveApi) throw new TypeError("Project and save APIs are required.");
   let activeHandle = null;
   let activeParent = null, activeName = null;
@@ -18,6 +18,7 @@ function create({projectApi, fileSaveApi, source, filename, language, tree,
     activeParent = null;
     activeName = null;
     if (deleteFileButton) deleteFileButton.disabled = true;
+    if (renameFileButton) renameFileButton.disabled = true;
     diskBaseline = null;
     editorBaseline = source.value;
     saveFileButton.disabled = true;
@@ -42,6 +43,7 @@ function create({projectApi, fileSaveApi, source, filename, language, tree,
     activeParent = parent || null;
     activeName = name;
     if (deleteFileButton) deleteFileButton.disabled = !activeParent;
+    if (renameFileButton) renameFileButton.disabled = !activeParent;
     diskBaseline = text;
     editorBaseline = text;
     saveFileButton.disabled = false;
@@ -101,6 +103,7 @@ function create({projectApi, fileSaveApi, source, filename, language, tree,
       setFilename(result.name, result.name);
       saveFileButton.disabled = false;
       if (deleteFileButton) deleteFileButton.disabled = true;
+      if (renameFileButton) renameFileButton.disabled = true;
       onDraft();
       status("Saved as " + result.name + " on disk.");
       return true;
@@ -153,6 +156,7 @@ function create({projectApi, fileSaveApi, source, filename, language, tree,
       editorBaseline = "";
       saveFileButton.disabled = true;
       if (deleteFileButton) deleteFileButton.disabled = true;
+      if (renameFileButton) renameFileButton.disabled = true;
       const extension = name.includes(".") ? "." + name.split(".").pop() : ".txt";
       setFilename("untitled" + extension, "untitled" + extension);
       onDraft();
@@ -164,14 +168,56 @@ function create({projectApi, fileSaveApi, source, filename, language, tree,
       return false;
     } finally { deleting = false; }
   }
+  async function renameFile() {
+    if (!activeHandle || !activeParent || !activeName) {
+      status("Open a project file before renaming."); return false;
+    }
+    if (saving || deleting) { status("File operation already running."); return false; }
+    if (dirty()) { status("Save or discard unsaved changes before renaming."); return false; }
+    if (!projectRenameApi || typeof projectRenameApi.rename !== "function") {
+      status("Project rename controller unavailable."); return false;
+    }
+    const nextName = promptName("New source filename", activeName);
+    if (nextName === null) return false;
+    if (!projectApi.validFilename(nextName) || nextName === activeName) {
+      status("Choose a different supported source filename."); return false;
+    }
+    const handle = activeHandle, parent = activeParent, name = activeName;
+    const baseline = diskBaseline;
+    deleting = true; // Serialize rename with save, open, delete, and project switches.
+    try {
+      const result = await projectRenameApi.rename({
+        parent, handle, name, nextName, baseline, fileSaveApi,
+        validFilename: projectApi.validFilename, confirmRename: confirmChange
+      });
+      if (!result) return false;
+      activeHandle = result.handle;
+      activeName = result.name;
+      diskBaseline = result.source;
+      editorBaseline = result.source;
+      const oldPath = filename.textContent;
+      const prefix = oldPath.includes("/") ? oldPath.slice(0, oldPath.lastIndexOf("/") + 1) : "";
+      setFilename(result.name, prefix + result.name);
+      onDraft();
+      try { await project.refresh(); }
+      catch (error) { status("Renamed file, but explorer refresh failed: " + (error.message || String(error))); return true; }
+      status("Renamed " + name + " to " + result.name + ".");
+      return true;
+    } catch (error) {
+      status("Rename failed: " + (error.message || String(error)));
+      return false;
+    } finally { deleting = false; }
+  }
   openFolderButton.addEventListener("click", () => { void choose(); });
   saveFileButton.addEventListener("click", () => { void save(); });
   if (saveAsButton) saveAsButton.addEventListener("click", () => { void saveAs(); });
   newFileButton.addEventListener("click", () => { void createFile(); });
   if (deleteFileButton) deleteFileButton.addEventListener("click", () => { void deleteFile(); });
+  if (renameFileButton) renameFileButton.addEventListener("click", () => { void renameFile(); });
   saveFileButton.disabled = true;
   if (deleteFileButton) deleteFileButton.disabled = true;
-  return {project, choose, save, saveAs, createFile, deleteFile, openHandle, notifyExternalOpen, dirty,
+  if (renameFileButton) renameFileButton.disabled = true;
+  return {project, choose, save, saveAs, createFile, deleteFile, renameFile, openHandle, notifyExternalOpen, dirty,
     hasActiveFile: () => activeHandle !== null};
 }
 const api = {create};

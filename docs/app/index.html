@@ -214,8 +214,8 @@ async function checkSyntax() {
     if (!issue) { notice("Syntax check unavailable: " + (result.output || "Unknown error")); return; }
     const message = language + " syntax: line " + issue.line + ", column " + issue.column + ": " + issue.message;
     notice(message);
-    $("console").textContent += "\\n" + message + "\\n";
-    const lines = code.split("\\n");
+    $("console").textContent += "\n" + message + "\n";
+    const lines = code.split("\n");
     if (Number.isSafeInteger(issue.line) && issue.line >= 1 && issue.line <= lines.length &&
         Number.isSafeInteger(issue.column) && issue.column >= 1) {
       let offset = 0;

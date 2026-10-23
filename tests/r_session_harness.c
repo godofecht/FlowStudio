@@ -5,7 +5,7 @@ extern int fs_r_status(void);
 extern void fs_r_reset(void);
 static int failure(int step, const char *output)
 {
-    fprintf(stderr, "R IPC stage %d failed: HTTP status=%d, output prefix=%.512s\\n",
+    fprintf(stderr, "R IPC stage %d failed: HTTP status=%d, output prefix=%.512s\n",
             step, fs_r_status(), output ? output : "(null)");
     return step;
 }

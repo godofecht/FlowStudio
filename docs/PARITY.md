@@ -17,7 +17,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Plot viewer | partial / Node-tested PNG import and integrated workspace tab; native unverified | png/svg plot history, zoom, save and deterministic device lifecycle |
 | Project explorer | partial / browser Pages open/create/save and confirmed active-file delete with baseline conflict checks; 10 regression tests V8-shim passed; physical-browser deletion unverified | Open project, tree navigation, source-file creation and save; scoped delete is implemented, copy-verify-delete rename implemented with non-atomic filesystem race limits; physical-browser acceptance remains missing |
 | Data viewer | partial / CSV/TSV plus bounded Python/R environment table snapshots wired; real Pyodide/webR and physical browser unverified | Interactive sortable/filterable tabular datasets including missing values |
-| Completion / language server | missing | R, Flow and Python completion/diagnostics |
+| Completion / language server | partial / browser Python AST and R parse-only syntax diagnostics wired; mocked V8/Node checks, live interpreters unverified; completion and Flow diagnostics missing | R, Flow and Python completion/diagnostics |
 | Packages pane | partial / browser Python inventory/install and webR 0.6.0 inventory/install; mocked Node tests, live interpreters unverified | List, install, update with environment-aware package sources |
 | Git pane | missing | Status, diff, stage, commit and branch operations |
 | Help pane | missing | Context-aware language/function docs |
@@ -318,3 +318,9 @@ are not yet independently verified. R extraction has not been run against an
 installed R interpreter in this environment. This is a bounded snapshot viewer,
 not an editable live DataFrame, database viewer, or native Flow table backend.
 No hosted CI definition was changed.
+
+## 2026-10-23: browser Python/R parse-only syntax diagnostics
+
+The browser source toolbar now offers **Check syntax** without executing the user's code. Python requests are serialized through the persistent Pyodide worker and use `ast.parse`; R requests are serialized through the webR session and use `parse(text=...)` without evaluation. Syntax errors show a bounded message, line and column and move the editor caret to the location. Empty/oversized requests are refused and R session-reset responses are invalidated. The Flow compiler remains native-only; browser Flow syntax checks and language-server completion remain missing.
+
+Validation: committed Node regression tests in `tests/browser_syntax_check.test.js` cover syntax-only dispatch, queue serialization, invalid diagnostics, R parse and reset races, and browser control wiring. A direct V8 mock-interpreter harness exercised the committed Python/R paths and HTML parsing, but no live Pyodide/webR browser run has yet been accepted. This is **partial**, not independently verified RStudio parity.

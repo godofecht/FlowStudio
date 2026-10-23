@@ -74,7 +74,7 @@ repeat {
     if (is.na(length_value) || length_value > MAX_SOURCE) break
     payload <- read_exact(length_value)
     if (is.null(payload)) break
-    source <- tryCatch(
+    source <- if (length(payload) == 0L) "" else tryCatch(
         iconv(rawToChar(payload), from = "UTF-8", to = "UTF-8", sub = NA_character_),
         error = function(error) NA_character_
     )

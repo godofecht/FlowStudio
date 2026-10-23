@@ -65,3 +65,42 @@ test("oversized native output is rejected", async () => {
     ok:true, status:200, headers:{get:()=> null}, text:async()=> "x".repeat(131073)
   }), async () => assert.rejects(native.run("x"), /128 KiB/));
 });
+
+
+test("Flow check uses the strict nonexecuting endpoint and parses compiler locations", async () => {
+  let count = 0;
+  await withBrowser(localhost, async (url, options) => {
+    count++;
+    assert.equal(url, "/api/check/flow");
+    assert.equal(options.method, "POST");
+    assert.equal(options.headers["X-FlowStudio-Intent"], "run");
+    assert.equal(options.body, "function main( -> i32 {");
+    return {ok:false, status:422, headers:{get:()=>null},
+      text:async()=>"/tmp/flowstudio-source.flow:2:7: error: unexpected token"};
+  }, async () => {
+    assert.deepEqual(await native.checkSyntax("function main( -> i32 {"), {
+      ok:false, output:"/tmp/flowstudio-source.flow:2:7: error: unexpected token",
+      diagnostics:[{line:2, column:7, message:"unexpected token"}]
+    });
+  });
+  assert.equal(count, 1);
+});
+
+test("Flow check success and compiler failures without locations are distinguished", async () => {
+  await withBrowser(localhost, async () => ({ok:true, status:200, headers:{get:()=>null},
+    text:async()=>"Flow compile check passed; source was not executed."}),
+  async () => assert.deepEqual(await native.checkSyntax("function main() -> i32 { return 0 }"), {
+    ok:true, output:"Flow compile check passed; source was not executed.", diagnostics:[]
+  }));
+  await withBrowser(localhost, async () => ({ok:false, status:503, headers:{get:()=>null},
+    text:async()=>"Compiler unavailable"}),
+  async () => assert.deepEqual(await native.checkSyntax("bad"), {
+    ok:false, output:"Compiler unavailable", diagnostics:[]
+  }));
+});
+
+test("Flow check rejects non-loopback requests before network access", async () => {
+  await withBrowser(new URL("https://godofecht.github.io/FlowStudio/app/"),
+    () => { throw Error("unexpected request"); },
+    async () => assert.rejects(native.checkSyntax("function main() {}"), /native FlowStudio server/));
+});

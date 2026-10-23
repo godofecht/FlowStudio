@@ -17,7 +17,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Plot viewer | partial / Node-tested PNG import and integrated workspace tab; native unverified | png/svg plot history, zoom, save and deterministic device lifecycle |
 | Project explorer | partial / browser Pages open/create/save and confirmed active-file delete with baseline conflict checks; 10 regression tests V8-shim passed; physical-browser deletion unverified | Open project, tree navigation, source-file creation and save; scoped delete is implemented, copy-verify-delete rename implemented with non-atomic filesystem race limits; physical-browser acceptance remains missing |
 | Data viewer | partial / CSV/TSV plus bounded Python/R environment table snapshots wired; real Pyodide/webR and physical browser unverified | Interactive sortable/filterable tabular datasets including missing values |
-| Completion / language server | partial / browser Python AST and R parse-only syntax diagnostics wired; mocked V8/Node checks, live interpreters unverified; completion and Flow diagnostics missing | R, Flow and Python completion/diagnostics |
+| Completion / language server | partial / browser Python AST and R parse-only syntax diagnostics wired; mocked V8/Node checks, live interpreters unverified; completion missing; native Flow strict compile-only diagnostics wired, CI pending | R, Flow and Python completion/diagnostics |
 | Packages pane | partial / browser Python inventory/install and webR 0.6.0 inventory/install; mocked Node tests, live interpreters unverified | List, install, update with environment-aware package sources |
 | Git pane | missing | Status, diff, stage, commit and branch operations |
 | Help pane | partial / browser Python live-global/builtin docstrings and installed R Rd help wired; Node/V8 contract tests, live Pyodide/webR and physical browser unverified; Flow help missing | Context-aware language/function docs |
@@ -32,6 +32,12 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Cross-platform packaging | missing | Installable signed/reproducible macOS and Linux releases |
 | Accessibility | partial / unverified | Full keyboard navigation, screen reader labels, resize and contrast checks |
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
+
+## 2026-10-23: nonexecuting native Flow syntax and type checks
+
+The browser editor's Check syntax action now calls the Flow-owned loopback endpoint `POST /api/check/flow` only when loaded from the native FlowStudio origin. The Flow server writes the submitted source to a private temporary file and invokes the documented `flow tool compiler/scripts/flowc_emit.flow --strict IN.flow OUT.c` compiler path. It removes both temporary files after the process completes, does not link the emitted C, and never executes the submitted Flow program. The same intent/origin/body checks and 60-second process-group deadline as native Flow execution apply. Compiler errors are surfaced in the console, with source-position navigation when flowc supplies file:line:column diagnostics.
+
+**Status: partial / unverified on live compiler.** Node client regression tests and a native HTTP acceptance case have been added; CI must establish actual strict Flow compilation on Linux and macOS. Browser DOM and physical-browser acceptance remain outstanding. This is not language-server completion or a debugger. Compilation of untrusted source still invokes a local compiler under the user's permissions and should not be exposed remotely.
 
 ## 2026-10-23: native Flow execution from the browser workspace
 

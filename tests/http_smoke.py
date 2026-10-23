@@ -21,7 +21,7 @@ def request(method: str, path: str, body: str | None = None,
         ROOT + path, data=data, method=method, headers=headers or {}
     )
     try:
-        with urllib.request.urlopen(req, timeout=80 if path == "/api/run/flow" else 25) as reply:
+        with urllib.request.urlopen(req, timeout=80 if path in ("/api/run/flow", "/api/check/flow") else 25) as reply:
             return reply.status, reply.read().decode("utf-8")
     except urllib.error.HTTPError as exc:
         return exc.code, exc.read().decode("utf-8")
@@ -35,6 +35,8 @@ def main() -> None:
     assert status == 200 and "<title>FlowStudio" in html, (status, html[:100])
 
     status, _ = request("POST", "/api/run/python", 'print("bad")')
+    assert status == 404, status
+    status, _ = request("POST", "/api/check/flow", "function main() -> i32 { return 0 }")
     assert status == 404, status
 
     status, browser = request("GET", "/app/")
@@ -74,6 +76,17 @@ def main() -> None:
         status, output = request("POST", "/api/run/flow",
                                  code, accepted_headers)
         assert status == 200 and "flowstudio-flow-ok" in output, (status, output)
+
+        # Strict Flow-to-C compilation must never execute the submitted program.
+        check_source = ('function main() -> i32 {\n'
+                        '    println("THIS-MUST-NOT-EXECUTE")\n'
+                        '    return 0\n}\n')
+        status, output = request("POST", "/api/check/flow",
+                                 check_source, accepted_headers)
+        assert status == 200 and "THIS-MUST-NOT-EXECUTE" not in output, (status, output)
+        status, output = request("POST", "/api/check/flow",
+                                 "function main( -> i32 {", accepted_headers)
+        assert status == 422 and output.strip(), (status, output)
     else:
         print("SKIP Flow subprocess: executable not on PATH")
 

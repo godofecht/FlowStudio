@@ -207,22 +207,30 @@ async function run(selectedOnly = false, activeCell = false, consoleCode = null)
 async function checkSyntax() {
   if (busy || notebookRunner?.isRunning()) { notice("Wait for execution to finish."); return; }
   const language = $("language").value;
-  if (language !== "python" && language !== "r") {
-    notice("Browser syntax checking requires Python or R; Flow requires the native compiler.");
+  if (language === "flow" && !globalThis.FlowStudioNativeFlow?.available?.()) {
+    notice("Flow compilation checks require the native FlowStudio server on port 8751.");
     return;
   }
+  if (!["python", "r", "flow"].includes(language)) return;
   const code = $("source").value;
   if (!code.trim()) { notice("Source is empty."); return; }
   const generation = sessionGeneration;
   setBusy(true);
   notice("Checking " + language + " syntax without executing source.");
   try {
-    const result = language === "r" ? await getRSession().checkSyntax(code) : await request("check", code);
+    const result = language === "flow" ? await globalThis.FlowStudioNativeFlow.checkSyntax(code) :
+      language === "r" ? await getRSession().checkSyntax(code) : await request("check", code);
     if (generation !== sessionGeneration || $("language").value !== language) return;
     if ($("source").value !== code) { notice("Source changed during syntax check; stale diagnostics discarded."); return; }
     const issue = Array.isArray(result.diagnostics) ? result.diagnostics[0] : null;
-    if (result.ok) { notice(language + " syntax valid; source was not executed."); return; }
-    if (!issue) { notice("Syntax check unavailable: " + (result.output || "Unknown error")); return; }
+    if (result.ok) { notice(language === "flow" ? "Flow strict compile check passed; source was not executed." :
+      language + " syntax valid; source was not executed."); return; }
+    if (!issue) {
+      const message = language + " check: " + (result.output || "Unknown error");
+      notice(message.slice(0, 1024));
+      $("console").textContent += "\n" + message.slice(0, 4096) + "\n";
+      return;
+    }
     const message = language + " syntax: line " + issue.line + ", column " + issue.column + ": " + issue.message;
     notice(message);
     $("console").textContent += "\n" + message + "\n";

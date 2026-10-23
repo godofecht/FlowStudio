@@ -108,3 +108,11 @@ test("Pages exposes syntax check control and diagnostic navigation", () => {
   assert.match(app, /\$\("source"\)\.value !== code/);
   assert.match(app, /checkSyntax"\)\.addEventListener/);
 });
+
+
+test("browser Flow syntax checks use the native compiler client, not run", () => {
+  assert.match(app, /language === "flow" && !globalThis\.FlowStudioNativeFlow\?\.available/);
+  assert.match(app, /FlowStudioNativeFlow\.checkSyntax\(code\)/);
+  assert.doesNotMatch(app, /FlowStudioNativeFlow\.run\(code\)[^;]*checkSyntax/);
+  assert.match(app, /Flow strict compile check passed; source was not executed/);
+});

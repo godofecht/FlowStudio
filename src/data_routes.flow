@@ -107,6 +107,9 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/app/notebook_runner.js" {
         return StaticAsset { path: "docs/app/notebook_runner.js", mime: "text/javascript; charset=utf-8", found: true }
     }
+    if url == "/app/notebook_recovery.js" {
+        return StaticAsset { path: "docs/app/notebook_recovery.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
     if url == "/app/packages_panel.js" {
         return StaticAsset { path: "docs/app/packages_panel.js", mime: "text/javascript; charset=utf-8", found: true }
     }

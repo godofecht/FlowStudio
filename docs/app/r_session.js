@@ -188,17 +188,17 @@ function create({load = () => import(CDN)} = {}) {
         if (!Array.isArray(lines) || lines.length < 2 || lines.length > 202 ||
             lines.some(line => typeof line !== "string" || line.length > 16384))
           throw Error("Invalid R table response.");
-        const counts = lines[0].split("\\t");
+        const counts = lines[0].split("\t");
         if (counts.length !== 2 || !counts.every(x => /^(0|[1-9][0-9]*)$/.test(x)))
           throw Error("Invalid R table dimensions.");
         const totalRows = Number(counts[0]), totalColumns = Number(counts[1]);
         if (!Number.isSafeInteger(totalRows) || !Number.isSafeInteger(totalColumns) ||
             totalColumns < 1 || totalColumns > 1000000 || totalRows < lines.length - 2)
           throw Error("Invalid R table dimensions.");
-        const columns = lines[1].split("\\t").map(decodeURIComponent);
+        const columns = lines[1].split("\t").map(decodeURIComponent);
         if (!columns.length || columns.length > 32 || columns.length !== Math.min(totalColumns, 32))
           throw Error("Invalid R table columns.");
-        const rows = lines.slice(2).map(line => line.split("\\t").map(decodeURIComponent));
+        const rows = lines.slice(2).map(line => line.split("\t").map(decodeURIComponent));
         if (rows.some(row => row.length !== columns.length || row.some(x => x.length > 160)) ||
             columns.some(x => x.length > 160)) throw Error("Invalid R table cell.");
         const result = {columns, rows, totalRows, truncated:totalRows > 200 || totalColumns > 32};

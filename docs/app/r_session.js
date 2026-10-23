@@ -117,6 +117,33 @@ function create({load = () => import(CDN)} = {}) {
       }
     });
   }
+  async function checkSyntax(code) {
+    if (typeof code !== "string" || !code.trim() ||
+        new TextEncoder().encode(code).length > MAX_SOURCE_BYTES)
+      return {ok:false, output:"R source is empty or exceeds 64 KiB.", diagnostics:[]};
+    const generation = epoch;
+    return schedule(async () => {
+      if (generation !== epoch) return {ok:false, output:"R session reset.", diagnostics:[]};
+      try {
+        const r = await get();
+        // parse() checks grammar only; it never evaluates the user's expressions.
+        const query = 'local({ tryCatch({ parse(text=' + JSON.stringify(code) +
+          ', keep.source=TRUE); c("ok") }, error=function(e) c(paste0("error\\t", utils::URLencode(conditionMessage(e), reserved=TRUE)))) })';
+        const rows = await r.evalRRaw(query, "string[]");
+        if (generation !== epoch) return {ok:false, output:"R session reset.", diagnostics:[]};
+        if (!Array.isArray(rows) || rows.length !== 1 || typeof rows[0] !== "string" ||
+            rows[0].length > 4096) throw Error("Invalid R syntax diagnostic response.");
+        if (rows[0] === "ok") return {ok:true, diagnostics:[]};
+        if (!rows[0].startsWith("error\\t")) throw Error("Invalid R syntax diagnostic response.");
+        const message = decodeURIComponent(rows[0].slice(6)).slice(0, 300);
+        const match = message.match(/(?:<text>|[^\\s:]+):(\\d+):(\\d+):/);
+        return {ok:false, diagnostics:[{message, line:match ? Number(match[1]) : 1,
+          column:match ? Number(match[2]) : 1}]};
+      } catch (error) {
+        return {ok:false, output:String(error).slice(0, 300), diagnostics:[]};
+      }
+    });
+  }
   async function inspect() {
     const generation = epoch;
     return schedule(async () => {
@@ -213,7 +240,7 @@ function create({load = () => import(CDN)} = {}) {
     runtime = null;
     loading = null;
   }
-  return Object.freeze({run, inspect, packages, installPackage, table, reset});
+  return Object.freeze({run, checkSyntax, inspect, packages, installPackage, table, reset});
 }
 function renderImages(target, images, document) {
   if (!Array.isArray(images) || !images.length) return 0;

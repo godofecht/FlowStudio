@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 extern const char *fs_py_run(const char *);
+extern const char *fs_py_inspect(void);
 extern int fs_py_status(void);
 extern void fs_py_reset(void);
 int main(void)
@@ -13,7 +14,18 @@ int main(void)
     if (fs_py_status() != 422 || !strstr(a, "ValueError: bad")) return 3;
     a = fs_py_run("print(value)");
     if (fs_py_status() != 200 || strcmp(a, "42\n") != 0) return 4;
+    a = fs_py_inspect();
+    if (fs_py_status() != 200 || !strstr(a, "\"name\":\"value\"") ||
+        !strstr(a, "\"type\":\"int\"")) return 9;
+    a = fs_py_run("class Dangerous:\n    def __repr__(self):\n        globals()['inspected'] = True\n        return 'bad'\nobj = Dangerous()\ninspected = False");
+    if (fs_py_status() != 200) return 10;
+    a = fs_py_inspect();
+    if (fs_py_status() != 200 || !strstr(a, "\"name\":\"obj\"")) return 11;
+    a = fs_py_run("print(inspected)");
+    if (fs_py_status() != 200 || strcmp(a, "False\n") != 0) return 12;
     fs_py_reset();
+    a = fs_py_inspect();
+    if (fs_py_status() != 200 || strstr(a, "\"name\":\"value\"")) return 13;
     a = fs_py_run("print('value' in globals())");
     if (fs_py_status() != 200 || strcmp(a, "False\n") != 0) return 5;
     a = fs_py_run("print('a' * 200000)");

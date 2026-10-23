@@ -98,7 +98,9 @@ footer { padding: 5px 14px; display: flex; justify-content: space-between; gap: 
     <h2>Environment / History</h2>
     <div class="body">
       <p id="runtimeInfo">Flow execution available when Flow is installed.</p>
-      <p class="muted hint">Native Python retains variables across runs until Reset Python; Flow and R executions are currently independent. Environment inspection is not yet available.</p>
+      <p class="muted hint">Native Python retains variables until Reset Python. Flow and R executions are independent.</p>
+      <button id="refreshPythonEnvironment" type="button">Refresh Python variables</button>
+      <div id="pythonEnvironment" aria-live="polite"><p class="muted">Select Python to inspect its native session.</p></div>
       <p class="muted hint">The IDE executes code with your local OS permissions. Only run code you trust.</p>
     </div>
   </section>
@@ -593,6 +595,66 @@ function updateCursor() {
   const lines = before.split("\n");
   el("cursor").textContent = "Ln " + lines.length + ", Col " + (lines[lines.length - 1].length + 1);
 }
+let environmentRevision = 0;
+function showPythonEnvironmentMessage(message) {
+  const pane = el("pythonEnvironment");
+  const p = document.createElement("p");
+  p.className = "muted";
+  p.textContent = message;
+  pane.replaceChildren(p);
+}
+async function refreshPythonEnvironment() {
+  const revision = ++environmentRevision;
+  if (language.value !== "python") {
+    showPythonEnvironmentMessage("Select Python to inspect its native session.");
+    return;
+  }
+  const response = await fetch("/api/inspect/python", {
+    method: "POST",
+    headers: { "Content-Type": "text/plain; charset=utf-8", "X-FlowStudio-Intent": "run" },
+    body: ""
+  });
+  if (!response.ok) throw new Error("Environment inspection failed: HTTP " + response.status);
+  const snapshot = await response.json();
+  if (revision !== environmentRevision || language.value !== "python") return;
+  if (!snapshot || !Array.isArray(snapshot.variables) || snapshot.variables.length > 128)
+    throw new Error("Invalid environment response.");
+  const pane = el("pythonEnvironment");
+  if (snapshot.variables.length === 0) {
+    showPythonEnvironmentMessage("No user variables in the native Python session.");
+    return;
+  }
+  const table = document.createElement("table");
+  const caption = document.createElement("caption");
+  caption.textContent = "Native Python variables";
+  table.append(caption);
+  const header = document.createElement("tr");
+  for (const label of ["Name", "Type", "Size"]) {
+    const cell = document.createElement("th");
+    cell.scope = "col";
+    cell.textContent = label;
+    header.append(cell);
+  }
+  table.append(header);
+  for (const variable of snapshot.variables) {
+    if (!variable || typeof variable.name !== "string" || typeof variable.type !== "string") continue;
+    const row = document.createElement("tr");
+    for (const value of [variable.name, variable.type, variable.size === null ? "—" : String(variable.size)]) {
+      const cell = document.createElement("td");
+      cell.textContent = value;
+      row.append(cell);
+    }
+    table.append(row);
+  }
+  pane.replaceChildren(table);
+  if (snapshot.truncated) {
+    const note = document.createElement("p");
+    note.className = "muted";
+    note.textContent = "Only the first variables are shown (inspection limit).";
+    pane.append(note);
+  }
+}
+
 async function executeCode(code, label) {
   if (el("run").disabled) return;
   if (!code.trim()) { status("Current cell is empty.", "error"); return; }
@@ -622,6 +684,10 @@ async function executeCode(code, label) {
     consolePane.textContent += String(error) + "\n";
     status("Execution request failed", "error");
   } finally {
+    if (language.value === "python") {
+      try { await refreshPythonEnvironment(); }
+      catch (error) { showPythonEnvironmentMessage(error.message || String(error)); }
+    }
     el("run").disabled = false;
     el("runCell").disabled = false;
     consolePane.scrollTop = consolePane.scrollHeight;
@@ -820,12 +886,19 @@ src.addEventListener("input", () => { markDirty(true); updateCursor(); updateFin
 src.addEventListener("click", updateCursor);
 src.addEventListener("keyup", updateCursor);
 language.addEventListener("change", () => {
+  environmentRevision++;
+  showPythonEnvironmentMessage(language.value === "python" ?
+    "Refresh to inspect native Python variables." : "Select Python to inspect its native session.");
   if (filename.startsWith("untitled.")) setFilename("untitled." + extension(language.value));
   el("runtimeInfo").textContent = language.value === "python" ? "Native Python: persistent until Reset Python." :
     "Selected runtime: " + language.value + ". Each execution is independent.";
 });
 el("run").addEventListener("click", run);
 el("runCell").addEventListener("click", runCell);
+el("refreshPythonEnvironment").addEventListener("click", async () => {
+  try { await refreshPythonEnvironment(); }
+  catch (error) { showPythonEnvironmentMessage(error.message || String(error)); }
+});
 el("resetPython").addEventListener("click", async () => {
   if (language.value !== "python") {
     status("Select Python before resetting its native session.", "error");
@@ -843,6 +916,10 @@ el("resetPython").addEventListener("click", async () => {
     });
     status(response.ok ? "Native Python session reset." : "Reset failed: HTTP " + response.status,
       response.ok ? "ok" : "error");
+    if (response.ok) {
+      try { await refreshPythonEnvironment(); }
+      catch (error) { showPythonEnvironmentMessage(error.message || String(error)); }
+    }
   } catch (error) {
     status("Python reset unavailable: " + String(error), "error");
   } finally {

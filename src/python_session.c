@@ -127,7 +127,7 @@ static int decode_hex(const char *digits, size_t *value)
     return 1;
 }
 
-const char *fs_py_run(const char *code)
+static const char *request_python(char operation, const char *code)
 {
     result[0] = 0;
     last_status = 503;
@@ -144,10 +144,10 @@ const char *fs_py_run(const char *code)
         return "Monotonic clock unavailable.";
     }
     int64_t deadline = now + FS_PY_DEADLINE_MS;
-    char header[9];
+    char header[10];
     size_t source_length = strlen(code);
-    snprintf(header, sizeof(header), "%08x", (unsigned)source_length);
-    if (!io_exact(kernel_in, header, 8, 1, deadline) ||
+    snprintf(header, sizeof(header), "%c%08x", operation, (unsigned)source_length);
+    if (!io_exact(kernel_in, header, 9, 1, deadline) ||
         !io_exact(kernel_in, (char *)code, source_length, 1, deadline)) goto failed;
     char response_header[9];
     if (!io_exact(kernel_out, response_header, 9, 0, deadline)) goto failed;
@@ -165,4 +165,6 @@ failed:
                                 "Python session disconnected and was reset.";
 }
 
+const char *fs_py_run(const char *code) { return request_python('E', code); }
+const char *fs_py_inspect(void) { return request_python('I', ""); }
 int fs_py_status(void) { return last_status; }

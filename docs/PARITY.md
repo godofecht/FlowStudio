@@ -24,6 +24,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Find / replace / cross-file search | partial / Node + V8-tested | Literal in-buffer find next/previous, single/all replacement and project-wide search implemented; incremental indexing, regex and physical-browser verification missing |
 | Percent-delimited source cells | partial / browser Python Run Cell integrated; Node and real-browser validation pending; Flow browser execution unavailable; browser R unverified | Run only the active `# %%` code cell in Flow/R/Python; markdown and empty cells do not execute |
 | Sequential percent-cell notebooks | partial / Python and R Run All wired; Node-tested, live runtimes unverified | Execute cells in order, retain interpreter state, show per-cell output and stop on error |
+| Jupyter `.ipynb` import/export | partial / browser UI wired and Node regression coverage; physical-browser file round-trip and live Python/R kernels unverified | Import/export nbformat 4 Python/R code and Markdown cells through file picker/download; validate with nbformat; preserve source; verify live outputs in Chromium and cross-platform acceptance |
 | R Markdown / Quarto | missing | Render notebook with inline plots and HTML export |
 | Source debugger | missing | Breakpoints, stack, variables, step execution |
 | Remote/server mode | missing | Authenticated, origin-aware multi-user sessions with isolation |
@@ -220,3 +221,7 @@ Validation: six Node.js tests using a mocked webR API passed locally on Node 22.
 ## Browser sequential Python/R percent-cell notebooks — 2026-10-23
 
 Run All Cells is now wired to the existing persistent Pyodide and webR runtimes. Python and R code cells execute sequentially; Markdown is displayed as escaped source text, bounded text and plots are shown per cell, errors stop execution, and reset invalidates stale results. Cancellation retains the execution lock until an in-flight interpreter call settles. Limits: 128 executable cells, 64 KiB per cell, 1 MiB aggregate text. The Node runner regression suite and inline JavaScript syntax check passed locally, but real interpreter execution in Chromium and full cross-platform validation remain unverified. This is partial notebook support, not R Markdown, Quarto or Jupyter parity; .ipynb persistence, rich MIME display and notebook HTML export are not part of this commit.
+
+## Browser Jupyter import/export integration — 2026-10-23
+
+The draft browser IDE now wires `notebook_format.js` and `notebook_io.js` into explicit Open/Export `.ipynb` controls. The implementation serializes Python/R source cells and bounded captured outputs, rejects unsupported notebook structures, and guards asynchronous file reads against concurrent execution. Node regression tests cover import/export, UI wiring, malformed data and the delayed-read race. This is **partial**, not verified RStudio parity: live Pyodide/webR, physical Chromium file picker/download, independent nbformat acceptance and native cross-platform qualification are outstanding for this integrated revision. No hosted CI configuration changes were made.

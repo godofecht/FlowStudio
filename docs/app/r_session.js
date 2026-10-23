@@ -26,6 +26,29 @@ const INSPECT = `local({
     paste(vapply(fields, utils::URLencode, character(1), reserved=TRUE), collapse="\\t")
   }, character(1))
 })`;
+const TABLE_NAME = /^[A-Za-z][A-Za-z0-9._]{0,119}$/;
+function tableQuery(name) {
+  return `local({
+    v <- get(${JSON.stringify(name)}, envir=.GlobalEnv, inherits=FALSE)
+    if (!(is.data.frame(v) || is.matrix(v))) stop("Select a data.frame or matrix")
+    nr <- nrow(v); nc <- ncol(v)
+    if (nc < 1L) stop("No tabular columns")
+    take_r <- min(nr, 200L); take_c <- min(nc, 32L)
+    cols <- colnames(v)
+    if (is.null(cols)) cols <- paste0("Column ", seq_len(nc))
+    cols <- cols[seq_len(take_c)]
+    encode <- function(x) utils::URLencode(substr(as.character(x), 1L, 160L), reserved=TRUE)
+    lines <- vapply(seq_len(take_r), function(i) {
+      cells <- vapply(seq_len(take_c), function(j) {
+        cell <- v[i, j, drop=TRUE]
+        if (!length(cell) || is.na(cell[1L])) return("")
+        encode(cell[1L])
+      }, character(1))
+      paste(cells, collapse="\\t")
+    }, character(1))
+    c(paste(nr, nc, sep="\\t"), paste(vapply(cols, encode, character(1)), collapse="\\t"), lines)
+  })`;
+}
 function create({load = () => import(CDN)} = {}) {
   let runtime = null, loading = null, epoch = 0;
   let serial = Promise.resolve();
@@ -152,13 +175,45 @@ function create({load = () => import(CDN)} = {}) {
       } catch (error) { return {ok:false, output:String(error).slice(0, 300)}; }
     });
   }
+  async function table(name) {
+    if (typeof name !== "string" || !TABLE_NAME.test(name))
+      return {ok:false, output:"Invalid R variable name."};
+    const generation = epoch;
+    return schedule(async () => {
+      if (generation !== epoch) return {ok:false, output:"R session reset."};
+      try {
+        const r = await get();
+        const lines = await r.evalRRaw(tableQuery(name), "string[]");
+        if (generation !== epoch) return {ok:false, output:"R session reset."};
+        if (!Array.isArray(lines) || lines.length < 2 || lines.length > 202 ||
+            lines.some(line => typeof line !== "string" || line.length > 16384))
+          throw Error("Invalid R table response.");
+        const counts = lines[0].split("\\t");
+        if (counts.length !== 2 || !counts.every(x => /^(0|[1-9][0-9]*)$/.test(x)))
+          throw Error("Invalid R table dimensions.");
+        const totalRows = Number(counts[0]), totalColumns = Number(counts[1]);
+        if (!Number.isSafeInteger(totalRows) || !Number.isSafeInteger(totalColumns) ||
+            totalColumns < 1 || totalColumns > 1000000 || totalRows < lines.length - 2)
+          throw Error("Invalid R table dimensions.");
+        const columns = lines[1].split("\\t").map(decodeURIComponent);
+        if (!columns.length || columns.length > 32 || columns.length !== Math.min(totalColumns, 32))
+          throw Error("Invalid R table columns.");
+        const rows = lines.slice(2).map(line => line.split("\\t").map(decodeURIComponent));
+        if (rows.some(row => row.length !== columns.length || row.some(x => x.length > 160)) ||
+            columns.some(x => x.length > 160)) throw Error("Invalid R table cell.");
+        const result = {columns, rows, totalRows, truncated:totalRows > 200 || totalColumns > 32};
+        if (JSON.stringify(result).length > 1048576) throw Error("R table exceeds 1 MiB.");
+        return {ok:true, table:result};
+      } catch (error) { return {ok:false, output:String(error).slice(0, 300)}; }
+    });
+  }
   function reset() {
     epoch++;
     if (runtime) { try { runtime.close(); } catch (_) { /* already closed */ } }
     runtime = null;
     loading = null;
   }
-  return Object.freeze({run, inspect, packages, installPackage, reset});
+  return Object.freeze({run, inspect, packages, installPackage, table, reset});
 }
 function renderImages(target, images, document) {
   if (!Array.isArray(images) || !images.length) return 0;

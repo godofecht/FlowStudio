@@ -209,6 +209,7 @@ async function checkSyntax() {
   try {
     const result = language === "r" ? await getRSession().checkSyntax(code) : await request("check", code);
     if (generation !== sessionGeneration || $("language").value !== language) return;
+    if ($("source").value !== code) { notice("Source changed during syntax check; stale diagnostics discarded."); return; }
     const issue = Array.isArray(result.diagnostics) ? result.diagnostics[0] : null;
     if (result.ok) { notice(language + " syntax valid; source was not executed."); return; }
     if (!issue) { notice("Syntax check unavailable: " + (result.output || "Unknown error")); return; }

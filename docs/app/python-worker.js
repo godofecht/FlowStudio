@@ -61,8 +61,10 @@ async function handle(event) {
     /^[A-Za-z_][A-Za-z0-9_]{0,119}$/.test(code);
   const validCheck = op === "check" && typeof code === "string" &&
     code.length > 0 && new TextEncoder().encode(code).length <= 65536;
+  const validHelp = op === "help" && typeof code === "string" && code.length <= 120 &&
+    /^[A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*){0,3}$/.test(code);
   if (!((op === "run" && typeof code === "string" && new TextEncoder().encode(code).length <= 65536) ||
-    op === "inspect" || op === "packages" || validInstall || validTable || validCheck)) {
+    op === "inspect" || op === "packages" || validInstall || validTable || validCheck || validHelp)) {
     self.postMessage({id, ok:false, output:"Invalid execution request."}); return;
   }
   let stdout = "", stderr = "", plotWarning = "";
@@ -91,6 +93,32 @@ async function handle(event) {
             !Number.isSafeInteger(d.column) || d.column < 1))
         throw Error("Invalid syntax diagnostic response.");
       self.postMessage({id, ok:result.ok, diagnostics:result.diagnostics});
+      return;
+    }
+    if (op === "help") {
+      // Resolve only already-loaded globals and builtins. No eval or module import by topic.
+      const query = [
+        "import builtins as _fs_help_builtins, inspect as _fs_help_inspect, json as _fs_help_json",
+        "_fs_help_parts = " + JSON.stringify(code.split(".")),
+        "_fs_help_obj = globals().get(_fs_help_parts[0], _fs_help_builtins.__dict__.get(_fs_help_parts[0]))",
+        "try:",
+        "    if _fs_help_obj is None: raise AttributeError('Unknown name')",
+        "    for _fs_help_attr in _fs_help_parts[1:]:",
+        "        _fs_help_obj = _fs_help_inspect.getattr_static(_fs_help_obj, _fs_help_attr)",
+        "    _fs_help_doc = _fs_help_inspect.getdoc(_fs_help_obj) or ''",
+        "    _fs_help_result = {'ok': True, 'name': " + JSON.stringify(code) + ", 'doc': _fs_help_doc[:12000]}",
+        "except (AttributeError, TypeError, ValueError) as _fs_help_error:",
+        "    _fs_help_result = {'ok': False, 'output': str(_fs_help_error)[:300]}",
+        "_fs_help_json.dumps(_fs_help_result)"
+      ].join("\\n");
+      const raw = await py.runPythonAsync(query);
+      if (typeof raw !== "string" || raw.length > 18000) throw Error("Invalid Python help response.");
+      const result = JSON.parse(raw);
+      if (!result || typeof result.ok !== "boolean" ||
+          (result.ok && (result.name !== code || typeof result.doc !== "string" || result.doc.length > 12000)) ||
+          (!result.ok && (typeof result.output !== "string" || result.output.length > 300)))
+        throw Error("Invalid Python help response.");
+      self.postMessage({id, ...result});
       return;
     }
     if (op === "packages") {

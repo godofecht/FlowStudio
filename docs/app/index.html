@@ -24,7 +24,7 @@ pre{white-space:pre-wrap;overflow:auto;overflow-wrap:anywhere;flex:1;margin:0;pa
 <header><strong>◈ FlowStudio <span class="muted">/ Browser</span></strong>
 <label for="language">Language</label><select id="language"><option value="python">Python (browser)</option><option value="flow">Flow (not yet browser executable)</option><option value="r">R (browser; webR 0.6.0)</option></select>
 <button id="open" type="button">Open file</button><button id="openFolder" type="button">Open project folder</button><button id="newProjectFile" type="button">New project file</button><button id="saveProjectFile" type="button" disabled>Save to disk</button><button id="saveAsProjectFile" type="button">Save As…</button><button id="renameProjectFile" type="button" disabled>Rename open project file</button><button id="deleteProjectFile" type="button" disabled>Delete open project file</button><input id="file" type="file" accept=".py,.flow,.r,.R,.txt" hidden>
-<button id="save" type="button">Download source</button><button id="run" type="button">Run Ctrl+Enter</button><button id="runSelection" type="button">Run selection Ctrl+Shift+Enter</button><button id="runCell" type="button">Run cell Ctrl+Alt+Enter</button><button id="runNotebook" type="button">Run all Python/R cells</button><button id="openNotebook" type="button">Open .ipynb</button><input id="notebookFile" type="file" accept=".ipynb,application/x-ipynb+json" hidden><button id="saveNotebook" type="button">Export .ipynb</button><button id="reset" type="button">Reset selected session</button><button id="forgetDraft" type="button">Forget saved draft</button>
+<button id="save" type="button">Download source</button><button id="run" type="button">Run Ctrl+Enter</button><button id="checkSyntax" type="button">Check syntax</button><button id="runSelection" type="button">Run selection Ctrl+Shift+Enter</button><button id="runCell" type="button">Run cell Ctrl+Alt+Enter</button><button id="runNotebook" type="button">Run all Python/R cells</button><button id="openNotebook" type="button">Open .ipynb</button><input id="notebookFile" type="file" accept=".ipynb,application/x-ipynb+json" hidden><button id="saveNotebook" type="button">Export .ipynb</button><button id="reset" type="button">Reset selected session</button><button id="forgetDraft" type="button">Forget saved draft</button>
 </header>
 <main>
 <section aria-label="Source editor"><h2>Source — <span id="filename">untitled.py</span></h2><details id="projectPanel"><summary>Project files</summary><div id="projectTree" aria-label="Project file explorer">Choose a folder to browse its files.</div></details><textarea id="source" aria-label="Source code" spellcheck="false">x = 40
@@ -86,7 +86,7 @@ function request(op, code) {
 function notice(text) { $("notice").textContent = text; }
 function setBusy(value) {
   busy = value;
-  for (const id of ["run", "runSelection", "runCell", "runNotebook"]) $(id).disabled = value;
+  for (const id of ["run", "runSelection", "runCell", "runNotebook", "checkSyntax"]) $(id).disabled = value;
 }
 const packagePanel = FlowStudioPackages.create({document, request, notice, target:$("packages"),
   input:$("packageName"), installButton:$("installPackage"), listButton:$("listPackages"),
@@ -194,6 +194,40 @@ async function run(selectedOnly = false, activeCell = false, consoleCode = null)
   } catch(error) { notice("Execution unavailable: " + error.message); return false; }
   finally { if (generation === sessionGeneration) setBusy(false); }
 }
+async function checkSyntax() {
+  if (busy || notebookRunner?.isRunning()) { notice("Wait for execution to finish."); return; }
+  const language = $("language").value;
+  if (language !== "python" && language !== "r") {
+    notice("Browser syntax checking requires Python or R; Flow requires the native compiler.");
+    return;
+  }
+  const code = $("source").value;
+  if (!code.trim()) { notice("Source is empty."); return; }
+  const generation = sessionGeneration;
+  setBusy(true);
+  notice("Checking " + language + " syntax without executing source.");
+  try {
+    const result = language === "r" ? await getRSession().checkSyntax(code) : await request("check", code);
+    if (generation !== sessionGeneration || $("language").value !== language) return;
+    const issue = Array.isArray(result.diagnostics) ? result.diagnostics[0] : null;
+    if (result.ok) { notice(language + " syntax valid; source was not executed."); return; }
+    if (!issue) { notice("Syntax check unavailable: " + (result.output || "Unknown error")); return; }
+    const message = language + " syntax: line " + issue.line + ", column " + issue.column + ": " + issue.message;
+    notice(message);
+    $("console").textContent += "\\n" + message + "\\n";
+    const lines = code.split("\\n");
+    if (Number.isSafeInteger(issue.line) && issue.line >= 1 && issue.line <= lines.length &&
+        Number.isSafeInteger(issue.column) && issue.column >= 1) {
+      let offset = 0;
+      for (let i = 0; i < issue.line - 1; i++) offset += lines[i].length + 1;
+      offset += Array.from(lines[issue.line - 1]).slice(0, issue.column - 1).join("").length;
+      $("source").focus();
+      $("source").setSelectionRange(offset, offset);
+    }
+  } catch (error) {
+    if (generation === sessionGeneration) notice("Syntax check failed: " + String(error));
+  } finally { if (generation === sessionGeneration) setBusy(false); }
+}
 function renderNotebookCell(entry) {
   const card = document.createElement("div");
   card.className = "notebook-cell";
@@ -263,6 +297,7 @@ async function runNotebook() {
 const consoleREPL = FlowStudioConsoleREPL.create({input:$("consoleInput"), button:$("submitConsole"),
   submit:code=>run(false, false, code), notice});
 $("run").addEventListener("click", () => { void run(false); });
+$("checkSyntax").addEventListener("click", () => { void checkSyntax(); });
 $("runSelection").addEventListener("click", () => { void run(true); });
 $("runCell").addEventListener("click", () => { void run(false, true); });
 $("runNotebook").addEventListener("click", () => { void runNotebook(); });

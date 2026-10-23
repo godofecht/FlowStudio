@@ -52,7 +52,7 @@ evaluate_source <- function(source) {
     reader <- file(output_file, open = "rb")
     bytes <- readBin(reader, what = "raw", n = MAX_OUTPUT - 64L)
     close(reader)
-    output <- tryCatch(
+    output <- if (length(bytes) == 0L) "" else tryCatch(
         iconv(rawToChar(bytes), from = "UTF-8", to = "UTF-8", sub = ""),
         error = function(error) "[Output contains invalid binary data]"
     )

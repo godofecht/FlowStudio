@@ -45,7 +45,7 @@ async function checkSyntax(code) {
   if (response.ok) return {ok:true, output:response.output, diagnostics:[]};
   // Strict flowc diagnostics use FILE:LINE:COLUMN: severity: message.
   // Keep compiler output when it does not carry a source location.
-  const match = /(?:^|\\n)[^\\r\\n]*?:(\\d+):(\\d+):\\s*(?:error:\\s*)?([^\\r\\n]+)/.exec(response.output);
+  const match = /(?:^|\n)[^\r\n]*?:(\d+):(\d+):\s*(?:error:\s*)?([^\r\n]+)/.exec(response.output);
   const line = match ? Number(match[1]) : 0;
   const column = match ? Number(match[2]) : 0;
   const diagnostics = match && Number.isSafeInteger(line) && line > 0 &&

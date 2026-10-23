@@ -28,12 +28,13 @@ test("workspace wires actual notebook modules, controls and syntactically valid 
   for (const file of ["notebook_runner.js", "notebook_format.js", "notebook_io.js"])
     assert.match(html, new RegExp('src="\\./' + file.replace(".", "\\.") + '"'));
   assert.ok(html.indexOf('src="./notebook_format.js"') < html.indexOf('src="./notebook_io.js"'));
-  assert.match(html, /FlowStudioNotebookIO\\.create\\(/);
-  assert.match(html, /getResults:\\(currentSource, selectedLanguage\\)/);
-  assert.match(html, /projectWorkspace\\.notifyExternalOpen\\(\\)/);
-  const script = html.match(/<script>\\s*([\\s\\S]*?)<\\/script>/);
-  assert.ok(script);
-  assert.doesNotThrow(() => new vm.Script(script[1]));
+  assert.ok(html.includes("FlowStudioNotebookIO.create("));
+  assert.ok(html.includes("getResults:(currentSource, selectedLanguage)"));
+  assert.ok(html.includes("projectWorkspace.notifyExternalOpen()"));
+  const start = html.indexOf("<script>"), end = html.indexOf("</script>", start);
+  assert.ok(start >= 0 && end > start);
+  const script = html.slice(start + "<script>".length, end);
+  assert.doesNotThrow(() => new vm.Script(script));
 });
 test("delayed notebook read cannot overwrite editor once execution starts", async () => {
   const openButton = button(), fileInput = button(), saveButton = button();

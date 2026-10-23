@@ -7,7 +7,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Feature | 2026-10-15 state | Minimum acceptance criterion |
 | --- | --- | --- |
 | Four-pane IDE shell | unverified | Source, environment, console and plots render; keyboard/accessibility checks |
-| File open / save | partial / conflict-aware browser saves wired; physical browser and native unverified | Native file-picker and download fallback round-trip UTF-8 |
+| File open / save | partial / conflict-aware browser saves and Save As picker wired; physical browser and native unverified | Native file-picker and download fallback round-trip UTF-8 |
 | Flow source execution | unverified | Compile and run valid code; surface diagnostics for invalid code |
 | R source execution | partial / browser webR 0.6.0 integrated, Node-mock tested; real webR and native R unverified | Run via installed R; preserve state across evaluations |
 | Python source execution | partial / unverified | Run via installed Python; preserve state across evaluations |
@@ -252,3 +252,26 @@ this browser-only feature. The Packages pane remains **partial**.
 The draft Pages workspace adds an explicit **Delete open project file** action for browser-granted project directories. The explorer supplies the opened file's parent directory handle, so deletion can target nested files without traversing outside the granted project. The operation refuses dirty buffers, requires explicit confirmation, checks the on-disk baseline twice, and checks file-handle identity when `isSameEntry` is supported. Saves and deletes are mutually excluded. On successful removal, the editor retains the source as a detached, unsaved copy. Switching project folders detaches the previous active file handle.
 
 **Evidence:** ten new regression cases in `tests/browser_project_delete.test.js` executed against the exact published modules using a V8 Node-compatible shim (10/10 passed). These cover successful removal, unsaved edits, external modification, replaced handles, cancellation, permission failures, save races, nested directories, project switching and browser UI wiring. The Node.js and native Flow cross-platform CI status for this revision must be checked separately; the V8 run is **not** physical-browser filesystem validation. Browser File System Access permission prompts and filesystem race windows between final check and `removeEntry` remain unverified. Rename, trash/undo and cross-browser file deletion are not implemented. The Flow 2.0 native server and CI definitions are unchanged.
+
+## Browser Save As via native file picker — 2026-10-23
+
+Draft PR #7 adds a browser-local Save As control using `showSaveFilePicker` when available.
+It writes the selected handle with the existing 2 MiB bounded, conflict-aware
+`writeIfUnchanged` implementation, preserves the old project file, confirms
+replacement of a selected destination, and keeps the original editor association
+when the picker is cancelled or a write fails. The active file's original disk
+baseline is reused when the selected handle refers to that same file. Saves,
+deletion, project switching and Save As are serialized by the workspace controller.
+A successful Save As attaches the selected file for subsequent disk saves but
+deliberately disables project-scoped deletion until the file is reopened through
+the project explorer, because a native file picker does not expose a verified
+parent directory handle.
+
+**Validation:** nine local Node.js 22.16.0 tests passed for the new Save As
+module against faithful copies of the existing file-save and filename validation
+contracts. Additional workspace integration tests are committed; check the
+current CI run separately before claiming cross-platform test success.
+Physical-browser file-picker permissions, overwrite dialogs and real filesystem
+race windows remain **unverified**. Browser file creation and writes are not
+atomic compare-and-swap, and this is not full RStudio file-management parity.
+The native Flow 2.0 server and hosted CI definitions are unchanged.

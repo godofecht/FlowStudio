@@ -14,14 +14,17 @@ button{cursor:pointer}button:focus-visible,select:focus-visible,textarea:focus-v
 textarea{background:#101b2c;color:inherit;border:0;resize:none;width:100%;height:100%;padding:1rem;font:14px/1.55 ui-monospace,monospace;tab-size:4}
 pre{white-space:pre-wrap;overflow:auto;overflow-wrap:anywhere;flex:1;margin:0;padding:1rem;font:13px/1.5 ui-monospace,monospace}
 #environment{overflow:auto;padding:1rem;flex:1}#environment table{border-collapse:collapse;width:100%}#environment th,#environment td{padding:.3rem .5rem;border:1px solid #50617a;text-align:left;overflow-wrap:anywhere}#workspace{overflow:auto;padding:.8rem;flex:1}#workspace table{border-collapse:collapse}#workspace th,#workspace td{padding:.2rem .5rem;border:1px solid #50617a}#workspace img{max-width:100%;height:auto}.workspace-tools{display:flex;gap:.4rem;flex-wrap:wrap;padding:.4rem}#workspace iframe{border:0;width:100%;height:100%;min-height:220px}
-#projectTree{max-height:22vh;overflow:auto;padding:.35rem;display:flex;flex-direction:column;gap:.25rem}#projectTree .project-file{text-align:left;width:100%}#projectTree .project-children{padding-left:1rem;display:flex;flex-direction:column;gap:.25rem}#projectPanel{border-bottom:1px solid #40506a}#projectPanel summary{cursor:pointer;padding:.4rem .7rem}section[aria-label="Source editor"] textarea{flex:1;min-height:6rem;height:auto}#consoleInput{height:5rem;flex:0 0 auto;border-top:1px solid #40506a;padding:.5rem}#consoleActions{display:flex;align-items:center;justify-content:space-between;gap:.5rem;padding:.35rem .6rem}.muted{color:#b6c7df}#notice{color:#ffe3a6}footer{font-size:.85rem}
+#projectTree{max-height:22vh;overflow:auto;padding:.35rem;display:flex;flex-direction:column;gap:.25rem}#projectTree .project-file{text-align:left;width:100%}#projectTree .project-children{padding-left:1rem;display:flex;flex-direction:column;gap:.25rem}#projectPanel{border-bottom:1px solid #40506a}#projectPanel summary{cursor:pointer;padding:.4rem .7rem}section[aria-label="Source editor"] textarea{flex:1;min-height:6rem;height:auto}#notebookOutput .notebook-cell{padding:.65rem;margin-bottom:.65rem;border:1px solid #40506a;border-radius:6px}
+#notebookOutput .notebook-cell pre{flex:none;max-height:20rem;overflow:auto;padding:.5rem}
+#notebookOutput .notebook-cell img{max-width:100%;height:auto}
+#consoleInput{height:5rem;flex:0 0 auto;border-top:1px solid #40506a;padding:.5rem}#consoleActions{display:flex;align-items:center;justify-content:space-between;gap:.5rem;padding:.35rem .6rem}.muted{color:#b6c7df}#notice{color:#ffe3a6}footer{font-size:.85rem}
 @media(max-width:750px){body{height:auto;min-height:100dvh}main{grid-template-columns:1fr;grid-template-rows:45vh 20vh 30vh 25vh}}
 </style></head>
 <body>
 <header><strong>◈ FlowStudio <span class="muted">/ Browser</span></strong>
 <label for="language">Language</label><select id="language"><option value="python">Python (browser)</option><option value="flow">Flow (not yet browser executable)</option><option value="r">R (browser; webR 0.6.0)</option></select>
 <button id="open" type="button">Open file</button><button id="openFolder" type="button">Open project folder</button><button id="newProjectFile" type="button">New project file</button><button id="saveProjectFile" type="button" disabled>Save to disk</button><input id="file" type="file" accept=".py,.flow,.r,.R,.txt" hidden>
-<button id="save" type="button">Download source</button><button id="run" type="button">Run Ctrl+Enter</button><button id="runSelection" type="button">Run selection Ctrl+Shift+Enter</button><button id="runCell" type="button">Run cell Ctrl+Alt+Enter</button><button id="reset" type="button">Reset selected session</button><button id="forgetDraft" type="button">Forget saved draft</button>
+<button id="save" type="button">Download source</button><button id="run" type="button">Run Ctrl+Enter</button><button id="runSelection" type="button">Run selection Ctrl+Shift+Enter</button><button id="runCell" type="button">Run cell Ctrl+Alt+Enter</button><button id="runNotebook" type="button">Run all Python/R cells</button><button id="reset" type="button">Reset selected session</button><button id="forgetDraft" type="button">Forget saved draft</button>
 </header>
 <main>
 <section aria-label="Source editor"><h2>Source — <span id="filename">untitled.py</span></h2><details id="projectPanel"><summary>Project files</summary><div id="projectTree" aria-label="Project file explorer">Choose a folder to browse its files.</div></details><textarea id="source" aria-label="Source code" spellcheck="false">x = 40
@@ -39,6 +42,7 @@ x + 2</textarea></section>
 <script src="./source_cells.js"></script>
 <script src="./console_repl.js"></script>
 <script src="./r_session.js"></script>
+<script src="./notebook_runner.js"></script>
 <script src="./project.js"></script>
 <script src="./file_save.js"></script>
 <script src="./project_workspace.js"></script>
@@ -46,6 +50,7 @@ x + 2</textarea></section>
 "use strict";
 const $ = id => document.getElementById(id);
 let worker, pending = new Map(), sequence = 0, busy = false, fileName = "untitled.py", imageURL = null, sessionGeneration = 0;
+let notebookRunner = null, notebookOutput = null;
 const plotHistory = FlowStudioPlotHistory.create($("workspace"));
 let rSession = null;
 function getRSession() { return rSession || (rSession = FlowStudioRSession.create()); }
@@ -71,6 +76,10 @@ function request(op, code) {
   });
 }
 function notice(text) { $("notice").textContent = text; }
+function setBusy(value) {
+  busy = value;
+  for (const id of ["run", "runSelection", "runCell", "runNotebook"]) $(id).disabled = value;
+}
 const packagePanel = FlowStudioPackages.create({document, request, notice, target:$("packages"),
   input:$("packageName"), installButton:$("installPackage"), listButton:$("listPackages")});
 function queueDraft() {
@@ -125,7 +134,7 @@ async function run(selectedOnly = false, activeCell = false, consoleCode = null)
   if (!prepared.ok) { notice(prepared.error); return false; }
   const code = prepared.code;
   const generation = sessionGeneration;
-  busy = true; $("run").disabled = true; $("runSelection").disabled = true; $("runCell").disabled = true;
+  setBusy(true);
   notice(language === "r" ? "Executing R in your browser — initial webR download can take time." : "Executing in your browser — initial Pyodide download can take time.");
   try {
     const response = language === "r" ? await getRSession().run(code) : await request("run", code);
@@ -144,13 +153,75 @@ async function run(selectedOnly = false, activeCell = false, consoleCode = null)
     }
     return true;
   } catch(error) { notice("Execution unavailable: " + error.message); return false; }
-  finally { busy = false; $("run").disabled = false; $("runSelection").disabled = false; $("runCell").disabled = false; }
+  finally { if (generation === sessionGeneration) setBusy(false); }
+}
+function renderNotebookCell(entry) {
+  const card = document.createElement("div");
+  card.className = "notebook-cell";
+  const heading = document.createElement("h3");
+  heading.textContent = entry.kind === "markdown" ? "Markdown cell " + (entry.index + 1) :
+    "Cell " + (entry.index + 1) + (entry.ok ? " — complete" : " — failed");
+  card.append(heading);
+  const output = document.createElement("pre");
+  output.textContent = entry.kind === "markdown" ? entry.code :
+    entry.output + (entry.truncated ? "\n[Output truncated]" : "");
+  card.append(output);
+  if (entry.kind === "code") {
+    for (const plot of entry.plots) {
+      if (!plot || typeof plot.png !== "string" || plot.png.length > 1398104 ||
+          !plot.png.startsWith("iVBORw0KGgo") || !/^[A-Za-z0-9+/=]+$/.test(plot.png)) continue;
+      const image = document.createElement("img");
+      image.src = "data:image/png;base64," + plot.png;
+      image.alt = "Python plot from cell " + (entry.index + 1);
+      card.append(image);
+    }
+    if (entry.images.length) {
+      const plotBox = document.createElement("div");
+      FlowStudioRSession.renderImages(plotBox, entry.images, document);
+      card.append(plotBox);
+    }
+  }
+  notebookOutput.append(card);
+}
+async function runNotebook() {
+  if (busy) { notice("An execution is already running."); return; }
+  const language = $("language").value;
+  if (language !== "python" && language !== "r") {
+    notice("Browser notebook execution supports Python/R; Flow requires the native application.");
+    return;
+  }
+  const generation = sessionGeneration;
+  notebookOutput = document.createElement("div");
+  notebookOutput.id = "notebookOutput";
+  notebookOutput.setAttribute("aria-label", "Notebook cell results");
+  $("workspace").replaceChildren(notebookOutput);
+  notebookRunner = FlowStudioNotebook.create({
+    parseCells: FlowStudioSourceCells.parseCells,
+    execute: (code, selectedLanguage) => selectedLanguage === "r" ? getRSession().run(code) : request("run", code),
+    onCell: renderNotebookCell, notice
+  });
+  setBusy(true);
+  try {
+    const result = await notebookRunner.run($("source").value, language);
+    if (generation !== sessionGeneration) return;
+    notice(result.ok ? "Notebook executed " + result.executed + " cells." :
+      "Notebook stopped after " + result.executed + " cells: " + result.error);
+    if (result.executed > 0) {
+      const inspect = language === "r" ? await getRSession().inspect() : await request("inspect");
+      if (generation !== sessionGeneration) return;
+      if (inspect.ok) renderEnvironment(inspect.variables);
+      else notice("Notebook environment inspection failed: " + inspect.output);
+    }
+  } catch (error) {
+    if (generation === sessionGeneration) notice("Notebook execution failed: " + String(error.message || error));
+  } finally { if (generation === sessionGeneration) setBusy(false); }
 }
 const consoleREPL = FlowStudioConsoleREPL.create({input:$("consoleInput"), button:$("submitConsole"),
   submit:code=>run(false, false, code), notice});
 $("run").addEventListener("click", () => { void run(false); });
 $("runSelection").addEventListener("click", () => { void run(true); });
 $("runCell").addEventListener("click", () => { void run(false, true); });
+$("runNotebook").addEventListener("click", () => { void runNotebook(); });
 $("source").addEventListener("keydown", event => {
   if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && event.altKey && !event.shiftKey) { event.preventDefault(); void run(false, true); }
   else if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && event.shiftKey) { event.preventDefault(); void run(true); }
@@ -165,6 +236,8 @@ $("forgetDraft").addEventListener("click", () => {
 });
 $("reset").addEventListener("click", () => {
   sessionGeneration++;
+  notebookRunner?.cancel();
+  setBusy(false);
   if ($("language").value === "r") {
     if (rSession) rSession.reset();
     $("environment").textContent = "(New R session)";

@@ -10,14 +10,14 @@ function available(location = global.location) {
     (location.hostname === "127.0.0.1" || location.hostname === "localhost") &&
     location.port === "8751";
 }
-async function run(code) {
+async function request(endpoint, code) {
   if (!available()) throw new Error("Flow execution requires the native FlowStudio server on port 8751.");
   if (typeof code !== "string" || new TextEncoder().encode(code).length > MAX_SOURCE_BYTES)
     throw new Error("Flow source exceeds the 64 KiB execution limit.");
   const controller = new AbortController();
   const timeout = global.setTimeout(() => controller.abort(), 70000);
   try {
-    const response = await global.fetch("/api/run/flow", {
+    const response = await global.fetch(endpoint, {
       method: "POST",
       headers: {"Content-Type": "text/plain; charset=utf-8", "X-FlowStudio-Intent": "run"},
       body: code,
@@ -37,7 +37,23 @@ async function run(code) {
     global.clearTimeout(timeout);
   }
 }
-const api = Object.freeze({available, run});
+async function run(code) {
+  return request("/api/run/flow", code);
+}
+async function checkSyntax(code) {
+  const response = await request("/api/check/flow", code);
+  if (response.ok) return {ok:true, output:response.output, diagnostics:[]};
+  // Strict flowc diagnostics use FILE:LINE:COLUMN: severity: message.
+  // Keep compiler output when it does not carry a source location.
+  const match = /(?:^|\\n)[^\\r\\n]*?:(\\d+):(\\d+):\\s*(?:error:\\s*)?([^\\r\\n]+)/.exec(response.output);
+  const line = match ? Number(match[1]) : 0;
+  const column = match ? Number(match[2]) : 0;
+  const diagnostics = match && Number.isSafeInteger(line) && line > 0 &&
+    Number.isSafeInteger(column) && column > 0 ?
+    [{line, column, message:match[3].slice(0, 512)}] : [];
+  return {ok:false, output:response.output, diagnostics};
+}
+const api = Object.freeze({available, run, checkSyntax});
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 global.FlowStudioNativeFlow = api;
 })(globalThis);

@@ -12,16 +12,16 @@ static int failure(int step, const char *output)
 
 int main(void)
 {
-    const char *out = fs_r_run("value <- 41\ncat(value, '\\n')");
+    const char *out = fs_r_run("value <- 41\ncat(value, '\\n', sep='')");
     if (fs_r_status() != 200 || strcmp(out, "41\n") != 0) return failure(1, out);
-    out = fs_r_run("value <- value + 1\ncat(value, '\\n')");
+    out = fs_r_run("value <- value + 1\ncat(value, '\\n', sep='')");
     if (fs_r_status() != 200 || strcmp(out, "42\n") != 0) return failure(2, out);
     out = fs_r_run("stop('expected failure')");
     if (fs_r_status() != 422 || !strstr(out, "expected failure")) return failure(3, out);
-    out = fs_r_run("cat(value, '\\n')");
+    out = fs_r_run("cat(value, '\\n', sep='')");
     if (fs_r_status() != 200 || strcmp(out, "42\n") != 0) return failure(4, out);
     fs_r_reset();
-    out = fs_r_run("cat(exists('value', inherits=FALSE), '\\n')");
+    out = fs_r_run("cat(exists('value', inherits=FALSE), '\\n', sep='')");
     if (fs_r_status() != 200 || strcmp(out, "FALSE\n") != 0) return failure(5, out);
     out = fs_r_run("cat(paste(rep('a', 200000), collapse=''))");
     if (fs_r_status() != 200 || strlen(out) > 131072 ||

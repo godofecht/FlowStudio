@@ -21,7 +21,7 @@ test("native execution is limited to the exact loopback FlowStudio origin", asyn
   for (const url of [
     "https://godofecht.github.io/FlowStudio/app/",
     "http://localhost:8752/app/",
-    "http://127.0.0.1:8751.evil.invalid/app/",
+    "http://127.0.0.1.evil.invalid:8751/app/",
     "https://localhost:8751/app/"
   ]) assert.equal(native.available(new URL(url)), false, url);
   await withBrowser(new URL("https://godofecht.github.io/FlowStudio/app/"),

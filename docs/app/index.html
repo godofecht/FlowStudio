@@ -24,7 +24,7 @@ pre{white-space:pre-wrap;overflow:auto;overflow-wrap:anywhere;flex:1;margin:0;pa
 <header><strong>◈ FlowStudio <span class="muted">/ Browser</span></strong>
 <label for="language">Language</label><select id="language"><option value="python">Python (browser)</option><option value="flow">Flow (not yet browser executable)</option><option value="r">R (browser; webR 0.6.0)</option></select>
 <button id="open" type="button">Open file</button><button id="openFolder" type="button">Open project folder</button><button id="newProjectFile" type="button">New project file</button><button id="saveProjectFile" type="button" disabled>Save to disk</button><button id="saveAsProjectFile" type="button">Save As…</button><button id="renameProjectFile" type="button" disabled>Rename open project file</button><button id="deleteProjectFile" type="button" disabled>Delete open project file</button><input id="file" type="file" accept=".py,.flow,.r,.R,.txt" hidden>
-<button id="save" type="button">Download source</button><button id="run" type="button">Run Ctrl+Enter</button><button id="checkSyntax" type="button">Check syntax</button><button id="runSelection" type="button">Run selection Ctrl+Shift+Enter</button><button id="runCell" type="button">Run cell Ctrl+Alt+Enter</button><button id="runNotebook" type="button">Run all Python/R cells</button><button id="openNotebook" type="button">Open .ipynb</button><input id="notebookFile" type="file" accept=".ipynb,application/x-ipynb+json" hidden><button id="saveNotebook" type="button">Export .ipynb</button><button id="reset" type="button">Reset selected session</button><button id="forgetDraft" type="button">Forget saved draft</button>
+<button id="save" type="button">Download source</button><button id="run" type="button">Run Ctrl+Enter</button><button id="checkSyntax" type="button">Check syntax</button><button id="runSelection" type="button">Run selection Ctrl+Shift+Enter</button><button id="runCell" type="button">Run cell Ctrl+Alt+Enter</button><button id="runNotebook" type="button">Run all Python/R cells</button><button id="openNotebook" type="button">Open .ipynb</button><input id="notebookFile" type="file" accept=".ipynb,application/x-ipynb+json" hidden><button id="saveNotebook" type="button">Export .ipynb</button><button id="exportReport" type="button">Export HTML report</button><button id="reset" type="button">Reset selected session</button><button id="forgetDraft" type="button">Forget saved draft</button>
 </header>
 <main>
 <section aria-label="Source editor"><h2>Source — <span id="filename">untitled.py</span></h2><details id="projectPanel"><summary>Project files</summary><div id="projectTree" aria-label="Project file explorer">Choose a folder to browse its files.</div></details><textarea id="source" aria-label="Source code" spellcheck="false">x = 40
@@ -47,6 +47,7 @@ x + 2</textarea></section>
 <script src="./help_panel.js"></script>
 <script src="./notebook_runner.js"></script>
 <script src="./notebook_format.js"></script>
+<script src="./notebook_report.js"></script>
 <script src="./notebook_io.js"></script>
 <script src="./project.js"></script>
 <script src="./file_save.js"></script>
@@ -441,6 +442,28 @@ FlowStudioNotebookIO.create({
     notebookExecutionSource === currentSource && notebookExecutionLanguage === selectedLanguage ? notebookEntries : [],
   getFilename:()=>fileName,
   notice
+});
+$("exportReport").addEventListener("click", () => {
+  if (busy || notebookRunner?.isRunning()) { notice("Wait for notebook execution to finish."); return; }
+  const selectedLanguage = $("language").value;
+  try {
+    const currentSource = $("source").value;
+    const results = notebookExecutionSource === currentSource &&
+      notebookExecutionLanguage === selectedLanguage ? notebookEntries : [];
+    const json = FlowStudioNotebookFormat.encode(currentSource, selectedLanguage,
+      results, FlowStudioSourceCells.parseCells);
+    const reportName = fileName.replace(/\.(?:py|r|flow|ipynb)$/i, "") || "notebook";
+    const html = FlowStudioNotebookReport.render(json, reportName);
+    const url = URL.createObjectURL(new Blob([html], {type:"text/html;charset=utf-8"}));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = reportName + ".html";
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    notice("Offline HTML report exported. Only current-source notebook outputs are included.");
+  } catch (error) {
+    notice("HTML report export failed: " + String(error.message || error));
+  }
 });
 startWorker();
 </script>

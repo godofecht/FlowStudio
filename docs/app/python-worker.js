@@ -8,6 +8,27 @@ let queued = 0;
 let serial = Promise.resolve();
 const MAX_QUEUED = 32;
 const MAX_OUTPUT = 131072;
+const TRANSFER_NAME = /^[A-Za-z][A-Za-z0-9_]{0,79}$/;
+function validTransferPacket(packet) {
+  if (!packet || typeof packet !== "object" || Array.isArray(packet) ||
+      Object.keys(packet).sort().join(",") !== "kind,type,values" ||
+      !["scalar", "vector"].includes(packet.kind) ||
+      !["number", "boolean", "string"].includes(packet.type) ||
+      !Array.isArray(packet.values) || packet.values.length > 256 ||
+      (packet.kind === "scalar" && packet.values.length !== 1))
+    return false;
+  for (const value of packet.values) {
+    if (packet.type === "number" &&
+        (typeof value !== "number" || !Number.isFinite(value) || Math.abs(value) > Number.MAX_SAFE_INTEGER))
+      return false;
+    if (packet.type === "boolean" && typeof value !== "boolean") return false;
+    if (packet.type === "string") {
+      if (typeof value !== "string" || value.length > 512 || value.includes("\\0")) return false;
+      try { encodeURIComponent(value); } catch (_) { return false; }
+    }
+  }
+  return new TextEncoder().encode(JSON.stringify(packet)).length <= 32768;
+}
 function boundedAppend(existing, text) {
   const room = MAX_OUTPUT - existing.length;
   return room > 0 ? existing + String(text).slice(0, room) : existing;
@@ -53,7 +74,7 @@ async function capturePlots(py) {
   }
 }
 async function handle(event) {
-  const {id, op, code} = event.data || {};
+  const {id, op, code, value} = event.data || {};
   if (!Number.isSafeInteger(id)) return;
   const validInstall = op === "install" && typeof code === "string" &&
     /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}(?:==[0-9][A-Za-z0-9.!+_-]{0,39})?$/.test(code);
@@ -65,14 +86,56 @@ async function handle(event) {
     /^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*){0,3}$/.test(code);
   const validComplete = op === "complete" && typeof code === "string" &&
     /^[A-Za-z_][A-Za-z0-9_]{0,79}$/.test(code);
+  const validExport = op === "export" && typeof code === "string" && TRANSFER_NAME.test(code);
+  const validImport = op === "import" && typeof code === "string" && TRANSFER_NAME.test(code) &&
+    validTransferPacket(value);
   if (!((op === "run" && typeof code === "string" && new TextEncoder().encode(code).length <= 65536) ||
-    op === "inspect" || op === "packages" || validInstall || validTable || validCheck || validHelp || validComplete)) {
+    op === "inspect" || op === "packages" || validInstall || validTable || validCheck || validHelp || validComplete || validExport || validImport)) {
     self.postMessage({id, ok:false, output:"Invalid execution request."}); return;
   }
   let stdout = "", stderr = "", plotWarning = "";
   let py = null;
   try {
     py = await python();
+    if (op === "export") {
+      // Only exact Python builtins are traversed; no user iterators, descriptors or repr().
+      const query = [
+        "import json as _fs_transfer_json, math as _fs_transfer_math",
+        "_fs_transfer_name = " + JSON.stringify(code),
+        "if _fs_transfer_name not in globals(): raise ValueError('Unknown Python variable')",
+        "_fs_transfer_obj = globals()[_fs_transfer_name]",
+        "_fs_transfer_kind = 'vector' if type(_fs_transfer_obj) in (list, tuple) else 'scalar'",
+        "_fs_transfer_values = list(_fs_transfer_obj) if _fs_transfer_kind == 'vector' else [_fs_transfer_obj]",
+        "if not _fs_transfer_values or len(_fs_transfer_values) > 256: raise ValueError('Python vector is empty or exceeds limit')",
+        "def _fs_transfer_type(v):",
+        "    return 'boolean' if type(v) is bool else 'number' if type(v) in (int, float) else 'string' if type(v) is str else None",
+        "_fs_transfer_type_name = _fs_transfer_type(_fs_transfer_values[0])",
+        "if _fs_transfer_type_name is None or any(_fs_transfer_type(v) != _fs_transfer_type_name for v in _fs_transfer_values): raise ValueError('Only homogeneous plain scalar/list/tuple values can be transferred')",
+        "if any(type(v) is str and (len(v) > 512 or '\\x00' in v) for v in _fs_transfer_values): raise ValueError('Python string exceeds limit or contains NUL')",
+        "if any(type(v) in (int, float) and (not _fs_transfer_math.isfinite(v) or abs(v) > 9007199254740991) for v in _fs_transfer_values): raise ValueError('Python number is not finite or safe')",
+        "_fs_transfer_json.dumps({'kind': _fs_transfer_kind, 'type': _fs_transfer_type_name, 'values': _fs_transfer_values}, allow_nan=False)"
+      ].join("\\n");
+      const raw = await py.runPythonAsync(query);
+      if (typeof raw !== "string" || new TextEncoder().encode(raw).length > 32768)
+        throw Error("Invalid Python transfer response.");
+      const packet = JSON.parse(raw);
+      if (!validTransferPacket(packet)) throw Error("Invalid Python transfer payload.");
+      self.postMessage({id, ok:true, value:packet});
+      return;
+    }
+    if (op === "import") {
+      // A JSON literal is parsed inside the existing Python globals; never eval() user text.
+      const query = [
+        "import json as _fs_transfer_json",
+        "_fs_transfer_packet = _fs_transfer_json.loads(" + JSON.stringify(JSON.stringify(value)) + ")",
+        "globals()[" + JSON.stringify(code) + "] = _fs_transfer_packet['values'] if _fs_transfer_packet['kind'] == 'vector' else _fs_transfer_packet['values'][0]",
+        "'ok'"
+      ].join("\\n");
+      const acknowledgement = await py.runPythonAsync(query);
+      if (acknowledgement !== "ok") throw Error("Python transfer assignment did not acknowledge success.");
+      self.postMessage({id, ok:true});
+      return;
+    }
     if (op === "check") {
       // ast.parse validates without executing user source or importing its dependencies.
       const query = [

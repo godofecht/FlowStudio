@@ -187,7 +187,7 @@ def main() -> None:
     assert request("POST", "/api/debug/python/start", "{}")[0] == 404
     assert request("POST", "/api/debug/python/step", "",
                    {"X-FlowStudio-Intent": "run", "Origin": "http://attacker.invalid"})[0] == 404
-    debug_source = "debug_value = 40\\ndebug_value += 2\\nprint(debug_value)\\n"
+    debug_source = "debug_value = 40\ndebug_value += 2\nprint(debug_value)\n"
     status, payload = request("POST", "/api/debug/python/start",
                               json.dumps({"source": debug_source, "breakpoints": [2]}),
                               accepted_headers)
@@ -205,7 +205,7 @@ def main() -> None:
     status, output = request("POST", "/api/run/python", "print(debug_value)", accepted_headers)
     assert status == 200 and output.strip() == "42", (status, output)
     status, payload = request("POST", "/api/debug/python/start",
-                              json.dumps({"source": "debug_stop = 1\\ndebug_unreached = 2",
+                              json.dumps({"source": "debug_stop = 1\ndebug_unreached = 2",
                                           "breakpoints": [2]}), accepted_headers)
     assert status == 200 and json.loads(payload)["state"] == "paused", (status, payload)
     status, payload = request("POST", "/api/debug/python/stop", "", accepted_headers)

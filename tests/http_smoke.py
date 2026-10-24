@@ -66,6 +66,15 @@ def main() -> None:
     )
     assert status == 200 and "flowstudio-python-ok" in output, (status, output)
 
+    # Flow itself orchestrates both persistent language kernels in one request.
+    if shutil.which("Rscript"):
+        status, mixed = request("POST", "/api/demo/python-r", "", accepted_headers)
+        assert status == 200, (status, mixed)
+        assert "Python sum = 15" in mixed, mixed
+        assert "R sqrt(sum) = " in mixed, mixed
+        r_value = float(mixed.split("R sqrt(sum) = ", 1)[1].strip())
+        assert abs(r_value - (15 ** 0.5)) < 0.0001, mixed
+
     # A single Python kernel retains variables between HTTP requests.
     status, output = request("POST", "/api/run/python",
                              "flowstudio_persistent = 40 + 2", accepted_headers)

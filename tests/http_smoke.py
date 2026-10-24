@@ -78,6 +78,11 @@ def main() -> None:
     assert status == 200 and '"/api/run/flow"' in client, (status, client[:100])
     status, recovery_script = request("GET", "/app/notebook_recovery.js")
     assert status == 200 and "FlowStudioNotebookRecovery" in recovery_script, (status, recovery_script[:100])
+    status, search_engine = request("GET", "/app/editor_find.js")
+    assert status == 200 and "FlowStudioEditorFind" in search_engine, (status, search_engine[:100])
+    status, search_panel = request("GET", "/app/find_panel.js")
+    assert status == 200 and "FlowStudioFindPanel" in search_panel, (status, search_panel[:100])
+    assert 'id="findQuery"' in browser and 'id="replaceAll"' in browser
     status, _ = request("GET", "/app/not-a-real-asset.js")
     assert status == 404, status
 

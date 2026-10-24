@@ -167,4 +167,5 @@ failed:
 
 const char *fs_py_run(const char *code) { return request_python('E', code); }
 const char *fs_py_inspect(void) { return request_python('I', ""); }
+const char *fs_py_trace(const char *code) { return request_python('T', code); }
 int fs_py_status(void) { return last_status; }

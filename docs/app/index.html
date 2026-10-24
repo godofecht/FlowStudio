@@ -24,7 +24,7 @@ pre{white-space:pre-wrap;overflow:auto;overflow-wrap:anywhere;flex:1;margin:0;pa
 <header><strong>◈ FlowStudio <span class="muted">/ Browser</span></strong>
 <label for="language">Language</label><select id="language"><option value="python">Python (browser)</option><option value="flow">Flow (native localhost only)</option><option value="r">R (browser; webR 0.6.0)</option></select>
 <button id="open" type="button">Open file</button><button id="openFolder" type="button">Open project folder</button><button id="newProjectFile" type="button">New project file</button><button id="saveProjectFile" type="button" disabled>Save to disk</button><button id="saveAsProjectFile" type="button">Save As…</button><button id="renameProjectFile" type="button" disabled>Rename open project file</button><button id="deleteProjectFile" type="button" disabled>Delete open project file</button><input id="file" type="file" accept=".py,.flow,.r,.R,.txt" hidden>
-<button id="save" type="button">Download source</button><button id="run" type="button">Run Ctrl+Enter</button><button id="checkSyntax" type="button">Check syntax</button><button id="completeSource" type="button" title="Complete symbol at cursor (Ctrl+Space)">Complete Ctrl+Space</button><button id="runSelection" type="button">Run selection Ctrl+Shift+Enter</button><button id="runCell" type="button">Run cell Ctrl+Alt+Enter</button><button id="runNotebook" type="button">Run all cells</button><button id="openNotebook" type="button">Open .ipynb</button><input id="notebookFile" type="file" accept=".ipynb,application/x-ipynb+json" hidden><button id="saveNotebook" type="button">Export .ipynb</button><button id="exportReport" type="button">Export HTML report</button><button id="reset" type="button">Reset selected session</button><button id="forgetDraft" type="button">Forget saved draft</button>
+<button id="save" type="button">Download source</button><button id="run" type="button">Run Ctrl+Enter</button><button id="checkSyntax" type="button">Check syntax</button><button id="tracePython" type="button" disabled title="Native localhost Python line tracing; executes source in the native Python session">Trace Python (native)</button><button id="completeSource" type="button" title="Complete symbol at cursor (Ctrl+Space)">Complete Ctrl+Space</button><button id="runSelection" type="button">Run selection Ctrl+Shift+Enter</button><button id="runCell" type="button">Run cell Ctrl+Alt+Enter</button><button id="runNotebook" type="button">Run all cells</button><button id="openNotebook" type="button">Open .ipynb</button><input id="notebookFile" type="file" accept=".ipynb,application/x-ipynb+json" hidden><button id="saveNotebook" type="button">Export .ipynb</button><button id="exportReport" type="button">Export HTML report</button><button id="reset" type="button">Reset selected session</button><button id="forgetDraft" type="button">Forget saved draft</button>
 </header>
 <main>
 <section aria-label="Source editor"><h2>Source — <span id="filename">untitled.py</span></h2><details id="projectPanel"><summary>Project files</summary><div id="projectTree" aria-label="Project file explorer">Choose a folder to browse its files.</div></details><textarea id="source" aria-label="Source code" spellcheck="false">x = 40
@@ -45,6 +45,7 @@ x + 2</textarea><div id="completions" role="region" aria-label="Source completio
 <script src="./console_repl.js"></script>
 <script src="./r_session.js"></script>
 <script src="./native_flow.js"></script>
+<script src="./python_trace_view.js"></script>
 <script src="./help_panel.js"></script>
 <script src="./completion.js"></script>
 <script src="./notebook_runner.js"></script>
@@ -94,6 +95,7 @@ function notice(text) { $("notice").textContent = text; }
 function setBusy(value) {
   busy = value;
   for (const id of ["run", "runSelection", "runCell", "runNotebook", "checkSyntax", "lookupHelp", "completeSource"]) $(id).disabled = value;
+  $("tracePython").disabled = value || $("language").value !== "python" || !globalThis.FlowStudioNativeFlow?.available?.();
 }
 const packagePanel = FlowStudioPackages.create({document, request, notice, target:$("packages"),
   input:$("packageName"), installButton:$("installPackage"), listButton:$("listPackages"),
@@ -214,6 +216,34 @@ async function run(selectedOnly = false, activeCell = false, consoleCode = null)
     return true;
   } catch(error) { notice("Execution unavailable: " + error.message); return false; }
   finally { if (generation === sessionGeneration) setBusy(false); }
+}
+async function tracePython() {
+  if (busy || notebookRunner?.isRunning()) { notice("Wait for execution to finish."); return; }
+  if ($("language").value !== "python" || !globalThis.FlowStudioNativeFlow?.available?.()) {
+    notice("Python tracing requires the native FlowStudio localhost server and Python source.");
+    return;
+  }
+  const code = $("source").value;
+  if (!code.trim()) { notice("Python source is empty."); return; }
+  const generation = sessionGeneration;
+  setBusy(true);
+  notice("Tracing Python lines in the native persistent kernel; this executes the source.");
+  try {
+    const response = await globalThis.FlowStudioNativeFlow.tracePython(code);
+    if (generation !== sessionGeneration || $("source").value !== code || $("language").value !== "python") {
+      notice("Trace finished, but the source or session changed; discarded stale trace.");
+      return;
+    }
+    if (!response.data) { notice("Python trace unavailable: " + response.error); return; }
+    const count = FlowStudioPythonTraceView.render($("workspace"), $("source"), response.data, document);
+    notice("Native Python traced " + count + " lines" + (response.data.truncated ? " (truncated)" : "") +
+      (response.ok ? "." : " with an execution error.") +
+      " Native Python and browser Pyodide have separate namespaces.");
+  } catch (error) {
+    notice("Native Python trace failed: " + String(error.message || error));
+  } finally {
+    if (generation === sessionGeneration) setBusy(false);
+  }
 }
 async function checkSyntax() {
   if (busy || notebookRunner?.isRunning()) { notice("Wait for execution to finish."); return; }
@@ -339,6 +369,7 @@ const consoleREPL = FlowStudioConsoleREPL.create({input:$("consoleInput"), butto
   submit:code=>run(false, false, code), notice});
 $("run").addEventListener("click", () => { void run(false); });
 $("checkSyntax").addEventListener("click", () => { void checkSyntax(); });
+$("tracePython").addEventListener("click", () => { void tracePython(); });
 $("runSelection").addEventListener("click", () => { void run(true); });
 $("runCell").addEventListener("click", () => { void run(false, true); });
 $("runNotebook").addEventListener("click", () => { void runNotebook(); });
@@ -348,7 +379,7 @@ $("source").addEventListener("keydown", event => {
   else if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void run(false); }
 });
 $("source").addEventListener("input", () => { notebookEntries = []; clearNotebookRecovery(); queueDraft(); });
-$("language").addEventListener("change", () => { completion.clear(); notebookEntries = []; clearNotebookRecovery(); environmentData.clear(); packagePanel.updateLanguage?.(); queueDraft(); });
+$("language").addEventListener("change", () => { completion.clear(); notebookEntries = []; clearNotebookRecovery(); environmentData.clear(); packagePanel.updateLanguage?.(); $("tracePython").disabled = busy || $("language").value !== "python" || !globalThis.FlowStudioNativeFlow?.available?.(); queueDraft(); });
 window.addEventListener("pagehide", () => drafts.flush());
 $("forgetDraft").addEventListener("click", () => {
   drafts.clear();
@@ -521,6 +552,7 @@ function restoreNotebookOutputs() {
   notice("Recovered " + entries.length + " notebook cell outputs from this browser. Interpreter variables were not restored.");
 }
 startWorker();
+setBusy(false);
 restoreNotebookOutputs();
 </script>
 </body></html>

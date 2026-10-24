@@ -13,6 +13,7 @@ import os
 import sys
 import traceback
 
+
 MAX_SOURCE = 131072
 MAX_OUTPUT = 131072
 
@@ -163,7 +164,7 @@ def serve() -> None:
             length = int(header[1:], 16)
         except ValueError:
             return
-        if header[:1] not in (b"E", b"I") or length > MAX_SOURCE or (header[:1] == b"I" and length != 0):
+        if header[:1] not in (b"E", b"I", b"T") or length > MAX_SOURCE or (header[:1] == b"I" and length != 0):
             return
         data = read_exact(stdin, length)
         if data is None:
@@ -171,6 +172,17 @@ def serve() -> None:
         if header[:1] == b"I":
             ok = True
             payload = inspect_namespace(namespace)
+        elif header[:1] == b"T":
+            try:
+                source = data.decode("utf-8", "strict")
+            except UnicodeDecodeError:
+                ok = False
+                payload = b'{"ok":false,"output":"Invalid UTF-8 source","events":[],"truncated":false}'
+            else:
+                # Loaded only for tracing: regular kernel imports and inspection
+                # remain usable when this file is imported via spec_from_file_location.
+                from python_trace import trace_source
+                ok, payload = trace_source(source, namespace, LimitedWriter())
         else:
             output = LimitedWriter()
             ok = True

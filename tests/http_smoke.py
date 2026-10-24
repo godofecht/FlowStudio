@@ -75,6 +75,30 @@ def main() -> None:
         r_value = float(mixed.split("R sqrt(sum) = ", 1)[1].strip())
         assert abs(r_value - (15 ** 0.5)) < 0.0001, mixed
 
+    # Native Flow-owned Python trace executes in the persistent CPython kernel.
+    status, _ = request("POST", "/api/trace/python", "print('blocked')")
+    assert status == 404, status
+    status, trace_js = request("GET", "/app/python_trace_view.js")
+    assert status == 200 and "FlowStudioPythonTraceView" in trace_js, status
+    status, traced = request(
+        "POST", "/api/trace/python",
+        "native_trace_variable = 40\nprint(native_trace_variable + 2)",
+        accepted_headers,
+    )
+    assert status == 200, (status, traced)
+    trace_data = json.loads(traced)
+    assert trace_data["ok"] and "42" in trace_data["output"], trace_data
+    assert [entry["line"] for entry in trace_data["events"]] == [1, 2], trace_data
+    status, output = request(
+        "POST", "/api/run/python", "print(native_trace_variable)", accepted_headers,
+    )
+    assert status == 200 and output.strip() == "40", (status, output)
+    status, traced = request(
+        "POST", "/api/trace/python", "raise ValueError('trace error')",
+        accepted_headers,
+    )
+    assert status == 422 and "trace error" in json.loads(traced)["output"], (status, traced)
+
     # A single Python kernel retains variables between HTTP requests.
     status, output = request("POST", "/api/run/python",
                              "flowstudio_persistent = 40 + 2", accepted_headers)

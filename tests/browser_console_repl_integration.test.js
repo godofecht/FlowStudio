@@ -10,7 +10,7 @@ const inline = html.match(/<script>\s*([\s\S]*?)<\/script>/);
 const consoleREPL = require("../docs/app/console_repl.js");
 const selectionScript = fs.readFileSync(path.join(base, "source_selection.js"), "utf8");
 function fixture() {
-  const elements = new Map(), workers = [];
+  const elements = new Map(), workers = [], rCalls = [], flowCalls = [];
   function element(id) {
     if (!elements.has(id)) elements.set(id, {
       id, value:"", textContent:"", disabled:false, selectionStart:0, selectionEnd:0,
@@ -28,6 +28,8 @@ function fixture() {
   const ctx={TextEncoder,Worker,setTimeout,clearTimeout,
     document:{getElementById:element,createElement:()=>({setAttribute(){},append(){}})},
     FlowStudioConsoleREPL:consoleREPL,
+    FlowStudioRSession:{create:()=>({run:async code=>{rCalls.push(code);return {ok:true,output:"R:"+code,images:[]};},inspect:async()=>({ok:true,variables:[]}),reset(){}}),renderImages(){}},
+    FlowStudioNativeFlow:{available:()=>true,run:async code=>{flowCalls.push(code);return {ok:true,output:"Flow:"+code};}},
     FlowStudioSourceCells:{cellAt:()=>({kind:"code",code:"print(1)"})},
     FlowStudioPlotHistory:{create:()=>({append(){},clear(){}})},
     FlowStudioData:require("../docs/app/data_viewer.js"),
@@ -48,7 +50,7 @@ function fixture() {
   vm.runInNewContext(inline[1],ctx,{filename:"docs/app/index.html"});
   function click(id){elements.get(id).listeners.get("click")({});}
   async function tick(){await new Promise(resolve=>setImmediate(resolve));}
-  return {element,workers,click,tick};
+  return {element,workers,rCalls,flowCalls,click,tick};
 }
 test("browser console is wired to the same persistent Python worker", async () => {
   const f=fixture();
@@ -96,4 +98,31 @@ test("browser console script is loaded before the workspace bootstrap", () => {
   assert.ok(html.indexOf('src="./console_repl.js"') < html.indexOf("\n<script>"));
   assert.match(html,/id="consoleInput"/);
   assert.match(html,/id="submitConsole"/);
+});
+
+test("R and Flow console use selected runtimes without changing editor language", async () => {
+  const f=fixture();
+  f.element("language").value="python";
+  f.element("consoleLanguage").value="r";
+  f.element("consoleLanguage").listeners.get("change")();
+  f.element("consoleInput").value="x <- 40 + 2";
+  f.click("submitConsole");
+  await f.tick();await f.tick();
+  assert.deepEqual(f.rCalls,["x <- 40 + 2"]);
+  assert.equal(f.workers[0].messages.length,0);
+  assert.match(f.element("console").textContent,/r console\nR:x <- 40 \+ 2/);
+  assert.equal(f.element("language").value,"python");
+  f.element("consoleLanguage").value="flow";
+  f.element("consoleLanguage").listeners.get("change")();
+  f.element("consoleInput").value="function main() -> i32 { return 0 }";
+  f.click("submitConsole");
+  await f.tick();await f.tick();
+  assert.deepEqual(f.flowCalls,["function main() -> i32 { return 0 }"]);
+  assert.match(f.element("console").textContent,/flow console/);
+  assert.equal(f.element("language").value,"python");
+});
+test("console language selector is distinct from source editor selector", () => {
+  assert.match(html,/id="consoleLanguage"/);
+  assert.match(html,/languageSelect:\$\("consoleLanguage"\)/);
+  assert.match(html,/submit:\(code, language\)=>run\(false, false, code, language\)/);
 });

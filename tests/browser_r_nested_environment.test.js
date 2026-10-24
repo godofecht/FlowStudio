@@ -114,7 +114,12 @@ test("generated inspector runs under real Rscript, avoids active bindings and bo
   assert.equal(proc.status,0,proc.stderr || proc.error?.message);
   const lines = proc.stdout.trimEnd().split(/\r?\n/);
   assert.equal(lines.pop(),"ACTIVE_SAFE");
-  const result = parseInspection(lines);
+  let result;
+  try { result = parseInspection(lines); }
+  catch (error) {
+    throw Error("Rscript emitted invalid inspector rows: " + error.message +
+      "; rows=" + JSON.stringify(lines.slice(0, 24)));
+  }
   const byName = Object.fromEntries(result.variables.map(v=>[v.name,v]));
   assert.equal(byName.trap.type,"active binding");
   assert.equal(byName.broken.type,"unavailable");

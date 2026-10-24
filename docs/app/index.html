@@ -183,7 +183,7 @@ function renderEnvironment(variables) {
   target.append(table);
 }
 async function run(selectedOnly = false, activeCell = false, consoleCode = null, consoleLanguage = null) {
-  if (busy) { if (consoleCode !== null) notice("An execution is already running."); return false; }
+  if (busy) { if (consoleCode !== null) notice("Execution is busy; wait for the current run."); return false; }
   let language = consoleCode !== null && ["python", "r", "flow"].includes(consoleLanguage) ? consoleLanguage :
     (["python", "r", "flow"].includes($("language").value) ? $("language").value : "python");
   let prepared;

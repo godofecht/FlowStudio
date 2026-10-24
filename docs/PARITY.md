@@ -28,7 +28,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | R Markdown / Quarto | partial / offline HTML report export from Python/R percent-cell notebooks; no Quarto/R Markdown rendering | Render notebook with inline plots and HTML export; verify actual Quarto/R Markdown format compatibility |
 | Source debugger | missing | Breakpoints, stack, variables, step execution |
 | Remote/server mode | missing | Authenticated, origin-aware multi-user sessions with isolation |
-| Diagnostics / profiling | partial / native CPython bounded line tracing implemented; cross-platform CI and physical-browser acceptance pending | Resource/time tracing and useful language-specific diagnostics |
+| Diagnostics / profiling | partial / native CPython bounded line tracing cross-platform CI accepted; physical-browser acceptance pending | Resource/time tracing and useful language-specific diagnostics |
 | Cross-platform packaging | missing | Installable signed/reproducible macOS and Linux releases |
 | Accessibility | partial / unverified | Full keyboard navigation, screen reader labels, resize and contrast checks |
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
@@ -46,11 +46,17 @@ an accessible trace table with guarded source-line navigation. The package
 script includes the helper, and existing Flow/C IPC and HTTP acceptance
 harnesses now exercise the real trace operation.
 
-**Status: partial / cross-platform CI pending.** Five isolated CPython tests
+**Status: partial / cross-platform CI accepted.** Five isolated CPython tests
 and two Node trace-view tests passed in the authoring environment on
-24 October 2026. Those tests alone do not validate the native Flow compiler,
-real C IPC or physical-browser interaction. CI must qualify the exact PR
-commit on Linux and macOS. GitHub Pages cannot invoke this native trace;
+24 October 2026. PR #24 passed all four jobs in
+[CI #40068293523](https://github.com/godofecht/FlowStudio/actions/runs/40068293523):
+the Python/Node suites, real C IPC harness, native Flow compilation, live
+Flow-owned HTTP acceptance and platform packaging succeeded on Ubuntu 24.04
+and macOS 14. Merged as
+[371d35b](https://github.com/godofecht/FlowStudio/commit/371d35b7ea9a5e2510ece2f654131a7f7b13e2ce).
+Physical Chromium/Safari acceptance remains unverified; a local Chromium
+attempt was blocked by the authoring environment's administrator policy.
+GitHub Pages cannot invoke this native trace;
 its Python runtime is a separate Pyodide session. This is an execution trace,
 **not** an interactive debugger: breakpoints, stepping, stack controls,
 R/Flow debugging and remote isolation remain missing. See

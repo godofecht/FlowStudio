@@ -131,6 +131,30 @@ def test_flow(page, timeout: int):
                "Flow physical browser 42", timeout)
 
 
+
+def test_native_conditional_debugger(page, timeout: int):
+    # Actual Chromium/Firefox/WebKit DOM -> Flow localhost HTTP -> CPython.
+    page.locator("#pythonDebugPanel summary").click()
+    page.locator("#language").select_option("python")
+    page.locator("#source").fill("for browser_i in range(5):\\n    browser_seen = browser_i\\nprint(browser_seen)\\n")
+    page.locator("#pythonBreakpoints").fill("2?browser_i>=3")
+    page.locator("#pythonDebugStart").click()
+    page.wait_for_function(
+        "() => document.querySelector('#pythonDebugOutput').textContent.includes('i: int = 3') || "
+        "document.querySelector('#pythonDebugOutput').textContent.includes('browser_i: int = 3')",
+        timeout=timeout)
+    assert "Python debugger: paused" in page.locator("#pythonDebugOutput").inner_text()
+    page.locator("#pythonDebugContinue").click()
+    page.wait_for_function(
+        "() => document.querySelector('#pythonDebugOutput').textContent.includes('browser_i: int = 4')",
+        timeout=timeout)
+    page.locator("#pythonDebugContinue").click()
+    page.wait_for_function(
+        "() => document.querySelector('#pythonDebugOutput').textContent.includes('Python debugger: done')",
+        timeout=timeout)
+    assert "4" in page.locator("#pythonDebugOutput").inner_text()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--url", help="Real native /app/ URL; otherwise serve checked-in docs/app locally")
@@ -173,6 +197,8 @@ def main():
                 if args.flow:
                     test_flow(page, args.timeout * 1000)
                     print("PASS real browser Flow via native Flow-owned server")
+                    test_native_conditional_debugger(page, args.timeout * 1000)
+                    print("PASS real browser conditional CPython debugging via native Flow-owned server")
                 assert not errors, f"Uncaught browser exceptions: {errors}"
                 print(f"PASS {args.browser} physical browser acceptance: {url}")
             finally:

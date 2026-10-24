@@ -13,7 +13,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Python source execution | partial / native persistent CPython kernel added; local C IPC and Flow-owned HTTP tested in Linux/macOS CI; physical-browser acceptance pending | Run via installed Python; preserve state across evaluations |
 | Editor selection execution | partial / Node-tested browser selection; native and physical-browser unverified | Selection runs without accidentally executing entire buffer |
 | Persistent REPL/session | partial / browser Pyodide/webR sessions; native Python process retention and reset added (local C harness and cross-platform Flow HTTP CI passed); native R persistent kernel passed real Rscript and Flow-owned HTTP acceptance on Linux/macOS CI | Incremental variables and package state persist until reset |
-| Variable inspector | partial / native Python and R bounded metadata snapshots cross-platform HTTP accepted; native Python exact-builtin nested metadata tree cross-platform CI accepted (unit/HTTP/DOM); R array dimensions and failed-lazy-binding recovery cross-platform HTTP accepted; browser Python/R metadata partial; arbitrary-object inspection and physical-browser acceptance missing | Nested objects / types / dimensions inspectable and refresh after execution |
+| Interactive multi-language console | partial / Python and R browser sessions plus stateless native Flow full-program execution wired; per-language histories and unsent drafts implemented; Node/V8 regression smoke, live physical-browser acceptance pending | Console can execute selected Python/R/Flow independently of source editor; preserve Python/R state, histories and drafts; report Flow native-only limits and execution failures |\n| Variable inspector | partial / native Python and R bounded metadata snapshots cross-platform HTTP accepted; native Python exact-builtin nested metadata tree cross-platform CI accepted (unit/HTTP/DOM); R array dimensions and failed-lazy-binding recovery cross-platform HTTP accepted; browser Python/R metadata partial; arbitrary-object inspection and physical-browser acceptance missing | Nested objects / types / dimensions inspectable and refresh after execution |
 | Plot viewer | partial / Node-tested PNG import and integrated workspace tab; native unverified | png/svg plot history, zoom, save and deterministic device lifecycle |
 | Project explorer | partial / browser Pages open/create/save and confirmed active-file delete with baseline conflict checks; 10 regression tests V8-shim passed; physical-browser deletion unverified | Open project, tree navigation, source-file creation and save; scoped delete is implemented, copy-verify-delete rename implemented with non-atomic filesystem race limits; physical-browser acceptance remains missing |
 | Data viewer | partial / CSV/TSV plus bounded Python/R environment table snapshots wired; real Pyodide/webR and physical browser unverified | Interactive sortable/filterable tabular datasets including missing values |
@@ -32,6 +32,25 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Cross-platform packaging | missing | Installable signed/reproducible macOS and Linux releases |
 | Accessibility | partial / unverified | Full keyboard navigation, screen reader labels, resize and contrast checks |
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
+
+## 2026-10-24: independent browser console runtimes (implementation committed, CI pending)
+
+The `docs/app/` interactive console now selects Python, R or Flow independently
+of the source editor. It submits Python to the existing persistent Pyodide
+worker, R to the existing persistent webR session, and full Flow programs
+to the native Flow-owned execution route only when running on localhost.
+Each console language has a separate bounded 100-command history and unsent
+draft, with keyboard history navigation. A pending execution locks the console
+language selector; runtime failures retain the source for correction. The
+source editor's Reset action does not accidentally reset Python when Flow is
+selected (Flow has no persistent console state). Existing native Flow compiler
+syntax is unchanged.
+
+**Status: partial / V8 smoke-tested, full CI pending.** The implementation
+is backed by Node regression and workspace integration tests but has not yet
+been exercised in a physical browser with real Pyodide/webR downloads or the
+native Flow server. Flow console execution remains stateless and unavailable
+on GitHub Pages. This is not a persistent Flow REPL or RStudio parity.
 
 ## 2026-10-24: mixed-language percent-cell notebooks (cross-platform CI accepted)
 

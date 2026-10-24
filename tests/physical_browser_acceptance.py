@@ -28,12 +28,12 @@ class QuietHandler(SimpleHTTPRequestHandler):
 
 @contextmanager
 def static_server():
-    handler = partial(QuietHandler, directory=str(ROOT))
+    handler = partial(QuietHandler, directory=str(ROOT / "docs"))
     server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
     thread = Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
-        yield f"http://127.0.0.1:{server.server_port}/docs/app/"
+        yield f"http://127.0.0.1:{server.server_port}/app/"
     finally:
         server.shutdown()
         server.server_close()

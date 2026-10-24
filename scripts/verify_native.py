@@ -113,6 +113,16 @@ def verify(root: Path, port: int = 8751, build_timeout: int = 180,
             print(transfer_result.stderr, end="", file=sys.stderr, flush=True)
         if transfer_result.returncode != 0:
             raise VerificationError("Real Python/R transfer query acceptance failed")
+        print("Real browser R inspector query acceptance: tests/browser_r_nested_environment.test.js", flush=True)
+        inspect_result = _command(
+            ["node", "--test", str(root / "tests/browser_r_nested_environment.test.js")], root, 65
+        )
+        if inspect_result.stdout:
+            print(inspect_result.stdout, end="", flush=True)
+        if inspect_result.stderr:
+            print(inspect_result.stderr, end="", file=sys.stderr, flush=True)
+        if inspect_result.returncode != 0:
+            raise VerificationError("Real browser R inspector acceptance failed")
     _free_port(port)
     # Never accept a stale executable left by an earlier successful build.
     # Unlinking a symlink here also avoids following an unexpected target.

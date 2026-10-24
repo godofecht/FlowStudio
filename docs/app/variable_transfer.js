@@ -22,7 +22,7 @@ function validate(packet) {
     if (packet.type === "boolean" && typeof value !== "boolean")
       throw Error("Transfer boolean has an invalid value.");
     if (packet.type === "string") {
-      if (typeof value !== "string" || value.length > 512)
+      if (typeof value !== "string" || value.length > 512 || value.includes("\0"))
         throw Error("Transfer string exceeds 512 characters.");
       try { encodeURIComponent(value); }
       catch (_) { throw Error("Transfer string contains invalid Unicode."); }

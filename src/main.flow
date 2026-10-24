@@ -360,6 +360,7 @@ function send_git_branch(kind: string, name: string) -> void {
         } else {
             proc_arg(command, "switch")
             proc_arg(command, "--no-guess")
+            proc_arg(command, "--no-overwrite-ignore")
             proc_arg(command, "--")
             proc_arg(command, name)
         }

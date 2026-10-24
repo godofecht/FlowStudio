@@ -379,7 +379,7 @@ $("source").addEventListener("keydown", event => {
   else if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void run(false); }
 });
 $("source").addEventListener("input", () => { notebookEntries = []; clearNotebookRecovery(); queueDraft(); });
-$("language").addEventListener("change", () => { completion.clear(); notebookEntries = []; clearNotebookRecovery(); environmentData.clear(); packagePanel.updateLanguage?.(); setBusy(false); queueDraft(); });
+$("language").addEventListener("change", () => { completion.clear(); notebookEntries = []; clearNotebookRecovery(); environmentData.clear(); packagePanel.updateLanguage?.(); $("tracePython").disabled = busy || $("language").value !== "python" || !FlowStudioNativeFlow.available(); queueDraft(); });
 window.addEventListener("pagehide", () => drafts.flush());
 $("forgetDraft").addEventListener("click", () => {
   drafts.clear();

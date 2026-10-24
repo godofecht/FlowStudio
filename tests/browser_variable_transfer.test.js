@@ -153,15 +153,17 @@ test("generated R transfer expressions execute under real Rscript when installed
   await m.session.importVariable("copied",packet);
   const exportQuery=m.queries[0][0], importQuery=m.queries[1][0];
   const exported=spawnSync("Rscript",["--vanilla","-e",
-    'measure <- c(1.25, 2.5)\\nresult <- '+exportQuery+
-    '\\ncat(paste(result, collapse="\\\\n"))'],{encoding:"utf8"});
+    'measure <- c(1.25, 2.5)\nresult <- '+exportQuery+
+    '\ncat(paste(result, collapse="\\n"))'],{encoding:"utf8"});
   assert.equal(exported.status,0,exported.stderr);
-  assert.deepEqual(exported.stdout.trim().split("\\n"),["double","1.2500000000000000e%2B00","2.5000000000000000e%2B00"]);
+  const rows=exported.stdout.trim().split("\n");
+  assert.equal(rows[0],"double");
+  assert.deepEqual(rows.slice(1).map(x=>Number(decodeURIComponent(x))),[1.25,2.5]);
   const imported=spawnSync("Rscript",["--vanilla","-e",
-    importQuery+'\\nstopifnot(is.numeric(copied), identical(copied, c(1.25, 2.5)))'],{encoding:"utf8"});
+    importQuery+'\nstopifnot(is.numeric(copied), identical(copied, c(1.25, 2.5)))'],{encoding:"utf8"});
   assert.equal(imported.status,0,imported.stderr);
   const active=spawnSync("Rscript",["--vanilla","-e",
-    'makeActiveBinding("measure", function() stop("side effect"), .GlobalEnv)\\n'+
+    'makeActiveBinding("measure", function() stop("side effect"), .GlobalEnv)\n'+
     exportQuery],{encoding:"utf8"});
   assert.notEqual(active.status,0);
   assert.match(active.stderr,/Unknown or active R binding/);

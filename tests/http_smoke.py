@@ -215,8 +215,8 @@ def main() -> None:
     assert status == 200 and output.strip() == "False", (status, output)
 
     # Real CPython frame-depth stepping: next skips callees; finish exits them.
-    depth_source = ("def depth_inner():\\n    depth_local = 40\\n    return depth_local\\n"
-                    "depth_result = depth_inner()\\nprint(depth_result)\\n")
+    depth_source = ("def depth_inner():\n    depth_local = 40\n    return depth_local\n"
+                    "depth_result = depth_inner()\nprint(depth_result)\n")
     status, payload = request("POST", "/api/debug/python/start",
                               json.dumps({"source": depth_source, "breakpoints": [4]}),
                               accepted_headers)

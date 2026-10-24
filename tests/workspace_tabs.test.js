@@ -6,7 +6,7 @@ const {mount} = require("../web/workspace_tabs.js");
 function fixture(initial = null, unavailable = false) {
   const nodes = new Map();
   const focus = [];
-  for (const name of ["files", "plots", "data"]) {
+  for (const name of ["files", "outline", "plots", "data"]) {
     const tab = {
       attributes: {}, tabIndex: 0, listeners: {},
       setAttribute(key, value) { this.attributes[key] = value; },

@@ -12,6 +12,22 @@ A **Flow-first scientific IDE** intended to become a capable successor to RStudi
 
 The initial implementation includes a native Flow server (src/main.flow), a small POSIX sockets/temp-file bridge (src/http_bridge.c), and a tabbed browser workspace (web/index.html) with a menu bar, one tab per open document (unsaved markers, close controls, Ctrl/⌘+Tab cycling), a resizable project sidebar, an environment panel and a console dock.
 
+### Document outline
+
+An **Outline** workspace tab lists the symbols of the active buffer for Flow
+(functions, structs, enums, module bindings), Python (classes, methods,
+functions, module constants with nesting depth) and R (functions, R6/S4 classes,
+top-level bindings). Selecting a symbol moves the caret to its line and scrolls
+it into view, and **Ctrl/⌘+Shift+O** (Edit ▸ Go to symbol) focuses the outline
+directly. Extraction is a bounded, best-effort line scan in the browser: it does
+not parse the language, skips lines over 400 characters, reports at most 400
+symbols, and never sends buffer text to the server. The outline re-reads the
+buffer 250 ms after typing stops and whenever the active document changes.
+
+Run its tests with:
+
+    node --test tests/ide_symbols.test.js tests/ide_outline.test.js
+
 The browser can open several source files at once as tabs, save them, choose a local project folder, lazily browse its source tree, create a source file in the project root, refresh the tree, search project files for literal text with exact match navigation, run the selected text or whole buffer as Flow, R or Python, and display captured stdout/stderr. Project operations use the browser File System Access API and are unavailable in browsers without folder-picker support. The native server retains separate Python and R interpreter processes between evaluations, with explicit reset controls. These are single-user localhost sessions, not restart-persistent or remotely isolated kernels.
 
 ### Editor find and replace

@@ -68,6 +68,9 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/app" or url == "/app/" or url == "/app/index.html" {
         return StaticAsset { path: "docs/app/index.html", mime: "text/html; charset=utf-8", found: true }
     }
+    if url == "/app/completion.js" {
+        return StaticAsset { path: "docs/app/completion.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
     if url == "/app/console_repl.js" {
         return StaticAsset { path: "docs/app/console_repl.js", mime: "text/javascript; charset=utf-8", found: true }
     }

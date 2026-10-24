@@ -30,7 +30,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Sequential percent-cell notebooks | partial / Python and R Run All wired with explicit per-cell Python/R/Flow language tags (cross-platform CI accepted; real browser pending); bounded browser-local text/Python PNG output recovery across reload; native and physical-browser acceptance unverified | Execute cells in order, retain interpreter state, show per-cell output and stop on error |
 | Jupyter `.ipynb` import/export | partial / browser UI wired and Node regression coverage; bounded output recovery is separate from `.ipynb` import/export; physical-browser file round-trip and live Python/R kernels unverified | Import/export nbformat 4 Python/R code and Markdown cells through file picker/download; validate with nbformat; preserve source; verify live outputs in Chromium and cross-platform acceptance |
 | R Markdown / Quarto | partial / offline HTML report export from Python/R percent-cell notebooks; no Quarto/R Markdown rendering | Render notebook with inline plots and HTML export; verify actual Quarto/R Markdown format compatibility |
-| Source debugger | partial / native CPython breakpoint/step/continue/stop and bounded stack inspection passed cross-platform Flow/HTTP CI #40122749072; step-over/step-out implemented with acceptance pending; physical browser and R/Flow debugging missing | Breakpoints, stack, variables, step execution |
+| Source debugger | partial / native CPython breakpoint/step/next/finish/continue/stop and bounded stack inspection passed cross-platform Flow/HTTP CI #40126891635; physical browser and R/Flow debugging missing | Breakpoints, stack, variables, step execution |
 | Remote/server mode | missing | Authenticated, origin-aware multi-user sessions with isolation |
 | Diagnostics / profiling | partial / native CPython bounded line tracing cross-platform CI accepted; physical-browser acceptance pending | Resource/time tracing and useful language-specific diagnostics |
 | Cross-platform packaging | missing | Installable signed/reproducible macOS and Linux releases |
@@ -49,8 +49,13 @@ top-level source frame runs to completion. Both operations reuse the
 persistent Python kernel and Flow-owned localhost intent/origin-gated routes;
 GitHub Pages does not emulate them. The browser provides separate accessible
 controls. Real CPython unit tests, browser route/control tests and live HTTP
-acceptance have been added. **Status: implemented, unverified pending
-cross-platform native CI; physical-browser acceptance still missing.**
+acceptance have been added. **Status: partial / cross-platform native CI accepted; physical-browser acceptance still missing.** [PR #39](https://github.com/godofecht/FlowStudio/pull/39)
+merged as [981790f](https://github.com/godofecht/FlowStudio/commit/981790fa5687a4d59998c86eff84dd07444c1b56)
+after [CI #40126891635](https://github.com/godofecht/FlowStudio/actions/runs/40126891635)
+passed all four Ubuntu 24.04/macOS 14 jobs. Each source/transport job
+recorded 501 passing Node tests, 2 skips and zero failures; real CPython
+step-over/step-out unit tests, native Flow compilation, live HTTP acceptance
+and platform packaging also passed.
 No claim of R/Flow debugger support or RStudio parity is made.
 
 ## 2026-10-24: native Python source debugger (cross-platform native acceptance passed)

@@ -24,12 +24,12 @@ pre{white-space:pre-wrap;overflow:auto;overflow-wrap:anywhere;flex:1;margin:0;pa
 <header><strong>◈ FlowStudio <span class="muted">/ Browser</span></strong>
 <label for="language">Language</label><select id="language"><option value="python">Python (browser)</option><option value="flow">Flow (native localhost only)</option><option value="r">R (browser; webR 0.6.0)</option></select>
 <button id="open" type="button">Open file</button><button id="openFolder" type="button">Open project folder</button><button id="newProjectFile" type="button">New project file</button><button id="saveProjectFile" type="button" disabled>Save to disk</button><button id="saveAsProjectFile" type="button">Save As…</button><button id="renameProjectFile" type="button" disabled>Rename open project file</button><button id="deleteProjectFile" type="button" disabled>Delete open project file</button><input id="file" type="file" accept=".py,.flow,.r,.R,.txt" hidden>
-<button id="save" type="button">Download source</button><button id="run" type="button">Run Ctrl+Enter</button><button id="checkSyntax" type="button">Check syntax</button><button id="runSelection" type="button">Run selection Ctrl+Shift+Enter</button><button id="runCell" type="button">Run cell Ctrl+Alt+Enter</button><button id="runNotebook" type="button">Run all cells</button><button id="openNotebook" type="button">Open .ipynb</button><input id="notebookFile" type="file" accept=".ipynb,application/x-ipynb+json" hidden><button id="saveNotebook" type="button">Export .ipynb</button><button id="exportReport" type="button">Export HTML report</button><button id="reset" type="button">Reset selected session</button><button id="forgetDraft" type="button">Forget saved draft</button>
+<button id="save" type="button">Download source</button><button id="run" type="button">Run Ctrl+Enter</button><button id="checkSyntax" type="button">Check syntax</button><button id="completeSource" type="button" title="Complete symbol at cursor (Ctrl+Space)">Complete Ctrl+Space</button><button id="runSelection" type="button">Run selection Ctrl+Shift+Enter</button><button id="runCell" type="button">Run cell Ctrl+Alt+Enter</button><button id="runNotebook" type="button">Run all cells</button><button id="openNotebook" type="button">Open .ipynb</button><input id="notebookFile" type="file" accept=".ipynb,application/x-ipynb+json" hidden><button id="saveNotebook" type="button">Export .ipynb</button><button id="exportReport" type="button">Export HTML report</button><button id="reset" type="button">Reset selected session</button><button id="forgetDraft" type="button">Forget saved draft</button>
 </header>
 <main>
 <section aria-label="Source editor"><h2>Source — <span id="filename">untitled.py</span></h2><details id="projectPanel"><summary>Project files</summary><div id="projectTree" aria-label="Project file explorer">Choose a folder to browse its files.</div></details><textarea id="source" aria-label="Source code" spellcheck="false">x = 40
 print("Hello from browser Python!")
-x + 2</textarea></section>
+x + 2</textarea><div id="completions" role="region" aria-label="Source completion suggestions" style="max-height:9rem;overflow:auto;padding:0 .5rem"></div></section>
 <section aria-label="Environment"><h2>Environment</h2><div id="environment" class="muted">Python runs entirely in a Web Worker using Pyodide. The runtime downloads on first use.</div><div class="workspace-tools"><input id="packageName" type="text" aria-label="Python or R package name" placeholder="package==version" maxlength="120"><button id="installPackage" type="button">Install package</button><button id="listPackages" type="button">List packages</button></div><div id="packages" role="region" aria-label="Installed language packages" style="overflow:auto;max-height:40%"></div></section>
 <section aria-label="Console"><h2>Python / R console</h2><pre id="console" role="log" aria-live="polite">Ready. Python and R run locally in your browser; Flow runs when this workspace is served by native FlowStudio.</pre><textarea id="consoleInput" aria-label="Python console input" placeholder="Python expression or statement" spellcheck="false"></textarea><div id="consoleActions"><span class="muted">Enter: execute · Shift+Enter: newline · ↑: history</span><button id="submitConsole" type="button">Execute</button></div></section>
 <section aria-label="Data and plots"><h2>Plots and data</h2><div class="workspace-tools"><label for="previewfile">Open image</label><input id="previewfile" type="file" accept=".png,.jpg,.jpeg,.webp"><button id="dataViewer" type="button">Open CSV/TSV viewer</button><label for="helpQuery">Help topic</label><input id="helpQuery" type="text" maxlength="120" placeholder="len / stats::lm" aria-label="Installed Python or R help topic"><button id="lookupHelp" type="button">Help</button></div><div id="workspace"><p class="muted">Local-only plots and tabular data.</p></div></section>
@@ -46,6 +46,7 @@ x + 2</textarea></section>
 <script src="./r_session.js"></script>
 <script src="./native_flow.js"></script>
 <script src="./help_panel.js"></script>
+<script src="./completion.js"></script>
 <script src="./notebook_runner.js"></script>
 <script src="./notebook_recovery.js"></script>
 <script src="./notebook_format.js"></script>
@@ -92,7 +93,7 @@ function request(op, code) {
 function notice(text) { $("notice").textContent = text; }
 function setBusy(value) {
   busy = value;
-  for (const id of ["run", "runSelection", "runCell", "runNotebook", "checkSyntax", "lookupHelp"]) $(id).disabled = value;
+  for (const id of ["run", "runSelection", "runCell", "runNotebook", "checkSyntax", "lookupHelp", "completeSource"]) $(id).disabled = value;
 }
 const packagePanel = FlowStudioPackages.create({document, request, notice, target:$("packages"),
   input:$("packageName"), installButton:$("installPackage"), listButton:$("listPackages"),
@@ -103,6 +104,13 @@ if (typeof FlowStudioHelpPanel !== "undefined") FlowStudioHelpPanel.create({
   python:topic=>request("help", topic), r:topic=>getRSession().help(topic),
   isBusy:()=>busy || !!notebookRunner?.isRunning(), setBusy,
   generation:()=>sessionGeneration
+});
+const completion = FlowStudioCompletion.create({
+  source:$("source"), button:$("completeSource"), target:$("completions"),
+  language:()=>$("language").value,
+  python:prefix=>request("complete", prefix), r:prefix=>getRSession().complete(prefix),
+  generation:()=>sessionGeneration, isBusy:()=>busy || !!notebookRunner?.isRunning(),
+  notice, document
 });
 function queueDraft() {
   drafts.queue($("source").value, fileName, $("language").value);
@@ -340,7 +348,7 @@ $("source").addEventListener("keydown", event => {
   else if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void run(false); }
 });
 $("source").addEventListener("input", () => { notebookEntries = []; clearNotebookRecovery(); queueDraft(); });
-$("language").addEventListener("change", () => { notebookEntries = []; clearNotebookRecovery(); environmentData.clear(); packagePanel.updateLanguage?.(); queueDraft(); });
+$("language").addEventListener("change", () => { completion.clear(); notebookEntries = []; clearNotebookRecovery(); environmentData.clear(); packagePanel.updateLanguage?.(); queueDraft(); });
 window.addEventListener("pagehide", () => drafts.flush());
 $("forgetDraft").addEventListener("click", () => {
   drafts.clear();
@@ -348,6 +356,7 @@ $("forgetDraft").addEventListener("click", () => {
 });
 $("reset").addEventListener("click", () => {
   sessionGeneration++;
+  completion.clear();
   notebookRunner?.cancel();
   notebookEntries = [];
   clearNotebookRecovery();

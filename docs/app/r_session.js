@@ -288,13 +288,89 @@ function create({load = () => import(CDN)} = {}) {
       } catch (error) { return {ok:false, output:String(error).slice(0, 300)}; }
     });
   }
+  // Export only classless, non-missing atomic vectors. Never evaluate a variable name as source.
+  async function exportVariable(name) {
+    if (!/^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(name))
+      return {ok:false, output:"Invalid shared Python/R variable name."};
+    const generation = epoch;
+    return schedule(async () => {
+      if (generation !== epoch) return {ok:false, output:"R session reset."};
+      try {
+        const r = await get();
+        const query = 'local({ n <- ' + JSON.stringify(name) +
+          '; if (!base::exists(n, envir=.GlobalEnv, inherits=FALSE) || ' +
+          'base::bindingIsActive(n, .GlobalEnv)) stop("Unknown or active R binding"); ' +
+          'v <- base::get(n, envir=.GlobalEnv, inherits=FALSE); ' +
+          't <- base::typeof(v); ' +
+          'if (!is.null(base::attributes(v)) || !(t %in% c("double","integer","logical","character"))) ' +
+          'stop("Only classless atomic R vectors can be transferred"); ' +
+          'if (length(v) > 256L || anyNA(v)) stop("R vector exceeds limit or contains NA"); ' +
+          'if (t %in% c("double","integer") && ' +
+          '(any(!is.finite(v)) || any(abs(v) > 9007199254740991))) stop("R number is not finite or safe"); ' +
+          'if (t == "character" && any(nchar(v, type="chars") > 512L)) stop("R string exceeds limit"); ' +
+          's <- if (t == "double") format(v, digits=17L, scientific=TRUE, trim=TRUE, decimal.mark=".") else as.character(v); ' +
+          'c(t, vapply(s, function(x) utils::URLencode(x, reserved=TRUE), character(1))) })';
+        const rows = await r.evalRRaw(query, "string[]");
+        if (generation !== epoch) return {ok:false, output:"R session reset."};
+        if (!Array.isArray(rows) || !rows.length || rows.length > 257 ||
+            !rows.every(row => typeof row === "string" && row.length <= 2048) ||
+            !["double", "integer", "logical", "character"].includes(rows[0]))
+          throw Error("Invalid R transfer response.");
+        const type = rows[0] === "logical" ? "boolean" : rows[0] === "character" ? "string" : "number";
+        const values = rows.slice(1).map(raw => {
+          const decoded = decodeURIComponent(raw);
+          if (type === "boolean") {
+            if (!["TRUE", "FALSE"].includes(decoded)) throw Error("Invalid R logical value.");
+            return decoded === "TRUE";
+          }
+          if (type === "number") {
+            if (!/^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$/.test(decoded))
+              throw Error("Invalid R numeric value.");
+            return Number(decoded);
+          }
+          return decoded;
+        });
+        const packet = global.FlowStudioVariableTransfer.validate({kind:"vector", type, values});
+        return {ok:true, value:packet};
+      } catch (error) { return {ok:false, output:String(error.message || error).slice(0, 300)}; }
+    });
+  }
+  async function importVariable(name, packet) {
+    if (!/^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(name))
+      return {ok:false, output:"Invalid shared Python/R variable name."};
+    try { global.FlowStudioVariableTransfer.validate(packet); }
+    catch (error) { return {ok:false, output:String(error.message || error).slice(0, 300)}; }
+    const generation = epoch;
+    return schedule(async () => {
+      if (generation !== epoch) return {ok:false, output:"R session reset."};
+      try {
+        const r = await get();
+        const atom = value => packet.type === "number" ? String(value) :
+          packet.type === "boolean" ? (value ? "TRUE" : "FALSE") :
+          'utils::URLdecode(' + JSON.stringify(encodeURIComponent(value)) + ')';
+        const empty = {number:"base::numeric(0L)", boolean:"base::logical(0L)", string:"base::character(0L)"};
+        const expression = packet.kind === "scalar" ? atom(packet.values[0]) :
+          packet.values.length ? "base::c(" + packet.values.map(atom).join(",") + ")" : empty[packet.type];
+        const query = 'local({ n <- ' + JSON.stringify(name) +
+          '; if (base::exists(n, envir=.GlobalEnv, inherits=FALSE) && ' +
+          '(base::bindingIsActive(n, .GlobalEnv) || base::bindingIsLocked(n, .GlobalEnv))) ' +
+          'stop("Cannot replace active or locked R binding"); ' +
+          'base::assign(n, ' + expression + ', envir=.GlobalEnv); c("ok") })';
+        const rows = await r.evalRRaw(query, "string[]");
+        if (generation !== epoch) return {ok:false, output:"R session reset."};
+        if (!Array.isArray(rows) || rows.length !== 1 || rows[0] !== "ok")
+          throw Error("R transfer assignment did not acknowledge success.");
+        return {ok:true};
+      } catch (error) { return {ok:false, output:String(error.message || error).slice(0, 300)}; }
+    });
+  }
   function reset() {
     epoch++;
     if (runtime) { try { runtime.close(); } catch (_) { /* already closed */ } }
     runtime = null;
     loading = null;
   }
-  return Object.freeze({run, checkSyntax, help, complete, inspect, packages, installPackage, table, reset});
+  return Object.freeze({run, checkSyntax, help, complete, inspect, packages, installPackage, table, exportVariable, importVariable, reset});
 }
 function renderImages(target, images, document) {
   if (!Array.isArray(images) || !images.length) return 0;

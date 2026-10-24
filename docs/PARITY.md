@@ -13,7 +13,9 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Python source execution | partial / native persistent CPython kernel added; local C IPC and Flow-owned HTTP tested in Linux/macOS CI; physical-browser acceptance pending | Run via installed Python; preserve state across evaluations |
 | Editor selection execution | partial / Node-tested browser selection; native and physical-browser unverified | Selection runs without accidentally executing entire buffer |
 | Persistent REPL/session | partial / browser Pyodide/webR sessions; native Python process retention and reset added (local C harness and cross-platform Flow HTTP CI passed); native R persistent kernel passed real Rscript and Flow-owned HTTP acceptance on Linux/macOS CI | Incremental variables and package state persist until reset |
-| Interactive multi-language console | partial / Python and R browser sessions plus stateless native Flow full-program execution wired; per-language histories and unsent drafts implemented; 427/427 JS tests per platform and native Flow/HTTP CI passed on Ubuntu/macOS; live physical-browser acceptance pending | Console can execute selected Python/R/Flow independently of source editor; preserve Python/R state, histories and drafts; report Flow native-only limits and execution failures |\n| Variable inspector | partial / native Python and R bounded metadata snapshots cross-platform HTTP accepted; native Python exact-builtin nested metadata tree cross-platform CI accepted (unit/HTTP/DOM); R array dimensions and failed-lazy-binding recovery cross-platform HTTP accepted; browser Python/R metadata partial; arbitrary-object inspection and physical-browser acceptance missing | Nested objects / types / dimensions inspectable and refresh after execution |
+| Interactive multi-language console | partial / Python and R browser sessions plus stateless native Flow full-program execution wired; per-language histories and unsent drafts implemented; 427/427 JS tests per platform and native Flow/HTTP CI passed on Ubuntu/macOS; live physical-browser acceptance pending | Console can execute selected Python/R/Flow independently of source editor; preserve Python/R state, histories and drafts; report Flow native-only limits and execution failures |
+| Explicit Python/R variable transfer | partial / bounded plain scalar and atomic-vector copy wired; real CPython/Rscript query tests and native Flow HTTP accepted on Ubuntu/macOS CI; physical-browser Pyodide/webR round-trip unverified | Copy typed scalars/vectors both ways between persistent runtimes, reject unsupported objects/NA/NaN and active bindings, verify independent real-browser and cross-platform execution |
+| Variable inspector | partial / native Python and R bounded metadata snapshots cross-platform HTTP accepted; native Python exact-builtin nested metadata tree cross-platform CI accepted (unit/HTTP/DOM); R array dimensions and failed-lazy-binding recovery cross-platform HTTP accepted; browser Python/R metadata partial; arbitrary-object inspection and physical-browser acceptance missing | Nested objects / types / dimensions inspectable and refresh after execution |
 | Plot viewer | partial / Node-tested PNG import and integrated workspace tab; native unverified | png/svg plot history, zoom, save and deterministic device lifecycle |
 | Project explorer | partial / browser Pages open/create/save and confirmed active-file delete with baseline conflict checks; 10 regression tests V8-shim passed; physical-browser deletion unverified | Open project, tree navigation, source-file creation and save; scoped delete is implemented, copy-verify-delete rename implemented with non-atomic filesystem race limits; physical-browser acceptance remains missing |
 | Data viewer | partial / CSV/TSV plus bounded Python/R environment table snapshots wired; real Pyodide/webR and physical browser unverified | Interactive sortable/filterable tabular datasets including missing values |
@@ -32,6 +34,37 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Cross-platform packaging | missing | Installable signed/reproducible macOS and Linux releases |
 | Accessibility | partial / unverified | Full keyboard navigation, screen reader labels, resize and contrast checks |
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
+
+## 2026-10-24: explicit typed browser Python/R variable transfer (cross-platform CI accepted)
+
+The Environment pane now has a manual Python → R / R → Python variable
+copy operation. A bounded tagged scalar/vector protocol uses actual existing
+Pyodide worker and webR session instances, not a synthetic interpreter or
+server-side substitute. Python exports exact built-in scalars or homogeneous
+lists/tuples; R exports classless atomic numeric/logical/character vectors.
+Target variables are assigned into the existing persistent interpreter globals.
+Both directions reject malformed identifiers, unsupported or missing values,
+non-finite/unsafe numbers, oversized data and active R bindings. Transfers
+do not run during source execution; a reset between export and import prevents
+the destination assignment. The Flow-owned router explicitly serves the
+same transfer-controller asset on localhost. No Flow language or compiler
+syntax was modified.
+
+**Status: partial / cross-platform CI accepted, physical-browser execution
+outstanding.** [PR #29](https://github.com/godofecht/FlowStudio/pull/29)
+passed [CI #40088230707](https://github.com/godofecht/FlowStudio/actions/runs/40088230707):
+all four jobs succeeded on Ubuntu 24.04 and macOS 14. Quality suites
+passed 436 Node tests per platform (one optional Rscript test skipped
+because Rscript is not installed in the quality jobs). Native acceptance
+ran all 10 transfer tests with **zero skips**, including actual CPython
+and Rscript execution of the generated queries, then built the real Flow
+server, exercised live HTTP routes and packaged both platforms. Direct
+V8 checks also passed. No physical browser with live Pyodide/webR has
+been exercised, so browser interoperability remains unverified. See
+[TYPED_VARIABLE_TRANSFER.md](TYPED_VARIABLE_TRANSFER.md). Arbitrary Python
+objects, R data frames/matrices, nested structures, missing-value transfer,
+Flow values and automatic notebook cross-language state sharing remain
+unsupported.
 
 ## 2026-10-24: independent browser console runtimes (cross-platform CI accepted)
 

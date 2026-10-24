@@ -101,6 +101,18 @@ def verify(root: Path, port: int = 8751, build_timeout: int = 180,
             print(r_result.stderr, end="", file=sys.stderr, flush=True)
         if r_result.returncode != 0:
             raise VerificationError("Real R IPC acceptance failed")
+        if not shutil.which("node"):
+            raise VerificationError("Node.js is required for browser transfer Rscript acceptance")
+        print("Real Python/R transfer query acceptance: tests/browser_variable_transfer.test.js", flush=True)
+        transfer_result = _command(
+            ["node", "--test", str(root / "tests/browser_variable_transfer.test.js")], root, 65
+        )
+        if transfer_result.stdout:
+            print(transfer_result.stdout, end="", flush=True)
+        if transfer_result.stderr:
+            print(transfer_result.stderr, end="", file=sys.stderr, flush=True)
+        if transfer_result.returncode != 0:
+            raise VerificationError("Real Python/R transfer query acceptance failed")
     _free_port(port)
     # Never accept a stale executable left by an earlier successful build.
     # Unlinking a symlink here also avoids following an unexpected target.

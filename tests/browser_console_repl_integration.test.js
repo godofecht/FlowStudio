@@ -9,6 +9,7 @@ const html = fs.readFileSync(path.join(base, "index.html"), "utf8");
 const inline = html.match(/<script>\s*([\s\S]*?)<\/script>/);
 const consoleREPL = require("../docs/app/console_repl.js");
 const selectionScript = fs.readFileSync(path.join(base, "source_selection.js"), "utf8");
+const transferScript = fs.readFileSync(path.join(base, "variable_transfer.js"), "utf8");
 function fixture() {
   const elements = new Map(), workers = [], rCalls = [], flowCalls = [];
   function element(id) {
@@ -47,6 +48,7 @@ function fixture() {
   };
   ctx.window=ctx;
   vm.runInNewContext(selectionScript,ctx,{filename:"docs/app/source_selection.js"});
+  vm.runInNewContext(transferScript,ctx,{filename:"docs/app/variable_transfer.js"});
   vm.runInNewContext(inline[1],ctx,{filename:"docs/app/index.html"});
   function click(id){elements.get(id).listeners.get("click")({});}
   async function tick(){await new Promise(resolve=>setImmediate(resolve));}

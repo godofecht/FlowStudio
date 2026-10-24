@@ -74,7 +74,7 @@ def test_python(page, timeout: int):
     assert "fs_browser_value" in page.locator("#environment").inner_text()
 
     # A user-defined repr/len must never run during automatic environment refresh.
-    run_source(page, "python", "class FSProbe:\\n    def __repr__(self):\\n        raise RuntimeError('inspection called user repr')\\n    def __len__(self):\\n        raise RuntimeError('inspection called user len')\\nfs_probe = FSProbe()\\nprint('inspection safe 42')",
+    run_source(page, "python", "class FSProbe:\n    def __repr__(self):\n        raise RuntimeError('inspection called user repr')\n    def __len__(self):\n        raise RuntimeError('inspection called user len')\nfs_probe = FSProbe()\nprint('inspection safe 42')",
                "inspection safe 42", timeout)
     assert "fs_probe" in page.locator("#environment").inner_text()
 

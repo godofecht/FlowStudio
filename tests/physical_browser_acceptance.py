@@ -136,12 +136,11 @@ def test_native_conditional_debugger(page, timeout: int):
     # Actual Chromium/Firefox/WebKit DOM -> Flow localhost HTTP -> CPython.
     page.locator("#pythonDebugPanel summary").click()
     page.locator("#language").select_option("python")
-    page.locator("#source").fill("for browser_i in range(5):\\n    browser_seen = browser_i\\nprint(browser_seen)\\n")
+    page.locator("#source").fill("for browser_i in range(5):\n    browser_seen = browser_i\nprint(browser_seen)\n")
     page.locator("#pythonBreakpoints").fill("2?browser_i>=3")
     page.locator("#pythonDebugStart").click()
     page.wait_for_function(
-        "() => document.querySelector('#pythonDebugOutput').textContent.includes('i: int = 3') || "
-        "document.querySelector('#pythonDebugOutput').textContent.includes('browser_i: int = 3')",
+        "() => document.querySelector('#pythonDebugOutput').textContent.includes('browser_i: int = 3')",
         timeout=timeout)
     assert "Python debugger: paused" in page.locator("#pythonDebugOutput").inner_text()
     page.locator("#pythonDebugContinue").click()

@@ -38,6 +38,23 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
 
 
+## 2026-10-24: real-browser acceptance harness (unverified)
+
+An opt-in Playwright runner now opens the checked-in FlowStudio browser IDE in
+Chromium/Firefox/WebKit, exercising actual Pyodide and webR downloads and
+source/console execution, live interpreter state, Python session snapshot
+export/import, source download, notebook execution, Python PNG plotting, webR
+canvas plotting, and R reset. When explicitly
+run against the native Flow-owned localhost server, it also checks real Flow
+compilation and execution. It refuses remote execution targets. The harness
+includes independent real-static-asset and loopback safety tests. See
+[physical browser acceptance instructions](PHYSICAL_BROWSER_ACCEPTANCE.md).
+
+**Status: physical-browser acceptance NOT YET RUN or independently verified.**
+This adds an executable acceptance gate, not evidence that Pyodide/webR ran
+successfully in Chromium or that RStudio parity has been achieved. No hosted CI
+configuration was modified.
+
 ## 2026-10-24: CPython step-over and step-out (acceptance pending)
 
 Native debugger commands now include **Step over** and **Step out**. The real

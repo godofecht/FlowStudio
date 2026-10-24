@@ -17,7 +17,7 @@ const PACKAGE_LIST = `local({
   }, character(1))
 })`;
 const INSPECT = `base::local({
-  rows <- character(0)
+  rows <- base::character(0)
   bytes <- 0L
   truncated <- FALSE
   encode <- function(value) utils::URLencode(base::substr(base::enc2utf8(value), 1L, 160L), reserved=TRUE)

@@ -37,11 +37,11 @@ def oversized_body_status() -> int:
     urllib is still writing, even when the server correctly returned 413.
     """
     request_headers = (
-        b"POST /api/run/python HTTP/1.1\\r\\n"
-        b"Host: 127.0.0.1:8751\\r\\n"
-        b"X-FlowStudio-Intent: run\\r\\n"
-        b"Content-Length: 131073\\r\\n"
-        b"Connection: close\\r\\n\\r\\n"
+        b"POST /api/run/python HTTP/1.1\r\n"
+        b"Host: 127.0.0.1:8751\r\n"
+        b"X-FlowStudio-Intent: run\r\n"
+        b"Content-Length: 131073\r\n"
+        b"Connection: close\r\n\r\n"
     )
     with socket.create_connection(("127.0.0.1", 8751), timeout=10) as connection:
         connection.sendall(request_headers)
@@ -49,7 +49,7 @@ def oversized_body_status() -> int:
         while chunk := connection.recv(4096):
             chunks.append(chunk)
     response = b"".join(chunks)
-    status_line = response.split(b"\\r\\n", 1)[0]
+    status_line = response.split(b"\r\n", 1)[0]
     assert status_line.startswith(b"HTTP/1.1 "), status_line
     return int(status_line.split()[1])
 

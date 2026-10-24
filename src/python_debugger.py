@@ -7,6 +7,9 @@ from __future__ import annotations
 
 import contextlib
 import json
+import math
+import operator
+import re
 import sys
 import threading
 import traceback
@@ -18,6 +21,43 @@ MAX_FRAMES = 16
 MAX_LOCALS = 16
 MAX_OUTPUT = 32768
 WAIT_SECONDS = 8.0
+MAX_CONDITION = 80
+# Conditional breakpoints intentionally support only numeric local comparisons.
+# Never eval() user-supplied expressions or invoke custom comparison methods.
+_CONDITION = re.compile(
+    r"([A-Za-z_][A-Za-z_0-9]*)(==|!=|>=|<=|>|<)(-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?)\Z"
+)
+_COMPARE = {"==": operator.eq, "!=": operator.ne, ">=": operator.ge,
+            "<=": operator.le, ">": operator.gt, "<": operator.lt}
+_MISSING = object()
+
+
+def _parse_breakpoints(points: object, line_count: int) -> dict[int, tuple[str, str, int | float] | None]:
+    if type(points) is not list or len(points) > MAX_BREAKPOINTS:
+        raise ValueError("Expected at most 64 breakpoint entries.")
+    result: dict[int, tuple[str, str, int | float] | None] = {}
+    for point in points:
+        condition = None
+        if type(point) is int:
+            line = point
+        elif type(point) is dict and set(point) == {"line", "condition"}:
+            line, expression = point["line"], point["condition"]
+            if type(expression) is not str or len(expression) > MAX_CONDITION:
+                raise ValueError("Invalid breakpoint condition.")
+            match = _CONDITION.fullmatch(expression)
+            if match is None:
+                raise ValueError("Condition must be a numeric local comparison, e.g. i>=3.")
+            name, comparison, literal = match.groups()
+            number = float(literal) if "." in literal else int(literal)
+            if type(number) is float and not math.isfinite(number):
+                raise ValueError("Breakpoint condition must compare finite numbers.")
+            condition = (name, comparison, number)
+        else:
+            raise ValueError("Invalid breakpoint entry.")
+        if type(line) is not int or not 1 <= line <= line_count or line in result:
+            raise ValueError("Invalid or duplicate breakpoint line.")
+        result[line] = condition
+    return result
 
 
 class _Stopped(BaseException):
@@ -66,7 +106,7 @@ class DebugSession:
         self.state = "idle"
         self.mode = "run"
         self.anchor_depth = 0
-        self.breakpoints: frozenset[int] = frozenset()
+        self.breakpoints: dict[int, tuple[str, str, int | float] | None] = {}
         self.frames: list[dict[str, object]] = []
         self.writer: Any = None
         self.ok = True
@@ -83,6 +123,21 @@ class DebugSession:
         with self.cv:
             return self._snapshot()
 
+    def _breakpoint_hit(self, frame: Any) -> bool:
+        condition = self.breakpoints.get(frame.f_lineno, _MISSING)
+        if condition is _MISSING:
+            return False
+        if condition is None:
+            return True
+        name, comparison, number = condition
+        value = frame.f_locals.get(name, _MISSING)
+        if type(value) not in (int, float):
+            return False
+        if type(value) is float and not math.isfinite(value):
+            return False
+        # Exact built-in numbers only: never dispatch to user-defined __eq__/__lt__.
+        return bool(_COMPARE[comparison](value, number))
+
     def _trace(self, frame: Any, event: str, arg: object) -> Any:
         if event != "line" or frame.f_code.co_filename != SOURCE_NAME:
             return self._trace
@@ -90,7 +145,7 @@ class DebugSession:
             if self.stop_requested:
                 raise _Stopped()
             depth = _source_depth(frame)
-            pause = (frame.f_lineno in self.breakpoints or self.mode == "step" or
+            pause = (self._breakpoint_hit(frame) or self.mode == "step" or
                      (self.mode == "next" and depth <= self.anchor_depth) or
                      (self.mode == "finish" and depth < self.anchor_depth))
             if not pause:
@@ -137,19 +192,16 @@ class DebugSession:
             source, points = request["source"], request["breakpoints"]
             if type(source) is not str or not source or len(source.encode("utf-8")) > 120000:
                 raise ValueError("Source must contain 1 to 120000 UTF-8 bytes.")
-            if type(points) is not list or len(points) > MAX_BREAKPOINTS or any(
-                type(n) is not int or n < 1 or n > len(source.splitlines()) for n in points
-            ) or len(set(points)) != len(points):
-                raise ValueError("Invalid breakpoint line numbers.")
+            parsed = _parse_breakpoints(points, len(source.splitlines()))
         except (ValueError, TypeError, UnicodeError) as exc:
             return {"state": "idle", "ok": False, "stack": [], "output": "", "message": str(exc)[:1024]}
         with self.cv:
             if self.state in ("running", "paused"):
                 return {"state": self.state, "ok": False, "stack": [], "output": "", "message": "Debugger already active."}
             self.state = "running"
-            self.mode = "run" if points else "step"
+            self.mode = "run" if parsed else "step"
             self.anchor_depth = 0
-            self.breakpoints = frozenset(points)
+            self.breakpoints = parsed
             self.frames = []
             self.writer = writer
             self.ok = True

@@ -41,6 +41,16 @@ const INSPECT = `base::local({
                  base::length(dimensions) <= 8L && base::all(!base::is.na(dimensions)) &&
                  base::all(dimensions >= 0L)) base::paste(dimensions, collapse=" x ") else ""
     classes <- base::attr(value, "class", exact=TRUE)
+    # Exact base data.frames store row/column labels as ordinary attributes.
+    # Reading their lengths avoids dispatching a user-defined dim() method.
+    if (base::identical(classes, "data.frame") && base::identical(raw_type, "list")) {
+      columns <- base::attr(value, "names", exact=TRUE)
+      rownames <- base::attr(value, "row.names", exact=TRUE)
+      if (base::is.character(columns) &&
+          (base::is.integer(rownames) || base::is.character(rownames)) &&
+          base::length(columns) <= 1000000L && base::length(rownames) <= 1000000L)
+        shape <- base::paste(base::length(rownames), base::length(columns), sep=" x ")
+    }
     kind <- if (base::is.character(classes) && base::length(classes) > 0L) {
       base::paste(utils::head(classes, 3L), collapse="/")
     } else if (base::nzchar(shape)) {

@@ -60,6 +60,8 @@ function encode(source, language, entries, parseCells) {
   const parsed = source ? parseCells(source) : [];
   if (!Array.isArray(parsed) || parsed.length > MAX_CELLS)
     throw Error("Notebook exceeds the 256-cell export limit.");
+  if (parsed.some(cell => cell.kind === "code" && cell.language && cell.language !== language))
+    throw Error("Mixed-language cells cannot be exported as a single-kernel .ipynb; save the source file instead.");
   const outputs = new Map();
   if (Array.isArray(entries)) for (const entry of entries) {
     if (entry && Number.isInteger(entry.index) && entry.index >= 0 && entry.index < parsed.length && entry.kind === "code")

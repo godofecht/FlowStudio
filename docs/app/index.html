@@ -24,7 +24,7 @@ pre{white-space:pre-wrap;overflow:auto;overflow-wrap:anywhere;flex:1;margin:0;pa
 <header><strong>◈ FlowStudio <span class="muted">/ Browser</span></strong>
 <label for="language">Language</label><select id="language"><option value="python">Python (browser)</option><option value="flow">Flow (native localhost only)</option><option value="r">R (browser; webR 0.6.0)</option></select>
 <button id="open" type="button">Open file</button><button id="openFolder" type="button">Open project folder</button><button id="newProjectFile" type="button">New project file</button><button id="saveProjectFile" type="button" disabled>Save to disk</button><button id="saveAsProjectFile" type="button">Save As…</button><button id="renameProjectFile" type="button" disabled>Rename open project file</button><button id="deleteProjectFile" type="button" disabled>Delete open project file</button><input id="file" type="file" accept=".py,.flow,.r,.R,.txt" hidden>
-<button id="save" type="button">Download source</button><button id="run" type="button">Run Ctrl+Enter</button><button id="checkSyntax" type="button">Check syntax</button><button id="tracePython" type="button" disabled title="Native localhost Python line tracing; executes source in the native Python session">Trace Python (native)</button><button id="completeSource" type="button" title="Complete symbol at cursor (Ctrl+Space)">Complete Ctrl+Space</button><button id="runSelection" type="button">Run selection Ctrl+Shift+Enter</button><button id="runCell" type="button">Run cell Ctrl+Alt+Enter</button><button id="runNotebook" type="button">Run all cells</button><button id="openNotebook" type="button">Open .ipynb</button><input id="notebookFile" type="file" accept=".ipynb,application/x-ipynb+json" hidden><button id="saveNotebook" type="button">Export .ipynb</button><button id="exportReport" type="button">Export HTML report</button><button id="reset" type="button">Reset selected session</button><button id="forgetDraft" type="button">Forget saved draft</button>
+<button id="save" type="button">Download source</button><button id="run" type="button">Run Ctrl+Enter</button><button id="checkSyntax" type="button">Check syntax</button><button id="tracePython" type="button" disabled title="Native localhost Python line tracing; executes source in the native Python session">Trace Python (native)</button><button id="completeSource" type="button" title="Complete symbol at cursor (Ctrl+Space)">Complete Ctrl+Space</button><button id="runSelection" type="button">Run selection Ctrl+Shift+Enter</button><button id="runCell" type="button">Run cell Ctrl+Alt+Enter</button><button id="runNotebook" type="button" title="Use # %% [python], # %% [r] or # %% [flow] for per-cell runtime selection; Flow requires native localhost">Run all cells</button><button id="openNotebook" type="button">Open .ipynb</button><input id="notebookFile" type="file" accept=".ipynb,application/x-ipynb+json" hidden><button id="saveNotebook" type="button">Export .ipynb</button><button id="exportReport" type="button">Export HTML report</button><button id="reset" type="button">Reset selected session</button><button id="forgetDraft" type="button">Forget saved draft</button>
 </header>
 <main>
 <section aria-label="Source editor"><h2>Source — <span id="filename">untitled.py</span></h2><details id="projectPanel"><summary>Project files</summary><div id="projectTree" aria-label="Project file explorer">Choose a folder to browse its files.</div></details><textarea id="source" aria-label="Source code" spellcheck="false">x = 40
@@ -184,11 +184,7 @@ function renderEnvironment(variables) {
 }
 async function run(selectedOnly = false, activeCell = false, consoleCode = null) {
   if (busy) { if (consoleCode !== null) notice("Python session is busy."); return false; }
-  const language = ["python", "r", "flow"].includes($("language").value) ? $("language").value : "python";
-  if (language === "flow" && !globalThis.FlowStudioNativeFlow?.available?.()) {
-    notice("Flow execution requires the native FlowStudio server at http://127.0.0.1:8751/app/. GitHub Pages does not run Flow.");
-    return false;
-  }
+  let language = ["python", "r", "flow"].includes($("language").value) ? $("language").value : "python";
   let prepared;
   if (consoleCode !== null) {
     prepared = FlowStudioSourceSelection.prepare({value:consoleCode}, false);
@@ -196,12 +192,17 @@ async function run(selectedOnly = false, activeCell = false, consoleCode = null)
     try {
       const cell = FlowStudioSourceCells.cellAt($("source").value, $("source").selectionStart);
       if (cell.kind !== "code") { notice("Markdown cells cannot be executed."); return; }
+      language = cell.language || language;
       prepared = FlowStudioSourceSelection.prepare({value:cell.code}, false);
     } catch (error) { notice("Cannot run cell: " + (error.message || String(error))); return; }
   } else {
     prepared = FlowStudioSourceSelection.prepare($("source"), selectedOnly);
   }
   if (!prepared.ok) { notice(prepared.error); return false; }
+  if (language === "flow" && !globalThis.FlowStudioNativeFlow?.available?.()) {
+    notice("Flow execution requires the native FlowStudio server at http://127.0.0.1:8751/app/. GitHub Pages does not run Flow.");
+    return false;
+  }
   const code = prepared.code;
   const generation = sessionGeneration;
   setBusy(true);
@@ -301,7 +302,8 @@ function renderNotebookCell(entry) {
   card.className = "notebook-cell";
   const heading = document.createElement("h3");
   heading.textContent = entry.kind === "markdown" ? "Markdown cell " + (entry.index + 1) :
-    "Cell " + (entry.index + 1) + (entry.ok ? " — complete" : " — failed");
+    "Cell " + (entry.index + 1) + (entry.language ? " (" + entry.language + ")" : "") +
+    (entry.ok ? " — complete" : " — failed");
   card.append(heading);
   const output = document.createElement("pre");
   output.textContent = entry.kind === "markdown" ? entry.code :
@@ -313,7 +315,7 @@ function renderNotebookCell(entry) {
           !plot.png.startsWith("iVBORw0KGgo") || !/^[A-Za-z0-9+/=]+$/.test(plot.png)) continue;
       const image = document.createElement("img");
       image.src = "data:image/png;base64," + plot.png;
-      image.alt = "Python plot from cell " + (entry.index + 1);
+      image.alt = (entry.language || "Python") + " plot from cell " + (entry.index + 1);
       card.append(image);
     }
     if (entry.images.length) {
@@ -324,7 +326,7 @@ function renderNotebookCell(entry) {
   }
   notebookOutput.append(card);
   if (entry.kind === "code") {
-    notebookEntries.push({index:entry.index, kind:entry.kind,
+    notebookEntries.push({index:entry.index, kind:entry.kind, language:entry.language,
       ok:entry.ok, output:entry.output, truncated:entry.truncated === true, plots:entry.plots});
     if (notebookExecutionSource !== null && !FlowStudioNotebookRecovery.save(
       draftStorage, notebookExecutionSource, notebookExecutionLanguage, notebookEntries) && !notebookRecoveryFailed) {
@@ -336,10 +338,6 @@ function renderNotebookCell(entry) {
 async function runNotebook() {
   if (busy) { notice("An execution is already running."); return; }
   const language = $("language").value;
-  if (language === "flow" && !globalThis.FlowStudioNativeFlow?.available?.()) {
-    notice("Flow notebook execution requires the native FlowStudio server at http://127.0.0.1:8751/app/. GitHub Pages cannot execute Flow.");
-    return;
-  }
   if (!["python", "r", "flow"].includes(language)) return;
   const generation = sessionGeneration;
   clearNotebookRecovery();
@@ -354,7 +352,7 @@ async function runNotebook() {
     parseCells: FlowStudioSourceCells.parseCells,
     execute: (code, selectedLanguage) => selectedLanguage === "flow" ?
       globalThis.FlowStudioNativeFlow.run(code) : selectedLanguage === "r" ? getRSession().run(code) : request("run", code),
-    allowNativeFlow: language === "flow" && globalThis.FlowStudioNativeFlow?.available?.() === true,
+    allowNativeFlow: globalThis.FlowStudioNativeFlow?.available?.() === true,
     onCell: renderNotebookCell, notice
   });
   setBusy(true);
@@ -363,8 +361,9 @@ async function runNotebook() {
     if (generation !== sessionGeneration) return;
     notice(result.ok ? "Notebook executed " + result.executed + " cells." :
       "Notebook stopped after " + result.executed + " cells: " + result.error);
-    if (result.executed > 0 && language !== "flow") {
-      const inspect = language === "r" ? await getRSession().inspect() : await request("inspect");
+    const lastLanguage = notebookEntries.at(-1)?.language || language;
+    if (result.executed > 0 && (lastLanguage === "python" || lastLanguage === "r")) {
+      const inspect = lastLanguage === "r" ? await getRSession().inspect() : await request("inspect");
       if (generation !== sessionGeneration) return;
       if (inspect.ok) renderEnvironment(inspect.variables);
       else notice("Notebook environment inspection failed: " + inspect.output);
@@ -555,7 +554,8 @@ function restoreNotebookOutputs() {
   $("workspace").replaceChildren(notebookOutput);
   for (const cell of cells) {
     if (cell.kind === "markdown") renderNotebookCell({index:cell.index, kind:"markdown", code:cell.code});
-    else if (byIndex.has(cell.index)) renderNotebookCell({...byIndex.get(cell.index), images:[]});
+    else if (byIndex.has(cell.index)) renderNotebookCell({...byIndex.get(cell.index),
+      language:cell.language || language, images:[]});
   }
   notice("Recovered " + entries.length + " notebook cell outputs from this browser. Interpreter variables were not restored.");
 }

@@ -40,7 +40,7 @@ test("native debugger can start, step and continue with a shared UI lock", async
   const calls=[];
   const c=controls({available:()=>true,
     async debugPythonStart(source,lines){calls.push(["start",source,lines]);return paused;},
-    async debugPythonCommand(action){calls.push(action);return action==="step"?paused:done;}});
+    async debugPythonCommand(action){calls.push(action);return action==="continue"?done:paused;}});
   assert.equal(c.stepButton.disabled,true);
   assert.equal(await c.ui.execute("start"),true);
   assert.equal(c.stepButton.disabled,false);

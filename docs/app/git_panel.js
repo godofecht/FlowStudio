@@ -3,12 +3,12 @@
  */
 (function (global) {
 "use strict";
-function create({native, statusButton, diffButton, stagedDiffButton, stageButton, commitButton,
+function create({native, statusButton, diffButton, stagedDiffButton, stageButton, unstageButton, commitButton,
                  pathInput, messageInput, target, notice, confirmAction}) {
   if (!native || !statusButton || !diffButton || !target)
     throw new Error("Git panel requires its native client and controls.");
   const supported = !!native.available();
-  const controls = [statusButton, diffButton, stagedDiffButton, stageButton, commitButton].filter(Boolean);
+  const controls = [statusButton, diffButton, stagedDiffButton, stageButton, unstageButton, commitButton].filter(Boolean);
   let pending = false;
   function lock(value) {
     for (const button of controls) button.disabled = value || !supported;
@@ -60,6 +60,14 @@ function create({native, statusButton, diffButton, stagedDiffButton, stageButton
       "\" in the native server working tree? A directory stages its contents.")) return Promise.resolve(false);
     return perform("stage", () => native.gitStage(path));
   }
+  function unstage() {
+    if (!supported || pending || !pathInput) return Promise.resolve(false);
+    const path = pathInput.value;
+    if (!path || !path.trim() || !approve("Unstage Git path \"" + path +
+      "\" in the native server index? Working-tree changes will be preserved."))
+      return Promise.resolve(false);
+    return perform("unstage", () => native.gitUnstage(path));
+  }
   function commit() {
     if (!supported || pending || !messageInput) return Promise.resolve(false);
     const message = messageInput.value;
@@ -72,8 +80,9 @@ function create({native, statusButton, diffButton, stagedDiffButton, stageButton
   diffButton.addEventListener("click", () => { void show("diff"); });
   stagedDiffButton?.addEventListener("click", () => { void show("staged"); });
   stageButton?.addEventListener("click", () => { void stage(); });
+  unstageButton?.addEventListener("click", () => { void unstage(); });
   commitButton?.addEventListener("click", () => { void commit(); });
-  return Object.freeze({show, stage, commit, supported});
+  return Object.freeze({show, stage, unstage, commit, supported});
 }
 const api = Object.freeze({create});
 if (typeof module !== "undefined" && module.exports) module.exports = api;

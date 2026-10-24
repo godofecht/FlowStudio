@@ -29,6 +29,7 @@ extern {
     function fs_py_reset() -> void
     function unlink(path: string) -> i32
     function strcmp(a: string, b: string) -> i32
+    function strlen(s: string) -> i64
 }
 
 function eq(a: string, b: string) -> bool {
@@ -198,6 +199,47 @@ function send_flow_check(code: string) -> void {
     fs_reply(result.status, "text/plain; charset=utf-8", result.output)
 }
 
+# Fixed-argv, read-only Git inspection of the server working tree.
+# Git never receives a client-supplied path or shell expression.
+function send_git_view(kind: string) -> void {
+    let command: ptr<ProcCmd> = proc_cmd("git")
+    proc_arg(command, "-c")
+    proc_arg(command, "core.fsmonitor=false")
+    proc_arg(command, "--no-optional-locks")
+    if eq(kind, "status") {
+        proc_arg(command, "status")
+        proc_arg(command, "--short")
+        proc_arg(command, "--branch")
+        proc_arg(command, "--untracked-files=normal")
+    } else {
+        proc_arg(command, "diff")
+        proc_arg(command, "--no-ext-diff")
+        proc_arg(command, "--no-textconv")
+        proc_arg(command, "--no-color")
+        proc_arg(command, "--unified=3")
+        proc_arg(command, "--")
+    }
+    proc_timeout_ms(command, 5000)
+    let result: ptr<ProcResult> = proc_run(command)
+    if result.timed_out {
+        fs_reply(504, "text/plain; charset=utf-8", "Git inspection timed out after five seconds.")
+        return
+    }
+    if not eq(result.error, "") {
+        fs_reply(503, "text/plain; charset=utf-8", "Git executable unavailable: " + result.error)
+        return
+    }
+    if result.exit_code != 0 {
+        fs_reply(422, "text/plain; charset=utf-8", "Git inspection failed: " + result.stderr)
+        return
+    }
+    if strlen(result.stdout) > 131072 {
+        fs_reply(413, "text/plain; charset=utf-8", "Git output exceeds the 128 KiB display limit.")
+        return
+    }
+    fs_reply(200, "text/plain; charset=utf-8", result.stdout)
+}
+
 function send_editor() -> void {
     let page: FileRead = io_read_text("web/index.html")
     if page.ok {
@@ -241,6 +283,14 @@ function dispatch() -> void {
         }
         if eq(path, "/api/demo/python-r") {
             send_mixed_demo()
+            return
+        }
+        if eq(path, "/api/git/status") {
+            send_git_view("status")
+            return
+        }
+        if eq(path, "/api/git/diff") {
+            send_git_view("diff")
             return
         }
         if eq(path, "/api/run/flow") {

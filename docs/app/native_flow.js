@@ -62,7 +62,13 @@ async function checkSyntax(code) {
     [{line, column, message:match[3].slice(0, 512)}] : [];
   return {ok:false, output:response.output, diagnostics};
 }
-const api = Object.freeze({available, run, checkSyntax, tracePython});
+async function gitStatus() {
+  return request("/api/git/status", "");
+}
+async function gitDiff() {
+  return request("/api/git/diff", "");
+}
+const api = Object.freeze({available, run, checkSyntax, tracePython, gitStatus, gitDiff});
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 global.FlowStudioNativeFlow = api;
 })(globalThis);

@@ -22,7 +22,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Git pane | missing | Status, diff, stage, commit and branch operations |
 | Help pane | partial / browser Python live-global/builtin docstrings and installed R Rd help wired; Node/V8 contract tests, live Pyodide/webR and physical browser unverified; Flow help missing | Context-aware language/function docs |
 | Find / replace / cross-file search | partial / Node + V8-tested | Literal in-buffer find next/previous, single/all replacement and project-wide search implemented; incremental indexing, regex and physical-browser verification missing |
-| Percent-delimited source cells | partial / browser Python Run Cell integrated; Node and real-browser validation pending; Flow browser execution unavailable; browser R unverified | Run only the active `# %%` code cell in Flow/R/Python; markdown and empty cells do not execute |
+| Percent-delimited source cells | partial / lexical scanner unified across native editor and Pages, Node/HTTP acceptance pending; physical-browser execution unverified | Run only the active `# %%` code cell in Flow/R/Python; markdown and empty cells do not execute |
 | Sequential percent-cell notebooks | partial / Python and R Run All wired; bounded browser-local text/Python PNG output recovery across reload; native and physical-browser acceptance unverified | Execute cells in order, retain interpreter state, show per-cell output and stop on error |
 | Jupyter `.ipynb` import/export | partial / browser UI wired and Node regression coverage; bounded output recovery is separate from `.ipynb` import/export; physical-browser file round-trip and live Python/R kernels unverified | Import/export nbformat 4 Python/R code and Markdown cells through file picker/download; validate with nbformat; preserve source; verify live outputs in Chromium and cross-platform acceptance |
 | R Markdown / Quarto | partial / offline HTML report export from Python/R percent-cell notebooks; no Quarto/R Markdown rendering | Render notebook with inline plots and HTML export; verify actual Quarto/R Markdown format compatibility |
@@ -32,6 +32,28 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Cross-platform packaging | missing | Installable signed/reproducible macOS and Linux releases |
 | Accessibility | partial / unverified | Full keyboard navigation, screen reader labels, resize and contrast checks |
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
+
+## 2026-10-24: native source-cell lexer parity (PR pending)
+
+The native editor previously embedded an obsolete regular-expression-only
+cell splitter while the Pages editor used a multiline-aware lexical scanner.
+Consequently a `# %%` line inside Python triple-quoted text or an R
+multiline string could execute the wrong source fragment on the native
+Flow-owned server. The native `web/source_cells.js` now matches the Pages
+`docs/app/source_cells.js` implementation, and `web/index.html` loads it
+from an explicit `/source_cells.js` route in `src/data_routes.flow` instead
+of embedding an untested stale copy. The lexer preserves CR, LF and CRLF
+source offsets and caps the number of cells at 10,000. Regression suites
+from superseded PR #6 are retained, with additional exact native/Pages
+parity and native HTTP asset checks.
+
+**Status: partial / awaiting hosted CI and physical-browser acceptance.**
+A direct V8 execution of the exact branch parser and its three test modules
+passed 14 tests, and 174 focused assertions on parser equivalence and route
+wiring passed on 24 October 2026. These are not Node CI, native Flow build,
+real interpreter execution or physical-browser results. The existing native
+HTTP acceptance harness will verify the route once hosted CI runs. Source
+cell execution is still subject to the limitations of each runtime.
 
 ## 2026-10-24: native Python execution trace (cross-platform acceptance pending)
 

@@ -8,6 +8,7 @@ No external Python dependencies.
 from __future__ import annotations
 
 import json
+import socket
 import shutil
 import urllib.error
 import urllib.request
@@ -28,12 +29,43 @@ def request(method: str, path: str, body: str | None = None,
         return exc.code, exc.read().decode("utf-8")
 
 
+def oversized_body_status() -> int:
+    """Exercise header-level 413 without racing an early-close against sendall.
+
+    The Flow transport rejects Content-Length above 128 KiB before reading
+    the body. Sending the body as well can cause a TCP reset on macOS while
+    urllib is still writing, even when the server correctly returned 413.
+    """
+    request_headers = (
+        b"POST /api/run/python HTTP/1.1\r\n"
+        b"Host: 127.0.0.1:8751\r\n"
+        b"X-FlowStudio-Intent: run\r\n"
+        b"Content-Length: 131073\r\n"
+        b"Connection: close\r\n\r\n"
+    )
+    with socket.create_connection(("127.0.0.1", 8751), timeout=10) as connection:
+        connection.sendall(request_headers)
+        chunks = []
+        while chunk := connection.recv(4096):
+            chunks.append(chunk)
+    response = b"".join(chunks)
+    status_line = response.split(b"\r\n", 1)[0]
+    assert status_line.startswith(b"HTTP/1.1 "), status_line
+    return int(status_line.split()[1])
+
+
 def main() -> None:
     status, body = request("GET", "/health")
     assert status == 200 and body == "FlowStudio ready", (status, body)
 
     status, html = request("GET", "/")
     assert status == 200 and "<title>FlowStudio" in html, (status, html[:100])
+
+    # Native editor must fetch the same multiline-safe source-cell parser tested
+    # by Node; a missing Flow static route silently breaks Run Cell.
+    assert '<script src="/source_cells.js"></script>' in html
+    status, source_cells = request("GET", "/source_cells.js")
+    assert status == 200 and "function scanLine(line, state)" in source_cells, (status, source_cells[:100])
 
     status, _ = request("POST", "/api/run/python", 'print("bad")')
     assert status == 404, status
@@ -56,9 +88,7 @@ def main() -> None:
     )
     assert status == 404, status
 
-    status, _ = request("POST", "/api/run/python", "x" * 131073,
-                        accepted_headers)
-    assert status == 413, status
+    assert oversized_body_status() == 413
 
     status, output = request(
         "POST", "/api/run/python", 'print("flowstudio-python-ok")',

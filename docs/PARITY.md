@@ -14,7 +14,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Editor selection execution | partial / Node-tested browser selection; native and physical-browser unverified | Selection runs without accidentally executing entire buffer |
 | Persistent REPL/session | partial / browser Pyodide/webR sessions; native Python process retention and reset added (local C harness and cross-platform Flow HTTP CI passed); native R persistent kernel passed real Rscript and Flow-owned HTTP acceptance on Linux/macOS CI | Incremental variables and package state persist until reset |
 | Interactive multi-language console | partial / Python and R browser sessions plus stateless native Flow full-program execution wired; per-language histories and unsent drafts implemented; 427/427 JS tests per platform and native Flow/HTTP CI passed on Ubuntu/macOS; live physical-browser acceptance pending | Console can execute selected Python/R/Flow independently of source editor; preserve Python/R state, histories and drafts; report Flow native-only limits and execution failures |
-| Explicit Python/R variable transfer | partial / bounded plain scalar and atomic-vector copy wired into browser workspace; direct V8 checks passed; CI and real webR/Pyodide browser round-trip unverified | Copy typed scalars/vectors both ways between persistent runtimes, reject unsupported objects/NA/NaN and active bindings, verify independent real-browser and cross-platform execution |
+| Explicit Python/R variable transfer | partial / bounded plain scalar and atomic-vector copy wired; real CPython/Rscript query tests and native Flow HTTP accepted on Ubuntu/macOS CI; physical-browser Pyodide/webR round-trip unverified | Copy typed scalars/vectors both ways between persistent runtimes, reject unsupported objects/NA/NaN and active bindings, verify independent real-browser and cross-platform execution |
 | Variable inspector | partial / native Python and R bounded metadata snapshots cross-platform HTTP accepted; native Python exact-builtin nested metadata tree cross-platform CI accepted (unit/HTTP/DOM); R array dimensions and failed-lazy-binding recovery cross-platform HTTP accepted; browser Python/R metadata partial; arbitrary-object inspection and physical-browser acceptance missing | Nested objects / types / dimensions inspectable and refresh after execution |
 | Plot viewer | partial / Node-tested PNG import and integrated workspace tab; native unverified | png/svg plot history, zoom, save and deterministic device lifecycle |
 | Project explorer | partial / browser Pages open/create/save and confirmed active-file delete with baseline conflict checks; 10 regression tests V8-shim passed; physical-browser deletion unverified | Open project, tree navigation, source-file creation and save; scoped delete is implemented, copy-verify-delete rename implemented with non-atomic filesystem race limits; physical-browser acceptance remains missing |
@@ -35,7 +35,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Accessibility | partial / unverified | Full keyboard navigation, screen reader labels, resize and contrast checks |
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
 
-## 2026-10-24: explicit typed browser Python/R variable transfer (validation pending)
+## 2026-10-24: explicit typed browser Python/R variable transfer (cross-platform CI accepted)
 
 The Environment pane now has a manual Python → R / R → Python variable
 copy operation. A bounded tagged scalar/vector protocol uses actual existing
@@ -50,14 +50,17 @@ the destination assignment. The Flow-owned router explicitly serves the
 same transfer-controller asset on localhost. No Flow language or compiler
 syntax was modified.
 
-**Status: partial / V8 protocol checks passed; full CI and real-browser
-acceptance not yet established.** Direct V8 checks exercised module syntax,
-typed validation, worker export/import dispatch and R query construction.
-A matching CPython query smoke passed locally; Rscript is not installed in
-the authoring environment. The new Node suite includes a real CPython
-execution test and an Rscript execution test when available. No physical
-browser execution with live Pyodide/webR has been observed, and no
-cross-platform CI result is claimed yet. See
+**Status: partial / cross-platform CI accepted, physical-browser execution
+outstanding.** [PR #29](https://github.com/godofecht/FlowStudio/pull/29)
+passed [CI #40088230707](https://github.com/godofecht/FlowStudio/actions/runs/40088230707):
+all four jobs succeeded on Ubuntu 24.04 and macOS 14. Quality suites
+passed 436 Node tests per platform (one optional Rscript test skipped
+because Rscript is not installed in the quality jobs). Native acceptance
+ran all 10 transfer tests with **zero skips**, including actual CPython
+and Rscript execution of the generated queries, then built the real Flow
+server, exercised live HTTP routes and packaged both platforms. Direct
+V8 checks also passed. No physical browser with live Pyodide/webR has
+been exercised, so browser interoperability remains unverified. See
 [TYPED_VARIABLE_TRANSFER.md](TYPED_VARIABLE_TRANSFER.md). Arbitrary Python
 objects, R data frames/matrices, nested structures, missing-value transfer,
 Flow values and automatic notebook cross-language state sharing remain
@@ -262,6 +265,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Project explorer | partial / browser Pages open/create/save and confirmed active-file delete with baseline conflict checks; 10 regression tests V8-shim passed; physical-browser deletion unverified | Open project, tree navigation, source-file creation and save; scoped delete is implemented, copy-verify-delete rename implemented with non-atomic filesystem race limits; physical-browser acceptance remains missing |
 | Data viewer | partial / CSV/TSV plus bounded Python/R environment table snapshots wired; real Pyodide/webR and physical browser unverified | Interactive sortable/filterable tabular datasets including missing values |
 | Completion / language server | partial / browser Python AST and R parse-only syntax diagnostics; browser Python/R global-symbol prefix completion implemented with bounded interpreter namespace enumeration and keyboard insertion, pending cross-platform CI and physical-browser verification; native Flow strict compile-only diagnostics; Flow completion and member-aware completion missing | R, Flow and Python completion/diagnostics |
+| Document outline | partial / browser line-scan symbol list for Flow, Python and R wired into the workspace with click-to-symbol; Node suites and headless-Chromium CDP run passed locally, cross-platform CI pending | List buffer symbols, navigate to them, and keep the outline in sync with the active buffer |
 | Packages pane | partial / browser Python inventory/install and webR 0.6.0 inventory/install; mocked Node tests, live interpreters unverified | List, install, update with environment-aware package sources |
 | Git pane | missing | Status, diff, stage, commit and branch operations |
 | Help pane | partial / browser Python live-global/builtin docstrings and installed R Rd help wired; Node/V8 contract tests, live Pyodide/webR and physical browser unverified; Flow help missing | Context-aware language/function docs |

@@ -49,6 +49,16 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
 .workspace-tabs [aria-selected="true"]{background:var(--accent-dim);border-color:#3d5c95}
 .workspace-frame{flex:1;min-height:0}
 .workspace-frame iframe{display:block;width:100%;height:100%;border:0;background:#10141e}
+.outline-body{display:flex;flex-direction:column;gap:6px}
+.outline-head{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted)}
+.outline-head button{font-size:11px;padding:2px 7px}
+#outlineList{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px}
+.outline-item{display:flex;align-items:baseline;gap:6px;width:100%;text-align:left;background:transparent;border:1px solid transparent;border-radius:5px;padding:3px 6px 3px calc(6px + var(--depth,0) * 12px);font:12px/1.45 ui-monospace,SFMono-Regular,monospace;white-space:nowrap;overflow:hidden}
+.outline-item:hover,.outline-item:focus-visible{background:var(--accent-dim);border-color:#3d5c95}
+.outline-glyph{flex:0 0 12px;width:12px;text-align:center;color:var(--accent)}
+.outline-name{color:var(--ink);overflow:hidden;text-overflow:ellipsis}
+.outline-detail{color:var(--muted);overflow:hidden;text-overflow:ellipsis}
+.outline-note{padding:4px 6px;font-size:11px;color:var(--muted)}
 .project-tools{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:9px}
 .project-tools button{padding:4px 9px;font-size:12px}
 .project-search{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:9px}
@@ -121,6 +131,8 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
         <button type="button" role="menuitem" data-command="focusFind">Find in buffer<kbd>Ctrl+F</kbd></button>
         <button type="button" role="menuitem" data-command="focusReplace">Replace<kbd>Ctrl+H</kbd></button>
         <button type="button" role="menuitem" data-command="findInProject">Find in project</button>
+        <hr>
+        <button type="button" role="menuitem" data-command="goToSymbol">Go to symbol…<kbd>Ctrl+Shift+O</kbd></button>
       </div>
     </div>
     <div class="menu">
@@ -139,6 +151,7 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
         <button type="button" role="menuitem" data-command="showFiles">Project files</button>
         <button type="button" role="menuitem" data-command="showPlots">Plots</button>
         <button type="button" role="menuitem" data-command="showData">Data viewer</button>
+        <button type="button" role="menuitem" data-command="showOutline">Outline</button>
         <hr>
         <button type="button" role="menuitem" data-command="toggleDock">Toggle console dock</button>
       </div>
@@ -162,9 +175,10 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
   </div>
 </header>
 <div class="workspace">
-  <aside class="panel sidebar" aria-label="Project, plots and data">
+  <aside class="panel sidebar" aria-label="Project files, outline, plots and data">
     <div class="workspace-tabs" role="tablist" aria-label="Workspace views">
       <button type="button" id="tab-files" role="tab" aria-controls="view-files" aria-selected="true" tabindex="0">Files</button>
+      <button type="button" id="tab-outline" role="tab" aria-controls="view-outline" aria-selected="false" tabindex="-1">Outline</button>
       <button type="button" id="tab-plots" role="tab" aria-controls="view-plots" aria-selected="false" tabindex="-1">Plots</button>
       <button type="button" id="tab-data" role="tab" aria-controls="view-data" aria-selected="false" tabindex="-1">Data</button>
     </div>
@@ -183,6 +197,12 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
       <div id="searchResults" aria-live="polite" aria-label="Project search results"></div>
       <div id="projectTree" role="navigation" aria-label="Project files"><p class="muted">Open a folder to browse source files.</p></div>
       <p class="muted hint">Project files stay on this device. Plot and data viewers accept locally selected files.</p>
+    </div>
+    <div class="body outline-body" id="view-outline" role="tabpanel" aria-labelledby="tab-outline" hidden>
+      <div class="outline-head"><span id="outlineLabel">Document symbols</span><button id="outlineRefresh" type="button" title="Re-read the buffer">Refresh</button></div>
+      <ul id="outlineList" aria-label="Document outline"></ul>
+      <p id="outlineEmpty" class="muted">Open a Flow, R or Python file to see its structure.</p>
+      <p class="muted hint">Select a symbol to move the caret to it. The outline follows the active buffer.</p>
     </div>
     <div id="view-plots" class="workspace-frame" role="tabpanel" aria-labelledby="tab-plots" hidden><iframe title="Local plot history" loading="lazy"></iframe></div>
     <div id="view-data" class="workspace-frame" role="tabpanel" aria-labelledby="tab-data" hidden><iframe title="Local CSV and TSV data viewer" loading="lazy"></iframe></div>
@@ -225,7 +245,7 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
   <span id="dirty" hidden>● unsaved</span>
   <span id="cursor">Ln 1, Col 1</span>
   <span class="spacer"></span>
-  <span>Ctrl/⌘+S Save · Ctrl/⌘+Enter Run · Ctrl/⌘+Shift+Enter Cell · Ctrl/⌘+W Close tab</span>
+  <span>Ctrl/⌘+S Save · Ctrl/⌘+Enter Run · Ctrl/⌘+Shift+Enter Cell · Ctrl/⌘+W Close tab · Ctrl/⌘+Shift+O Outline</span>
 </footer>
 </div>
 <!-- BEGIN EMBEDDED PROJECT MODULE: mirrors web/project.js -->
@@ -839,6 +859,7 @@ function loadDocumentIntoEditor(doc) {
   updateCursor();
   updateFindCount();
   renderTabs();
+  if (typeof refreshOutline === "function") refreshOutline();
   return true;
 }
 function activateDocument(id) {
@@ -890,6 +911,23 @@ function updateCursor() {
   const before = src.value.slice(0, src.selectionStart);
   const lines = before.split("\n");
   el("cursor").textContent = "Ln " + lines.length + ", Col " + (lines[lines.length - 1].length + 1);
+}
+/* Move the caret to a buffer position and scroll that line toward the middle. */
+function revealPosition(line, column = 1) {
+  const lines = src.value.split("\n");
+  const target = Math.min(Math.max(1, Math.trunc(Number(line)) || 1), lines.length);
+  let offset = 0;
+  for (let index = 0; index < target - 1; index++) offset += lines[index].length + 1;
+  const width = (lines[target - 1] || "").length + 1;
+  const column_ = Math.min(Math.max(1, Math.trunc(Number(column)) || 1), width);
+  const computed = typeof getComputedStyle === "function" ? getComputedStyle(src) : null;
+  const lineHeight = computed ? parseFloat(computed.lineHeight) || 20 : 20;
+  src.focus();
+  src.setSelectionRange(offset + column_ - 1, offset + column_ - 1);
+  if (Number.isFinite(src.clientHeight) && Number.isFinite(src.scrollTop))
+    src.scrollTop = Math.max(0, (target - 1) * lineHeight - src.clientHeight / 2);
+  updateCursor();
+  return true;
 }
 let environmentRevision = 0;
 function showPythonEnvironmentMessage(message) {
@@ -1271,6 +1309,7 @@ src.addEventListener("input", () => {
   }
   updateCursor();
   updateFindCount();
+  if (typeof scheduleOutlineRefresh === "function") scheduleOutlineRefresh();
 });
 src.addEventListener("click", updateCursor);
 src.addEventListener("keyup", updateCursor);
@@ -1387,6 +1426,11 @@ document.addEventListener("keydown", event => {
     createUntitled();
     return;
   }
+  if (command && event.shiftKey && !event.altKey && event.key.toLowerCase() === "o") {
+    event.preventDefault();
+    goToSymbol();
+    return;
+  }
   if (command && event.key.toLowerCase() === "f") {
     event.preventDefault();
     showFindBar();
@@ -1441,6 +1485,9 @@ const commands = Object.freeze({
   },
   focusReplace: () => { showFindBar(); el("editorReplace").focus(); },
   findInProject: () => el("projectSearch").focus(),
+  showOutline: () => el("tab-outline").click(),
+  goToSymbol: () => goToSymbol(),
+  refreshOutline: () => refreshOutline(),
   run: () => el("run").click(),
   runCell: () => el("runCell").click(),
   resetR: () => el("resetR").click(),
@@ -1456,12 +1503,12 @@ const commands = Object.freeze({
     if (splitter) splitter.hidden = hide;
   },
   refreshEnvironment: () => el("refreshPythonEnvironment").click(),
-  shortcuts: () => status("Ctrl+Enter run · Ctrl+Shift+Enter cell · Ctrl+S save · Ctrl+W close tab · Ctrl+Tab next tab · Ctrl+F find · Ctrl+H replace", "ok"),
+  shortcuts: () => status("Ctrl+Enter run · Ctrl+Shift+Enter cell · Ctrl+S save · Ctrl+W close tab · Ctrl+Tab next tab · Ctrl+F find · Ctrl+H replace · Ctrl+Shift+O outline", "ok"),
   about: () => status("FlowStudio 0.1.0-alpha.1 · Flow-first local IDE · execution on 127.0.0.1:8751 only", "ok")
 });
 if (typeof window !== "undefined") {
   window.FlowStudioApp = Object.freeze({
-    commands, documents, createUntitled, activateDocument, closeDocument, openEditorHandle
+    commands, documents, createUntitled, activateDocument, closeDocument, openEditorHandle, revealPosition
   });
 }
 renderTabs();
@@ -1472,5 +1519,35 @@ renderTabs();
 <script src="/console.js"></script>
 <script src="/workspace_console.js"></script>
 <script src="/ide_shell.js"></script>
+<script src="/ide_symbols.js"></script>
+<script src="/ide_outline.js"></script>
+<script>
+"use strict";
+/* Outline panel: parses the active buffer and jumps the caret to a symbol. */
+const outlinePanel = FlowStudioOutline.mount(document, { jump: revealPosition });
+let outlineTimer = 0;
+function refreshOutline() {
+  if (!outlinePanel) return 0;
+  const doc = activeDocument();
+  return outlinePanel.update({
+    language: doc ? doc.language : language.value,
+    text: src.value,
+    label: doc ? FlowStudioDocuments.label(doc) : ""
+  });
+}
+function scheduleOutlineRefresh() {
+  if (outlineTimer) clearTimeout(outlineTimer);
+  outlineTimer = setTimeout(() => { outlineTimer = 0; refreshOutline(); }, 250);
+}
+function goToSymbol() {
+  const tab = el("tab-outline");
+  if (tab) tab.click();
+  refreshOutline();
+  if (outlinePanel) outlinePanel.focusFirst();
+}
+const outlineRefreshButton = el("outlineRefresh");
+if (outlineRefreshButton) outlineRefreshButton.addEventListener("click", refreshOutline);
+refreshOutline();
+</script>
 </body>
 </html>

@@ -63,6 +63,12 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/workspace_console.js" {
         return StaticAsset { path: "web/workspace_console.js", mime: "text/javascript; charset=utf-8", found: true }
     }
+    if url == "/ide_symbols.js" {
+        return StaticAsset { path: "web/ide_symbols.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/ide_outline.js" {
+        return StaticAsset { path: "web/ide_outline.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
     if url == "/ide_shell.js" {
         return StaticAsset { path: "web/ide_shell.js", mime: "text/javascript; charset=utf-8", found: true }
     }

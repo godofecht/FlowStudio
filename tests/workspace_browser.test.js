@@ -9,8 +9,12 @@ const root = path.join(__dirname, "..");
 const html = fs.readFileSync(path.join(root, "web/index.html"), "utf8");
 const projectSource = fs.readFileSync(path.join(root, "web/project.js"), "utf8").trimEnd();
 const sourceCells = fs.readFileSync(path.join(root, "web/source_cells.js"), "utf8").trimEnd();
+/* Enhancement mounts (workspace tabs, outline) run after this harness stops;
+   their own suites cover them. Everything else is the editor itself. */
 const scripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)]
-  .map(m => m[1]).filter(source => source.trim() && !source.includes("FlowStudioWorkspaceTabs.mount();"));
+  .map(m => m[1]).filter(source => source.trim() &&
+    !source.includes("FlowStudioWorkspaceTabs.mount();") &&
+    !source.includes("FlowStudioOutline.mount("));
 
 class Element {
   constructor(tag = "div") {

@@ -108,6 +108,24 @@ the hosted editor continues to execute Python/R through browser WebAssembly.
 Flow notebooks are not yet supported by the Python/R-only Jupyter export or
 HTML report exporter. Physical-browser end-to-end acceptance remains pending.
 
+## Native Git branches
+
+The Git pane on the Flow-owned localhost server lists local branches, creates
+a named branch at `HEAD`, and switches to an existing local branch after
+explicit confirmation. Branch switching refuses tracked changes and
+non-ignored untracked files; it never automatically stashes, commits,
+discards or overwrites user work. Native Git commands use fixed argv,
+bounded timeouts and disabled hooks. GitHub Pages has no access to the
+server working tree, and a browser-picked project directory is not the
+Git target. Branch deletion, remote tracking, merges and rebases are not
+implemented. Native build and real-browser acceptance remain pending for
+this addition; see [parity matrix](docs/PARITY.md).
+
+`node --test tests/browser_git_native.test.js tests/browser_git_panel.test.js`
+tests the browser-facing contract; `python3 scripts/verify_native.py`
+builds the Flow server and exercises real Git operations over localhost
+against an isolated temporary repository.
+
 ## Build and launch
 
 Requirements: [Flow 2.x](https://github.com/flooooooooooow/flow) installed as flow, a C11 compiler available as cc, POSIX macOS/Linux and a recent browser. Python 3 and Rscript are optional **runtime executables** for their respective execution modes.

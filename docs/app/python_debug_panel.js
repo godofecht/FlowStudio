@@ -30,12 +30,16 @@ function parseBreakpoints(input, lineCount) {
   const tokens = input.split(/[\s,]+/).filter(Boolean);
   if (tokens.length > 64) throw Error("At most 64 breakpoints are supported.");
   const points = tokens.map(token => {
-    if (!/^[1-9][0-9]*$/.test(token)) throw Error("Breakpoints must be positive line numbers.");
-    const line = Number(token);
+    // Syntax: line or line?numericLocalComparison, e.g. 4?counter>=3.
+    // No expression evaluation in the browser or native interpreter.
+    const match = /^([1-9][0-9]*)(?:\?([A-Za-z_][A-Za-z_0-9]*(?:==|!=|>=|<=|>|<)-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?))?$/.exec(token);
+    if (!match) throw Error("Use line or line?name>=number (no spaces).");
+    const line = Number(match[1]);
     if (!Number.isSafeInteger(line) || line > lineCount) throw Error("Breakpoint is outside source.");
-    return line;
+    return match[2] ? {line, condition:match[2]} : line;
   });
-  if (new Set(points).size !== points.length) throw Error("Duplicate breakpoint.");
+  const lines = points.map(point => typeof point === "number" ? point : point.line);
+  if (new Set(lines).size !== lines.length) throw Error("Duplicate breakpoint line.");
   return points;
 }
 function format(data) {

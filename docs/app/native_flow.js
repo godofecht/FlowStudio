@@ -51,11 +51,23 @@ async function tracePython(code) {
 }
 async function debugPythonStart(source, breakpoints) {
   if (typeof source !== "string" || !source.trim() ||
-      !Array.isArray(breakpoints) || breakpoints.length > 64 ||
-      breakpoints.some(n => !Number.isSafeInteger(n) || n < 1 ||
-        n > source.split(/\r\n|\r|\n/).length) ||
-      new Set(breakpoints).size !== breakpoints.length)
+      !Array.isArray(breakpoints) || breakpoints.length > 64)
     throw new Error("Python debugger requires source and up to 64 valid breakpoint lines.");
+  const lineCount = source.split(/\r\n|\r|\n/).length;
+  const condition = /^[A-Za-z_][A-Za-z_0-9]*(?:==|!=|>=|<=|>|<)-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$/;
+  const lines = breakpoints.map(point => {
+    if (Number.isSafeInteger(point)) return point;
+    if (!point || typeof point !== "object" || Array.isArray(point) ||
+        Object.keys(point).length !== 2 ||
+        !Object.hasOwn(point, "line") || !Object.hasOwn(point, "condition") ||
+        typeof point.condition !== "string" || point.condition.length > 80 ||
+        !condition.test(point.condition))
+      throw new Error("Invalid Python conditional breakpoint.");
+    return point.line;
+  });
+  if (lines.some(line => !Number.isSafeInteger(line) || line < 1 || line > lineCount) ||
+      new Set(lines).size !== lines.length)
+    throw new Error("Python debugger requires distinct valid breakpoint lines.");
   return debugPythonResponse("/api/debug/python/start", JSON.stringify({source, breakpoints}));
 }
 async function debugPythonCommand(action) {

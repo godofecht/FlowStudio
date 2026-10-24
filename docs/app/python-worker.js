@@ -4,6 +4,7 @@ let runtime = null;
 let loading = null;
 let plotCaptureLoaded = false;
 let dataCaptureLoaded = false;
+let environmentCaptureLoaded = false;
 let queued = 0;
 let serial = Promise.resolve();
 const MAX_QUEUED = 32;
@@ -59,6 +60,39 @@ async function prepareDataCapture(py) {
   if (source.length > 16384) throw Error("Table capture helper exceeds size limit.");
   py.FS.writeFile("flowstudio_data_capture.py", source);
   dataCaptureLoaded = true;
+}
+async function prepareEnvironmentCapture(py) {
+  if (environmentCaptureLoaded) return;
+  const response = await fetch("./environment_capture.py");
+  if (!response.ok) throw Error("Environment capture helper unavailable.");
+  const source = await response.text();
+  if (source.length > 16384) throw Error("Environment capture helper exceeds size limit.");
+  py.FS.writeFile("flowstudio_environment_capture.py", source);
+  environmentCaptureLoaded = true;
+}
+function validateEnvironmentSnapshot(snapshot) {
+  if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot) ||
+      typeof snapshot.truncated !== "boolean" || !Array.isArray(snapshot.variables) ||
+      snapshot.variables.length > 128)
+    throw Error("Invalid Python environment response.");
+  let nodes = 0;
+  function check(node, depth) {
+    nodes++;
+    if (nodes > 256 || !node || typeof node !== "object" || Array.isArray(node) ||
+        typeof node.name !== "string" || node.name.length > 160 ||
+        typeof node.type !== "string" || node.type.length > 100 ||
+        typeof node.preview !== "string" || node.preview.length > 160 ||
+        !(node.shape === null || (Array.isArray(node.shape) && node.shape.length <= 2 &&
+          node.shape.every(n => Number.isSafeInteger(n) && n >= 0))) ||
+        (node.truncated !== undefined && typeof node.truncated !== "boolean") ||
+        (node.cycle !== undefined && typeof node.cycle !== "boolean") ||
+        (node.children !== undefined && (!Array.isArray(node.children) ||
+          node.children.length > 12 || depth >= 2)))
+      throw Error("Invalid Python environment node.");
+    if (node.children) for (const child of node.children) check(child, depth + 1);
+  }
+  for (const variable of snapshot.variables) check(variable, 0);
+  return snapshot;
 }
 async function capturePlots(py) {
   try {
@@ -221,6 +255,15 @@ async function handle(event) {
       self.postMessage({id, ok:true, output:"Installed " + code});
       return;
     }
+    if (op === "inspect") {
+      await prepareEnvironmentCapture(py);
+      const raw = await py.runPythonAsync("import json as _fs_json, flowstudio_environment_capture as _fs_environment_capture\\n_fs_json.dumps(_fs_environment_capture.capture(globals()), ensure_ascii=True, separators=(',', ':'))");
+      if (typeof raw !== "string" || raw.length > 65536)
+        throw Error("Python environment response exceeds 64 KiB.");
+      const snapshot = validateEnvironmentSnapshot(JSON.parse(raw));
+      self.postMessage({id, ok:true, variables:snapshot.variables, truncated:snapshot.truncated});
+      return;
+    }
     if (op === "table") {
       await prepareDataCapture(py);
       const raw = await py.runPythonAsync("import flowstudio_data_capture as _fs_data_capture\n_fs_data_capture.capture(" +
@@ -241,7 +284,7 @@ async function handle(event) {
     }
     py.setStdout({batched: text => { stdout = boundedAppend(stdout, text + "\n"); }});
     py.setStderr({batched: text => { stderr = boundedAppend(stderr, text + "\n"); }});
-    const value = await py.runPythonAsync(op === "inspect" ? "import json as _fs_json\n_fs_json.dumps([{\u0027name\u0027:k,\u0027type\u0027:type(v).__name__,\u0027preview\u0027:repr(v)[:160],\u0027shape\u0027:None} for k,v in list(globals().items()) if not k.startswith(\u0027_\u0027)][:100])" : code);
+    const value = await py.runPythonAsync(code);
     const rendered = value === undefined || value === null ? "" : String(value).slice(0, MAX_OUTPUT);
     if (value && typeof value.destroy === "function") value.destroy();
     if (op === "run" && plotCaptureLoaded) {
@@ -249,8 +292,7 @@ async function handle(event) {
       plots = captured.plots;
       if (captured.warning) plotWarning = captured.warning;
     }
-    if (op === "inspect") self.postMessage({id, ok:true, variables:JSON.parse(rendered)});
-    else self.postMessage({id, ok:true, output:(stdout + rendered + (stderr ? "\n" + stderr : "")).slice(0, MAX_OUTPUT), plots, plotWarning});
+    self.postMessage({id, ok:true, output:(stdout + rendered + (stderr ? "\n" + stderr : "")).slice(0, MAX_OUTPUT), plots, plotWarning});
   } catch (error) {
     let plots = [];
     if (op === "run" && py && plotCaptureLoaded) {

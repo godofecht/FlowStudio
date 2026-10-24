@@ -97,7 +97,7 @@ function request(op, code, value) {
 function notice(text) { $("notice").textContent = text; }
 function setBusy(value) {
   busy = value;
-  for (const id of ["run", "runSelection", "runCell", "runNotebook", "checkSyntax", "lookupHelp", "completeSource"]) $(id).disabled = value;
+  for (const id of ["run", "runSelection", "runCell", "runNotebook", "checkSyntax", "lookupHelp", "completeSource", "transferVariable"]) $(id).disabled = value;
   $("tracePython").disabled = value || $("language").value !== "python" || !globalThis.FlowStudioNativeFlow?.available?.();
 }
 const packagePanel = FlowStudioPackages.create({document, request, notice, target:$("packages"),

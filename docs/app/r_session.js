@@ -16,84 +16,84 @@ const PACKAGE_LIST = `local({
           utils::URLencode(p[i, 2L], reserved=TRUE), sep="\\t")
   }, character(1))
 })`;
-const INSPECT = `local({
+const INSPECT = `base::local({
   rows <- character(0)
   bytes <- 0L
   truncated <- FALSE
-  encode <- function(value) utils::URLencode(substr(enc2utf8(value), 1L, 160L), reserved=TRUE)
+  encode <- function(value) utils::URLencode(base::substr(base::enc2utf8(value), 1L, 160L), reserved=TRUE)
   push <- function(depth, name, kind, shape, preview, more=FALSE) {
-    row <- paste(depth, encode(name), encode(kind), encode(shape), encode(preview),
+    row <- base::paste(depth, encode(name), encode(kind), encode(shape), encode(preview),
                  if (more) "1" else "0", sep="\t")
-    size <- nchar(row, type="bytes")
-    if (length(rows) >= 256L || bytes + size > 65000L) {
+    size <- base::nchar(row, type="bytes")
+    if (base::length(rows) >= 256L || bytes + size > 65000L) {
       truncated <<- TRUE
-      return(FALSE)
+      base::return(FALSE)
     }
-    rows <<- c(rows, row)
+    rows <<- base::c(rows, row)
     bytes <<- bytes + size
     TRUE
   }
   describe <- function(name, value, depth) {
-    plain <- !is.object(value)
-    raw_type <- typeof(value)
-    dimensions <- attr(value, "dim", exact=TRUE)
-    shape <- if (is.integer(dimensions) && length(dimensions) > 0L &&
-                 length(dimensions) <= 8L && all(!is.na(dimensions)) &&
-                 all(dimensions >= 0L)) paste(dimensions, collapse=" x ") else ""
-    classes <- attr(value, "class", exact=TRUE)
-    kind <- if (is.character(classes) && length(classes) > 0L) {
-      paste(head(classes, 3L), collapse="/")
-    } else if (nzchar(shape)) {
-      paste0("matrix/array (", raw_type, ")")
+    plain <- !base::is.object(value)
+    raw_type <- base::typeof(value)
+    dimensions <- base::attr(value, "dim", exact=TRUE)
+    shape <- if (base::is.integer(dimensions) && base::length(dimensions) > 0L &&
+                 base::length(dimensions) <= 8L && base::all(!base::is.na(dimensions)) &&
+                 base::all(dimensions >= 0L)) base::paste(dimensions, collapse=" x ") else ""
+    classes <- base::attr(value, "class", exact=TRUE)
+    kind <- if (base::is.character(classes) && base::length(classes) > 0L) {
+      base::paste(utils::head(classes, 3L), collapse="/")
+    } else if (base::nzchar(shape)) {
+      base::paste0("matrix/array (", raw_type, ")")
     } else {
       raw_type
     }
-    size <- if (plain && raw_type %in% c("logical", "integer", "double",
+    size <- if (plain && raw_type %in% base::c("logical", "integer", "double",
               "complex", "character", "raw", "list")) base::length(value) else NA_integer_
-    preview <- if (!is.na(size) && size == 1L &&
-                   is.null(attributes(value)) &&
-                   raw_type %in% c("logical", "integer", "double", "character") &&
-                   !is.na(value[1L]) &&
-                   (raw_type != "double" || is.finite(value[1L]))) {
-      substr(as.character(value[1L]), 1L, 120L)
-    } else if (!is.na(size)) {
-      paste0(raw_type, " [", size, "]")
+    preview <- if (!base::is.na(size) && size == 1L &&
+                   base::is.null(base::attributes(value)) &&
+                   raw_type %in% base::c("logical", "integer", "double", "character") &&
+                   !base::is.na(value[1L]) &&
+                   (raw_type != "double" || base::is.finite(value[1L]))) {
+      base::substr(base::as.character(value[1L]), 1L, 120L)
+    } else if (!base::is.na(size)) {
+      base::paste0(raw_type, " [", size, "]")
     } else {
-      paste0("<", raw_type, ">")
+      base::paste0("<", raw_type, ">")
     }
-    count <- if (depth < 2L && plain && identical(raw_type, "list"))
-      min(size, 12L) else 0L
-    more <- depth < 2L && plain && identical(raw_type, "list") && size > count
-    if (!push(depth, name, kind, shape, preview, more)) return(FALSE)
+    count <- if (depth < 2L && plain && base::identical(raw_type, "list"))
+      base::min(size, 12L) else 0L
+    more <- depth < 2L && plain && base::identical(raw_type, "list") && size > count
+    if (!push(depth, name, kind, shape, preview, more)) base::return(FALSE)
     if (count > 0L) {
-      labels <- attr(value, "names", exact=TRUE)
-      for (index in seq_len(count)) {
-        if (length(rows) >= 256L) { truncated <<- TRUE; break }
-        label <- paste0("[[", index, "]]")
-        if (is.character(labels) && length(labels) >= index &&
-            !is.na(labels[index]) && nzchar(labels[index]))
-          label <- paste0(label, " ", substr(labels[index], 1L, 80L))
+      labels <- base::attr(value, "names", exact=TRUE)
+      for (index in base::seq_len(count)) {
+        if (base::length(rows) >= 256L) { truncated <<- TRUE; break }
+        label <- base::paste0("[[", index, "]]")
+        if (base::is.character(labels) && base::length(labels) >= index &&
+            !base::is.na(labels[index]) && base::nzchar(labels[index]))
+          label <- base::paste0(label, " ", base::substr(labels[index], 1L, 80L))
         if (!describe(label, value[[index]], depth + 1L)) break
       }
     }
     TRUE
   }
-  names <- ls(envir=.GlobalEnv, all.names=FALSE)
-  if (length(names) > 128L) truncated <- TRUE
-  for (name in head(names, 128L)) {
-    if (length(rows) >= 256L) { truncated <- TRUE; break }
-    if (bindingIsActive(name, .GlobalEnv)) {
+  names <- base::ls(envir=.GlobalEnv, all.names=FALSE)
+  if (base::length(names) > 128L) truncated <- TRUE
+  for (name in utils::head(names, 128L)) {
+    if (base::length(rows) >= 256L) { truncated <- TRUE; break }
+    if (base::bindingIsActive(name, .GlobalEnv)) {
       if (!push(0L, name, "active binding", "", "<not evaluated>")) break
     } else {
-      binding <- tryCatch(
-        list(ok=TRUE, value=get(name, envir=.GlobalEnv, inherits=FALSE)),
-        error=function(e) list(ok=FALSE))
+      binding <- base::tryCatch(
+        base::list(ok=TRUE, value=base::get(name, envir=.GlobalEnv, inherits=FALSE)),
+        error=function(e) base::list(ok=FALSE))
       if (!binding$ok) {
         if (!push(0L, name, "unavailable", "", "<failed binding>")) break
       } else if (!describe(name, binding$value, 0L)) break
     }
   }
-  c(if (truncated) "@1" else "@0", rows)
+  base::c(if (truncated) "@1" else "@0", rows)
 })`;
 function parseInspection(rows) {
   if (!Array.isArray(rows) || rows.length < 1 || rows.length > 257 ||

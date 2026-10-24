@@ -17,15 +17,112 @@ const PACKAGE_LIST = `local({
   }, character(1))
 })`;
 const INSPECT = `local({
-  n <- head(ls(envir=.GlobalEnv, all.names=FALSE), 100L)
-  vapply(n, function(k) {
-    v <- get(k, envir=.GlobalEnv, inherits=FALSE)
-    fields <- c(k, paste(head(class(v), 3L), collapse="/"),
-      paste(dim(v), collapse=" x "),
-      substr(paste(capture.output(str(v, max.level=0L, give.attr=FALSE)), collapse=" "), 1L, 160L))
-    paste(vapply(fields, utils::URLencode, character(1), reserved=TRUE), collapse="\\t")
-  }, character(1))
+  rows <- character(0)
+  bytes <- 0L
+  truncated <- FALSE
+  encode <- function(value) utils::URLencode(substr(enc2utf8(value), 1L, 160L), reserved=TRUE)
+  push <- function(depth, name, kind, shape, preview, more=FALSE) {
+    row <- paste(depth, encode(name), encode(kind), encode(shape), encode(preview),
+                 if (more) "1" else "0", sep="\t")
+    size <- nchar(row, type="bytes")
+    if (length(rows) >= 256L || bytes + size > 65000L) {
+      truncated <<- TRUE
+      return(FALSE)
+    }
+    rows <<- c(rows, row)
+    bytes <<- bytes + size
+    TRUE
+  }
+  describe <- function(name, value, depth) {
+    plain <- !is.object(value)
+    raw_type <- typeof(value)
+    dimensions <- attr(value, "dim", exact=TRUE)
+    shape <- if (is.integer(dimensions) && length(dimensions) > 0L &&
+                 length(dimensions) <= 8L && all(!is.na(dimensions)) &&
+                 all(dimensions >= 0L)) paste(dimensions, collapse=" x ") else ""
+    classes <- attr(value, "class", exact=TRUE)
+    kind <- if (is.character(classes) && length(classes) > 0L)
+      paste(head(classes, 3L), collapse="/")
+    else if (nzchar(shape)) paste0("matrix/array (", raw_type, ")")
+    else raw_type
+    size <- if (plain && raw_type %in% c("logical", "integer", "double",
+              "complex", "character", "raw", "list")) base::length(value) else NA_integer_
+    preview <- if (!is.na(size) && size == 1L &&
+                   is.null(attributes(value)) &&
+                   raw_type %in% c("logical", "integer", "double", "character") &&
+                   !is.na(value[1L]) &&
+                   (raw_type != "double" || is.finite(value[1L])))
+      substr(as.character(value[1L]), 1L, 120L)
+    else if (!is.na(size)) paste0(raw_type, " [", size, "]")
+    else paste0("<", raw_type, ">")
+    count <- if (depth < 2L && plain && identical(raw_type, "list"))
+      min(size, 12L) else 0L
+    more <- depth < 2L && plain && identical(raw_type, "list") && size > count
+    if (!push(depth, name, kind, shape, preview, more)) return(FALSE)
+    if (count > 0L) {
+      labels <- attr(value, "names", exact=TRUE)
+      for (index in seq_len(count)) {
+        if (length(rows) >= 256L) { truncated <<- TRUE; break }
+        label <- paste0("[[", index, "]]")
+        if (is.character(labels) && length(labels) >= index &&
+            !is.na(labels[index]) && nzchar(labels[index]))
+          label <- paste0(label, " ", substr(labels[index], 1L, 80L))
+        if (!describe(label, value[[index]], depth + 1L)) break
+      }
+    }
+    TRUE
+  }
+  names <- ls(envir=.GlobalEnv, all.names=FALSE)
+  if (length(names) > 128L) truncated <- TRUE
+  for (name in head(names, 128L)) {
+    if (length(rows) >= 256L) { truncated <- TRUE; break }
+    if (bindingIsActive(name, .GlobalEnv)) {
+      if (!push(0L, name, "active binding", "", "<not evaluated>")) break
+    } else {
+      binding <- tryCatch(
+        list(ok=TRUE, value=get(name, envir=.GlobalEnv, inherits=FALSE)),
+        error=function(e) list(ok=FALSE))
+      if (!binding$ok) {
+        if (!push(0L, name, "unavailable", "", "<failed binding>")) break
+      } else if (!describe(name, binding$value, 0L)) break
+    }
+  }
+  c(if (truncated) "@1" else "@0", rows)
 })`;
+function parseInspection(rows) {
+  if (!Array.isArray(rows) || rows.length < 1 || rows.length > 257 ||
+      !["@0", "@1"].includes(rows[0]))
+    throw Error("Invalid R environment response.");
+  const variables = [], stack = [];
+  for (const row of rows.slice(1)) {
+    if (typeof row !== "string" || row.length > 4096)
+      throw Error("Invalid R environment entry.");
+    const fields = row.split("\t");
+    if (fields.length !== 6 || !/^[012]$/.test(fields[0]) || !/^[01]$/.test(fields[5]))
+      throw Error("Invalid R environment fields.");
+    const depth = Number(fields[0]);
+    const [name, type, shape, preview] = fields.slice(1, 5).map(decodeURIComponent);
+    if (!name || name.length > 160 || type.length > 160 || shape.length > 160 ||
+        preview.length > 160 || [name, type, shape, preview].some(x => x.includes("\0")))
+      throw Error("Invalid R environment metadata.");
+    const node = {name, type, shape:shape ? shape.split(" x ") : null, preview};
+    if (fields[5] === "1") node.truncated = true;
+    if (depth === 0) {
+      if (variables.length >= 128) throw Error("R environment exceeds variable limit.");
+      variables.push(node);
+    } else {
+      const parent = stack[depth - 1];
+      if (!parent || parent.type !== "list")
+        throw Error("Invalid R environment nesting.");
+      if (!parent.children) parent.children = [];
+      if (parent.children.length >= 12) throw Error("R environment exceeds child limit.");
+      parent.children.push(node);
+    }
+    stack.length = depth;
+    stack[depth] = node;
+  }
+  return {ok:true, variables, truncated:rows[0] === "@1"};
+}
 const HELP_NAME = /^[A-Za-z][A-Za-z0-9._]{0,79}(?:::[A-Za-z][A-Za-z0-9._]{0,79})?$/;
 const TABLE_NAME = /^[A-Za-z][A-Za-z0-9._]{0,119}$/;
 function tableQuery(name) {
@@ -206,15 +303,7 @@ function create({load = () => import(CDN)} = {}) {
         const r = await get();
         const rows = await r.evalRRaw(INSPECT, "string[]");
         if (generation !== epoch) return {ok:false, output:"R session reset."};
-        if (!Array.isArray(rows) || rows.length > 100) throw Error("Invalid R environment response.");
-        const variables = rows.map(row => {
-          if (typeof row !== "string" || row.length > 4096) throw Error("Invalid R environment entry.");
-          const fields = row.split("\t");
-          if (fields.length !== 4) throw Error("Invalid R environment fields.");
-          const [name, type, shape, preview] = fields.map(decodeURIComponent);
-          return {name, type, shape:shape ? shape.split(" x ") : null, preview};
-        });
-        return {ok:true, variables};
+        return parseInspection(rows);
       } catch (error) { return {ok:false, output:String(error).slice(0, 300)}; }
     });
   }
@@ -400,7 +489,7 @@ function renderImages(target, images, document) {
   if (rendered) target.replaceChildren(holder);
   return rendered;
 }
-const api = Object.freeze({create, renderImages, CDN});
+const api = Object.freeze({create, renderImages, CDN, INSPECT, parseInspection});
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 global.FlowStudioRSession = api;
 })(globalThis);

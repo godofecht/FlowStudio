@@ -23,7 +23,7 @@ function validTransferPacket(packet) {
       return false;
     if (packet.type === "boolean" && typeof value !== "boolean") return false;
     if (packet.type === "string") {
-      if (typeof value !== "string" || value.length > 512 || value.includes("\\0")) return false;
+      if (typeof value !== "string" || value.length > 512 || value.includes("\0")) return false;
       try { encodeURIComponent(value); } catch (_) { return false; }
     }
   }
@@ -114,7 +114,7 @@ async function handle(event) {
         "if any(type(v) is str and (len(v) > 512 or '\\x00' in v) for v in _fs_transfer_values): raise ValueError('Python string exceeds limit or contains NUL')",
         "if any(type(v) in (int, float) and (not _fs_transfer_math.isfinite(v) or abs(v) > 9007199254740991) for v in _fs_transfer_values): raise ValueError('Python number is not finite or safe')",
         "_fs_transfer_json.dumps({'kind': _fs_transfer_kind, 'type': _fs_transfer_type_name, 'values': _fs_transfer_values}, allow_nan=False)"
-      ].join("\\n");
+      ].join("\n");
       const raw = await py.runPythonAsync(query);
       if (typeof raw !== "string" || new TextEncoder().encode(raw).length > 32768)
         throw Error("Invalid Python transfer response.");
@@ -130,7 +130,7 @@ async function handle(event) {
         "_fs_transfer_packet = _fs_transfer_json.loads(" + JSON.stringify(JSON.stringify(value)) + ")",
         "globals()[" + JSON.stringify(code) + "] = _fs_transfer_packet['values'] if _fs_transfer_packet['kind'] == 'vector' else _fs_transfer_packet['values'][0]",
         "'ok'"
-      ].join("\\n");
+      ].join("\n");
       const acknowledgement = await py.runPythonAsync(query);
       if (acknowledgement !== "ok") throw Error("Python transfer assignment did not acknowledge success.");
       self.postMessage({id, ok:true});

@@ -142,6 +142,16 @@ def main() -> None:
         matrix_variables = {item["name"]: item for item in json.loads(snapshot)["variables"]}
         assert matrix_variables["flowstudio_matrix"]["dimensions"] == [2, 3], matrix_variables
         assert matrix_variables["flowstudio_r_value"]["dimensions"] is None, matrix_variables
+        status, output = request("POST", "/api/run/r",
+                                 'flowstudio_nested <- list(numbers=list(answer=42L), values=c(1,2))',
+                                 accepted_headers)
+        assert status == 200, (status, output)
+        status, snapshot = request("POST", "/api/inspect/r", "", accepted_headers)
+        assert status == 200, (status, snapshot)
+        nested = {item["name"]: item for item in json.loads(snapshot)["variables"]}["flowstudio_nested"]
+        assert nested["type"] == "list" and nested["size"] == 2, nested
+        assert nested["children"][0]["name"] == "[[1]] numbers", nested
+        assert nested["children"][0]["children"][0]["type"] == "integer", nested
         status, _ = request("POST", "/api/inspect/r", "")
         assert status == 404, status
         status, output = request("POST", "/api/run/r",

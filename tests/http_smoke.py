@@ -35,6 +35,12 @@ def main() -> None:
     status, html = request("GET", "/")
     assert status == 200 and "<title>FlowStudio" in html, (status, html[:100])
 
+    # Native editor must fetch the same multiline-safe source-cell parser tested
+    # by Node; a missing Flow static route silently breaks Run Cell.
+    assert '<script src="/source_cells.js"></script>' in html
+    status, source_cells = request("GET", "/source_cells.js")
+    assert status == 200 and "function scanLine(line, state)" in source_cells, (status, source_cells[:100])
+
     status, _ = request("POST", "/api/run/python", 'print("bad")')
     assert status == 404, status
     status, _ = request("POST", "/api/check/flow", "function main() -> i32 { return 0 }")

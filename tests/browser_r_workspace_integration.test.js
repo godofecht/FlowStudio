@@ -7,6 +7,7 @@ const path = require("node:path");
 const html = fs.readFileSync(path.join(__dirname, "../docs/app/index.html"), "utf8");
 const inline = html.match(/<script>\s*([\s\S]*?)<\/script>/)[1];
 const transferScript = fs.readFileSync(path.join(__dirname, "../docs/app/variable_transfer.js"), "utf8");
+const snapshotScript = fs.readFileSync(path.join(__dirname, "../docs/app/session_snapshot.js"), "utf8");
 function fixture() {
   const elements = new Map(), workers = [], rCalls = [];
   function element(id) {
@@ -53,6 +54,7 @@ function fixture() {
   };
   ctx.window = ctx;
   vm.runInNewContext(transferScript, ctx, {filename:"docs/app/variable_transfer.js"});
+  vm.runInNewContext(snapshotScript, ctx, {filename:"docs/app/session_snapshot.js"});
   vm.runInNewContext(inline, ctx, {filename:"docs/app/index.html"});
   const tick = async () => { for (let i=0;i<6;i++) await Promise.resolve(); };
   return {element,workers,rCalls,tick};

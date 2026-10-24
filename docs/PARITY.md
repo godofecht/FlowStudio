@@ -14,6 +14,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Editor selection execution | partial / Node-tested browser selection; native and physical-browser unverified | Selection runs without accidentally executing entire buffer |
 | Persistent REPL/session | partial / browser Pyodide/webR sessions; native Python process retention and reset added (local C harness and cross-platform Flow HTTP CI passed); native R persistent kernel passed real Rscript and Flow-owned HTTP acceptance on Linux/macOS CI | Incremental variables and package state persist until reset |
 | Interactive multi-language console | partial / Python and R browser sessions plus stateless native Flow full-program execution wired; per-language histories and unsent drafts implemented; 427/427 JS tests per platform and native Flow/HTTP CI passed on Ubuntu/macOS; live physical-browser acceptance pending | Console can execute selected Python/R/Flow independently of source editor; preserve Python/R state, histories and drafts; report Flow native-only limits and execution failures |
+| Browser Python/R session snapshot export/import | partial / bounded plain scalar/vector JSON snapshots implemented in PR, V8 regression tests passed; native Flow HTTP/Node CI and physical browser acceptance pending | Explicitly export and restore supported live interpreter values through a local file, reject tampering and stale sessions, verify live Pyodide/webR and cross-platform browser interactions; no implicit or arbitrary-object serialization |
 | Explicit Python/R variable transfer | partial / bounded plain scalar and atomic-vector copy wired; real CPython/Rscript query tests and native Flow HTTP accepted on Ubuntu/macOS CI; physical-browser Pyodide/webR round-trip unverified | Copy typed scalars/vectors both ways between persistent runtimes, reject unsupported objects/NA/NaN and active bindings, verify independent real-browser and cross-platform execution |
 | Variable inspector | partial / native Python and R bounded metadata snapshots cross-platform HTTP accepted; native Python exact-builtin nested metadata tree cross-platform CI accepted (unit/HTTP/DOM); R array dimensions and failed-lazy-binding recovery cross-platform HTTP accepted; browser R bounded two-level plain-list tree and active-binding protection accepted by Ubuntu/macOS CI #40090303070 (real Rscript, Node, native Flow/HTTP); arbitrary-object inspection and physical-browser acceptance missing | Nested objects / types / dimensions inspectable and refresh after execution |
 | Plot viewer | partial / Node-tested PNG import and integrated workspace tab; native unverified | png/svg plot history, zoom, save and deterministic device lifecycle |
@@ -34,6 +35,39 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Cross-platform packaging | missing | Installable signed/reproducible macOS and Linux releases |
 | Accessibility | partial / unverified | Full keyboard navigation, screen reader labels, resize and contrast checks |
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
+
+## 2026-10-24: explicit browser Python/R session value snapshots (PR pending)
+
+The browser workspace now offers **Export session values** and **Import
+session values** for the selected persistent Python or R interpreter.
+Exports enumerate actual interpreter bindings and use the already implemented
+typed variable transfer protocol, preserving only supported plain built-in
+scalars/homogeneous lists or R classless atomic vectors. The browser downloads
+a local JSON file; import requires an explicit user-selected file and overwrite
+confirmation. The Flow-owned native HTTP router serves the exact same browser
+module through an allowlisted read-only asset route; it does not serialize
+native Flow state, change Flow syntax or add a remote code-execution endpoint.
+
+Snapshots contain at most 64 values and 128 KiB of JSON; individual values
+retain the existing 256-item, 32 KiB protocol limits. Unsupported variables
+are counted as omitted, inspection truncation is reported, and snapshot
+validation rejects duplicate names, unexpected fields, malformed values and
+wrong-language restores before interpreter mutation. Session generation and
+selected language are checked after asynchronous operations. An import is
+**not transactional**: if a destination rejects a later value, earlier
+imports remain. Only explicitly exported values are restored; functions,
+packages, files, open connections, native Flow variables and arbitrary
+objects are not persisted. Export files may contain sensitive user data and
+remain entirely under the user's control.
+
+**Status: partial / V8 regression validated; CI and physical-browser
+acceptance pending.** Eleven isolated tests passed in a V8 harness against
+the exact branch modules and browser/native-route source, including
+tampering, bounds, partial imports, stale resets, language mismatch and
+UI wiring. This is **not** real Pyodide/webR browser acceptance; the new
+Node and Flow-owned live HTTP tests are committed but their hosted CI has
+not yet been run. The broader RStudio session-persistence criterion remains
+unmet.
 
 ## 2026-10-24: bounded browser R nested environment inspector (acceptance pending)
 

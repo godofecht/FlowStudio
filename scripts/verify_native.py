@@ -174,7 +174,8 @@ def verify(root: Path, port: int = 8751, build_timeout: int = 180,
         fixture = Path(temp)
         shutil.copytree(root / "web", fixture / "web")
         shutil.copytree(root / "docs", fixture / "docs")
-        _free_port(port)
+        # The preceding server may leave TCP TIME_WAIT sockets. The real
+        # listener sets SO_REUSEADDR; a plain probe bind here would be flaky.
         with tempfile.TemporaryFile(mode="w+t", encoding="utf-8") as git_log:
             git_server = subprocess.Popen([str(binary)], cwd=fixture,
                                           stdout=git_log, stderr=subprocess.STDOUT,

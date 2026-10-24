@@ -23,6 +23,7 @@ extern {
     function fs_r_status() -> i32
     function fs_r_reset() -> void
     function fs_py_run(code: string) -> string
+    function fs_py_trace(code: string) -> string
     function fs_py_inspect() -> string
     function fs_py_status() -> i32
     function fs_py_reset() -> void
@@ -171,6 +172,17 @@ function send_r_environment() -> void {
     }
 }
 
+# Flow owns the trace route and status; CPython performs bounded line tracing.
+function send_python_trace(code: string) -> void {
+    let output: string = fs_py_trace(code)
+    let status: i32 = fs_py_status()
+    if status == 200 or status == 422 {
+        fs_reply(status, "application/json; charset=utf-8", output)
+    } else {
+        fs_reply(status, "text/plain; charset=utf-8", output)
+    }
+}
+
 function send_python_environment() -> void {
     let output: string = fs_py_inspect()
     let status: i32 = fs_py_status()
@@ -245,6 +257,10 @@ function dispatch() -> void {
         }
         if eq(path, "/api/inspect/r") {
             send_r_environment()
+            return
+        }
+        if eq(path, "/api/trace/python") {
+            send_python_trace(fs_body())
             return
         }
         if eq(path, "/api/inspect/python") {

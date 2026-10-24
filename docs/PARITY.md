@@ -39,7 +39,8 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 
 The browser webR environment inspector now enumerates real `.GlobalEnv`
 bindings without evaluating active bindings or calling `str()` on user
-objects. It emits a bounded depth-two tree of ordinary R lists (12 children
+objects. Inspector helper calls resolve explicitly in base/utils namespaces,
+so user-masked global functions cannot intercept inspection. It emits a bounded depth-two tree of ordinary R lists (12 children
 per container, 256 total nodes, 128 root variables, 65 KiB metadata budget),
 with scalar previews limited to classless built-in atomic values. Matrix
 dimensions and data-frame classes remain visible; classed objects are not

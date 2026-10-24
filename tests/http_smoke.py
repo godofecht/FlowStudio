@@ -138,6 +138,24 @@ def main() -> None:
         status, output = request("POST", "/api/run/r",
                                  'cat(flowstudio_r_value, "\\n")', accepted_headers)
         assert status == 200 and output.strip() == "42", (status, output)
+        # Exercise compiled C via the actual native R HTTP kernel, not a mock.
+        status, output = request(
+            "POST", "/api/run/r",
+            "flowjit_x <- as.double(seq_len(512L)); "
+            "flowjit_f <- flowjit_compile(function(x) x * x + 1.0, "
+            "hot = 1L, min_length = 32L); "
+            "stopifnot(identical(flowjit_f(flowjit_x), "
+            "flowjit_x * flowjit_x + 1.0)); "
+            "cat('flowjit-native=', flowjit_status(flowjit_f)$native, '\\n', sep='')",
+            accepted_headers)
+        assert status == 200 and "flowjit-native=1" in output, (status, output)
+        # Guard failures are counted and handled by baseline GNU R.
+        status, output = request(
+            "POST", "/api/run/r",
+            "stopifnot(identical(flowjit_f(1:4), 1:4 * 1:4 + 1.0)); "
+            "cat('flowjit-fallback=', flowjit_status(flowjit_f)$fallback, '\\n', sep='')",
+            accepted_headers)
+        assert status == 200 and "flowjit-fallback=1" in output, (status, output)
         status, output = request("POST", "/api/reset/r", "", accepted_headers)
         assert status == 200 and "reset" in output, (status, output)
         status, snapshot = request("POST", "/api/inspect/r", "", accepted_headers)

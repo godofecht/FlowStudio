@@ -90,17 +90,17 @@ def verify(root: Path, port: int = 8751, build_timeout: int = 180,
     if require_r:
         if not shutil.which("Rscript"):
             raise VerificationError("Rscript is required for native R acceptance")
-        print("Real R IPC acceptance: tests/test_native_r_session.py", flush=True)
+        print("Real R IPC and FlowJIT native acceptance", flush=True)
         r_result = _command(
             [sys.executable, "-m", "unittest", "discover", "-s", "tests",
-             "-p", "test_native_r_session.py", "-v"], root, 65
+             "-p", "test_native_*.py", "-v"], root, 110
         )
         if r_result.stdout:
             print(r_result.stdout, end="", flush=True)
         if r_result.stderr:
             print(r_result.stderr, end="", file=sys.stderr, flush=True)
         if r_result.returncode != 0:
-            raise VerificationError("Real R IPC acceptance failed")
+            raise VerificationError("Real R IPC or FlowJIT native acceptance failed")
     _free_port(port)
     # Never accept a stale executable left by an earlier successful build.
     # Unlinking a symlink here also avoids following an unexpected target.

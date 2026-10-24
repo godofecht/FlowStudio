@@ -6,7 +6,9 @@ MAX_SOURCE <- 131072L
 MAX_OUTPUT <- 131072L
 input <- file("stdin", open = "rb")
 protocol <- file("/dev/fd/3", open = "wb")
-workspace <- new.env(parent = globalenv())
+flowjit_api <- new.env(parent = globalenv())
+sys.source("src/flowjit.R", envir = flowjit_api)
+workspace <- new.env(parent = flowjit_api)
 
 read_exact <- function(count) {
     value <- raw(0)

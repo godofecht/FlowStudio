@@ -28,8 +28,11 @@ the repository root, then run:
 
     python3 tests/physical_browser_acceptance.py --url http://127.0.0.1:8751/app/ --flow
 
-The runner refuses non-loopback --url targets. Native Flow execution is
-not tested against a fake backend or GitHub Pages. Browser interpreter
+The runner refuses non-loopback --url targets. With --flow it also
+requires a real browser interaction with the native CPython conditional
+debugger (pause on a live numeric local, continue, pause again, finish).
+Native Flow execution and debugging are not tested against a fake backend
+or GitHub Pages. Browser interpreter
 execution and native Flow use separate runtime paths. The server is not
 automatically built by this script; python3 scripts/verify_native.py remains
 the native build and HTTP acceptance gate.

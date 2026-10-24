@@ -5,78 +5,155 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark">
 <title>FlowStudio — Scientific IDE</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23151b26'/%3E%3Ctext x='16' y='23' font-size='19' text-anchor='middle' fill='%235b93ff'%3E%E2%97%88%3C/text%3E%3C/svg%3E">
 <style>
-:root { font: 14px/1.45 system-ui, -apple-system, sans-serif; color: #e8edf5; background: #10141e; }
-* { box-sizing: border-box; }
-body { margin: 0; height: 100dvh; display: flex; flex-direction: column; }
-button,select,textarea { font: inherit; }
-button,select { background: #273044; border: 1px solid #3a4762; color: #f2f6ff; border-radius: 6px; padding: 7px 11px; cursor: pointer; }
-button:hover,select:hover { border-color: #8baaf4; }
-button:focus-visible,select:focus-visible,textarea:focus-visible { outline: 2px solid #80a5fe; outline-offset: 1px; }
-button:disabled { opacity: .5; cursor: wait; }
-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; border-bottom: 1px solid #39435b; padding: 10px 16px; background: #171e2c; }
-.brand { font-size: 17px; font-weight: 700; letter-spacing: -.02em; }
-.brand b { color: #85b3ff; }
-.toolbar { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; }
-.primary { background: #315fbf; border-color: #3f72dc; }
-.main { display: grid; flex: 1; min-height: 0; grid-template-columns: minmax(0, 2fr) minmax(255px, 1fr); grid-template-rows: minmax(180px, 58fr) minmax(130px, 42fr); gap: 5px; background: #080c14; padding: 5px; }
-.panel { display: flex; flex-direction: column; overflow: hidden; min-width: 0; min-height: 0; background: #171e2a; border: 1px solid #2c3950; border-radius: 7px; }
-.panel > h2 { font-size: 12px; color: #b9c7e2; text-transform: uppercase; letter-spacing: .08em; margin: 0; padding: 10px 13px; border-bottom: 1px solid #30394e; }
-.panel .body { flex: 1; min-height: 0; padding: 11px 13px; }
-textarea { flex: 1; resize: none; width: 100%; min-height: 0; padding: 15px 17px; background: #101520; border: 0; color: #e6eeff; font: 14px/1.65 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; tab-size: 4; }
-pre { margin: 0; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 12.5px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace; height: 100%; }
-kbd { background: #333f55; padding: 2px 4px; border-radius: 4px; font: inherit; }
-.muted { color: #a4b0c6; }
-.hint { font-size: 13px; max-width: 45ch; }
-footer { padding: 5px 14px; display: flex; justify-content: space-between; gap: 15px; font-size: 12px; background: #192337; color: #a7b8d6; }
-#resultStatus[data-state="error"] { color: #ffb8ad; }
-#resultStatus[data-state="ok"] { color: #93deb3; }
-#fileLabel { color: #b9cae5; font-size: 12px; }
-#console { color: #c8daee; }
-.project-body { overflow-y: auto; }
-#projectTree { display: flex; flex-direction: column; gap: 5px; }
-#projectTree details { padding-left: 9px; border-left: 1px solid #39465f; }
-#projectTree summary { cursor: pointer; padding: 5px 0; }
-#projectTree .project-children { display: flex; flex-direction: column; gap: 4px; margin: 4px 0 5px 8px; }
-#projectTree .project-file { display: block; text-align: left; width: 100%; overflow-wrap: anywhere; }
-#projectTree .project-file:focus-visible { outline-offset: -2px; }
-
-.project-search { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; }
-.project-search input[type="search"] { background: #101520; color: #e6eeff; border: 1px solid #3a4762; border-radius: 6px; padding: 7px; flex: 1; min-width: 110px; }
-.project-search label { color: #c2cee4; font-size: 12px; }
-#searchResults { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
-#searchResults button { text-align: left; white-space: normal; overflow-wrap: anywhere; width: 100%; font: 12px/1.5 ui-monospace, monospace; }
-@media (max-width: 790px) {
- body { min-height: 100dvh; height: auto; }
- .main { min-height: 90dvh; grid-template-columns: 1fr; grid-template-rows: 36vh 16vh 25vh 16vh; }
- footer { flex-wrap: wrap; }
-}
-.editor-find { display:flex; gap:6px; flex-wrap:wrap; align-items:center; padding:7px 10px; border-bottom:1px solid #30394e; }
-.editor-find input[type="text"] { min-width:95px; max-width:220px; flex:1; background:#101520; color:#e6eeff; border:1px solid #3a4762; border-radius:5px; padding:5px 7px; }
-.editor-find label { font-size:12px; color:#c2cee4; }
-.editor-find button { padding:5px 8px; font-size:12px; }
-#editorFindCount { font-size:12px; color:#afc4e6; }
-
-.workspace-tabs { display:flex; gap:5px; padding:6px 9px; border-bottom:1px solid #30394e; }
-.workspace-tabs button { flex:1; min-width:0; padding:5px; }
-.workspace-tabs [aria-selected="true"] { border-color:#8baaf4; background:#31518b; }
-.workspace-frame { flex:1; min-height:0; overflow:hidden; }
-.workspace-frame iframe { display:block; width:100%; height:100%; border:0; background:#10141e; }
-[hidden] { display:none !important; }
+:root{color-scheme:dark;--bg:#0d1119;--surface:#151b26;--surface-2:#1b2331;--line:#283344;--ink:#e7edf8;--muted:#9db0cb;--accent:#5b93ff;--accent-dim:#22385f;--ok:#8ee0b1;--warn:#f0c37b;--error:#ffb4a8;--sidebar-width:290px;--right-width:320px;--dock-height:190px;font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink)}
+*{box-sizing:border-box}
+body{margin:0;height:100dvh;overflow:hidden;background:var(--bg)}
+button,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+button,select{background:var(--surface-2);border:1px solid #3a4a63;border-radius:6px;padding:5px 10px}
+button:hover:not(:disabled),select:hover{border-color:#6d90cf}
+button:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.shell{height:100dvh;display:grid;grid-template-rows:auto minmax(0,1fr) 5px var(--dock-height) auto}
+.topbar{display:flex;align-items:center;gap:10px;padding:6px 12px;background:var(--surface);border-bottom:1px solid var(--line);flex-wrap:wrap}
+.brand{font-weight:700;white-space:nowrap;letter-spacing:-.01em}
+.brand b{color:#8fb8ff}
+.menubar{display:flex;gap:2px;align-items:center}
+.menu{position:relative}
+.menu-trigger{background:transparent;border:1px solid transparent;padding:4px 9px}
+.menu-trigger[aria-expanded="true"]{background:var(--accent-dim);border-color:#3d5c95}
+.menu-popup{position:absolute;top:calc(100% + 4px);left:0;z-index:50;min-width:240px;padding:5px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;box-shadow:0 18px 34px #0009}
+.menu-popup button{display:flex;justify-content:space-between;gap:18px;width:100%;padding:7px 9px;background:transparent;border:0;border-radius:5px;text-align:left}
+.menu-popup button:hover,.menu-popup button:focus-visible{background:var(--accent-dim)}
+.menu-popup kbd{color:var(--muted);font:11px ui-monospace,monospace}
+.menu-popup hr{border:0;border-top:1px solid var(--line);margin:4px 2px}
+.topbar-actions{margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.topbar-actions label{color:var(--muted);font-size:12px}
+.primary{background:#2f5db8;border-color:#4275d6}
+.workspace{display:grid;grid-template-columns:var(--sidebar-width) 5px minmax(0,1fr) 5px var(--right-width);min-height:0}
+.splitter{position:relative;background:var(--bg);cursor:col-resize}
+.splitter::after{content:"";position:absolute;inset:0 2px;background:var(--line)}
+.splitter:hover::after,.splitter:focus-visible::after{background:var(--accent)}
+.splitter-horizontal{cursor:row-resize}
+.splitter-horizontal::after{inset:2px 0}
+.panel{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--surface)}
+.panel>h2{margin:0;padding:8px 12px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:8px}
+.panel>h2 button{padding:1px 8px;font-size:11px;text-transform:none;letter-spacing:0}
+.sidebar{border-right:1px solid var(--line)}
+.rightpanel{border-left:1px solid var(--line)}
+.panel .body{flex:1;min-height:0;overflow:auto;padding:10px 12px}
+.workspace-tabs{display:flex;gap:4px;padding:6px 8px;border-bottom:1px solid var(--line)}
+.workspace-tabs button{flex:1;min-width:0;padding:4px 6px;font-size:12px;background:transparent;border-color:transparent}
+.workspace-tabs [aria-selected="true"]{background:var(--accent-dim);border-color:#3d5c95}
+.workspace-frame{flex:1;min-height:0}
+.workspace-frame iframe{display:block;width:100%;height:100%;border:0;background:#10141e}
+.project-tools{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:9px}
+.project-tools button{padding:4px 9px;font-size:12px}
+.project-search{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:9px}
+.project-search input[type="search"]{flex:1;min-width:100px;background:#0f141d;border:1px solid #3a4a63;border-radius:6px;padding:5px 7px}
+.project-search label{font-size:12px;color:var(--muted)}
+#searchResults{display:flex;flex-direction:column;gap:3px;margin-bottom:9px}
+#searchResults button{width:100%;text-align:left;white-space:normal;overflow-wrap:anywhere;font:12px/1.45 ui-monospace,monospace;padding:4px 6px}
+#projectTree{display:flex;flex-direction:column;gap:3px;font-size:13px}
+#projectTree details{padding-left:8px;border-left:1px solid var(--line)}
+#projectTree summary{cursor:pointer;padding:3px 0}
+#projectTree .project-children{display:flex;flex-direction:column;gap:2px;margin:3px 0 4px 6px}
+#projectTree .project-file{display:block;width:100%;text-align:left;overflow-wrap:anywhere;padding:3px 6px;background:transparent;border-color:transparent}
+#projectTree .project-file:hover{background:var(--accent-dim)}
+.hint{font-size:12px;max-width:46ch}
+.muted{color:var(--muted)}
+.editor-area{display:flex;flex-direction:column;min-width:0;min-height:0;background:#111721}
+.doc-tabs-row{display:flex;align-items:stretch;background:var(--surface);border-bottom:1px solid var(--line);min-height:35px}
+.doc-tabs{display:flex;flex:1;min-width:0;overflow-x:auto;gap:1px}
+.doc-tabs-empty{padding:9px 12px;font-size:12px;color:var(--muted)}
+.doc-tab{display:flex;align-items:center;gap:7px;max-width:230px;padding:0 5px 0 11px;background:#151c27;border:0;border-right:1px solid var(--line);border-radius:0;color:var(--muted);font-size:13px}
+.doc-tab.active{background:#111721;color:var(--ink);box-shadow:inset 0 2px 0 var(--accent)}
+.doc-tab-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.doc-tab-dot{color:var(--warn);font-size:9px}
+.doc-tab-close{width:19px;height:19px;padding:0;line-height:1;background:transparent;border:0;border-radius:4px;color:var(--muted)}
+.doc-tab-close:hover{background:#33415a;color:#fff}
+.doc-tab-new{padding:0 11px;background:transparent;border:0;border-left:1px solid var(--line);border-radius:0;font-size:16px;color:var(--muted)}
+.doc-tab-new:hover{color:var(--ink)}
+.editor-find{display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:6px 10px;border-bottom:1px solid var(--line);background:var(--surface)}
+.editor-find input[type="text"]{min-width:95px;max-width:210px;flex:1;background:#0f141d;border:1px solid #3a4a63;border-radius:5px;padding:4px 7px}
+.editor-find label{font-size:12px;color:var(--muted)}
+.editor-find button{padding:4px 8px;font-size:12px}
+#editorFindCount{font-size:12px;color:var(--muted)}
+#source{flex:1;width:100%;min-height:0;resize:none;border:0;padding:12px 16px;background:#111721;color:#e9f0fb;font:14px/1.65 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;tab-size:4}
+.dock{border-top:1px solid var(--line)}
+.dock .body{display:flex;flex-direction:column;gap:6px;padding:8px 11px;overflow:auto}
+#console{margin:0;overflow:auto;flex:1;min-height:60px;white-space:pre-wrap;overflow-wrap:anywhere;font:12.5px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;color:#cbd9ec}
+.statusbar{display:flex;align-items:center;gap:14px;padding:3px 12px;background:#121924;border-top:1px solid var(--line);font-size:12px;color:var(--muted);overflow:hidden;white-space:nowrap}
+#resultStatus[data-state="error"]{color:var(--error)}
+#resultStatus[data-state="ok"]{color:var(--ok)}
+#fileLabel{color:#c4d3e8}
+#dirty{color:var(--warn)}
+.statusbar .spacer{margin-left:auto}
+#editorRecovery{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--warn)}
+[hidden]{display:none !important}
+@media(max-width:900px){.workspace{grid-template-columns:minmax(0,1fr)}.sidebar,.rightpanel,.workspace>.splitter{display:none}}
+@media(max-width:760px){.shell{grid-template-rows:auto minmax(0,1fr) 5px 40vh auto}.topbar-actions{margin-left:0}}
 </style>
 </head>
 <body>
-<header>
-  <div class="brand"><b>◈</b> FlowStudio <span class="muted">/ developer preview</span></div>
-  <div class="toolbar" aria-label="Editor actions">
+<div class="shell" id="ideShell">
+<header class="topbar">
+  <div class="brand" aria-label="FlowStudio">◈ <b>FlowStudio</b></div>
+  <nav class="menubar" aria-label="Main menu">
+    <div class="menu">
+      <button class="menu-trigger" id="menuFile" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="menuFilePopup">File</button>
+      <div class="menu-popup" id="menuFilePopup" role="menu" aria-labelledby="menuFile" hidden>
+        <button type="button" role="menuitem" id="newDocument">New buffer<kbd>Ctrl+Alt+N</kbd></button>
+        <button type="button" role="menuitem" id="open">Open file…<kbd>Ctrl+O</kbd></button>
+        <button type="button" role="menuitem" data-command="openFolder">Open folder…</button>
+        <hr>
+        <button type="button" role="menuitem" id="save">Save<kbd>Ctrl+S</kbd></button>
+        <button type="button" role="menuitem" data-command="saveFileAs">Save as…</button>
+        <hr>
+        <button type="button" role="menuitem" data-command="closeDocument">Close tab<kbd>Ctrl+W</kbd></button>
+      </div>
+    </div>
+    <div class="menu">
+      <button class="menu-trigger" id="menuEdit" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="menuEditPopup">Edit</button>
+      <div class="menu-popup" id="menuEditPopup" role="menu" aria-labelledby="menuEdit" hidden>
+        <button type="button" role="menuitem" data-command="focusFind">Find in buffer<kbd>Ctrl+F</kbd></button>
+        <button type="button" role="menuitem" data-command="focusReplace">Replace<kbd>Ctrl+H</kbd></button>
+        <button type="button" role="menuitem" data-command="findInProject">Find in project</button>
+      </div>
+    </div>
+    <div class="menu">
+      <button class="menu-trigger" id="menuRun" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="menuRunPopup">Run</button>
+      <div class="menu-popup" id="menuRunPopup" role="menu" aria-labelledby="menuRun" hidden>
+        <button type="button" role="menuitem" data-command="run">Run selection or file<kbd>Ctrl+Enter</kbd></button>
+        <button type="button" role="menuitem" data-command="runCell">Run cell<kbd>Ctrl+Shift+Enter</kbd></button>
+        <hr>
+        <button type="button" role="menuitem" data-command="resetR">Reset R session</button>
+        <button type="button" role="menuitem" data-command="resetPython">Reset Python session</button>
+      </div>
+    </div>
+    <div class="menu">
+      <button class="menu-trigger" id="menuView" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="menuViewPopup">View</button>
+      <div class="menu-popup" id="menuViewPopup" role="menu" aria-labelledby="menuView" hidden>
+        <button type="button" role="menuitem" data-command="showFiles">Project files</button>
+        <button type="button" role="menuitem" data-command="showPlots">Plots</button>
+        <button type="button" role="menuitem" data-command="showData">Data viewer</button>
+        <hr>
+        <button type="button" role="menuitem" data-command="toggleDock">Toggle console dock</button>
+      </div>
+    </div>
+    <div class="menu">
+      <button class="menu-trigger" id="menuHelp" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="menuHelpPopup">Help</button>
+      <div class="menu-popup" id="menuHelpPopup" role="menu" aria-labelledby="menuHelp" hidden>
+        <button type="button" role="menuitem" data-command="shortcuts">Keyboard shortcuts</button>
+        <button type="button" role="menuitem" data-command="about">About FlowStudio</button>
+      </div>
+    </div>
+  </nav>
+  <div class="topbar-actions" aria-label="Editor actions">
     <label for="language">Runtime</label>
     <select id="language" aria-label="Execution language"><option value="flow">Flow</option><option value="r">R</option><option value="python">Python</option></select>
-    <button id="folder">Open folder</button>
-    <button id="newFile" title="Create a new source file in the opened project">New file</button>
-    <button id="refreshProject" title="Refresh project tree">Refresh</button>
-    <a href="/rproj" aria-label="Edit RStudio project settings">RStudio project</a>
-    <button id="open">Open file</button>
-    <button id="save">Save file</button>
     <button id="run" class="primary" title="Run selection or entire buffer (Ctrl/⌘+Enter)">▶ Run</button>
     <button id="runCell" title="Run current # %% cell (Ctrl/⌘+Shift+Enter)">Run cell</button>
     <button id="resetR" type="button" title="Discard native R variables and restart its interpreter">Reset R</button>
@@ -84,41 +161,19 @@ footer { padding: 5px 14px; display: flex; justify-content: space-between; gap: 
     <input id="fallbackOpen" type="file" accept=".flow,.R,.r,.py,.txt" hidden>
   </div>
 </header>
-<div class="main">
-  <section class="panel" aria-label="Source editor">
-    <h2>Source <span id="fileLabel">untitled.flow</span><span id="dirty" hidden> • modified</span></h2>
-    <div class="editor-find"><input id="editorFind" type="text" aria-label="Find text"><button id="findNext">Next</button>
-    <label for="editorReplace">Replace with</label><input id="editorReplace" type="text" aria-label="Replacement text"><button id="replaceOne">Replace</button><button id="replaceAll">Replace all</button><button id="findPrevious">Previous</button><label><input id="editorCaseSensitive" type="checkbox"> Match case</label><span id="editorFindCount" role="status" aria-live="polite"></span></div>
-    <textarea id="source" spellcheck="false" aria-label="Source code editor">function main() -> i32 {
-    println("Hello from FlowStudio")
-    return 0
-}
-</textarea>
-  </section>
-  <section class="panel" aria-label="Environment">
-    <h2>Environment / History</h2>
-    <div class="body">
-      <p id="runtimeInfo">Flow execution available when Flow is installed.</p>
-      <p class="muted hint">Native R and Python retain separate variables until their respective Reset controls. Flow runs are independent.</p>
-      <button id="refreshPythonEnvironment" type="button">Refresh selected environment</button>
-      <div id="pythonEnvironment" aria-live="polite"><p class="muted">Select Python to inspect its native session.</p></div>
-      <p class="muted hint">The IDE executes code with your local OS permissions. Only run code you trust.</p>
-    </div>
-  </section>
-  <section class="panel" aria-label="Console output">
-    <h2>Console <button id="clear" style="float:right;padding:1px 7px;font-size:11px">Clear</button></h2>
-    <div class="body"><pre id="console" role="log" aria-live="polite">Ready. Press Ctrl/⌘+Enter to execute selection or buffer.
-</pre></div>
-  </section>
-  <section class="panel" aria-label="Project, plots and data">
-    <h2>Project / Plots / Data</h2>
+<div class="workspace">
+  <aside class="panel sidebar" aria-label="Project, plots and data">
     <div class="workspace-tabs" role="tablist" aria-label="Workspace views">
       <button type="button" id="tab-files" role="tab" aria-controls="view-files" aria-selected="true" tabindex="0">Files</button>
       <button type="button" id="tab-plots" role="tab" aria-controls="view-plots" aria-selected="false" tabindex="-1">Plots</button>
       <button type="button" id="tab-data" role="tab" aria-controls="view-data" aria-selected="false" tabindex="-1">Data</button>
     </div>
     <div class="body project-body" id="view-files" role="tabpanel" aria-labelledby="tab-files">
-
+      <div class="project-tools">
+        <button id="folder" type="button">Open folder</button>
+        <button id="newFile" type="button" title="Create a new source file in the opened project">New file</button>
+        <button id="refreshProject" type="button" title="Refresh project tree">Refresh</button>
+      </div>
       <div class="project-search" role="search" aria-label="Search project files">
         <label for="projectSearch">Find in project</label>
         <input id="projectSearch" type="search" maxlength="256" placeholder="Literal text" aria-label="Find in project">
@@ -127,17 +182,52 @@ footer { padding: 5px 14px; display: flex; justify-content: space-between; gap: 
       </div>
       <div id="searchResults" aria-live="polite" aria-label="Project search results"></div>
       <div id="projectTree" role="navigation" aria-label="Project files"><p class="muted">Open a folder to browse source files.</p></div>
-      <p class="muted hint">Project files remain local to your browser. Plot and data viewers accept locally selected files.</p>
+      <p class="muted hint">Project files stay on this device. Plot and data viewers accept locally selected files.</p>
     </div>
-    <div id="view-plots" class="workspace-frame" role="tabpanel" aria-labelledby="tab-plots" hidden>
-      <iframe title="Local plot history" loading="lazy"></iframe>
+    <div id="view-plots" class="workspace-frame" role="tabpanel" aria-labelledby="tab-plots" hidden><iframe title="Local plot history" loading="lazy"></iframe></div>
+    <div id="view-data" class="workspace-frame" role="tabpanel" aria-labelledby="tab-data" hidden><iframe title="Local CSV and TSV data viewer" loading="lazy"></iframe></div>
+  </aside>
+  <div class="splitter" data-splitter data-axis="x" data-panel="sidebar" role="separator" aria-orientation="vertical" aria-label="Resize project sidebar" tabindex="0"></div>
+  <main class="editor-area" aria-label="Source editor">
+    <div class="doc-tabs-row">
+      <div class="doc-tabs" id="docTabs" role="tablist" aria-label="Open documents"></div>
+      <button id="newDocumentTab" class="doc-tab-new" type="button" title="New buffer (Ctrl+Alt+N)" aria-label="New buffer">+</button>
     </div>
-    <div id="view-data" class="workspace-frame" role="tabpanel" aria-labelledby="tab-data" hidden>
-      <iframe title="Local CSV and TSV data viewer" loading="lazy"></iframe>
+    <div class="editor-find" id="findBar" hidden><input id="editorFind" type="text" aria-label="Find text"><button id="findNext">Next</button>
+    <label for="editorReplace">Replace with</label><input id="editorReplace" type="text" aria-label="Replacement text"><button id="replaceOne">Replace</button><button id="replaceAll">Replace all</button><button id="findPrevious">Previous</button><label><input id="editorCaseSensitive" type="checkbox"> Match case</label><span id="editorFindCount" role="status" aria-live="polite"></span></div>
+    <textarea id="source" spellcheck="false" aria-label="Source code editor">function main() -> i32 {
+    println("Hello from FlowStudio")
+    return 0
+}
+</textarea>
+  </main>
+  <div class="splitter" data-splitter data-axis="x" data-panel="right" role="separator" aria-orientation="vertical" aria-label="Resize environment panel" tabindex="0"></div>
+  <aside class="panel rightpanel" aria-label="Environment">
+    <h2>Environment</h2>
+    <div class="body">
+      <p id="runtimeInfo">Flow execution available when Flow is installed.</p>
+      <button id="refreshPythonEnvironment" type="button">Refresh selected environment</button>
+      <div id="pythonEnvironment" aria-live="polite"><p class="muted">Select Python or R to inspect its native session.</p></div>
+      <p class="muted hint">Native R and Python retain separate variables until their respective Reset controls. Flow runs are independent.</p>
+      <p class="muted hint">The IDE executes code with your local OS permissions. Only run code you trust.</p>
     </div>
-  </section>
+  </aside>
 </div>
-<footer><span id="resultStatus" role="status">Idle</span><span>Local: 127.0.0.1:8751 · <span id="cursor">Ln 1, Col 1</span> · Ctrl/⌘+S Save · Ctrl/⌘+Enter Run · Ctrl/⌘+Shift+Enter Cell</span></footer>
+<div class="splitter splitter-horizontal" id="dockSplitter" data-splitter data-axis="y" data-panel="dock" role="separator" aria-orientation="horizontal" aria-label="Resize console dock" tabindex="0"></div>
+<section class="panel dock" id="consoleDock" aria-label="Console output">
+    <h2>Console <button id="clear" type="button">Clear</button></h2>
+    <div class="body"><pre id="console" role="log" aria-live="polite">Ready. Press Ctrl/⌘+Enter to execute selection or buffer.
+</pre></div>
+  </section>
+<footer class="statusbar">
+  <span id="resultStatus" role="status">Idle</span>
+  <span id="fileLabel">untitled.flow</span>
+  <span id="dirty" hidden>● unsaved</span>
+  <span id="cursor">Ln 1, Col 1</span>
+  <span class="spacer"></span>
+  <span>Ctrl/⌘+S Save · Ctrl/⌘+Enter Run · Ctrl/⌘+Shift+Enter Cell · Ctrl/⌘+W Close tab</span>
+</footer>
+</div>
 <!-- BEGIN EMBEDDED PROJECT MODULE: mirrors web/project.js -->
 <script>
 /* FlowStudio project explorer. Browser File System Access API only. */
@@ -423,6 +513,137 @@ global.FlowStudioSourceCells = api;
 })(globalThis);
 </script>
 <!-- END EMBEDDED SOURCE CELLS MODULE -->
+<!-- BEGIN EMBEDDED DOCUMENT MODEL: mirrors web/ide_documents.js -->
+<script>
+/* FlowStudio open-document model.
+ * Pure state: no DOM, no filesystem, no network. The editor view renders it.
+ */
+(function (global) {
+"use strict";
+const MAX_DOCUMENTS = 24;
+const MAX_NAME = 256;
+const LANGUAGES = Object.freeze(["flow", "r", "python"]);
+
+function label(doc) {
+  if (!doc) return "";
+  return doc.path || doc.name;
+}
+
+function createModel(options = {}) {
+  const limit = Number.isInteger(options.limit) && options.limit > 0
+    ? Math.min(options.limit, MAX_DOCUMENTS) : MAX_DOCUMENTS;
+  const items = [];
+  let activeId = null;
+  let sequence = 0;
+
+  function find(id) {
+    return items.find(item => item.id === id) || null;
+  }
+  function list() {
+    return items.slice();
+  }
+  function active() {
+    return find(activeId);
+  }
+  function count() {
+    return items.length;
+  }
+  function normalizeLanguage(value) {
+    return LANGUAGES.includes(value) ? value : "flow";
+  }
+  function sameDocument(doc, spec) {
+    if (typeof spec.path === "string" && spec.path && doc.path === spec.path) return true;
+    return Boolean(spec.handle) && doc.handle === spec.handle;
+  }
+  function open(spec) {
+    if (!spec || typeof spec.name !== "string" || !spec.name || spec.name.length > MAX_NAME)
+      throw new TypeError("A document needs a name of 1–256 characters.");
+    if (typeof spec.text !== "string")
+      throw new TypeError("A document needs string content.");
+    const existing = items.find(doc => sameDocument(doc, spec));
+    if (existing) {
+      activeId = existing.id;
+      return { document: existing, created: false };
+    }
+    if (items.length >= limit)
+      throw new RangeError("Close a document before opening more than " + limit + ".");
+    const document_ = {
+      id: "doc-" + (++sequence),
+      name: spec.name,
+      path: typeof spec.path === "string" && spec.path ? spec.path : null,
+      language: normalizeLanguage(spec.language),
+      text: spec.text,
+      saved: typeof spec.baseline === "string" ? spec.baseline : spec.text,
+      handle: spec.handle || null,
+      dirty: false
+    };
+    items.push(document_);
+    activeId = document_.id;
+    return { document: document_, created: true };
+  }
+  function activate(id) {
+    const doc = find(id);
+    if (!doc) return null;
+    activeId = doc.id;
+    return doc;
+  }
+  function setText(id, text) {
+    const doc = find(id);
+    if (!doc || typeof text !== "string") return false;
+    doc.text = text;
+    doc.dirty = text !== doc.saved;
+    return true;
+  }
+  function setDirty(id, isDirty) {
+    const doc = find(id);
+    if (!doc) return false;
+    doc.dirty = Boolean(isDirty);
+    return true;
+  }
+  function markSaved(id, text = null) {
+    const doc = find(id);
+    if (!doc) return null;
+    if (typeof text === "string") doc.text = text;
+    doc.saved = doc.text;
+    doc.dirty = false;
+    return doc;
+  }
+  function rename(id, name, path = null) {
+    const doc = find(id);
+    if (!doc) return null;
+    if (typeof name === "string" && name && name.length <= MAX_NAME) doc.name = name;
+    if (path === null || (typeof path === "string" && path)) doc.path = path;
+    return doc;
+  }
+  function setLanguage(id, language) {
+    const doc = find(id);
+    if (!doc) return null;
+    doc.language = normalizeLanguage(language);
+    return doc;
+  }
+  function close(id) {
+    const index = items.findIndex(item => item.id === id);
+    if (index < 0) return null;
+    const [closed] = items.splice(index, 1);
+    if (closed.id === activeId) {
+      const neighbour = items[index] || items[index - 1] || null;
+      activeId = neighbour ? neighbour.id : null;
+    }
+    return { document: closed, activeId };
+  }
+  return Object.freeze({
+    open, activate, active, find, list, count, close,
+    setText, setDirty, markSaved, rename, setLanguage,
+    limit: () => limit
+  });
+}
+
+const api = Object.freeze({ createModel, label, MAX_DOCUMENTS, MAX_NAME, LANGUAGES });
+global.FlowStudioDocuments = api;
+if (typeof module !== "undefined" && module.exports) module.exports = api;
+})(globalThis);
+</script>
+<!-- END EMBEDDED DOCUMENT MODEL -->
 <script>
 "use strict";
 /* BEGIN EMBEDDED FILE SAVE MODULE: mirrors web/file_save.js */
@@ -476,17 +697,18 @@ const src = el("source");
 const language = el("language");
 const consolePane = el("console");
 const resultStatus = el("resultStatus");
-let fileHandle = null;
-let fileBaseline = null;
-let filename = "untitled.flow";
-let projectPath = null;
-let dirty = false;
-let creatingProjectFile = false;
+const documents = FlowStudioDocuments.createModel();
+documents.open({ name: "untitled.flow", text: src.value,
+  language: language.value || "flow", baseline: src.value });
 
 
 function currentFind() {
   return FlowStudioEditorFind.findMatches(src.value, el("editorFind").value,
     { caseSensitive: el("editorCaseSensitive").checked });
+}
+function showFindBar() {
+  const bar = el("findBar");
+  if (bar) bar.hidden = false;
 }
 function updateFindCount() {
   try {
@@ -583,13 +805,123 @@ function inferLanguage(name) {
   if (/\.flow$/i.test(name)) return "flow";
   return language.value;
 }
+function activeDocument() {
+  return documents.active();
+}
 function setFilename(name, label = name) {
-  filename = name;
+  const doc = activeDocument();
+  if (doc) documents.rename(doc.id, name, label === name ? null : label);
   el("fileLabel").textContent = label;
+  renderTabs();
 }
 function markDirty(isDirty) {
-  dirty = isDirty;
+  const doc = activeDocument();
+  if (doc) documents.setDirty(doc.id, Boolean(isDirty));
   el("dirty").hidden = !isDirty;
+  renderTabs();
+}
+/* Open-document tab strip: one tab per buffer, dirty marker, close control. */
+function renderTabs() {
+  const strip = el("docTabs");
+  if (!strip) return;
+  const list = documents.list();
+  const current = activeDocument();
+  if (!list.length) {
+    const empty = document.createElement("p");
+    empty.className = "doc-tabs-empty";
+    empty.textContent = "No open documents";
+    strip.replaceChildren(empty);
+    return;
+  }
+  strip.replaceChildren(...list.map(doc => {
+    const selected = Boolean(current && current.id === doc.id);
+    const tab = document.createElement("div");
+    tab.className = "doc-tab" + (selected ? " active" : "") + (doc.dirty ? " dirty" : "");
+    tab.dataset.docId = doc.id;
+    tab.tabIndex = selected ? 0 : -1;
+    tab.setAttribute("role", "tab");
+    tab.setAttribute("aria-selected", String(selected));
+    tab.title = FlowStudioDocuments.label(doc);
+    const name = document.createElement("span");
+    name.className = "doc-tab-name";
+    name.textContent = FlowStudioDocuments.label(doc);
+    tab.append(name);
+    if (doc.dirty) {
+      const dot = document.createElement("span");
+      dot.className = "doc-tab-dot";
+      dot.textContent = "●";
+      dot.title = "Unsaved changes";
+      tab.append(dot);
+    }
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "doc-tab-close";
+    close.textContent = "×";
+    close.setAttribute("aria-label", "Close " + FlowStudioDocuments.label(doc));
+    close.addEventListener("click", event => {
+      if (event && typeof event.stopPropagation === "function") event.stopPropagation();
+      closeDocument(doc.id);
+    });
+    tab.append(close);
+    tab.addEventListener("click", () => activateDocument(doc.id));
+    return tab;
+  }));
+}
+function loadDocumentIntoEditor(doc) {
+  if (!doc) return false;
+  src.value = doc.text;
+  language.value = doc.language;
+  el("fileLabel").textContent = FlowStudioDocuments.label(doc);
+  el("dirty").hidden = !doc.dirty;
+  updateCursor();
+  updateFindCount();
+  renderTabs();
+  return true;
+}
+function activateDocument(id) {
+  const current = activeDocument();
+  if (current && current.id === id) { renderTabs(); src.focus(); return true; }
+  if (current) documents.setText(current.id, src.value);
+  const doc = documents.activate(id);
+  if (!doc) return false;
+  loadDocumentIntoEditor(doc);
+  src.focus();
+  return true;
+}
+function createUntitled() {
+  const doc = activeDocument();
+  if (doc) documents.setText(doc.id, src.value);
+  try {
+    const opened = documents.open({ name: "untitled." + extension(language.value), text: "",
+      language: language.value, baseline: "" });
+    loadDocumentIntoEditor(opened.document);
+    status("New buffer", "ok");
+    src.focus();
+    return opened.document;
+  } catch (error) {
+    status(error.message || String(error), "error");
+    return null;
+  }
+}
+function closeDocument(id = null) {
+  const current = activeDocument();
+  if (current) documents.setText(current.id, src.value);
+  const target = id ? documents.find(id) : activeDocument();
+  if (!target) return false;
+  if (target.dirty && !confirm("Discard unsaved changes in " + FlowStudioDocuments.label(target) + "?"))
+    return false;
+  documents.close(target.id);
+  if (documents.count() === 0) { createUntitled(); return true; }
+  loadDocumentIntoEditor(activeDocument());
+  src.focus();
+  return true;
+}
+function cycleDocument(step) {
+  const list = documents.list();
+  if (list.length < 2) return false;
+  const current = activeDocument();
+  const index = Math.max(0, list.findIndex(doc => current && doc.id === current.id));
+  return activateDocument(list[(index + step + list.length) % list.length].id);
 }
 function updateCursor() {
   const before = src.value.slice(0, src.selectionStart);
@@ -768,28 +1100,34 @@ async function runCell() {
   }
 }
 
-async function openEditorHandle(handle, path = null, skipDirtyCheck = false) {
-  if (dirty && !skipDirtyCheck && !creatingProjectFile && !confirm("Discard unsaved editor changes?")) return false;
+async function openEditorHandle(handle, path = null) {
+  const existing = documents.list().find(doc => doc.handle === handle &&
+    (path === null || doc.path === path));
+  if (existing) {
+    status("Switched to " + FlowStudioDocuments.label(existing), "ok");
+    return activateDocument(existing.id);
+  }
   const content = await FlowStudioFileSave.readSnapshot(handle);
-  src.value = content;
-  fileHandle = handle;
-  fileBaseline = content;
-  projectPath = path;
-  setFilename(handle.name, path || handle.name);
-  language.value = inferLanguage(handle.name);
-  markDirty(false);
-  updateCursor();
-  updateFindCount();
+  const current = activeDocument();
+  if (current) documents.setText(current.id, src.value);
+  let opened;
+  try {
+    opened = documents.open({ name: handle.name, path, text: content,
+      language: inferLanguage(handle.name), handle, baseline: content });
+  } catch (error) {
+    status(error.message || String(error), "error");
+    return false;
+  }
+  loadDocumentIntoEditor(opened.document);
   status("Opened " + (path || handle.name), "ok");
   return true;
 }
 async function openFile() {
-  if (dirty && !confirm("Discard unsaved editor changes?")) return;
   try {
     if (typeof window.showOpenFilePicker === "function") {
       const handles = await window.showOpenFilePicker({ multiple: false });
       if (!handles.length) return;
-      await openEditorHandle(handles[0], null, true);
+      await openEditorHandle(handles[0], null);
     } else {
       el("fallbackOpen").click();
     }
@@ -798,19 +1136,22 @@ async function openFile() {
   }
 }
 async function saveFile() {
-  const name = filename.startsWith("untitled.") ? "untitled." + extension(language.value) : filename;
+  const doc = activeDocument();
+  if (!doc) return;
+  const name = doc.name.startsWith("untitled.") ? "untitled." + extension(language.value) : doc.name;
   try {
-    if (fileHandle && typeof fileHandle.createWritable === "function") {
-      fileBaseline = await FlowStudioFileSave.writeIfUnchanged(fileHandle, fileBaseline, src.value);
-      setFilename(fileHandle.name, projectPath || fileHandle.name);
+    if (doc.handle && typeof doc.handle.createWritable === "function") {
+      const fileHandle = doc.handle;
+      const saved = await FlowStudioFileSave.writeIfUnchanged(fileHandle, doc.saved, src.value);
+      documents.rename(doc.id, fileHandle.name, doc.path);
+      documents.markSaved(doc.id, saved);
     } else if (typeof window.showSaveFilePicker === "function") {
       const handle = await window.showSaveFilePicker({ suggestedName: name });
       const baseline = await FlowStudioFileSave.readSnapshot(handle);
       const saved = await FlowStudioFileSave.writeIfUnchanged(handle, baseline, src.value);
-      fileHandle = handle;
-      fileBaseline = saved;
-      projectPath = null;
-      setFilename(handle.name);
+      doc.handle = handle;
+      documents.rename(doc.id, handle.name, null);
+      documents.markSaved(doc.id, saved);
     } else {
       const blob = new Blob([src.value], {type: "text/plain; charset=utf-8"});
       const url = URL.createObjectURL(blob);
@@ -819,9 +1160,30 @@ async function saveFile() {
       link.download = name;
       link.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
+      documents.markSaved(doc.id);
     }
+    el("fileLabel").textContent = FlowStudioDocuments.label(doc);
     markDirty(false);
     status("Saved " + name, "ok");
+  } catch (error) {
+    if (error.name !== "AbortError") status(String(error), "error");
+  }
+}
+async function saveFileAs() {
+  const doc = activeDocument();
+  if (!doc) return;
+  if (typeof window.showSaveFilePicker !== "function") return saveFile();
+  const name = doc.name.startsWith("untitled.") ? "untitled." + extension(language.value) : doc.name;
+  try {
+    const handle = await window.showSaveFilePicker({ suggestedName: name });
+    const baseline = await FlowStudioFileSave.readSnapshot(handle);
+    const saved = await FlowStudioFileSave.writeIfUnchanged(handle, baseline, src.value);
+    doc.handle = handle;
+    documents.rename(doc.id, handle.name, null);
+    documents.markSaved(doc.id, saved);
+    el("fileLabel").textContent = handle.name;
+    markDirty(false);
+    status("Saved " + handle.name, "ok");
   } catch (error) {
     if (error.name !== "AbortError") status(String(error), "error");
   }
@@ -850,14 +1212,10 @@ el("newFile").addEventListener("click", async () => {
     status("Invalid or unsupported source filename.", "error");
     return;
   }
-  if (dirty && !confirm("Discard unsaved editor changes?")) return;
-  creatingProjectFile = true;
   try {
     await project.create(name);
   } catch (error) {
     status(error.message || String(error), "error");
-  } finally {
-    creatingProjectFile = false;
   }
 });
 
@@ -939,14 +1297,29 @@ el("findPrevious").addEventListener("click", () => findInEditor(true));
 el("replaceOne").addEventListener("click", replaceCurrent);
 el("replaceAll").addEventListener("click", replaceAllInEditor);
 
-src.addEventListener("input", () => { markDirty(true); updateCursor(); updateFindCount(); });
+src.addEventListener("input", () => {
+  const doc = activeDocument();
+  if (doc) {
+    documents.setText(doc.id, src.value);
+    el("dirty").hidden = !activeDocument().dirty;
+    renderTabs();
+  } else {
+    markDirty(true);
+  }
+  updateCursor();
+  updateFindCount();
+});
 src.addEventListener("click", updateCursor);
 src.addEventListener("keyup", updateCursor);
 language.addEventListener("change", () => {
   environmentRevision++;
   showPythonEnvironmentMessage(language.value === "python" || language.value === "r" ?
     "Refresh to inspect native " + language.value + " variables." : "Select Python or R to inspect its native session.");
-  if (filename.startsWith("untitled.")) setFilename("untitled." + extension(language.value));
+  const doc = activeDocument();
+  if (doc) {
+    documents.setLanguage(doc.id, language.value);
+    if (doc.name.startsWith("untitled.")) setFilename("untitled." + extension(language.value));
+  }
   el("runtimeInfo").textContent = language.value === "python" ? "Native Python: persistent until Reset Python." :
     language.value === "r" ? "Native R: persistent until Reset R." :
     "Flow executions are independent.";
@@ -1021,29 +1394,54 @@ el("clear").addEventListener("click", () => { consolePane.textContent = ""; });
 el("fallbackOpen").addEventListener("change", async event => {
   const file = event.target.files[0];
   if (!file) return;
-  src.value = await file.text();
-  fileHandle = null;
-  fileBaseline = null;
-  projectPath = null;
-  setFilename(file.name);
-  language.value = inferLanguage(file.name);
-  markDirty(false);
-  updateFindCount();
-  status("Opened " + file.name, "ok");
-  event.target.value = "";
+  const text = await file.text();
+  const current = activeDocument();
+  if (current) documents.setText(current.id, src.value);
+  try {
+    const opened = documents.open({ name: file.name, text, baseline: text,
+      language: inferLanguage(file.name) });
+    el("fallbackOpen").value = "";
+    loadDocumentIntoEditor(opened.document);
+    status("Opened " + file.name, "ok");
+  } catch (error) {
+    status(error.message || String(error), "error");
+  }
 });
 document.addEventListener("keydown", event => {
-  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") {
+  const command = event.ctrlKey || event.metaKey;
+  if (command && !event.altKey && event.key.toLowerCase() === "w") {
     event.preventDefault();
+    closeDocument();
+    return;
+  }
+  if (command && event.key === "Tab") {
+    event.preventDefault();
+    cycleDocument(event.shiftKey ? -1 : 1);
+    return;
+  }
+  if (command && event.altKey && event.key.toLowerCase() === "n") {
+    event.preventDefault();
+    createUntitled();
+    return;
+  }
+  if (command && event.key.toLowerCase() === "f") {
+    event.preventDefault();
+    showFindBar();
     const selection = src.value.slice(src.selectionStart, src.selectionEnd);
     if (selection.length > 0 && selection.length <= 256) el("editorFind").value = selection;
     updateFindCount();
     el("editorFind").focus();
     return;
   }
-  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "h") {
+  if (command && event.key.toLowerCase() === "h") {
     event.preventDefault();
+    showFindBar();
     el("editorReplace").focus();
+    return;
+  }
+  if (event.key === "Escape" && el("findBar") && !el("findBar").hidden &&
+      event.target !== el("editorFind") && event.target !== el("editorReplace")) {
+    el("findBar").hidden = true;
     return;
   }
   if (event.key === "F3" && el("editorFind").value) {
@@ -1060,11 +1458,56 @@ document.addEventListener("keydown", event => {
     saveFile();
   }
 });
+
+el("newDocument").addEventListener("click", () => createUntitled());
+el("newDocumentTab").addEventListener("click", () => createUntitled());
+
+const commands = Object.freeze({
+  newDocument: () => createUntitled(),
+  closeDocument: () => closeDocument(),
+  openFile: () => openFile(),
+  saveFile: () => saveFile(),
+  saveFileAs: () => saveFileAs(),
+  openFolder: () => el("folder").click(),
+  focusFind: () => {
+    showFindBar();
+    const selection = src.value.slice(src.selectionStart, src.selectionEnd);
+    if (selection.length > 0 && selection.length <= 256) el("editorFind").value = selection;
+    updateFindCount();
+    el("editorFind").focus();
+  },
+  focusReplace: () => { showFindBar(); el("editorReplace").focus(); },
+  findInProject: () => el("projectSearch").focus(),
+  run: () => el("run").click(),
+  runCell: () => el("runCell").click(),
+  resetR: () => el("resetR").click(),
+  resetPython: () => el("resetPython").click(),
+  showFiles: () => el("tab-files").click(),
+  showPlots: () => el("tab-plots").click(),
+  showData: () => el("tab-data").click(),
+  toggleDock: () => {
+    const dock = el("consoleDock");
+    const splitter = el("dockSplitter");
+    const hide = !dock.hidden;
+    dock.hidden = hide;
+    if (splitter) splitter.hidden = hide;
+  },
+  refreshEnvironment: () => el("refreshPythonEnvironment").click(),
+  shortcuts: () => status("Ctrl+Enter run · Ctrl+Shift+Enter cell · Ctrl+S save · Ctrl+W close tab · Ctrl+Tab next tab · Ctrl+F find · Ctrl+H replace", "ok"),
+  about: () => status("FlowStudio 0.1.0-alpha.1 · Flow-first local IDE · execution on 127.0.0.1:8751 only", "ok")
+});
+if (typeof window !== "undefined") {
+  window.FlowStudioApp = Object.freeze({
+    commands, documents, createUntitled, activateDocument, closeDocument, openEditorHandle
+  });
+}
+renderTabs();
 </script>
 <script src="/editor_recovery.js"></script>
 <script src="/workspace_tabs.js"></script>
 <script>FlowStudioWorkspaceTabs.mount();</script>
 <script src="/console.js"></script>
 <script src="/workspace_console.js"></script>
+<script src="/ide_shell.js"></script>
 </body>
 </html>

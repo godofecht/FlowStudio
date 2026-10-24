@@ -34,6 +34,8 @@ class Element {
   fire(event, payload = {}) { return this.listeners[event]?.(payload); }
   click() { return this.fire("click"); }
   focus() { this.focused = true; }
+  setAttribute(name, value) { (this.attributes ||= {})[name] = String(value); }
+  getAttribute(name) { return (this.attributes || {})[name] ?? null; }
   setSelectionRange(start, end) { this.selectionStart = start; this.selectionEnd = end; }
   setRangeText(text, start, end) {
     this.value = this.value.slice(0, start) + text + this.value.slice(end);
@@ -75,7 +77,8 @@ function workspace(folder) {
     "projectTree", "folder", "newFile", "refreshProject",
     "projectSearch", "caseSensitive", "searchProject", "searchResults",
     "editorFind", "editorReplace", "findNext", "findPrevious",
-    "replaceOne", "replaceAll", "editorCaseSensitive", "editorFindCount"
+    "replaceOne", "replaceAll", "editorCaseSensitive", "editorFindCount",
+    "docTabs", "newDocument", "newDocumentTab", "findBar"
   ];
   for (const id of ids) elements.set(id, new Element());
   elements.get("source").value = "initial";
@@ -113,11 +116,12 @@ function workspace(folder) {
     },
     Blob, URL, setTimeout, console
   });
-  assert.equal(scripts.length, 4, "Expected project, editor-find, cells and workspace scripts");
+  assert.equal(scripts.length, 5, "Expected project, editor-find, cells, documents and workspace scripts");
   vm.runInContext(scripts[0], context, { filename: "project-embedded.js" });
   vm.runInContext(scripts[1], context, { filename: "editor-find-embedded.js" });
   vm.runInContext(scripts[2], context, { filename: "source-cells-embedded.js" });
-  vm.runInContext(scripts[3], context, { filename: "workspace.js" });
+  vm.runInContext(scripts[3], context, { filename: "documents-embedded.js" });
+  vm.runInContext(scripts[4], context, { filename: "workspace.js" });
   return {
     el: id => elements.get(id), document, fetches, inspectionFetches,
     setDiscard: value => { allowDiscard = value; },
@@ -130,6 +134,7 @@ test("embedded project module exactly mirrors tested standalone source", () => {
   const findSource = fs.readFileSync(path.join(root, "web/editor_find.js"), "utf8").trimEnd();
   assert.equal(scripts[1].trim(), findSource);
   assert.equal(scripts[2].trim(), fs.readFileSync(path.join(root, "web/source_cells.js"), "utf8").trimEnd());
+  assert.equal(scripts[3].trim(), fs.readFileSync(path.join(root, "web/ide_documents.js"), "utf8").trimEnd());
   assert.match(html, /id="projectTree"/);
   assert.match(html, /id="folder"/);
   assert.match(html, /id="newFile"/);
@@ -154,7 +159,7 @@ test("folder selection opens nested source in editor, saves to exact handle", as
   assert.equal(app.el("dirty").hidden, true);
 });
 
-test("refuses project file switch with unsaved changes", async () => {
+test("opening a second project file keeps the edited buffer in its own tab", async () => {
   const first = file("one.py", "first");
   const second = file("two.py", "second");
   const app = workspace(directory("p", [["one.py", first], ["two.py", second]]));
@@ -162,8 +167,14 @@ test("refuses project file switch with unsaved changes", async () => {
   await app.el("projectTree").children[1].fire("click");
   app.el("source").value = "unsaved";
   app.el("source").fire("input");
-  app.setDiscard(false);
   await app.el("projectTree").children[2].fire("click");
+  assert.equal(app.el("source").value, "second");
+  const tabs = app.el("docTabs").children;
+  // The starting buffer plus one tab per opened project file.
+  assert.equal(tabs.length, 3);
+  assert.match(tabs[1].className, /dirty/);
+  assert.equal(app.el("dirty").hidden, true);
+  await tabs[1].fire("click");
   assert.equal(app.el("source").value, "unsaved");
   assert.equal(app.el("dirty").hidden, false);
 });
@@ -241,7 +252,7 @@ test("project-wide search navigates to exact match with editor selection", async
   assert.equal(app.el("source").focused, true);
 });
 
-test("search navigation preserves unsaved source edits when switching is declined", async () => {
+test("search navigation opens its own tab and preserves the edited buffer", async () => {
   const folder = directory("research", [
     ["a.flow", file("a.flow", "needle")],
     ["b.flow", file("b.flow", "needle")]
@@ -253,8 +264,11 @@ test("search navigation preserves unsaved source edits when switching is decline
   app.el("source").fire("input");
   app.el("projectSearch").value = "needle";
   await app.el("searchProject").fire("click");
-  app.setDiscard(false);
   await app.el("searchResults").children[2].fire("click");
+  assert.equal(app.el("source").value, "needle");
+  const tabs = app.el("docTabs").children;
+  assert.equal(tabs.length, 3);
+  await tabs[1].fire("click");
   assert.equal(app.el("source").value, "unsaved changes");
   assert.equal(app.el("dirty").hidden, false);
 });

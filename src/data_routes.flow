@@ -60,6 +60,9 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/workspace_console.js" {
         return StaticAsset { path: "web/workspace_console.js", mime: "text/javascript; charset=utf-8", found: true }
     }
+    if url == "/ide_shell.js" {
+        return StaticAsset { path: "web/ide_shell.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
     # Serve the same browser workspace under the native Flow-owned loopback server.
     # Every asset is allowlisted; URL paths are never used as filesystem paths.
     if url == "/app" or url == "/app/" or url == "/app/index.html" {

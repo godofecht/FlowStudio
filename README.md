@@ -112,11 +112,11 @@ HTML report exporter. Physical-browser end-to-end acceptance remains pending.
 
 The Flow-owned localhost server now has an experimental interactive CPython
 debugger. Enter comma-separated breakpoint line numbers in the browser's
-Python debugger panel, then Start, Step, Continue or Stop. An empty breakpoint
+Python debugger panel, then Start, Step into, Step over, Step out, Continue or Stop. An empty breakpoint
 list stops on the first executable line. The stack viewer shows bounded local
 variable types and safe scalar previews. Debugging executes real Python in
 the existing persistent native session; it does not emulate breakpoints in
-JavaScript. Ordinary native Python execution is blocked while the debugger
+JavaScript. Step over skips source callees unless a breakpoint is hit; Step out resumes at the caller or completes a top-level frame. Ordinary native Python execution is blocked while the debugger
 is active. The kernel runs with the current user's permissions and is not
 safe for untrusted code. GitHub Pages, R and Flow source debugging are not
 supported. See [docs/PARITY.md](docs/PARITY.md) for verification status.

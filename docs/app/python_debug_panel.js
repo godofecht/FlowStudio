@@ -51,15 +51,17 @@ function format(data) {
   return lines.join("\n");
 }
 function create({native, source, language, breakpoints, startButton, stepButton,
-                 continueButton, stopButton, statusButton, target, notice}) {
+                 nextButton, finishButton, continueButton, stopButton, statusButton, target, notice}) {
   if (!native || !source || !language || !breakpoints || !startButton ||
-      !stepButton || !continueButton || !stopButton || !statusButton || !target)
+      !stepButton || !nextButton || !finishButton || !continueButton || !stopButton || !statusButton || !target)
     throw Error("Native Python debugger requires its controls.");
   const supported = !!native.available();
   let state = "idle", pending = false;
   function update() {
     startButton.disabled = !supported || pending || state === "paused" || state === "running";
     stepButton.disabled = !supported || pending || state !== "paused";
+    nextButton.disabled = !supported || pending || state !== "paused";
+    finishButton.disabled = !supported || pending || state !== "paused";
     continueButton.disabled = !supported || pending || state !== "paused";
     stopButton.disabled = !supported || pending || (state !== "paused" && state !== "running");
     statusButton.disabled = !supported || pending;
@@ -67,7 +69,7 @@ function create({native, source, language, breakpoints, startButton, stepButton,
   async function execute(action) {
     if (!supported || pending) return false;
     if (action === "start" && (state === "paused" || state === "running")) return false;
-    if ((action === "step" || action === "continue") && state !== "paused") return false;
+    if (["step", "next", "finish", "continue"].includes(action) && state !== "paused") return false;
     if (action === "stop" && state !== "paused" && state !== "running") return false;
     pending = true;
     update();
@@ -94,6 +96,8 @@ function create({native, source, language, breakpoints, startButton, stepButton,
   }
   startButton.addEventListener("click", () => { void execute("start"); });
   stepButton.addEventListener("click", () => { void execute("step"); });
+  nextButton.addEventListener("click", () => { void execute("next"); });
+  finishButton.addEventListener("click", () => { void execute("finish"); });
   continueButton.addEventListener("click", () => { void execute("continue"); });
   stopButton.addEventListener("click", () => { void execute("stop"); });
   statusButton.addEventListener("click", () => { void execute("status"); });

@@ -40,6 +40,46 @@ class DebugTests(unittest.TestCase):
         self.assertEqual(namespace["y"], 3)
         self.assertFalse(debugger.busy())
 
+    def test_step_over_skips_called_source_frames(self):
+        source = ("def inner():\\n    value = 40\\n    return value\\n"
+                  "answer = inner()\\nprint(answer)\\n")
+        debugger, namespace, result = self.start(source, [4])
+        self.assertEqual(result["stack"][0]["line"], 4)
+        result = debugger.command("next")
+        self.assertEqual(result["state"], "paused")
+        self.assertEqual(result["stack"][0]["line"], 5)
+        self.assertEqual(result["stack"][0]["function"], "<module>")
+        self.assertEqual(debugger.command("continue")["state"], "done")
+        self.assertEqual(namespace["answer"], 40)
+
+    def test_step_out_returns_to_calling_source_frame(self):
+        source = ("def inner():\\n    value = 40\\n    return value\\n"
+                  "answer = inner()\\nprint(answer)\\n")
+        debugger, namespace, result = self.start(source, [2])
+        self.assertEqual(result["stack"][0]["function"], "inner")
+        result = debugger.command("finish")
+        self.assertEqual(result["state"], "paused")
+        self.assertEqual(result["stack"][0]["line"], 5)
+        self.assertEqual(result["stack"][0]["function"], "<module>")
+        self.assertEqual(debugger.command("continue")["state"], "done")
+        self.assertEqual(namespace["answer"], 40)
+
+    def test_step_over_honors_breakpoint_inside_called_function(self):
+        source = ("def inner():\\n    value = 40\\n    return value\\n"
+                  "answer = inner()\\nprint(answer)\\n")
+        debugger, _, result = self.start(source, [2, 4])
+        self.assertEqual(result["stack"][0]["line"], 4)
+        result = debugger.command("next")
+        self.assertEqual(result["state"], "paused")
+        self.assertEqual(result["stack"][0]["line"], 2)
+        self.assertEqual(debugger.command("continue")["state"], "done")
+
+    def test_step_out_from_module_runs_to_completion(self):
+        debugger, namespace, result = self.start("x = 1\\ny = 2\\n", [])
+        self.assertEqual(result["state"], "paused")
+        self.assertEqual(debugger.command("finish")["state"], "done")
+        self.assertEqual(namespace["y"], 2)
+
     def test_stop_preserves_unexecuted_lines(self):
         debugger, namespace, result = self.start("x = 1\ny = 2\n", [2])
         self.assertEqual(result["state"], "paused")

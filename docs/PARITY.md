@@ -30,13 +30,28 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Sequential percent-cell notebooks | partial / Python and R Run All wired with explicit per-cell Python/R/Flow language tags (cross-platform CI accepted; real browser pending); bounded browser-local text/Python PNG output recovery across reload; native and physical-browser acceptance unverified | Execute cells in order, retain interpreter state, show per-cell output and stop on error |
 | Jupyter `.ipynb` import/export | partial / browser UI wired and Node regression coverage; bounded output recovery is separate from `.ipynb` import/export; physical-browser file round-trip and live Python/R kernels unverified | Import/export nbformat 4 Python/R code and Markdown cells through file picker/download; validate with nbformat; preserve source; verify live outputs in Chromium and cross-platform acceptance |
 | R Markdown / Quarto | partial / offline HTML report export from Python/R percent-cell notebooks; no Quarto/R Markdown rendering | Render notebook with inline plots and HTML export; verify actual Quarto/R Markdown format compatibility |
-| Source debugger | partial / native CPython breakpoint/step/continue/stop and bounded stack inspection passed cross-platform Flow/HTTP CI #40122749072; physical browser and R/Flow debugging missing | Breakpoints, stack, variables, step execution |
+| Source debugger | partial / native CPython breakpoint/step/continue/stop and bounded stack inspection passed cross-platform Flow/HTTP CI #40122749072; step-over/step-out implemented with acceptance pending; physical browser and R/Flow debugging missing | Breakpoints, stack, variables, step execution |
 | Remote/server mode | missing | Authenticated, origin-aware multi-user sessions with isolation |
 | Diagnostics / profiling | partial / native CPython bounded line tracing cross-platform CI accepted; physical-browser acceptance pending | Resource/time tracing and useful language-specific diagnostics |
 | Cross-platform packaging | missing | Installable signed/reproducible macOS and Linux releases |
 | Accessibility | partial / unverified | Full keyboard navigation, screen reader labels, resize and contrast checks |
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
 
+
+## 2026-10-24: CPython step-over and step-out (acceptance pending)
+
+Native debugger commands now include **Step over** and **Step out**. The real
+CPython trace engine counts FlowStudio source frames, so Step over skips
+nested calls and resumes at the next line in the same or calling frame;
+Step out resumes when the current source frame returns. Explicit
+breakpoints in called frames still take precedence. Step out from a
+top-level source frame runs to completion. Both operations reuse the
+persistent Python kernel and Flow-owned localhost intent/origin-gated routes;
+GitHub Pages does not emulate them. The browser provides separate accessible
+controls. Real CPython unit tests, browser route/control tests and live HTTP
+acceptance have been added. **Status: implemented, unverified pending
+cross-platform native CI; physical-browser acceptance still missing.**
+No claim of R/Flow debugger support or RStudio parity is made.
 
 ## 2026-10-24: native Python source debugger (cross-platform native acceptance passed)
 

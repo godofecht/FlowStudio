@@ -59,7 +59,7 @@ async function debugPythonStart(source, breakpoints) {
   return debugPythonResponse("/api/debug/python/start", JSON.stringify({source, breakpoints}));
 }
 async function debugPythonCommand(action) {
-  if (!["step", "continue", "stop", "status"].includes(action))
+  if (!["step", "next", "finish", "continue", "stop", "status"].includes(action))
     throw new Error("Unknown Python debugger action.");
   return debugPythonResponse("/api/debug/python/" + action, "");
 }

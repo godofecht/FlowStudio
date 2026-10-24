@@ -214,6 +214,27 @@ def main() -> None:
                              "print('debug_unreached' in globals())", accepted_headers)
     assert status == 200 and output.strip() == "False", (status, output)
 
+    # Real CPython frame-depth stepping: next skips callees; finish exits them.
+    depth_source = ("def depth_inner():\\n    depth_local = 40\\n    return depth_local\\n"
+                    "depth_result = depth_inner()\\nprint(depth_result)\\n")
+    status, payload = request("POST", "/api/debug/python/start",
+                              json.dumps({"source": depth_source, "breakpoints": [4]}),
+                              accepted_headers)
+    assert status == 200 and json.loads(payload)["stack"][0]["line"] == 4, (status, payload)
+    status, payload = request("POST", "/api/debug/python/next", "", accepted_headers)
+    assert status == 200 and json.loads(payload)["stack"][0]["line"] == 5, (status, payload)
+    assert request("POST", "/api/debug/python/continue", "", accepted_headers)[0] == 200
+    status, payload = request("POST", "/api/debug/python/start",
+                              json.dumps({"source": depth_source, "breakpoints": [2]}),
+                              accepted_headers)
+    assert status == 200 and json.loads(payload)["stack"][0]["line"] == 2, (status, payload)
+    status, payload = request("POST", "/api/debug/python/finish", "", accepted_headers)
+    assert status == 200 and json.loads(payload)["stack"][0]["line"] == 5, (status, payload)
+    assert request("POST", "/api/debug/python/continue", "", accepted_headers)[0] == 200
+    assert request("POST", "/api/debug/python/next", "")[0] == 404
+    assert request("POST", "/api/debug/python/finish", "",
+                   {"X-FlowStudio-Intent": "run", "Origin": "http://attacker.invalid"})[0] == 404
+
     # A single Python kernel retains variables between HTTP requests.
     status, output = request("POST", "/api/run/python",
                              "flowstudio_persistent = 40 + 2", accepted_headers)

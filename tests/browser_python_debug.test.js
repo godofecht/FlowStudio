@@ -9,13 +9,13 @@ function button() {
     addEventListener(event, fn) {this.listeners[event] = fn;}};
 }
 function controls(client) {
-  const startButton=button(), stepButton=button(), continueButton=button(),
+  const startButton=button(), stepButton=button(), nextButton=button(), finishButton=button(), continueButton=button(),
     stopButton=button(), statusButton=button(), target={textContent:""};
   const source={value:"x = 1\ny = x + 2\nprint(y)"};
   const language={value:"python"}, breakpoints={value:"2"};
   const ui=panel.create({native:client,source,language,breakpoints,
-    startButton,stepButton,continueButton,stopButton,statusButton,target});
-  return {ui,startButton,stepButton,continueButton,stopButton,statusButton,
+    startButton,stepButton,nextButton,finishButton,continueButton,stopButton,statusButton,target});
+  return {ui,startButton,stepButton,nextButton,finishButton,continueButton,stopButton,statusButton,
     source,language,breakpoints,target};
 }
 const paused = {state:"paused",ok:true,stack:[{line:2,function:"<module>",
@@ -44,11 +44,16 @@ test("native debugger can start, step and continue with a shared UI lock", async
   assert.equal(c.stepButton.disabled,true);
   assert.equal(await c.ui.execute("start"),true);
   assert.equal(c.stepButton.disabled,false);
+  assert.equal(c.nextButton.disabled,false);
+  assert.equal(c.finishButton.disabled,false);
   assert.match(c.target.textContent,/x: int = 1/);
   assert.equal(await c.ui.execute("step"),true);
+  assert.equal(await c.ui.execute("next"),true);
+  assert.equal(await c.ui.execute("finish"),true);
   assert.equal(await c.ui.execute("continue"),true);
   assert.equal(c.stepButton.disabled,true);
-  assert.deepEqual(calls,[["start",c.source.value,[2]],"step","continue"]);
+  assert.equal(c.nextButton.disabled,true);
+  assert.deepEqual(calls,[["start",c.source.value,[2]],"step","next","finish","continue"]);
 });
 test("hosted Pages disables all debugger commands", async () => {
   const c=controls({available:()=>false,
@@ -71,12 +76,14 @@ test("native debugger client uses intent-gated fixed routes and rejects invalid 
   try {
     assert.deepEqual(await native.debugPythonStart("x = 1\nprint(x)",[2]),paused);
     assert.deepEqual(await native.debugPythonCommand("step"),paused);
-    assert.deepEqual(calls.map(c=>c[0]),["/api/debug/python/start","/api/debug/python/step"]);
+    assert.deepEqual(await native.debugPythonCommand("next"),paused);
+    assert.deepEqual(await native.debugPythonCommand("finish"),paused);
+    assert.deepEqual(calls.map(c=>c[0]),["/api/debug/python/start","/api/debug/python/step","/api/debug/python/next","/api/debug/python/finish"]);
     assert.equal(calls[0][2],"run");
     assert.deepEqual(JSON.parse(calls[0][1]).breakpoints,[2]);
     await assert.rejects(native.debugPythonCommand("exec"),/Unknown/);
     await assert.rejects(native.debugPythonStart("x = 1",[2]),/breakpoint/);
-    assert.equal(calls.length,2);
+    assert.equal(calls.length,4);
   } finally {
     if (oldLocation===undefined) delete globalThis.location;
     else globalThis.location=oldLocation;

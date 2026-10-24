@@ -166,12 +166,12 @@ def serve() -> None:
             length = int(header[1:], 16)
         except ValueError:
             return
-        if header[:1] not in (b"E", b"I", b"T", b"B", b"S", b"C", b"X", b"Q") or length > MAX_SOURCE or (header[:1] in (b"I", b"S", b"C", b"X", b"Q") and length != 0):
+        if header[:1] not in (b"E", b"I", b"T", b"B", b"S", b"N", b"F", b"C", b"X", b"Q") or length > MAX_SOURCE or (header[:1] in (b"I", b"S", b"N", b"F", b"C", b"X", b"Q") and length != 0):
             return
         data = read_exact(stdin, length)
         if data is None:
             return
-        if header[:1] in (b"B", b"S", b"C", b"X", b"Q"):
+        if header[:1] in (b"B", b"S", b"N", b"F", b"C", b"X", b"Q"):
             if header[:1] == b"B":
                 try:
                     ok, payload = encode(debugger.start(data.decode("utf-8", "strict"), namespace, LimitedWriter()))
@@ -179,7 +179,7 @@ def serve() -> None:
                     ok, payload = encode({"state": "idle", "ok": False, "stack": [],
                                           "output": "", "message": "Invalid UTF-8 debugger request."})
             else:
-                actions = {b"S": "step", b"C": "continue", b"X": "stop", b"Q": "status"}
+                actions = {b"S": "step", b"N": "next", b"F": "finish", b"C": "continue", b"X": "stop", b"Q": "status"}
                 ok, payload = encode(debugger.command(actions[header[:1]]))
         elif debugger.busy() and header[:1] != b"I":
             ok, payload = False, b"Python debugger is active; stop or finish it before normal execution."

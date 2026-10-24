@@ -108,6 +108,19 @@ the hosted editor continues to execute Python/R through browser WebAssembly.
 Flow notebooks are not yet supported by the Python/R-only Jupyter export or
 HTML report exporter. Physical-browser end-to-end acceptance remains pending.
 
+## Native Python source debugging
+
+The Flow-owned localhost server now has an experimental interactive CPython
+debugger. Enter comma-separated breakpoint line numbers in the browser's
+Python debugger panel, then Start, Step, Continue or Stop. An empty breakpoint
+list stops on the first executable line. The stack viewer shows bounded local
+variable types and safe scalar previews. Debugging executes real Python in
+the existing persistent native session; it does not emulate breakpoints in
+JavaScript. Ordinary native Python execution is blocked while the debugger
+is active. The kernel runs with the current user's permissions and is not
+safe for untrusted code. GitHub Pages, R and Flow source debugging are not
+supported. See [docs/PARITY.md](docs/PARITY.md) for verification status.
+
 ## Native Git branches
 
 The Git pane on the Flow-owned localhost server lists local branches, creates

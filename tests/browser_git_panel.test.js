@@ -51,7 +51,7 @@ test("network errors recover both controls", async () => {
 
 test("stage and commit require explicit confirmation and preserve literal inputs", async () => {
   const statusButton = button(), diffButton = button(), stagedDiffButton = button();
-  const stageButton = button(), commitButton = button(), target = {textContent:""};
+  const stageButton = button(), unstageButton = button(), commitButton = button(), target = {textContent:""};
   const pathInput = {value:"folder/a [1].flow"}, messageInput = {value:"Fix native execution"};
   const calls = [], prompts = [];
   let allow = false;
@@ -60,31 +60,38 @@ test("stage and commit require explicit confirmation and preserve literal inputs
     async gitDiff(){return {ok:true,status:200,output:""};},
     async gitStagedDiff(){calls.push("staged");return {ok:true,status:200,output:"diff --cached"};},
     async gitStage(path){calls.push(["stage",path]);return {ok:true,status:200,output:""};},
+    async gitUnstage(path){calls.push(["unstage",path]);return {ok:true,status:200,output:""};},
     async gitCommit(message){calls.push(["commit",message]);return {ok:true,status:200,output:"[main abc]"};}},
-    statusButton,diffButton,stagedDiffButton,stageButton,commitButton,
+    statusButton,diffButton,stagedDiffButton,stageButton,unstageButton,commitButton,
     pathInput,messageInput,target,confirmAction:(prompt)=>{prompts.push(prompt);return allow;}});
   assert.equal(await ui.stage(),false);
+  assert.equal(await ui.unstage(),false);
   assert.equal(await ui.commit(),false);
   assert.deepEqual(calls,[]);
   allow = true;
   assert.equal(await ui.stage(),true);
+  assert.equal(await ui.unstage(),true);
   assert.equal(await ui.show("staged"),true);
   assert.equal(await ui.commit(),true);
-  assert.deepEqual(calls,[["stage","folder/a [1].flow"],"staged",["commit","Fix native execution"]]);
+  assert.deepEqual(calls,[["stage","folder/a [1].flow"],["unstage","folder/a [1].flow"],"staged",["commit","Fix native execution"]]);
   assert.match(prompts[0],/server working tree/);
-  assert.match(prompts[1],/ALL currently staged/);
+  assert.match(prompts[1],/Working-tree changes will be preserved/);
+  assert.match(prompts[2],/ALL currently staged/);
   assert.equal(stageButton.disabled,false);
+  assert.equal(unstageButton.disabled,false);
   assert.equal(commitButton.disabled,false);
 });
 test("hosted Pages disables all Git writes and does not ask for confirmation", async () => {
   const statusButton = button(), diffButton = button(), stagedDiffButton = button();
-  const stageButton = button(), commitButton = button(), target = {textContent:""};
+  const stageButton = button(), unstageButton = button(), commitButton = button(), target = {textContent:""};
   const ui = panel.create({native:{available:()=>false},statusButton,diffButton,
-    stagedDiffButton,stageButton,commitButton,pathInput:{value:"a.py"},
+    stagedDiffButton,stageButton,unstageButton,commitButton,pathInput:{value:"a.py"},
     messageInput:{value:"commit"},target,confirmAction:()=>{throw Error("prompted");}});
   assert.equal(await ui.stage(),false);
+  assert.equal(await ui.unstage(),false);
   assert.equal(await ui.commit(),false);
   assert.equal(stageButton.disabled,true);
+  assert.equal(unstageButton.disabled,true);
   assert.equal(commitButton.disabled,true);
 });
 test("Git write concurrency locks all controls and recovers after rejection", async () => {

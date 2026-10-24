@@ -59,7 +59,7 @@ test("prefix parsing refuses arbitrary expressions, selections, member access an
 test("editor completion inserts selected live symbol and fires input for draft tracking", async () => {
   const f=fixture({python:async prefix=>{
     assert.equal(prefix,"pri");
-    return {ok:true,items:["print","property"]};
+    return {ok:true,items:["print","private"]};
   }});
   let inputs=0;f.source.addEventListener("input",()=>{inputs++;});
   assert.equal(await f.api.complete(),true);
@@ -88,7 +88,7 @@ test("invalid completion payload is rejected without HTML interpretation", async
 });
 test("Python completion uses actual worker interpreter namespace without eval", async () => {
   const calls=[], replies=[];
-  const py={async runPythonAsync(code){calls.push(code);return '["print","property"]';}};
+  const py={async runPythonAsync(code){calls.push(code);return '["print","private"]';}};
   const self={postMessage:message=>replies.push(message)};
   vm.runInNewContext(workerSource,{self,TextEncoder,importScripts:()=>{},
     loadPyodide:async()=>py,fetch:async()=>({ok:true,text:async()=>""})});

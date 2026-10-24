@@ -20,7 +20,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Plot viewer | partial / Node-tested PNG import and integrated workspace tab; native unverified | png/svg plot history, zoom, save and deterministic device lifecycle |
 | Project explorer | partial / browser Pages open/create/save and confirmed active-file delete with baseline conflict checks; 10 regression tests V8-shim passed; physical-browser deletion unverified | Open project, tree navigation, source-file creation and save; scoped delete is implemented, copy-verify-delete rename implemented with non-atomic filesystem race limits; physical-browser acceptance remains missing |
 | Data viewer | partial / CSV/TSV plus bounded Python/R environment table snapshots wired; real Pyodide/webR and physical browser unverified | Interactive sortable/filterable tabular datasets including missing values |
-| Completion / language server | partial / browser Python/R runtime prefix completion cross-platform CI accepted; Flow source-local lexical completion accepted by Ubuntu/macOS CI (physical-browser unverified); Flow semantic/LSP/member completion and physical-browser acceptance missing | R, Flow and Python completion/diagnostics |
+| Completion / language server | partial / browser Python/R runtime prefix completion cross-platform CI accepted; Flow lexical completion accepted by Ubuntu/macOS CI; explicit-type Flow struct and evolution-state member completion implemented with V8-local tests, cross-platform CI and physical-browser verification pending; full semantic/LSP completion missing | R, Flow and Python completion/diagnostics |
 | Packages pane | partial / browser Python inventory/install and webR 0.6.0 inventory/install; mocked Node tests, live interpreters unverified | List, install, update with environment-aware package sources |
 | Git pane | missing | Status, diff, stage, commit and branch operations |
 | Help pane | partial / browser Python live-global/builtin docstrings and installed R Rd help wired; Node/V8 contract tests, live Pyodide/webR and physical browser unverified; Flow help missing | Context-aware language/function docs |
@@ -767,3 +767,7 @@ The inspector can still force ordinary lazy R promises during root binding
 lookup, and the physical-browser workflow has not been independently accepted.
 This is not full RStudio environment inspection parity.
 
+
+## 2026-10-24: source-local typed Flow member completion (validation pending)
+
+The browser editor now offers Ctrl/Command+Space completion for fields on explicitly typed Flow `struct` variables and accessible `flow` evolution state members. It recognises typed function parameters, module bindings and `let`/`let mut` locals, including lexical shadowing; unknown and inferred receiver types intentionally return no member suggestions. The implementation uses the actual Flow 2.x struct/state syntax, without invoking Python/R or claiming compiler-backed inference. Ten focused and pre-existing completion tests passed in a V8 execution harness in this iteration. Node, native Flow, physical Chromium and cross-platform CI acceptance are **not yet verified** for this change. This remains **partial**, not RStudio parity.

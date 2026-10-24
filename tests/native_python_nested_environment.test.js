@@ -38,7 +38,7 @@ test("native editor renders bounded nested metadata as inert text", () => {
   assert.equal(render({name:"x", type:"str"}, 3), null);
 });
 test("native environment refresh gates nested inspection to Python and validates shape", () => {
-  assert.match(html, /selectedLanguage === "python" && Array\.isArray\(variable\.children\)/);
+  assert.match(html, /\(selectedLanguage === "python" \|\| selectedLanguage === "r"\) && Array\.isArray\(variable\.children\)/);
   assert.match(html, /variable\.children\.length <= 12/);
   assert.match(html, /row\.firstChild\.replaceChildren\(details\)/);
   assert.match(html, /fetch\("\/api\/inspect\/" \+ selectedLanguage/);

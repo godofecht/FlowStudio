@@ -107,8 +107,8 @@ test("generated inspector runs under real Rscript, avoids active bindings and bo
     '.GlobalEnv <- new.env(parent=emptyenv())'
   ].join("\n");
   const program = setup + "\n._fs_rows <- " + INSPECT +
-    '\ncat(base::paste(._fs_rows, collapse="\\n"), "\\n")' +
-    '\ncat(if (tripped) "ACTIVE_CALLED" else "ACTIVE_SAFE", "\\n")';
+    '\ncat(base::paste(._fs_rows, collapse="\\n"), "\\n", sep="")' +
+    '\ncat(if (tripped) "ACTIVE_CALLED" else "ACTIVE_SAFE", "\\n", sep="")';
   const proc = spawnSync("Rscript", ["--vanilla", "-e", program],
     {encoding:"utf8", timeout:30000, maxBuffer:1024*1024});
   assert.equal(proc.status,0,proc.stderr || proc.error?.message);

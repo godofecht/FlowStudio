@@ -47,7 +47,7 @@ test("real browser worker loads the bounded Python helper and returns nested met
   assert.equal(h.writes.length,1);
   assert.equal(h.writes[0][0],"flowstudio_environment_capture.py");
   assert.equal(h.writes[0][1],helper);
-  assert.match(h.queries[0],/flowstudio_environment_capture\.capture\(globals\(\)\)/);
+  assert.match(h.queries[0],/_fs_environment_capture\.capture\(globals\(\)\)/);
   assert.doesNotMatch(h.queries[0],/repr\(v\)/);
   await h.send(2);
   assert.equal(h.fetches,1);

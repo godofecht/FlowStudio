@@ -40,6 +40,15 @@ async function request(endpoint, code) {
 async function run(code) {
   return request("/api/run/flow", code);
 }
+async function tracePython(code) {
+  const response = await request("/api/trace/python", code);
+  if (response.status !== 200 && response.status !== 422)
+    return {ok:false, error:response.output, status:response.status};
+  let data;
+  try { data = JSON.parse(response.output); }
+  catch (_) { throw new Error("Native Python trace response was not JSON."); }
+  return {ok:response.ok, data, status:response.status};
+}
 async function checkSyntax(code) {
   const response = await request("/api/check/flow", code);
   if (response.ok) return {ok:true, output:response.output, diagnostics:[]};
@@ -53,7 +62,7 @@ async function checkSyntax(code) {
     [{line, column, message:match[3].slice(0, 512)}] : [];
   return {ok:false, output:response.output, diagnostics};
 }
-const api = Object.freeze({available, run, checkSyntax});
+const api = Object.freeze({available, run, checkSyntax, tracePython});
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 global.FlowStudioNativeFlow = api;
 })(globalThis);

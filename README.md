@@ -22,6 +22,27 @@ Run the additional pure-module tests with:
 
     node --test tests/editor_find.test.js
 
+## Independent Python/R/Flow console (browser workspace)
+
+The `docs/app/` workspace has a **Console language** selector separate from the
+source editor's language. Python submissions run in the same persistent Pyodide
+worker as Python source cells, and R submissions run in the same persistent
+webR session as R cells. Flow console submissions run full Flow programs through
+the real native Flow-owned `/api/run/flow` endpoint **only** when the workspace
+is served at `http://127.0.0.1:8751/app/`; GitHub Pages cannot compile Flow.
+Flow is compiled afresh for each submission and has no persistent Flow REPL
+variables. Switching console language preserves unsent drafts and bounded
+100-entry command histories independently for each language. Runtime errors
+preserve console input for correction; successful submissions clear it.
+The Reset button targets the **source editor's** selected Python/R runtime;
+Flow has no session to reset. No interpreter variables persist across reloads.
+
+The console dispatch, history, drafts and pending-submission behavior have
+Node regression tests. Physical-browser interaction with live Pyodide/webR
+and native Flow execution remains unverified.
+
+`node --test tests/browser_console_repl.test.js tests/browser_console_multilanguage.test.js tests/browser_console_repl_integration.test.js`
+
 ## Flow source-local symbol completion
 
 The GitHub Pages editor and native-served `/app/` editor also support

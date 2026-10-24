@@ -31,7 +31,7 @@ pre{white-space:pre-wrap;overflow:auto;overflow-wrap:anywhere;flex:1;margin:0;pa
 print("Hello from browser Python!")
 x + 2</textarea><div id="findPanel" role="search" aria-label="Source find and replace"><label for="findQuery">Find</label><input id="findQuery" type="text" maxlength="256" aria-label="Find literal text"><label for="replaceText">Replace</label><input id="replaceText" type="text" maxlength="10000" aria-label="Replacement text"><label><input id="findCase" type="checkbox"> Match case</label><button id="findPrevious" type="button">Previous</button><button id="findNext" type="button">Next</button><button id="replaceOne" type="button">Replace</button><button id="replaceAll" type="button">Replace all</button><span id="findStatus" role="status" aria-live="polite">Ctrl+F to find; Ctrl+H to replace.</span></div><div id="completions" role="region" aria-label="Source completion suggestions" style="max-height:9rem;overflow:auto;padding:0 .5rem"></div></section>
 <section aria-label="Environment"><h2>Environment</h2><div id="environment" class="muted">Python runs entirely in a Web Worker using Pyodide. The runtime downloads on first use.</div><div class="workspace-tools"><input id="packageName" type="text" aria-label="Python or R package name" placeholder="package==version" maxlength="120"><button id="installPackage" type="button">Install package</button><button id="listPackages" type="button">List packages</button></div><div id="packages" role="region" aria-label="Installed language packages" style="overflow:auto;max-height:40%"></div></section>
-<section aria-label="Console"><h2>Python / R console</h2><pre id="console" role="log" aria-live="polite">Ready. Python and R run locally in your browser; Flow runs when this workspace is served by native FlowStudio.</pre><textarea id="consoleInput" aria-label="Python console input" placeholder="Python expression or statement" spellcheck="false"></textarea><div id="consoleActions"><span class="muted">Enter: execute · Shift+Enter: newline · ↑: history</span><button id="submitConsole" type="button">Execute</button></div></section>
+<section aria-label="Console"><h2>Interactive console</h2><label for="consoleLanguage">Console language</label><select id="consoleLanguage" aria-label="Console language"><option value="python">Python (browser)</option><option value="r">R (browser)</option><option value="flow">Flow (native localhost)</option></select><pre id="console" role="log" aria-live="polite">Ready. Python and R run locally in your browser; Flow runs when this workspace is served by native FlowStudio.</pre><textarea id="consoleInput" aria-label="Python console input" placeholder="Python expression or statement" spellcheck="false"></textarea><div id="consoleActions"><span class="muted">Enter: execute · Shift+Enter: newline · ↑: history</span><button id="submitConsole" type="button">Execute</button></div></section>
 <section aria-label="Data and plots"><h2>Plots and data</h2><div class="workspace-tools"><label for="previewfile">Open image</label><input id="previewfile" type="file" accept=".png,.jpg,.jpeg,.webp"><button id="dataViewer" type="button">Open CSV/TSV viewer</button><label for="helpQuery">Help topic</label><input id="helpQuery" type="text" maxlength="120" placeholder="len / stats::lm" aria-label="Installed Python or R help topic"><button id="lookupHelp" type="button">Help</button></div><div id="workspace"><p class="muted">Local-only plots and tabular data.</p></div></section>
 </main>
 <footer><span id="notice" role="status">Static Pages preview — no remote code execution or uploaded source</span><a href="../">Project overview</a><a href="https://github.com/godofecht/FlowStudio">Source</a></footer>
@@ -182,9 +182,10 @@ function renderEnvironment(variables) {
   }
   target.append(table);
 }
-async function run(selectedOnly = false, activeCell = false, consoleCode = null) {
-  if (busy) { if (consoleCode !== null) notice("Python session is busy."); return false; }
-  let language = ["python", "r", "flow"].includes($("language").value) ? $("language").value : "python";
+async function run(selectedOnly = false, activeCell = false, consoleCode = null, consoleLanguage = null) {
+  if (busy) { if (consoleCode !== null) notice("Execution is busy; wait for the current run."); return false; }
+  let language = consoleCode !== null && ["python", "r", "flow"].includes(consoleLanguage) ? consoleLanguage :
+    (["python", "r", "flow"].includes($("language").value) ? $("language").value : "python");
   let prepared;
   if (consoleCode !== null) {
     prepared = FlowStudioSourceSelection.prepare({value:consoleCode}, false);
@@ -222,7 +223,7 @@ async function run(selectedOnly = false, activeCell = false, consoleCode = null)
       if (inspect.ok) renderEnvironment(inspect.variables);
       else notice("Environment inspection failed: " + inspect.output);
     }
-    return true;
+    return consoleCode === null || response.ok === true;
   } catch(error) { notice("Execution unavailable: " + error.message); return false; }
   finally { if (generation === sessionGeneration) setBusy(false); }
 }
@@ -373,7 +374,7 @@ async function runNotebook() {
   } finally { if (generation === sessionGeneration) setBusy(false); }
 }
 const consoleREPL = FlowStudioConsoleREPL.create({input:$("consoleInput"), button:$("submitConsole"),
-  submit:code=>run(false, false, code), notice});
+  languageSelect:$("consoleLanguage"), submit:(code, language)=>run(false, false, code, language), notice});
 $("run").addEventListener("click", () => { void run(false); });
 $("checkSyntax").addEventListener("click", () => { void checkSyntax(); });
 $("tracePython").addEventListener("click", () => { void tracePython(); });
@@ -393,6 +394,10 @@ $("forgetDraft").addEventListener("click", () => {
   notice("Saved local draft forgotten; current editor contents remain open.");
 });
 $("reset").addEventListener("click", () => {
+  if ($("language").value === "flow") {
+    notice("Flow programs run independently; there is no persistent Flow session to reset.");
+    return;
+  }
   sessionGeneration++;
   completion.clear();
   notebookRunner?.cancel();

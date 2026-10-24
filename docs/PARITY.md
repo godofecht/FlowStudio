@@ -17,7 +17,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Plot viewer | partial / Node-tested PNG import and integrated workspace tab; native unverified | png/svg plot history, zoom, save and deterministic device lifecycle |
 | Project explorer | partial / browser Pages open/create/save and confirmed active-file delete with baseline conflict checks; 10 regression tests V8-shim passed; physical-browser deletion unverified | Open project, tree navigation, source-file creation and save; scoped delete is implemented, copy-verify-delete rename implemented with non-atomic filesystem race limits; physical-browser acceptance remains missing |
 | Data viewer | partial / CSV/TSV plus bounded Python/R environment table snapshots wired; real Pyodide/webR and physical browser unverified | Interactive sortable/filterable tabular datasets including missing values |
-| Completion / language server | partial / browser Python/R runtime prefix completion cross-platform CI accepted; Flow source-local lexical completion added (V8 regression validated, cross-platform CI pending); Flow semantic/LSP/member completion and physical-browser acceptance missing | R, Flow and Python completion/diagnostics |
+| Completion / language server | partial / browser Python/R runtime prefix completion cross-platform CI accepted; Flow source-local lexical completion accepted by Ubuntu/macOS CI (physical-browser unverified); Flow semantic/LSP/member completion and physical-browser acceptance missing | R, Flow and Python completion/diagnostics |
 | Packages pane | partial / browser Python inventory/install and webR 0.6.0 inventory/install; mocked Node tests, live interpreters unverified | List, install, update with environment-aware package sources |
 | Git pane | missing | Status, diff, stage, commit and branch operations |
 | Help pane | partial / browser Python live-global/builtin docstrings and installed R Rd help wired; Node/V8 contract tests, live Pyodide/webR and physical browser unverified; Flow help missing | Context-aware language/function docs |
@@ -33,7 +33,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Accessibility | partial / unverified | Full keyboard navigation, screen reader labels, resize and contrast checks |
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
 
-## 2026-10-24: Flow source-local symbol completion (pending cross-platform acceptance)
+## 2026-10-24: Flow source-local symbol completion (cross-platform CI accepted)
 
 The Pages `docs/app/` editor now uses the existing Ctrl+Space completion
 controller to offer **Flow** source-local function/type/constant names,
@@ -43,8 +43,12 @@ does not evaluate source, launch Flow or contact a server. The 256 KiB source
 limit and 64-name result limit bound editor work. A separate Node test file
 exercises declarations matching real Flow 2.0 syntax, scopes, comments,
 string literals, limits and editor insertion. Four cases passed a direct V8
-execution check on 24 October 2026; full Node, macOS/Linux CI and real-browser
-acceptance have not yet been established at the time of this entry.
+execution check on 24 October 2026. PR #23 then passed all four jobs in
+[CI #40064076010](https://github.com/godofecht/FlowStudio/actions/runs/40064076010):
+Node regression suites and native Flow build/HTTP acceptance passed on Ubuntu
+24.04 and macOS 14. Merged as
+[c238a9a](https://github.com/godofecht/FlowStudio/commit/c238a9af6989c60a62bc5c48d287ce8115a20ef4).
+Physical Chromium/Safari acceptance of the completion UI remains unverified.
 
 **Status: partial.** This is not semantic completion or an LSP; no type-aware
 members, cross-file imports, function signatures or compiler-backed symbol

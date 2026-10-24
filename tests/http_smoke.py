@@ -86,6 +86,9 @@ def main() -> None:
     status, transfer_script = request("GET", "/app/variable_transfer.js")
     assert status == 200 and "FlowStudioVariableTransfer" in transfer_script, (status, transfer_script[:100])
     assert 'id="transferVariable"' in browser and 'id="transferDirection"' in browser
+    status, session_script = request("GET", "/app/session_snapshot.js")
+    assert status == 200 and "FlowStudioSessionSnapshot" in session_script, (status, session_script[:100])
+    assert 'id="exportSession"' in browser and 'id="importSession"' in browser
     status, _ = request("GET", "/app/not-a-real-asset.js")
     assert status == 404, status
 

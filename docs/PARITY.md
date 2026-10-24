@@ -30,13 +30,31 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Sequential percent-cell notebooks | partial / Python and R Run All wired with explicit per-cell Python/R/Flow language tags (cross-platform CI accepted; real browser pending); bounded browser-local text/Python PNG output recovery across reload; native and physical-browser acceptance unverified | Execute cells in order, retain interpreter state, show per-cell output and stop on error |
 | Jupyter `.ipynb` import/export | partial / browser UI wired and Node regression coverage; bounded output recovery is separate from `.ipynb` import/export; physical-browser file round-trip and live Python/R kernels unverified | Import/export nbformat 4 Python/R code and Markdown cells through file picker/download; validate with nbformat; preserve source; verify live outputs in Chromium and cross-platform acceptance |
 | R Markdown / Quarto | partial / offline HTML report export from Python/R percent-cell notebooks; no Quarto/R Markdown rendering | Render notebook with inline plots and HTML export; verify actual Quarto/R Markdown format compatibility |
-| Source debugger | partial / native CPython breakpoint/step/next/finish/continue/stop and bounded stack inspection passed cross-platform Flow/HTTP CI #40126891635; physical browser and R/Flow debugging missing | Breakpoints, stack, variables, step execution |
+| Source debugger | partial / native CPython breakpoint/step/next/finish/continue/stop and bounded stack inspection passed cross-platform Flow/HTTP CI #40126891635; numeric-local conditional breakpoints implemented in PR #42, acceptance pending; physical browser and R/Flow debugging missing | Breakpoints, stack, variables, step execution |
 | Remote/server mode | missing | Authenticated, origin-aware multi-user sessions with isolation |
 | Diagnostics / profiling | partial / native CPython bounded line tracing cross-platform CI accepted; physical-browser acceptance pending | Resource/time tracing and useful language-specific diagnostics |
 | Cross-platform packaging | missing | Installable signed/reproducible macOS and Linux releases |
 | Accessibility | partial / unverified | Full keyboard navigation, screen reader labels, resize and contrast checks |
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
 
+
+## 2026-10-25: numeric conditional CPython breakpoints (acceptance pending)
+
+The existing Flow-owned localhost debugger now accepts both unconditional
+line breakpoints and narrowly scoped numeric-local conditions, entered as
+`5?counter>=3`. Conditions are checked against live CPython frame locals
+at line events; the debugger never calls `eval`, arbitrary user-defined
+comparisons or user object representations. Only exact built-in `int` and
+`float` locals compared to finite decimal literals are eligible. Invalid
+syntax, out-of-range and duplicate lines are rejected by the browser client
+and native kernel. Existing breakpoint/step/next/finish/continue operations
+retain their semantics.
+
+Real CPython unit tests and Node transport/parser tests were added.
+**Status: implemented on PR #42; CI and native Flow HTTP acceptance pending,
+real physical-browser acceptance not run.** This is an incremental debugger
+capability, not R or Flow debugging, remote session support, or RStudio parity.
+No hosted CI configuration was modified.
 
 ## 2026-10-24: side-effect-free browser Python environment inspector (native acceptance passed)
 

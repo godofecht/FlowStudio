@@ -4,11 +4,13 @@
 (function (global) {
 "use strict";
 function create({native, statusButton, diffButton, stagedDiffButton, stageButton, unstageButton, commitButton,
+                 branchesButton, createBranchButton, switchBranchButton, branchInput,
                  pathInput, messageInput, target, notice, confirmAction}) {
   if (!native || !statusButton || !diffButton || !target)
     throw new Error("Git panel requires its native client and controls.");
   const supported = !!native.available();
-  const controls = [statusButton, diffButton, stagedDiffButton, stageButton, unstageButton, commitButton].filter(Boolean);
+  const controls = [statusButton, diffButton, stagedDiffButton, stageButton, unstageButton, commitButton,
+    branchesButton, createBranchButton, switchBranchButton].filter(Boolean);
   let pending = false;
   function lock(value) {
     for (const button of controls) button.disabled = value || !supported;
@@ -51,6 +53,7 @@ function create({native, statusButton, diffButton, stagedDiffButton, stageButton
     if (kind === "status") return perform("status", () => native.gitStatus());
     if (kind === "diff") return perform("diff", () => native.gitDiff());
     if (kind === "staged") return perform("staged diff", () => native.gitStagedDiff());
+    if (kind === "branches") return perform("branches", () => native.gitBranches());
     return Promise.resolve(false);
   }
   function stage() {
@@ -76,13 +79,33 @@ function create({native, statusButton, diffButton, stagedDiffButton, stageButton
       return Promise.resolve(false);
     return perform("commit", () => native.gitCommit(message));
   }
+  function createBranch() {
+    if (!supported || pending || !branchInput) return Promise.resolve(false);
+    const name = branchInput.value;
+    if (!name || !name.trim() || !approve(
+      "Create local Git branch \"" + name + "\" at HEAD in the native server working tree?"))
+      return Promise.resolve(false);
+    return perform("branch creation", () => native.gitCreateBranch(name));
+  }
+  function switchBranch() {
+    if (!supported || pending || !branchInput) return Promise.resolve(false);
+    const name = branchInput.value;
+    if (!name || !name.trim() || !approve(
+      "Switch the native server working tree to Git branch \"" + name +
+      "\"? All tracked and untracked changes must first be cleared."))
+      return Promise.resolve(false);
+    return perform("branch switch", () => native.gitSwitchBranch(name));
+  }
   statusButton.addEventListener("click", () => { void show("status"); });
   diffButton.addEventListener("click", () => { void show("diff"); });
   stagedDiffButton?.addEventListener("click", () => { void show("staged"); });
   stageButton?.addEventListener("click", () => { void stage(); });
   unstageButton?.addEventListener("click", () => { void unstage(); });
   commitButton?.addEventListener("click", () => { void commit(); });
-  return Object.freeze({show, stage, unstage, commit, supported});
+  branchesButton?.addEventListener("click", () => { void show("branches"); });
+  createBranchButton?.addEventListener("click", () => { void createBranch(); });
+  switchBranchButton?.addEventListener("click", () => { void switchBranch(); });
+  return Object.freeze({show, stage, unstage, commit, createBranch, switchBranch, supported});
 }
 const api = Object.freeze({create});
 if (typeof module !== "undefined" && module.exports) module.exports = api;

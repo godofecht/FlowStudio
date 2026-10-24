@@ -24,6 +24,11 @@ extern {
     function fs_r_reset() -> void
     function fs_py_run(code: string) -> string
     function fs_py_trace(code: string) -> string
+    function fs_py_debug_start(code: string) -> string
+    function fs_py_debug_step() -> string
+    function fs_py_debug_continue() -> string
+    function fs_py_debug_stop() -> string
+    function fs_py_debug_state() -> string
     function fs_py_inspect() -> string
     function fs_py_status() -> i32
     function fs_py_reset() -> void
@@ -176,6 +181,35 @@ function send_r_environment() -> void {
 # Flow owns the trace route and status; CPython performs bounded line tracing.
 function send_python_trace(code: string) -> void {
     let output: string = fs_py_trace(code)
+    let status: i32 = fs_py_status()
+    if status == 200 or status == 422 {
+        fs_reply(status, "application/json; charset=utf-8", output)
+    } else {
+        fs_reply(status, "text/plain; charset=utf-8", output)
+    }
+}
+
+# Interactive CPython debugging runs inside the persistent native Python
+# kernel; Flow owns all HTTP routes and their existing origin/intent gate.
+function send_python_debug(action: string, body: string) -> void {
+    let mut output: string = ""
+    if eq(action, "start") {
+        output = fs_py_debug_start(body)
+    } else {
+        if eq(action, "step") {
+            output = fs_py_debug_step()
+        } else {
+            if eq(action, "continue") {
+                output = fs_py_debug_continue()
+            } else {
+                if eq(action, "stop") {
+                    output = fs_py_debug_stop()
+                } else {
+                    output = fs_py_debug_state()
+                }
+            }
+        }
+    }
     let status: i32 = fs_py_status()
     if status == 200 or status == 422 {
         fs_reply(status, "application/json; charset=utf-8", output)
@@ -489,6 +523,26 @@ function dispatch() -> void {
         }
         if eq(path, "/api/inspect/r") {
             send_r_environment()
+            return
+        }
+        if eq(path, "/api/debug/python/start") {
+            send_python_debug("start", fs_body())
+            return
+        }
+        if eq(path, "/api/debug/python/step") {
+            send_python_debug("step", "")
+            return
+        }
+        if eq(path, "/api/debug/python/continue") {
+            send_python_debug("continue", "")
+            return
+        }
+        if eq(path, "/api/debug/python/stop") {
+            send_python_debug("stop", "")
+            return
+        }
+        if eq(path, "/api/debug/python/status") {
+            send_python_debug("status", "")
             return
         }
         if eq(path, "/api/trace/python") {

@@ -33,7 +33,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Accessibility | partial / unverified | Full keyboard navigation, screen reader labels, resize and contrast checks |
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
 
-## 2026-10-24: native source-cell lexer parity (PR pending)
+## 2026-10-24: native source-cell lexer parity (cross-platform CI accepted)
 
 The native editor previously embedded an obsolete regular-expression-only
 cell splitter while the Pages editor used a multiline-aware lexical scanner.
@@ -47,13 +47,19 @@ source offsets and caps the number of cells at 10,000. Regression suites
 from superseded PR #6 are retained, with additional exact native/Pages
 parity and native HTTP asset checks.
 
-**Status: partial / awaiting hosted CI and physical-browser acceptance.**
-A direct V8 execution of the exact branch parser and its three test modules
-passed 14 tests, and 174 focused assertions on parser equivalence and route
-wiring passed on 24 October 2026. These are not Node CI, native Flow build,
-real interpreter execution or physical-browser results. The existing native
-HTTP acceptance harness will verify the route once hosted CI runs. Source
-cell execution is still subject to the limitations of each runtime.
+**Status: partial / cross-platform CI accepted, physical-browser acceptance
+outstanding.** A direct V8 execution of the branch parser and its three test
+modules passed 14 tests, and 174 focused assertions on parser equivalence and
+route wiring passed on 24 October 2026. PR #25 subsequently passed all four
+jobs in [CI #40071889990](https://github.com/godofecht/FlowStudio/actions/runs/40071889990):
+Node tests and native Flow build/HTTP acceptance on Ubuntu 24.04 and macOS 14,
+including native static-route and Run Cell regression checks. Merged as
+[432104a](https://github.com/godofecht/FlowStudio/commit/432104af250dea1e056bf42bd4233162a74b204f).
+An earlier macOS CI attempt encountered a TCP reset during an oversized-body
+request; the acceptance harness now tests the transport's header-level 413
+without racing a premature client body send against server early rejection.
+Physical-browser and real interpreter Run Cell interaction remain unverified;
+this does not establish RStudio parity.
 
 ## 2026-10-24: native Python execution trace (cross-platform acceptance pending)
 

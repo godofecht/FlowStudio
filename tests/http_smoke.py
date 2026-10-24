@@ -82,7 +82,7 @@ def main() -> None:
     assert status == 200 and "FlowStudioPythonTraceView" in trace_js, status
     status, traced = request(
         "POST", "/api/trace/python",
-        "native_trace_variable = 40\\nprint(native_trace_variable + 2)",
+        "native_trace_variable = 40\nprint(native_trace_variable + 2)",
         accepted_headers,
     )
     assert status == 200, (status, traced)

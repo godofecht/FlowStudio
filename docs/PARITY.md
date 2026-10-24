@@ -47,13 +47,16 @@ variable inspector; Python and R retain their existing persistent runtimes.
 The GitHub Pages build cannot run native Flow, and Flow is not yet supported
 by the Jupyter notebook exporter.
 
-**Status: partial / pending CI.** Node integration tests exercise real
-`native_flow.js` client request construction, sequential dispatch, compiler
-failure propagation and GitHub Pages denial using a mock HTTP response;
-this is not physical-browser acceptance. Native Flow compilation and HTTP
-execution are independently tested by existing cross-platform CI, but a
-physical browser running the entire notebook workflow has not yet been
-verified. Do not count this as RStudio notebook parity.
+**Status: partial / cross-platform CI accepted.** PR #19 passed all four jobs in
+[CI #40046843234](https://github.com/godofecht/FlowStudio/actions/runs/40046843234),
+including 356 Node tests on each platform, actual native Flow compiler builds
+and HTTP acceptance on Ubuntu 24.04 and macOS 14; merged as
+[561b8c0](https://github.com/godofecht/FlowStudio/commit/561b8c0d1bcc46556750406a653118adcb55ddd5).
+The Node integration tests exercise real `native_flow.js` client request
+construction, sequential dispatch, compiler failure propagation and GitHub
+Pages denial with mocked HTTP responses; they are **not** physical-browser
+acceptance. A physical browser running the entire Flow notebook workflow is
+still unverified. Do not count this as RStudio notebook parity.
 
 ## 2026-10-24: native R environment metadata inspection (cross-platform HTTP accepted)
 

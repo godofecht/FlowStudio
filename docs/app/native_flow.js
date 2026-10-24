@@ -89,7 +89,24 @@ async function gitCommit(message) {
     throw new Error("Git commit message must contain 1 to 512 bytes.");
   return request("/api/git/commit", message);
 }
-const api = Object.freeze({available, run, checkSyntax, tracePython, gitStatus, gitDiff, gitStagedDiff, gitStage, gitUnstage, gitCommit});
+async function gitBranches() {
+  return request("/api/git/branches", "");
+}
+function checkedBranchName(name) {
+  if (typeof name !== "string" || !name || new TextEncoder().encode(name).length > 128 ||
+      !/^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(name) ||
+      name.includes("..") || name.includes("//") || name.endsWith("/") ||
+      name.endsWith(".") || name.split("/").some(part => !part || part.startsWith(".") || part.endsWith(".lock")))
+    throw new Error("Git branch name must be a valid 1–128 byte local branch name.");
+  return name;
+}
+async function gitCreateBranch(name) {
+  return request("/api/git/branch/create", checkedBranchName(name));
+}
+async function gitSwitchBranch(name) {
+  return request("/api/git/branch/switch", checkedBranchName(name));
+}
+const api = Object.freeze({available, run, checkSyntax, tracePython, gitStatus, gitDiff, gitStagedDiff, gitStage, gitUnstage, gitCommit, gitBranches, gitCreateBranch, gitSwitchBranch});
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 global.FlowStudioNativeFlow = api;
 })(globalThis);

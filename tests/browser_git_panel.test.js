@@ -131,3 +131,49 @@ test("Git write concurrency locks all controls and recovers after rejection", as
   assert.match(target.textContent,/path missing/);
   assert.equal(commitButton.disabled,false);
 });
+
+test("branch create and switch require confirmation and share the native write lock", async () => {
+  const statusButton = button(), diffButton = button(), branchesButton = button();
+  const createBranchButton = button(), switchBranchButton = button();
+  const target = {textContent:""}, calls = [], prompts = [];
+  let allow = false, finish;
+  const ui = panel.create({
+    native:{available:()=>true,
+      async gitBranches(){calls.push("list");return {ok:true,status:200,output:"* main"};},
+      async gitCreateBranch(name){calls.push(["create",name]);return {ok:true,status:200,output:"created"};},
+      gitSwitchBranch(name){calls.push(["switch",name]);return new Promise(resolve=>{finish=resolve;});}},
+    statusButton,diffButton,branchesButton,createBranchButton,switchBranchButton,
+    branchInput:{value:"feature/verified"},target,
+    confirmAction:message=>{prompts.push(message);return allow;}
+  });
+  assert.equal(await ui.createBranch(),false);
+  assert.equal(await ui.switchBranch(),false);
+  assert.deepEqual(calls,[]);
+  allow = true;
+  assert.equal(await ui.show("branches"),true);
+  assert.equal(await ui.createBranch(),true);
+  const pending = ui.switchBranch();
+  assert.equal(branchesButton.disabled,true);
+  assert.equal(createBranchButton.disabled,true);
+  assert.equal(await ui.createBranch(),false);
+  finish({ok:false,status:409,output:"dirty working tree"});
+  assert.equal(await pending,false);
+  assert.match(target.textContent,/dirty working tree/);
+  assert.equal(switchBranchButton.disabled,false);
+  assert.deepEqual(calls,["list",["create","feature/verified"],["switch","feature/verified"]]);
+  assert.match(prompts[0],/native server working tree/);
+  assert.match(prompts[1],/untracked changes/);
+});
+test("Hosted Pages disables Git branch controls", async () => {
+  const statusButton = button(), diffButton = button(), branchesButton = button();
+  const createBranchButton = button(), switchBranchButton = button();
+  const ui = panel.create({native:{available:()=>false},statusButton,diffButton,
+    branchesButton,createBranchButton,switchBranchButton,
+    branchInput:{value:"feature/verified"},target:{textContent:""},
+    confirmAction:()=>{throw Error("must not confirm");}});
+  assert.equal(await ui.createBranch(),false);
+  assert.equal(await ui.switchBranch(),false);
+  assert.equal(branchesButton.disabled,true);
+  assert.equal(createBranchButton.disabled,true);
+  assert.equal(switchBranchButton.disabled,true);
+});

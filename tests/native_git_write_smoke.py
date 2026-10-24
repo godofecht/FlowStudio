@@ -92,7 +92,29 @@ def main() -> None:
     assert post("/api/git/commit", "")[0] == 400
     assert post("/api/git/stage", "other.flow", "http://attacker.invalid")[0] == 404
     assert post("/api/git/commit", "malicious", "http://attacker.invalid")[0] == 404
-    print("PASS: live Flow Git stage, selective unstage, staged diff, commit, literal paths, hook isolation and origin gate")
+    # Real branch operations run through the Flow-owned HTTP server, not a
+    # test double. Switching must never carry dirty or untracked changes.
+    status, branches = post("/api/git/branches", "")
+    assert status == 200 and "*" in branches, (status, branches)
+    assert post("/api/git/branch/create", "feature/native")[0] == 200
+    assert "feature/native" in post("/api/git/branches", "")[1]
+    assert post("/api/git/branch/create", "feature/native")[0] == 422
+    assert post("/api/git/branch/create", "-bad")[0] == 422
+    assert post("/api/git/branch/create", "")[0] == 400
+    assert post("/api/git/branch/create", "x" * 129)[0] == 400
+    assert post("/api/git/branch/create", "feature/attack", "http://attacker.invalid")[0] == 404
+    status, output = post("/api/git/branch/switch", "feature/native")
+    assert status == 409 and "working-tree" in output, (status, output)
+    git("add", "-A")
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "Clean fixture before branch switch")
+    assert git("status", "--porcelain") == ""
+    status, output = post("/api/git/branch/switch", "feature/native")
+    assert status == 200, (status, output)
+    assert git("symbolic-ref", "--short", "HEAD").strip() == "feature/native"
+    assert post("/api/git/branch/switch", "does-not-exist")[0] == 422
+    assert post("/api/git/branch/switch", "feature/native", "http://attacker.invalid")[0] == 404
+    assert git("symbolic-ref", "--short", "HEAD").strip() == "feature/native"
+    print("PASS: live Flow Git stage, unstage, commit, branch list/create/switch, dirty-tree refusal, hooks and origin gate")
 
 
 if __name__ == "__main__":

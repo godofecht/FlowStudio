@@ -89,3 +89,47 @@ test("hosted Pages rejects all Git write and staged-read routes", async () => {
     globalThis.fetch = oldFetch;
   }
 });
+
+test("Git branch requests use fixed routes and reject invalid names", async () => {
+  const oldLocation = globalThis.location, oldFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.location = new URL("http://127.0.0.1:8751/app/");
+  globalThis.fetch = async (url, options) => {
+    calls.push([url, options.body, options.headers["X-FlowStudio-Intent"]]);
+    return {ok:true,status:200,headers:{get:()=>null},text:async()=>""};
+  };
+  try {
+    await native.gitBranches();
+    await native.gitCreateBranch("feature/clean");
+    await native.gitSwitchBranch("feature/clean");
+    assert.deepEqual(calls, [
+      ["/api/git/branches","","run"],
+      ["/api/git/branch/create","feature/clean","run"],
+      ["/api/git/branch/switch","feature/clean","run"]
+    ]);
+    for (const name of ["", "-bad", "a..b", "a//b", "a.lock", "a/", ".hidden",
+                        "a b", "a\\nb", "x".repeat(129)]) {
+      await assert.rejects(native.gitCreateBranch(name), /Git branch name/);
+      await assert.rejects(native.gitSwitchBranch(name), /Git branch name/);
+    }
+    assert.equal(calls.length, 3);
+  } finally {
+    if (oldLocation === undefined) delete globalThis.location;
+    else globalThis.location = oldLocation;
+    globalThis.fetch = oldFetch;
+  }
+});
+test("Hosted Pages rejects Git branch operations without contacting localhost", async () => {
+  const oldLocation = globalThis.location, oldFetch = globalThis.fetch;
+  globalThis.location = new URL("https://godofecht.github.io/FlowStudio/app/");
+  globalThis.fetch = () => { throw Error("unexpected network request"); };
+  try {
+    await assert.rejects(native.gitBranches(), /native FlowStudio server/);
+    await assert.rejects(native.gitCreateBranch("feature/clean"), /native FlowStudio server/);
+    await assert.rejects(native.gitSwitchBranch("feature/clean"), /native FlowStudio server/);
+  } finally {
+    if (oldLocation === undefined) delete globalThis.location;
+    else globalThis.location = oldLocation;
+    globalThis.fetch = oldFetch;
+  }
+});

@@ -49,6 +49,29 @@ async function tracePython(code) {
   catch (_) { throw new Error("Native Python trace response was not JSON."); }
   return {ok:response.ok, data, status:response.status};
 }
+async function debugPythonStart(source, breakpoints) {
+  if (typeof source !== "string" || !source.trim() ||
+      !Array.isArray(breakpoints) || breakpoints.length > 64 ||
+      breakpoints.some(n => !Number.isSafeInteger(n) || n < 1 ||
+        n > source.split(/\r\n|\r|\n/).length) ||
+      new Set(breakpoints).size !== breakpoints.length)
+    throw new Error("Python debugger requires source and up to 64 valid breakpoint lines.");
+  return debugPythonResponse("/api/debug/python/start", JSON.stringify({source, breakpoints}));
+}
+async function debugPythonCommand(action) {
+  if (!["step", "continue", "stop", "status"].includes(action))
+    throw new Error("Unknown Python debugger action.");
+  return debugPythonResponse("/api/debug/python/" + action, "");
+}
+async function debugPythonResponse(route, body) {
+  const response = await request(route, body);
+  if (response.status !== 200 && response.status !== 422)
+    throw new Error(response.output);
+  let data;
+  try { data = JSON.parse(response.output); }
+  catch (_) { throw new Error("Native Python debugger returned invalid JSON."); }
+  return data;
+}
 async function checkSyntax(code) {
   const response = await request("/api/check/flow", code);
   if (response.ok) return {ok:true, output:response.output, diagnostics:[]};
@@ -106,7 +129,7 @@ async function gitCreateBranch(name) {
 async function gitSwitchBranch(name) {
   return request("/api/git/branch/switch", checkedBranchName(name));
 }
-const api = Object.freeze({available, run, checkSyntax, tracePython, gitStatus, gitDiff, gitStagedDiff, gitStage, gitUnstage, gitCommit, gitBranches, gitCreateBranch, gitSwitchBranch});
+const api = Object.freeze({available, run, checkSyntax, tracePython, debugPythonStart, debugPythonCommand, gitStatus, gitDiff, gitStagedDiff, gitStage, gitUnstage, gitCommit, gitBranches, gitCreateBranch, gitSwitchBranch});
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 global.FlowStudioNativeFlow = api;
 })(globalThis);

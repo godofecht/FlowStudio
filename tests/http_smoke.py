@@ -179,6 +179,41 @@ def main() -> None:
     )
     assert status == 422 and "trace error" in json.loads(traced)["output"], (status, traced)
 
+    # Interactive source debugging is real CPython execution in the same
+    # persistent kernel, with Flow-owned origin/intent-gated HTTP routes.
+    status, debug_script = request("GET", "/app/python_debug_panel.js")
+    assert status == 200 and "FlowStudioPythonDebugPanel" in debug_script
+    assert 'id="pythonDebugStart"' in browser and 'id="pythonDebugStep"' in browser
+    assert request("POST", "/api/debug/python/start", "{}")[0] == 404
+    assert request("POST", "/api/debug/python/step", "",
+                   {"X-FlowStudio-Intent": "run", "Origin": "http://attacker.invalid"})[0] == 404
+    debug_source = "debug_value = 40\ndebug_value += 2\nprint(debug_value)\n"
+    status, payload = request("POST", "/api/debug/python/start",
+                              json.dumps({"source": debug_source, "breakpoints": [2]}),
+                              accepted_headers)
+    assert status == 200, (status, payload)
+    paused = json.loads(payload)
+    assert paused["state"] == "paused" and paused["stack"][0]["line"] == 2, paused
+    assert paused["stack"][0]["locals"]["debug_value"]["value"] == "40", paused
+    status, output = request("POST", "/api/run/python", "print('must not run')", accepted_headers)
+    assert status == 422 and "debugger is active" in output, (status, output)
+    status, payload = request("POST", "/api/debug/python/step", "", accepted_headers)
+    assert status == 200 and json.loads(payload)["stack"][0]["line"] == 3, (status, payload)
+    status, payload = request("POST", "/api/debug/python/continue", "", accepted_headers)
+    assert status == 200 and json.loads(payload)["state"] == "done", (status, payload)
+    assert "42" in json.loads(payload)["output"], payload
+    status, output = request("POST", "/api/run/python", "print(debug_value)", accepted_headers)
+    assert status == 200 and output.strip() == "42", (status, output)
+    status, payload = request("POST", "/api/debug/python/start",
+                              json.dumps({"source": "debug_stop = 1\ndebug_unreached = 2",
+                                          "breakpoints": [2]}), accepted_headers)
+    assert status == 200 and json.loads(payload)["state"] == "paused", (status, payload)
+    status, payload = request("POST", "/api/debug/python/stop", "", accepted_headers)
+    assert status == 200 and json.loads(payload)["state"] == "stopped", (status, payload)
+    status, output = request("POST", "/api/run/python",
+                             "print('debug_unreached' in globals())", accepted_headers)
+    assert status == 200 and output.strip() == "False", (status, output)
+
     # A single Python kernel retains variables between HTTP requests.
     status, output = request("POST", "/api/run/python",
                              "flowstudio_persistent = 40 + 2", accepted_headers)

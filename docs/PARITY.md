@@ -30,13 +30,37 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Sequential percent-cell notebooks | partial / Python and R Run All wired with explicit per-cell Python/R/Flow language tags (cross-platform CI accepted; real browser pending); bounded browser-local text/Python PNG output recovery across reload; native and physical-browser acceptance unverified | Execute cells in order, retain interpreter state, show per-cell output and stop on error |
 | Jupyter `.ipynb` import/export | partial / browser UI wired and Node regression coverage; bounded output recovery is separate from `.ipynb` import/export; physical-browser file round-trip and live Python/R kernels unverified | Import/export nbformat 4 Python/R code and Markdown cells through file picker/download; validate with nbformat; preserve source; verify live outputs in Chromium and cross-platform acceptance |
 | R Markdown / Quarto | partial / offline HTML report export from Python/R percent-cell notebooks; no Quarto/R Markdown rendering | Render notebook with inline plots and HTML export; verify actual Quarto/R Markdown format compatibility |
-| Source debugger | missing | Breakpoints, stack, variables, step execution |
+| Source debugger | partial / native CPython breakpoint/step/continue/stop and bounded stack inspection implemented on branch; real native Flow/HTTP CI and physical browser acceptance pending; R/Flow debugging missing | Breakpoints, stack, variables, step execution |
 | Remote/server mode | missing | Authenticated, origin-aware multi-user sessions with isolation |
 | Diagnostics / profiling | partial / native CPython bounded line tracing cross-platform CI accepted; physical-browser acceptance pending | Resource/time tracing and useful language-specific diagnostics |
 | Cross-platform packaging | missing | Installable signed/reproducible macOS and Linux releases |
 | Accessibility | partial / unverified | Full keyboard navigation, screen reader labels, resize and contrast checks |
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
 
+
+## 2026-10-24: native Python source debugger (acceptance pending)
+
+The Flow-owned HTTP router now exposes explicit intent/origin-gated Python
+debugging operations: start with source and up to 64 line breakpoints, step,
+continue, stop and status. A dedicated background CPython thread executes
+source in the existing persistent Python namespace. Breakpoints genuinely
+pause execution before the selected source line; stepping pauses at the next
+line event. The native browser panel displays a bounded call stack and
+safe exact-builtin scalar previews without evaluating arbitrary user reprs.
+While debugging is active, ordinary Python execution is refused; session
+reset terminates the interpreter. Empty breakpoint sets pause at the first
+executable line. The debugger is not a sandbox and runs with the user's
+local permissions. No remote debugging or browser-only emulation is claimed.
+
+New real-CPython unit tests cover nested frames, variable previews,
+breakpoints, step/continue, explicit stop and exceptions. Browser Node tests
+cover validation, UI controls and fixed HTTP routes. Native HTTP smoke
+exercises actual debugger execution, persistent state, request rejection
+and the origin gate through the compiled Flow router. Local CPython
+debugger-engine tests passed (6 tests), but **Flow compilation, native HTTP
+and cross-platform CI are not yet verified**. Physical-browser interaction,
+R and Flow source debugging, conditional breakpoints, expression evaluation,
+watchpoints and advanced stepping are missing. Status: **partial / CI pending**.
 
 ## 2026-10-24: local Git branch management (cross-platform native acceptance passed)
 

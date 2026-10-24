@@ -168,4 +168,9 @@ failed:
 const char *fs_py_run(const char *code) { return request_python('E', code); }
 const char *fs_py_inspect(void) { return request_python('I', ""); }
 const char *fs_py_trace(const char *code) { return request_python('T', code); }
+const char *fs_py_debug_start(const char *request) { return request_python('B', request); }
+const char *fs_py_debug_step(void) { return request_python('S', ""); }
+const char *fs_py_debug_continue(void) { return request_python('C', ""); }
+const char *fs_py_debug_stop(void) { return request_python('X', ""); }
+const char *fs_py_debug_state(void) { return request_python('Q', ""); }
 int fs_py_status(void) { return last_status; }

@@ -30,7 +30,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Sequential percent-cell notebooks | partial / Python and R Run All wired with explicit per-cell Python/R/Flow language tags (cross-platform CI accepted; real browser pending); bounded browser-local text/Python PNG output recovery across reload; native and physical-browser acceptance unverified | Execute cells in order, retain interpreter state, show per-cell output and stop on error |
 | Jupyter `.ipynb` import/export | partial / browser UI wired and Node regression coverage; bounded output recovery is separate from `.ipynb` import/export; physical-browser file round-trip and live Python/R kernels unverified | Import/export nbformat 4 Python/R code and Markdown cells through file picker/download; validate with nbformat; preserve source; verify live outputs in Chromium and cross-platform acceptance |
 | R Markdown / Quarto | partial / offline HTML report export from Python/R percent-cell notebooks; no Quarto/R Markdown rendering | Render notebook with inline plots and HTML export; verify actual Quarto/R Markdown format compatibility |
-| Source debugger | partial / native CPython breakpoint/step/next/finish/continue/stop and bounded stack inspection passed cross-platform Flow/HTTP CI #40126891635; numeric-local conditional breakpoints implemented in PR #42, acceptance pending; physical browser and R/Flow debugging missing | Breakpoints, stack, variables, step execution |
+| Source debugger | partial / native CPython breakpoint/step/next/finish/continue/stop and bounded stack inspection passed cross-platform Flow/HTTP CI #40126891635; numeric-local conditional breakpoints accepted by Ubuntu/macOS CI #40144484561 (real CPython and Flow HTTP); physical browser and R/Flow debugging missing | Breakpoints, stack, variables, step execution |
 | Remote/server mode | missing | Authenticated, origin-aware multi-user sessions with isolation |
 | Diagnostics / profiling | partial / native CPython bounded line tracing cross-platform CI accepted; physical-browser acceptance pending | Resource/time tracing and useful language-specific diagnostics |
 | Cross-platform packaging | missing | Installable signed/reproducible macOS and Linux releases |
@@ -51,9 +51,16 @@ and native kernel. Existing breakpoint/step/next/finish/continue operations
 retain their semantics.
 
 Real CPython unit tests and Node transport/parser tests were added.
-**Status: implemented on PR #42; CI and native Flow HTTP acceptance pending,
-real physical-browser acceptance not run.** This is an incremental debugger
-capability, not R or Flow debugging, remote session support, or RStudio parity.
+**Status: partial / cross-platform native acceptance passed; real
+physical-browser acceptance not run.** [PR #42](https://github.com/godofecht/FlowStudio/pull/42)
+merged as [2e2934a](https://github.com/godofecht/FlowStudio/commit/2e2934ac4d4ec0840c367fef8272faab098092de)
+after [CI #40144484561](https://github.com/godofecht/FlowStudio/actions/runs/40144484561)
+completed all four jobs on Ubuntu 24.04 and macOS 14. Each source/transport
+platform passed 505 Node tests, 2 skips and zero failures, plus 68 real Python
+unit tests. Both native jobs compiled Flow 2.0.0 and passed real localhost HTTP
+conditional breakpoint acceptance, R/Python kernels and packaging.
+An opt-in physical-browser native-debugger scenario was added but **not run**.
+This is not R or Flow debugging, remote session support, or RStudio parity.
 No hosted CI configuration was modified.
 
 ## 2026-10-24: side-effect-free browser Python environment inspector (native acceptance passed)

@@ -83,6 +83,9 @@ def main() -> None:
     status, search_panel = request("GET", "/app/find_panel.js")
     assert status == 200 and "FlowStudioFindPanel" in search_panel, (status, search_panel[:100])
     assert 'id="findQuery"' in browser and 'id="replaceAll"' in browser
+    status, transfer_script = request("GET", "/app/variable_transfer.js")
+    assert status == 200 and "FlowStudioVariableTransfer" in transfer_script, (status, transfer_script[:100])
+    assert 'id="transferVariable"' in browser and 'id="transferDirection"' in browser
     status, _ = request("GET", "/app/not-a-real-asset.js")
     assert status == 404, status
 

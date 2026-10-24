@@ -103,7 +103,8 @@ test("generated inspector runs under real Rscript, avoids active bindings and bo
     'paste <- function(...) stop("masked paste executed")',
     'bindingIsActive <- function(...) stop("masked binding check executed")',
     'makeActiveBinding("trap", function() { assign("tripped", TRUE, envir=.GlobalEnv); stop("active binding invoked") }, .GlobalEnv)',
-    'delayedAssign("broken", stop("lazy binding failure"), assign.env=.GlobalEnv)'
+    'delayedAssign("broken", stop("lazy binding failure"), assign.env=.GlobalEnv)',
+    '.GlobalEnv <- new.env(parent=emptyenv())'
   ].join("\n");
   const program = setup + "\n._fs_rows <- " + INSPECT +
     '\ncat(base::paste(._fs_rows, collapse="\\n"), "\\n")' +

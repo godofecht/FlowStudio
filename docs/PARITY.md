@@ -23,7 +23,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Help pane | partial / browser Python live-global/builtin docstrings and installed R Rd help wired; Node/V8 contract tests, live Pyodide/webR and physical browser unverified; Flow help missing | Context-aware language/function docs |
 | Find / replace / cross-file search | partial / Node + V8-tested | Literal in-buffer find next/previous, single/all replacement and project-wide search implemented; incremental indexing, regex and physical-browser verification missing |
 | Percent-delimited source cells | partial / lexical scanner unified across native editor and Pages, Node/HTTP acceptance pending; physical-browser execution unverified | Run only the active `# %%` code cell in Flow/R/Python; markdown and empty cells do not execute |
-| Sequential percent-cell notebooks | partial / Python and R Run All wired; bounded browser-local text/Python PNG output recovery across reload; native and physical-browser acceptance unverified | Execute cells in order, retain interpreter state, show per-cell output and stop on error |
+| Sequential percent-cell notebooks | partial / Python and R Run All wired with explicit per-cell Python/R/Flow language tags (cross-platform CI accepted; real browser pending); bounded browser-local text/Python PNG output recovery across reload; native and physical-browser acceptance unverified | Execute cells in order, retain interpreter state, show per-cell output and stop on error |
 | Jupyter `.ipynb` import/export | partial / browser UI wired and Node regression coverage; bounded output recovery is separate from `.ipynb` import/export; physical-browser file round-trip and live Python/R kernels unverified | Import/export nbformat 4 Python/R code and Markdown cells through file picker/download; validate with nbformat; preserve source; verify live outputs in Chromium and cross-platform acceptance |
 | R Markdown / Quarto | partial / offline HTML report export from Python/R percent-cell notebooks; no Quarto/R Markdown rendering | Render notebook with inline plots and HTML export; verify actual Quarto/R Markdown format compatibility |
 | Source debugger | missing | Breakpoints, stack, variables, step execution |
@@ -33,7 +33,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Accessibility | partial / unverified | Full keyboard navigation, screen reader labels, resize and contrast checks |
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
 
-## 2026-10-24: mixed-language percent-cell notebooks (CI pending)
+## 2026-10-24: mixed-language percent-cell notebooks (cross-platform CI accepted)
 
 The GitHub Pages `docs/app/` editor and the Flow-owned native `/app/`
 workspace now parse explicit `# %% [python]`, `# %% [r]`, and
@@ -48,12 +48,16 @@ output recovery displays the language derived from the source marker.
 Single-kernel `.ipynb` export rejects incompatible mixed-language cells
 rather than mislabeling their runtime.
 
-**Status: partial / automated tests added; cross-platform CI and
-physical-browser execution pending.** Local direct V8 checks passed for
+**Status: partial / cross-platform CI accepted; physical-browser execution
+pending.** Local direct V8 checks passed for
 language-tag parsing, sequential mixed-runtime dispatch, Flow preflight,
 Jupyter export rejection and the updated workspace inline-script syntax.
 `tests/browser_mixed_language_notebook.test.js` adds Node regression
-coverage; CI results must be recorded only after they finish.
+coverage. PR #27 passed all four jobs in
+[CI #40079407053](https://github.com/godofecht/FlowStudio/actions/runs/40079407053):
+JavaScript regression tests and native Flow compilation/HTTP acceptance on
+Ubuntu 24.04 and macOS 14. Merged as
+[1db9441](https://github.com/godofecht/FlowStudio/commit/1db94418ac89a2b54c684101531500fa952fda22).
 Python and R **do not share variables or objects**; there is no typed
 cross-language data transfer. Flow compilation remains native-only,
 per-cell, and does not preserve Flow variables across cells. Physical

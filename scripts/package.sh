@@ -25,6 +25,7 @@ cp -R docs "$stage/$name/docs"
 mkdir -p "$stage/$name/src"
 cp src/python_kernel.py "$stage/$name/src/python_kernel.py"
 cp src/python_trace.py "$stage/$name/src/python_trace.py"
+cp src/python_debugger.py "$stage/$name/src/python_debugger.py"
 cp src/r_kernel.R "$stage/$name/src/r_kernel.R"
 cp VERSION README.md "$stage/$name/"
 if test -f LICENSE; then cp LICENSE "$stage/$name/"; fi

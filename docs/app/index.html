@@ -95,7 +95,7 @@ function notice(text) { $("notice").textContent = text; }
 function setBusy(value) {
   busy = value;
   for (const id of ["run", "runSelection", "runCell", "runNotebook", "checkSyntax", "lookupHelp", "completeSource"]) $(id).disabled = value;
-  $("tracePython").disabled = value || $("language").value !== "python" || !FlowStudioNativeFlow.available();
+  $("tracePython").disabled = value || $("language").value !== "python" || !globalThis.FlowStudioNativeFlow?.available?.();
 }
 const packagePanel = FlowStudioPackages.create({document, request, notice, target:$("packages"),
   input:$("packageName"), installButton:$("installPackage"), listButton:$("listPackages"),
@@ -219,7 +219,7 @@ async function run(selectedOnly = false, activeCell = false, consoleCode = null)
 }
 async function tracePython() {
   if (busy || notebookRunner?.isRunning()) { notice("Wait for execution to finish."); return; }
-  if ($("language").value !== "python" || !FlowStudioNativeFlow.available()) {
+  if ($("language").value !== "python" || !globalThis.FlowStudioNativeFlow?.available?.()) {
     notice("Python tracing requires the native FlowStudio localhost server and Python source.");
     return;
   }
@@ -229,7 +229,7 @@ async function tracePython() {
   setBusy(true);
   notice("Tracing Python lines in the native persistent kernel; this executes the source.");
   try {
-    const response = await FlowStudioNativeFlow.tracePython(code);
+    const response = await globalThis.FlowStudioNativeFlow.tracePython(code);
     if (generation !== sessionGeneration || $("source").value !== code || $("language").value !== "python") {
       notice("Trace finished, but the source or session changed; discarded stale trace.");
       return;
@@ -379,7 +379,7 @@ $("source").addEventListener("keydown", event => {
   else if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void run(false); }
 });
 $("source").addEventListener("input", () => { notebookEntries = []; clearNotebookRecovery(); queueDraft(); });
-$("language").addEventListener("change", () => { completion.clear(); notebookEntries = []; clearNotebookRecovery(); environmentData.clear(); packagePanel.updateLanguage?.(); $("tracePython").disabled = busy || $("language").value !== "python" || !FlowStudioNativeFlow.available(); queueDraft(); });
+$("language").addEventListener("change", () => { completion.clear(); notebookEntries = []; clearNotebookRecovery(); environmentData.clear(); packagePanel.updateLanguage?.(); $("tracePython").disabled = busy || $("language").value !== "python" || !globalThis.FlowStudioNativeFlow?.available?.(); queueDraft(); });
 window.addEventListener("pagehide", () => drafts.flush());
 $("forgetDraft").addEventListener("click", () => {
   drafts.clear();

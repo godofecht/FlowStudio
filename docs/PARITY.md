@@ -33,6 +33,33 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Accessibility | partial / unverified | Full keyboard navigation, screen reader labels, resize and contrast checks |
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
 
+## 2026-10-24: mixed-language percent-cell notebooks (CI pending)
+
+The GitHub Pages `docs/app/` editor and the Flow-owned native `/app/`
+workspace now parse explicit `# %% [python]`, `# %% [r]`, and
+`# %% [flow]` language markers while retaining source offsets and the
+native/Pages parser's byte-for-byte equivalence. Run All dispatches
+sequentially into the actual existing Pyodide/webR sessions, or the native
+Flow endpoint for tagged Flow cells. The runner validates Flow availability
+**before executing any cell**, stops on interpreter failures, and labels
+cell output by the runtime used. Run Cell also respects tags; the
+environment inspector targets the last completed Python/R kernel. Notebook
+output recovery displays the language derived from the source marker.
+Single-kernel `.ipynb` export rejects incompatible mixed-language cells
+rather than mislabeling their runtime.
+
+**Status: partial / automated tests added; cross-platform CI and
+physical-browser execution pending.** Local direct V8 checks passed for
+language-tag parsing, sequential mixed-runtime dispatch, Flow preflight,
+Jupyter export rejection and the updated workspace inline-script syntax.
+`tests/browser_mixed_language_notebook.test.js` adds Node regression
+coverage; CI results must be recorded only after they finish.
+Python and R **do not share variables or objects**; there is no typed
+cross-language data transfer. Flow compilation remains native-only,
+per-cell, and does not preserve Flow variables across cells. Physical
+Chromium/Safari interaction with real webR/Pyodide downloads is unverified.
+See [MIXED_LANGUAGE_NOTEBOOKS.md](MIXED_LANGUAGE_NOTEBOOKS.md).
+
 ## 2026-10-24: Pages source find/replace (cross-platform CI accepted)
 
 The GitHub Pages and native `/app/` editor now expose the existing

@@ -30,7 +30,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Sequential percent-cell notebooks | partial / Python and R Run All wired with explicit per-cell Python/R/Flow language tags (cross-platform CI accepted; real browser pending); bounded browser-local text/Python PNG output recovery across reload; native and physical-browser acceptance unverified | Execute cells in order, retain interpreter state, show per-cell output and stop on error |
 | Jupyter `.ipynb` import/export | partial / browser UI wired and Node regression coverage; bounded output recovery is separate from `.ipynb` import/export; physical-browser file round-trip and live Python/R kernels unverified | Import/export nbformat 4 Python/R code and Markdown cells through file picker/download; validate with nbformat; preserve source; verify live outputs in Chromium and cross-platform acceptance |
 | R Markdown / Quarto | partial / offline HTML report export from Python/R percent-cell notebooks; no Quarto/R Markdown rendering | Render notebook with inline plots and HTML export; verify actual Quarto/R Markdown format compatibility |
-| Source debugger | partial / native CPython breakpoint/step/continue/stop and bounded stack inspection implemented on branch; real native Flow/HTTP CI and physical browser acceptance pending; R/Flow debugging missing | Breakpoints, stack, variables, step execution |
+| Source debugger | partial / native CPython breakpoint/step/continue/stop and bounded stack inspection passed cross-platform Flow/HTTP CI #40122749072; physical browser and R/Flow debugging missing | Breakpoints, stack, variables, step execution |
 | Remote/server mode | missing | Authenticated, origin-aware multi-user sessions with isolation |
 | Diagnostics / profiling | partial / native CPython bounded line tracing cross-platform CI accepted; physical-browser acceptance pending | Resource/time tracing and useful language-specific diagnostics |
 | Cross-platform packaging | missing | Installable signed/reproducible macOS and Linux releases |
@@ -38,7 +38,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
 
 
-## 2026-10-24: native Python source debugger (acceptance pending)
+## 2026-10-24: native Python source debugger (cross-platform native acceptance passed)
 
 The Flow-owned HTTP router now exposes explicit intent/origin-gated Python
 debugging operations: start with source and up to 64 line breakpoints, step,
@@ -57,10 +57,16 @@ breakpoints, step/continue, explicit stop and exceptions. Browser Node tests
 cover validation, UI controls and fixed HTTP routes. Native HTTP smoke
 exercises actual debugger execution, persistent state, request rejection
 and the origin gate through the compiled Flow router. Local CPython
-debugger-engine tests passed (6 tests), but **Flow compilation, native HTTP
-and cross-platform CI are not yet verified**. Physical-browser interaction,
+debugger-engine tests passed (6 tests). [PR #38](https://github.com/godofecht/FlowStudio/pull/38)
+passed [CI #40122749072](https://github.com/godofecht/FlowStudio/actions/runs/40122749072):
+all four jobs succeeded on Ubuntu 24.04 and macOS 14. Each platform passed
+501 JavaScript tests (2 skips, zero failures) and 7 real CPython debugger
+unit tests; native Flow 2.0.0 compilation, real HTTP breakpoint/step/stop
+acceptance, persistent-session checks and packaging also passed. Merged as
+[379c1d2](https://github.com/godofecht/FlowStudio/commit/379c1d28f44d9bc20d76f19507bfe470876330b1).
+Physical-browser interaction,
 R and Flow source debugging, conditional breakpoints, expression evaluation,
-watchpoints and advanced stepping are missing. Status: **partial / CI pending**.
+watchpoints and advanced stepping are missing. Status: **partial / cross-platform native CI accepted; physical browser pending**.
 
 ## 2026-10-24: local Git branch management (cross-platform native acceptance passed)
 

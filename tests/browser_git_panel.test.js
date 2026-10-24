@@ -94,6 +94,25 @@ test("hosted Pages disables all Git writes and does not ask for confirmation", a
   assert.equal(unstageButton.disabled,true);
   assert.equal(commitButton.disabled,true);
 });
+test("Git unstage shares the write lock and recovers after native failure", async () => {
+  const statusButton = button(), diffButton = button(), stageButton = button();
+  const unstageButton = button(), commitButton = button(), target = {textContent:""};
+  let resolve, calls = 0;
+  const ui = panel.create({native:{available:()=>true,
+    gitUnstage(){calls++;return new Promise(r=>resolve=r);}},
+    statusButton,diffButton,stageButton,unstageButton,commitButton,
+    pathInput:{value:"a [1].flow"},messageInput:{value:"msg"},target,confirmAction:()=>true});
+  const first = ui.unstage();
+  assert.equal(stageButton.disabled,true);
+  assert.equal(unstageButton.disabled,true);
+  assert.equal(await ui.unstage(),false);
+  assert.equal(await ui.stage(),false);
+  assert.equal(calls,1);
+  resolve({ok:false,status:422,output:"path not staged"});
+  assert.equal(await first,false);
+  assert.match(target.textContent,/path not staged/);
+  assert.equal(unstageButton.disabled,false);
+});
 test("Git write concurrency locks all controls and recovers after rejection", async () => {
   const statusButton = button(), diffButton = button(), stagedDiffButton = button();
   const stageButton = button(), commitButton = button(), target = {textContent:""};

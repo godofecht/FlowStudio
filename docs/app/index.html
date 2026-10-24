@@ -24,7 +24,7 @@ pre{white-space:pre-wrap;overflow:auto;overflow-wrap:anywhere;flex:1;margin:0;pa
 <header><strong>◈ FlowStudio <span class="muted">/ Browser</span></strong>
 <label for="language">Language</label><select id="language"><option value="python">Python (browser)</option><option value="flow">Flow (native localhost only)</option><option value="r">R (browser; webR 0.6.0)</option></select>
 <button id="open" type="button">Open file</button><button id="openFolder" type="button">Open project folder</button><button id="newProjectFile" type="button">New project file</button><button id="saveProjectFile" type="button" disabled>Save to disk</button><button id="saveAsProjectFile" type="button">Save As…</button><button id="renameProjectFile" type="button" disabled>Rename open project file</button><button id="deleteProjectFile" type="button" disabled>Delete open project file</button><input id="file" type="file" accept=".py,.flow,.r,.R,.txt" hidden>
-<button id="save" type="button">Download source</button><button id="run" type="button">Run Ctrl+Enter</button><button id="checkSyntax" type="button">Check syntax</button><button id="runSelection" type="button">Run selection Ctrl+Shift+Enter</button><button id="runCell" type="button">Run cell Ctrl+Alt+Enter</button><button id="runNotebook" type="button">Run all Python/R cells</button><button id="openNotebook" type="button">Open .ipynb</button><input id="notebookFile" type="file" accept=".ipynb,application/x-ipynb+json" hidden><button id="saveNotebook" type="button">Export .ipynb</button><button id="exportReport" type="button">Export HTML report</button><button id="reset" type="button">Reset selected session</button><button id="forgetDraft" type="button">Forget saved draft</button>
+<button id="save" type="button">Download source</button><button id="run" type="button">Run Ctrl+Enter</button><button id="checkSyntax" type="button">Check syntax</button><button id="runSelection" type="button">Run selection Ctrl+Shift+Enter</button><button id="runCell" type="button">Run cell Ctrl+Alt+Enter</button><button id="runNotebook" type="button">Run all cells</button><button id="openNotebook" type="button">Open .ipynb</button><input id="notebookFile" type="file" accept=".ipynb,application/x-ipynb+json" hidden><button id="saveNotebook" type="button">Export .ipynb</button><button id="exportReport" type="button">Export HTML report</button><button id="reset" type="button">Reset selected session</button><button id="forgetDraft" type="button">Forget saved draft</button>
 </header>
 <main>
 <section aria-label="Source editor"><h2>Source — <span id="filename">untitled.py</span></h2><details id="projectPanel"><summary>Project files</summary><div id="projectTree" aria-label="Project file explorer">Choose a folder to browse its files.</div></details><textarea id="source" aria-label="Source code" spellcheck="false">x = 40
@@ -290,10 +290,11 @@ function renderNotebookCell(entry) {
 async function runNotebook() {
   if (busy) { notice("An execution is already running."); return; }
   const language = $("language").value;
-  if (language !== "python" && language !== "r") {
-    notice("Browser notebook execution supports Python/R; Flow requires the native application.");
+  if (language === "flow" && !globalThis.FlowStudioNativeFlow?.available?.()) {
+    notice("Flow notebook execution requires the native FlowStudio server at http://127.0.0.1:8751/app/. GitHub Pages cannot execute Flow.");
     return;
   }
+  if (!["python", "r", "flow"].includes(language)) return;
   const generation = sessionGeneration;
   clearNotebookRecovery();
   notebookEntries = [];
@@ -305,7 +306,9 @@ async function runNotebook() {
   $("workspace").replaceChildren(notebookOutput);
   notebookRunner = FlowStudioNotebook.create({
     parseCells: FlowStudioSourceCells.parseCells,
-    execute: (code, selectedLanguage) => selectedLanguage === "r" ? getRSession().run(code) : request("run", code),
+    execute: (code, selectedLanguage) => selectedLanguage === "flow" ?
+      globalThis.FlowStudioNativeFlow.run(code) : selectedLanguage === "r" ? getRSession().run(code) : request("run", code),
+    allowNativeFlow: language === "flow" && globalThis.FlowStudioNativeFlow?.available?.() === true,
     onCell: renderNotebookCell, notice
   });
   setBusy(true);
@@ -314,7 +317,7 @@ async function runNotebook() {
     if (generation !== sessionGeneration) return;
     notice(result.ok ? "Notebook executed " + result.executed + " cells." :
       "Notebook stopped after " + result.executed + " cells: " + result.error);
-    if (result.executed > 0) {
+    if (result.executed > 0 && language !== "flow") {
       const inspect = language === "r" ? await getRSession().inspect() : await request("inspect");
       if (generation !== sessionGeneration) return;
       if (inspect.ok) renderEnvironment(inspect.variables);

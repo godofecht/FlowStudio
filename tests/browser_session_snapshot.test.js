@@ -31,7 +31,7 @@ function fixture(overrides={}) {
     reset:()=>{epoch++;busy=false;}, select:value=>{selected=value;}, busy:()=>busy};
 }
 test("snapshot format rejects duplicate, prototype, invalid, oversized and malformed values",()=>{
-  assert.equal(snapshots.validate(snapshot()),snapshot()); // structural validation
+  assert.deepEqual(snapshots.validate(snapshot()),snapshot()); // structural validation
   for(const bad of [
     {...snapshot(),format:"wrong"},
     {...snapshot(),extra:true},

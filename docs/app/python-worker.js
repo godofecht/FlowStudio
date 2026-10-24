@@ -74,7 +74,7 @@ async function capturePlots(py) {
   }
 }
 async function handle(event) {
-  const {id, op, code, value} = event.data || {};
+  const {id, op, code, value: transferValue} = event.data || {};
   if (!Number.isSafeInteger(id)) return;
   const validInstall = op === "install" && typeof code === "string" &&
     /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}(?:==[0-9][A-Za-z0-9.!+_-]{0,39})?$/.test(code);
@@ -88,7 +88,7 @@ async function handle(event) {
     /^[A-Za-z_][A-Za-z0-9_]{0,79}$/.test(code);
   const validExport = op === "export" && typeof code === "string" && TRANSFER_NAME.test(code);
   const validImport = op === "import" && typeof code === "string" && TRANSFER_NAME.test(code) &&
-    validTransferPacket(value);
+    validTransferPacket(transferValue);
   if (!((op === "run" && typeof code === "string" && new TextEncoder().encode(code).length <= 65536) ||
     op === "inspect" || op === "packages" || validInstall || validTable || validCheck || validHelp || validComplete || validExport || validImport)) {
     self.postMessage({id, ok:false, output:"Invalid execution request."}); return;
@@ -127,7 +127,7 @@ async function handle(event) {
       // A JSON literal is parsed inside the existing Python globals; never eval() user text.
       const query = [
         "import json as _fs_transfer_json",
-        "_fs_transfer_packet = _fs_transfer_json.loads(" + JSON.stringify(JSON.stringify(value)) + ")",
+        "_fs_transfer_packet = _fs_transfer_json.loads(" + JSON.stringify(JSON.stringify(transferValue)) + ")",
         "globals()[" + JSON.stringify(code) + "] = _fs_transfer_packet['values'] if _fs_transfer_packet['kind'] == 'vector' else _fs_transfer_packet['values'][0]",
         "'ok'"
       ].join("\n");

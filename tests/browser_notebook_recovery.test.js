@@ -44,7 +44,8 @@ test("rejects malformed, reordered, injected and excessive output", () => {
     Array.from({length:129},(_,i)=>entry(i))
   ]) assert.equal(recovery.save(store, "source", "r", entries), false);
   assert.equal(recovery.save(store, "x".repeat(131073), "r", [entry(0)]), false);
-  assert.equal(recovery.save(store, "source", "flow", [entry(0)]), false);
+  assert.equal(recovery.save(store, "source", "flow", [entry(0)]), true);
+  assert.deepEqual(recovery.read(store, "source", "flow"), [entry(0)]);
   assert.equal(recovery.save(store, "source", "python", [entry(0)]), true);
   const record = JSON.parse(store.raw());
   record.entries[0].output = "x".repeat(131073);

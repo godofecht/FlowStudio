@@ -1017,7 +1017,7 @@ async function refreshPythonEnvironment() {
       cell.textContent = value;
       row.append(cell);
     }
-    if (selectedLanguage === "python" && Array.isArray(variable.children) &&
+    if ((selectedLanguage === "python" || selectedLanguage === "r") && Array.isArray(variable.children) &&
         variable.children.length > 0 && variable.children.length <= 12) {
       const list = document.createElement("ul");
       for (const child of variable.children) {

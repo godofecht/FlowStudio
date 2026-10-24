@@ -78,49 +78,86 @@ json_quote <- function(value) {
     paste0('"', paste0(escaped, collapse = ""), '"')
 }
 
+# Inspect only ordinary R lists, not S3/S4 objects or arbitrary methods.
+# Two child levels, twelve entries per container and 256 total child nodes.
+# The same bounded metadata schema is consumed by the native Python tree UI.
+inspect_value <- function(name, value, depth, budget) {
+    kind <- typeof(value)
+    plain <- !is.object(value)
+    size <- "null"
+    if (plain && kind %in% c("logical", "integer", "double", "complex",
+                             "character", "raw", "list")) {
+        size <- as.character(base::length(value))
+    }
+    dimensions <- "null"
+    shape <- attr(value, "dim", exact = TRUE)
+    if (is.integer(shape) && length(shape) > 0L &&
+        length(shape) <= 8L && all(!is.na(shape)) && all(shape >= 0L)) {
+        dimensions <- paste0("[", paste(shape, collapse = ","), "]")
+    }
+    fields <- paste0('"name":', json_quote(substr(name, 1L, 160L)),
+                     ',"type":', json_quote(substr(kind, 1L, 100L)),
+                     ',"size":', size, ',"dimensions":', dimensions)
+    if (depth < 2L && plain && identical(kind, "list")) {
+        count <- base::length(value)
+        take <- min(count, 12L)
+        labels <- attr(value, "names", exact = TRUE)
+        children <- character(0)
+        partial <- count > take
+        if (take > 0L) for (index in seq_len(take)) {
+            if (budget$nodes >= 256L) {
+                partial <- TRUE
+                break
+            }
+            budget$nodes <- budget$nodes + 1L
+            label <- paste0("[[", index, "]]")
+            if (!is.null(labels) && length(labels) >= index &&
+                !is.na(labels[index]) && nzchar(labels[index])) {
+                label <- paste0(label, " ", substr(labels[index], 1L, 120L))
+            }
+            children <- c(children, inspect_value(label, value[[index]],
+                                                  depth + 1L, budget))
+        }
+        fields <- paste0(fields, ',"children":[', paste(children, collapse = ","), ']')
+        if (partial) {
+            fields <- paste0(fields, ',"truncated":true')
+            budget$truncated <- TRUE
+        }
+    }
+    paste0("{", fields, "}")
+}
+
 inspect_workspace <- function() {
     names <- ls(envir = workspace, all.names = TRUE)
     entries <- character(0)
     used <- 35L
     truncated <- FALSE
+    budget <- new.env(parent = emptyenv())
+    budget$nodes <- 0L
+    budget$truncated <- FALSE
     for (name in names) {
         if (length(entries) >= 128L) {
             truncated <- TRUE
             break
         }
-        kind <- "unavailable"
-        size <- "null"
-        dimensions <- "null"
         if (bindingIsActive(name, workspace)) {
-            # An active binding may execute arbitrary user code when read.
-            kind <- "active binding"
+            # Reading an active binding could execute arbitrary user code.
+            entry <- paste0('{"name":', json_quote(substr(name, 1L, 160L)),
+                            ',"type":"active binding","size":null,"dimensions":null}')
         } else {
-            # A lazy promise can raise when forced. An inspection failure must
-            # not terminate the IPC loop or erase other variable metadata.
+            # Existing limitation: forcing a lazy promise may have side effects.
+            # A failed promise must not break inspection or the IPC process.
             binding <- tryCatch(
                 list(ok = TRUE, value = get(name, envir = workspace, inherits = FALSE)),
                 error = function(error) list(ok = FALSE)
             )
-            if (binding$ok) {
-                value <- binding$value
-                kind <- typeof(value)
-                if (!is.object(value) &&
-                    kind %in% c("logical", "integer", "double", "complex",
-                                "character", "raw", "list")) {
-                    size <- as.character(base::length(value))
-                }
-                # Read the raw dimension attribute, never dispatch dim() on
-                # user-defined objects. Bound dimensionality and JSON size.
-                shape <- attr(value, "dim", exact = TRUE)
-                if (is.integer(shape) && length(shape) > 0L &&
-                    length(shape) <= 8L && all(!is.na(shape)) && all(shape >= 0L)) {
-                    dimensions <- paste0("[", paste(shape, collapse = ","), "]")
-                }
+            entry <- if (binding$ok) {
+                inspect_value(name, binding$value, 0L, budget)
+            } else {
+                paste0('{"name":', json_quote(substr(name, 1L, 160L)),
+                       ',"type":"unavailable","size":null,"dimensions":null}')
             }
         }
-        entry <- paste0('{"name":', json_quote(substr(name, 1L, 160L)),
-                        ',"type":', json_quote(substr(kind, 1L, 100L)),
-                        ',"size":', size, ',"dimensions":', dimensions, "}")
         additional <- nchar(entry, type = "bytes") + if (length(entries)) 1L else 0L
         if (used + additional > 65000L) {
             truncated <- TRUE
@@ -130,7 +167,7 @@ inspect_workspace <- function() {
         used <- used + additional
     }
     json <- paste0('{"variables":[', paste(entries, collapse = ","),
-                   '],"truncated":', if (truncated) "true" else "false", "}")
+                   '],"truncated":', if (truncated || budget$truncated) "true" else "false", "}")
     list(success = TRUE, payload = charToRaw(enc2utf8(json)))
 }
 

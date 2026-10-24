@@ -431,3 +431,23 @@ Validation: committed Node regression tests in `tests/browser_syntax_check.test.
 The browser notebook now writes completed Python/R cell text outputs and bounded Python PNG plot captures to browser-local storage after each cell. On reload it restores outputs only when the source text and language exactly match; it does not re-execute cells or pretend to restore interpreter variables. New notebook execution, source edits, language changes, file changes, imports and session reset clear the saved output snapshot. Stored data are schema-validated and limited to 1 MiB total, 128 code cells, 128 KiB source and 128 KiB output per cell. The recovered results can be exported through existing .ipynb/HTML report routes when source matches. R ImageBitmap plot objects are not serializable and are intentionally not persisted.
 
 **Status: partial.** Added Node regression tests for exact-source recovery, failed cells, bounds, tampering, storage errors and workspace wiring. Local V8 execution with a UTF-8 encoder shim passed nine assertions and parsed the actual browser inline script. Native Flow/R/Python interpreter state persistence, IndexedDB project-scoped history, live Pyodide/webR acceptance and physical-browser reload acceptance remain unverified or missing. Browser storage can be cleared by the user or browser.
+
+## 2026-10-24: native R nested plain-list inspection (CI pending)
+
+The Flow-owned persistent R inspector now includes bounded child metadata for
+**ordinary unclassed R lists** through the existing intent-gated
+`POST /api/inspect/r` endpoint. It descends at most two child levels,
+returns up to twelve children per container and 256 children per inspection,
+and respects the existing 65 KiB JSON response budget. The native editor uses
+its existing text-only, keyboard-expandable environment tree for R as well as
+Python. Classed/S3/S4 objects are not traversed; active bindings are not
+read, and the inspector does not call user-defined print or indexing methods.
+
+**Status: partial / CI pending.** A real Rscript-backed IPC harness now checks
+nested values, classed-list method avoidance and truncation; the Flow-owned
+HTTP smoke suite checks nested R metadata, and the Node DOM suite checks
+rendering. These tests are committed but are **not yet claimed passing**.
+The inspector can still force ordinary lazy R promises during root binding
+lookup, and the physical-browser workflow has not been independently accepted.
+This is not full RStudio environment inspection parity.
+

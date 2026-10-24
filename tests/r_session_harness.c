@@ -26,6 +26,24 @@ int main(void)
         !strstr(out, "\"name\":\"matrix_value\",\"type\":\"integer\",\"size\":6,\"dimensions\":[2,3]") ||
         !strstr(out, "\"name\":\"broken\",\"type\":\"unavailable\",\"size\":null,\"dimensions\":null"))
         return failure(15, out);
+    /* Native R lists expose nested metadata without evaluating user methods. */
+    out = fs_r_run("nested <- list(numbers=list(answer=42L, more=list(x=1L)), words=c('a','b'))\n"
+                   "trap <- structure(list(secret=1L), class='flowstudio_trap')\n"
+                   "`[[.flowstudio_trap` <- function(...) stop('user method executed')");
+    if (fs_r_status() != 200) return failure(17, out);
+    out = fs_r_inspect();
+    if (fs_r_status() != 200 ||
+        !strstr(out, "\"name\":\"nested\",\"type\":\"list\",\"size\":2") ||
+        !strstr(out, "\"name\":\"[[1]] numbers\",\"type\":\"list\",\"size\":2") ||
+        !strstr(out, "\"name\":\"[[1]] answer\",\"type\":\"integer\",\"size\":1") ||
+        !strstr(out, "\"name\":\"trap\",\"type\":\"list\",\"size\":null,\"dimensions\":null}") ||
+        strstr(out, "user method executed")) return failure(18, out);
+    out = fs_r_run("large_nested <- replicate(30, as.list(1:30), simplify=FALSE)");
+    if (fs_r_status() != 200) return failure(19, out);
+    out = fs_r_inspect();
+    if (fs_r_status() != 200 || !strstr(out, "\"name\":\"large_nested\"") ||
+        !strstr(out, "\"truncated\":true") || strlen(out) > 65000)
+        return failure(20, out);
     /* Failed lazy binding must not crash the R kernel or lose prior state. */
     out = fs_r_run("cat(value, '\\n', sep='')");
     if (fs_r_status() != 200 || strcmp(out, "41\n") != 0) return failure(16, out);

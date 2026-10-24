@@ -38,8 +38,27 @@ test("native editor renders bounded nested metadata as inert text", () => {
   assert.equal(render({name:"x", type:"str"}, 3), null);
 });
 test("native environment refresh gates nested inspection to Python and validates shape", () => {
-  assert.match(html, /selectedLanguage === "python" && Array\.isArray\(variable\.children\)/);
+  assert.match(html, /\(selectedLanguage === "python" \|\| selectedLanguage === "r"\) && Array\.isArray\(variable\.children\)/);
   assert.match(html, /variable\.children\.length <= 12/);
   assert.match(html, /row\.firstChild\.replaceChildren\(details\)/);
   assert.match(html, /fetch\("\/api\/inspect\/" \+ selectedLanguage/);
+});
+
+test("native R list metadata expands two levels without interpreting labels", () => {
+  const match = /function renderPythonEnvironmentChild\(item, depth\) \{[\s\S]*?\n\}\n(?=async function refreshPythonEnvironment)/.exec(html);
+  assert.ok(match);
+  const context = {document:{createElement:tag => new Element(tag)}, Number};
+  vm.runInNewContext(match[0], context);
+  const tree = context.renderPythonEnvironmentChild({
+    name:"[[1]] <script>alert(1)</script>", type:"list", size:2, children:[
+      {name:"[[1]] answer", type:"integer", size:1},
+      {name:"[[2]] deeper", type:"list", size:1, children:[
+        {name:"[[1]] x", type:"double", size:1}
+      ]}
+    ]
+  }, 0);
+  assert.equal(tree.children[0].tag, "details");
+  assert.match(tree.children[0].children[0].textContent, /<script>/);
+  assert.equal(tree.children[0].children[1].children.length, 2);
+  assert.equal(tree.children[0].children[1].children[1].children[0].tag, "details");
 });

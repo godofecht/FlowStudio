@@ -22,7 +22,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Data viewer | partial / CSV/TSV plus bounded Python/R environment table snapshots wired; real Pyodide/webR and physical browser unverified | Interactive sortable/filterable tabular datasets including missing values |
 | Completion / language server | partial / browser Python/R runtime prefix completion cross-platform CI accepted; Flow lexical completion accepted by Ubuntu/macOS CI; explicit-type Flow struct and evolution-state member completion cross-platform CI accepted (#40095770668, 473 JS passes, 2 skips per platform, native Flow/HTTP accepted); physical-browser verification pending; full semantic/LSP completion missing | R, Flow and Python completion/diagnostics |
 | Packages pane | partial / browser Python inventory/install and webR 0.6.0 inventory/install; mocked Node tests, live interpreters unverified | List, install, update with environment-aware package sources |
-| Git pane | partial / native Flow status, diff, stage, unstage and commit previously accepted cross-platform; branch list/create/switch implemented in PR pending native Flow/HTTP CI and physical-browser verification; branch deletion, remote tracking and merge missing | Status, diff, stage, unstage, commit and branch operations |
+| Git pane | partial / native Flow status, diff, stage, unstage and commit previously accepted cross-platform; branch list/create/switch accepted by CI #40117614745 on Ubuntu/macOS (PR #37 merged); physical-browser verification missing; branch deletion, remote tracking and merge missing | Status, diff, stage, unstage, commit and branch operations |
 | Help pane | partial / browser Python live-global/builtin docstrings and installed R Rd help wired; Node/V8 contract tests, live Pyodide/webR and physical browser unverified; Flow help missing | Context-aware language/function docs |
 | Find / replace / cross-file search | partial / Node + V8-tested | Literal in-buffer find next/previous, single/all replacement and project-wide search implemented; incremental indexing, regex and physical-browser verification missing |
 | Percent-delimited source cells | partial / lexical scanner unified across native editor and Pages, Node/HTTP acceptance pending; physical-browser execution unverified | Run only the active `# %%` code cell in Flow/R/Python; markdown and empty cells do not execute |
@@ -38,7 +38,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
 
 
-## 2026-10-24: local Git branch management (validation pending)
+## 2026-10-24: local Git branch management (cross-platform native acceptance passed)
 
 The Flow-owned native router now supports read-only `/api/git/branches`,
 explicit local `/api/git/branch/create` and `/api/git/branch/switch` routes.
@@ -53,12 +53,13 @@ Pages cannot invoke these native routes.
 
 Added JavaScript route/confirmation/concurrency regression tests and real-Git
 HTTP fixture assertions for branch creation, duplicate and invalid names,
-dirty-tree rejection, successful checkout and cross-origin rejection. A
-direct V8 harness executed the new browser client and panel methods; the
-native Git argv was exercised in a separate local Git fixture. **These
-checks are not a native Flow build, full Node suite or cross-platform
-CI result.** Status: **partial / native cross-platform acceptance pending;
-physical-browser acceptance missing**. Remote branch operations, merges,
+dirty-tree rejection, successful checkout and cross-origin rejection. [CI #40117614745](https://github.com/godofecht/FlowStudio/actions/runs/40117614745)
+subsequently completed all four jobs successfully on Ubuntu 24.04 and
+macOS 14: JavaScript/source/transport suites, Flow 2.0.0 compilation,
+real-Git native HTTP acceptance and packaging. [PR #37](https://github.com/godofecht/FlowStudio/pull/37)
+merged as [fce088a](https://github.com/godofecht/FlowStudio/commit/fce088a068624c4641ecee3cc1e5a07763239400).
+**Status: partial / native cross-platform acceptance passed; physical-browser
+acceptance missing**. Remote branch operations, merges,
 rebases and branch deletion are not implemented.
 
 ## 2026-10-24: selective Git unstage (cross-platform native acceptance passed)

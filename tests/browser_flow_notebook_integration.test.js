@@ -5,9 +5,8 @@ const native = require("../docs/app/native_flow.js");
 const {create} = require("../docs/app/notebook_runner.js");
 const {parseCells} = require("../docs/app/source_cells.js");
 
-const source = 'function main() -> i32 { println("first"); return 0 }\n' +
-  '# %%\nfunction main() -> i32 { println("second"); return 0 }\n' +
-  '# %%\nfunction main() -> i32 { println("third"); return 0 }\n';
+const program = label => 'function main() -> i32 {\\n    println("' + label + '")\\n    return 0\\n}\\n';
+const source = program("first") + '# %%\\n' + program("second") + '# %%\\n' + program("third");
 
 async function withOrigin(origin, fetch, action) {
   const previousLocation = globalThis.location;

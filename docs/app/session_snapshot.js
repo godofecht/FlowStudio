@@ -127,7 +127,7 @@ function create({exportButton, importButton, fileInput, language, inspect, expor
       const snapshot = await capture({language:selected, inspect, exportValue,
         generation:currentGeneration});
       same(currentGeneration, epoch);
-      download(JSON.stringify(snapshot, null, 2) + "\n", "flowstudio-" + selected + "-session.json");
+      download(JSON.stringify(snapshot), "flowstudio-" + selected + "-session.json");
       notice("Exported " + snapshot.variables.length + " " + selected + " variables" +
         (snapshot.omitted || snapshot.truncated ? " (partial: " + snapshot.omitted +
           " omitted" + (snapshot.truncated ? "; inspection truncated" : "") + ")" : "") +

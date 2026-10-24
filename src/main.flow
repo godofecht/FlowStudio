@@ -213,6 +213,9 @@ function send_git_view(kind: string) -> void {
         proc_arg(command, "--untracked-files=normal")
     } else {
         proc_arg(command, "diff")
+        if eq(kind, "staged") {
+            proc_arg(command, "--cached")
+        }
         proc_arg(command, "--no-ext-diff")
         proc_arg(command, "--no-textconv")
         proc_arg(command, "--no-color")
@@ -238,6 +241,60 @@ function send_git_view(kind: string) -> void {
         return
     }
     fs_reply(200, "text/plain; charset=utf-8", result.stdout)
+}
+
+# Explicit native Git writes. Only a literal pathspec or commit message is
+# supplied by the browser. No shell, arbitrary argv, repository path or hooks.
+# The server's working tree is the target, not a browser-picked folder.
+function send_git_write(kind: string, value: string) -> void {
+    if eq(value, "") or strlen(value) > 512 {
+        fs_reply(400, "text/plain; charset=utf-8", "Git input must contain 1 to 512 bytes.")
+        return
+    }
+    if eq(kind, "stage") and (eq(value, ".") or eq(value, "..") or eq(value, "/")) {
+        fs_reply(400, "text/plain; charset=utf-8", "Stage a specific file or subdirectory, not the whole repository.")
+        return
+    }
+    let command: ptr<ProcCmd> = proc_cmd("git")
+    proc_arg(command, "-c")
+    proc_arg(command, "core.fsmonitor=false")
+    proc_arg(command, "-c")
+    proc_arg(command, "core.hooksPath=/dev/null")
+    if eq(kind, "stage") {
+        proc_arg(command, "add")
+        proc_arg(command, "--")
+        proc_arg(command, ":(literal)" + value)
+    } else {
+        proc_arg(command, "-c")
+        proc_arg(command, "commit.gpgsign=false")
+        proc_arg(command, "commit")
+        proc_arg(command, "--no-gpg-sign")
+        proc_arg(command, "-m")
+        proc_arg(command, value)
+    }
+    proc_timeout_ms(command, 10000)
+    let result: ptr<ProcResult> = proc_run(command)
+    if result.timed_out {
+        fs_reply(504, "text/plain; charset=utf-8", "Git operation timed out after ten seconds.")
+        return
+    }
+    if not eq(result.error, "") {
+        fs_reply(503, "text/plain; charset=utf-8", "Git executable unavailable: " + result.error)
+        return
+    }
+    let output: string = result.stdout + result.stderr
+    if strlen(output) > 131072 {
+        fs_reply(413, "text/plain; charset=utf-8", "Git output exceeds the 128 KiB display limit.")
+        return
+    }
+    if result.exit_code != 0 {
+        fs_reply(422, "text/plain; charset=utf-8", "Git operation failed: " + output)
+        return
+    }
+    if eq(output, "") {
+        output = "Selected path staged successfully."
+    }
+    fs_reply(200, "text/plain; charset=utf-8", output)
 }
 
 function send_editor() -> void {
@@ -291,6 +348,18 @@ function dispatch() -> void {
         }
         if eq(path, "/api/git/diff") {
             send_git_view("diff")
+            return
+        }
+        if eq(path, "/api/git/diff/staged") {
+            send_git_view("staged")
+            return
+        }
+        if eq(path, "/api/git/stage") {
+            send_git_write("stage", fs_body())
+            return
+        }
+        if eq(path, "/api/git/commit") {
+            send_git_write("commit", fs_body())
             return
         }
         if eq(path, "/api/run/flow") {

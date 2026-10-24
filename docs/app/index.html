@@ -145,13 +145,42 @@ async function viewEnvironmentVariable(name) {
     if (generation === sessionGeneration) notice("Table inspection failed: " + String(error.message || error));
   } finally { if (generation === sessionGeneration) setBusy(false); }
 }
-function renderEnvironment(variables) {
+function renderEnvironment(variables, truncated = false) {
   environmentData.clear();
   const target = $("environment");
   target.replaceChildren();
   if (!variables.length) { target.textContent = "(No user variables)"; return; }
+  // Expand metadata returned by the real R inspector; never evaluate values in the UI.
+  function nestedDetails(variable, root = false) {
+    const details = document.createElement("details");
+    const summary = document.createElement("summary");
+    summary.textContent = (root ? "" : variable.name + ": " + variable.type + " — ") +
+      variable.preview + (variable.truncated ? " (truncated)" : "");
+    details.append(summary);
+    const children = document.createElement("ul");
+    for (const child of variable.children || []) {
+      const row = document.createElement("li");
+      if (Array.isArray(child.children) && child.children.length) {
+        row.append(nestedDetails(child));
+      } else {
+        const label = document.createElement("span");
+        label.textContent = child.name + ": " + child.type +
+          (Array.isArray(child.shape) ? " [" + child.shape.join(" × ") + "]" : "") +
+          " — " + child.preview + (child.truncated ? " (truncated)" : "");
+        row.append(label);
+      }
+      children.append(row);
+    }
+    details.append(children);
+    return details;
+  }
   const table = document.createElement("table");
   table.setAttribute("aria-label", $("language").value === "r" ? "R environment variables" : "Python environment variables");
+  if (truncated) {
+    const caption = document.createElement("caption");
+    caption.textContent = "Environment snapshot truncated at the inspection limit.";
+    table.append(caption);
+  }
   const head = document.createElement("tr");
   for (const title of ["Name", "Type", "Shape", "Value", "Data"]) {
     const cell = document.createElement("th");
@@ -162,13 +191,17 @@ function renderEnvironment(variables) {
   table.append(head);
   for (const variable of variables) {
     const row = document.createElement("tr");
-    const fields = [variable.name, variable.type,
-      Array.isArray(variable.shape) ? variable.shape.join(" × ") : "", variable.preview];
-    for (const value of fields) {
+    for (const value of [variable.name, variable.type,
+      Array.isArray(variable.shape) ? variable.shape.join(" × ") : ""]) {
       const cell = document.createElement("td");
       cell.textContent = String(value);
       row.append(cell);
     }
+    const valueCell = document.createElement("td");
+    if (Array.isArray(variable.children) && variable.children.length)
+      valueCell.append(nestedDetails(variable, true));
+    else valueCell.textContent = String(variable.preview) + (variable.truncated ? " (truncated)" : "");
+    row.append(valueCell);
     const action = document.createElement("td");
     if (/(DataFrame|ndarray|list|tuple|data\.frame|matrix|array)/i.test(String(variable.type))) {
       const view = document.createElement("button");
@@ -221,7 +254,7 @@ async function run(selectedOnly = false, activeCell = false, consoleCode = null,
     if (language !== "flow" && (response.ok || Array.isArray(response.plots) || Array.isArray(response.images))) {
       const inspect = language === "r" ? await getRSession().inspect() : await request("inspect");
       if (generation !== sessionGeneration) return false;
-      if (inspect.ok) renderEnvironment(inspect.variables);
+      if (inspect.ok) renderEnvironment(inspect.variables, inspect.truncated);
       else notice("Environment inspection failed: " + inspect.output);
     }
     return consoleCode === null || response.ok === true;
@@ -367,7 +400,7 @@ async function runNotebook() {
     if (result.executed > 0 && (lastLanguage === "python" || lastLanguage === "r")) {
       const inspect = lastLanguage === "r" ? await getRSession().inspect() : await request("inspect");
       if (generation !== sessionGeneration) return;
-      if (inspect.ok) renderEnvironment(inspect.variables);
+      if (inspect.ok) renderEnvironment(inspect.variables, inspect.truncated);
       else notice("Notebook environment inspection failed: " + inspect.output);
     }
   } catch (error) {

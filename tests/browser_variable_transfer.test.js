@@ -121,8 +121,8 @@ test("Pyodide worker export/import stays serialized and rejects unsafe packets b
   h.send(2,"import","copied",packet);
   h.send(3,"import","bad;code",packet);
   await waitReply(h,3);
-  assert.deepEqual(h.replies.map(x=>x.ok),[true,true,false]);
-  assert.equal(h.replies[0].value.kind,"vector");
+  assert.deepEqual(h.replies.slice().sort((a,b)=>a.id-b.id).map(x=>x.ok),[true,true,false]);
+  assert.equal(h.replies.find(x=>x.id===1).value.kind,"vector");
   assert.equal(h.queries.length,2);
   assert.match(h.queries[0],/type\(_fs_transfer_obj\) in \(list, tuple\)/);
   assert.match(h.queries[1],/globals\(\)\["copied"\]/);

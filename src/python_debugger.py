@@ -50,11 +50,22 @@ def _stack(frame: Any) -> list[dict[str, object]]:
     return result
 
 
+def _source_depth(frame: Any) -> int:
+    """Count only FlowStudio source frames; external library frames are excluded."""
+    depth = 0
+    while frame is not None:
+        if frame.f_code.co_filename == SOURCE_NAME:
+            depth += 1
+        frame = frame.f_back
+    return depth
+
+
 class DebugSession:
     def __init__(self) -> None:
         self.cv = threading.Condition()
         self.state = "idle"
         self.mode = "run"
+        self.anchor_depth = 0
         self.breakpoints: frozenset[int] = frozenset()
         self.frames: list[dict[str, object]] = []
         self.writer: Any = None
@@ -78,8 +89,13 @@ class DebugSession:
         with self.cv:
             if self.stop_requested:
                 raise _Stopped()
-            if self.mode != "step" and frame.f_lineno not in self.breakpoints:
+            depth = _source_depth(frame)
+            pause = (frame.f_lineno in self.breakpoints or self.mode == "step" or
+                     (self.mode == "next" and depth <= self.anchor_depth) or
+                     (self.mode == "finish" and depth < self.anchor_depth))
+            if not pause:
                 return self._trace
+            self.anchor_depth = depth
             self.frames = _stack(frame)
             self.state = "paused"
             self.cv.notify_all()
@@ -132,6 +148,7 @@ class DebugSession:
                 return {"state": self.state, "ok": False, "stack": [], "output": "", "message": "Debugger already active."}
             self.state = "running"
             self.mode = "run" if points else "step"
+            self.anchor_depth = 0
             self.breakpoints = frozenset(points)
             self.frames = []
             self.writer = writer
@@ -146,7 +163,7 @@ class DebugSession:
         with self.cv:
             if action == "status":
                 return self._snapshot()
-            if action not in ("step", "continue", "stop"):
+            if action not in ("step", "next", "finish", "continue", "stop"):
                 return {"state": self.state, "ok": False, "stack": [], "output": "", "message": "Unknown debugger command."}
             if self.state not in ("paused", "running"):
                 return {"state": self.state, "ok": False, "stack": self.frames, "output": "", "message": "No active debugging session."}
@@ -154,7 +171,7 @@ class DebugSession:
                 self.stop_requested = True
             elif self.state != "paused":
                 return {"state": self.state, "ok": False, "stack": [], "output": "", "message": "Debugger has not reached a breakpoint."}
-            self.mode = "step" if action == "step" else "run"
+            self.mode = action if action in ("step", "next", "finish") else "run"
             if self.state == "paused":
                 self.state = "running"
                 self.cv.notify_all()

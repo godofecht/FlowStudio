@@ -95,7 +95,7 @@ test("generated inspector runs under real Rscript, avoids active bindings and bo
   const setup = [
     'items <- list(alpha=3L, child=list(beta="ok"), many=as.list(1:20))',
     'mat <- matrix(1:6, nrow=2)',
-    'df <- data.frame(x=1:2, y=c("a","b"))',
+    'df <- data.frame(x=1:3, y=c("a","b","c"))',
     'object <- structure(list(secret=7), class="custom")',
     'tripped <- FALSE',
     'head <- function(...) stop("masked head executed")',
@@ -124,7 +124,7 @@ test("generated inspector runs under real Rscript, avoids active bindings and bo
   assert.equal(byName.trap.type,"active binding");
   assert.equal(byName.broken.type,"unavailable");
   assert.equal(byName.df.type,"data.frame");
-  assert.deepEqual(byName.df.shape,["2","2"]);
+  assert.deepEqual(byName.df.shape,["3","2"]);
   assert.deepEqual(byName.mat.shape,["2","3"]);
   assert.equal(byName.object.children,undefined);
   assert.equal(byName.items.children[0].preview,"3");

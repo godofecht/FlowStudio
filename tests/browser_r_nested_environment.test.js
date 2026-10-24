@@ -58,7 +58,7 @@ test("webR inspect uses the actual bounded query and never evaluates source in J
   assert.equal(calls.length, 1);
   assert.equal(calls[0].query, INSPECT);
   assert.equal(calls[0].type, "string[]");
-  assert.match(INSPECT, /bindingIsActive\(name, \.GlobalEnv\)/);
+  assert.match(INSPECT, /base::bindingIsActive\(name, base::globalenv\(\)\)/);
   assert.doesNotMatch(INSPECT, /capture\.output\(str\(/);
 });
 

@@ -30,7 +30,7 @@ pre{white-space:pre-wrap;overflow:auto;overflow-wrap:anywhere;flex:1;margin:0;pa
 <section aria-label="Source editor"><h2>Source — <span id="filename">untitled.py</span></h2><details id="projectPanel"><summary>Project files</summary><div id="projectTree" aria-label="Project file explorer">Choose a folder to browse its files.</div></details><textarea id="source" aria-label="Source code" spellcheck="false">x = 40
 print("Hello from browser Python!")
 x + 2</textarea><div id="findPanel" role="search" aria-label="Source find and replace"><label for="findQuery">Find</label><input id="findQuery" type="text" maxlength="256" aria-label="Find literal text"><label for="replaceText">Replace</label><input id="replaceText" type="text" maxlength="10000" aria-label="Replacement text"><label><input id="findCase" type="checkbox"> Match case</label><button id="findPrevious" type="button">Previous</button><button id="findNext" type="button">Next</button><button id="replaceOne" type="button">Replace</button><button id="replaceAll" type="button">Replace all</button><span id="findStatus" role="status" aria-live="polite">Ctrl+F to find; Ctrl+H to replace.</span></div><div id="completions" role="region" aria-label="Source completion suggestions" style="max-height:9rem;overflow:auto;padding:0 .5rem"></div></section>
-<section aria-label="Environment"><h2>Environment</h2><div id="environment" class="muted">Python runs entirely in a Web Worker using Pyodide. The runtime downloads on first use.</div><div class="workspace-tools"><input id="packageName" type="text" aria-label="Python or R package name" placeholder="package==version" maxlength="120"><button id="installPackage" type="button">Install package</button><button id="listPackages" type="button">List packages</button></div><div id="packages" role="region" aria-label="Installed language packages" style="overflow:auto;max-height:40%"></div><div class="workspace-tools" role="group" aria-label="Transfer plain Python and R variables"><label for="transferDirection">Transfer</label><select id="transferDirection" aria-label="Variable transfer direction"><option value="python-to-r">Python → R</option><option value="r-to-python">R → Python</option></select><label for="transferSource">Source variable</label><input id="transferSource" type="text" maxlength="80" placeholder="x" aria-label="Source variable name"><label for="transferDestination">Destination variable</label><input id="transferDestination" type="text" maxlength="80" placeholder="same name" aria-label="Destination variable name (optional)"><button id="transferVariable" type="button" title="Copy a bounded plain scalar or atomic vector; no shared object references">Copy variable</button></div></section>
+<section aria-label="Environment"><h2>Environment</h2><div id="environment" class="muted">Python runs entirely in a Web Worker using Pyodide. The runtime downloads on first use.</div><div class="workspace-tools"><input id="packageName" type="text" aria-label="Python or R package name" placeholder="package==version" maxlength="120"><button id="installPackage" type="button">Install package</button><button id="listPackages" type="button">List packages</button></div><div id="packages" role="region" aria-label="Installed language packages" style="overflow:auto;max-height:40%"></div><div class="workspace-tools" role="group" aria-label="Transfer plain Python and R variables"><label for="transferDirection">Transfer</label><select id="transferDirection" aria-label="Variable transfer direction"><option value="python-to-r">Python → R</option><option value="r-to-python">R → Python</option></select><label for="transferSource">Source variable</label><input id="transferSource" type="text" maxlength="80" placeholder="x" aria-label="Source variable name"><label for="transferDestination">Destination variable</label><input id="transferDestination" type="text" maxlength="80" placeholder="same name" aria-label="Destination variable name (optional)"><button id="transferVariable" type="button" title="Copy a bounded plain scalar or atomic vector; no shared object references">Copy variable</button></div><div class="workspace-tools" role="group" aria-label="Export and import supported browser session values"><button id="exportSession" type="button">Export session values</button><button id="importSession" type="button">Import session values</button><input id="sessionFile" type="file" accept=".json,application/json" hidden><span class="muted">Explicit local JSON snapshot of plain Python/R scalars and vectors only; unsupported objects are omitted.</span></div></section>
 <section aria-label="Console"><h2>Interactive console</h2><label for="consoleLanguage">Console language</label><select id="consoleLanguage" aria-label="Console language"><option value="python">Python (browser)</option><option value="r">R (browser)</option><option value="flow">Flow (native localhost)</option></select><pre id="console" role="log" aria-live="polite">Ready. Python and R run locally in your browser; Flow runs when this workspace is served by native FlowStudio.</pre><textarea id="consoleInput" aria-label="Python console input" placeholder="Python expression or statement" spellcheck="false"></textarea><div id="consoleActions"><span class="muted">Enter: execute · Shift+Enter: newline · ↑: history</span><button id="submitConsole" type="button">Execute</button></div></section>
 <section aria-label="Data and plots"><h2>Plots and data</h2><div class="workspace-tools"><label for="previewfile">Open image</label><input id="previewfile" type="file" accept=".png,.jpg,.jpeg,.webp"><button id="dataViewer" type="button">Open CSV/TSV viewer</button><label for="helpQuery">Help topic</label><input id="helpQuery" type="text" maxlength="120" placeholder="len / stats::lm" aria-label="Installed Python or R help topic"><button id="lookupHelp" type="button">Help</button></div><div id="workspace"><p class="muted">Local-only plots and tabular data.</p></div></section>
 </main>
@@ -44,6 +44,7 @@ x + 2</textarea><div id="findPanel" role="search" aria-label="Source find and re
 <script src="./source_cells.js"></script>
 <script src="./console_repl.js"></script>
 <script src="./variable_transfer.js"></script>
+<script src="./session_snapshot.js"></script>
 <script src="./r_session.js"></script>
 <script src="./native_flow.js"></script>
 <script src="./python_trace_view.js"></script>
@@ -417,6 +418,25 @@ FlowStudioVariableTransfer.create({
     const inspection = language === "r" ? await getRSession().inspect() : await request("inspect");
     if (inspection.ok) renderEnvironment(inspection.variables);
   }
+});
+FlowStudioSessionSnapshot.create({
+  exportButton:$("exportSession"), importButton:$("importSession"), fileInput:$("sessionFile"),
+  language:()=> $("language").value, generation:()=>sessionGeneration,
+  isBusy:()=>busy || !!notebookRunner?.isRunning(), setBusy, notice,
+  inspect:lang=>lang==="r" ? getRSession().inspect() : request("inspect"),
+  exportValue:(lang,name)=>lang==="r" ? getRSession().exportVariable(name) : request("export",name),
+  importValue:(lang,name,value)=>lang==="r" ? getRSession().importVariable(name,value) : request("import",name,value),
+  refresh:async lang=>{
+    const result=lang==="r" ? await getRSession().inspect() : await request("inspect");
+    if (result.ok && $("language").value===lang) renderEnvironment(result.variables,result.truncated);
+  },
+  download:(text,name)=>{
+    const url=URL.createObjectURL(new Blob([text],{type:"application/json;charset=utf-8"}));
+    const anchor=document.createElement("a");
+    anchor.href=url; anchor.download=name; anchor.click();
+    setTimeout(()=>URL.revokeObjectURL(url),2000);
+  },
+  confirmOverwrite:message=>window.confirm(message)
 });
 const consoleREPL = FlowStudioConsoleREPL.create({input:$("consoleInput"), button:$("submitConsole"),
   languageSelect:$("consoleLanguage"), submit:(code, language)=>run(false, false, code, language), notice});

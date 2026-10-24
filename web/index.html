@@ -604,6 +604,35 @@ function showPythonEnvironmentMessage(message) {
   p.textContent = message;
   pane.replaceChildren(p);
 }
+// Only exact built-in Python containers are supplied by the native kernel.
+// Render their bounded metadata tree as inert text; never interpret names as code.
+function renderPythonEnvironmentChild(item, depth) {
+  if (!item || typeof item.name !== "string" || typeof item.type !== "string" ||
+      depth > 2 || item.name.length > 160 || item.type.length > 100) return null;
+  const li = document.createElement("li");
+  const size = Number.isSafeInteger(item.size) && item.size >= 0 ?
+    " (" + item.size + ")" : "";
+  const label = item.name + " : " + item.type + size +
+    (item.cycle === true ? " [cycle]" : "") +
+    (item.truncated === true ? " [partial]" : "");
+  const children = Array.isArray(item.children) && item.children.length <= 12 &&
+    depth < 2 ? item.children : [];
+  if (children.length) {
+    const details = document.createElement("details");
+    const summary = document.createElement("summary");
+    summary.textContent = label;
+    const list = document.createElement("ul");
+    for (const child of children) {
+      const element = renderPythonEnvironmentChild(child, depth + 1);
+      if (element) list.append(element);
+    }
+    details.append(summary, list);
+    li.append(details);
+  } else {
+    li.textContent = label;
+  }
+  return li;
+}
 async function refreshPythonEnvironment() {
   const revision = ++environmentRevision;
   const selectedLanguage = language.value;
@@ -655,6 +684,22 @@ async function refreshPythonEnvironment() {
       const cell = document.createElement("td");
       cell.textContent = value;
       row.append(cell);
+    }
+    if (selectedLanguage === "python" && Array.isArray(variable.children) &&
+        variable.children.length > 0 && variable.children.length <= 12) {
+      const list = document.createElement("ul");
+      for (const child of variable.children) {
+        const element = renderPythonEnvironmentChild(child, 1);
+        if (element) list.append(element);
+      }
+      if (list.childNodes.length) {
+        const details = document.createElement("details");
+        const summary = document.createElement("summary");
+        summary.textContent = variable.name + " — expand children" +
+          (variable.truncated === true ? " (partial)" : "");
+        details.append(summary, list);
+        row.firstChild.replaceChildren(details);
+      }
     }
     table.append(row);
   }

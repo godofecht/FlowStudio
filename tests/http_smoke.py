@@ -86,6 +86,18 @@ def main() -> None:
     assert status == 200, (status, snapshot)
     variables = {item["name"]: item for item in json.loads(snapshot)["variables"]}
     assert variables["flowstudio_persistent"]["type"] == "int", variables
+    status, output = request("POST", "/api/run/python",
+                             "flowstudio_nested = {'numbers': [1, 2, 3], 'meta': {'ok': True}}",
+                             accepted_headers)
+    assert status == 200, (status, output)
+    status, snapshot = request("POST", "/api/inspect/python", "", accepted_headers)
+    assert status == 200, (status, snapshot)
+    nested = next(item for item in json.loads(snapshot)["variables"]
+                  if item["name"] == "flowstudio_nested")
+    assert nested["type"] == "dict" and nested["size"] == 2, nested
+    assert nested["children"][0]["name"] == '["numbers"]', nested
+    assert [item["type"] for item in nested["children"][0]["children"]] == [
+        "int", "int", "int"], nested
     status, _ = request("POST", "/api/inspect/python", "")
     assert status == 404, status
     status, output = request("POST", "/api/run/python",

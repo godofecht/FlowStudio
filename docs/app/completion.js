@@ -58,7 +58,7 @@ function flowSymbols(source, cursor, prefix) {
       if (masked[end] === "{") depth++;
       else if (masked[end] === "}") depth--;
     }
-    if (cursor <= end && (!active || open > active.open)) active = {open, parameters:match[1]};
+    if (cursor < end && (!active || open > active.open)) active = {open, parameters:match[1]};
   }
   if (active) {
     for (const match of active.parameters.matchAll(/(?:^|,)\s*([A-Za-z_][A-Za-z0-9_]*)\s*:/g))

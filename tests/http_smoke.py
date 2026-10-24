@@ -239,6 +239,29 @@ def main() -> None:
     assert request("POST", "/api/debug/python/finish", "",
                    {"X-FlowStudio-Intent": "run", "Origin": "http://attacker.invalid"})[0] == 404
 
+    # Conditional breakpoints run in real CPython through Flow's HTTP router.
+    # They inspect exact numeric locals only, without evaluating expressions.
+    conditional_source = ("for condition_i in range(5):\\n"
+                          "    condition_seen = condition_i\\n"
+                          "print(condition_seen)\\n")
+    status, payload = request("POST", "/api/debug/python/start",
+                              json.dumps({"source": conditional_source,
+                                          "breakpoints": [{"line": 2, "condition": "condition_i>=3"}]}),
+                              accepted_headers)
+    conditional = json.loads(payload)
+    assert status == 200 and conditional["state"] == "paused", (status, payload)
+    assert conditional["stack"][0]["locals"]["condition_i"]["value"] == "3", payload
+    status, payload = request("POST", "/api/debug/python/continue", "", accepted_headers)
+    assert status == 200 and json.loads(payload)["stack"][0]["locals"]["condition_i"]["value"] == "4", (status, payload)
+    status, payload = request("POST", "/api/debug/python/continue", "", accepted_headers)
+    assert status == 200 and json.loads(payload)["state"] == "done", (status, payload)
+    assert "4" in json.loads(payload)["output"], payload
+    status, payload = request("POST", "/api/debug/python/start",
+                              json.dumps({"source": "x = 1\\n",
+                                          "breakpoints": [{"line": 1, "condition": "__import__('os')"}]}),
+                              accepted_headers)
+    assert status == 422 and not json.loads(payload)["ok"], (status, payload)
+
     # A single Python kernel retains variables between HTTP requests.
     status, output = request("POST", "/api/run/python",
                              "flowstudio_persistent = 40 + 2", accepted_headers)

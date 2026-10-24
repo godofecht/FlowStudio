@@ -309,6 +309,90 @@ function send_git_write(kind: string, value: string) -> void {
     fs_reply(200, "text/plain; charset=utf-8", output)
 }
 
+# Branch operations target only the native server working tree. Git validates
+# ref names, argv is fixed, and checkout refuses dirty tracked or untracked files.
+function send_git_branch(kind: string, name: string) -> void {
+    if not eq(kind, "list") and (eq(name, "") or strlen(name) > 128) {
+        fs_reply(400, "text/plain; charset=utf-8", "Branch name must contain 1 to 128 bytes.")
+        return
+    }
+    if eq(kind, "switch") {
+        let dirty: ptr<ProcCmd> = proc_cmd("git")
+        proc_arg(dirty, "-c")
+        proc_arg(dirty, "core.fsmonitor=false")
+        proc_arg(dirty, "--no-optional-locks")
+        proc_arg(dirty, "status")
+        proc_arg(dirty, "--porcelain")
+        proc_arg(dirty, "--untracked-files=normal")
+        proc_timeout_ms(dirty, 5000)
+        let state: ptr<ProcResult> = proc_run(dirty)
+        if state.timed_out {
+            fs_reply(504, "text/plain; charset=utf-8", "Git working-tree check timed out.")
+            return
+        }
+        if not eq(state.error, "") {
+            fs_reply(503, "text/plain; charset=utf-8", "Git unavailable: " + state.error)
+            return
+        }
+        if state.exit_code != 0 {
+            fs_reply(422, "text/plain; charset=utf-8", "Git working-tree check failed: " + state.stderr)
+            return
+        }
+        if not eq(state.stdout, "") {
+            fs_reply(409, "text/plain; charset=utf-8", "Commit, stash or remove all working-tree changes and untracked files before switching branches.")
+            return
+        }
+    }
+    let command: ptr<ProcCmd> = proc_cmd("git")
+    proc_arg(command, "-c")
+    proc_arg(command, "core.fsmonitor=false")
+    proc_arg(command, "-c")
+    proc_arg(command, "core.hooksPath=/dev/null")
+    if eq(kind, "list") {
+        proc_arg(command, "branch")
+        proc_arg(command, "--list")
+        proc_arg(command, "--no-color")
+    } else {
+        if eq(kind, "create") {
+            proc_arg(command, "branch")
+            proc_arg(command, "--")
+            proc_arg(command, name)
+        } else {
+            proc_arg(command, "switch")
+            proc_arg(command, "--no-guess")
+            proc_arg(command, "--")
+            proc_arg(command, name)
+        }
+    }
+    proc_timeout_ms(command, 10000)
+    let result: ptr<ProcResult> = proc_run(command)
+    if result.timed_out {
+        fs_reply(504, "text/plain; charset=utf-8", "Git branch operation timed out.")
+        return
+    }
+    if not eq(result.error, "") {
+        fs_reply(503, "text/plain; charset=utf-8", "Git executable unavailable: " + result.error)
+        return
+    }
+    let mut output: string = result.stdout + result.stderr
+    if strlen(output) > 131072 {
+        fs_reply(413, "text/plain; charset=utf-8", "Git branch output exceeds 128 KiB.")
+        return
+    }
+    if result.exit_code != 0 {
+        fs_reply(422, "text/plain; charset=utf-8", "Git branch operation failed: " + output)
+        return
+    }
+    if eq(output, "") {
+        if eq(kind, "create") {
+            output = "Branch created: " + name
+        } else {
+            output = "Branch operation completed."
+        }
+    }
+    fs_reply(200, "text/plain; charset=utf-8", output)
+}
+
 function send_editor() -> void {
     let page: FileRead = io_read_text("web/index.html")
     if page.ok {
@@ -376,6 +460,18 @@ function dispatch() -> void {
         }
         if eq(path, "/api/git/commit") {
             send_git_write("commit", fs_body())
+            return
+        }
+        if eq(path, "/api/git/branches") {
+            send_git_branch("list", "")
+            return
+        }
+        if eq(path, "/api/git/branch/create") {
+            send_git_branch("create", fs_body())
+            return
+        }
+        if eq(path, "/api/git/branch/switch") {
+            send_git_branch("switch", fs_body())
             return
         }
         if eq(path, "/api/run/flow") {

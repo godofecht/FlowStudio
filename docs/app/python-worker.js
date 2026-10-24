@@ -257,7 +257,7 @@ async function handle(event) {
     }
     if (op === "inspect") {
       await prepareEnvironmentCapture(py);
-      const raw = await py.runPythonAsync("import json as _fs_json, flowstudio_environment_capture as _fs_environment_capture\\n_fs_json.dumps(_fs_environment_capture.capture(globals()), ensure_ascii=True, separators=(',', ':'))");
+      const raw = await py.runPythonAsync("import json as _fs_json, flowstudio_environment_capture as _fs_environment_capture\n_fs_json.dumps(_fs_environment_capture.capture(globals()), ensure_ascii=True, separators=(',', ':'))");
       if (typeof raw !== "string" || raw.length > 65536)
         throw Error("Python environment response exceeds 64 KiB.");
       const snapshot = validateEnvironmentSnapshot(JSON.parse(raw));

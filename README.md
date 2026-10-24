@@ -22,6 +22,22 @@ Run the additional pure-module tests with:
 
     node --test tests/editor_find.test.js
 
+## Browser Python/R symbol completion
+
+The GitHub Pages workspace and native-served `/app/` editor support
+**Ctrl+Space** or **Complete Ctrl+Space** to list real Python and R symbol
+names from the current interpreter session. Python names come from Pyodide's
+globals and builtins; R names come from the active webR search path. Choose
+a suggestion with keyboard Tab/Enter or click to insert it into the source
+editor. The request does not evaluate the prefix or run user expressions.
+Results are capped at 64 names and stale responses are ignored.
+
+This is identifier-prefix completion only: member/attribute completion,
+Flow completion, function signatures and LSP integration remain missing.
+The legacy native `web/index.html` editor does not yet expose this UI.
+Runtime acceptance in physical browsers is pending; see
+`docs/PARITY.md`.
+
 ## Sequential Flow notebooks (native server)
 
 The browser workspace at `http://127.0.0.1:8751/app/` can now run all

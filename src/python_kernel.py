@@ -13,7 +13,6 @@ import os
 import sys
 import traceback
 
-from python_trace import trace_source
 
 MAX_SOURCE = 131072
 MAX_OUTPUT = 131072
@@ -180,6 +179,9 @@ def serve() -> None:
                 ok = False
                 payload = b'{"ok":false,"output":"Invalid UTF-8 source","events":[],"truncated":false}'
             else:
+                # Loaded only for tracing: regular kernel imports and inspection
+                # remain usable when this file is imported via spec_from_file_location.
+                from python_trace import trace_source
                 ok, payload = trace_source(source, namespace, LimitedWriter())
         else:
             output = LimitedWriter()

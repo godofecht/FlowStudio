@@ -98,11 +98,15 @@ test("generated inspector runs under real Rscript, avoids active bindings and bo
     'df <- data.frame(x=1:2, y=c("a","b"))',
     'object <- structure(list(secret=7), class="custom")',
     'tripped <- FALSE',
+    'head <- function(...) stop("masked head executed")',
+    'ls <- function(...) stop("masked ls executed")',
+    'paste <- function(...) stop("masked paste executed")',
+    'bindingIsActive <- function(...) stop("masked binding check executed")',
     'makeActiveBinding("trap", function() { assign("tripped", TRUE, envir=.GlobalEnv); stop("active binding invoked") }, .GlobalEnv)',
     'delayedAssign("broken", stop("lazy binding failure"), assign.env=.GlobalEnv)'
   ].join("\n");
   const program = setup + "\n._fs_rows <- " + INSPECT +
-    '\ncat(paste(._fs_rows, collapse="\\n"), "\\n")' +
+    '\ncat(base::paste(._fs_rows, collapse="\\n"), "\\n")' +
     '\ncat(if (tripped) "ACTIVE_CALLED" else "ACTIVE_SAFE", "\\n")';
   const proc = spawnSync("Rscript", ["--vanilla", "-e", program],
     {encoding:"utf8", timeout:30000, maxBuffer:1024*1024});

@@ -203,7 +203,7 @@ function renderEnvironment(variables, truncated = false) {
     else valueCell.textContent = String(variable.preview) + (variable.truncated ? " (truncated)" : "");
     row.append(valueCell);
     const action = document.createElement("td");
-    if (/(DataFrame|ndarray|list|tuple|data\\.frame|matrix|array)/i.test(String(variable.type))) {
+    if (/(DataFrame|ndarray|list|tuple|data\.frame|matrix|array)/i.test(String(variable.type))) {
       const view = document.createElement("button");
       view.type = "button";
       view.textContent = "View";

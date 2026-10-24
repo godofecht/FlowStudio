@@ -241,9 +241,9 @@ def main() -> None:
 
     # Conditional breakpoints run in real CPython through Flow's HTTP router.
     # They inspect exact numeric locals only, without evaluating expressions.
-    conditional_source = ("for condition_i in range(5):\\n"
-                          "    condition_seen = condition_i\\n"
-                          "print(condition_seen)\\n")
+    conditional_source = ("for condition_i in range(5):\n"
+                          "    condition_seen = condition_i\n"
+                          "print(condition_seen)\n")
     status, payload = request("POST", "/api/debug/python/start",
                               json.dumps({"source": conditional_source,
                                           "breakpoints": [{"line": 2, "condition": "condition_i>=3"}]}),
@@ -257,7 +257,7 @@ def main() -> None:
     assert status == 200 and json.loads(payload)["state"] == "done", (status, payload)
     assert "4" in json.loads(payload)["output"], payload
     status, payload = request("POST", "/api/debug/python/start",
-                              json.dumps({"source": "x = 1\\n",
+                              json.dumps({"source": "x = 1\n",
                                           "breakpoints": [{"line": 1, "condition": "__import__('os')"}]}),
                               accepted_headers)
     assert status == 422 and not json.loads(payload)["ok"], (status, payload)

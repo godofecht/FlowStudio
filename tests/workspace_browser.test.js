@@ -358,6 +358,29 @@ test("Run cell sends only the active percent cell through execution API", async 
   assert.equal(app.fetches[0].options.body, "print('two')\n");
   assert.match(app.el("console").textContent, /\[cell 2\/2\]/);
 });
+test("Run Cell keeps Python multiline string markers inside the same execution", async () => {
+  const app = workspace(directory("empty"));
+  app.el("language").value = "python";
+  const source = 'message = """first\\n# %% literal\\nlast"""\\nprint(message)\\n# %%\\nprint("next")\\n';
+  app.el("source").value = source;
+  app.el("source").setSelectionRange(source.indexOf("literal"), source.indexOf("literal"));
+  await app.el("runCell").fire("click");
+  assert.equal(app.fetches.length, 1);
+  assert.equal(app.fetches[0].url, "/api/run/python");
+  assert.equal(app.fetches[0].options.body, 'message = """first\\n# %% literal\\nlast"""\\nprint(message)\\n');
+  assert.match(app.el("console").textContent, /\\[cell 1\\/2\\]/);
+});
+test("Run Cell preserves R multiline strings and CR-only source boundaries", async () => {
+  const app = workspace(directory("empty"));
+  app.el("language").value = "r";
+  const source = 'x <- "start\\r# %% literal\\rend"\\r# %%\\rprint(x)\\r';
+  app.el("source").value = source;
+  app.el("source").setSelectionRange(source.indexOf("literal"), source.indexOf("literal"));
+  await app.el("runCell").fire("click");
+  assert.equal(app.fetches.length, 1);
+  assert.equal(app.fetches[0].url, "/api/run/r");
+  assert.equal(app.fetches[0].options.body, 'x <- "start\\r# %% literal\\rend"\\r');
+});
 test("Markdown and empty cells never execute", async () => {
   const app = workspace(directory("empty"));
   app.el("source").value = "# %% [markdown]\n# Title\n# %%\n";

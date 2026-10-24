@@ -15,7 +15,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Persistent REPL/session | partial / browser Pyodide/webR sessions; native Python process retention and reset added (local C harness and cross-platform Flow HTTP CI passed); native R persistent kernel passed real Rscript and Flow-owned HTTP acceptance on Linux/macOS CI | Incremental variables and package state persist until reset |
 | Interactive multi-language console | partial / Python and R browser sessions plus stateless native Flow full-program execution wired; per-language histories and unsent drafts implemented; 427/427 JS tests per platform and native Flow/HTTP CI passed on Ubuntu/macOS; live physical-browser acceptance pending | Console can execute selected Python/R/Flow independently of source editor; preserve Python/R state, histories and drafts; report Flow native-only limits and execution failures |
 | Explicit Python/R variable transfer | partial / bounded plain scalar and atomic-vector copy wired; real CPython/Rscript query tests and native Flow HTTP accepted on Ubuntu/macOS CI; physical-browser Pyodide/webR round-trip unverified | Copy typed scalars/vectors both ways between persistent runtimes, reject unsupported objects/NA/NaN and active bindings, verify independent real-browser and cross-platform execution |
-| Variable inspector | partial / native Python and R bounded metadata snapshots cross-platform HTTP accepted; native Python exact-builtin nested metadata tree cross-platform CI accepted (unit/HTTP/DOM); R array dimensions and failed-lazy-binding recovery cross-platform HTTP accepted; browser R bounded two-level plain-list tree and active-binding protection implemented in PR #30 (validation pending); arbitrary-object inspection and physical-browser acceptance missing | Nested objects / types / dimensions inspectable and refresh after execution |
+| Variable inspector | partial / native Python and R bounded metadata snapshots cross-platform HTTP accepted; native Python exact-builtin nested metadata tree cross-platform CI accepted (unit/HTTP/DOM); R array dimensions and failed-lazy-binding recovery cross-platform HTTP accepted; browser R bounded two-level plain-list tree and active-binding protection accepted by Ubuntu/macOS CI #40090303070 (real Rscript, Node, native Flow/HTTP); arbitrary-object inspection and physical-browser acceptance missing | Nested objects / types / dimensions inspectable and refresh after execution |
 | Plot viewer | partial / Node-tested PNG import and integrated workspace tab; native unverified | png/svg plot history, zoom, save and deterministic device lifecycle |
 | Project explorer | partial / browser Pages open/create/save and confirmed active-file delete with baseline conflict checks; 10 regression tests V8-shim passed; physical-browser deletion unverified | Open project, tree navigation, source-file creation and save; scoped delete is implemented, copy-verify-delete rename implemented with non-atomic filesystem race limits; physical-browser acceptance remains missing |
 | Data viewer | partial / CSV/TSV plus bounded Python/R environment table snapshots wired; real Pyodide/webR and physical browser unverified | Interactive sortable/filterable tabular datasets including missing values |
@@ -50,11 +50,14 @@ as unavailable rather than aborting the entire snapshot. The Pages and native
 text-only details, and report truncation. The R execution and Flow-owned
 native routing architecture are unchanged.
 
-**Status: implemented, not yet cross-platform accepted.** New Node tests
-exercise nesting, bounds, malformed responses, active-binding guards and DOM
-rendering. The native verification script additionally requires a real
-`Rscript` run of the exact browser-generated query on Linux and macOS;
-no Rscript or physical-browser webR execution has been run locally.
+**Status: partial / cross-platform CI accepted; physical-browser execution pending.**
+[PR #30](https://github.com/godofecht/FlowStudio/pull/30) passed all four
+jobs in [CI #40090303070](https://github.com/godofecht/FlowStudio/actions/runs/40090303070)
+on Ubuntu 24.04 and macOS 14, including Node DOM/parser regression suites,
+real Rscript execution of the exact generated inspector query, active-binding
+and masked-global protections, native Flow compilation, HTTP acceptance and
+packaging. Merged as [899f4cf](https://github.com/godofecht/FlowStudio/commit/899f4cfa158713165674163a41a698c100fb8d09).
+No physical Chromium/Safari webR execution has been independently verified.
 Inspection still may force lazy promises, which can have side effects;
 it does not implement arbitrary object traversal or full RStudio parity.
 

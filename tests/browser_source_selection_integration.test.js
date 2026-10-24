@@ -10,6 +10,7 @@ const script = html.match(/<script>\s*([\s\S]*?)<\/script>/)[1];
 const moduleSource = fs.readFileSync(path.join(base, "source_selection.js"), "utf8");
 const cellSource = fs.readFileSync(path.join(base, "source_cells.js"), "utf8");
 const consoleSource = fs.readFileSync(path.join(base, "console_repl.js"), "utf8");
+const transferScript = fs.readFileSync(path.join(base, "variable_transfer.js"), "utf8");
 const draftSource = fs.readFileSync(path.join(base, "draft_storage.js"), "utf8");
 const recoverySource = fs.readFileSync(path.join(base, "notebook_recovery.js"), "utf8");
 const projectSource = fs.readFileSync(path.join(base, "project.js"), "utf8");
@@ -55,6 +56,7 @@ function fixture(initialDraft = null) {
   vm.runInNewContext(saveSource, context);
   vm.runInNewContext(projectWorkspaceSource, context);
   vm.runInNewContext(consoleSource, context);
+  vm.runInNewContext(transferScript, context);
   vm.runInNewContext(script, context);
   const recovered = {source:element("source").value, filename:element("filename").textContent, language:element("language").value};
   const source = element("source");

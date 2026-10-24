@@ -113,6 +113,9 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/app/help_panel.js" {
         return StaticAsset { path: "docs/app/help_panel.js", mime: "text/javascript; charset=utf-8", found: true }
     }
+    if url == "/app/git_panel.js" {
+        return StaticAsset { path: "docs/app/git_panel.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
     if url == "/app/native_flow.js" {
         return StaticAsset { path: "docs/app/native_flow.js", mime: "text/javascript; charset=utf-8", found: true }
     }

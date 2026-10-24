@@ -22,7 +22,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Data viewer | partial / CSV/TSV plus bounded Python/R environment table snapshots wired; real Pyodide/webR and physical browser unverified | Interactive sortable/filterable tabular datasets including missing values |
 | Completion / language server | partial / browser Python/R runtime prefix completion cross-platform CI accepted; Flow lexical completion accepted by Ubuntu/macOS CI; explicit-type Flow struct and evolution-state member completion cross-platform CI accepted (#40095770668, 473 JS passes, 2 skips per platform, native Flow/HTTP accepted); physical-browser verification pending; full semantic/LSP completion missing | R, Flow and Python completion/diagnostics |
 | Packages pane | partial / browser Python inventory/install and webR 0.6.0 inventory/install; mocked Node tests, live interpreters unverified | List, install, update with environment-aware package sources |
-| Git pane | missing | Status, diff, stage, commit and branch operations |
+| Git pane | partial / Flow-owned native read-only working-tree status and unstaged diff; Node tests local, native Flow/HTTP and physical-browser acceptance pending; stage/commit/branch missing | Status, diff, stage, commit and branch operations |
 | Help pane | partial / browser Python live-global/builtin docstrings and installed R Rd help wired; Node/V8 contract tests, live Pyodide/webR and physical browser unverified; Flow help missing | Context-aware language/function docs |
 | Find / replace / cross-file search | partial / Node + V8-tested | Literal in-buffer find next/previous, single/all replacement and project-wide search implemented; incremental indexing, regex and physical-browser verification missing |
 | Percent-delimited source cells | partial / lexical scanner unified across native editor and Pages, Node/HTTP acceptance pending; physical-browser execution unverified | Run only the active `# %%` code cell in Flow/R/Python; markdown and empty cells do not execute |
@@ -361,7 +361,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Completion / language server | partial / browser Python AST and R parse-only syntax diagnostics; browser Python/R global-symbol prefix completion implemented with bounded interpreter namespace enumeration and keyboard insertion, pending cross-platform CI and physical-browser verification; native Flow strict compile-only diagnostics; Flow completion and member-aware completion missing | R, Flow and Python completion/diagnostics |
 | Document outline | partial / browser line-scan symbol list for Flow, Python and R wired into the workspace with click-to-symbol; Node suites passed in Linux x86-64 and macOS arm64 CI, and a headless-Chromium CDP run exercised click, shortcut, keyboard and document-switch navigation locally; physical-browser acceptance missing | List buffer symbols, navigate to them, and keep the outline in sync with the active buffer |
 | Packages pane | partial / browser Python inventory/install and webR 0.6.0 inventory/install; mocked Node tests, live interpreters unverified | List, install, update with environment-aware package sources |
-| Git pane | missing | Status, diff, stage, commit and branch operations |
+| Git pane | partial / Flow-owned native read-only working-tree status and unstaged diff; Node tests local, native Flow/HTTP and physical-browser acceptance pending; stage/commit/branch missing | Status, diff, stage, commit and branch operations |
 | Help pane | partial / browser Python live-global/builtin docstrings and installed R Rd help wired; Node/V8 contract tests, live Pyodide/webR and physical browser unverified; Flow help missing | Context-aware language/function docs |
 | Find / replace / cross-file search | partial / Node + V8-tested | Literal in-buffer find next/previous, single/all replacement and project-wide search implemented; incremental indexing, regex and physical-browser verification missing |
 | Percent-delimited source cells | partial / browser Python Run Cell integrated; Node and real-browser validation pending; Flow browser execution unavailable; browser R unverified | Run only the active `# %%` code cell in Flow/R/Python; markdown and empty cells do not execute |
@@ -802,3 +802,19 @@ This is not full RStudio environment inspection parity.
 ## 2026-10-24: source-local typed Flow member completion (cross-platform CI accepted)
 
 The browser editor now offers Ctrl/Command+Space completion for fields on explicitly typed Flow `struct` variables and accessible `flow` evolution state members. It recognises typed function parameters, module bindings and `let`/`let mut` locals, including lexical shadowing; unknown and inferred receiver types intentionally return no member suggestions. The implementation uses the actual Flow 2.x struct/state syntax, without invoking Python/R or claiming compiler-backed inference. Ten focused and pre-existing completion tests passed in a V8 execution harness. PR #32 was merged as b1089665bad127c7726d1ccb9b434f606feb2177 after [CI #40095770668](https://github.com/godofecht/FlowStudio/actions/runs/40095770668) completed all four jobs successfully: Ubuntu 24.04 and macOS 14 each recorded **473 JavaScript passes, 2 skips and zero failures**, plus native Flow compilation, HTTP acceptance and packaging. **Physical Chromium with real Pyodide/webR is still unverified.** This remains **partial**, not RStudio parity.
+
+## 2026-10-24: native Git status and diff (acceptance pending)
+
+FlowStudio's Flow-owned localhost server exposes fixed-argv, read-only
+`POST /api/git/status` and `POST /api/git/diff` endpoints for the server
+working tree, **not** the browser-selected folder. The browser IDE has a
+collapsible Git pane. Hosted Pages disables the controls. Requests require
+the existing intent and origin checks. Git status disables filesystem
+monitor hooks; diff disables external drivers and text conversion.
+Both commands have five-second deadlines and 128 KiB response limits.
+
+**Status: partial / native acceptance pending.** Local Node tests exercise
+the pane's disabled, success, error and concurrent-request paths. Native
+Flow compilation, HTTP fixture acceptance, cross-platform CI and physical
+browser interactions remain unverified. Staging, commits, branches, remote
+Git and project-folder selection remain missing. No RStudio parity claim.

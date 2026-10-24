@@ -10,6 +10,8 @@ from __future__ import annotations
 import json
 import socket
 import shutil
+from pathlib import Path
+import uuid
 import urllib.error
 import urllib.request
 
@@ -93,6 +95,27 @@ def main() -> None:
     assert status == 404, status
 
     accepted_headers = {"X-FlowStudio-Intent": "run"}
+    # Native Git routes are read-only and enforce the existing intent/origin gate.
+    assert request("GET", "/api/git/status")[0] == 404
+    assert request("POST", "/api/git/status", "")[0] == 404
+    assert request("POST", "/api/git/diff", "")[0] == 404
+    assert request("POST", "/api/git/status", "",
+                   {"X-FlowStudio-Intent": "run", "Origin": "http://attacker.invalid"})[0] == 404
+    status, git_client = request("GET", "/app/git_panel.js")
+    assert status == 200 and "FlowStudioGitPanel" in git_client
+    assert 'id="gitRefresh"' in browser and 'id="gitDiff"' in browser
+    if shutil.which("git"):
+        probe = Path(__file__).resolve().parents[1] / ("flowstudio_git_probe_" + uuid.uuid4().hex + ".txt")
+        try:
+            probe.write_text("native Git status acceptance\\n", encoding="utf-8")
+            git_code, git_text = request("POST", "/api/git/status", "", accepted_headers)
+            assert git_code == 200 and probe.name in git_text, (git_code, git_text)
+            diff_code, diff_text = request("POST", "/api/git/diff", "", accepted_headers)
+            assert diff_code == 200 and "fatal:" not in diff_text, (diff_code, diff_text)
+        finally:
+            probe.unlink(missing_ok=True)
+    else:
+        assert request("POST", "/api/git/status", "", accepted_headers)[0] == 503
     status, _ = request(
         "POST", "/api/run/python", 'print("bad")',
         {"X-FlowStudio-Intent": "run", "Origin": "http://attacker.invalid"},

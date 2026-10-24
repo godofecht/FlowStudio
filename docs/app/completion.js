@@ -223,7 +223,8 @@ function create({source, button, target, language, python, r, generation, isBusy
       const matches = [...new Set(response.items)].sort().slice(0, MAX_ITEMS);
       if (!matches.length) { notice("No matching symbols."); return true; }
       const heading = document.createElement("p");
-      heading.textContent = matches.length + " completion suggestions for " + range.prefix;
+      heading.textContent = matches.length + " completion suggestions for " +
+        (range.receiver ? range.receiver + "." + range.prefix : range.prefix);
       const list = document.createElement("div");
       list.setAttribute("role", "group");
       list.setAttribute("aria-label", "Completion suggestions");

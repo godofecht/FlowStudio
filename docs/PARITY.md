@@ -26,6 +26,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Help pane | partial / browser Python live-global/builtin docstrings and installed R Rd help wired; Node/V8 contract tests, live Pyodide/webR and physical browser unverified; Flow help missing | Context-aware language/function docs |
 | Find / replace / cross-file search | partial / Node + V8-tested | Literal in-buffer find next/previous, single/all replacement and project-wide search implemented; incremental indexing, regex and physical-browser verification missing |
 | Percent-delimited source cells | partial / lexical scanner unified across native editor and Pages, Node/HTTP acceptance pending; physical-browser execution unverified | Run only the active `# %%` code cell in Flow/R/Python; markdown and empty cells do not execute |
+| Portable mixed-language FlowStudio notebooks (`.fsnb`) | partial / source and display-only outputs round-trip in Node tests; cross-platform CI accepted in PR #33; physical-browser file interaction unverified | Import/export exact Flow/R/Python tagged source and bounded saved text/PNG results, verify physical-browser round-trip, no interpreter-state restoration claims |
 | Sequential percent-cell notebooks | partial / Python and R Run All wired with explicit per-cell Python/R/Flow language tags (cross-platform CI accepted; real browser pending); bounded browser-local text/Python PNG output recovery across reload; native and physical-browser acceptance unverified | Execute cells in order, retain interpreter state, show per-cell output and stop on error |
 | Jupyter `.ipynb` import/export | partial / browser UI wired and Node regression coverage; bounded output recovery is separate from `.ipynb` import/export; physical-browser file round-trip and live Python/R kernels unverified | Import/export nbformat 4 Python/R code and Markdown cells through file picker/download; validate with nbformat; preserve source; verify live outputs in Chromium and cross-platform acceptance |
 | R Markdown / Quarto | partial / offline HTML report export from Python/R percent-cell notebooks; no Quarto/R Markdown rendering | Render notebook with inline plots and HTML export; verify actual Quarto/R Markdown format compatibility |
@@ -35,6 +36,36 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Cross-platform packaging | missing | Installable signed/reproducible macOS and Linux releases |
 | Accessibility | partial / unverified | Full keyboard navigation, screen reader labels, resize and contrast checks |
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
+
+## 2026-10-24: portable mixed-language notebook files (cross-platform CI accepted)
+
+FlowStudio now supports a dedicated **`.fsnb` v1** JSON notebook file for
+portable, browser-local import/export of exact percent-cell source, default
+language, explicit Flow/R/Python cell tags, and previously captured bounded
+text/PNG outputs. The file is deliberately **not** presented as a
+single-kernel Jupyter `.ipynb`: mixed Flow/R/Python notebooks cannot be
+executed by an ordinary Jupyter kernel without additional language runtimes.
+Imported outputs are rendered as **saved results**, not re-executed.
+Interpreter variables, installed packages, active sessions and external files
+are **not** restored. Existing `.ipynb` support is unchanged.
+
+The codec validates format/version, exact schema keys, source/cell/result
+limits, unique ascending code-cell indices, matching runtime tags, bounded
+text and PNG payloads. It rejects malformed or oversized files before
+changing the editor. The same checked-in `docs/app/` modules are served by
+GitHub Pages and the Flow-owned native localhost asset router; native Flow
+compilation and HTTP execution routes are unchanged.
+
+**Status: partial / cross-platform CI accepted; physical-browser acceptance
+outstanding.** [PR #33](https://github.com/godofecht/FlowStudio/pull/33)
+passed [CI #40099804982](https://github.com/godofecht/FlowStudio/actions/runs/40099804982):
+all four jobs succeeded on Ubuntu 24.04 and macOS 14, with **480 Node tests
+passing, two skips and zero failures per platform**, plus real native Flow
+compilation, HTTP acceptance and packaging. Merged as
+[d55a059](https://github.com/godofecht/FlowStudio/commit/d55a059f4b693e84a00411ee1cb5eb4d70ef1098).
+No physical Chromium/Safari file-picker or real Pyodide/webR mixed-language
+execution has been independently validated. The file is not an execution
+environment snapshot, and broader RStudio notebook parity remains unmet.
 
 ## 2026-10-24: explicit browser Python/R session value snapshots (cross-platform CI accepted)
 

@@ -22,7 +22,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Data viewer | partial / CSV/TSV plus bounded Python/R environment table snapshots wired; real Pyodide/webR and physical browser unverified | Interactive sortable/filterable tabular datasets including missing values |
 | Completion / language server | partial / browser Python/R runtime prefix completion cross-platform CI accepted; Flow lexical completion accepted by Ubuntu/macOS CI; explicit-type Flow struct and evolution-state member completion cross-platform CI accepted (#40095770668, 473 JS passes, 2 skips per platform, native Flow/HTTP accepted); physical-browser verification pending; full semantic/LSP completion missing | R, Flow and Python completion/diagnostics |
 | Packages pane | partial / browser Python inventory/install and webR 0.6.0 inventory/install; mocked Node tests, live interpreters unverified | List, install, update with environment-aware package sources |
-| Git pane | partial / native Flow status, unstaged/staged diff, literal-path stage/commit cross-platform CI verified (#40109268078); selective unstage implemented in PR (native cross-platform acceptance pending); physical-browser and branch management missing | Status, diff, stage, unstage, commit and branch operations |
+| Git pane | partial / native Flow status, unstaged/staged diff, literal-path stage/commit CI #40109268078; selective unstage real-Git native/HTTP CI #40113113929 passed on Ubuntu/macOS (PR #36); physical-browser and branch management missing | Status, diff, stage, unstage, commit and branch operations |
 | Help pane | partial / browser Python live-global/builtin docstrings and installed R Rd help wired; Node/V8 contract tests, live Pyodide/webR and physical browser unverified; Flow help missing | Context-aware language/function docs |
 | Find / replace / cross-file search | partial / Node + V8-tested | Literal in-buffer find next/previous, single/all replacement and project-wide search implemented; incremental indexing, regex and physical-browser verification missing |
 | Percent-delimited source cells | partial / lexical scanner unified across native editor and Pages, Node/HTTP acceptance pending; physical-browser execution unverified | Run only the active `# %%` code cell in Flow/R/Python; markdown and empty cells do not execute |
@@ -38,7 +38,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
 
 
-## 2026-10-24: selective Git unstage (independent acceptance pending)
+## 2026-10-24: selective Git unstage (cross-platform native acceptance passed)
 
 The Flow-owned native Git backend now supports `POST /api/git/unstage` for a
 single literal relative path or subdirectory in the server working tree. The
@@ -51,8 +51,15 @@ reported rather than silently falling back to destructive index changes.
 The browser requires an explicit confirmation and disables the control on
 GitHub Pages. Automated tests cover client validation, the UI write lock,
 origin rejection and isolated real-Git staging/unstaging of tracked and newly
-added files. **Status: partial / implementation submitted; cross-platform
-native Flow and HTTP acceptance pending; physical-browser acceptance missing.**
+added files. **Status: partial / native acceptance passed; physical-browser acceptance
+missing.** [PR #36](https://github.com/godofecht/FlowStudio/pull/36)
+merged as [608efc6](https://github.com/godofecht/FlowStudio/commit/608efc61221917e99263801a208cac879acbcf39)
+after [CI #40113113929](https://github.com/godofecht/FlowStudio/actions/runs/40113113929)
+passed all four jobs on Ubuntu 24.04 and macOS 14. Each source/transport
+platform passed 492 Node tests, zero failures and two skips; native jobs
+compiled Flow 2.0.0, passed live HTTP acceptance and isolated real-Git
+selective unstage assertions for tracked and newly added paths. No physical
+Chromium/Safari Git interaction has been independently verified.
 
 ## 2026-10-24: native Git stage and commit (independent acceptance pending)
 

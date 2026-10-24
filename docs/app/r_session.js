@@ -41,20 +41,26 @@ const INSPECT = `local({
                  length(dimensions) <= 8L && all(!is.na(dimensions)) &&
                  all(dimensions >= 0L)) paste(dimensions, collapse=" x ") else ""
     classes <- attr(value, "class", exact=TRUE)
-    kind <- if (is.character(classes) && length(classes) > 0L)
+    kind <- if (is.character(classes) && length(classes) > 0L) {
       paste(head(classes, 3L), collapse="/")
-    else if (nzchar(shape)) paste0("matrix/array (", raw_type, ")")
-    else raw_type
+    } else if (nzchar(shape)) {
+      paste0("matrix/array (", raw_type, ")")
+    } else {
+      raw_type
+    }
     size <- if (plain && raw_type %in% c("logical", "integer", "double",
               "complex", "character", "raw", "list")) base::length(value) else NA_integer_
     preview <- if (!is.na(size) && size == 1L &&
                    is.null(attributes(value)) &&
                    raw_type %in% c("logical", "integer", "double", "character") &&
                    !is.na(value[1L]) &&
-                   (raw_type != "double" || is.finite(value[1L])))
+                   (raw_type != "double" || is.finite(value[1L]))) {
       substr(as.character(value[1L]), 1L, 120L)
-    else if (!is.na(size)) paste0(raw_type, " [", size, "]")
-    else paste0("<", raw_type, ">")
+    } else if (!is.na(size)) {
+      paste0(raw_type, " [", size, "]")
+    } else {
+      paste0("<", raw_type, ">")
+    }
     count <- if (depth < 2L && plain && identical(raw_type, "list"))
       min(size, 12L) else 0L
     more <- depth < 2L && plain && identical(raw_type, "list") && size > count

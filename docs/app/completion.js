@@ -75,6 +75,89 @@ function flowSymbols(source, cursor, prefix) {
   return {ok:true, items:[...names].sort().slice(0, MAX_ITEMS)};
 }
 
+/* Source-local Flow member completion for explicitly typed struct and flow state.
+ * Deliberately not an inferred type system or a replacement for flowc.
+ */
+function flowTypeFields(masked) {
+  const types = new Map();
+  for (const match of masked.matchAll(/\b(struct|flow)\s+([A-Za-z_]\w*)\s*\{/g)) {
+    const open = match.index + match[0].length - 1;
+    let depth = 1, end = open + 1;
+    for (; end < masked.length && depth > 0; end++) {
+      if (masked[end] === "{") depth++;
+      else if (masked[end] === "}") depth--;
+    }
+    if (depth) continue;
+    const body = masked.slice(open + 1, end - 1);
+    const fields = new Set();
+    if (match[1] === "struct") {
+      let start = 0, nesting = 0;
+      for (let i = 0; i <= body.length; i++) {
+        const ch = body[i];
+        if (ch === "{") nesting++;
+        else if (ch === "}") nesting--;
+        if (nesting === 0 && (i === body.length || ch === "," || ch === "\n")) {
+          const field = /^\s*([A-Za-z_]\w*)\s*:\s*[A-Za-z_]\w*/.exec(body.slice(start, i));
+          if (field && FLOW_NAME.test(field[1])) fields.add(field[1]);
+          start = i + 1;
+        }
+      }
+    } else {
+      for (const field of body.matchAll(/(?:^|[\r\n])\s*state\s+([A-Za-z_]\w*)\s*:/g))
+        if (FLOW_NAME.test(field[1])) fields.add(field[1]);
+    }
+    types.set(match[2], fields);
+  }
+  return types;
+}
+function flowBindingType(masked, cursor, receiver) {
+  // Ignore local declarations while collecting module-scope bindings.
+  const globals = new Map();
+  let depth = 0;
+  const bindings = /[{}]|\b(?:let|const)\s+(?:mut\s+)?([A-Za-z_]\w*)(?:\s*:\s*([A-Za-z_]\w*))?/g;
+  for (const token of masked.slice(0, cursor).matchAll(bindings)) {
+    if (token[0] === "{") depth++;
+    else if (token[0] === "}") depth = Math.max(0, depth - 1);
+    else if (depth === 0) globals.set(token[1], token[2] || null);
+  }
+  let active = null;
+  for (const match of masked.matchAll(/\bfunction\s+[A-Za-z_]\w*\s*\(([^)]*)\)[^{\n]*\{/g)) {
+    const open = match.index + match[0].length - 1;
+    if (open >= cursor) continue;
+    let nesting = 1, end = open + 1;
+    for (; end < masked.length && nesting > 0; end++) {
+      if (masked[end] === "{") nesting++;
+      else if (masked[end] === "}") nesting--;
+    }
+    if (cursor < end && (!active || open > active.open))
+      active = {open, parameters:match[1]};
+  }
+  if (!active) return globals.get(receiver) || null;
+  const params = new Map();
+  for (const match of active.parameters.matchAll(/(?:^|,)\s*([A-Za-z_]\w*)\s*:\s*([A-Za-z_]\w*)/g))
+    params.set(match[1], match[2]);
+  const scopes = [params];
+  for (const token of masked.slice(active.open + 1, cursor).matchAll(bindings)) {
+    if (token[0] === "{") scopes.push(new Map());
+    else if (token[0] === "}") { if (scopes.length > 1) scopes.pop(); }
+    else scopes[scopes.length - 1].set(token[1], token[2] || null);
+  }
+  for (let i = scopes.length - 1; i >= 0; i--)
+    if (scopes[i].has(receiver)) return scopes[i].get(receiver);
+  return globals.get(receiver) || null;
+}
+function flowMembers(source, cursor, receiver, prefix) {
+  if (typeof source !== "string" || source.length > MAX_FLOW_SOURCE ||
+      !Number.isSafeInteger(cursor) || cursor < 0 || cursor > source.length ||
+      !FLOW_NAME.test(receiver) || (prefix !== "" && !FLOW_NAME.test(prefix)))
+    return {ok:false, output:"Flow member completion supports buffers up to 256 KiB."};
+  const masked = maskFlow(source);
+  const type = flowBindingType(masked, cursor, receiver);
+  const fields = type ? flowTypeFields(masked).get(type) : null;
+  return {ok:true, items:fields ?
+    [...fields].filter(name => name.startsWith(prefix)).sort().slice(0, MAX_ITEMS) : []};
+}
+
 function prefixAt(source, language) {
   if (!source || typeof source.value !== "string" ||
       !Number.isSafeInteger(source.selectionStart) ||
@@ -82,6 +165,16 @@ function prefixAt(source, language) {
   const cursor = source.selectionStart;
   if (cursor < 0 || cursor > source.value.length) return null;
   const before = source.value.slice(0, cursor);
+  if (language === "flow") {
+    const member = before.match(/([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]{0,79})?$/);
+    if (member) {
+      const memberPrefix = member[2] || "";
+      const start = cursor - memberPrefix.length;
+      const receiverStart = start - member[1].length - 1;
+      if (maskFlow(before).slice(receiverStart) !== before.slice(receiverStart)) return null;
+      return {prefix:memberPrefix, start, cursor, receiver:member[1]};
+    }
+  }
   const match = before.match(language === "python" ?
     /([A-Za-z_][A-Za-z0-9_]{0,79})$/ :
     language === "r" ? /([A-Za-z.][A-Za-z0-9._]{0,79})$/ :
@@ -115,7 +208,8 @@ function create({source, button, target, language, python, r, generation, isBusy
     try {
       const response = selected === "python" ?
         await python(range.prefix) : selected === "r" ? await r(range.prefix) :
-        flowSymbols(snapshot, range.cursor, range.prefix);
+        (range.receiver ? flowMembers(snapshot, range.cursor, range.receiver, range.prefix) :
+          flowSymbols(snapshot, range.cursor, range.prefix));
       if (current !== requestId || started !== generation() || language() !== selected ||
           source.value !== snapshot || source.selectionStart !== range.cursor ||
           source.selectionEnd !== range.cursor) return false;
@@ -129,7 +223,8 @@ function create({source, button, target, language, python, r, generation, isBusy
       const matches = [...new Set(response.items)].sort().slice(0, MAX_ITEMS);
       if (!matches.length) { notice("No matching symbols."); return true; }
       const heading = document.createElement("p");
-      heading.textContent = matches.length + " completion suggestions for " + range.prefix;
+      heading.textContent = matches.length + " completion suggestions for " +
+        (range.receiver ? range.receiver + "." + range.prefix : range.prefix);
       const list = document.createElement("div");
       list.setAttribute("role", "group");
       list.setAttribute("aria-label", "Completion suggestions");
@@ -171,7 +266,7 @@ function create({source, button, target, language, python, r, generation, isBusy
   source.addEventListener("input", clear);
   return Object.freeze({complete, clear});
 }
-const api = Object.freeze({create, prefixAt, validItems, flowSymbols, maskFlow});
+const api = Object.freeze({create, prefixAt, validItems, flowSymbols, flowMembers, maskFlow});
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 global.FlowStudioCompletion = api;
 })(globalThis);

@@ -71,8 +71,11 @@ let notebookRunner = null, notebookOutput = null;
 let notebookEntries = [], notebookExecutionSource = null, notebookExecutionLanguage = null;
 let notebookRecoveryFailed = false;
 function clearNotebookRecovery() { FlowStudioNotebookRecovery.clear(draftStorage); notebookRecoveryFailed = false; }
-const gitPanel = FlowStudioGitPanel.create({native:FlowStudioNativeFlow,
-  statusButton:$("gitRefresh"), diffButton:$("gitDiff"), target:$("gitOutput"), notice});
+// VM integration fixtures omit optional browser modules; the native/Pages
+// document loads git_panel.js before this bootstrap in real browsers.
+if (typeof FlowStudioGitPanel !== "undefined" && typeof FlowStudioNativeFlow !== "undefined")
+  FlowStudioGitPanel.create({native:FlowStudioNativeFlow,
+    statusButton:$("gitRefresh"), diffButton:$("gitDiff"), target:$("gitOutput"), notice});
 const plotHistory = FlowStudioPlotHistory.create($("workspace"));
 const environmentData = FlowStudioEnvironmentData.create({target:$("workspace"), document, dataApi:FlowStudioData});
 let rSession = null;

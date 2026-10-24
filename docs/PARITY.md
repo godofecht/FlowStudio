@@ -33,6 +33,28 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Accessibility | partial / unverified | Full keyboard navigation, screen reader labels, resize and contrast checks |
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
 
+## 2026-10-24: sequential native Flow notebook execution (pending acceptance)
+
+The existing `docs/app/` percent-cell notebook runner now supports Flow only
+when the browser is served from FlowStudio's exact loopback origin
+(`http://127.0.0.1:8751/app/` or `localhost`). Each Flow code cell is a
+complete, **independently compiled and executed** program dispatched in order
+to the existing Flow-owned `POST /api/run/flow` endpoint. The runner retains
+its 64 KiB/cell, 128 executable-cell and 1 MiB aggregate output limits,
+stops on compiler/runtime errors, skips Markdown, and stores bounded output
+for exact-source browser recovery. There is no cross-cell Flow state or Flow
+variable inspector; Python and R retain their existing persistent runtimes.
+The GitHub Pages build cannot run native Flow, and Flow is not yet supported
+by the Jupyter notebook exporter.
+
+**Status: partial / pending CI.** Node integration tests exercise real
+`native_flow.js` client request construction, sequential dispatch, compiler
+failure propagation and GitHub Pages denial using a mock HTTP response;
+this is not physical-browser acceptance. Native Flow compilation and HTTP
+execution are independently tested by existing cross-platform CI, but a
+physical browser running the entire notebook workflow has not yet been
+verified. Do not count this as RStudio notebook parity.
+
 ## 2026-10-24: native R environment metadata inspection (cross-platform HTTP accepted)
 
 The Flow-owned localhost server now exposes intent-gated `POST /api/inspect/r`, backed by an `I` opcode in the persistent Rscript process. A bounded JSON response reports at most 128 variable names, R storage types, and base-vector lengths; active bindings are reported without evaluating their functions. The native editor refreshes the R environment after execution and reset and supports manual refresh. Output uses DOM `textContent`, not executable HTML. C IPC harness, live Flow HTTP acceptance, Node UI regression tests and protocol wiring tests were extended.

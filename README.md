@@ -22,6 +22,25 @@ Run the additional pure-module tests with:
 
     node --test tests/editor_find.test.js
 
+## Sequential Flow notebooks (native server)
+
+The browser workspace at `http://127.0.0.1:8751/app/` can now run all
+`# %%`-delimited **Flow** cells, alongside the existing Python and R notebook
+execution. Select **Flow**, put a complete, independently executable Flow
+program (including `function main() -> i32`) in each code cell, and choose
+**Run all cells**. Cells are compiled and executed in order using the real
+Flow-owned `/api/run/flow` route; execution stops at the first compiler or
+runtime error. Markdown cells are displayed without execution. Bounded text
+outputs can be recovered from browser storage after reload, but execution
+state is not recovered.
+
+Unlike persistent Python and R notebooks, **Flow cells run as independent
+compiled programs**: declarations and variables do not persist between cells.
+GitHub Pages cannot execute Flow because it cannot run the native compiler;
+the hosted editor continues to execute Python/R through browser WebAssembly.
+Flow notebooks are not yet supported by the Python/R-only Jupyter export or
+HTML report exporter. Physical-browser end-to-end acceptance remains pending.
+
 ## Build and launch
 
 Requirements: [Flow 2.x](https://github.com/flooooooooooow/flow) installed as flow, a C11 compiler available as cc, POSIX macOS/Linux and a recent browser. Python 3 and Rscript are optional **runtime executables** for their respective execution modes.

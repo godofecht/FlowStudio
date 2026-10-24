@@ -15,7 +15,7 @@ const encoder = new TextEncoder();
 
 function normalise(source, language, entries) {
   if (typeof source !== "string" || encoder.encode(source).length > MAX_SOURCE_BYTES ||
-      !["python", "r"].includes(language) || !Array.isArray(entries) || entries.length > MAX_ENTRIES)
+      !["python", "r", "flow"].includes(language) || !Array.isArray(entries) || entries.length > MAX_ENTRIES)
     return null;
   let lastIndex = -1;
   const safe = [];

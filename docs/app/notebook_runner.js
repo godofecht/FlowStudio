@@ -23,7 +23,7 @@ function boundUTF8(raw, limit) {
   }
   return {output:raw.slice(0, end), bytes, truncated:end < raw.length};
 }
-function create({parseCells, execute, onCell, notice}) {
+function create({parseCells, execute, onCell, notice, allowNativeFlow = false}) {
   if (typeof parseCells !== "function" || typeof execute !== "function" ||
       typeof onCell !== "function" || typeof notice !== "function")
     throw new TypeError("Notebook requires parser, executor, renderer and status callback.");
@@ -35,8 +35,8 @@ function create({parseCells, execute, onCell, notice}) {
   function cancel() { generation++; }
   async function run(source, language) {
     if (active) return {ok:false, executed:0, error:"Notebook execution is already running."};
-    if (language !== "python" && language !== "r")
-      return {ok:false, executed:0, error:"Notebook execution requires browser Python or R."};
+    if (language !== "python" && language !== "r" && !(language === "flow" && allowNativeFlow === true))
+      return {ok:false, executed:0, error:"Notebook execution requires browser Python/R or an explicitly enabled native Flow server."};
     let cells;
     try { cells = parseCells(source); }
     catch (error) { return {ok:false, executed:0, error:String(error.message || error)}; }

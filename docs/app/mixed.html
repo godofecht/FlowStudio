@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FlowStudio — Python + R in your browser</title>
+<style>
+:root{font:16px/1.5 system-ui,sans-serif;color:#e8edf5;background:#10141e;color-scheme:dark}
+body{max-width:850px;margin:2rem auto;padding:0 1rem}
+button{background:#315fbf;color:white;border:1px solid #8baaf4;border-radius:6px;padding:.7rem 1.2rem;cursor:pointer}
+button:disabled{opacity:.55}pre{background:#192337;border:1px solid #40506a;padding:1rem;white-space:pre-wrap;overflow-wrap:anywhere}
+a{color:#a8cdff}#status{min-height:1.5rem}
+</style></head><body>
+<p><a href="./">← FlowStudio workspace</a></p>
+<h1>Python + R, one browser workflow</h1>
+<p>Python computes a sum in Pyodide; JavaScript validates and transfers the numeric result; R computes its square root in webR. Both interpreters execute in WebAssembly in your browser, with no FlowStudio server.</p>
+<p><strong>Important:</strong> the coordinator on GitHub Pages is JavaScript, not compiled Flow. For native Flow orchestration, see <a href="../MIXED_LANGUAGES.md">the Flow server example</a>.</p>
+<button id="run" type="button">Run Python → R</button>
+<p id="status" role="status" aria-live="polite">Ready. Initial runtime download may take a while.</p>
+<pre id="result" aria-label="Execution results"></pre>
+<script src="./r_session.js"></script>
+<script src="./mixed_languages.js"></script>
+</body></html>

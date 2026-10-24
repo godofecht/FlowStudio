@@ -92,6 +92,9 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/app/data.html" {
         return StaticAsset { path: "docs/app/data.html", mime: "text/html; charset=utf-8", found: true }
     }
+    if url == "/app/environment_capture.py" {
+        return StaticAsset { path: "docs/app/environment_capture.py", mime: "text/plain; charset=utf-8", found: true }
+    }
     if url == "/app/data_capture.py" {
         return StaticAsset { path: "docs/app/data_capture.py", mime: "text/plain; charset=utf-8", found: true }
     }

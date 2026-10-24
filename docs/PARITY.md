@@ -38,6 +38,25 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
 
 
+## 2026-10-24: side-effect-free browser Python environment inspector (PR pending)
+
+The Pyodide worker previously inspected globals with arbitrary `repr(v)`,
+which could execute user-defined methods, raise exceptions or block refresh.
+The new Python helper captures bounded metadata from exact built-in types and
+nested list/tuple/dict values only, preserving opaque user objects without
+calling their `__repr__`, `__len__`, `__iter__` or descriptors.
+A Flow allowlisted native asset route serves the same helper under `/app/`.
+Real CPython tests cover hostile objects, cycles, nested metadata and limits;
+Node worker tests cover helper loading and malformed response rejection.
+The physical-browser suite now also checks that a hostile object does not
+break Pyodide environment refresh.
+
+**Status: implementation committed on a feature branch; cross-platform CI and
+real Pyodide browser acceptance pending.** This improves Python environment
+inspection safety and depth, but does not validate RStudio feature parity.
+Flow remains the native HTTP/backend owner; the browser Python interpreter
+remains Pyodide.
+
 ## 2026-10-24: real-browser acceptance harness (unverified)
 
 An opt-in Playwright runner now opens the checked-in FlowStudio browser IDE in

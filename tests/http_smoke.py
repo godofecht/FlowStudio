@@ -91,6 +91,10 @@ def main() -> None:
     status, session_script = request("GET", "/app/session_snapshot.js")
     assert status == 200 and "FlowStudioSessionSnapshot" in session_script, (status, session_script[:100])
     assert 'id="exportSession"' in browser and 'id="importSession"' in browser
+    # The Pyodide environment helper must be available from the real Flow
+    # static-asset allowlist, not only from GitHub Pages.
+    status, capture_helper = request("GET", "/app/environment_capture.py")
+    assert status == 200 and "def capture(namespace):" in capture_helper, (status, capture_helper[:100])
     status, _ = request("GET", "/app/not-a-real-asset.js")
     assert status == 404, status
 

@@ -73,6 +73,11 @@ def test_python(page, timeout: int):
     run_console(page, "python", "print(fs_browser_value + 4)", "43", timeout)
     assert "fs_browser_value" in page.locator("#environment").inner_text()
 
+    # A user-defined repr/len must never run during automatic environment refresh.
+    run_source(page, "python", "class FSProbe:\n    def __repr__(self):\n        raise RuntimeError('inspection called user repr')\n    def __len__(self):\n        raise RuntimeError('inspection called user len')\nfs_probe = FSProbe()\nprint('inspection safe 42')",
+               "inspection safe 42", timeout)
+    assert "fs_probe" in page.locator("#environment").inner_text()
+
     # Browser download must contain exact edited source, not a synthetic fixture.
     page.locator("#source").fill("print('physical-browser-round-trip')\n")
     with page.expect_download(timeout=timeout) as download_info:

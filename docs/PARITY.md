@@ -17,7 +17,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Plot viewer | partial / Node-tested PNG import and integrated workspace tab; native unverified | png/svg plot history, zoom, save and deterministic device lifecycle |
 | Project explorer | partial / browser Pages open/create/save and confirmed active-file delete with baseline conflict checks; 10 regression tests V8-shim passed; physical-browser deletion unverified | Open project, tree navigation, source-file creation and save; scoped delete is implemented, copy-verify-delete rename implemented with non-atomic filesystem race limits; physical-browser acceptance remains missing |
 | Data viewer | partial / CSV/TSV plus bounded Python/R environment table snapshots wired; real Pyodide/webR and physical browser unverified | Interactive sortable/filterable tabular datasets including missing values |
-| Completion / language server | partial / browser Python AST and R parse-only syntax diagnostics; browser Python/R global-symbol prefix completion implemented with bounded interpreter namespace enumeration and keyboard insertion, pending cross-platform CI and physical-browser verification; native Flow strict compile-only diagnostics; Flow completion and member-aware completion missing | R, Flow and Python completion/diagnostics |
+| Completion / language server | partial / browser Python AST and R parse-only syntax diagnostics; browser Python/R global-symbol prefix completion accepted by Node tests on Ubuntu/macOS CI with bounded interpreter namespace enumeration and keyboard insertion; physical-browser verification pending; native Flow strict compile-only diagnostics; Flow completion and member-aware completion missing | R, Flow and Python completion/diagnostics |
 | Packages pane | partial / browser Python inventory/install and webR 0.6.0 inventory/install; mocked Node tests, live interpreters unverified | List, install, update with environment-aware package sources |
 | Git pane | missing | Status, diff, stage, commit and branch operations |
 | Help pane | partial / browser Python live-global/builtin docstrings and installed R Rd help wired; Node/V8 contract tests, live Pyodide/webR and physical browser unverified; Flow help missing | Context-aware language/function docs |
@@ -46,9 +46,14 @@ normal input/draft tracking. Stale completions are discarded when the source,
 caret, language or session generation changes. The native Flow-owned server
 explicitly allowlists the same browser module at `/app/completion.js`.
 
-**Status: partial / V8 parse and focused smoke checks only; CI pending.**
-No physical Chromium/Safari acceptance or live Pyodide/webR acceptance has
-been claimed. No Flow symbol completion, Python member completion, R `# FlowStudio RStudio parity matrix
+**Status: partial / cross-platform CI accepted.** PR #22 passed all four
+jobs in [CI #40059915507](https://github.com/godofecht/FlowStudio/actions/runs/40059915507):
+383/383 Node tests passed on both Ubuntu 24.04 and macOS 14, including
+runtime-protocol mocks, editor insertion, stale-response and allowlist tests;
+native Flow compilation, live HTTP acceptance and platform packaging also
+passed. Merged as [a93facb](https://github.com/godofecht/FlowStudio/commit/a93facbd962b6971f388fa7065765ab521a2745c).
+These are **not** real Pyodide/webR runtime completion or physical Chromium/Safari
+acceptance tests. No Flow symbol completion, Python member completion, R `# FlowStudio RStudio parity matrix
 
 **Baseline:** RStudio Desktop + Server core scientific IDE workflows. This is a goal and acceptance test list, not a claim of equivalence.
 

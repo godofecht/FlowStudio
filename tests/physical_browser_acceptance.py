@@ -104,11 +104,18 @@ def test_python(page, timeout: int):
                            timeout=timeout)
     assert "44" in page.locator("#notebookOutput").inner_text()
 
+    # Exercise real matplotlib capture and the rendered PNG history.
+    run_source(page, "python", "import matplotlib.pyplot as plt\nplt.figure()\nplt.plot([1, 2, 3])\nprint('plot ready 42')",
+               "plot ready 42", timeout)
+    page.locator("#workspace img[alt^='Python figure']").first.wait_for(timeout=timeout)
+
 
 def test_r(page, timeout: int):
     run_source(page, "r", "fs_browser_value <- 21L\nprint(fs_browser_value * 2L)", "42", timeout)
     run_console(page, "r", "print(fs_browser_value + 22L)", "43", timeout)
     assert "fs_browser_value" in page.locator("#environment").inner_text()
+    run_source(page, "r", "plot(c(1, 2, 3))\nprint('r plot ready 42')", "r plot ready 42", timeout)
+    page.locator("#workspace canvas").first.wait_for(timeout=timeout)
     page.locator("#reset").click()
     assert "R state reset" in page.locator("#notice").inner_text()
     run_source(page, "r", "print(exists('fs_browser_value', envir=.GlobalEnv))", "FALSE", timeout)

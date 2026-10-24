@@ -24,7 +24,7 @@ pre{white-space:pre-wrap;overflow:auto;overflow-wrap:anywhere;flex:1;margin:0;pa
 <header><strong>◈ FlowStudio <span class="muted">/ Browser</span></strong>
 <label for="language">Language</label><select id="language"><option value="python">Python (browser)</option><option value="flow">Flow (native localhost only)</option><option value="r">R (browser; webR 0.6.0)</option></select>
 <button id="open" type="button">Open file</button><button id="openFolder" type="button">Open project folder</button><button id="newProjectFile" type="button">New project file</button><button id="saveProjectFile" type="button" disabled>Save to disk</button><button id="saveAsProjectFile" type="button">Save As…</button><button id="renameProjectFile" type="button" disabled>Rename open project file</button><button id="deleteProjectFile" type="button" disabled>Delete open project file</button><input id="file" type="file" accept=".py,.flow,.r,.R,.txt" hidden>
-<button id="save" type="button">Download source</button><button id="run" type="button">Run Ctrl+Enter</button><button id="checkSyntax" type="button">Check syntax</button><button id="tracePython" type="button" disabled title="Native localhost Python line tracing; executes source in the native Python session">Trace Python (native)</button><button id="completeSource" type="button" title="Complete symbol at cursor (Ctrl+Space)">Complete Ctrl+Space</button><button id="runSelection" type="button">Run selection Ctrl+Shift+Enter</button><button id="runCell" type="button">Run cell Ctrl+Alt+Enter</button><button id="runNotebook" type="button" title="Use # %% [python], # %% [r] or # %% [flow] for per-cell runtime selection; Flow requires native localhost">Run all cells</button><button id="openNotebook" type="button">Open .ipynb</button><input id="notebookFile" type="file" accept=".ipynb,application/x-ipynb+json" hidden><button id="saveNotebook" type="button">Export .ipynb</button><button id="exportReport" type="button">Export HTML report</button><button id="reset" type="button">Reset selected session</button><button id="forgetDraft" type="button">Forget saved draft</button>
+<button id="save" type="button">Download source</button><button id="run" type="button">Run Ctrl+Enter</button><button id="checkSyntax" type="button">Check syntax</button><button id="tracePython" type="button" disabled title="Native localhost Python line tracing; executes source in the native Python session">Trace Python (native)</button><button id="completeSource" type="button" title="Complete symbol at cursor (Ctrl+Space)">Complete Ctrl+Space</button><button id="runSelection" type="button">Run selection Ctrl+Shift+Enter</button><button id="runCell" type="button">Run cell Ctrl+Alt+Enter</button><button id="runNotebook" type="button" title="Use # %% [python], # %% [r] or # %% [flow] for per-cell runtime selection; Flow requires native localhost">Run all cells</button><button id="openNotebook" type="button">Open .ipynb</button><input id="notebookFile" type="file" accept=".ipynb,application/x-ipynb+json" hidden><button id="saveNotebook" type="button">Export .ipynb</button><button id="openFlowNotebook" type="button" title="Open a portable mixed-language FlowStudio notebook">Open .fsnb</button><input id="flowNotebookFile" type="file" accept=".fsnb,application/json" hidden><button id="saveFlowNotebook" type="button" title="Preserve exact mixed-language source and saved outputs without restoring interpreter state">Export .fsnb</button><button id="exportReport" type="button">Export HTML report</button><button id="reset" type="button">Reset selected session</button><button id="forgetDraft" type="button">Forget saved draft</button>
 </header>
 <main>
 <section aria-label="Source editor"><h2>Source — <span id="filename">untitled.py</span></h2><details id="projectPanel"><summary>Project files</summary><div id="projectTree" aria-label="Project file explorer">Choose a folder to browse its files.</div></details><textarea id="source" aria-label="Source code" spellcheck="false">x = 40
@@ -367,7 +367,7 @@ function renderNotebookCell(entry) {
     if (notebookExecutionSource !== null && !FlowStudioNotebookRecovery.save(
       draftStorage, notebookExecutionSource, notebookExecutionLanguage, notebookEntries) && !notebookRecoveryFailed) {
       notebookRecoveryFailed = true;
-      notice("Notebook output recovery unavailable (storage limit or disabled storage). Export .ipynb to retain results.");
+      notice("Notebook output recovery unavailable (storage limit or disabled storage). Export .fsnb to retain mixed-language results.");
     }
   }
 }
@@ -555,6 +555,7 @@ const projectWorkspace = FlowStudioProjectWorkspace.create({
 });
 FlowStudioNotebookIO.create({
   openButton:$("openNotebook"), fileInput:$("notebookFile"), saveButton:$("saveNotebook"),
+  bundleOpenButton:$("openFlowNotebook"), bundleFileInput:$("flowNotebookFile"), bundleSaveButton:$("saveFlowNotebook"),
   source:$("source"), language:$("language"), format:FlowStudioNotebookFormat,
   parseCells:FlowStudioSourceCells.parseCells,
   isBusy:()=>busy || !!notebookRunner?.isRunning(),
@@ -563,17 +564,31 @@ FlowStudioNotebookIO.create({
     $("source").value = imported.source;
     $("language").value = imported.language;
     packagePanel.updateLanguage?.();
-    fileName = name.replace(/\.ipynb$/i, "") + (imported.language === "r" ? ".R" : ".py");
+    fileName = name.replace(/\.(?:ipynb|fsnb)$/i, "") + (imported.language === "r" ? ".R" : imported.language === "flow" ? ".flow" : ".py");
     $("filename").textContent = name + " (imported notebook)";
     projectWorkspace.notifyExternalOpen();
     notebookEntries = [];
     clearNotebookRecovery();
     notebookExecutionSource = null;
+    notebookExecutionLanguage = null;
     if (notebookOutput) notebookOutput.replaceChildren();
+    if (Array.isArray(imported.entries)) {
+      notebookExecutionSource = imported.source;
+      notebookExecutionLanguage = imported.language;
+      notebookOutput = document.createElement("div");
+      notebookOutput.id = "notebookOutput";
+      notebookOutput.setAttribute("aria-label", "Imported saved notebook results (not executed)");
+      $("workspace").replaceChildren(notebookOutput);
+      const byIndex = new Map(imported.entries.map(entry => [entry.index, entry]));
+      for (const cell of FlowStudioSourceCells.parseCells(imported.source)) {
+        if (cell.kind === "markdown") renderNotebookCell({index:cell.index, kind:"markdown", code:cell.code});
+        else if (byIndex.has(cell.index)) renderNotebookCell(byIndex.get(cell.index));
+      }
+    }
     queueDraft();
   },
   onExport:(json, name)=>{
-    const blob = new Blob([json], {type:"application/x-ipynb+json"});
+    const blob = new Blob([json], {type:name.endsWith(".fsnb") ? "application/json" : "application/x-ipynb+json"});
     const url = URL.createObjectURL(blob), anchor = document.createElement("a");
     anchor.href = url;
     anchor.download = name;

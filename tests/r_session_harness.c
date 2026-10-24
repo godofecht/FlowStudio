@@ -29,7 +29,7 @@ int main(void)
     /* Native R lists expose nested metadata without evaluating user methods. */
     out = fs_r_run("nested <- list(numbers=list(answer=42L, more=list(x=1L)), words=c('a','b'))\n"
                    "trap <- structure(list(secret=1L), class='flowstudio_trap')\n"
-                   "\`[[.flowstudio_trap\` <- function(...) stop('user method executed')");
+                   "`[[.flowstudio_trap` <- function(...) stop('user method executed')");
     if (fs_r_status() != 200) return failure(17, out);
     out = fs_r_inspect();
     if (fs_r_status() != 200 ||

@@ -95,15 +95,24 @@ def main() -> None:
     assert status == 404, status
 
     accepted_headers = {"X-FlowStudio-Intent": "run"}
-    # Native Git routes are read-only and enforce the existing intent/origin gate.
+    # Native Git reads and writes require the existing intent/origin gate.
     assert request("GET", "/api/git/status")[0] == 404
-    assert request("POST", "/api/git/status", "")[0] == 404
-    assert request("POST", "/api/git/diff", "")[0] == 404
+    for route in ("/api/git/status", "/api/git/diff", "/api/git/diff/staged",
+                  "/api/git/stage", "/api/git/commit"):
+        assert request("POST", route, "")[0] == 404
+    assert request("POST", "/api/git/stage", "file.py",
+                   {"X-FlowStudio-Intent": "run", "Origin": "http://attacker.invalid"})[0] == 404
+    assert request("POST", "/api/git/commit", "message",
+                   {"X-FlowStudio-Intent": "run", "Origin": "http://attacker.invalid"})[0] == 404
+    assert request("POST", "/api/git/stage", ".", accepted_headers)[0] == 400
+    assert request("POST", "/api/git/commit", "", accepted_headers)[0] == 400
     assert request("POST", "/api/git/status", "",
                    {"X-FlowStudio-Intent": "run", "Origin": "http://attacker.invalid"})[0] == 404
     status, git_client = request("GET", "/app/git_panel.js")
     assert status == 200 and "FlowStudioGitPanel" in git_client
     assert 'id="gitRefresh"' in browser and 'id="gitDiff"' in browser
+    assert 'id="gitStage"' in browser and 'id="gitCommit"' in browser
+    assert 'id="gitStagedDiff"' in browser
     if shutil.which("git"):
         probe = Path(__file__).resolve().parents[1] / ("flowstudio_git_probe_" + uuid.uuid4().hex + ".txt")
         try:
@@ -112,6 +121,8 @@ def main() -> None:
             assert git_code == 200 and probe.name in git_text, (git_code, git_text)
             diff_code, diff_text = request("POST", "/api/git/diff", "", accepted_headers)
             assert diff_code == 200 and "fatal:" not in diff_text, (diff_code, diff_text)
+            staged_code, staged_text = request("POST", "/api/git/diff/staged", "", accepted_headers)
+            assert staged_code == 200 and "fatal:" not in staged_text, (staged_code, staged_text)
         finally:
             probe.unlink(missing_ok=True)
     else:

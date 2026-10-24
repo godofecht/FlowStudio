@@ -22,7 +22,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Data viewer | partial / CSV/TSV plus bounded Python/R environment table snapshots wired; real Pyodide/webR and physical browser unverified | Interactive sortable/filterable tabular datasets including missing values |
 | Completion / language server | partial / browser Python/R runtime prefix completion cross-platform CI accepted; Flow lexical completion accepted by Ubuntu/macOS CI; explicit-type Flow struct and evolution-state member completion cross-platform CI accepted (#40095770668, 473 JS passes, 2 skips per platform, native Flow/HTTP accepted); physical-browser verification pending; full semantic/LSP completion missing | R, Flow and Python completion/diagnostics |
 | Packages pane | partial / browser Python inventory/install and webR 0.6.0 inventory/install; mocked Node tests, live interpreters unverified | List, install, update with environment-aware package sources |
-| Git pane | partial / Flow-owned native read-only working-tree status and unstaged diff accepted on Ubuntu/macOS CI #40104296753; physical-browser acceptance pending; stage/commit/branch missing | Status, diff, stage, commit and branch operations |
+| Git pane | partial / Flow-owned status and unstaged diff accepted on Ubuntu/macOS CI #40104296753; literal-path stage, staged diff and commit implemented in PR (native isolated acceptance pending); physical-browser and branch management missing | Status, diff, stage, commit and branch operations |
 | Help pane | partial / browser Python live-global/builtin docstrings and installed R Rd help wired; Node/V8 contract tests, live Pyodide/webR and physical browser unverified; Flow help missing | Context-aware language/function docs |
 | Find / replace / cross-file search | partial / Node + V8-tested | Literal in-buffer find next/previous, single/all replacement and project-wide search implemented; incremental indexing, regex and physical-browser verification missing |
 | Percent-delimited source cells | partial / lexical scanner unified across native editor and Pages, Node/HTTP acceptance pending; physical-browser execution unverified | Run only the active `# %%` code cell in Flow/R/Python; markdown and empty cells do not execute |
@@ -36,6 +36,32 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Cross-platform packaging | missing | Installable signed/reproducible macOS and Linux releases |
 | Accessibility | partial / unverified | Full keyboard navigation, screen reader labels, resize and contrast checks |
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
+
+
+## 2026-10-24: native Git stage and commit (independent acceptance pending)
+
+The Flow-owned localhost backend now offers fixed-argv Git staging of an
+explicit **literal** relative path, a read-only staged diff, and commit of
+the existing index with a user-entered message. The browser requires separate
+confirmation for staging and committing and explicitly warns that the target
+is the native server's working tree, not a browser-selected folder. It
+never accepts arbitrary commands or a repository path. Git runs without shell
+interpolation, with a 10-second process-group timeout and a 128 KiB output
+limit. The commit route disables Git hooks and signing for deterministic
+local acceptance. It does not push, change branches, or stage all files
+implicitly. Committing includes **all** previously staged changes, even
+those staged outside FlowStudio; review staged diff before committing.
+
+**Status: partial / implementation pending cross-platform acceptance.**
+Node tests cover the browser API's route/body limits, hosted Pages isolation,
+confirmation, concurrent-write rejection and error recovery. The native
+acceptance script starts a second real FlowStudio server in a disposable Git
+repository, tests literal-path staging (including metacharacters), staged
+diff, a real commit with a deliberately failing hook, untouched untracked
+files, bad paths and cross-origin rejection. Passing tests and browser
+interactions are **not claimed** until observed. Git branch operations,
+selective unstage, physical-browser interaction and RStudio Git parity remain
+outstanding.
 
 ## 2026-10-24: portable mixed-language notebook files (cross-platform CI accepted)
 

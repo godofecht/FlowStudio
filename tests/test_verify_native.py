@@ -91,7 +91,10 @@ HTTPServer(("127.0.0.1", int(sys.argv[1])) , Handler).serve_forever()
             "#!/bin/sh\nexec python3 " + str(self.root / "fake_server.py") + " " + str(self.port) + "\n")
         (self.root / "fake_server.py").write_text(fake_server)
         self.fixture("cp fake_runner.sh build/flowstudio\nchmod +x build/flowstudio\n", "print('fake smoke ran')\n")
-        native.verify(self.root, self.port, startup_timeout=8)
+        # A fake health endpoint and fake smoke script cannot satisfy the
+        # new real-Git acceptance gate; a fixture test is mandatory.
+        with self.assertRaisesRegex(native.VerificationError, "requires git and its fixture script"):
+            native.verify(self.root, self.port, startup_timeout=8)
 
     def test_failed_smoke_is_not_pass(self):
         # The server is healthy but the acceptance script fails.

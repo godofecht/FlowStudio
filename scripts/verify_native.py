@@ -164,6 +164,41 @@ def verify(root: Path, port: int = 8751, build_timeout: int = 180,
         finally:
             _stop_process_group(proc)
 
+    # A second live server exercises Git mutations in an isolated checkout,
+    # never the repository running CI. This is real Git and the real Flow
+    # executable, not an HTTP mock or a command-line approximation.
+    git_smoke = root / "tests/native_git_write_smoke.py"
+    if not git_smoke.is_file() or not shutil.which("git"):
+        raise VerificationError("Native Git write acceptance requires git and its fixture script")
+    with tempfile.TemporaryDirectory(prefix="flowstudio-git-") as temp:
+        fixture = Path(temp)
+        shutil.copytree(root / "web", fixture / "web")
+        shutil.copytree(root / "docs", fixture / "docs")
+        # The preceding server may leave TCP TIME_WAIT sockets. The real
+        # listener sets SO_REUSEADDR; a plain probe bind here would be flaky.
+        with tempfile.TemporaryFile(mode="w+t", encoding="utf-8") as git_log:
+            git_server = subprocess.Popen([str(binary)], cwd=fixture,
+                                          stdout=git_log, stderr=subprocess.STDOUT,
+                                          start_new_session=True)
+            try:
+                _wait_health(git_server, port, startup_timeout)
+                result = _command([sys.executable, str(git_smoke)], fixture, 65)
+                if result.stdout:
+                    print(result.stdout, end="", flush=True)
+                if result.stderr:
+                    print(result.stderr, end="", file=sys.stderr, flush=True)
+                if result.returncode != 0:
+                    raise VerificationError("Isolated live native Git write acceptance failed")
+                if git_server.poll() is not None:
+                    raise VerificationError("Git fixture server exited unexpectedly")
+            except BaseException:
+                git_log.seek(0)
+                print("Native Git fixture server log:\\n" + git_log.read()[-16000:],
+                      file=sys.stderr)
+                raise
+            finally:
+                _stop_process_group(git_server)
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)

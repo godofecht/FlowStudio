@@ -22,6 +22,20 @@ Run the additional pure-module tests with:
 
     node --test tests/editor_find.test.js
 
+## Flow source-local symbol completion
+
+The GitHub Pages editor and native-served `/app/` editor also support
+**Ctrl+Space** for Flow source-local identifiers without executing code or
+requiring a Python/R runtime. Completion scans bounded Flow source (256 KiB)
+for functions, types, explicit imports, parameters and currently open lexical
+`let` scopes. Comments and quoted strings are excluded, and results are
+limited to 64 names. This is an editor convenience, **not** semantic completion:
+it does not resolve imports transitively, infer types, offer members, or replace
+the actual `flowc --strict` diagnostics. No Flow execution occurs on GitHub Pages.
+
+`node --test tests/browser_flow_completion.test.js tests/browser_completion.test.js`
+checks real Flow syntax fixtures and editor insertion.
+
 ## Browser Python/R symbol completion
 
 The GitHub Pages workspace and native-served `/app/` editor support

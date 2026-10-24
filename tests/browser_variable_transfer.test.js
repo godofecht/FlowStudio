@@ -94,6 +94,16 @@ test("R export validates classless atomic wire values and import uses base assig
   assert.equal((await m.session.importVariable("bad;stop()",exported.value)).ok,false);
   assert.equal(m.queries.length,2);
 });
+test("R import preserves typed empty vectors, logicals and URL-escaped Unicode", async () => {
+  const m=mockR(()=>["ok"]);
+  assert.equal((await m.session.importVariable("empty", {kind:"vector",type:"number",values:[]})).ok,true);
+  assert.match(m.queries.at(-1)[0],/base::numeric\(0L\)/);
+  assert.equal((await m.session.importVariable("flags", {kind:"vector",type:"boolean",values:[true,false]})).ok,true);
+  assert.match(m.queries.at(-1)[0],/base::c\(TRUE,FALSE\)/);
+  assert.equal((await m.session.importVariable("labels", {kind:"vector",type:"string",values:["é","line\nbreak"]})).ok,true);
+  assert.match(m.queries.at(-1)[0],/utils::URLdecode\("%C3%A9"\)/);
+  assert.match(m.queries.at(-1)[0],/line%0Abreak/);
+});
 test("R transfer decodes strings and rejects malformed interpreter values", async () => {
   const m=mockR(()=>["character","hello%20world","%C3%A9"]);
   assert.deepEqual((await m.session.exportVariable("labels")).value,
@@ -144,6 +154,12 @@ test("generated Python transfer source executes under real CPython", async t => 
   const imported=spawnSync("python3",["-c",h.queries[1]+'\nprint(copied == ["é", "line\\nbreak"])'],{encoding:"utf8"});
   assert.equal(imported.status,0,imported.stderr);
   assert.equal(imported.stdout.trim(),"True");
+  const subclass=spawnSync("python3",["-c",
+    'class Sneaky(list):\n    def __iter__(self):\n        raise RuntimeError("must not iterate")\nvalues = Sneaky([1, 2])\n'+
+    h.queries[0]],{encoding:"utf8"});
+  assert.notEqual(subclass.status,0);
+  assert.match(subclass.stderr,/Only homogeneous plain scalar/);
+  assert.doesNotMatch(subclass.stderr,/must not iterate/);
 });
 test("generated R transfer expressions execute under real Rscript when installed", async t => {
   const available=spawnSync("Rscript",["--version"],{encoding:"utf8"});

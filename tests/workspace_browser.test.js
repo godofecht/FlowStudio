@@ -8,6 +8,7 @@ const path = require("node:path");
 const root = path.join(__dirname, "..");
 const html = fs.readFileSync(path.join(root, "web/index.html"), "utf8");
 const projectSource = fs.readFileSync(path.join(root, "web/project.js"), "utf8").trimEnd();
+const sourceCells = fs.readFileSync(path.join(root, "web/source_cells.js"), "utf8").trimEnd();
 const scripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)]
   .map(m => m[1]).filter(source => source.trim() && !source.includes("FlowStudioWorkspaceTabs.mount();"));
 
@@ -116,12 +117,12 @@ function workspace(folder) {
     },
     Blob, URL, setTimeout, console
   });
-  assert.equal(scripts.length, 5, "Expected project, editor-find, cells, documents and workspace scripts");
+  assert.equal(scripts.length, 4, "Expected embedded project, editor-find, documents and workspace scripts");
   vm.runInContext(scripts[0], context, { filename: "project-embedded.js" });
   vm.runInContext(scripts[1], context, { filename: "editor-find-embedded.js" });
-  vm.runInContext(scripts[2], context, { filename: "source-cells-embedded.js" });
-  vm.runInContext(scripts[3], context, { filename: "documents-embedded.js" });
-  vm.runInContext(scripts[4], context, { filename: "workspace.js" });
+  vm.runInContext(sourceCells, context, { filename: "source_cells.js" });
+  vm.runInContext(scripts[2], context, { filename: "documents-embedded.js" });
+  vm.runInContext(scripts[3], context, { filename: "workspace.js" });
   return {
     el: id => elements.get(id), document, fetches, inspectionFetches,
     setDiscard: value => { allowDiscard = value; },
@@ -133,8 +134,8 @@ test("embedded project module exactly mirrors tested standalone source", () => {
   assert.equal(scripts[0].trim(), projectSource);
   const findSource = fs.readFileSync(path.join(root, "web/editor_find.js"), "utf8").trimEnd();
   assert.equal(scripts[1].trim(), findSource);
-  assert.equal(scripts[2].trim(), fs.readFileSync(path.join(root, "web/source_cells.js"), "utf8").trimEnd());
-  assert.equal(scripts[3].trim(), fs.readFileSync(path.join(root, "web/ide_documents.js"), "utf8").trimEnd());
+  assert.match(html, /<script src="\/source_cells\.js"><\/script>/);
+  assert.equal(scripts[2].trim(), fs.readFileSync(path.join(root, "web/ide_documents.js"), "utf8").trimEnd());
   assert.match(html, /id="projectTree"/);
   assert.match(html, /id="folder"/);
   assert.match(html, /id="newFile"/);

@@ -22,7 +22,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Data viewer | partial / CSV/TSV plus bounded Python/R environment table snapshots wired; real Pyodide/webR and physical browser unverified | Interactive sortable/filterable tabular datasets including missing values |
 | Completion / language server | partial / browser Python/R runtime prefix completion cross-platform CI accepted; Flow lexical completion accepted by Ubuntu/macOS CI; explicit-type Flow struct and evolution-state member completion cross-platform CI accepted (#40095770668, 473 JS passes, 2 skips per platform, native Flow/HTTP accepted); physical-browser verification pending; full semantic/LSP completion missing | R, Flow and Python completion/diagnostics |
 | Packages pane | partial / browser Python inventory/install and webR 0.6.0 inventory/install; mocked Node tests, live interpreters unverified | List, install, update with environment-aware package sources |
-| Git pane | partial / native Flow status, unstaged/staged diff, literal-path staging and commit verified by Ubuntu/macOS CI #40109268078 (real isolated Git fixture); physical-browser and branch management missing | Status, diff, stage, commit and branch operations |
+| Git pane | partial / native Flow status, unstaged/staged diff, literal-path stage/commit cross-platform CI verified (#40109268078); selective unstage implemented in PR (native cross-platform acceptance pending); physical-browser and branch management missing | Status, diff, stage, unstage, commit and branch operations |
 | Help pane | partial / browser Python live-global/builtin docstrings and installed R Rd help wired; Node/V8 contract tests, live Pyodide/webR and physical browser unverified; Flow help missing | Context-aware language/function docs |
 | Find / replace / cross-file search | partial / Node + V8-tested | Literal in-buffer find next/previous, single/all replacement and project-wide search implemented; incremental indexing, regex and physical-browser verification missing |
 | Percent-delimited source cells | partial / lexical scanner unified across native editor and Pages, Node/HTTP acceptance pending; physical-browser execution unverified | Run only the active `# %%` code cell in Flow/R/Python; markdown and empty cells do not execute |
@@ -37,6 +37,22 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Accessibility | partial / unverified | Full keyboard navigation, screen reader labels, resize and contrast checks |
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
 
+
+## 2026-10-24: selective Git unstage (independent acceptance pending)
+
+The Flow-owned native Git backend now supports `POST /api/git/unstage` for a
+single literal relative path or subdirectory in the server working tree. The
+implementation invokes `git restore --staged -- :(literal)<path>` with a
+fixed argument vector, ten-second timeout, 128 KiB response limit and the
+existing origin/intent gate. It restores the index entry from `HEAD` without
+discarding working-tree edits or implicitly touching unrelated staged files.
+An unborn branch without `HEAD` cannot use this operation; Git errors are
+reported rather than silently falling back to destructive index changes.
+The browser requires an explicit confirmation and disables the control on
+GitHub Pages. Automated tests cover client validation, the UI write lock,
+origin rejection and isolated real-Git staging/unstaging of tracked and newly
+added files. **Status: partial / implementation submitted; cross-platform
+native Flow and HTTP acceptance pending; physical-browser acceptance missing.**
 
 ## 2026-10-24: native Git stage and commit (independent acceptance pending)
 

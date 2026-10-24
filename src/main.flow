@@ -251,8 +251,8 @@ function send_git_write(kind: string, value: string) -> void {
         fs_reply(400, "text/plain; charset=utf-8", "Git input must contain 1 to 512 bytes.")
         return
     }
-    if eq(kind, "stage") and (eq(value, ".") or eq(value, "..") or eq(value, "/")) {
-        fs_reply(400, "text/plain; charset=utf-8", "Stage a specific file or subdirectory, not the whole repository.")
+    if (eq(kind, "stage") or eq(kind, "unstage")) and (eq(value, ".") or eq(value, "..") or eq(value, "/")) {
+        fs_reply(400, "text/plain; charset=utf-8", "Select a specific file or subdirectory, not the whole repository.")
         return
     }
     let command: ptr<ProcCmd> = proc_cmd("git")
@@ -265,12 +265,20 @@ function send_git_write(kind: string, value: string) -> void {
         proc_arg(command, "--")
         proc_arg(command, ":(literal)" + value)
     } else {
-        proc_arg(command, "-c")
-        proc_arg(command, "commit.gpgsign=false")
-        proc_arg(command, "commit")
-        proc_arg(command, "--no-gpg-sign")
-        proc_arg(command, "-m")
-        proc_arg(command, value)
+        if eq(kind, "unstage") {
+            # Restore only the index entry from HEAD. Leave working-tree edits intact.
+            proc_arg(command, "restore")
+            proc_arg(command, "--staged")
+            proc_arg(command, "--")
+            proc_arg(command, ":(literal)" + value)
+        } else {
+            proc_arg(command, "-c")
+            proc_arg(command, "commit.gpgsign=false")
+            proc_arg(command, "commit")
+            proc_arg(command, "--no-gpg-sign")
+            proc_arg(command, "-m")
+            proc_arg(command, value)
+        }
     }
     proc_timeout_ms(command, 10000)
     let result: ptr<ProcResult> = proc_run(command)
@@ -292,7 +300,11 @@ function send_git_write(kind: string, value: string) -> void {
         return
     }
     if eq(output, "") {
-        output = "Selected path staged successfully."
+        if eq(kind, "unstage") {
+            output = "Selected path unstaged; working-tree contents preserved."
+        } else {
+            output = "Selected path staged successfully."
+        }
     }
     fs_reply(200, "text/plain; charset=utf-8", output)
 }
@@ -356,6 +368,10 @@ function dispatch() -> void {
         }
         if eq(path, "/api/git/stage") {
             send_git_write("stage", fs_body())
+            return
+        }
+        if eq(path, "/api/git/unstage") {
+            send_git_write("unstage", fs_body())
             return
         }
         if eq(path, "/api/git/commit") {

@@ -554,7 +554,8 @@ function restoreNotebookOutputs() {
   $("workspace").replaceChildren(notebookOutput);
   for (const cell of cells) {
     if (cell.kind === "markdown") renderNotebookCell({index:cell.index, kind:"markdown", code:cell.code});
-    else if (byIndex.has(cell.index)) renderNotebookCell({...byIndex.get(cell.index), images:[]});
+    else if (byIndex.has(cell.index)) renderNotebookCell({...byIndex.get(cell.index),
+      language:cell.language || language, images:[]});
   }
   notice("Recovered " + entries.length + " notebook cell outputs from this browser. Interpreter variables were not restored.");
 }

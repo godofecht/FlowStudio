@@ -28,10 +28,33 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | R Markdown / Quarto | partial / offline HTML report export from Python/R percent-cell notebooks; no Quarto/R Markdown rendering | Render notebook with inline plots and HTML export; verify actual Quarto/R Markdown format compatibility |
 | Source debugger | missing | Breakpoints, stack, variables, step execution |
 | Remote/server mode | missing | Authenticated, origin-aware multi-user sessions with isolation |
-| Diagnostics / profiling | missing | Resource/time tracing and useful language-specific diagnostics |
+| Diagnostics / profiling | partial / native CPython bounded line tracing implemented; cross-platform CI and physical-browser acceptance pending | Resource/time tracing and useful language-specific diagnostics |
 | Cross-platform packaging | missing | Installable signed/reproducible macOS and Linux releases |
 | Accessibility | partial / unverified | Full keyboard navigation, screen reader labels, resize and contrast checks |
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
+
+## 2026-10-24: native Python execution trace (cross-platform acceptance pending)
+
+FlowStudio's native Flow-owned `POST /api/trace/python` route now invokes
+real `sys.settrace` instrumentation inside the **existing persistent CPython
+kernel**. It records up to 256 executed lines, function names, timestamps and
+up to 16 local variables per line; previews are restricted to exact built-in
+scalars and do not invoke arbitrary `__repr__`. Output and JSON response
+sizes are bounded, prior trace hooks are restored, and exceptions retain
+structured trace output with HTTP 422. The native browser workspace renders
+an accessible trace table with guarded source-line navigation. The package
+script includes the helper, and existing Flow/C IPC and HTTP acceptance
+harnesses now exercise the real trace operation.
+
+**Status: partial / cross-platform CI pending.** Five isolated CPython tests
+and two Node trace-view tests passed in the authoring environment on
+24 October 2026. Those tests alone do not validate the native Flow compiler,
+real C IPC or physical-browser interaction. CI must qualify the exact PR
+commit on Linux and macOS. GitHub Pages cannot invoke this native trace;
+its Python runtime is a separate Pyodide session. This is an execution trace,
+**not** an interactive debugger: breakpoints, stepping, stack controls,
+R/Flow debugging and remote isolation remain missing. See
+[PYTHON_TRACE.md](PYTHON_TRACE.md).
 
 ## 2026-10-24: Flow source-local symbol completion (cross-platform CI accepted)
 

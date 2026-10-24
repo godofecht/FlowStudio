@@ -324,7 +324,7 @@ function create({load = () => import(CDN)} = {}) {
             return decoded === "TRUE";
           }
           if (type === "number") {
-            if (!/^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$/.test(decoded))
+            if (!/^[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?$/.test(decoded))
               throw Error("Invalid R numeric value.");
             return Number(decoded);
           }

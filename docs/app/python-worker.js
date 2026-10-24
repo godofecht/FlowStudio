@@ -63,8 +63,10 @@ async function handle(event) {
     code.length > 0 && new TextEncoder().encode(code).length <= 65536;
   const validHelp = op === "help" && typeof code === "string" && code.length <= 120 &&
     /^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*){0,3}$/.test(code);
+  const validComplete = op === "complete" && typeof code === "string" &&
+    /^[A-Za-z_][A-Za-z0-9_]{0,79}$/.test(code);
   if (!((op === "run" && typeof code === "string" && new TextEncoder().encode(code).length <= 65536) ||
-    op === "inspect" || op === "packages" || validInstall || validTable || validCheck || validHelp)) {
+    op === "inspect" || op === "packages" || validInstall || validTable || validCheck || validHelp || validComplete)) {
     self.postMessage({id, ok:false, output:"Invalid execution request."}); return;
   }
   let stdout = "", stderr = "", plotWarning = "";
@@ -93,6 +95,25 @@ async function handle(event) {
             !Number.isSafeInteger(d.column) || d.column < 1))
         throw Error("Invalid syntax diagnostic response.");
       self.postMessage({id, ok:result.ok, diagnostics:result.diagnostics});
+      return;
+    }
+    if (op === "complete") {
+      // Enumerate only names, never evaluate user source, descriptors or object methods.
+      const query = [
+        "import builtins as _fs_completion_builtins, json as _fs_completion_json",
+        "_fs_completion_prefix = " + JSON.stringify(code),
+        "_fs_completion_names = sorted(name for name in set(globals()).union(vars(_fs_completion_builtins)) if type(name) is str and len(name) <= 80 and name.isascii() and name.isidentifier() and name.startswith(_fs_completion_prefix) and not name.startswith('_fs_'))[:64]",
+        "_fs_completion_json.dumps(_fs_completion_names)"
+      ].join("\n");
+      const raw = await py.runPythonAsync(query);
+      if (typeof raw !== "string" || raw.length > 8192)
+        throw Error("Invalid Python completion response.");
+      const items = JSON.parse(raw);
+      if (!Array.isArray(items) || items.length > 64 ||
+          !items.every(name => typeof name === "string" &&
+            /^[A-Za-z_][A-Za-z0-9_]{0,79}$/.test(name) && name.startsWith(code)))
+        throw Error("Invalid Python completion response.");
+      self.postMessage({id, ok:true, items});
       return;
     }
     if (op === "help") {

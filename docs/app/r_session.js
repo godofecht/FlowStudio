@@ -175,6 +175,29 @@ function create({load = () => import(CDN)} = {}) {
       } catch (error) { return {ok:false, output:String(error).slice(0, 300)}; }
     });
   }
+  async function complete(prefix) {
+    if (typeof prefix !== "string" || !/^[A-Za-z.][A-Za-z0-9._]{0,79}$/.test(prefix))
+      return {ok:false, output:"Invalid R completion prefix."};
+    const generation = epoch;
+    return schedule(async () => {
+      if (generation !== epoch) return {ok:false, output:"R session reset."};
+      try {
+        const r = await get();
+        // Search-path names only; no get(), eval(), active-binding reads or source execution.
+        const query = 'local({ n <- unique(unlist(lapply(head(search(), 16L), function(p) ' +
+          'ls(envir=as.environment(p), all.names=FALSE)), use.names=FALSE)); ' +
+          'n <- n[nchar(n) <= 80L & grepl("^[A-Za-z.][A-Za-z0-9._]*$", n) & ' +
+          'startsWith(n, ' + JSON.stringify(prefix) + ')]; head(sort(n), 64L) })';
+        const items = await r.evalRRaw(query, "string[]");
+        if (generation !== epoch) return {ok:false, output:"R session reset."};
+        if (!Array.isArray(items) || items.length > 64 ||
+            !items.every(name => typeof name === "string" &&
+              /^[A-Za-z.][A-Za-z0-9._]{0,79}$/.test(name) && name.startsWith(prefix)))
+          throw Error("Invalid R completion response.");
+        return {ok:true, items};
+      } catch (error) { return {ok:false, output:String(error).slice(0, 300)}; }
+    });
+  }
   async function inspect() {
     const generation = epoch;
     return schedule(async () => {
@@ -271,7 +294,7 @@ function create({load = () => import(CDN)} = {}) {
     runtime = null;
     loading = null;
   }
-  return Object.freeze({run, checkSyntax, help, inspect, packages, installPackage, table, reset});
+  return Object.freeze({run, checkSyntax, help, complete, inspect, packages, installPackage, table, reset});
 }
 function renderImages(target, images, document) {
   if (!Array.isArray(images) || !images.length) return 0;

@@ -42,6 +42,7 @@ function fixture() {
     FlowStudioNotebookFormat:require("../docs/app/notebook_format.js"),
     FlowStudioNotebookRecovery:require("../docs/app/notebook_recovery.js"),
     FlowStudioPackages:{create:()=>({clear(){}})},
+    FlowStudioCompletion:{create:()=>({clear(){}})},
     FlowStudioDraftStorage:{create:()=>({queue(){},flush(){},clear(){},read(){return null;}})},
     FlowStudioSourceSelection:{prepare:source=>({ok:true,code:source.value})},
     FlowStudioSourceCells:{cellAt:()=>({kind:"code",code:"x <- 42"})},

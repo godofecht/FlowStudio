@@ -23,7 +23,7 @@ function setup(options = {}) {
         if (options.malformed) return "{}";
         return JSON.stringify([{number:2, png:PNG}]);
       }
-      if (code.includes("_fs_json.dumps")) { calls.push("inspect"); return "[]"; }
+      if (code.includes("_fs_json.dumps")) { calls.push("inspect"); return JSON.stringify({variables:[],truncated:false}); }
       calls.push("execute");
       stdout("printed before error");
       if (code.includes("explode")) throw new Error("user exception");

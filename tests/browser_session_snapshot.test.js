@@ -112,6 +112,18 @@ test("controller downloads a validated explicit snapshot and imports with confir
   assert.equal(h.busy(),false);
   assert.match(h.messages.at(-1),/Imported 1/);
 });
+test("exported JSON remains importable at the 128 KiB boundary",async()=>{
+  const large={kind:"vector",type:"string",values:Array.from({length:63},()=> "x".repeat(512))};
+  const h=fixture({
+    inspect:async()=>({ok:true,variables:[{name:"v0"},{name:"v1"},{name:"v2"},{name:"v3"}]}),
+    exportValue:async()=>({ok:true,value:large})
+  });
+  assert.equal(await h.api.exportCurrent(),true);
+  const text=h.downloads[0].text;
+  assert.ok(Buffer.byteLength(text,"utf8")<=snapshots.MAX_BYTES);
+  assert.equal(await h.api.importFile({size:Buffer.byteLength(text,"utf8"),text:async()=>text}),true);
+  assert.equal(h.imports.length,4);
+});
 test("controller rejects wrong-language, cancelled and oversized imports without mutation",async()=>{
   const h=fixture({confirmOverwrite:()=>false});
   assert.equal(await h.api.importFile({size:50,text:async()=>JSON.stringify(snapshot())}),false);

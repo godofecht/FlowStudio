@@ -51,6 +51,12 @@ includes independent real-static-asset and loopback safety tests. See
 [physical browser acceptance instructions](PHYSICAL_BROWSER_ACCEPTANCE.md).
 
 **Status: physical-browser acceptance NOT YET RUN or independently verified.**
+The acceptance *harness and static-asset safety tests* passed
+[CI #40132144052](https://github.com/godofecht/FlowStudio/actions/runs/40132144052)
+on Ubuntu 24.04 and macOS 14: all four jobs passed, including 501 Node passes,
+2 skips and 0 failures per platform, 58 Python unittest passes per platform,
+real native Flow 2.0.0 compilation, R/Python HTTP acceptance and packaging.
+These checks **did not run a physical browser or download real Pyodide/webR**.
 This adds an executable acceptance gate, not evidence that Pyodide/webR ran
 successfully in Chromium or that RStudio parity has been achieved. No hosted CI
 configuration was modified.

@@ -282,7 +282,7 @@ function send_git_write(kind: string, value: string) -> void {
         fs_reply(503, "text/plain; charset=utf-8", "Git executable unavailable: " + result.error)
         return
     }
-    let output: string = result.stdout + result.stderr
+    let mut output: string = result.stdout + result.stderr
     if strlen(output) > 131072 {
         fs_reply(413, "text/plain; charset=utf-8", "Git output exceeds the 128 KiB display limit.")
         return

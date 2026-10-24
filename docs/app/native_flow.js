@@ -68,7 +68,22 @@ async function gitStatus() {
 async function gitDiff() {
   return request("/api/git/diff", "");
 }
-const api = Object.freeze({available, run, checkSyntax, tracePython, gitStatus, gitDiff});
+async function gitStagedDiff() {
+  return request("/api/git/diff/staged", "");
+}
+async function gitStage(path) {
+  if (typeof path !== "string" || !path.trim() || [".", "..", "/"].includes(path.trim()) ||
+      new TextEncoder().encode(path).length > 512)
+    throw new Error("Choose a specific Git path of at most 512 bytes.");
+  return request("/api/git/stage", path);
+}
+async function gitCommit(message) {
+  if (typeof message !== "string" || !message.trim() ||
+      new TextEncoder().encode(message).length > 512)
+    throw new Error("Git commit message must contain 1 to 512 bytes.");
+  return request("/api/git/commit", message);
+}
+const api = Object.freeze({available, run, checkSyntax, tracePython, gitStatus, gitDiff, gitStagedDiff, gitStage, gitCommit});
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 global.FlowStudioNativeFlow = api;
 })(globalThis);

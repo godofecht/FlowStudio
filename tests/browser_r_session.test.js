@@ -39,7 +39,7 @@ test("reuses R state, inspects actual global environment and resets",async()=>{
   assert.equal(m.instances.length,1);
   assert.equal(inspection.truncated,false);
   assert.deepEqual(inspection.variables,[{name:"x",type:"integer",shape:["2","3"],preview:"int [1:6]"}]);
-  assert.match(m.calls.at(-1).inspect,/ls\(envir=\.GlobalEnv/);
+  assert.match(m.calls.at(-1).inspect, /base::ls\(envir=base::globalenv\(\)/);
   r.reset();
   assert.equal(m.instances[0].closed,true);
   await r.run("x <- 5");

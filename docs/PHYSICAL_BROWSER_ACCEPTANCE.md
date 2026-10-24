@@ -6,7 +6,7 @@ opt-in acceptance runner opens the checked-in IDE in an actual browser,
 downloads the actual released interpreter distributions, executes source and
 console commands, checks persistent state, exports and restores a Python
 snapshot, verifies a source-file download, runs sequential Python notebook
-cells, and resets the real R interpreter. There are no mocked workers, CDN
+cells, checks real matplotlib PNG plot history and webR canvas plotting, and resets the real R interpreter. There are no mocked workers, CDN
 intercepts, or simulated interpreter responses.
 
 From the repository root:

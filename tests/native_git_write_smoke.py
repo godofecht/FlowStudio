@@ -61,11 +61,38 @@ def main() -> None:
     assert git("log", "-1", "--format=%s").strip() == "Native Git HTTP acceptance"
     assert git("show", "--pretty=format:", "--name-only", "HEAD").strip() == "a [1].flow"
     assert "other.flow" in git("status", "--short")
+
+    # Unstage a tracked modification without discarding the edited file, while
+    # leaving unrelated staged paths untouched. Include literal metacharacters.
+    tracked = HERE / "a [1].flow"
+    tracked.write_text("function main() -> i32 { return 42 }\n", encoding="utf-8")
+    new_path = HERE / "new [2].flow"
+    new_path.write_text("new untracked content\n", encoding="utf-8")
+    assert post("/api/git/stage", "a [1].flow")[0] == 200
+    assert post("/api/git/stage", "new [2].flow")[0] == 200
+    assert git("diff", "--cached", "--name-only").splitlines() == ["a [1].flow", "new [2].flow"]
+    status, output = post("/api/git/unstage", "a [1].flow")
+    assert status == 200 and "unstaged" in output, (status, output)
+    assert tracked.read_text(encoding="utf-8").endswith("return 42 }\n")
+    assert git("diff", "--cached", "--name-only").strip() == "new [2].flow"
+    assert "a [1].flow" in git("diff", "--name-only")
+    assert post("/api/git/unstage", "*.flow")[0] == 422
+    assert post("/api/git/unstage", "../outside.flow")[0] == 422
+    assert post("/api/git/unstage", ".")[0] == 400
+    assert post("/api/git/unstage", "x" * 513)[0] == 400
+    assert post("/api/git/unstage", "a [1].flow", "http://attacker.invalid")[0] == 404
+    assert git("diff", "--cached", "--name-only").strip() == "new [2].flow"
+    status, output = post("/api/git/unstage", "new [2].flow")
+    assert status == 200, (status, output)
+    assert "new [2].flow" in git("status", "--short")
+    assert git("diff", "--cached", "--name-only").strip() == ""
+    assert new_path.read_text(encoding="utf-8") == "new untracked content\n"
+
     assert post("/api/git/commit", "Nothing staged")[0] == 422
     assert post("/api/git/commit", "")[0] == 400
     assert post("/api/git/stage", "other.flow", "http://attacker.invalid")[0] == 404
     assert post("/api/git/commit", "malicious", "http://attacker.invalid")[0] == 404
-    print("PASS: live Flow Git stage, staged diff, commit, literal paths, hook isolation and origin gate")
+    print("PASS: live Flow Git stage, selective unstage, staged diff, commit, literal paths, hook isolation and origin gate")
 
 
 if __name__ == "__main__":

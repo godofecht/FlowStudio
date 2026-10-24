@@ -20,7 +20,8 @@ class AssetRoutesTest(unittest.TestCase):
 
     def test_declared_assets_exist(self):
         paths = re.findall(r'path: "(web/[^"]+)"', self.router)
-        self.assertEqual(len(paths), 12)
+        self.assertEqual(len(paths), len(set(paths)), "duplicate static file routes")
+        self.assertIn("web/source_cells.js", paths)
         for path in paths:
             with self.subTest(path=path):
                 self.assertTrue((ROOT / path).is_file(), path)

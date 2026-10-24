@@ -106,7 +106,7 @@ def main() -> None:
     status, output = post("/api/git/branch/switch", "feature/native")
     assert status == 409 and "working-tree" in output, (status, output)
     git("add", "-A")
-    git("commit", "-m", "Clean fixture before branch switch")
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "Clean fixture before branch switch")
     assert git("status", "--porcelain") == ""
     status, output = post("/api/git/branch/switch", "feature/native")
     assert status == 200, (status, output)

@@ -131,8 +131,9 @@ discards or overwrites user work. Native Git commands use fixed argv,
 bounded timeouts and disabled hooks. GitHub Pages has no access to the
 server working tree, and a browser-picked project directory is not the
 Git target. Branch deletion, remote tracking, merges and rebases are not
-implemented. Native build and real-browser acceptance remain pending for
-this addition; see [parity matrix](docs/PARITY.md).
+implemented. Native Flow/HTTP acceptance passed on Ubuntu and macOS in
+[CI #40117614745](https://github.com/godofecht/FlowStudio/actions/runs/40117614745);
+real-browser acceptance remains pending. See [parity matrix](docs/PARITY.md).
 
 `node --test tests/browser_git_native.test.js tests/browser_git_panel.test.js`
 tests the browser-facing contract; `python3 scripts/verify_native.py`

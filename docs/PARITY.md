@@ -33,6 +33,29 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Accessibility | partial / unverified | Full keyboard navigation, screen reader labels, resize and contrast checks |
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
 
+## 2026-10-24: Pages source find/replace (cross-platform CI pending)
+
+The GitHub Pages and native `/app/` editor now expose the existing
+bounded literal search engine through an accessible source Find/Replace
+panel. Ctrl/⌘+F and Ctrl/⌘+H focus the respective controls while the
+source editor is focused; F3 and Shift+F3 navigate matches with wraparound.
+Find, Replace, and Replace All preserve Unicode source and line endings;
+edits dispatch the existing source `input` event, invalidating notebook
+outputs and queuing the draft-save path. Search caps are 2 MiB source,
+256-character query, 10,000 matches and 10,000-character replacement.
+Replace All refuses truncated match sets and oversized results. The
+native Flow-owned server explicitly allowlists both browser assets and
+the HTTP smoke test exercises those routes.
+
+**Status: partial / independent CI and physical-browser acceptance pending.**
+The exact committed browser modules passed direct V8 functional checks of
+forward/backward search, case sensitivity, single/all replacement,
+input events, bounds and keyboard controls; the actual inline workspace
+script parsed in V8. Node regression and native Flow HTTP tests are committed
+but are not claimed passing until CI finishes. This is literal find/replace
+within a buffer, not regex find/replace or indexed cross-file search; real
+Chromium/Safari interaction and RStudio editor parity remain outstanding.
+
 ## 2026-10-24: native source-cell lexer parity (cross-platform CI accepted)
 
 The native editor previously embedded an obsolete regular-expression-only

@@ -17,7 +17,7 @@ pre{white-space:pre-wrap;overflow:auto;overflow-wrap:anywhere;flex:1;margin:0;pa
 #projectTree{max-height:22vh;overflow:auto;padding:.35rem;display:flex;flex-direction:column;gap:.25rem}#projectTree .project-file{text-align:left;width:100%}#projectTree .project-children{padding-left:1rem;display:flex;flex-direction:column;gap:.25rem}#projectPanel{border-bottom:1px solid #40506a}#projectPanel summary{cursor:pointer;padding:.4rem .7rem}section[aria-label="Source editor"] textarea{flex:1;min-height:6rem;height:auto}#notebookOutput .notebook-cell{padding:.65rem;margin-bottom:.65rem;border:1px solid #40506a;border-radius:6px}
 #notebookOutput .notebook-cell pre{flex:none;max-height:20rem;overflow:auto;padding:.5rem}
 #notebookOutput .notebook-cell img{max-width:100%;height:auto}
-#consoleInput{height:5rem;flex:0 0 auto;border-top:1px solid #40506a;padding:.5rem}#consoleActions{display:flex;align-items:center;justify-content:space-between;gap:.5rem;padding:.35rem .6rem}.muted{color:#b6c7df}#notice{color:#ffe3a6}footer{font-size:.85rem}
+#findPanel{display:flex;flex-wrap:wrap;align-items:center;gap:.35rem;padding:.5rem;border-top:1px solid #40506a}#findPanel input[type="text"]{width:10rem;max-width:35vw}#findStatus{font-size:.85rem;color:#b6c7df}#consoleInput{height:5rem;flex:0 0 auto;border-top:1px solid #40506a;padding:.5rem}#consoleActions{display:flex;align-items:center;justify-content:space-between;gap:.5rem;padding:.35rem .6rem}.muted{color:#b6c7df}#notice{color:#ffe3a6}footer{font-size:.85rem}
 @media(max-width:750px){body{height:auto;min-height:100dvh}main{grid-template-columns:1fr;grid-template-rows:45vh 20vh 30vh 25vh}}
 </style></head>
 <body>
@@ -29,7 +29,7 @@ pre{white-space:pre-wrap;overflow:auto;overflow-wrap:anywhere;flex:1;margin:0;pa
 <main>
 <section aria-label="Source editor"><h2>Source — <span id="filename">untitled.py</span></h2><details id="projectPanel"><summary>Project files</summary><div id="projectTree" aria-label="Project file explorer">Choose a folder to browse its files.</div></details><textarea id="source" aria-label="Source code" spellcheck="false">x = 40
 print("Hello from browser Python!")
-x + 2</textarea><div id="completions" role="region" aria-label="Source completion suggestions" style="max-height:9rem;overflow:auto;padding:0 .5rem"></div></section>
+x + 2</textarea><div id="findPanel" role="search" aria-label="Source find and replace"><label for="findQuery">Find</label><input id="findQuery" type="text" maxlength="256" aria-label="Find literal text"><label for="replaceText">Replace</label><input id="replaceText" type="text" maxlength="10000" aria-label="Replacement text"><label><input id="findCase" type="checkbox"> Match case</label><button id="findPrevious" type="button">Previous</button><button id="findNext" type="button">Next</button><button id="replaceOne" type="button">Replace</button><button id="replaceAll" type="button">Replace all</button><span id="findStatus" role="status" aria-live="polite">Ctrl+F to find; Ctrl+H to replace.</span></div><div id="completions" role="region" aria-label="Source completion suggestions" style="max-height:9rem;overflow:auto;padding:0 .5rem"></div></section>
 <section aria-label="Environment"><h2>Environment</h2><div id="environment" class="muted">Python runs entirely in a Web Worker using Pyodide. The runtime downloads on first use.</div><div class="workspace-tools"><input id="packageName" type="text" aria-label="Python or R package name" placeholder="package==version" maxlength="120"><button id="installPackage" type="button">Install package</button><button id="listPackages" type="button">List packages</button></div><div id="packages" role="region" aria-label="Installed language packages" style="overflow:auto;max-height:40%"></div></section>
 <section aria-label="Console"><h2>Python / R console</h2><pre id="console" role="log" aria-live="polite">Ready. Python and R run locally in your browser; Flow runs when this workspace is served by native FlowStudio.</pre><textarea id="consoleInput" aria-label="Python console input" placeholder="Python expression or statement" spellcheck="false"></textarea><div id="consoleActions"><span class="muted">Enter: execute · Shift+Enter: newline · ↑: history</span><button id="submitConsole" type="button">Execute</button></div></section>
 <section aria-label="Data and plots"><h2>Plots and data</h2><div class="workspace-tools"><label for="previewfile">Open image</label><input id="previewfile" type="file" accept=".png,.jpg,.jpeg,.webp"><button id="dataViewer" type="button">Open CSV/TSV viewer</button><label for="helpQuery">Help topic</label><input id="helpQuery" type="text" maxlength="120" placeholder="len / stats::lm" aria-label="Installed Python or R help topic"><button id="lookupHelp" type="button">Help</button></div><div id="workspace"><p class="muted">Local-only plots and tabular data.</p></div></section>
@@ -48,6 +48,8 @@ x + 2</textarea><div id="completions" role="region" aria-label="Source completio
 <script src="./python_trace_view.js"></script>
 <script src="./help_panel.js"></script>
 <script src="./completion.js"></script>
+<script src="./editor_find.js"></script>
+<script src="./find_panel.js"></script>
 <script src="./notebook_runner.js"></script>
 <script src="./notebook_recovery.js"></script>
 <script src="./notebook_format.js"></script>
@@ -113,6 +115,12 @@ const completion = FlowStudioCompletion.create({
   python:prefix=>request("complete", prefix), r:prefix=>getRSession().complete(prefix),
   generation:()=>sessionGeneration, isBusy:()=>busy || !!notebookRunner?.isRunning(),
   notice, document
+});
+if (typeof FlowStudioFindPanel !== "undefined") FlowStudioFindPanel.create({
+  source:$("source"), query:$("findQuery"), replacement:$("replaceText"),
+  caseSensitive:$("findCase"), status:$("findStatus"),
+  nextButton:$("findNext"), previousButton:$("findPrevious"),
+  replaceButton:$("replaceOne"), allButton:$("replaceAll"), document
 });
 function queueDraft() {
   drafts.queue($("source").value, fileName, $("language").value);

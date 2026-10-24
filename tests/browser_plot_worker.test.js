@@ -14,7 +14,7 @@ function workerFixture() {
     runPythonAsync: async code => {
       if (code.includes("_fs_plot_capture.prepare()")) {calls.push("prepare"); return null;}
       if (code.includes("_fs_plot_capture.capture()")) {calls.push("capture"); return "[]";}
-      if (code.includes("_fs_json.dumps")) {calls.push("inspect"); return "[]";}
+      if (code.includes("_fs_json.dumps")) {calls.push("inspect"); return JSON.stringify({variables:[],truncated:false});}
       calls.push("execute"); return 42;
     }
   };

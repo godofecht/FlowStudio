@@ -43,6 +43,7 @@ function fixture(initialDraft = null) {
     FlowStudioEnvironmentData:require("../docs/app/environment_data.js"),
     FlowStudioNotebookIO:require("../docs/app/notebook_io.js"),
     FlowStudioNotebookFormat:require("../docs/app/notebook_format.js"),
+    FlowStudioCompletion:{create:()=>({clear(){}})},
     FlowStudioPackages:{create:()=>({clear(){}})}
   };
   context.window = context;

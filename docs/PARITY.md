@@ -33,7 +33,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Accessibility | partial / unverified | Full keyboard navigation, screen reader labels, resize and contrast checks |
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
 
-## 2026-10-24: Pages source find/replace (cross-platform CI pending)
+## 2026-10-24: Pages source find/replace (cross-platform CI accepted)
 
 The GitHub Pages and native `/app/` editor now expose the existing
 bounded literal search engine through an accessible source Find/Replace
@@ -47,14 +47,18 @@ Replace All refuses truncated match sets and oversized results. The
 native Flow-owned server explicitly allowlists both browser assets and
 the HTTP smoke test exercises those routes.
 
-**Status: partial / independent CI and physical-browser acceptance pending.**
+**Status: partial / cross-platform CI accepted; physical-browser acceptance pending.**
 The exact committed browser modules passed direct V8 functional checks of
 forward/backward search, case sensitivity, single/all replacement,
 input events, bounds and keyboard controls; the actual inline workspace
-script parsed in V8. Node regression and native Flow HTTP tests are committed
-but are not claimed passing until CI finishes. This is literal find/replace
-within a buffer, not regex find/replace or indexed cross-file search; real
-Chromium/Safari interaction and RStudio editor parity remain outstanding.
+script parsed in V8. PR #26 passed all four jobs in
+[CI #40075706074](https://github.com/godofecht/FlowStudio/actions/runs/40075706074):
+Node regression and native Flow compilation/HTTP acceptance succeeded on
+Ubuntu 24.04 and macOS 14. Merged as
+[e8cb6af](https://github.com/godofecht/FlowStudio/commit/e8cb6afa9a0f3c38fbc0ee02cdb2542c610a4f08).
+This is literal find/replace within a buffer, not regex find/replace or indexed
+cross-file search; real Chromium/Safari interaction and RStudio editor parity
+remain outstanding.
 
 ## 2026-10-24: native source-cell lexer parity (cross-platform CI accepted)
 

@@ -78,15 +78,15 @@ const INSPECT = `base::local({
     }
     TRUE
   }
-  names <- base::ls(envir=.GlobalEnv, all.names=FALSE)
+  names <- base::ls(envir=base::globalenv(), all.names=FALSE)
   if (base::length(names) > 128L) truncated <- TRUE
   for (name in utils::head(names, 128L)) {
     if (base::length(rows) >= 256L) { truncated <- TRUE; break }
-    if (base::bindingIsActive(name, .GlobalEnv)) {
+    if (base::bindingIsActive(name, base::globalenv())) {
       if (!push(0L, name, "active binding", "", "<not evaluated>")) break
     } else {
       binding <- base::tryCatch(
-        base::list(ok=TRUE, value=base::get(name, envir=.GlobalEnv, inherits=FALSE)),
+        base::list(ok=TRUE, value=base::get(name, envir=base::globalenv(), inherits=FALSE)),
         error=function(e) base::list(ok=FALSE))
       if (!binding$ok) {
         if (!push(0L, name, "unavailable", "", "<failed binding>")) break

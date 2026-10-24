@@ -41,7 +41,7 @@ async function settle(replies, n) {
   for(let i=0;i<100&&replies.length<n;i++) await new Promise(resolve=>setTimeout(resolve,1));
   assert.equal(replies.length,n);
 }
-test("prefix parsing refuses arbitrary expressions, selections, member access and Flow", () => {
+test("prefix parsing refuses arbitrary expressions, selections and member access", () => {
   const at = (value,language,offset=value.length) =>
     prefixAt({value,selectionStart:offset,selectionEnd:offset},language)?.prefix ?? null;
   assert.equal(at("pri","python"),"pri");
@@ -50,7 +50,7 @@ test("prefix parsing refuses arbitrary expressions, selections, member access an
   assert.equal(at("mean","r"),"mean");
   assert.equal(at("stats::lm","r"),null);
   assert.equal(at("df$col","r"),null);
-  assert.equal(at("print","flow"),null);
+  assert.equal(at("print","flow"),"print");
   assert.equal(prefixAt({value:"print",selectionStart:0,selectionEnd:5},"python"),null);
   assert.equal(validItems(["print"],"pri","python"),true);
   assert.equal(validItems(["print;bad"],"pri","python"),false);

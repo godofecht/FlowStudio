@@ -13,7 +13,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Python source execution | partial / native persistent CPython kernel added; local C IPC and Flow-owned HTTP tested in Linux/macOS CI; physical-browser acceptance pending | Run via installed Python; preserve state across evaluations |
 | Editor selection execution | partial / Node-tested browser selection; native and physical-browser unverified | Selection runs without accidentally executing entire buffer |
 | Persistent REPL/session | partial / browser Pyodide/webR sessions; native Python process retention and reset added (local C harness and cross-platform Flow HTTP CI passed); native R persistent kernel passed real Rscript and Flow-owned HTTP acceptance on Linux/macOS CI | Incremental variables and package state persist until reset |
-| Variable inspector | partial / native Python and R bounded metadata snapshots cross-platform HTTP accepted; native Python exact-builtin nested metadata tree implemented with unit/HTTP/browser-DOM regression tests pending CI; R array dimensions and failed-lazy-binding recovery cross-platform HTTP accepted; browser Python/R metadata partial; arbitrary-object inspection and physical-browser acceptance missing | Nested objects / types / dimensions inspectable and refresh after execution |
+| Variable inspector | partial / native Python and R bounded metadata snapshots cross-platform HTTP accepted; native Python exact-builtin nested metadata tree cross-platform CI accepted (unit/HTTP/DOM); R array dimensions and failed-lazy-binding recovery cross-platform HTTP accepted; browser Python/R metadata partial; arbitrary-object inspection and physical-browser acceptance missing | Nested objects / types / dimensions inspectable and refresh after execution |
 | Plot viewer | partial / Node-tested PNG import and integrated workspace tab; native unverified | png/svg plot history, zoom, save and deterministic device lifecycle |
 | Project explorer | partial / browser Pages open/create/save and confirmed active-file delete with baseline conflict checks; 10 regression tests V8-shim passed; physical-browser deletion unverified | Open project, tree navigation, source-file creation and save; scoped delete is implemented, copy-verify-delete rename implemented with non-atomic filesystem race limits; physical-browser acceptance remains missing |
 | Data viewer | partial / CSV/TSV plus bounded Python/R environment table snapshots wired; real Pyodide/webR and physical browser unverified | Interactive sortable/filterable tabular datasets including missing values |
@@ -46,11 +46,14 @@ inspection traversal. The native editor renders a keyboard-expandable
 `<details>` tree with text-only DOM nodes. It reports truncation and does
 not attempt to inspect pandas, numpy, user objects, or R list elements.
 
-**Status: partial / CI pending.** New Python unit tests cover nesting,
-malicious objects, truncation and cycles; native HTTP smoke tests exercise
-the actual persistent Python process through Flow routing; Node tests check
-the native editor renderer. Neither physical-browser accessibility nor
-independent Linux/macOS acceptance is claimed until those jobs complete.
+**Status: partial / cross-platform CI accepted.** PR #20 passed all four jobs in
+[CI #40051484731](https://github.com/godofecht/FlowStudio/actions/runs/40051484731):
+Python unit tests cover nesting, malicious objects, truncation and cycles;
+native HTTP smoke tests exercise the actual persistent Python process through
+Flow routing; Node tests check the native editor renderer. Real FlowStudio
+native builds and HTTP acceptance passed on Ubuntu 24.04 and macOS 14.
+Merged as [eb87f6c](https://github.com/godofecht/FlowStudio/commit/eb87f6caaf834b0db58c75927ffe26632a600b4a).
+Physical-browser accessibility and arbitrary-object inspection remain unverified.
 
 ## 2026-10-24: sequential native Flow notebook execution (pending acceptance)
 

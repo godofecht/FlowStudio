@@ -42,9 +42,10 @@ function scanLine(line, state) {
 function parseCells(source) {
   if (typeof source !== "string" || source.length > MAX_SOURCE)
     throw new Error("Cell navigation supports source buffers up to 2 MiB.");
-  const boundaries = [{ start: 0, codeStart: 0, kind: "code" }];
+  const boundaries = [{ start: 0, codeStart: 0, kind: "code", language: null }];
   const state = { mode: "normal", quote: "", triple: false };
   let currentKind = "code";
+  let currentLanguage = null;
   let offset = 0;
   while (offset < source.length) {
     // Preserve CR-only, LF-only and CRLF line endings and source offsets.
@@ -59,7 +60,10 @@ function parseCells(source) {
     if (match) {
       const label = (match[1] || "").trim().toLowerCase();
       currentKind = /^\[(?:markdown|md)\](?:\s|$)/.test(label) ? "markdown" : "code";
-      const boundary = { start: offset, codeStart: offset + match[0].length, kind: currentKind };
+      const tagged = /^\[(python|r|flow)\](?:\s|$)/.exec(label);
+      currentLanguage = currentKind === "code" && tagged ? tagged[1] : null;
+      const boundary = { start: offset, codeStart: offset + match[0].length,
+        kind: currentKind, language: currentLanguage };
       if (offset === 0) boundaries[0] = boundary;
       else boundaries.push(boundary);
       if (boundaries.length > MAX_CELLS) throw new Error("Source exceeds the 10,000-cell limit.");
@@ -72,7 +76,8 @@ function parseCells(source) {
   return boundaries.map((boundary, index) => {
     const end = index + 1 < boundaries.length ? boundaries[index + 1].start : source.length;
     return { index, count: boundaries.length, start: boundary.start, end,
-      kind: boundary.kind, code: source.slice(boundary.codeStart, end) };
+      kind: boundary.kind, language: boundary.language,
+      code: source.slice(boundary.codeStart, end) };
   });
 }
 

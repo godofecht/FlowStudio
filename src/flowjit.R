@@ -4,7 +4,6 @@ flowjit_compile <- local({
     quota <- new.env(parent = emptyenv())
     quota$compiled <- 0L
     operators <- c("+", "-", "*")
-    missing_formal <- formals(function(x) NULL)[[1L]]
 
     validate <- function(node, args) {
         if (is.symbol(node)) {
@@ -124,7 +123,7 @@ flowjit_compile <- local({
         if (length(args) < 1L || length(args) > 4L || anyNA(args) ||
             any(!nzchar(args)) || any(args == "...") ||
             !all(vapply(as.list(formals(fn)),
-                        function(x) identical(x, missing_formal), logical(1L)))) {
+                        function(x) missing(x), logical(1L)))) {
             stop("Require 1-4 positional formals without defaults.")
         }
         if (length(hot) != 1L || is.na(hot) || !is.finite(hot) ||

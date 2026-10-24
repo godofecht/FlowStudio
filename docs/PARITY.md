@@ -16,7 +16,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Interactive multi-language console | partial / Python and R browser sessions plus stateless native Flow full-program execution wired; per-language histories and unsent drafts implemented; 427/427 JS tests per platform and native Flow/HTTP CI passed on Ubuntu/macOS; live physical-browser acceptance pending | Console can execute selected Python/R/Flow independently of source editor; preserve Python/R state, histories and drafts; report Flow native-only limits and execution failures |
 | Browser Python/R session snapshot export/import | partial / bounded scalar/vector JSON snapshots cross-platform CI accepted in PR #31; physical browser acceptance pending | Explicitly export and restore supported live interpreter values through a local file, reject tampering and stale sessions, verify live Pyodide/webR and cross-platform browser interactions; no implicit or arbitrary-object serialization |
 | Explicit Python/R variable transfer | partial / bounded plain scalar and atomic-vector copy wired; real CPython/Rscript query tests and native Flow HTTP accepted on Ubuntu/macOS CI; physical-browser Pyodide/webR round-trip unverified | Copy typed scalars/vectors both ways between persistent runtimes, reject unsupported objects/NA/NaN and active bindings, verify independent real-browser and cross-platform execution |
-| Variable inspector | partial / native Python and R bounded metadata snapshots cross-platform HTTP accepted; native Python exact-builtin nested metadata tree cross-platform CI accepted (unit/HTTP/DOM); R array dimensions and failed-lazy-binding recovery cross-platform HTTP accepted; browser R bounded two-level plain-list tree and active-binding protection accepted by Ubuntu/macOS CI #40090303070 (real Rscript, Node, native Flow/HTTP); arbitrary-object inspection and physical-browser acceptance missing | Nested objects / types / dimensions inspectable and refresh after execution |
+| Variable inspector | partial / native Python and R bounded metadata snapshots cross-platform HTTP accepted; native Python exact-builtin nested metadata tree cross-platform CI accepted (unit/HTTP/DOM); R array dimensions and failed-lazy-binding recovery cross-platform HTTP accepted; browser R bounded two-level plain-list tree and active-binding protection accepted by Ubuntu/macOS CI #40090303070 (real Rscript, Node, native Flow/HTTP); side-effect-free bounded browser Python nested inspection accepted by cross-platform CI #40140193181 (real CPython/Node/native Flow HTTP), but real Pyodide physical-browser acceptance and arbitrary-object introspection remain missing | Nested objects / types / dimensions inspectable and refresh after execution |
 | Plot viewer | partial / Node-tested PNG import and integrated workspace tab; native unverified | png/svg plot history, zoom, save and deterministic device lifecycle |
 | Project explorer | partial / browser Pages open/create/save and confirmed active-file delete with baseline conflict checks; 10 regression tests V8-shim passed; physical-browser deletion unverified | Open project, tree navigation, source-file creation and save; scoped delete is implemented, copy-verify-delete rename implemented with non-atomic filesystem race limits; physical-browser acceptance remains missing |
 | Data viewer | partial / CSV/TSV plus bounded Python/R environment table snapshots wired; real Pyodide/webR and physical browser unverified | Interactive sortable/filterable tabular datasets including missing values |
@@ -38,7 +38,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
 
 
-## 2026-10-24: side-effect-free browser Python environment inspector (PR pending)
+## 2026-10-24: side-effect-free browser Python environment inspector (native acceptance passed)
 
 The Pyodide worker previously inspected globals with arbitrary `repr(v)`,
 which could execute user-defined methods, raise exceptions or block refresh.
@@ -51,9 +51,18 @@ Node worker tests cover helper loading and malformed response rejection.
 The physical-browser suite now also checks that a hostile object does not
 break Pyodide environment refresh.
 
-**Status: implementation committed on a feature branch; cross-platform CI and
-real Pyodide browser acceptance pending.** This improves Python environment
-inspection safety and depth, but does not validate RStudio feature parity.
+**Status: partial / cross-platform native and source acceptance passed; real
+Pyodide physical-browser acceptance remains unverified.** [PR #41](https://github.com/godofecht/FlowStudio/pull/41)
+merged as [f7f1713](https://github.com/godofecht/FlowStudio/commit/f7f171355416edc4c3014f2c2a4ee1113a688f62)
+after [CI #40140193181](https://github.com/godofecht/FlowStudio/actions/runs/40140193181)
+passed all four jobs on Ubuntu 24.04 and macOS 14. Each platform passed
+503 Node tests, 2 skips, zero failures, and 62 Python tests. Native Flow 2.0.0
+compilation, live HTTP acceptance, R/Python kernels and packaging passed.
+The first CI attempt failed because an existing source contract test asserted
+the removed `repr`-based inspection path; the test now asserts the actual bounded
+helper and its response validation. No hosted CI configuration was changed.
+This improves Python environment inspection safety and depth, but does not
+validate RStudio feature parity.
 Flow remains the native HTTP/backend owner; the browser Python interpreter
 remains Pyodide.
 

@@ -100,7 +100,90 @@ function encode(source, language, entries, parseCells) {
   checkText(json, MAX_JSON_BYTES, "Exported notebook");
   return json;
 }
-const api = Object.freeze({decode, encode, MAX_JSON_BYTES});
+
+/* FlowStudio's portable, explicitly multi-kernel notebook format.
+ * Unlike .ipynb, this stores exact percent-cell source and per-cell language
+ * without claiming that Jupyter can execute Flow/R/Python in one kernel.
+ * Results are display-only snapshots, never interpreter state.
+ */
+const BUNDLE_FORMAT = "flowstudio-notebook";
+const MAX_BUNDLE_RESULTS = 128;
+const MAX_BUNDLE_PNG = 524288;
+function exactKeys(object, keys) {
+  return object !== null && typeof object === "object" && !Array.isArray(object) &&
+    Object.keys(object).length === keys.length &&
+    Object.keys(object).every(key => keys.includes(key));
+}
+function bundleCells(source, parseCells) {
+  if (typeof parseCells !== "function") throw TypeError("Source-cell parser is required.");
+  const cells = parseCells(checkText(source, MAX_SOURCE_BYTES, "Notebook source"));
+  if (!Array.isArray(cells) || cells.length > MAX_CELLS)
+    throw Error("FlowStudio notebook exceeds the 256-cell limit.");
+  for (const cell of cells) {
+    if (!cell || !["code", "markdown"].includes(cell.kind) || typeof cell.code !== "string")
+      throw Error("Invalid FlowStudio notebook source cell.");
+    checkText(cell.code, MAX_CELL_BYTES, "Notebook cell");
+  }
+  return cells;
+}
+function bundleResults(entries, cells, language, strict) {
+  if (!Array.isArray(entries) || entries.length > MAX_BUNDLE_RESULTS)
+    throw Error("FlowStudio notebook exceeds the 128-result limit.");
+  const results = [];
+  let previous = -1;
+  for (const entry of entries) {
+    if (!entry || typeof entry !== "object" ||
+        (strict && !exactKeys(entry, ["index", "language", "ok", "output", "truncated", "plots"])))
+      throw Error("Invalid FlowStudio notebook result.");
+    const index = entry.index;
+    const cell = Number.isSafeInteger(index) && index >= 0 ? cells[index] : null;
+    if (!cell || cell.kind !== "code" || index <= previous)
+      throw Error("Notebook results must refer to unique, ascending code cells.");
+    const selected = cell.language || language;
+    if (entry.language !== undefined && entry.language !== selected)
+      throw Error("Notebook result language does not match its source cell.");
+    if (typeof entry.ok !== "boolean" || typeof entry.truncated !== "boolean" ||
+        !Array.isArray(entry.plots) || entry.plots.length > 8)
+      throw Error("Invalid FlowStudio notebook result metadata.");
+    checkText(entry.output, 131072, "Notebook output");
+    const plots = entry.plots.map(plot => {
+      if (!plot || typeof plot.png !== "string" ||
+          (strict && !exactKeys(plot, ["png"])) ||
+          plot.png.length > MAX_BUNDLE_PNG || !PNG.test(plot.png))
+        throw Error("Invalid or oversized notebook PNG.");
+      return {png:plot.png};
+    });
+    results.push({index, language:selected, ok:entry.ok,
+      output:entry.output, truncated:entry.truncated, plots});
+    previous = index;
+  }
+  return results;
+}
+function encodeBundle(source, language, entries, parseCells) {
+  if (!["flow", "python", "r"].includes(language))
+    throw Error("Unsupported FlowStudio notebook default language.");
+  const cells = bundleCells(source, parseCells);
+  const results = bundleResults(entries, cells, language, false);
+  const json = JSON.stringify({format:BUNDLE_FORMAT, version:1, language, source, results}, null, 2) + "\n";
+  checkText(json, MAX_JSON_BYTES, "FlowStudio notebook");
+  return json;
+}
+function decodeBundle(json, parseCells) {
+  checkText(json, MAX_JSON_BYTES, "FlowStudio notebook");
+  let data;
+  try { data = JSON.parse(json); }
+  catch (_) { throw Error("FlowStudio notebook is not valid JSON."); }
+  if (!exactKeys(data, ["format", "version", "language", "source", "results"]) ||
+      data.format !== BUNDLE_FORMAT || data.version !== 1 ||
+      !["flow", "python", "r"].includes(data.language))
+    throw Error("Not a supported FlowStudio notebook v1.");
+  const cells = bundleCells(data.source, parseCells);
+  const results = bundleResults(data.results, cells, data.language, true);
+  return {language:data.language, source:data.source,
+    entries:results.map(result => ({...result, kind:"code", images:[]}))};
+}
+
+const api = Object.freeze({decode, encode, encodeBundle, decodeBundle, MAX_JSON_BYTES});
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 global.FlowStudioNotebookFormat = api;
 })(globalThis);

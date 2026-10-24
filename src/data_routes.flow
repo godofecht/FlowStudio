@@ -137,6 +137,9 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/app/project_workspace.js" {
         return StaticAsset { path: "docs/app/project_workspace.js", mime: "text/javascript; charset=utf-8", found: true }
     }
+    if url == "/app/python_trace_view.js" {
+        return StaticAsset { path: "docs/app/python_trace_view.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
     if url == "/app/python-worker.js" {
         return StaticAsset { path: "docs/app/python-worker.js", mime: "text/javascript; charset=utf-8", found: true }
     }

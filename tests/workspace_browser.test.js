@@ -368,7 +368,7 @@ test("Run Cell keeps Python multiline string markers inside the same execution",
   assert.equal(app.fetches.length, 1);
   assert.equal(app.fetches[0].url, "/api/run/python");
   assert.equal(app.fetches[0].options.body, 'message = """first\\n# %% literal\\nlast"""\\nprint(message)\\n');
-  assert.match(app.el("console").textContent, /\\[cell 1\\/2\\]/);
+  assert.match(app.el("console").textContent, /\[cell 1\/2\]/);
 });
 test("Run Cell preserves R multiline strings and CR-only source boundaries", async () => {
   const app = workspace(directory("empty"));

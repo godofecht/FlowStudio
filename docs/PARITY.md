@@ -1,5 +1,26 @@
 # FlowStudio RStudio parity matrix
 
+## 2026-10-25: multiple top-level R debugger breakpoints (implementation; acceptance pending)
+
+The existing Flow-owned `POST /api/debug/r/continue` endpoint now accepts up to
+64 comma-separated positive source lines (each at most six digits). The
+persistent native Rscript kernel parses the list strictly as data and stops
+before the earliest **future** matching top-level parsed expression, regardless
+of input order. The same list can be reused to continue to the next match.
+Malformed input, missing future targets and overlong lists reject without
+executing an expression. A blank target continues to completion. The browser
+debugger accepts the list and displays its source position. No new route,
+alternate backend or hosted CI change is required.
+
+**Status: partial / implementation committed; independent Linux/macOS CI
+and physical-browser acceptance pending.** Real Rscript IPC tests and Flow
+HTTP acceptance tests were added, along with browser validation and UI tests.
+These tests have **not** yet been reported as passing. This feature only
+stops between top-level expressions: breakpoints inside functions, step-into,
+stack-frame evaluation, authenticated remote sessions and full RStudio parity
+remain unimplemented.
+
+
 ## 2026-10-25: native R top-level continue and run-to-line (Linux/macOS CI passed)
 
 FlowStudio's Flow-owned `POST /api/debug/r/continue` route sends a distinct

@@ -166,5 +166,6 @@ failed:
 }
 
 const char *fs_r_run(const char *code) { return request_r('E', code); }
+const char *fs_r_check(const char *code) { return request_r('C', code); }
 const char *fs_r_inspect(void) { return request_r('I', ""); }
 int fs_r_status(void) { return last_status; }

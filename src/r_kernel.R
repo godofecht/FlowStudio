@@ -1,6 +1,6 @@
 # FlowStudio native R kernel: length-framed, single-user persistent session.
 # This is not a sandbox. Evaluated R code inherits the local user's permissions.
-# stdin: E (execute), C (parse), I (inspect), T (table), P (plot), K (packages), L (load), N (install), V (update), U (remove), B (debug start), S (debug step), F (debug continue/target line), D (debug stop), Q (debug status) + 8 lowercase hex digits + UTF-8 payload.
+# stdin: E (execute), C (parse), I (inspect), T (table), P (plot), K (packages), L (load), N (install), V (update), U (remove), B (debug start), S (debug step), F (debug continue/target line), W (evaluate while paused), D (debug stop), Q (debug status) + 8 lowercase hex digits + UTF-8 payload.
 # fd 3: 0/1 + 8 lowercase hex digits + bounded UTF-8 output.
 MAX_SOURCE <- 131072L
 MAX_OUTPUT <- 131072L
@@ -205,6 +205,26 @@ debug_step <- function() {
     debug_state <<- if (!result$success) "error" else if (
         debug_index > length(debug_expressions)) "done" else "paused"
     debug_reply(result$success, rawToChar(result$payload), line)
+}
+
+# Explicit debugger-console evaluation in the real paused workspace. Unlike
+# syntax checks, this intentionally runs user R code and may mutate bindings,
+# write files or call functions. The session is local-only and not sandboxed.
+# Only one complete parsed expression is accepted per request; errors leave
+# the pending debug expression and source position unchanged.
+debug_evaluate <- function(source) {
+    if (!identical(debug_state, "paused"))
+        return(debug_reply(FALSE, "No paused R expression is available."))
+    if (!nzchar(trimws(source)) || nchar(source, type = "bytes") > 4096L)
+        return(debug_reply(FALSE, "R debugger evaluation requires 1 to 4096 bytes of source."))
+    parsed <- tryCatch(parse(text = source, keep.source = FALSE),
+                       error = function(error) error)
+    if (inherits(parsed, "error"))
+        return(debug_reply(FALSE, paste0("R syntax error: ", conditionMessage(parsed))))
+    if (length(parsed) != 1L)
+        return(debug_reply(FALSE, "R debugger evaluation requires exactly one expression."))
+    result <- evaluate_source("", expressions_override = parsed)
+    debug_reply(result$success, rawToChar(result$payload))
 }
 
 # Continue real top-level R expressions, optionally stopping before a later
@@ -700,7 +720,7 @@ repeat {
     header <- read_exact(9L)
     if (is.null(header)) break
     header_text <- rawToChar(header)
-    if (!grepl("^[ECITPKLNUVBSFDQ][0-9a-f]{8}$", header_text)) break
+    if (!grepl("^[ECITPKLNUVBSFDQW][0-9a-f]{8}$", header_text)) break
     length_text <- substr(header_text, 2L, 9L)
     length_value <- strtoi(length_text, base = 16L)
     if (is.na(length_value) || length_value > MAX_SOURCE ||
@@ -738,6 +758,8 @@ repeat {
         debug_step()
     } else if (substr(header_text, 1L, 1L) == "F") {
         debug_continue(source)
+    } else if (substr(header_text, 1L, 1L) == "W") {
+        debug_evaluate(source)
     } else if (substr(header_text, 1L, 1L) == "D") {
         debug_stop()
     } else if (substr(header_text, 1L, 1L) == "Q") {

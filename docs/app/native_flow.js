@@ -64,7 +64,14 @@ async function debugRResponse(endpoint, body) {
         line === null || (Number.isSafeInteger(line) && line > 0)) ||
       !(data.failed_line === undefined || data.failed_line === null ||
         (Number.isSafeInteger(data.failed_line) && data.failed_line > 0)) ||
-      typeof data.output !== "string" || data.output.length > 20000)
+      typeof data.output !== "string" || data.output.length > 20000 ||
+      !(data.frames === undefined || (Array.isArray(data.frames) &&
+        data.frames.length <= 8 && data.frames.every((frame, i) =>
+          frame && typeof frame === "object" && !Array.isArray(frame) &&
+          frame.id === i + 1 && typeof frame.call === "string" &&
+          frame.call.length <= 180 && Array.isArray(frame.locals) &&
+          frame.locals.length <= 16 && frame.locals.every(name =>
+            typeof name === "string" && name.length <= 80)))))
     throw new Error("Invalid native R debugger response.");
   return {...data, ok:response.ok};
 }
@@ -80,7 +87,7 @@ function validRTargets(value) {
   return tokens.length <= 64 && tokens.every(token =>
     /^[1-9][0-9]{0,5}(?:\?[A-Za-z][A-Za-z0-9._]*(?:==|!=|>=|<=|>|<)-?(?:0|[1-9][0-9]{0,12})(?:\.[0-9]{1,12})?)?$/.test(token));
 }
-async function debugRCommand(action, targetLine = "") {
+async function debugRCommand(action, targetLine = "", frameIndex = 0) {
   if (!["step", "continue", "evaluate", "stop", "status"].includes(action))
     throw new Error("Unknown native R debugger action.");
   if (action === "continue") {
@@ -90,12 +97,17 @@ async function debugRCommand(action, targetLine = "") {
     return debugRResponse("/api/debug/r/continue", lines);
   }
   if (action === "evaluate") {
-    if (typeof targetLine !== "string" || !targetLine.trim() ||
-        new TextEncoder().encode(targetLine).length > 4096)
+    if (!Number.isSafeInteger(frameIndex) || frameIndex < 0 || frameIndex > 8)
+      throw new Error("Invalid retained R function frame index.");
+    if (typeof targetLine !== "string" || !targetLine.trim())
       throw new Error("R debugger evaluation requires 1 to 4096 bytes of source.");
-    return debugRResponse("/api/debug/r/evaluate", targetLine);
+    const body = frameIndex ? "@" + frameIndex + "\n" + targetLine : targetLine;
+    if (new TextEncoder().encode(body).length > 4096)
+      throw new Error("R debugger evaluation requires 1 to 4096 bytes of source.");
+    return debugRResponse("/api/debug/r/evaluate", body);
   }
-  if (targetLine !== "") throw new Error("Only R continue and evaluate accept source input.");
+  if (frameIndex !== 0 || targetLine !== "")
+    throw new Error("Only R evaluate accepts a function frame, and only R continue/evaluate accept source input.");
   return debugRResponse("/api/debug/r/" + action, "");
 }
 async function debugPythonStart(source, breakpoints, pauseOnException = false) {

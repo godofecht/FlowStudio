@@ -423,6 +423,22 @@ def main() -> None:
         assert isinstance(inventory["packages"], list) and len(inventory["packages"]) <= 1000
         assert any(item["name"] == "stats" for item in inventory["packages"]), inventory
         assert isinstance(inventory["truncated"], bool)
+        # Attach an installed R package through the same Flow-owned session.
+        assert request("POST", "/api/packages/r/load", "splines")[0] == 404
+        assert request("POST", "/api/packages/r/load", "splines",
+                       {"X-FlowStudio-Intent": "run",
+                        "Origin": "http://attacker.invalid"})[0] == 404
+        status, output = request("POST", "/api/packages/r/load", "splines", accepted_headers)
+        assert status == 200 and "Loaded installed R package splines" in output, (status, output)
+        status, output = request("POST", "/api/run/r",
+                                 "cat('package:splines' %in% search())", accepted_headers)
+        assert status == 200 and output.strip() == "TRUE", (status, output)
+        status, output = request("POST", "/api/packages/r/load",
+                                 "splines;stop('unsafe')", accepted_headers)
+        assert status == 422 and "Invalid R package name" in output, (status, output)
+        status, output = request("POST", "/api/packages/r/load",
+                                 "FlowStudioPackageDefinitelyMissing", accepted_headers)
+        assert status == 422 and "there is no package" in output, (status, output)
         # Real native R graphics are produced by the persistent Rscript
         # device, then retrieved through a separate Flow-owned JSON route.
         assert request("POST", "/api/plot/r", "")[0] == 404

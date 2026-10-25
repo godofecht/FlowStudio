@@ -6,6 +6,7 @@ extern const char *fs_r_inspect(void);
 extern const char *fs_r_table(const char *);
 extern const char *fs_r_plot(void);
 extern const char *fs_r_packages(void);
+extern const char *fs_r_load_package(const char *);
 extern int fs_r_status(void);
 extern void fs_r_reset(void);
 static int failure(int step, const char *output)
@@ -25,6 +26,24 @@ int main(void)
         !strstr(out, "\"name\":\"stats\"") ||
         !strstr(out, "\"truncated\":") || strlen(out) > 65000)
         return failure(37, out);
+    /* Load an installed recommended package in the persistent R search path.
+     * Invalid expressions and absent packages must not execute source or kill R.
+     */
+    out = fs_r_run("cat('package:splines' %in% search())");
+    if (fs_r_status() != 200 || strcmp(out, "FALSE") != 0) return failure(38, out);
+    out = fs_r_load_package("splines");
+    if (fs_r_status() != 200 || !strstr(out, "Loaded installed R package splines"))
+        return failure(39, out);
+    out = fs_r_run("cat('package:splines' %in% search())");
+    if (fs_r_status() != 200 || strcmp(out, "TRUE") != 0) return failure(40, out);
+    out = fs_r_load_package("splines;stop('unsafe')");
+    if (fs_r_status() != 422 || !strstr(out, "Invalid R package name"))
+        return failure(41, out);
+    out = fs_r_load_package("FlowStudioPackageDefinitelyMissing");
+    if (fs_r_status() != 422 || !strstr(out, "there is no package"))
+        return failure(42, out);
+    out = fs_r_run("cat(value)");
+    if (fs_r_status() != 200 || strcmp(out, "41") != 0) return failure(43, out);
     /* Parsing valid source must not evaluate assignments or errors. */
     out = fs_r_check("value <- 999; stop('must not run')");
     if (fs_r_status() != 200 || !strstr(out, "not executed")) return failure(21, out);

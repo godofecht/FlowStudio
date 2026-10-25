@@ -171,4 +171,5 @@ const char *fs_r_inspect(void) { return request_r('I', ""); }
 const char *fs_r_table(const char *name) { return request_r('T', name); }
 const char *fs_r_plot(void) { return request_r('P', ""); }
 const char *fs_r_packages(void) { return request_r('K', ""); }
+const char *fs_r_load_package(const char *name) { return request_r('L', name); }
 int fs_r_status(void) { return last_status; }

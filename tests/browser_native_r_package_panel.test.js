@@ -9,25 +9,42 @@ function node(tag="div") {
     click(){handlers.click?.();},replaceChildren(...items){this.children=items;this.textContent="";},
     append(...items){this.children.push(...items);}};
 }
-test("native R package panel allows real inventory but disables installation",async()=>{
+test("native R package panel loads installed packages without network installation",async()=>{
   const calls=[], notices=[];
   const target=node(),input=node("input"),installButton=node("button"),listButton=node("button");
-  let native=false;
+  let native=true;
   const panel=create({document:{createElement:node},target,input,installButton,listButton,
-    language:()=>"r",rReadOnly:()=>native,
-    rSession:()=>({async packages(){calls.push("list");return {ok:true,packages:[{name:"stats",version:"4.5.1"}]};},
-      async installPackage(){throw Error("must not install");}}),
+    language:()=>"r",rNative:()=>native,
+    rSession:()=>({async packages(){calls.push("list");return {ok:true,packages:[{name:"splines",version:"4.5.1"}]};},
+      async loadPackage(name){calls.push("load:"+name);return {ok:true,output:"Loaded installed R package "+name};},
+      async installPackage(name){calls.push("install:"+name);return {ok:true};}}),
     request:async()=>{throw Error("wrong runtime");},notice:text=>notices.push(text)});
-  native=true;panel.updateLanguage();
-  assert.equal(installButton.disabled,true);
-  assert.equal(listButton.disabled,false);
+  assert.equal(installButton.disabled,false);
+  assert.equal(installButton.textContent,"Load installed R package");
   assert.equal(await panel.list(),true);
-  assert.deepEqual(calls,["list"]);
   assert.equal(target.children[0]["aria-label"],"Installed R packages");
-  input.value="ggplot2";
+  input.value="splines";
   installButton.click();
   await new Promise(resolve=>setImmediate(resolve));
-  assert.deepEqual(calls,["list"]);
+  assert.deepEqual(calls,["list","load:splines","list"]);
+  assert.ok(notices.some(text=>text.includes("loaded into the native session")));
   native=false;panel.updateLanguage();
-  assert.equal(installButton.disabled,false);
+  assert.equal(installButton.textContent,"Install R package");
+  installButton.click();
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(calls,["list","load:splines","list","install:splines","list"]);
+});
+test("native R package panel refuses expression injection before any load",async()=>{
+  const calls=[], notices=[];
+  const target=node(),input=node("input"),installButton=node("button"),listButton=node("button");
+  create({document:{createElement:node},target,input,installButton,listButton,
+    language:()=>"r",rNative:()=>true,
+    rSession:()=>({async packages(){calls.push("list");return {ok:true,packages:[]};},
+      async loadPackage(name){calls.push(name);return {ok:true};}}),
+    request:async()=>{throw Error("wrong runtime");},notice:text=>notices.push(text)});
+  input.value="splines;stop('unsafe')";
+  installButton.click();
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(calls,[]);
+  assert.ok(notices.some(text=>text.includes("valid R package name")));
 });

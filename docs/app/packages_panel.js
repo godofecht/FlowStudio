@@ -8,7 +8,7 @@ function validRName(name) {
 }
 function create(options) {
   const {document, request, notice, target, input, installButton, listButton,
-    language = () => "python", rSession = null} = options;
+    language = () => "python", rSession = null, rReadOnly = () => false} = options;
   let busy = false, revision = 0;
   function render(packages, kind) {
     target.replaceChildren();
@@ -44,7 +44,8 @@ function create(options) {
     input.setAttribute?.("aria-label", kind === "r" ? "R package name" : "Python package name");
     installButton.textContent = kind === "r" ? "Install R package" : "Install package";
     listButton.textContent = kind === "r" ? "List R packages" : "List packages";
-    installButton.disabled = listButton.disabled = busy || kind === "flow";
+    installButton.disabled = busy || kind === "flow" || (kind === "r" && rReadOnly());
+    listButton.disabled = busy || kind === "flow";
   }
   async function perform(operation, code) {
     if (busy) return false;
@@ -54,10 +55,14 @@ function create(options) {
       notice("Browser package management supports Python and R, not Flow.");
       return false;
     }
+    if (operation === "install" && kind === "r" && rReadOnly()) {
+      notice("Native R package installation is not yet supported. Select browser webR to install packages.");
+      return false;
+    }
     busy = true;
     installButton.disabled = listButton.disabled = true;
-    notice(operation === "install" ? "Installing into the browser " + kind + " session…" :
-      "Inspecting browser " + kind + " packages…");
+    notice(operation === "install" ? "Installing into the selected " + kind + " session…" :
+      "Inspecting installed " + kind + " packages…");
     try {
       let inventory;
       if (kind === "r") {
@@ -95,7 +100,9 @@ function create(options) {
       return false;
     } finally {
       busy = false;
-      installButton.disabled = listButton.disabled = currentLanguage() === "flow";
+      installButton.disabled = currentLanguage() === "flow" ||
+        (currentLanguage() === "r" && rReadOnly());
+      listButton.disabled = currentLanguage() === "flow";
     }
   }
   listButton.addEventListener("click", () => { void perform("packages"); });

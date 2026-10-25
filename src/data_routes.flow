@@ -176,6 +176,9 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/app/variable_transfer.js" {
         return StaticAsset { path: "docs/app/variable_transfer.js", mime: "text/javascript; charset=utf-8", found: true }
     }
+    if url == "/app/r_debug_panel.js" {
+        return StaticAsset { path: "docs/app/r_debug_panel.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
     if url == "/app/r_session.js" {
         return StaticAsset { path: "docs/app/r_session.js", mime: "text/javascript; charset=utf-8", found: true }
     }

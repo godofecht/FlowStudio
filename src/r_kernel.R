@@ -14,6 +14,8 @@ debug_lines <- integer(0)
 debug_index <- 1L
 debug_state <- "idle"
 debug_failed_line <- NULL
+# Retained R call environments are postmortem only; cleared on Start/Stop.
+debug_frames <- list()
 # Persistent user-owned library; never install into the system R libraries.
 user_library <- file.path(tools::R_user_dir("FlowStudio", which = "data"), "library")
 if (dir.exists(user_library)) .libPaths(c(user_library, .libPaths()))
@@ -74,7 +76,8 @@ begin_plot_capture <- function() {
     }
 }
 
-evaluate_source <- function(source, expressions_override = NULL) {
+evaluate_source <- function(source, expressions_override = NULL,
+                            evaluation_env = workspace, capture_frames = FALSE) {
     last_plot_svg <<- NULL
     last_plot_pdf <<- NULL
     last_plot_warning <<- NULL
@@ -85,13 +88,14 @@ evaluate_source <- function(source, expressions_override = NULL) {
     original_sinks <- sink.number()
     success <- TRUE
     error_stack <- character(0)
+    captured_frames <- list()
     sink(output_connection)
     tryCatch(
         withCallingHandlers({
             expressions <- if (is.null(expressions_override))
                 parse(text = source, keep.source = FALSE) else expressions_override
             for (expression in expressions) {
-                value <- withVisible(eval(expression, envir = workspace))
+                value <- withVisible(eval(expression, envir = evaluation_env))
                 if (value$visible) print(value$value)
             }
         }, error = function(error) {
@@ -113,6 +117,50 @@ evaluate_source <- function(source, expressions_override = NULL) {
                 }, character(1L), USE.NAMES = FALSE)
                 tail(frames[nzchar(frames)], 16L)
             }, error = function(unused) character(0))
+            if (capture_frames) {
+                # Retain only closures defined in this R workspace (or nested
+                # inside one of its functions). Never retain evaluator/handler
+                # frames or invoke bindings to discover their values.
+                captured_frames <<- tryCatch({
+                    calls <- sys.calls()
+                    frames <- sys.frames()
+                    selected <- list()
+                    for (i in seq_len(min(length(calls), length(frames)))) {
+                        call <- calls[[i]]
+                        if (!is.call(call)) next
+                        callee <- call[[1L]]
+                        name <- if (is.symbol(callee)) as.character(callee) else ""
+                        if (!nzchar(name) || name %in% c(
+                            "eval", "withVisible", "tryCatch", "tryCatchList",
+                            "tryCatchOne", "doTryCatch", "withCallingHandlers",
+                            "evaluate_source", "parse", "stop", "h",
+                            ".handleSimpleError", "signalCondition")) next
+                        fn <- tryCatch(sys.function(i), error = function(e) NULL)
+                        if (!is.function(fn) || is.primitive(fn)) next
+                        env <- environment(fn)
+                        owned <- FALSE
+                        for (depth in seq_len(32L)) {
+                            if (identical(env, workspace)) {
+                                owned <- TRUE
+                                break
+                            }
+                            if (identical(env, emptyenv()) ||
+                                identical(env, globalenv()) ||
+                                identical(env, baseenv())) break
+                            env <- parent.env(env)
+                        }
+                        if (!owned) next
+                        label <- substr(paste(deparse(call, nlines = 1L,
+                                                      width.cutoff = 100L),
+                                              collapse = " "), 1L, 180L)
+                        locals <- head(ls(envir = frames[[i]], all.names = TRUE), 16L)
+                        selected[[length(selected) + 1L]] <- list(
+                            call = label, locals = substr(locals, 1L, 80L),
+                            envir = frames[[i]])
+                    }
+                    tail(selected, 8L)
+                }, error = function(unused) list())
+            }
         }, warning = function(warning) {
             cat("Warning: ", conditionMessage(warning), "\n", sep = "")
             invokeRestart("muffleWarning")
@@ -148,7 +196,8 @@ evaluate_source <- function(source, expressions_override = NULL) {
     if (nchar(output, type = "bytes") == 0L) {
         output <- if (success) "(No output)" else "Execution failed."
     }
-    list(success = success, payload = charToRaw(enc2utf8(output)))
+    list(success = success, payload = charToRaw(enc2utf8(output)),
+         frames = captured_frames)
 }
 
 # This debugger deliberately steps over one complete top-level R expression at
@@ -159,15 +208,22 @@ debug_reply <- function(success = TRUE, output = "", executed_line = NULL) {
     next_line <- if (identical(debug_state, "paused") &&
                      debug_index <= length(debug_lines)) debug_lines[[debug_index]] else NULL
     line_json <- function(value) if (is.null(value) || is.na(value)) "null" else as.character(value)
+    frame_json <- vapply(seq_along(debug_frames), function(i) {
+        frame <- debug_frames[[i]]
+        locals <- vapply(frame$locals, json_quote, character(1L), USE.NAMES = FALSE)
+        paste0('{"id":', i, ',"call":', json_quote(frame$call),
+               ',"locals":[', paste(locals, collapse = ","), ']}')
+    }, character(1L), USE.NAMES = FALSE)
     json <- paste0('{"state":', json_quote(debug_state),
                    ',"next_line":', line_json(next_line),
                    ',"executed_line":', line_json(executed_line),
                    ',"failed_line":', line_json(debug_failed_line),
                    ',"index":', debug_index,
                    ',"total":', length(debug_lines),
-                   ',"output":', json_quote(substr(output, 1L, 2048L)), "}")
+                   ',"output":', json_quote(substr(output, 1L, 2048L)),
+                   ',"frames":[', paste(frame_json, collapse = ","), "]}")
     if (nchar(json, type = "bytes") > 20000L)
-        json <- '{"state":"error","next_line":null,"executed_line":null,"index":0,"total":0,"output":"Debug output exceeds limit."}'
+        json <- '{"state":"error","next_line":null,"executed_line":null,"index":0,"total":0,"output":"Debug output exceeds limit.","frames":[]}'
     list(success = success, payload = charToRaw(enc2utf8(json)))
 }
 
@@ -180,6 +236,7 @@ debug_start <- function(source) {
     debug_index <<- 1L
     debug_state <<- "idle"
     debug_failed_line <<- NULL
+    debug_frames <<- list()
     parsed <- tryCatch(parse(text = source, keep.source = TRUE),
                        error = function(error) error)
     if (inherits(parsed, "error"))
@@ -203,7 +260,9 @@ debug_step <- function() {
     # Execute exactly one parsed expression, preserving all existing R evaluation,
     # warning, stdout, error and plot-capture behavior.
     expression <- as.expression(list(debug_expressions[[debug_index]]))
-    result <- evaluate_source("", expressions_override = expression)
+    result <- evaluate_source("", expressions_override = expression,
+                              capture_frames = TRUE)
+    debug_frames <<- if (result$success) list() else result$frames
     debug_failed_line <<- if (result$success) NULL else line
     debug_index <<- debug_index + 1L
     debug_state <<- if (!result$success) "error" else if (
@@ -211,9 +270,9 @@ debug_step <- function() {
     debug_reply(result$success, rawToChar(result$payload), line)
 }
 
-# Explicit debugger-console evaluation in the real paused or failed workspace.
-# After an error this provides postmortem inspection of top-level bindings,
-# not an unwound function frame. Evaluations are real and may have side effects.
+# Explicit debugger-console evaluation in the paused workspace or a retained
+# postmortem user-function frame. Frame evaluation is not a live breakpoint:
+# unwound execution cannot resume. All evaluations have user-code side effects.
 # Only one parsed expression is accepted; it never resumes source execution,
 # clears the failure location, or changes the debugger state.
 debug_evaluate <- function(source) {
@@ -221,13 +280,26 @@ debug_evaluate <- function(source) {
         return(debug_reply(FALSE, "No paused or failed R expression is available."))
     if (!nzchar(trimws(source)) || nchar(source, type = "bytes") > 4096L)
         return(debug_reply(FALSE, "R debugger evaluation requires 1 to 4096 bytes of source."))
+    evaluation_env <- workspace
+    # @N followed by a newline selects the Nth retained user function frame.
+    # This is an explicit debugger protocol prefix, not evaluated as R source.
+    selector <- regmatches(source, regexec("^@([1-9][0-9]?)\\n", source,
+                                          perl = TRUE))[[1L]]
+    if (length(selector)) {
+        index <- as.integer(selector[[2L]])
+        if (!identical(debug_state, "error") || index > length(debug_frames))
+            return(debug_reply(FALSE, "No retained R function frame at that index."))
+        evaluation_env <- debug_frames[[index]]$envir
+        source <- substring(source, nchar(selector[[1L]]) + 1L)
+    }
     parsed <- tryCatch(parse(text = source, keep.source = FALSE),
                        error = function(error) error)
     if (inherits(parsed, "error"))
         return(debug_reply(FALSE, paste0("R syntax error: ", conditionMessage(parsed))))
     if (length(parsed) != 1L)
         return(debug_reply(FALSE, "R debugger evaluation requires exactly one expression."))
-    result <- evaluate_source("", expressions_override = parsed)
+    result <- evaluate_source("", expressions_override = parsed,
+                              evaluation_env = evaluation_env)
     debug_reply(result$success, rawToChar(result$payload))
 }
 
@@ -306,7 +378,9 @@ debug_continue <- function(target_line) {
             }, logical(1L)))) break
         last_line <- debug_lines[[debug_index]]
         expression <- as.expression(list(debug_expressions[[debug_index]]))
-        result <- evaluate_source("", expressions_override = expression)
+        result <- evaluate_source("", expressions_override = expression,
+                                  capture_frames = TRUE)
+        debug_frames <<- if (result$success) list() else result$frames
         debug_index <<- debug_index + 1L
         debug_state <<- if (!result$success) "error" else if (
             debug_index > length(debug_expressions)) "done" else "paused"
@@ -331,6 +405,7 @@ debug_stop <- function() {
     debug_lines <<- integer(0)
     debug_index <<- 1L
     debug_failed_line <<- NULL
+    debug_frames <<- list()
     debug_state <<- "idle"
     debug_reply()
 }

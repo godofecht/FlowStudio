@@ -195,6 +195,30 @@ def main() -> None:
     assert status == 200 and json.loads(body)["state"] == "done", (status, body)
     assert json.loads(body)["output"] == "1", body
 
+    # Actual Flow HTTP -> C IPC -> Rscript postmortem user function frames.
+    status, body = request("POST", "/api/debug/r/start",
+                           "fs_outer <- function(v) { fs_outer_local <- v + 1L; "
+                           "fs_inner <- function(w) { fs_inner_local <- w + 2L; "
+                           "stop('frame failure') }; fs_inner(fs_outer_local) }\n"
+                           "fs_outer(40L)\ncat('unreachable')", accepted_headers)
+    assert status == 200, (status, body)
+    assert request("POST", "/api/debug/r/step", "", accepted_headers)[0] == 200
+    status, body = request("POST", "/api/debug/r/step", "", accepted_headers)
+    frames = json.loads(body)
+    assert status == 422 and frames["state"] == "error" and frames["failed_line"] == 2, frames
+    assert [frame["call"] for frame in frames["frames"]] == [
+        "fs_outer(40L)", "fs_inner(fs_outer_local)"], frames
+    assert "fs_outer_local" in frames["frames"][0]["locals"], frames
+    assert "fs_inner_local" in frames["frames"][1]["locals"], frames
+    status, body = request("POST", "/api/debug/r/evaluate",
+                           "@2\nfs_inner_local", accepted_headers)
+    assert status == 200 and json.loads(body)["output"].strip() == "[1] 43", (status, body)
+    status, body = request("POST", "/api/debug/r/evaluate",
+                           "@8\nfs_inner_local", accepted_headers)
+    assert status == 422 and "No retained R function frame" in json.loads(body)["output"]
+    status, body = request("POST", "/api/debug/r/stop", "", accepted_headers)
+    assert status == 200 and json.loads(body)["frames"] == [], (status, body)
+
     # Native Git reads and writes require the existing intent/origin gate.
     assert request("GET", "/api/git/status")[0] == 404
     for route in ("/api/git/status", "/api/git/diff", "/api/git/diff/staged",

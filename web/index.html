@@ -190,8 +190,10 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
       </div>
       <div class="project-search" role="search" aria-label="Search project files">
         <label for="projectSearch">Find in project</label>
-        <input id="projectSearch" type="search" maxlength="256" placeholder="Literal text" aria-label="Find in project">
+        <input id="projectSearch" type="search" maxlength="256" placeholder="Text or regex" aria-label="Find in project">
         <label><input id="caseSensitive" type="checkbox"> Case</label>
+        <label><input id="projectRegex" type="checkbox"> Regex</label>
+        <label><input id="projectWholeWord" type="checkbox"> Word</label>
         <button id="searchProject" type="button">Find all</button>
       </div>
       <div id="searchResults" aria-live="polite" aria-label="Project search results"></div>
@@ -262,7 +264,7 @@ function validFilename(name) {
   return true;
 }
 
-/* Bounded, read-only literal search over browser-granted project files. */
+/* Bounded, read-only literal/regex search over browser-granted project files. */
 async function searchProject(root, query, options = {}) {
   if (!root || root.kind !== "directory") throw new Error("Open a project folder first.");
   if (typeof query !== "string" || !query.trim() || query.length > 256)
@@ -271,7 +273,16 @@ async function searchProject(root, query, options = {}) {
   const MAX_BYTES = 1024 * 1024, MAX_ENTRIES = 500;
   const metacharacters = "\\^$.*+?()[]{}|";
   const literal = [...query].map(ch => metacharacters.includes(ch) ? "\\" + ch : ch).join("");
-  const expression = new RegExp(literal, options.caseSensitive ? "g" : "gi");
+  const body = options.regex ? query : literal;
+  const pattern = options.wholeWord
+    ? "(?<![\\p{L}\\p{N}_])(?:" + body + ")(?![\\p{L}\\p{N}_])" : body;
+  let expression;
+  try {
+    expression = new RegExp(pattern, (options.caseSensitive ? "g" : "gi") +
+      (options.regex ? "m" : "") + "u");
+  } catch (error) {
+    throw new Error("Invalid regular expression: " + error.message);
+  }
   const matches = [];
   let scannedFiles = 0, skippedLarge = 0, truncated = false;
   function checkAbort() {
@@ -305,10 +316,11 @@ async function searchProject(root, query, options = {}) {
       if (handle.kind !== "file" || !editable.test(name)) continue;
       const file = await handle.getFile();
       checkAbort();
-      if (file.size > MAX_BYTES) { skippedLarge++; continue; }
+      const maxBytes = options.regex ? 128 * 1024 : MAX_BYTES;
+      if (file.size > maxBytes) { skippedLarge++; continue; }
       const source = await file.text();
       checkAbort();
-      if (source.length > MAX_BYTES) { skippedLarge++; continue; }
+      if (source.length > maxBytes) { skippedLarge++; continue; }
       scannedFiles++;
       let line = 1, lineStart = 0;
       for (const found of source.matchAll(expression)) {
@@ -323,7 +335,7 @@ async function searchProject(root, query, options = {}) {
         }
         const lineEnd = newline < 0 ? source.length : newline;
         matches.push({
-          path, handle, index, length: found[0].length,
+          path, handle, index, length: found[0].length, text: found[0],
           line, column: index - lineStart + 1,
           preview: source.slice(lineStart, Math.min(lineEnd, lineStart + 180))
         });
@@ -1296,7 +1308,9 @@ async function runProjectSearch() {
   status("Searching project …");
   try {
     const caseSensitive = el("caseSensitive").checked;
-    const result = await project.search(query, { caseSensitive });
+    const regex = el("projectRegex").checked;
+    const wholeWord = el("projectWholeWord").checked;
+    const result = await project.search(query, { caseSensitive, regex, wholeWord });
     if (token !== searchRevision) return;
     const summary = document.createElement("p");
     summary.className = "muted hint";
@@ -1311,12 +1325,19 @@ async function runProjectSearch() {
       button.title = "Open " + hit.path + " at line " + hit.line;
       button.addEventListener("click", async () => {
         try {
+          // Re-read the granted disk file before switching tabs: an already
+          // open editor tab may still hold an older, cached buffer.
+          const current = await hit.handle.getFile();
+          const limit = regex ? 128 * 1024 : 1024 * 1024;
+          if (current.size > limit ||
+              (await current.text()).slice(hit.index, hit.index + hit.length) !== hit.text) {
+            status("File changed since search; search again.", "error");
+            return;
+          }
           const opened = await openEditorHandle(hit.handle, hit.path);
           if (!opened) return;
           const selected = src.value.slice(hit.index, hit.index + hit.length);
-          const equal = caseSensitive ? selected === query :
-            selected.toLowerCase() === query.toLowerCase();
-          if (!equal) {
+          if (selected !== hit.text) {
             status("File changed since search; search again.", "error");
             return;
           }

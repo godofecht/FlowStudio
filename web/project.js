@@ -10,7 +10,7 @@ function validFilename(name) {
   return true;
 }
 
-/* Bounded, read-only literal search over browser-granted project files. */
+/* Bounded, read-only literal/regex search over browser-granted project files. */
 async function searchProject(root, query, options = {}) {
   if (!root || root.kind !== "directory") throw new Error("Open a project folder first.");
   if (typeof query !== "string" || !query.trim() || query.length > 256)
@@ -19,7 +19,16 @@ async function searchProject(root, query, options = {}) {
   const MAX_BYTES = 1024 * 1024, MAX_ENTRIES = 500;
   const metacharacters = "\\^$.*+?()[]{}|";
   const literal = [...query].map(ch => metacharacters.includes(ch) ? "\\" + ch : ch).join("");
-  const expression = new RegExp(literal, options.caseSensitive ? "g" : "gi");
+  const body = options.regex ? query : literal;
+  const pattern = options.wholeWord
+    ? "(?<![\\p{L}\\p{N}_])(?:" + body + ")(?![\\p{L}\\p{N}_])" : body;
+  let expression;
+  try {
+    expression = new RegExp(pattern, (options.caseSensitive ? "g" : "gi") +
+      (options.regex ? "m" : "") + "u");
+  } catch (error) {
+    throw new Error("Invalid regular expression: " + error.message);
+  }
   const matches = [];
   let scannedFiles = 0, skippedLarge = 0, truncated = false;
   function checkAbort() {
@@ -53,10 +62,11 @@ async function searchProject(root, query, options = {}) {
       if (handle.kind !== "file" || !editable.test(name)) continue;
       const file = await handle.getFile();
       checkAbort();
-      if (file.size > MAX_BYTES) { skippedLarge++; continue; }
+      const maxBytes = options.regex ? 128 * 1024 : MAX_BYTES;
+      if (file.size > maxBytes) { skippedLarge++; continue; }
       const source = await file.text();
       checkAbort();
-      if (source.length > MAX_BYTES) { skippedLarge++; continue; }
+      if (source.length > maxBytes) { skippedLarge++; continue; }
       scannedFiles++;
       let line = 1, lineStart = 0;
       for (const found of source.matchAll(expression)) {
@@ -71,7 +81,7 @@ async function searchProject(root, query, options = {}) {
         }
         const lineEnd = newline < 0 ? source.length : newline;
         matches.push({
-          path, handle, index, length: found[0].length,
+          path, handle, index, length: found[0].length, text: found[0],
           line, column: index - lineStart + 1,
           preview: source.slice(lineStart, Math.min(lineEnd, lineStart + 180))
         });

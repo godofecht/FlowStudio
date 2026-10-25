@@ -10,12 +10,12 @@ function available(location = global.location) {
     (location.hostname === "127.0.0.1" || location.hostname === "localhost") &&
     location.port === "8751";
 }
-async function request(endpoint, code) {
+async function request(endpoint, code, timeoutMs = 70000) {
   if (!available()) throw new Error("Flow execution requires the native FlowStudio server on port 8751.");
   if (typeof code !== "string" || new TextEncoder().encode(code).length > MAX_SOURCE_BYTES)
     throw new Error("Flow source exceeds the 64 KiB execution limit.");
   const controller = new AbortController();
-  const timeout = global.setTimeout(() => controller.abort(), 70000);
+  const timeout = global.setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await global.fetch(endpoint, {
       method: "POST",
@@ -315,6 +315,18 @@ function createRSession() {
       return generation === epoch ? result : stale();
     });
   }
+  function installPackage(name) {
+    if (typeof name !== "string" ||
+        !/^[A-Za-z][A-Za-z0-9.]{0,79}$/.test(name) ||
+        name.includes("..") || name.endsWith("."))
+      return Promise.resolve({ok:false, output:"Invalid R package name."});
+    const generation = epoch;
+    return schedule(async () => {
+      if (generation !== epoch) return stale();
+      const result = await request("/api/packages/r/install", name, 190000);
+      return generation === epoch ? result : stale();
+    });
+  }
   function checkSyntax(code) {
     const generation = epoch;
     return schedule(async () => {
@@ -331,9 +343,9 @@ function createRSession() {
     });
   }
   const unsupported = () => Promise.resolve({ok:false,
-    output:"This operation is not available for native R yet. Select browser webR for installation, help, completion or variable transfer; the two R workspaces are separate."});
+    output:"This operation is not available for native R yet. Select browser webR for help, completion or variable transfer; the two R workspaces are separate."});
   return Object.freeze({run, inspect, checkSyntax, reset,
-    table, plot, packages, loadPackage, installPackage:unsupported,
+    table, plot, packages, loadPackage, installPackage,
     help:unsupported, complete:unsupported,
     exportVariable:unsupported, importVariable:unsupported});
 }

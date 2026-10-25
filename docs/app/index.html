@@ -23,6 +23,7 @@ pre{white-space:pre-wrap;overflow:auto;overflow-wrap:anywhere;flex:1;margin:0;pa
 <body>
 <header><strong>◈ FlowStudio <span class="muted">/ Browser</span></strong>
 <label for="language">Language</label><select id="language"><option value="python">Python (browser)</option><option value="flow">Flow (native localhost only)</option><option value="r">R (browser; webR 0.6.0)</option></select>
+<label for="rRuntime">R engine</label><select id="rRuntime" aria-label="R execution engine"><option value="browser">webR (browser)</option><option value="native">Rscript (native Flow server)</option></select>
 <button id="open" type="button">Open file</button><button id="openFolder" type="button">Open project folder</button><button id="newProjectFile" type="button">New project file</button><button id="saveProjectFile" type="button" disabled>Save to disk</button><button id="saveAsProjectFile" type="button">Save As…</button><button id="renameProjectFile" type="button" disabled>Rename open project file</button><button id="deleteProjectFile" type="button" disabled>Delete open project file</button><input id="file" type="file" accept=".py,.flow,.r,.R,.txt" hidden>
 <button id="save" type="button">Download source</button><button id="run" type="button">Run Ctrl+Enter</button><button id="checkSyntax" type="button">Check syntax</button><button id="tracePython" type="button" disabled title="Native localhost Python line tracing; executes source in the native Python session">Trace Python (native)</button><button id="completeSource" type="button" title="Complete symbol at cursor (Ctrl+Space)">Complete Ctrl+Space</button><button id="runSelection" type="button">Run selection Ctrl+Shift+Enter</button><button id="runCell" type="button">Run cell Ctrl+Alt+Enter</button><button id="runNotebook" type="button" title="Use # %% [python], # %% [r] or # %% [flow] for per-cell runtime selection; Flow requires native localhost">Run all cells</button><button id="openNotebook" type="button">Open .ipynb</button><input id="notebookFile" type="file" accept=".ipynb,application/x-ipynb+json" hidden><button id="saveNotebook" type="button">Export .ipynb</button><button id="openFlowNotebook" type="button" title="Open a portable mixed-language FlowStudio notebook">Open .fsnb</button><input id="flowNotebookFile" type="file" accept=".fsnb,application/json" hidden><button id="saveFlowNotebook" type="button" title="Preserve exact mixed-language source and saved outputs without restoring interpreter state">Export .fsnb</button><button id="exportReport" type="button">Export HTML report</button><button id="reset" type="button">Reset selected session</button><button id="forgetDraft" type="button">Forget saved draft</button>
 </header>
@@ -91,8 +92,15 @@ if (typeof FlowStudioPythonDebugPanel !== "undefined" && typeof FlowStudioNative
     statusButton:$("pythonDebugStatus"), target:$("pythonDebugOutput"), notice});
 const plotHistory = FlowStudioPlotHistory.create($("workspace"));
 const environmentData = FlowStudioEnvironmentData.create({target:$("workspace"), document, dataApi:FlowStudioData});
-let rSession = null;
-function getRSession() { return rSession || (rSession = FlowStudioRSession.create()); }
+let rSession = null, nativeRSession = null;
+const nativeAvailable = globalThis.FlowStudioNativeFlow?.available?.() === true;
+$("rRuntime").disabled = !nativeAvailable;
+function nativeRSelected() { return nativeAvailable && $("rRuntime").value === "native"; }
+function getRSession() {
+  if (nativeRSelected())
+    return nativeRSession || (nativeRSession = FlowStudioNativeFlow.createRSession());
+  return rSession || (rSession = FlowStudioRSession.create());
+}
 let draftStorage = null;
 try { draftStorage = window.localStorage; } catch (_) { /* private browsing may block storage */ }
 const drafts = FlowStudioDraftStorage.create(draftStorage, 300, () => notice("Draft could not be saved in this browser."));
@@ -119,6 +127,7 @@ function setBusy(value) {
   busy = value;
   for (const id of ["run", "runSelection", "runCell", "runNotebook", "checkSyntax", "lookupHelp", "completeSource", "transferVariable"]) $(id).disabled = value;
   $("tracePython").disabled = value || $("language").value !== "python" || !globalThis.FlowStudioNativeFlow?.available?.();
+  $("rRuntime").disabled = value || !nativeAvailable;
 }
 const packagePanel = FlowStudioPackages.create({document, request, notice, target:$("packages"),
   input:$("packageName"), installButton:$("installPackage"), listButton:$("listPackages"),
@@ -261,7 +270,7 @@ async function run(selectedOnly = false, activeCell = false, consoleCode = null,
   const code = prepared.code;
   const generation = sessionGeneration;
   setBusy(true);
-  notice(language === "flow" ? "Compiling and executing Flow with the native localhost server." : language === "r" ? "Executing R in your browser — initial webR download can take time." : "Executing in your browser — initial Pyodide download can take time.");
+  notice(language === "flow" ? "Compiling and executing Flow with the native localhost server." : language === "r" ? (nativeRSelected() ? "Executing R in the persistent native Rscript kernel via Flow." : "Executing R in your browser — initial webR download can take time.") : "Executing in your browser — initial Pyodide download can take time.");
   try {
     const response = language === "flow" ? await globalThis.FlowStudioNativeFlow.run(code) : language === "r" ? await getRSession().run(code) : await request("run", code);
     if (generation !== sessionGeneration) return false;
@@ -324,8 +333,7 @@ async function checkSyntax() {
   notice("Checking " + language + " syntax without executing source.");
   try {
     const result = language === "flow" ? await globalThis.FlowStudioNativeFlow.checkSyntax(code) :
-      language === "r" ? (globalThis.FlowStudioNativeFlow?.available?.() ?
-        await globalThis.FlowStudioNativeFlow.checkRSyntax(code) : await getRSession().checkSyntax(code)) :
+      language === "r" ? await getRSession().checkSyntax(code) :
         await request("check", code);
     if (generation !== sessionGeneration || $("language").value !== language) return;
     if ($("source").value !== code) { notice("Source changed during syntax check; stale diagnostics discarded."); return; }
@@ -473,13 +481,27 @@ $("source").addEventListener("keydown", event => {
   else if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void run(false); }
 });
 $("source").addEventListener("input", () => { notebookEntries = []; clearNotebookRecovery(); queueDraft(); });
+$("rRuntime").addEventListener("change", () => {
+  if (!nativeAvailable) { $("rRuntime").value = "browser"; return; }
+  sessionGeneration++;
+  notebookRunner?.cancel();
+  notebookEntries = [];
+  clearNotebookRecovery();
+  environmentData.clear();
+  $("environment").textContent = "(R engine changed; sessions are separate)";
+  packagePanel.clear();
+  completion.clear();
+  notice(nativeRSelected() ?
+    "Native Rscript selected. Source, console, notebook cells and environment use Flow's persistent R kernel. Browser-only R packages, tables, help, transfer and plotting are unavailable in this mode." :
+    "Browser webR selected. This workspace is separate from the native Rscript kernel.");
+});
 $("language").addEventListener("change", () => { completion.clear(); notebookEntries = []; clearNotebookRecovery(); environmentData.clear(); packagePanel.updateLanguage?.(); $("tracePython").disabled = busy || $("language").value !== "python" || !globalThis.FlowStudioNativeFlow?.available?.(); queueDraft(); });
 window.addEventListener("pagehide", () => drafts.flush());
 $("forgetDraft").addEventListener("click", () => {
   drafts.clear();
   notice("Saved local draft forgotten; current editor contents remain open.");
 });
-$("reset").addEventListener("click", () => {
+$("reset").addEventListener("click", async () => {
   if ($("language").value === "flow") {
     notice("Flow programs run independently; there is no persistent Flow session to reset.");
     return;
@@ -493,9 +515,21 @@ $("reset").addEventListener("click", () => {
   setBusy(false);
   packagePanel.clear();
   if ($("language").value === "r") {
-    if (rSession) rSession.reset();
-    $("environment").textContent = "(New R session)";
-    notice("R state reset.");
+    const generation = sessionGeneration;
+    const session = getRSession();
+    try {
+      const result = await session.reset();
+      if (generation !== sessionGeneration) return;
+      if (result && result.ok === false) {
+        notice("R reset failed: " + (result.output || "Unknown error"));
+        return;
+      }
+      $("environment").textContent = "(New R session)";
+      notice("R state reset.");
+    } catch (error) {
+      if (generation === sessionGeneration)
+        notice("R reset failed: " + String(error.message || error));
+    }
     return;
   }
   plotHistory.clear();

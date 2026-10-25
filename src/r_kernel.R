@@ -19,76 +19,41 @@ read_exact <- function(count) {
 }
 
 
-# Capture actual R graphics in a device opened before evaluation. Cairo SVG
-# works on most Linux hosts; the built-in PDF device needs no X11 on macOS.
-# This is a real R graphics device, not an emulated plotting implementation.
+# R's built-in PDF device works without X11, Cairo, or third-party packages.
+# Open it before evaluating source; close it before exposing a bounded snapshot.
 last_plot_svg <- NULL
 last_plot_pdf <- NULL
 last_plot_warning <- NULL
 begin_plot_capture <- function() {
-    path <- tempfile("flowstudio-r-plot-", fileext = ".svg")
-    format <- "svg"
-    opened <- tryCatch({
-        grDevices::svg(filename = path, width = 7, height = 5)
-        TRUE
-    }, error = function(error) FALSE)
-    if (!opened) {
-        path <- tempfile("flowstudio-r-plot-", fileext = ".pdf")
-        format <- "pdf"
-        grDevices::pdf(file = path, width = 7, height = 5, onefile = TRUE)
-    }
+    path <- tempfile("flowstudio-r-plot-", fileext = ".pdf")
+    grDevices::pdf(file = path, width = 7, height = 5, onefile = TRUE)
     device <- as.integer(grDevices::dev.cur())
     function() {
-        last_plot_warning <<- paste0("capture-finalizer:", format, " device=", device)
         devices <- grDevices::dev.list()
         if (!is.null(devices) && device %in% devices) {
             try(grDevices::dev.off(which = device), silent = TRUE)
         }
         on.exit(unlink(path), add = TRUE)
-        if (!file.exists(path)) {
-            last_plot_warning <<- paste0("capture-missing-file:", format)
-            return(invisible(NULL))
-        }
+        if (!file.exists(path)) return(invisible(NULL))
         bytes <- file.info(path)$size
-        last_plot_warning <<- paste0("capture-file:", format, " bytes=", bytes)
         if (!is.finite(bytes) || bytes <= 0) return(invisible(NULL))
         if (bytes > 60000L) {
-            last_plot_warning <<- "Native R plot exceeds the 60 KiB capture limit."
+            last_plot_warning <<- "Native R PDF exceeds the 60 KiB capture limit."
             return(invisible(NULL))
         }
-        if (format == "svg") {
-            svg <- tryCatch(readChar(path, nchars = as.integer(bytes), useBytes = TRUE),
-                            error = function(error) NULL)
-            if (is.null(svg) || !grepl("<svg", svg, fixed = TRUE)) {
-                last_plot_warning <<- "Native R SVG capture could not be read."
-                return(invisible(NULL))
-            }
-            # Blank SVG devices contain no drawn graphical elements.
-            if (!grepl("<(path|use|text|image|rect|circle|line|polygon|polyline)[ >]",
-                       svg, perl = TRUE)) return(invisible(NULL))
-            svg <- iconv(svg, from = "UTF-8", to = "UTF-8", sub = NA_character_)
-            if (is.na(svg)) {
-                last_plot_warning <<- "Native R SVG capture contains invalid UTF-8."
-            } else {
-                last_plot_svg <<- svg
-                last_plot_warning <<- NULL
-            }
-        } else {
-            reader <- file(path, open = "rb")
-            raw <- readBin(reader, what = "raw", n = as.integer(bytes))
-            close(reader)
-            if (length(raw) < 4L || !identical(raw[1:4], charToRaw("%PDF"))) {
-                last_plot_warning <<- "Native R PDF capture was invalid."
-                return(invisible(NULL))
-            }
-            # A PDF device without a drawn page has no page dictionary.
-            printable <- paste(rawToChar(raw, multiple = TRUE), collapse = "")
-            if (!grepl("/Type /Page([^sA-Za-z]|$)", printable, perl = TRUE)) {
-                return(invisible(NULL))
-            }
-            last_plot_pdf <<- paste(sprintf("%02x", as.integer(raw)), collapse = "")
-            last_plot_warning <<- NULL
+        reader <- file(path, open = "rb")
+        raw <- readBin(reader, what = "raw", n = as.integer(bytes))
+        close(reader)
+        if (length(raw) < 4L || !identical(raw[1:4], charToRaw("%PDF"))) {
+            last_plot_warning <<- "Native R PDF capture was invalid."
+            return(invisible(NULL))
         }
+        # A device without a drawn page has no /Type /Page dictionary.
+        printable <- paste(rawToChar(raw, multiple = TRUE), collapse = "")
+        if (!grepl("/Type /Page([^sA-Za-z]|$)", printable, perl = TRUE)) {
+            return(invisible(NULL))
+        }
+        last_plot_pdf <<- paste(sprintf("%02x", as.integer(raw)), collapse = "")
         invisible(NULL)
     }
 }

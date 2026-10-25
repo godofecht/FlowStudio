@@ -217,8 +217,19 @@ function create({projectApi, fileSaveApi, source, filename, language, tree,
   saveFileButton.disabled = true;
   if (deleteFileButton) deleteFileButton.disabled = true;
   if (renameFileButton) renameFileButton.disabled = true;
+  async function isOpenHandle(handle) {
+    if (!activeHandle) return false;
+    if (activeHandle === handle) return true;
+    if (typeof activeHandle.isSameEntry === "function")
+      return !!(await activeHandle.isSameEntry(handle));
+    if (typeof handle.isSameEntry === "function")
+      return !!(await handle.isSameEntry(activeHandle));
+    // When identity cannot be established, reject replacement rather than
+    // risk overwriting a file currently held in the editor.
+    throw new Error("Cannot verify whether the project file is open in the editor.");
+  }
   return {project, choose, save, saveAs, createFile, deleteFile, renameFile, openHandle, notifyExternalOpen, dirty,
-    hasActiveFile: () => activeHandle !== null};
+    isOpenHandle, hasActiveFile: () => activeHandle !== null};
 }
 const api = {create};
 if (typeof module !== "undefined" && module.exports) module.exports = api;

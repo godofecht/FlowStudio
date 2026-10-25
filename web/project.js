@@ -156,7 +156,7 @@ async function applyProjectReplacement(plan, options = {}) {
     throw new Error("Invalid project replacement preview.");
   for (const entry of plan.files) {
     checkReplacementAbort(options.signal);
-    if (options.isBlocked && options.isBlocked(entry))
+    if (options.isBlocked && await options.isBlocked(entry))
       throw new Error("Close the open editor tab before replacing " + entry.path + ".");
     if (typeof entry.handle.createWritable !== "function")
       throw new Error("Write access is unavailable for " + entry.path + ".");
@@ -168,7 +168,7 @@ async function applyProjectReplacement(plan, options = {}) {
   try {
     for (const entry of plan.files) {
       checkReplacementAbort(options.signal);
-      if (options.isBlocked && options.isBlocked(entry))
+      if (options.isBlocked && await options.isBlocked(entry))
         throw new Error("An editor tab was opened during replacement: " + entry.path);
       const current = await entry.handle.getFile();
       if (await current.text() !== entry.before)

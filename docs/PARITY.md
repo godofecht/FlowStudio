@@ -1,6 +1,34 @@
 # FlowStudio RStudio parity matrix
 
 
+## 2026-10-25: Pages project-wide replacement controls (PR #56; acceptance pending)
+
+The Pages/browser workspace now exposes a real project-wide replacement panel
+backed by the existing browser-granted File System Access project engine.
+Literal, regex, Unicode whole-word and case-sensitive options produce a
+read-only preview with per-file counts and before/after excerpts. Explicit
+confirmation is required before applying. Changes to search controls invalidate
+the preview; project switches, stale disk contents and files held by the
+source editor are refused before writes. Open-editor detection awaits actual
+`FileSystemHandle.isSameEntry` when file handles differ. Native and Pages
+replacement engines both await asynchronous blocked-file guards.
+
+The existing bounds remain in force (200 search matches, 50 changed files,
+8-million-character preview budget, regex files limited to 128 KiB).
+Multi-file writes are **not atomic**; failures after some files were written
+are reported as partial changes, never as rollback. Project sources are not
+uploaded to the Flow backend.
+
+**Status: implemented / new Node regression tests committed; independent
+Linux/macOS CI and physical-browser acceptance not yet verified.**
+[PR #56](https://github.com/godofecht/FlowStudio/pull/56).
+No hosted CI configuration or Flow compiler syntax was changed. This
+improves the Pages project UI but does not establish RStudio parity;
+physical-browser interpreter acceptance, interactive R/Flow debugging,
+authenticated remote sessions and full desktop compatibility remain open.
+
+
+
 ## 2026-10-25: project-wide literal/regex replacement (implementation; cross-platform CI pending)
 
 The native four-pane IDE now previews project-wide literal or Unicode whole-word

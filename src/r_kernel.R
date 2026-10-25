@@ -1,6 +1,6 @@
 # FlowStudio native R kernel: length-framed, single-user persistent session.
 # This is not a sandbox. Evaluated R code inherits the local user's permissions.
-# stdin: E (execute), C (parse), I (inspect), T (table), P (plot), K (packages), L (load), N (install from CRAN), V (update user package), U (remove user package) + 8 lowercase hex digits + UTF-8 payload.
+# stdin: E (execute), C (parse), I (inspect), T (table), P (plot), K (packages), L (load), N (install), V (update), U (remove), B (debug start), S (debug step), D (debug stop), Q (debug status) + 8 lowercase hex digits + UTF-8 payload.
 # fd 3: 0/1 + 8 lowercase hex digits + bounded UTF-8 output.
 MAX_SOURCE <- 131072L
 MAX_OUTPUT <- 131072L

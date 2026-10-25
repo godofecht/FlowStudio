@@ -195,6 +195,7 @@ class DebugSession:
             finally:
                 sys.settrace(None)
         with self.cv:
+            self.last_exception = None
             self.exception = None
             self.ok = ok
             self.message = message

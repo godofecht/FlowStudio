@@ -217,12 +217,13 @@ table_snapshot <- function(name) {
         return(list(success = FALSE, payload = charToRaw("Select a plain data.frame or atomic matrix.")))
     }
     if (frame) {
-        total_columns <- length(value)
+        total_columns <- length(unclass(value))
         if (total_columns < 1L) {
             return(list(success = FALSE, payload = charToRaw("R table has no columns.")))
         }
         columns_data <- unclass(value)
-        total_rows <- length(columns_data[[1L]])
+        first_column <- columns_data[[1L]]
+        total_rows <- length(if (is.object(first_column)) unclass(first_column) else first_column)
         labels <- attr(value, "names", exact = TRUE)
     } else {
         total_rows <- shape[[1L]]
@@ -231,13 +232,14 @@ table_snapshot <- function(name) {
             return(list(success = FALSE, payload = charToRaw("R matrix has no columns.")))
         }
         dim_names <- attr(value, "dimnames", exact = TRUE)
-        labels <- if (is.list(dim_names) && length(dim_names) == 2L &&
-                      is.character(dim_names[[2L]])) dim_names[[2L]] else NULL
+        labels <- if (is.list(dim_names) && !is.object(dim_names) &&
+                      length(dim_names) == 2L && is.character(dim_names[[2L]]) &&
+                      !is.object(dim_names[[2L]])) dim_names[[2L]] else NULL
     }
     take_columns <- min(total_columns, 32L)
     take_rows <- min(total_rows, 200L)
     label <- function(index) {
-        if (is.character(labels) && length(labels) >= index &&
+        if (is.character(labels) && !is.object(labels) && length(labels) >= index &&
             !is.na(labels[[index]]) && nzchar(labels[[index]])) {
             return(substr(labels[[index]], 1L, 160L))
         }
@@ -246,18 +248,21 @@ table_snapshot <- function(name) {
     cell_text <- function(row, column) {
         if (frame) {
             values <- columns_data[[column]]
-            if (length(values) < row) return("[invalid column]")
             if (is.object(values)) {
                 levels <- attr(values, "levels", exact = TRUE)
                 if (!identical(attr(values, "class", exact = TRUE), "factor") ||
-                    typeof(values) != "integer" || !is.character(levels)) {
+                    typeof(values) != "integer" || !is.character(levels) ||
+                    is.object(levels)) {
                     return("[unsupported column]")
                 }
-                code <- unclass(values)[[row]]
+                plain <- unclass(values)
+                if (length(plain) < row) return("[invalid column]")
+                code <- plain[[row]]
                 if (is.na(code)) return("")
                 if (code < 1L || code > length(levels)) return("[invalid factor]")
                 return(substr(levels[[code]], 1L, 160L))
             }
+            if (length(values) < row) return("[invalid column]")
             if (!typeof(values) %in% c("logical", "integer", "double", "character")) {
                 return("[unsupported column]")
             }

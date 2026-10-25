@@ -80,7 +80,7 @@ function workspace(folder) {
     "source", "language", "console", "resultStatus", "fileLabel", "dirty",
     "cursor", "run", "runCell", "resetR", "resetPython", "refreshPythonEnvironment", "pythonEnvironment", "open", "save", "clear", "fallbackOpen", "runtimeInfo",
     "projectTree", "folder", "newFile", "refreshProject",
-    "projectSearch", "caseSensitive", "projectRegex", "projectWholeWord", "searchProject", "searchResults",
+    "projectSearch", "caseSensitive", "projectRegex", "projectWholeWord", "searchProject", "searchResults", "projectReplace", "replaceProject",
     "editorFind", "editorReplace", "findNext", "findPrevious",
     "replaceOne", "replaceAll", "editorCaseSensitive", "editorRegex", "editorWholeWord", "editorFindCount",
     "docTabs", "newDocument", "newDocumentTab", "findBar"
@@ -520,4 +520,48 @@ test("project regex search selects real matches and rejects stale changed file t
   await writable.close();
   await results.children[2].fire("click");
   assert.match(app.el("resultStatus").textContent, /File changed since search/);
+});
+
+
+test("project-wide replacement writes only after confirmation and never uploads project contents", async () => {
+  const target = file("analysis.R", "x <- 1\nx <- 2\n");
+  const app = workspace(directory("work", [["analysis.R", target]]));
+  await app.el("folder").fire("click");
+  app.el("projectSearch").value = "x";
+  app.el("projectReplace").value = "count";
+  app.setDiscard(false);
+  await app.el("replaceProject").fire("click");
+  assert.equal(target.content, "x <- 1\nx <- 2\n");
+  assert.match(app.el("resultStatus").textContent, /cancelled/);
+  app.setDiscard(true);
+  await app.el("replaceProject").fire("click");
+  assert.equal(target.content, "count <- 1\ncount <- 2\n");
+  assert.match(app.el("resultStatus").textContent, /Replaced 2 matches in 1 project files/);
+  assert.equal(app.fetches.length, 0);
+});
+
+test("project-wide replacement refuses open tabs and preserves unsaved source", async () => {
+  const target = file("analysis.R", "x <- 1\n");
+  const app = workspace(directory("work", [["analysis.R", target]]));
+  await app.el("folder").fire("click");
+  await app.el("projectTree").children[1].fire("click");
+  app.el("source").value = "x <- 99\n";
+  app.el("source").fire("input");
+  app.el("projectSearch").value = "x";
+  app.el("projectReplace").value = "y";
+  await app.el("replaceProject").fire("click");
+  assert.equal(target.content, "x <- 1\n");
+  assert.equal(app.el("source").value, "x <- 99\n");
+  assert.match(app.el("resultStatus").textContent, /Close open editor tabs/);
+});
+
+test("project-wide replacement uses regex capture groups in the native workspace", async () => {
+  const target = file("analysis.R", "foo_1 <- 3\nfoo_2 <- 4");
+  const app = workspace(directory("work", [["analysis.R", target]]));
+  await app.el("folder").fire("click");
+  app.el("projectSearch").value = "foo_(\\d)";
+  app.el("projectRegex").checked = true;
+  app.el("projectReplace").value = "bar_$1";
+  await app.el("replaceProject").fire("click");
+  assert.equal(target.content, "bar_1 <- 3\nbar_2 <- 4");
 });

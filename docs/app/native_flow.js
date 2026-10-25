@@ -159,7 +159,98 @@ async function gitCreateBranch(name) {
 async function gitSwitchBranch(name) {
   return request("/api/git/branch/switch", checkedBranchName(name));
 }
-const api = Object.freeze({available, run, checkSyntax, checkRSyntax, tracePython, debugPythonStart, debugPythonCommand, gitStatus, gitDiff, gitStagedDiff, gitStage, gitUnstage, gitCommit, gitBranches, gitCreateBranch, gitSwitchBranch});
+
+// The native R adapter shares Flow-owned localhost transport but never shares
+// interpreter state with webR. Its unsupported features fail explicitly.
+function validateRInspection(payload) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload) ||
+      !Array.isArray(payload.variables) || payload.variables.length > 128 ||
+      typeof payload.truncated !== "boolean")
+    throw new Error("Invalid native R environment response.");
+  let nodes = 0;
+  function convert(node, depth) {
+    if (++nodes > 384 || !node || typeof node !== "object" || Array.isArray(node) ||
+        typeof node.name !== "string" || !node.name || node.name.length > 160 ||
+        typeof node.type !== "string" || !node.type || node.type.length > 100 ||
+        [node.name, node.type].some(value => value.includes("\0")) ||
+        (node.size !== null && (!Number.isSafeInteger(node.size) || node.size < 0)) ||
+        (node.dimensions !== null && (!Array.isArray(node.dimensions) ||
+          node.dimensions.length < 1 || node.dimensions.length > 8 ||
+          node.dimensions.some(value => !Number.isSafeInteger(value) || value < 0))) ||
+        (node.truncated !== undefined && typeof node.truncated !== "boolean"))
+      throw new Error("Invalid native R environment entry.");
+    const result = {name:node.name, type:node.type,
+      shape:node.dimensions === null ? null : node.dimensions.map(String),
+      preview:node.size === null ? "(not evaluated)" : "length " + node.size};
+    if (node.truncated) result.truncated = true;
+    if (node.children !== undefined) {
+      if (node.type !== "list" || depth >= 2 || !Array.isArray(node.children) ||
+          node.children.length > 12)
+        throw new Error("Invalid native R environment nesting.");
+      result.children = node.children.map(child => convert(child, depth + 1));
+    }
+    return result;
+  }
+  return {ok:true, variables:payload.variables.map(node => convert(node, 0)),
+    truncated:payload.truncated};
+}
+function createRSession() {
+  let epoch = 0;
+  let serial = Promise.resolve();
+  function schedule(work) {
+    const next = serial.then(work);
+    serial = next.catch(() => {});
+    return next;
+  }
+  function stale() { return {ok:false, output:"Native R session reset; result discarded."}; }
+  function run(code) {
+    if (typeof code !== "string" || !code.trim() ||
+        new TextEncoder().encode(code).length > MAX_SOURCE_BYTES)
+      return Promise.resolve({ok:false, output:"R source is empty or exceeds 64 KiB."});
+    const generation = epoch;
+    return schedule(async () => {
+      if (generation !== epoch) return stale();
+      const result = await request("/api/run/r", code);
+      return generation === epoch ? result : stale();
+    });
+  }
+  function inspect() {
+    const generation = epoch;
+    return schedule(async () => {
+      if (generation !== epoch) return stale();
+      const result = await request("/api/inspect/r", "");
+      if (generation !== epoch) return stale();
+      if (!result.ok) return result;
+      let payload;
+      try { payload = JSON.parse(result.output); }
+      catch (_) { throw new Error("Native R inspection was not JSON."); }
+      return validateRInspection(payload);
+    });
+  }
+  function checkSyntax(code) {
+    const generation = epoch;
+    return schedule(async () => {
+      if (generation !== epoch) return stale();
+      const result = await checkRSyntax(code);
+      return generation === epoch ? result : stale();
+    });
+  }
+  function reset() {
+    const generation = ++epoch;
+    return schedule(async () => {
+      const result = await request("/api/reset/r", "");
+      return generation === epoch ? result : stale();
+    });
+  }
+  const unsupported = () => Promise.resolve({ok:false,
+    output:"This operation is not available for native R yet. Select browser webR for packages, tables, help, completion or variable transfer; the two R workspaces are separate."});
+  return Object.freeze({run, inspect, checkSyntax, reset,
+    table:unsupported, packages:unsupported, installPackage:unsupported,
+    help:unsupported, complete:unsupported,
+    exportVariable:unsupported, importVariable:unsupported});
+}
+
+const api = Object.freeze({available, run, createRSession, checkSyntax, checkRSyntax, tracePython, debugPythonStart, debugPythonCommand, gitStatus, gitDiff, gitStagedDiff, gitStage, gitUnstage, gitCommit, gitBranches, gitCreateBranch, gitSwitchBranch});
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 global.FlowStudioNativeFlow = api;
 })(globalThis);

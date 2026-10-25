@@ -76,8 +76,10 @@ begin_plot_capture <- function() {
                 return(invisible(NULL))
             }
             # A PDF device without a drawn page has no page dictionary.
-            printable <- rawToChar(raw)
-            if (!grepl("/Type /Page", printable, fixed = TRUE)) return(invisible(NULL))
+            printable <- paste(rawToChar(raw, multiple = TRUE), collapse = "")
+            if (!grepl("/Type /Page([^sA-Za-z]|$)", printable, perl = TRUE)) {
+                return(invisible(NULL))
+            }
             last_plot_pdf <<- paste(sprintf("%02x", as.integer(raw)), collapse = "")
         }
         invisible(NULL)

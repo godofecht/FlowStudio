@@ -1,5 +1,27 @@
 # FlowStudio RStudio parity matrix
 
+## 2026-10-25: project-wide regex and Unicode whole-word search (PR #54; verification pending)
+
+The native four-pane project search now supports explicit Regex and Word
+options in addition to case-sensitive literal matching. It scans actual
+browser-granted local project files recursively without server upload, returns
+real file handles and line/column offsets, and refuses to select stale changed
+matches. The Pages project-search module uses the same matching behavior,
+although the Pages workspace does not yet expose a project-search UI.
+Native and Pages implementations retain limits of 12 directory levels,
+500 entries per directory, 1000 files, and 200 matches; regex additionally
+skips files above 128 KiB. The file-size bound does not guarantee a time
+bound for pathological JavaScript regular expressions.
+
+**Status: partial / implemented in PR #54; independent CI and physical-browser
+acceptance pending.** Added 11 Node tests across both modules and the native
+inline HTML integration. Six direct V8 functional preflight cases passed
+during authoring; they are not a substitute for the repository test suite.
+No Flow compiler syntax, Flow-owned backend, or hosted CI was changed.
+Physical-browser interpreter acceptance, native R/Flow debugging, remote
+sessions and full RStudio parity remain outstanding.
+
+
 ## 2026-10-25: regex and Unicode whole-word source find/replace (PR acceptance pending)
 
 The browser Flow/R/Python editor and native four-pane editor now expose

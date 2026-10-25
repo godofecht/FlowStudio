@@ -1,6 +1,6 @@
 # FlowStudio RStudio parity matrix
 
-## 2026-10-25: one-level conflict-checked project replacement undo (PR pending)
+## 2026-10-25: one-level conflict-checked project replacement undo (Linux/macOS CI passed)
 
 Native and Pages editors now offer an explicit one-level undo after a fully
 successful project-wide replacement. The reverse operation uses actual
@@ -10,10 +10,20 @@ another replacement, or an attempted undo invalidates history. Undo is
 in-memory only; multi-file writes remain non-atomic, and partial failures may
 require manual recovery. No source files are uploaded to the Flow backend.
 
-**Status: implemented / local V8 behavioral validation; independent Linux/macOS
-CI and physical-browser acceptance pending.** This improves editor safety
-without establishing RStudio parity. Native R/Flow interactive debugging and
-authenticated remote sessions remain missing.
+**Status: partial / independently verified Linux/macOS CI; physical-browser
+acceptance pending.** [PR #57](https://github.com/godofecht/FlowStudio/pull/57)
+merged as [385e7bf](https://github.com/godofecht/FlowStudio/commit/385e7bf82de8b70c6817f4e737e7c283c6ad7d3d)
+after [CI #40204492656](https://github.com/godofecht/FlowStudio/actions/runs/40204492656)
+completed all four jobs successfully on Ubuntu 24.04 and macOS 14. Each
+source/transport job passed 618 JavaScript tests (2 skips, zero failures),
+76 Python unit tests (11 skips), plus the C transport and Python harness
+suites. Both native jobs built the real Flow 2.0.0 backend, passed live HTTP
+acceptance and completed packaging. Local V8 checks also executed the real
+project replacement/undo controller and Pages panel against writable file
+handles. Real physical-browser file-picker acceptance was **not** executed.
+No hosted CI configuration or Flow compiler syntax changed. This improves
+editor safety without establishing RStudio parity; native R/Flow interactive
+debugging and authenticated remote sessions remain missing.
 
 
 

@@ -327,6 +327,18 @@ function createRSession() {
       return generation === epoch ? result : stale();
     });
   }
+  function removePackage(name) {
+    if (typeof name !== "string" ||
+        !/^[A-Za-z][A-Za-z0-9.]{0,79}$/.test(name) ||
+        name.includes("..") || name.endsWith("."))
+      return Promise.resolve({ok:false, output:"Invalid R package name."});
+    const generation = epoch;
+    return schedule(async () => {
+      if (generation !== epoch) return stale();
+      const result = await request("/api/packages/r/remove", name);
+      return generation === epoch ? result : stale();
+    });
+  }
   function checkSyntax(code) {
     const generation = epoch;
     return schedule(async () => {
@@ -345,7 +357,7 @@ function createRSession() {
   const unsupported = () => Promise.resolve({ok:false,
     output:"This operation is not available for native R yet. Select browser webR for help, completion or variable transfer; the two R workspaces are separate."});
   return Object.freeze({run, inspect, checkSyntax, reset,
-    table, plot, packages, loadPackage, installPackage,
+    table, plot, packages, loadPackage, installPackage, removePackage,
     help:unsupported, complete:unsupported,
     exportVariable:unsupported, importVariable:unsupported});
 }

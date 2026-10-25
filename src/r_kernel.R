@@ -77,6 +77,7 @@ evaluate_source <- function(source) {
     output_connection <- file(output_file, open = "wt", encoding = "UTF-8")
     original_sinks <- sink.number()
     success <- TRUE
+    error_stack <- character(0)
     sink(output_connection)
     tryCatch(
         withCallingHandlers({
@@ -85,6 +86,25 @@ evaluate_source <- function(source) {
                 value <- withVisible(eval(expression, envir = workspace))
                 if (value$visible) print(value$value)
             }
+        }, error = function(error) {
+            # Capture frames before tryCatch unwinds the failing R call stack.
+            # Deparse syntax only: never print/evaluate user objects or arguments.
+            error_stack <<- tryCatch({
+                internal <- c("eval", "withVisible", "tryCatch", "tryCatchList",
+                              "tryCatchOne", "doTryCatch", "withCallingHandlers",
+                              "evaluate_source", "parse", "stop", "h",
+                              ".handleSimpleError", "signalCondition")
+                frames <- vapply(sys.calls(), function(call) {
+                    if (!is.call(call)) return("")
+                    head <- call[[1L]]
+                    name <- if (is.symbol(head)) as.character(head) else ""
+                    if (name %in% internal) return("")
+                    text <- paste(deparse(call, nlines = 1L,
+                                          width.cutoff = 100L), collapse = " ")
+                    substr(text, 1L, 180L)
+                }, character(1L), USE.NAMES = FALSE)
+                tail(frames[nzchar(frames)], 16L)
+            }, error = function(unused) character(0))
         }, warning = function(warning) {
             cat("Warning: ", conditionMessage(warning), "\n", sep = "")
             invokeRestart("muffleWarning")
@@ -95,6 +115,10 @@ evaluate_source <- function(source) {
         error = function(error) {
             success <<- FALSE
             cat("Error: ", conditionMessage(error), "\n", sep = "")
+            if (length(error_stack)) {
+                cat("R call stack (most recent last):\n")
+                for (frame in error_stack) cat("  ", frame, "\n", sep = "")
+            }
         },
         finally = {
             while (sink.number() > original_sinks) sink()

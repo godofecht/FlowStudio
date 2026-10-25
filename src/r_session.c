@@ -168,6 +168,10 @@ failed:
 }
 
 const char *fs_r_run(const char *code) { return request_r('E', code); }
+const char *fs_r_debug_start(const char *source) { return request_r('B', source); }
+const char *fs_r_debug_step(void) { return request_r('S', ""); }
+const char *fs_r_debug_stop(void) { return request_r('D', ""); }
+const char *fs_r_debug_status(void) { return request_r('Q', ""); }
 const char *fs_r_check(const char *code) { return request_r('C', code); }
 const char *fs_r_inspect(void) { return request_r('I', ""); }
 const char *fs_r_table(const char *name) { return request_r('T', name); }

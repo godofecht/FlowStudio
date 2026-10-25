@@ -107,7 +107,7 @@ async function debugRCommand(action, targetLine = "", frameIndex = 0) {
     return debugRResponse("/api/debug/r/evaluate", body);
   }
   if (frameIndex !== 0 || targetLine !== "")
-    throw new Error("Only R continue and evaluate accept source input; only R evaluate accepts a function frame.");
+    throw new Error("Only R continue and evaluate accept source input; Only R evaluate accepts a function frame.");
   return debugRResponse("/api/debug/r/" + action, "");
 }
 async function debugPythonStart(source, breakpoints, pauseOnException = false) {

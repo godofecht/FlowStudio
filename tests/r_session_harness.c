@@ -287,34 +287,34 @@ int main(void)
     if (fs_r_status() != 200) return failure(122, out);
     out = fs_r_debug_step();
     if (fs_r_status() != 422 || !strstr(out, "nested postmortem failure") ||
-        !strstr(out, "\\"failed_line\\":2") ||
-        !strstr(out, "\\"call\\":\\"outer(40L)\\"") ||
-        !strstr(out, "\\"call\\":\\"inner(local_outer)\\"") ||
-        !strstr(out, "\\"local_outer\\"") ||
-        !strstr(out, "\\"local_inner\\""))
+        !strstr(out, "\"failed_line\":2") ||
+        !strstr(out, "\"call\":\"outer(40L)\"") ||
+        !strstr(out, "\"call\":\"inner(local_outer)\"") ||
+        !strstr(out, "\"local_outer\"") ||
+        !strstr(out, "\"local_inner\""))
         return failure(123, out);
     out = fs_r_debug_status();
-    if (fs_r_status() != 200 || !strstr(out, "\\"frames\\":[{"))
+    if (fs_r_status() != 200 || !strstr(out, "\"frames\":[{"))
         return failure(124, out);
     out = fs_r_debug_evaluate("@1\nlocal_outer");
-    if (fs_r_status() != 200 || !strstr(out, "\\"output\\":\\"[1] 41"))
+    if (fs_r_status() != 200 || !strstr(out, "\"output\":\"[1] 41"))
         return failure(125, out);
     out = fs_r_debug_evaluate("@2\nlocal_inner");
-    if (fs_r_status() != 200 || !strstr(out, "\\"output\\":\\"[1] 43"))
+    if (fs_r_status() != 200 || !strstr(out, "\"output\":\"[1] 43"))
         return failure(126, out);
     out = fs_r_debug_evaluate("@2\nlocal_inner <- local_inner + 1L");
     if (fs_r_status() != 200) return failure(127, out);
     out = fs_r_debug_evaluate("@2\nlocal_inner");
-    if (fs_r_status() != 200 || !strstr(out, "\\"output\\":\\"[1] 44"))
+    if (fs_r_status() != 200 || !strstr(out, "\"output\":\"[1] 44"))
         return failure(128, out);
     out = fs_r_debug_evaluate("@8\nlocal_inner");
     if (fs_r_status() != 422 || !strstr(out, "No retained R function frame"))
         return failure(129, out);
     out = fs_r_debug_status();
-    if (fs_r_status() != 200 || !strstr(out, "\\"failed_line\\":2"))
+    if (fs_r_status() != 200 || !strstr(out, "\"failed_line\":2"))
         return failure(130, out);
     out = fs_r_debug_stop();
-    if (fs_r_status() != 200 || !strstr(out, "\\"frames\\":[]"))
+    if (fs_r_status() != 200 || !strstr(out, "\"frames\":[]"))
         return failure(131, out);
     out = fs_r_debug_evaluate("@2\nlocal_inner");
     if (fs_r_status() != 422) return failure(132, out);

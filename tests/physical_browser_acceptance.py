@@ -245,7 +245,7 @@ def test_native_r_expression_debugger(page, timeout: int):
     page.locator("#language").select_option("r")
     page.locator("#rRuntime").select_option("native")
     page.locator("#source").fill(
-        "fs_r_browser_step <- 40L\\nfs_r_browser_step <- fs_r_browser_step + 2L\\ncat(fs_r_browser_step)")
+        "fs_r_browser_step <- 40L\nfs_r_browser_step <- fs_r_browser_step + 2L\ncat(fs_r_browser_step)")
     page.locator("#rDebugStart").click()
     page.wait_for_function(
         "() => document.querySelector('#rDebugOutput').textContent.includes('Next expression at line 1')",
@@ -259,7 +259,7 @@ def test_native_r_expression_debugger(page, timeout: int):
     page.wait_for_function(
         "() => document.querySelector('#rDebugOutput').textContent.includes('R expression debugger: done')",
         timeout=timeout)
-    assert "Output:\\n42" in page.locator("#rDebugOutput").inner_text()
+    assert "Output:\n42" in page.locator("#rDebugOutput").inner_text()
     page.locator("#rDebugStop").click()
     page.wait_for_function(
         "() => document.querySelector('#rDebugOutput').textContent.includes('R expression debugger: idle')",

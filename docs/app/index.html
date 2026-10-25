@@ -279,7 +279,7 @@ async function run(selectedOnly = false, activeCell = false, consoleCode = null,
       try {
         const plot = await getRSession().plot();
         if (generation !== sessionGeneration) return false;
-        if (plot.ok && plot.svg) response.plots = [{number:Date.now(), svg:plot.svg}];
+        if (plot.ok && (plot.svg || plot.pdf)) response.plots = [{number:Date.now(), svg:plot.svg, pdf:plot.pdf}];
         if (!plot.ok || plot.warning) response.plotWarning = plot.warning || plot.output;
       } catch (error) {
         response.plotWarning = "Native R plot retrieval failed: " + String(error.message || error);

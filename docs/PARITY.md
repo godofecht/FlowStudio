@@ -1,5 +1,29 @@
 # FlowStudio RStudio parity matrix
 
+## 2026-10-25: retained R postmortem user-function frames (implementation; validation pending)
+
+The persistent native Rscript kernel now captures up to eight **actual lexical
+user-function environments** when an error is signalled, before the R stack
+unwinds. The debugger's JSON status includes bounded call labels and up to
+16 local binding **names** per frame without reading or forcing their values.
+Frame 0 continues to mean the top-level persistent workspace. In the native
+browser debugger, selecting frame 1–8 explicitly evaluates a single real R
+expression in the retained function environment via the existing Flow-owned,
+origin/intent-gated `/api/debug/r/evaluate` endpoint. The protocol prefix
+`@N\n` is consumed by R before parsing the requested expression. Evaluation
+may mutate the retained environment and perform I/O; it is **not sandboxed**.
+No code is resumed after the failed call unwinds. Stop/Start discard retained
+frames; normal execution and paused evaluations do not expose function frames.
+
+Native C/R IPC tests and Flow HTTP acceptance exercise nested user closures,
+actual local bindings, evaluation and cleanup; browser tests cover frame
+selection and bounded response validation. **Status: implemented in PR branch;
+independent Linux/macOS CI and physical-browser acceptance not yet verified.**
+This is postmortem function-frame evaluation, **not live function breakpoints,
+step-into/over, or resumable stack frames**. Authenticated remote sessions,
+physical-browser Pyodide/webR/Rscript acceptance and full RStudio parity remain
+outstanding. No hosted CI configuration changed.
+
 ## 2026-10-25: native R postmortem top-level workspace evaluation (Linux/macOS CI passed)
 
 The real persistent Rscript debugger now retains the failed **top-level** source

@@ -82,7 +82,7 @@ function workspace(folder) {
     "projectTree", "folder", "newFile", "refreshProject",
     "projectSearch", "caseSensitive", "searchProject", "searchResults",
     "editorFind", "editorReplace", "findNext", "findPrevious",
-    "replaceOne", "replaceAll", "editorCaseSensitive", "editorFindCount",
+    "replaceOne", "replaceAll", "editorCaseSensitive", "editorRegex", "editorWholeWord", "editorFindCount",
     "docTabs", "newDocument", "newDocumentTab", "findBar"
   ];
   for (const id of ids) elements.set(id, new Element());

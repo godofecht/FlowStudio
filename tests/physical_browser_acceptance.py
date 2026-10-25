@@ -151,6 +151,7 @@ def test_native_r(page, timeout: int):
     assert page.locator("#installPackage").is_enabled()
     assert page.locator("#loadRPackage").is_enabled()
     assert page.locator("#removeRPackage").is_enabled()
+    assert page.locator("#updateRPackage").is_enabled()
     # A preinstalled base package gives deterministic no-network acceptance.
     page.locator("#packageName").fill("stats")
     page.locator("#installPackage").click()
@@ -161,6 +162,10 @@ def test_native_r(page, timeout: int):
     page.once("dialog", lambda dialog: dialog.accept())
     page.locator("#removeRPackage").click()
     page.get_by_text("system packages cannot be removed", exact=False).wait_for(timeout=timeout)
+    # Updating a system package is also rejected without reaching CRAN.
+    page.once("dialog", lambda dialog: dialog.accept())
+    page.locator("#updateRPackage").click()
+    page.get_by_text("system packages cannot be updated", exact=False).wait_for(timeout=timeout)
     # Real Rscript PDF device -> Flow plot endpoint -> browser plot history.
     run_source(page, "r",
                "plot(c(1, 2, 3))\ncat('native SVG ready 42\\n')",

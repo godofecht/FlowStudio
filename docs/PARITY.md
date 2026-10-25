@@ -21,7 +21,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Project explorer | partial / browser Pages open/create/save and confirmed active-file delete with baseline conflict checks; 10 regression tests V8-shim passed; physical-browser deletion unverified | Open project, tree navigation, source-file creation and save; scoped delete is implemented, copy-verify-delete rename implemented with non-atomic filesystem race limits; physical-browser acceptance remains missing |
 | Data viewer | partial / CSV/TSV and browser Python/webR table snapshots; native Rscript data.frame/matrix bounded preview accepted by Ubuntu/macOS native Flow/HTTP CI #40163391932 (physical-browser pending); no remote data browsing | Interactive sortable/filterable tabular datasets including missing values |
 | Completion / language server | partial / browser Python/R runtime prefix completion cross-platform CI accepted; Flow lexical completion accepted by Ubuntu/macOS CI; explicit-type Flow struct and evolution-state member completion cross-platform CI accepted (#40095770668, 473 JS passes, 2 skips per platform, native Flow/HTTP accepted); physical-browser verification pending; full semantic/LSP completion missing | R, Flow and Python completion/diagnostics |
-| Packages pane | partial / browser Python and webR inventory/install; native Rscript installed-library inventory through Flow implemented with IPC/HTTP/browser tests (independent acceptance pending), native R installation/update still missing | List, install, update with environment-aware package sources |
+| Packages pane | partial / browser Python and webR inventory/install; native Rscript read-only installed-library inventory independently accepted by Ubuntu/macOS native Flow/R HTTP CI #40168902761 (actual physical-browser acceptance pending); native R installation/update still missing | List, install, update with environment-aware package sources |
 | Git pane | partial / native Flow status, diff, stage, unstage and commit previously accepted cross-platform; branch list/create/switch accepted by CI #40117614745 on Ubuntu/macOS (PR #37 merged); physical-browser verification missing; branch deletion, remote tracking and merge missing | Status, diff, stage, unstage, commit and branch operations |
 | Help pane | partial / browser Python live-global/builtin docstrings and installed R Rd help wired; Node/V8 contract tests, live Pyodide/webR and physical browser unverified; Flow help missing | Context-aware language/function docs |
 | Find / replace / cross-file search | partial / Node + V8-tested | Literal in-buffer find next/previous, single/all replacement and project-wide search implemented; incremental indexing, regex and physical-browser verification missing |
@@ -39,7 +39,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 
 
 
-## 2026-10-25: native R installed-library inventory (implementation; acceptance pending)
+## 2026-10-25: native R installed-library inventory (cross-platform native acceptance passed)
 
 The persistent Rscript kernel reads the actual installed package database via
 `utils::installed.packages()` using read-only `K` IPC. Flow owns the
@@ -50,9 +50,16 @@ selected native R library, with native R installation explicitly unsupported
 and disabled. Browser webR and native Rscript have separate libraries.
 
 Real Rscript/C IPC, Flow-owned HTTP, Node transport/UI and optional physical-
-browser acceptance scenarios have been added. **Independent CI and actual
-physical-browser acceptance have not yet passed for this change.**
-No hosted CI configuration changed. Full RStudio parity is not claimed.
+browser acceptance scenarios were added. **Cross-platform native acceptance
+passed** in [CI #40168902761](https://github.com/godofecht/FlowStudio/actions/runs/40168902761)
+on Ubuntu 24.04 and macOS 14: all four jobs succeeded; each source/transport
+job recorded 539 JavaScript passes, two skips and zero failures, plus 76
+Python tests (11 skips). Both native jobs compiled Flow 2.0.0, exercised the
+actual Rscript package database through the Flow-owned localhost route and
+completed packaging. [PR #48](https://github.com/godofecht/FlowStudio/pull/48)
+merged as [aae909e](https://github.com/godofecht/FlowStudio/commit/aae909e4f03cfbe7fa3fbb63ba6f6a0266dcb135).
+**Actual physical-browser acceptance remains unverified.** No hosted CI
+configuration changed. Full RStudio parity is not claimed.
 
 ## 2026-10-25: native Rscript PDF graphics capture (implementation; acceptance pending)
 

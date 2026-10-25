@@ -128,8 +128,8 @@ evaluate_source <- function(source, expressions_override = NULL,
                     for (i in seq_len(min(length(calls), length(frames)))) {
                         call <- calls[[i]]
                         if (!is.call(call)) next
-                        head <- call[[1L]]
-                        name <- if (is.symbol(head)) as.character(head) else ""
+                        callee <- call[[1L]]
+                        name <- if (is.symbol(callee)) as.character(callee) else ""
                         if (!nzchar(name) || name %in% c(
                             "eval", "withVisible", "tryCatch", "tryCatchList",
                             "tryCatchOne", "doTryCatch", "withCallingHandlers",

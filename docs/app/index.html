@@ -620,7 +620,7 @@ const projectWorkspace = FlowStudioProjectWorkspace.create({
   confirmChange: message => window.confirm(message),
   promptName: message => window.prompt(message)
 });
-FlowStudioProjectReplacePanel.create({
+if (typeof FlowStudioProjectReplacePanel !== "undefined") FlowStudioProjectReplacePanel.create({
   project: projectWorkspace.project, isOpenHandle: projectWorkspace.isOpenHandle,
   query: $("projectReplaceQuery"), replacement: $("projectReplaceText"),
   caseSensitive: $("projectReplaceCase"), regex: $("projectReplaceRegex"),

@@ -11,6 +11,8 @@ function format(result) {
     (result.ok ? "" : " (error)")];
   if (result.executed_line !== null) lines.push("Executed expression at line " + result.executed_line);
   if (result.next_line !== null) lines.push("Next expression at line " + result.next_line);
+  if (Number.isSafeInteger(result.failed_line) && result.failed_line > 0)
+    lines.push("Failed expression at line " + result.failed_line + " (top-level workspace only)");
   lines.push("Expression " + Math.min(result.index, result.total) + " of " + result.total);
   if (result.output) lines.push("Output:\n" + result.output);
   return lines.join("\n");
@@ -37,15 +39,16 @@ function create({native, source, language, runtime, startButton, stepButton,
     stepButton.disabled = !enabled || pending || state !== "paused";
     continueButton.disabled = !enabled || pending || state !== "paused";
     targetLine.disabled = !enabled || pending || state !== "paused";
-    watchExpression.disabled = !enabled || pending || state !== "paused";
-    evaluateButton.disabled = !enabled || pending || state !== "paused";
+    watchExpression.disabled = !enabled || pending || (state !== "paused" && state !== "error");
+    evaluateButton.disabled = !enabled || pending || (state !== "paused" && state !== "error");
     stopButton.disabled = !enabled || pending || state === "idle";
     statusButton.disabled = !enabled || pending;
   }
   async function execute(action) {
     if (pending || !supported || language.value !== "r" || runtime.value !== "native")
       return false;
-    if ((action === "step" || action === "continue" || action === "evaluate") && state !== "paused") return false;
+    if ((action === "step" || action === "continue") && state !== "paused") return false;
+    if (action === "evaluate" && state !== "paused" && state !== "error") return false;
     pending = true;
     update();
     try {

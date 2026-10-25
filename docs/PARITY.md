@@ -18,12 +18,18 @@ package, verifies changed executable behavior and checks up-to-date/no-downgrade
 behavior. Native Flow HTTP origin/intent rejection, Node transport/UI validation
 and an optional physical-browser negative scenario are included.
 
-**Status: partial / newly implemented, CI acceptance pending.** No Rscript or
-Flow compiler is installed in the authoring environment; neither native test
-execution nor physical-browser acceptance is claimed. Public CRAN downloads,
-dependency-conflict handling, recovery after failed installation, R/Flow
-interactive debugging and remote sessions remain unverified or missing. Hosted
-CI configuration was not modified.
+**Status: partial / independently verified native Linux/macOS acceptance.**
+[CI #40182126305](https://github.com/godofecht/FlowStudio/actions/runs/40182126305)
+completed all four jobs successfully on Ubuntu 24.04 and macOS 14. Each
+source/transport platform recorded 553 passing JavaScript tests, two skips and
+zero failures, plus 76 Python unit tests. Both native jobs compiled Flow 2.0.0,
+executed the real offline v0.0.1-to-v0.0.2 Rscript package upgrade and
+up-to-date/loaded-package protections, passed live Flow-owned HTTP acceptance,
+and completed packaging. [PR #52](https://github.com/godofecht/FlowStudio/pull/52)
+merged as [01f670e](https://github.com/godofecht/FlowStudio/commit/01f670efad91b6b42e16797dc91bed7abf72791f).
+Public CRAN downloads, physical-browser acceptance, dependency-conflict
+handling, recovery after failed installation, R/Flow interactive debugging and
+remote sessions remain unverified or missing. No hosted CI configuration changed.
 
 **Baseline:** RStudio Desktop + Server core scientific IDE workflows. This is a goal and acceptance test list, not a claim of equivalence.
 
@@ -95,7 +101,7 @@ No hosted CI configuration was changed.
 | Project explorer | partial / browser Pages open/create/save and confirmed active-file delete with baseline conflict checks; 10 regression tests V8-shim passed; physical-browser deletion unverified | Open project, tree navigation, source-file creation and save; scoped delete is implemented, copy-verify-delete rename implemented with non-atomic filesystem race limits; physical-browser acceptance remains missing |
 | Data viewer | partial / CSV/TSV and browser Python/webR table snapshots; native Rscript data.frame/matrix bounded preview accepted by Ubuntu/macOS native Flow/HTTP CI #40163391932 (physical-browser pending); no remote data browsing | Interactive sortable/filterable tabular datasets including missing values |
 | Completion / language server | partial / browser Python/R runtime prefix completion cross-platform CI accepted; Flow lexical completion accepted by Ubuntu/macOS CI; explicit-type Flow struct and evolution-state member completion cross-platform CI accepted (#40095770668, 473 JS passes, 2 skips per platform, native Flow/HTTP accepted); physical-browser verification pending; full semantic/LSP completion missing | R, Flow and Python completion/diagnostics |
-| Packages pane | partial / browser Python and webR inventory/install; native Rscript installed-library inventory accepted by Ubuntu/macOS native Flow/R HTTP CI #40168902761; native installed-package loading accepted by Linux/macOS real Flow/R HTTP CI #40170771561 (physical-browser acceptance pending); native CRAN installation through persistent Flow/R kernel and real offline source-package install/restart accepted on Ubuntu/macOS CI #40174758087 (PR #50 merged); public CRAN download and physical-browser acceptance unverified; native update implementation pending independent acceptance; user-library removal passed real Linux/macOS Flow/R CI #40178422509 (physical-browser pending) | List, install, update with environment-aware package sources |
+| Packages pane | partial / browser Python and webR inventory/install; native Rscript installed-library inventory accepted by Ubuntu/macOS native Flow/R HTTP CI #40168902761; native installed-package loading accepted by Linux/macOS real Flow/R HTTP CI #40170771561 (physical-browser acceptance pending); native CRAN installation through persistent Flow/R kernel and real offline source-package install/restart accepted on Ubuntu/macOS CI #40174758087 (PR #50 merged); public CRAN download and physical-browser acceptance unverified; native user-library update passed real offline Linux/macOS Rscript/Flow HTTP CI #40182126305 (physical-browser pending); user-library removal passed real Linux/macOS Flow/R CI #40178422509 (physical-browser pending) | List, install, update with environment-aware package sources |
 | Git pane | partial / native Flow status, diff, stage, unstage and commit previously accepted cross-platform; branch list/create/switch accepted by CI #40117614745 on Ubuntu/macOS (PR #37 merged); physical-browser verification missing; branch deletion, remote tracking and merge missing | Status, diff, stage, unstage, commit and branch operations |
 | Help pane | partial / browser Python live-global/builtin docstrings and installed R Rd help wired; Node/V8 contract tests, live Pyodide/webR and physical browser unverified; Flow help missing | Context-aware language/function docs |
 | Find / replace / cross-file search | partial / Node + V8-tested | Literal in-buffer find next/previous, single/all replacement and project-wide search implemented; incremental indexing, regex and physical-browser verification missing |

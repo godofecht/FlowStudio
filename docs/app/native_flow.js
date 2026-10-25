@@ -71,9 +71,17 @@ async function debugRStart(source) {
     throw new Error("Native R debugger requires nonempty R source.");
   return debugRResponse("/api/debug/r/start", source);
 }
-async function debugRCommand(action) {
-  if (!["step", "stop", "status"].includes(action))
+async function debugRCommand(action, targetLine = "") {
+  if (!["step", "continue", "stop", "status"].includes(action))
     throw new Error("Unknown native R debugger action.");
+  if (action === "continue") {
+    if (targetLine !== "" && (!Number.isSafeInteger(targetLine) ||
+        targetLine < 1 || targetLine > 999999))
+      throw new Error("R continue target must be a positive source line.");
+    return debugRResponse("/api/debug/r/continue",
+      targetLine === "" ? "" : String(targetLine));
+  }
+  if (targetLine !== "") throw new Error("Only R continue accepts a target line.");
   return debugRResponse("/api/debug/r/" + action, "");
 }
 async function debugPythonStart(source, breakpoints, pauseOnException = false) {

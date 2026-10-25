@@ -6,7 +6,7 @@ const path = require("node:path");
 const native = require("../docs/app/native_flow.js");
 const plots = require("../docs/app/plot_history.js");
 const localhost = new URL("http://127.0.0.1:8751/app/");
-const svg = '<?xml version="1.0" encoding="UTF-8"?>\\n<svg xmlns="http://www.w3.org/2000/svg" width="504" height="360"><path d="M0 0L5 5"/></svg>';
+const svg = '<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="504" height="360"><path d="M0 0L5 5"/></svg>';
 
 function response(body, status = 200) {
   return {ok:status === 200, status, headers:{get:()=>null}, text:async()=>body};
@@ -123,8 +123,8 @@ test("SVG plot history creates safe img data URI with zoom and SVG download", ()
 test("Flow owns native R plot route and IDE fetches it after execution", () => {
   const root = path.join(__dirname, "..");
   const read = name => fs.readFileSync(path.join(root, name), "utf8");
-  assert.match(read("src/main.flow"), /if eq\\(path, "\/api\/plot\/r"\\) \\{\\s*send_r_plot\\(\\)/);
-  assert.match(read("src/r_session.c"), /fs_r_plot\\(void\\) \\{ return request_r\\('P', ""\\); \\}/);
-  assert.match(read("src/r_kernel.R"), /plot_snapshot <- function\\(\\)/);
-  assert.match(read("docs/app/index.html"), /await getRSession\\(\\)\\.plot\\(\\)/);
+  assert.match(read("src/main.flow"), /if eq\(path, "\/api\/plot\/r"\) \{\s*send_r_plot\(\)/);
+  assert.match(read("src/r_session.c"), /fs_r_plot\(void\) \{ return request_r\('P', ""\); \}/);
+  assert.match(read("src/r_kernel.R"), /plot_snapshot <- function\(\)/);
+  assert.match(read("docs/app/index.html"), /await getRSession\(\)\.plot\(\)/);
 });

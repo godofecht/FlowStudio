@@ -1,6 +1,6 @@
 # FlowStudio RStudio parity matrix
 
-## 2026-10-25: bounded native R runtime call-stack diagnostics (PR validation pending)
+## 2026-10-25: bounded native R runtime call-stack diagnostics (Linux/macOS CI passed)
 
 The persistent Rscript interpreter now captures a bounded deparsed call chain
 **at the point an uncaught error is signalled**, before R's exiting error
@@ -11,8 +11,13 @@ regression asserts nested `outer()` / `inner()` frames and verifies that the
 same interpreter continues executing after the error. No new network route,
 hosted CI change or Flow compiler syntax is introduced.
 
-**Status: implementation committed to a focused PR; real Rscript regression
-and Linux/macOS Flow-owned HTTP acceptance are not yet independently verified.**
+**Status: partial / independently verified native Linux/macOS CI; physical
+browser acceptance pending.** [PR #58](https://github.com/godofecht/FlowStudio/pull/58)
+merged as [72bbcc7](https://github.com/godofecht/FlowStudio/commit/72bbcc7ac28e5d077240fd6c50ff4a56b5919e12)
+after [CI #40208720442](https://github.com/godofecht/FlowStudio/actions/runs/40208720442)
+completed all four jobs successfully on Ubuntu 24.04 and macOS 14.
+The source/transport jobs and native Flow compilation, real Rscript IPC
+regression, live HTTP acceptance and packaging passed on both platforms.
 This is error traceback information, **not interactive R breakpoints,
 single-stepping or stack-frame evaluation**. Physical-browser execution,
 authenticated remote sessions and RStudio feature parity remain outstanding.

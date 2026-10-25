@@ -207,7 +207,7 @@ test("native R debugger client rejects malformed and non-local responses", async
 });
 
 test("postmortem R frame selector evaluates in retained function environments", async () => {
-  const source = control("outer <- function(x) stop('fail')\\nouter(41L)");
+  const source = control("outer <- function(x) stop('fail')\nouter(41L)");
   const language = control("r"), runtime = control("native");
   const startButton = control(), stepButton = control(), stopButton = control();
   const continueButton = control(), targetLine = control("");
@@ -273,7 +273,7 @@ test("native R frame evaluation protocol validates indexes and frame metadata", 
     };
     const result = await native.debugRCommand("evaluate", "local_outer", 1);
     assert.equal(result.frames[0].locals[1], "local_outer");
-    assert.equal(bodies[0], "@1\\nlocal_outer");
+    assert.equal(bodies[0], "@1\nlocal_outer");
     await assert.rejects(native.debugRCommand("evaluate", "x", 9), /Invalid retained/);
     await assert.rejects(native.debugRCommand("step", "", 1), /Only R evaluate/);
     await assert.rejects(native.debugRCommand("evaluate", "x".repeat(4095), 1), /4096 bytes/);

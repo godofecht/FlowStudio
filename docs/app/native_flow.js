@@ -72,7 +72,7 @@ async function debugRStart(source) {
   return debugRResponse("/api/debug/r/start", source);
 }
 async function debugRCommand(action, targetLine = "") {
-  if (!["step", "continue", "stop", "status"].includes(action))
+  if (!["step", "continue", "evaluate", "stop", "status"].includes(action))
     throw new Error("Unknown native R debugger action.");
   if (action === "continue") {
     const lines = typeof targetLine === "number" ? String(targetLine) : targetLine;
@@ -81,7 +81,13 @@ async function debugRCommand(action, targetLine = "") {
       throw new Error("R continue target must be 1 to 64 comma-separated positive source lines.");
     return debugRResponse("/api/debug/r/continue", lines);
   }
-  if (targetLine !== "") throw new Error("Only R continue accepts a target line.");
+  if (action === "evaluate") {
+    if (typeof targetLine !== "string" || !targetLine.trim() ||
+        new TextEncoder().encode(targetLine).length > 4096)
+      throw new Error("R debugger evaluation requires 1 to 4096 bytes of source.");
+    return debugRResponse("/api/debug/r/evaluate", targetLine);
+  }
+  if (targetLine !== "") throw new Error("Only R continue and evaluate accept source input.");
   return debugRResponse("/api/debug/r/" + action, "");
 }
 async function debugPythonStart(source, breakpoints, pauseOnException = false) {

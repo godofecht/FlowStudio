@@ -82,7 +82,7 @@ function workspace(folder) {
     "projectTree", "folder", "newFile", "refreshProject",
     "projectSearch", "caseSensitive", "searchProject", "searchResults",
     "editorFind", "editorReplace", "findNext", "findPrevious",
-    "replaceOne", "replaceAll", "editorCaseSensitive", "editorFindCount",
+    "replaceOne", "replaceAll", "editorCaseSensitive", "editorRegex", "editorWholeWord", "editorFindCount",
     "docTabs", "newDocument", "newDocumentTab", "findBar"
   ];
   for (const id of ids) elements.set(id, new Element());
@@ -322,6 +322,33 @@ test("replace current and replace all edit buffer without saving or executing", 
   app.el("replaceAll").fire("click");
   assert.equal(app.el("source").value, "$& dog dog");
   assert.equal(app.el("editorFindCount").textContent, "0 matches");
+  assert.equal(app.fetches.length, 0);
+});
+
+test("native editor regex captures and Unicode whole-word search stay local", () => {
+  const app = workspace(directory("empty"));
+  app.el("source").value = "cat1 cats cat2";
+  app.el("editorFind").value = "(cat)(\\d)";
+  app.el("editorRegex").checked = true;
+  app.el("editorRegex").fire("change");
+  assert.equal(app.el("editorFindCount").textContent, "2 matches");
+  app.el("editorReplace").value = "$2-$1";
+  app.el("findNext").fire("click");
+  app.el("replaceOne").fire("click");
+  assert.equal(app.el("source").value, "1-cat cats cat2");
+  assert.equal(app.el("dirty").hidden, false);
+  app.el("editorRegex").checked = false;
+  app.el("editorWholeWord").checked = true;
+  app.el("editorWholeWord").fire("change");
+  app.el("editorFind").value = "cat";
+  app.el("editorFind").fire("input");
+  assert.equal(app.el("editorFindCount").textContent, "1 matches");
+  app.el("editorRegex").checked = true;
+  app.el("editorRegex").fire("change");
+  app.el("editorFind").value = "(";
+  app.el("editorFind").fire("input");
+  assert.match(app.el("editorFindCount").textContent, /Invalid regular expression/);
+  assert.equal(app.el("source").value, "1-cat cats cat2");
   assert.equal(app.fetches.length, 0);
 });
 

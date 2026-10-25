@@ -274,6 +274,50 @@ int main(void)
     out = fs_r_run("cat(postmortem_probe)");
     if (fs_r_status() != 200 || strcmp(out, "102") != 0)
         return failure(120, out);
+    /* A genuine nested user-function error retains lexical frame environments.
+     * These are postmortem frames, not active browser() breakpoints.
+     * Frame reads/evaluations must never resume the failed source expression. */
+    out = fs_r_debug_start(
+        "outer <- function(v) { local_outer <- v + 1L; "
+        "inner <- function(w) { local_inner <- w + 2L; "
+        "stop('nested postmortem failure') }; inner(local_outer) }\n"
+        "outer(40L)\ncat('must not run')");
+    if (fs_r_status() != 200) return failure(121, out);
+    out = fs_r_debug_step();
+    if (fs_r_status() != 200) return failure(122, out);
+    out = fs_r_debug_step();
+    if (fs_r_status() != 422 || !strstr(out, "nested postmortem failure") ||
+        !strstr(out, "\\"failed_line\\":2") ||
+        !strstr(out, "\\"call\\":\\"outer(40L)\\"") ||
+        !strstr(out, "\\"call\\":\\"inner(local_outer)\\"") ||
+        !strstr(out, "\\"local_outer\\"") ||
+        !strstr(out, "\\"local_inner\\""))
+        return failure(123, out);
+    out = fs_r_debug_status();
+    if (fs_r_status() != 200 || !strstr(out, "\\"frames\\":[{"))
+        return failure(124, out);
+    out = fs_r_debug_evaluate("@1\nlocal_outer");
+    if (fs_r_status() != 200 || !strstr(out, "\\"output\\":\\"[1] 41"))
+        return failure(125, out);
+    out = fs_r_debug_evaluate("@2\nlocal_inner");
+    if (fs_r_status() != 200 || !strstr(out, "\\"output\\":\\"[1] 43"))
+        return failure(126, out);
+    out = fs_r_debug_evaluate("@2\nlocal_inner <- local_inner + 1L");
+    if (fs_r_status() != 200) return failure(127, out);
+    out = fs_r_debug_evaluate("@2\nlocal_inner");
+    if (fs_r_status() != 200 || !strstr(out, "\\"output\\":\\"[1] 44"))
+        return failure(128, out);
+    out = fs_r_debug_evaluate("@8\nlocal_inner");
+    if (fs_r_status() != 422 || !strstr(out, "No retained R function frame"))
+        return failure(129, out);
+    out = fs_r_debug_status();
+    if (fs_r_status() != 200 || !strstr(out, "\\"failed_line\\":2"))
+        return failure(130, out);
+    out = fs_r_debug_stop();
+    if (fs_r_status() != 200 || !strstr(out, "\\"frames\\":[]"))
+        return failure(131, out);
+    out = fs_r_debug_evaluate("@2\nlocal_inner");
+    if (fs_r_status() != 422) return failure(132, out);
     /* Continue pauses before future top-level expressions and preserves state. */
     out = fs_r_debug_start("continue_value <- 40L\ncontinue_value <- continue_value + 2L\ncat(continue_value)");
     if (fs_r_status() != 200) return failure(82, out);

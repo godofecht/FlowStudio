@@ -450,7 +450,7 @@ function compile(query, options = {}) {
   const pattern = options.wholeWord
     ? "(?<![\\p{L}\\p{N}_])(?:" + body + ")(?![\\p{L}\\p{N}_])" : body;
   try {
-    return new RegExp(pattern, options.caseSensitive ? "gu" : "giu");
+    return new RegExp(pattern, options.regex ? (options.caseSensitive ? "gmu" : "gimu") : (options.caseSensitive ? "gu" : "giu"));
   } catch (error) {
     throw new Error("Invalid regular expression: " + error.message);
   }

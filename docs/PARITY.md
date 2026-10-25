@@ -1,5 +1,37 @@
 # FlowStudio RStudio parity matrix
 
+## 2026-10-25: native R postmortem top-level workspace evaluation (Linux/macOS CI passed)
+
+The real persistent Rscript debugger now retains the failed **top-level** source
+line in `failed_line` after Step or Continue raises an R error. Status requests
+retain that location until Stop or a new Start. The existing Flow-owned,
+origin/intent-gated `POST /api/debug/r/evaluate` route now permits an explicit
+one-expression evaluation in the failed session, preserving the error state and
+source location even when the postmortem evaluation itself fails. The browser
+panel displays the failed line and enables Evaluate without enabling Step or
+Continue after failure. The client validates the optional positive failure line.
+Postmortem expressions are **real R code with local-user privileges** and can
+mutate the persistent top-level workspace; no sandbox or read-only guarantee is
+claimed. No failed expression is automatically retried or resumed, and the
+remaining source is not executed. **Unwound function frames are not retained**;
+this is not RStudio's interactive function-frame debugger.
+
+Real R/C IPC regression assertions cover the failed line, persistent status,
+successful and failing postmortem evaluation, refusal to Step after failure,
+workspace persistence, and Stop. Browser tests cover the enabled controls,
+rendered failure location and rejection of malformed failure metadata.
+**Status: partial / independently verified native Linux/macOS CI;
+physical-browser acceptance pending.** [CI #40236961936](https://github.com/godofecht/FlowStudio/actions/runs/40236961936)
+passed all four jobs on Ubuntu 24.04 and macOS 14. Each source/transport job
+ran 624 JavaScript tests (622 passed, 2 skipped, 0 failed) and 76 Python tests
+(11 skipped). Both native jobs compiled Flow 2.0.0, passed real Rscript IPC
+postmortem regression tests and live Flow HTTP acceptance, and packaged the
+platform builds. Local Flow and Rscript executables are unavailable; physical-
+browser acceptance was not executed. Flow remains the native HTTP backend,
+and no hosted CI configuration changed. Function breakpoints, step-into/over,
+stack-frame inspection, authenticated remote sessions and RStudio parity
+remain missing.
+
 ## 2026-10-25: conditional native R top-level breakpoints (implementation; independent acceptance pending)
 
 The existing Flow-owned, origin/intent-gated `POST /api/debug/r/continue`

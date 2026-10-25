@@ -13,6 +13,7 @@ debug_expressions <- NULL
 debug_lines <- integer(0)
 debug_index <- 1L
 debug_state <- "idle"
+debug_failed_line <- NULL
 # Persistent user-owned library; never install into the system R libraries.
 user_library <- file.path(tools::R_user_dir("FlowStudio", which = "data"), "library")
 if (dir.exists(user_library)) .libPaths(c(user_library, .libPaths()))
@@ -161,6 +162,7 @@ debug_reply <- function(success = TRUE, output = "", executed_line = NULL) {
     json <- paste0('{"state":', json_quote(debug_state),
                    ',"next_line":', line_json(next_line),
                    ',"executed_line":', line_json(executed_line),
+                   ',"failed_line":', line_json(debug_failed_line),
                    ',"index":', debug_index,
                    ',"total":', length(debug_lines),
                    ',"output":', json_quote(substr(output, 1L, 2048L)), "}")
@@ -177,6 +179,7 @@ debug_start <- function(source) {
     debug_lines <<- integer(0)
     debug_index <<- 1L
     debug_state <<- "idle"
+    debug_failed_line <<- NULL
     parsed <- tryCatch(parse(text = source, keep.source = TRUE),
                        error = function(error) error)
     if (inherits(parsed, "error"))
@@ -201,20 +204,21 @@ debug_step <- function() {
     # warning, stdout, error and plot-capture behavior.
     expression <- as.expression(list(debug_expressions[[debug_index]]))
     result <- evaluate_source("", expressions_override = expression)
+    debug_failed_line <<- if (result$success) NULL else line
     debug_index <<- debug_index + 1L
     debug_state <<- if (!result$success) "error" else if (
         debug_index > length(debug_expressions)) "done" else "paused"
     debug_reply(result$success, rawToChar(result$payload), line)
 }
 
-# Explicit debugger-console evaluation in the real paused workspace. Unlike
-# syntax checks, this intentionally runs user R code and may mutate bindings,
-# write files or call functions. The session is local-only and not sandboxed.
-# Only one complete parsed expression is accepted per request; errors leave
-# the pending debug expression and source position unchanged.
+# Explicit debugger-console evaluation in the real paused or failed workspace.
+# After an error this provides postmortem inspection of top-level bindings,
+# not an unwound function frame. Evaluations are real and may have side effects.
+# Only one parsed expression is accepted; it never resumes source execution,
+# clears the failure location, or changes the debugger state.
 debug_evaluate <- function(source) {
-    if (!identical(debug_state, "paused"))
-        return(debug_reply(FALSE, "No paused R expression is available."))
+    if (!(debug_state %in% c("paused", "error")))
+        return(debug_reply(FALSE, "No paused or failed R expression is available."))
     if (!nzchar(trimws(source)) || nchar(source, type = "bytes") > 4096L)
         return(debug_reply(FALSE, "R debugger evaluation requires 1 to 4096 bytes of source."))
     parsed <- tryCatch(parse(text = source, keep.source = FALSE),
@@ -306,6 +310,7 @@ debug_continue <- function(target_line) {
         debug_index <<- debug_index + 1L
         debug_state <<- if (!result$success) "error" else if (
             debug_index > length(debug_expressions)) "done" else "paused"
+        if (!result$success) debug_failed_line <<- last_line
         chunk <- rawToChar(result$payload)
         if (!identical(chunk, "(No output)")) {
             if (length(output) < 16L || !result$success) {
@@ -325,6 +330,7 @@ debug_stop <- function() {
     debug_expressions <<- NULL
     debug_lines <<- integer(0)
     debug_index <<- 1L
+    debug_failed_line <<- NULL
     debug_state <<- "idle"
     debug_reply()
 }

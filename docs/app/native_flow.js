@@ -62,6 +62,8 @@ async function debugRResponse(endpoint, body) {
       !Number.isSafeInteger(data.total) || data.total < 0 || data.total > 1024 ||
       ![data.next_line, data.executed_line].every(line =>
         line === null || (Number.isSafeInteger(line) && line > 0)) ||
+      !(data.failed_line === undefined || data.failed_line === null ||
+        (Number.isSafeInteger(data.failed_line) && data.failed_line > 0)) ||
       typeof data.output !== "string" || data.output.length > 20000)
     throw new Error("Invalid native R debugger response.");
   return {...data, ok:response.ok};

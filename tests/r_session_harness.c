@@ -233,7 +233,7 @@ int main(void)
     if (fs_r_status() != 200 || strcmp(out, "99") != 0)
         return failure(103, out);
     out = fs_r_debug_evaluate("debug_value");
-    if (fs_r_status() != 422 || !strstr(out, "No paused R expression"))
+    if (fs_r_status() != 422 || !strstr(out, "No paused or failed R expression"))
         return failure(104, out);
     out = fs_r_debug_start("debug_value <- )");
     if (fs_r_status() != 422 || !strstr(out, "R syntax error"))
@@ -244,13 +244,36 @@ int main(void)
     if (fs_r_status() != 200) return failure(78, out);
     out = fs_r_debug_step();
     if (fs_r_status() != 422 || !strstr(out, "\"state\":\"error\"") ||
-        !strstr(out, "debug trap")) return failure(79, out);
+        !strstr(out, "debug trap") || !strstr(out, "\"failed_line\":2"))
+        return failure(79, out);
+    /* Postmortem evaluation reads the real workspace without retrying the
+     * failed expression or running the remaining source. */
+    out = fs_r_debug_status();
+    if (fs_r_status() != 200 || !strstr(out, "\"failed_line\":2") ||
+        !strstr(out, "\"state\":\"error\"")) return failure(115, out);
+    out = fs_r_debug_evaluate("debug_value + 1L");
+    if (fs_r_status() != 200 || !strstr(out, "\"output\":\"[1] 101") ||
+        !strstr(out, "\"failed_line\":2") || !strstr(out, "\"state\":\"error\""))
+        return failure(116, out);
+    out = fs_r_debug_evaluate("postmortem_probe <- debug_value + 2L");
+    if (fs_r_status() != 200 || !strstr(out, "\"state\":\"error\""))
+        return failure(117, out);
+    out = fs_r_debug_evaluate("stop('postmortem evaluation failure')");
+    if (fs_r_status() != 422 || !strstr(out, "postmortem evaluation failure") ||
+        !strstr(out, "\"failed_line\":2") || !strstr(out, "\"state\":\"error\""))
+        return failure(118, out);
+    out = fs_r_debug_step();
+    if (fs_r_status() != 422 || !strstr(out, "No paused R expression"))
+        return failure(119, out);
     out = fs_r_debug_stop();
     if (fs_r_status() != 200 || !strstr(out, "\"state\":\"idle\""))
         return failure(80, out);
     out = fs_r_run("cat(debug_value)");
     if (fs_r_status() != 200 || strcmp(out, "100") != 0)
         return failure(81, out);
+    out = fs_r_run("cat(postmortem_probe)");
+    if (fs_r_status() != 200 || strcmp(out, "102") != 0)
+        return failure(120, out);
     /* Continue pauses before future top-level expressions and preserves state. */
     out = fs_r_debug_start("continue_value <- 40L\ncontinue_value <- continue_value + 2L\ncat(continue_value)");
     if (fs_r_status() != 200) return failure(82, out);

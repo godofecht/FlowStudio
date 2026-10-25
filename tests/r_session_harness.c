@@ -10,6 +10,7 @@ extern const char *fs_r_packages(void);
 extern const char *fs_r_load_package(const char *);
 extern const char *fs_r_install_package(const char *);
 extern const char *fs_r_remove_package(const char *);
+extern const char *fs_r_update_package(const char *);
 extern int fs_r_status(void);
 extern void fs_r_reset(void);
 static int failure(int step, const char *output)
@@ -60,6 +61,16 @@ int main(void)
     out = fs_r_remove_package("stats;system('false')");
     if (fs_r_status() != 422 || !strstr(out, "Invalid R package name"))
         return failure(51, out);
+    /* Updates cannot modify system libraries or evaluate expressions. */
+    out = fs_r_update_package("stats");
+    if (fs_r_status() != 422 || !strstr(out, "system packages cannot be updated"))
+        return failure(56, out);
+    out = fs_r_update_package("stats;system('false')");
+    if (fs_r_status() != 422 || !strstr(out, "Invalid R package name"))
+        return failure(57, out);
+    out = fs_r_update_package("FlowStudioPackageDefinitelyMissing");
+    if (fs_r_status() != 422 || !strstr(out, "not installed in the FlowStudio user library"))
+        return failure(58, out);
     out = fs_r_run("cat(value)");
     if (fs_r_status() != 200 || strcmp(out, "41") != 0) return failure(43, out);
     /* Parsing valid source must not evaluate assignments or errors. */
@@ -172,15 +183,37 @@ int main(void)
         out = fs_r_run("cat(FlowStudioFixture::answer())");
         if (fs_r_status() != 200 || strcmp(out, "42") != 0)
             return failure(47, out);
+        out = fs_r_update_package("FlowStudioFixture");
+        if (fs_r_status() != 422 || !strstr(out, "loaded in the native session"))
+            return failure(59, out);
     }
     fs_r_reset();
     out = fs_r_inspect();
     if (fs_r_status() != 200 || !strstr(out, "\"variables\":[]")) return failure(13, out);
     if (getenv("FLOWSTUDIO_R_TEST_REPO"))
     {
+        /* Atomically publish the newer CRAN index only after the old version
+         * has been installed; both tarballs were built by the Python harness. */
+        const char *next = getenv("FLOWSTUDIO_R_TEST_PACKAGES_NEXT");
+        const char *current = getenv("FLOWSTUDIO_R_TEST_PACKAGES_CURRENT");
+        if (!next || !current || rename(next, current) != 0)
+            return failure(60, "Could not publish upgraded offline CRAN index");
+        out = fs_r_update_package("FlowStudioFixture");
+        if (fs_r_status() != 200 || !strstr(out, "from 0.0.1 to 0.0.2"))
+            return failure(61, out);
         out = fs_r_run("cat(FlowStudioFixture::answer())");
-        if (fs_r_status() != 200 || strcmp(out, "42") != 0)
-            return failure(48, out);
+        if (fs_r_status() != 200 || strcmp(out, "43") != 0)
+            return failure(62, out);
+        out = fs_r_update_package("FlowStudioFixture");
+        if (fs_r_status() != 422 || !strstr(out, "loaded in the native session"))
+            return failure(63, out);
+        fs_r_reset();
+        out = fs_r_update_package("FlowStudioFixture");
+        if (fs_r_status() != 200 || !strstr(out, "up to date at 0.0.2"))
+            return failure(64, out);
+        out = fs_r_run("cat(FlowStudioFixture::answer())");
+        if (fs_r_status() != 200 || strcmp(out, "43") != 0)
+            return failure(65, out);
     }
     if (getenv("FLOWSTUDIO_R_TEST_REPO"))
     {

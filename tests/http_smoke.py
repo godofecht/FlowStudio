@@ -451,6 +451,17 @@ def main() -> None:
         status, output = request("POST", "/api/packages/r/install",
                                  "stats;stop('unsafe')", accepted_headers)
         assert status == 422 and "Invalid R package name" in output, (status, output)
+        # Updates are explicit and cannot overwrite system libraries or execute
+        # injected expressions. Public CRAN network access is not assumed in CI.
+        assert request("POST", "/api/packages/r/update", "stats")[0] == 404
+        assert request("POST", "/api/packages/r/update", "stats",
+                       {"X-FlowStudio-Intent": "run",
+                        "Origin": "http://attacker.invalid"})[0] == 404
+        status, output = request("POST", "/api/packages/r/update", "stats", accepted_headers)
+        assert status == 422 and "system packages cannot be updated" in output, (status, output)
+        status, output = request("POST", "/api/packages/r/update",
+                                 "stats;stop('unsafe')", accepted_headers)
+        assert status == 422 and "Invalid R package name" in output, (status, output)
         # Removal cannot touch system libraries or evaluate arbitrary source.
         assert request("POST", "/api/packages/r/remove", "stats")[0] == 404
         assert request("POST", "/api/packages/r/remove", "stats",

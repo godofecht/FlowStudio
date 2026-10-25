@@ -264,6 +264,27 @@ def test_native_r_expression_debugger(page, timeout: int):
     page.wait_for_function(
         "() => document.querySelector('#rDebugOutput').textContent.includes('R expression debugger: idle')",
         timeout=timeout)
+    page.locator("#source").fill(
+        "fs_r_browser_continue <- 40L\nfs_r_browser_continue <- fs_r_browser_continue + 2L\ncat(fs_r_browser_continue)")
+    page.locator("#rDebugStart").click()
+    page.wait_for_function(
+        "() => document.querySelector('#rDebugOutput').textContent.includes('Next expression at line 1')",
+        timeout=timeout)
+    page.locator("#rDebugTargetLine").fill("3")
+    page.locator("#rDebugContinue").click()
+    page.wait_for_function(
+        "() => document.querySelector('#rDebugOutput').textContent.includes('Next expression at line 3')",
+        timeout=timeout)
+    page.locator("#rDebugTargetLine").fill("")
+    page.locator("#rDebugContinue").click()
+    page.wait_for_function(
+        "() => document.querySelector('#rDebugOutput').textContent.includes('R expression debugger: done')",
+        timeout=timeout)
+    assert "Output:\n42" in page.locator("#rDebugOutput").inner_text()
+    page.locator("#rDebugStop").click()
+    page.wait_for_function(
+        "() => document.querySelector('#rDebugOutput').textContent.includes('R expression debugger: idle')",
+        timeout=timeout)
 
 
 def test_native_conditional_debugger(page, timeout: int):

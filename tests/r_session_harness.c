@@ -24,7 +24,7 @@ int main(void)
     if (fs_r_status() != 422 || !strstr(out, "R syntax error:") ||
         !strstr(out, "<text>:")) return failure(22, out);
     out = fs_r_run("cat(value, '\\n', sep='')");
-    if (fs_r_status() != 200 || strcmp(out, "41\\n") != 0) return failure(23, out);
+    if (fs_r_status() != 200 || strcmp(out, "41\n") != 0) return failure(23, out);
     out = fs_r_inspect();
     if (fs_r_status() != 200 || !strstr(out, "\"name\":\"value\"") ||
         !strstr(out, "\"type\":\"double\"") ||

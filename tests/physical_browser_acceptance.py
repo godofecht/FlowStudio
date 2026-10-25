@@ -144,6 +144,14 @@ def test_native_r(page, timeout: int):
     page.get_by_role("heading", name="Snapshot: fs_native_frame").wait_for(timeout=timeout)
     assert "alpha" in page.locator("#workspace").inner_text()
     assert "beta" in page.locator("#workspace").inner_text()
+    # Real Rscript SVG device -> Flow plot endpoint -> browser plot history.
+    run_source(page, "r",
+               "plot(c(1, 2, 3))\\ncat('native SVG ready 42\\\\n')",
+               "native SVG ready 42", timeout)
+    plot_image = page.locator("#workspace img[alt^='R plot']").first
+    plot_image.wait_for(timeout=timeout)
+    assert plot_image.get_attribute("src").startswith("data:image/svg+xml;")
+    assert page.locator("#workspace a[download$='.svg']").count() > 0
 
     page.locator("#source").fill(
         "# %% [r]\nfs_native_nb <- fs_native_browser + 1L\n"

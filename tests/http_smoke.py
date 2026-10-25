@@ -424,13 +424,17 @@ def main() -> None:
         status, plot_json = request("POST", "/api/plot/r", "", accepted_headers)
         assert status == 200, (status, plot_json[:120])
         captured = json.loads(plot_json)
-        assert isinstance(captured["svg"], str) and "<svg" in captured["svg"], captured
-        assert "</svg>" in captured["svg"] and captured["warning"] is None, captured
+        assert captured["warning"] is None, captured
+        if captured["svg"] is not None:
+            assert "<svg" in captured["svg"] and "</svg>" in captured["svg"], captured
+            assert captured["pdf"] is None, captured
+        else:
+            assert bytes.fromhex(captured["pdf"]).startswith(b"%PDF"), captured
         status, output = request("POST", "/api/run/r",
                                  "cat('text only\\n')", accepted_headers)
         assert status == 200, (status, output)
         status, plot_json = request("POST", "/api/plot/r", "", accepted_headers)
-        assert status == 200 and json.loads(plot_json)["svg"] is None, (status, plot_json)
+        assert status == 200 and json.loads(plot_json)["svg"] is None and json.loads(plot_json)["pdf"] is None, (status, plot_json)
         status, _ = request("POST", "/api/inspect/r", "")
         assert status == 404, status
         status, output = request("POST", "/api/run/r",

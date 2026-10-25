@@ -1,5 +1,31 @@
 # FlowStudio RStudio parity matrix
 
+## 2026-10-25: native R postmortem top-level workspace evaluation (implementation; native acceptance pending)
+
+The real persistent Rscript debugger now retains the failed **top-level** source
+line in `failed_line` after Step or Continue raises an R error. Status requests
+retain that location until Stop or a new Start. The existing Flow-owned,
+origin/intent-gated `POST /api/debug/r/evaluate` route now permits an explicit
+one-expression evaluation in the failed session, preserving the error state and
+source location even when the postmortem evaluation itself fails. The browser
+panel displays the failed line and enables Evaluate without enabling Step or
+Continue after failure. The client validates the optional positive failure line.
+Postmortem expressions are **real R code with local-user privileges** and can
+mutate the persistent top-level workspace; no sandbox or read-only guarantee is
+claimed. No failed expression is automatically retried or resumed, and the
+remaining source is not executed. **Unwound function frames are not retained**;
+this is not RStudio's interactive function-frame debugger.
+
+Real R/C IPC regression assertions cover the failed line, persistent status,
+successful and failing postmortem evaluation, refusal to Step after failure,
+workspace persistence, and Stop. Browser tests cover the enabled controls,
+rendered failure location and rejection of malformed failure metadata.
+**Status: implemented, not independently verified in native CI yet.** Local
+Flow and Rscript executables are unavailable; physical-browser acceptance is
+also outstanding. Flow remains the native HTTP backend, and no hosted CI
+configuration was changed. Function breakpoints, step-into/over, stack-frame
+inspection, authenticated remote sessions and RStudio parity remain missing.
+
 ## 2026-10-25: conditional native R top-level breakpoints (implementation; independent acceptance pending)
 
 The existing Flow-owned, origin/intent-gated `POST /api/debug/r/continue`

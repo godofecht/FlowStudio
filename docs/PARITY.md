@@ -55,8 +55,10 @@ or Python graphics backend is required.
 passed on Ubuntu and macOS in the initial run, but the original lazy SVG
 device failed actual R IPC acceptance on both platforms: Linux returned no
 plot, and macOS required unavailable X11 libraries. The implementation was
-reworked to open devices explicitly and fall back to PDF; this correction
-requires independent rerun. Real Rscript IPC, Flow HTTP and physical-browser
+reworked to open devices explicitly and fall back to PDF. A second native
+failure revealed an existing `on.exit(unlink(output_file))` call replacing
+the registered plot finalizer; it now uses `add=TRUE`, with regression
+coverage. This correction requires independent rerun. Real Rscript IPC, Flow HTTP and physical-browser
 acceptance must pass before merge. Multiple graphics pages, native R notebook
 plot attachments, user-managed devices, restart persistence and complete
 RStudio plot parity remain outstanding. No hosted CI configuration was changed.

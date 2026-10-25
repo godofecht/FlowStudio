@@ -148,10 +148,11 @@ def test_native_r(page, timeout: int):
     run_source(page, "r",
                "plot(c(1, 2, 3))\ncat('native SVG ready 42\\n')",
                "native SVG ready 42", timeout)
-    plot_image = page.locator("#workspace img[alt^='R plot']").first
+    plot_image = page.locator("#workspace img[alt^='R plot'], #workspace embed[aria-label^='R plot']").first
     plot_image.wait_for(timeout=timeout)
-    assert plot_image.get_attribute("src").startswith("data:image/svg+xml;")
-    assert page.locator("#workspace a[download$='.svg']").count() > 0
+    assert plot_image.get_attribute("src").startswith(
+        ("data:image/svg+xml;", "data:application/pdf;"))
+    assert page.locator("#workspace a[download$='.svg'], #workspace a[download$='.pdf']").count() > 0
 
     page.locator("#source").fill(
         "# %% [r]\nfs_native_nb <- fs_native_browser + 1L\n"

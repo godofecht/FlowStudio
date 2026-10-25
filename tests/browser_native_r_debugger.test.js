@@ -88,7 +88,7 @@ test("native R expression debugger panel only enables real localhost Rscript con
 });
 
 test("native R debugger retains the failed line and permits postmortem workspace evaluation", async () => {
-  const source = control("x <- 100L\\nstop('failure')\\ncat('unreachable')");
+  const source = control("x <- 100L\nstop('failure')\ncat('unreachable')");
   const language = control("r"), runtime = control("native");
   const startButton = control(), stepButton = control(), stopButton = control();
   const continueButton = control(), targetLine = control("");
@@ -124,7 +124,7 @@ test("native R debugger retains the failed line and permits postmortem workspace
   assert.equal(watchExpression.disabled, false);
   assert.equal(await p.execute("step"), false);
   assert.equal(await p.execute("evaluate"), true);
-  assert.match(target.textContent, /Output:\\n\[1\] 101/);
+  assert.match(target.textContent, /Output:\n\[1\] 101/);
   assert.match(target.textContent, /Failed expression at line 2/);
   assert.equal(await p.execute("status"), true);
   assert.match(target.textContent, /Failed expression at line 2/);

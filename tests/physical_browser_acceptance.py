@@ -150,12 +150,17 @@ def test_native_r(page, timeout: int):
     assert "stats" in page.locator("#packages").inner_text()
     assert page.locator("#installPackage").is_enabled()
     assert page.locator("#loadRPackage").is_enabled()
+    assert page.locator("#removeRPackage").is_enabled()
     # A preinstalled base package gives deterministic no-network acceptance.
     page.locator("#packageName").fill("stats")
     page.locator("#installPackage").click()
     page.get_by_text("Package installation completed", exact=False).wait_for(timeout=timeout)
     page.locator("#loadRPackage").click()
     page.get_by_text("Installed R package loaded", exact=False).wait_for(timeout=timeout)
+    # Confirming removal of a system package must fail in the real R kernel.
+    page.once("dialog", lambda dialog: dialog.accept())
+    page.locator("#removeRPackage").click()
+    page.get_by_text("system packages cannot be removed", exact=False).wait_for(timeout=timeout)
     # Real Rscript PDF device -> Flow plot endpoint -> browser plot history.
     run_source(page, "r",
                "plot(c(1, 2, 3))\ncat('native SVG ready 42\\n')",

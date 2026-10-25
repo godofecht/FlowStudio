@@ -77,13 +77,13 @@ int main(void)
     out = fs_r_run("plot(c(1, 2, 3), main='FlowStudio native SVG')");
     if (fs_r_status() != 200) return failure(33, out);
     out = fs_r_plot();
-    if (fs_r_status() != 200 || !strstr(out, "\\"svg\\":\\"<?xml") ||
+    if (fs_r_status() != 200 || !strstr(out, "\"svg\":\"<?xml") ||
         !strstr(out, "<svg") || !strstr(out, "</svg>"))
         return failure(34, out);
     out = fs_r_run("cat('no plot\\n')");
     if (fs_r_status() != 200) return failure(35, out);
     out = fs_r_plot();
-    if (fs_r_status() != 200 || !strstr(out, "\\"svg\\":null"))
+    if (fs_r_status() != 200 || !strstr(out, "\"svg\":null"))
         return failure(36, out);
     /* Native R lists expose nested metadata without evaluating user methods. */
     out = fs_r_run("nested <- list(numbers=list(answer=42L, more=list(x=1L)), words=c('a','b'))\n"

@@ -197,6 +197,7 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
         <button id="searchProject" type="button">Find all</button>
         <label for="projectReplace">Replace</label><input id="projectReplace" type="text" maxlength="10000" placeholder="Replacement text" aria-label="Project-wide replacement text">
         <button id="replaceProject" type="button" title="Preview and confirm local file changes">Replace all…</button>
+        <button id="undoProjectReplace" type="button" disabled title="Undo the last verified project-wide replacement">Undo project replace</button>
       </div>
       <div id="searchResults" aria-live="polite" aria-label="Project search results"></div>
       <div id="projectTree" role="navigation" aria-label="Project files"><p class="muted">Open a folder to browse source files.</p></div>
@@ -457,8 +458,18 @@ async function applyProjectReplacement(plan, options = {}) {
   return { files: completed, matches };
 }
 
+/* Undo is a second, conflict-checked write, never an unconditional rollback. */
+function reverseProjectReplacement(plan) {
+  if (!plan || !Array.isArray(plan.files) || plan.files.length > 50)
+    throw new Error("Invalid project replacement history.");
+  return {root:plan.root, matches:plan.matches, files:plan.files.map(entry => ({
+    path:entry.path, handle:entry.handle, before:entry.after,
+    after:entry.before, count:entry.count
+  }))};
+}
+
 function createProjectExplorer({ tree, status, openHandle, picker }) {
-  let root = null, revision = 0;
+  let root = null, revision = 0, lastReplacement = null;
   const element = (tag, text) => {
     const node = document.createElement(tag);
     if (text !== undefined) node.textContent = text;
@@ -528,6 +539,7 @@ function createProjectExplorer({ tree, status, openHandle, picker }) {
       const handle = await picker({ mode: "read" });
       if (!handle || handle.kind !== "directory") throw new Error("Not a directory");
       root = handle;
+      lastReplacement = null;
       await refresh();
       status("Opened project " + root.name, "ok");
       return true;
@@ -543,12 +555,26 @@ function createProjectExplorer({ tree, status, openHandle, picker }) {
   }
   return { choose, refresh, create, search: (query, options) => searchProject(root, query, options),
     previewReplace: (query, replacement, options) => planProjectReplace(root, query, replacement, options),
-    applyReplace: (plan, options) => {
-      if (!root || plan.root !== root) throw new Error("Project changed since replacement preview.");
-      return applyProjectReplacement(plan, options);
-    }, hasProject: () => root !== null };
+    applyReplace: async (plan, options) => {
+      if (!root || !plan || plan.root !== root)
+        throw new Error("Project changed since replacement preview.");
+      lastReplacement = null;
+      const result = await applyProjectReplacement(plan, options);
+      if (root === plan.root && result.files > 0)
+        lastReplacement = reverseProjectReplacement(plan);
+      return result;
+    },
+    undoReplace: async options => {
+      if (!root || !lastReplacement || lastReplacement.root !== root)
+        throw new Error("No completed project replacement to undo.");
+      const undo = lastReplacement;
+      lastReplacement = null; // A failed or partial undo must not be blindly replayed.
+      return applyProjectReplacement(undo, options);
+    },
+    hasUndoReplace: () => lastReplacement !== null && lastReplacement.root === root,
+    hasProject: () => root !== null };
 }
-const api = { createProjectExplorer, validFilename, searchProject, planProjectReplace, applyProjectReplacement };
+const api = { createProjectExplorer, validFilename, searchProject, planProjectReplace, applyProjectReplacement, reverseProjectReplacement };
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 global.FlowStudioProject = api;
 })(globalThis);
@@ -1385,7 +1411,7 @@ const project = FlowStudioProject.createProjectExplorer({
 });
 el("folder").addEventListener("click", async () => {
   const chosen = await project.choose();
-  if (chosen) { ++searchRevision; el("searchResults").replaceChildren(); }
+  if (chosen) { ++searchRevision; el("searchResults").replaceChildren(); el("undoProjectReplace").disabled = true; }
 });
 el("refreshProject").addEventListener("click", () => project.refresh());
 el("newFile").addEventListener("click", async () => {
@@ -1497,8 +1523,17 @@ async function runProjectReplace() {
         "No project matches to replace.", "ok");
       return;
     }
-    const blocked = entry => documents.list().some(doc => doc.handle === entry.handle);
-    const open = plan.files.filter(blocked);
+    const blocked = async entry => {
+      for (const doc of documents.list()) {
+        if (!doc.handle) continue;
+        if (doc.handle === entry.handle) return true;
+        if (typeof entry.handle.isSameEntry === "function" &&
+            await entry.handle.isSameEntry(doc.handle)) return true;
+      }
+      return false;
+    };
+    const open = [];
+    for (const entry of plan.files) if (await blocked(entry)) open.push(entry);
     if (open.length) throw new Error("Close open editor tabs before project replacement: " +
       open.map(entry => entry.path).join(", "));
     const names = plan.files.slice(0, 10).map(entry => entry.path).join("\n");
@@ -1508,13 +1543,16 @@ async function runProjectReplace() {
       "\n\nWrites are sequential; a later filesystem failure can leave earlier files changed.";
     if (!confirm(summary)) { status("Project replacement cancelled."); return; }
     const applied = await project.applyReplace(plan, { isBlocked: blocked });
+    el("undoProjectReplace").disabled = !project.hasUndoReplace();
     if (token !== searchRevision) return;
     el("searchResults").replaceChildren();
-    status("Replaced " + applied.matches + " matches in " + applied.files + " project files.", "ok");
+    status("Replaced " + applied.matches + " matches in " + applied.files +
+      " project files. One-level undo is available.", "ok");
   } catch (error) {
     if (token === searchRevision && error.name !== "AbortError")
       status(error.message || String(error), "error");
   } finally {
+    el("undoProjectReplace").disabled = !project.hasUndoReplace();
     if (token === searchRevision) {
       el("replaceProject").disabled = false;
       el("searchProject").disabled = false;
@@ -1522,7 +1560,39 @@ async function runProjectReplace() {
   }
 }
 
+async function runProjectUndo() {
+  if (!project.hasUndoReplace()) { el("undoProjectReplace").disabled = true; return; }
+  if (!confirm("Undo the last project-wide replacement? Files must be unchanged. Multi-file writes are not atomic.")) return;
+  el("undoProjectReplace").disabled = true;
+  el("replaceProject").disabled = true;
+  el("searchProject").disabled = true;
+  try {
+    const blocked = async entry => {
+      for (const doc of documents.list()) {
+        if (!doc.handle) continue;
+        if (doc.handle === entry.handle) return true;
+        if (typeof entry.handle.isSameEntry === "function" &&
+            await entry.handle.isSameEntry(doc.handle)) return true;
+      }
+      return false;
+    };
+    const result = await project.undoReplace({isBlocked: blocked});
+    ++searchRevision;
+    el("searchResults").replaceChildren();
+    status("Restored " + result.files + " project files (" + result.matches +
+      " replacements undone).", "ok");
+  } catch (error) {
+    status("Project undo failed: " + (error.message || String(error)) +
+      ". Review files before further changes.", "error");
+  } finally {
+    el("undoProjectReplace").disabled = !project.hasUndoReplace();
+    el("replaceProject").disabled = false;
+    el("searchProject").disabled = false;
+  }
+}
+
 el("searchProject").addEventListener("click", runProjectSearch);
+el("undoProjectReplace").addEventListener("click", runProjectUndo);
 el("replaceProject").addEventListener("click", runProjectReplace);
 el("projectSearch").addEventListener("keydown", event => {
   if (event.key === "Enter") {

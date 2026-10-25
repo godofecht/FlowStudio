@@ -80,7 +80,7 @@ function workspace(folder) {
     "source", "language", "console", "resultStatus", "fileLabel", "dirty",
     "cursor", "run", "runCell", "resetR", "resetPython", "refreshPythonEnvironment", "pythonEnvironment", "open", "save", "clear", "fallbackOpen", "runtimeInfo",
     "projectTree", "folder", "newFile", "refreshProject",
-    "projectSearch", "caseSensitive", "projectRegex", "projectWholeWord", "searchProject", "searchResults", "projectReplace", "replaceProject",
+    "projectSearch", "caseSensitive", "projectRegex", "projectWholeWord", "searchProject", "searchResults", "projectReplace", "replaceProject", "undoProjectReplace",
     "editorFind", "editorReplace", "findNext", "findPrevious",
     "replaceOne", "replaceAll", "editorCaseSensitive", "editorRegex", "editorWholeWord", "editorFindCount",
     "docTabs", "newDocument", "newDocumentTab", "findBar"
@@ -564,4 +564,34 @@ test("project-wide replacement uses regex capture groups in the native workspace
   app.el("projectReplace").value = "bar_$1";
   await app.el("replaceProject").fire("click");
   assert.equal(target.content, "bar_1 <- 3\nbar_2 <- 4");
+});
+
+test("native project undo restores verified disk contents and is one-shot", async () => {
+  const target = file("analysis.R", "x <- 1\nx <- 2\n");
+  const app = workspace(directory("work", [["analysis.R", target]]));
+  await app.el("folder").fire("click");
+  app.el("projectSearch").value = "x";
+  app.el("projectReplace").value = "z";
+  await app.el("replaceProject").fire("click");
+  assert.equal(target.content, "z <- 1\nz <- 2\n");
+  assert.equal(app.el("undoProjectReplace").disabled, false);
+  await app.el("undoProjectReplace").fire("click");
+  assert.equal(target.content, "x <- 1\nx <- 2\n");
+  assert.equal(app.el("undoProjectReplace").disabled, true);
+  assert.equal(app.fetches.length, 0);
+});
+test("native project undo refuses external edits without overwriting", async () => {
+  const target = file("analysis.R", "x <- 1\n");
+  const app = workspace(directory("work", [["analysis.R", target]]));
+  await app.el("folder").fire("click");
+  app.el("projectSearch").value = "x";
+  app.el("projectReplace").value = "z";
+  await app.el("replaceProject").fire("click");
+  const writer = await target.createWritable();
+  await writer.write("external");
+  await writer.close();
+  await app.el("undoProjectReplace").fire("click");
+  assert.equal(target.content, "external");
+  assert.match(app.el("resultStatus").textContent, /Project undo failed.*File changed since preview/);
+  assert.equal(app.el("undoProjectReplace").disabled, true);
 });

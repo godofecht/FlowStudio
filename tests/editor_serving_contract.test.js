@@ -36,3 +36,10 @@ test("integrated console scripts load once, after workspace tabs", () => {
   assert.match(routes, /if url == "\/console\.js"/);
   assert.match(routes, /if url == "\/workspace_console\.js"/);
 });
+
+test("native project replacement has an explicit conflict-checked undo", () => {
+  const html = read("web/index.html");
+  assert.match(html, /id="undoProjectReplace"[^>]*disabled/);
+  assert.match(html, /project\.undoReplace\(\{isBlocked: blocked\}\)/);
+  assert.match(html, /entry\.handle\.isSameEntry\(doc\.handle\)/);
+});

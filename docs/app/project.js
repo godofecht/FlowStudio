@@ -201,8 +201,18 @@ async function applyProjectReplacement(plan, options = {}) {
   return { files: completed, matches };
 }
 
+/* Undo is a second, conflict-checked write, never an unconditional rollback. */
+function reverseProjectReplacement(plan) {
+  if (!plan || !Array.isArray(plan.files) || plan.files.length > 50)
+    throw new Error("Invalid project replacement history.");
+  return {root:plan.root, matches:plan.matches, files:plan.files.map(entry => ({
+    path:entry.path, handle:entry.handle, before:entry.after,
+    after:entry.before, count:entry.count
+  }))};
+}
+
 function createProjectExplorer({ tree, status, openHandle, picker }) {
-  let root = null, revision = 0;
+  let root = null, revision = 0, lastReplacement = null;
   const element = (tag, text) => {
     const node = document.createElement(tag);
     if (text !== undefined) node.textContent = text;
@@ -272,6 +282,7 @@ function createProjectExplorer({ tree, status, openHandle, picker }) {
       const handle = await picker({ mode: "read" });
       if (!handle || handle.kind !== "directory") throw new Error("Not a directory");
       root = handle;
+      lastReplacement = null;
       await refresh();
       status("Opened project " + root.name, "ok");
       return true;
@@ -287,12 +298,26 @@ function createProjectExplorer({ tree, status, openHandle, picker }) {
   }
   return { choose, refresh, create, search: (query, options) => searchProject(root, query, options),
     previewReplace: (query, replacement, options) => planProjectReplace(root, query, replacement, options),
-    applyReplace: (plan, options) => {
-      if (!root || plan.root !== root) throw new Error("Project changed since replacement preview.");
-      return applyProjectReplacement(plan, options);
-    }, hasProject: () => root !== null };
+    applyReplace: async (plan, options) => {
+      if (!root || !plan || plan.root !== root)
+        throw new Error("Project changed since replacement preview.");
+      lastReplacement = null;
+      const result = await applyProjectReplacement(plan, options);
+      if (root === plan.root && result.files > 0)
+        lastReplacement = reverseProjectReplacement(plan);
+      return result;
+    },
+    undoReplace: async options => {
+      if (!root || !lastReplacement || lastReplacement.root !== root)
+        throw new Error("No completed project replacement to undo.");
+      const undo = lastReplacement;
+      lastReplacement = null; // A failed or partial undo must not be blindly replayed.
+      return applyProjectReplacement(undo, options);
+    },
+    hasUndoReplace: () => lastReplacement !== null && lastReplacement.root === root,
+    hasProject: () => root !== null };
 }
-const api = { createProjectExplorer, validFilename, searchProject, planProjectReplace, applyProjectReplacement };
+const api = { createProjectExplorer, validFilename, searchProject, planProjectReplace, applyProjectReplacement, reverseProjectReplacement };
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 global.FlowStudioProject = api;
 })(globalThis);

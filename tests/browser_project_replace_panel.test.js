@@ -72,15 +72,15 @@ function fixture(confirmChange = () => true) {
   const query=node("x"), replacement=node("y");
   query.value="x"; replacement.value="y";
   const caseSensitive=node(), regex=node(), wholeWord=node();
-  const previewButton=node(), applyButton=node(), output=node();
+  const previewButton=node(), applyButton=node(), undoButton=node(), output=node();
   const panel=Panel.create({
     project:workspace.project, isOpenHandle:workspace.isOpenHandle,
     query,replacement,caseSensitive,regex,wholeWord,previewButton,applyButton,
-    output,notice:m=>messages.push(m),confirmChange
+    undoButton,output,notice:m=>messages.push(m),confirmChange
   });
   return {
     first,second,root,source,workspace,panel,query,replacement,regex,wholeWord,
-    previewButton,applyButton,output,messages,
+    previewButton,applyButton,undoButton,output,messages,
     selectRoot(next){selectedRoot=next;},
     cleanup(){global.document=previousDocument;}
   };
@@ -160,11 +160,12 @@ test("Pages wiring exposes real project replacement controls and module",()=>{
   const html=fs.readFileSync(path.join(__dirname,"../docs/app/index.html"),"utf8");
   for (const id of ["projectReplaceQuery","projectReplaceText","projectReplaceCase",
     "projectReplaceRegex","projectReplaceWholeWord","projectReplacePreview",
-    "projectReplaceApply","projectReplaceOutput"])
+    "projectReplaceApply","projectReplaceUndo","projectReplaceOutput"])
     assert.ok(html.includes('id="'+id+'"'),"missing "+id);
   assert.match(html,/src="\.\/project_replace_panel\.js"/);
   assert.match(html,/FlowStudioProjectReplacePanel\.create\(/);
   assert.match(html,/isOpenHandle: projectWorkspace\.isOpenHandle/);
+  assert.match(html,/undoButton: \$\("projectReplaceUndo"\)/);
 });
 for (const [name, api] of [["Pages",Project],["native",require("../web/project.js")]]) {
   test(name+" awaits asynchronous editor-open guards before writing",async()=>{
@@ -179,3 +180,42 @@ for (const [name, api] of [["Pages",Project],["native",require("../web/project.j
     assert.equal(first.state.content,"x");
   });
 }
+
+test("Pages provides one explicit undo of successfully replaced project files",async()=>{
+  const f=fixture();
+  try {
+    await f.workspace.choose();
+    await f.panel.preview();
+    await f.panel.apply();
+    assert.equal(f.undoButton.disabled,false);
+    assert.equal(await f.panel.undo(),true);
+    assert.equal(f.first.state.content,"x <- 1\nx <- 2\n");
+    assert.equal(f.second.state.content,"x = 3\n");
+    assert.equal(f.undoButton.disabled,true);
+    assert.equal(await f.panel.undo(),false);
+  } finally {f.cleanup();}
+});
+test("Pages refuses undo after an external edit without touching other files",async()=>{
+  const f=fixture();
+  try {
+    await f.workspace.choose();
+    await f.panel.preview();
+    await f.panel.apply();
+    f.second.state.content="external";
+    assert.equal(await f.panel.undo(),false);
+    assert.match(f.output.textContent,/File changed since preview/);
+    assert.equal(f.first.state.content,"y <- 1\ny <- 2\n");
+    assert.equal(f.undoButton.disabled,true);
+  } finally {f.cleanup();}
+});
+test("Pages refuses undo while a project file is open in the editor",async()=>{
+  const f=fixture();
+  try {
+    await f.workspace.choose();
+    await f.panel.preview();
+    await f.panel.apply();
+    await f.workspace.openHandle(f.first.handle(),"work/a.R",f.root);
+    assert.equal(await f.panel.undo(),false);
+    assert.match(f.output.textContent,/Close the open editor tab/);
+  } finally {f.cleanup();}
+});

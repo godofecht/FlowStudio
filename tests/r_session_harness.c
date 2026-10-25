@@ -227,7 +227,7 @@ int main(void)
     if (fs_r_status() != 200 || strcmp(out, "100") != 0)
         return failure(81, out);
     /* Continue pauses before future top-level expressions and preserves state. */
-    out = fs_r_debug_start("continue_value <- 40L\\ncontinue_value <- continue_value + 2L\\ncat(continue_value)");
+    out = fs_r_debug_start("continue_value <- 40L\ncontinue_value <- continue_value + 2L\ncat(continue_value)");
     if (fs_r_status() != 200) return failure(82, out);
     out = fs_r_debug_continue("999");
     if (fs_r_status() != 422 || !strstr(out, "No later top-level expression") ||
@@ -246,7 +246,7 @@ int main(void)
         !strstr(out, "\"output\":\"42\"")) return failure(87, out);
     out = fs_r_run("cat(continue_value)");
     if (fs_r_status() != 200 || strcmp(out, "42") != 0) return failure(88, out);
-    out = fs_r_debug_start("continue_value <- 99L\\nstop('continue failure')\\ncontinue_value <- 100L");
+    out = fs_r_debug_start("continue_value <- 99L\nstop('continue failure')\ncontinue_value <- 100L");
     if (fs_r_status() != 200) return failure(89, out);
     out = fs_r_debug_continue("");
     if (fs_r_status() != 422 || !strstr(out, "\"state\":\"error\"") ||

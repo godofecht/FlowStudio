@@ -30,7 +30,8 @@ the repository root, then run:
 
 The runner refuses non-loopback --url targets. With --flow it also
 requires a real browser interaction with the native CPython conditional
-debugger (pause on a live numeric local, continue, pause again, finish),\nand then the opt-in raised-exception pause on a real caught CPython exception.
+debugger (pause on a live numeric local, continue, pause again, finish),
+and then the opt-in raised-exception pause on a real caught CPython exception.
 Native Flow execution and debugging are not tested against a fake backend
 or GitHub Pages. Browser interpreter
 execution and native Flow use separate runtime paths. The server is not

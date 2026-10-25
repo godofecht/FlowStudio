@@ -92,6 +92,115 @@ async function searchProject(root, query, options = {}) {
   return { matches, scannedFiles, skippedLarge, truncated };
 }
 
+
+/* Two-phase, bounded local project replacement. Preview never writes files. */
+function replacementEngine() {
+  const engine = global.FlowStudioEditorFind ||
+    (typeof require === "function" ? require("./editor_find.js") : null);
+  if (!engine || typeof engine.findMatches !== "function" ||
+      typeof engine.replaceAll !== "function")
+    throw new Error("The source replacement engine is unavailable.");
+  return engine;
+}
+function checkReplacementAbort(signal) {
+  if (signal && signal.aborted) {
+    const error = new Error("Project replacement cancelled.");
+    error.name = "AbortError";
+    throw error;
+  }
+}
+async function planProjectReplace(root, query, replacement, options = {}) {
+  if (typeof replacement !== "string" || replacement.length > 10000)
+    throw new Error("Replacement must be at most 10,000 characters.");
+  const found = await searchProject(root, query, options);
+  if (found.truncated || found.skippedLarge)
+    throw new Error("Project search was incomplete; narrow the query or remove oversized files before replacing.");
+  const engine = replacementEngine();
+  const groups = new Map();
+  for (const hit of found.matches) {
+    if (!groups.has(hit.handle))
+      groups.set(hit.handle, { handle: hit.handle, path: hit.path, hits: [] });
+    groups.get(hit.handle).hits.push(hit);
+  }
+  if (groups.size > 50)
+    throw new Error("Project replacement is limited to 50 changed files.");
+  let budget = 0;
+  const files = [];
+  for (const entry of groups.values()) {
+    checkReplacementAbort(options.signal);
+    const file = await entry.handle.getFile();
+    const limit = options.regex ? 128 * 1024 : 1024 * 1024;
+    if (file.size > limit) throw new Error("File grew since search: " + entry.path);
+    const before = await file.text();
+    checkReplacementAbort(options.signal);
+    if (before.length > limit) throw new Error("File grew since search: " + entry.path);
+    const matches = engine.findMatches(before, query, options);
+    if (matches.truncated || matches.matches.length !== entry.hits.length ||
+        matches.matches.some((hit, i) => hit.index !== entry.hits[i].index ||
+          hit.end - hit.index !== entry.hits[i].length ||
+          before.slice(hit.index, hit.end) !== entry.hits[i].text))
+      throw new Error("File changed since search; retry: " + entry.path);
+    const updated = engine.replaceAll(before, query, replacement, options);
+    if (updated.count !== entry.hits.length)
+      throw new Error("Replacement count changed; retry: " + entry.path);
+    budget += before.length + updated.value.length;
+    if (budget > 8 * 1024 * 1024)
+      throw new Error("Project replacement exceeds the 8-million-character preview budget.");
+    if (updated.value !== before)
+      files.push({ path: entry.path, handle: entry.handle, before, after: updated.value, count: updated.count });
+  }
+  return { root, matches: found.matches.length, files };
+}
+async function applyProjectReplacement(plan, options = {}) {
+  if (!plan || !Array.isArray(plan.files) || plan.files.length > 50)
+    throw new Error("Invalid project replacement preview.");
+  for (const entry of plan.files) {
+    checkReplacementAbort(options.signal);
+    if (options.isBlocked && options.isBlocked(entry))
+      throw new Error("Close the open editor tab before replacing " + entry.path + ".");
+    if (typeof entry.handle.createWritable !== "function")
+      throw new Error("Write access is unavailable for " + entry.path + ".");
+    const current = await entry.handle.getFile();
+    if (await current.text() !== entry.before)
+      throw new Error("File changed since preview; no files replaced: " + entry.path);
+  }
+  let completed = 0, matches = 0;
+  try {
+    for (const entry of plan.files) {
+      checkReplacementAbort(options.signal);
+      if (options.isBlocked && options.isBlocked(entry))
+        throw new Error("An editor tab was opened during replacement: " + entry.path);
+      const current = await entry.handle.getFile();
+      if (await current.text() !== entry.before)
+        throw new Error("File changed during replacement: " + entry.path);
+      const writer = await entry.handle.createWritable();
+      try {
+        await writer.write(entry.after);
+        await writer.close();
+      } catch (error) {
+        if (typeof writer.abort === "function") {
+          try { await writer.abort(); } catch (_) { /* preserve original error */ }
+        }
+        throw error;
+      }
+      const saved = await entry.handle.getFile();
+      if (await saved.text() !== entry.after)
+        throw new Error("Could not verify the written file: " + entry.path);
+      completed++;
+      matches += entry.count;
+    }
+  } catch (error) {
+    if (completed) {
+      const partial = new Error("Replacement stopped after " + completed + " files (" +
+        matches + " matches); earlier writes remain on disk: " + (error.message || String(error)));
+      partial.name = error.name || "Error";
+      throw partial;
+    }
+    throw error;
+  }
+  return { files: completed, matches };
+}
+
 function createProjectExplorer({ tree, status, openHandle, picker }) {
   let root = null, revision = 0;
   const element = (tag, text) => {
@@ -176,9 +285,14 @@ function createProjectExplorer({ tree, status, openHandle, picker }) {
     await refresh();
     return opened;
   }
-  return { choose, refresh, create, search: (query, options) => searchProject(root, query, options), hasProject: () => root !== null };
+  return { choose, refresh, create, search: (query, options) => searchProject(root, query, options),
+    previewReplace: (query, replacement, options) => planProjectReplace(root, query, replacement, options),
+    applyReplace: (plan, options) => {
+      if (!root || plan.root !== root) throw new Error("Project changed since replacement preview.");
+      return applyProjectReplacement(plan, options);
+    }, hasProject: () => root !== null };
 }
-const api = { createProjectExplorer, validFilename, searchProject };
+const api = { createProjectExplorer, validFilename, searchProject, planProjectReplace, applyProjectReplacement };
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 global.FlowStudioProject = api;
 })(globalThis);

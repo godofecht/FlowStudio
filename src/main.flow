@@ -23,6 +23,7 @@ extern {
     function fs_r_inspect() -> string
     function fs_r_table(name: string) -> string
     function fs_r_plot() -> string
+    function fs_r_packages() -> string
     function fs_r_status() -> i32
     function fs_r_reset() -> void
     function fs_py_run(code: string) -> string
@@ -181,6 +182,17 @@ function send_python(code: string) -> void {
 
 function send_r_environment() -> void {
     let output: string = fs_r_inspect()
+    let status: i32 = fs_r_status()
+    if status == 200 {
+        fs_reply(200, "application/json; charset=utf-8", output)
+    } else {
+        fs_reply(status, "text/plain; charset=utf-8", output)
+    }
+}
+
+# Flow owns the package inventory route; no submitted R source is evaluated.
+function send_r_packages() -> void {
+    let output: string = fs_r_packages()
     let status: i32 = fs_r_status()
     if status == 200 {
         fs_reply(200, "application/json; charset=utf-8", output)
@@ -571,6 +583,10 @@ function dispatch() -> void {
         }
         if eq(path, "/api/plot/r") {
             send_r_plot()
+            return
+        }
+        if eq(path, "/api/packages/r") {
+            send_r_packages()
             return
         }
         if eq(path, "/api/debug/python/start") {

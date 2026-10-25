@@ -1,6 +1,6 @@
 # FlowStudio native R kernel: length-framed, single-user persistent session.
 # This is not a sandbox. Evaluated R code inherits the local user's permissions.
-# stdin: E (execute), C (parse), I (inspect), T (table), P (plot) + 8 lowercase hex digits + UTF-8 payload.
+# stdin: E (execute), C (parse), I (inspect), T (table), P (plot), K (packages) + 8 lowercase hex digits + UTF-8 payload.
 # fd 3: 0/1 + 8 lowercase hex digits + bounded UTF-8 output.
 MAX_SOURCE <- 131072L
 MAX_OUTPUT <- 131072L
@@ -157,6 +157,37 @@ plot_snapshot <- function() {
     if (nchar(json, type = "bytes") > 131000L) {
         json <- '{"svg":null,"pdf":null,"warning":"Native R plot JSON exceeds the IPC limit."}'
     }
+    list(success = TRUE, payload = charToRaw(enc2utf8(json)))
+}
+
+# Read the real installed R package database without evaluating workspace code.
+# Return at most 1000 packages and 65 KiB of dependency-free JSON.
+package_snapshot <- function() {
+    matrix <- utils::installed.packages()[, c("Package", "Version"), drop = FALSE]
+    if (nrow(matrix) > 1L) matrix <- matrix[order(matrix[, 1L]), , drop = FALSE]
+    entries <- character(0)
+    used <- 64L
+    truncated <- FALSE
+    for (index in seq_len(nrow(matrix))) {
+        if (length(entries) >= 1000L) { truncated <- TRUE; break }
+        name <- matrix[index, 1L]
+        version <- matrix[index, 2L]
+        if (is.na(name) || is.na(version) ||
+            nchar(name, type = "bytes") > 100L ||
+            nchar(version, type = "bytes") > 100L ||
+            !grepl("^[A-Za-z][A-Za-z0-9.]*$", name)) {
+            truncated <- TRUE
+            next
+        }
+        entry <- paste0('{"name":', json_quote(name),
+                        ',"version":', json_quote(version), "}")
+        length_bytes <- nchar(entry, type = "bytes") + 1L
+        if (used + length_bytes > 65000L) { truncated <- TRUE; break }
+        entries <- c(entries, entry)
+        used <- used + length_bytes
+    }
+    json <- paste0('{"packages":[', paste(entries, collapse = ","),
+                   '],"truncated":', if (truncated) "true" else "false", "}")
     list(success = TRUE, payload = charToRaw(enc2utf8(json)))
 }
 
@@ -365,11 +396,11 @@ repeat {
     header <- read_exact(9L)
     if (is.null(header)) break
     header_text <- rawToChar(header)
-    if (!grepl("^[ECITP][0-9a-f]{8}$", header_text)) break
+    if (!grepl("^[ECITPK][0-9a-f]{8}$", header_text)) break
     length_text <- substr(header_text, 2L, 9L)
     length_value <- strtoi(length_text, base = 16L)
     if (is.na(length_value) || length_value > MAX_SOURCE ||
-        (substr(header_text, 1L, 1L) %in% c("I", "P") && length_value != 0L)) break
+        (substr(header_text, 1L, 1L) %in% c("I", "P", "K") && length_value != 0L)) break
     payload <- read_exact(length_value)
     if (is.null(payload)) break
     source <- if (length(payload) == 0L) "" else tryCatch(
@@ -380,6 +411,9 @@ repeat {
         inspect_workspace()
     } else if (substr(header_text, 1L, 1L) == "P") {
         plot_snapshot()
+    } else if (substr(header_text, 1L, 1L) == "K") {
+        tryCatch(package_snapshot(), error = function(error)
+            list(success = FALSE, payload = charToRaw("R package inventory unavailable.")))
     } else if (is.na(source)) {
         list(success = FALSE, payload = charToRaw("Invalid UTF-8 source."))
     } else if (substr(header_text, 1L, 1L) == "C") {

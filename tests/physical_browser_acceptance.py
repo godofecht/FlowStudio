@@ -144,7 +144,12 @@ def test_native_r(page, timeout: int):
     page.get_by_role("heading", name="Snapshot: fs_native_frame").wait_for(timeout=timeout)
     assert "alpha" in page.locator("#workspace").inner_text()
     assert "beta" in page.locator("#workspace").inner_text()
-    # Real Rscript SVG device -> Flow plot endpoint -> browser plot history.
+    # Native installed-library inventory must come from Rscript, not webR.
+    page.locator("#listPackages").click()
+    page.locator("#packages table[aria-label='Installed R packages']").wait_for(timeout=timeout)
+    assert "stats" in page.locator("#packages").inner_text()
+    assert page.locator("#installPackage").is_disabled()
+    # Real Rscript PDF device -> Flow plot endpoint -> browser plot history.
     run_source(page, "r",
                "plot(c(1, 2, 3))\ncat('native SVG ready 42\\n')",
                "native SVG ready 42", timeout)

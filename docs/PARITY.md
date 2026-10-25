@@ -17,11 +17,11 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Browser Python/R session snapshot export/import | partial / bounded scalar/vector JSON snapshots cross-platform CI accepted in PR #31; physical browser acceptance pending | Explicitly export and restore supported live interpreter values through a local file, reject tampering and stale sessions, verify live Pyodide/webR and cross-platform browser interactions; no implicit or arbitrary-object serialization |
 | Explicit Python/R variable transfer | partial / bounded plain scalar and atomic-vector copy wired; real CPython/Rscript query tests and native Flow HTTP accepted on Ubuntu/macOS CI; physical-browser Pyodide/webR round-trip unverified | Copy typed scalars/vectors both ways between persistent runtimes, reject unsupported objects/NA/NaN and active bindings, verify independent real-browser and cross-platform execution |
 | Variable inspector | partial / native Python and R bounded metadata snapshots cross-platform HTTP accepted; opt-in browser rendering of native R metadata cross-platform Node/Flow HTTP CI accepted (physical-browser pending); native Python exact-builtin nested metadata tree cross-platform CI accepted (unit/HTTP/DOM); R array dimensions and failed-lazy-binding recovery cross-platform HTTP accepted; browser R bounded two-level plain-list tree and active-binding protection accepted by Ubuntu/macOS CI #40090303070 (real Rscript, Node, native Flow/HTTP); side-effect-free bounded browser Python nested inspection accepted by cross-platform CI #40140193181 (real CPython/Node/native Flow HTTP), but real Pyodide physical-browser acceptance and arbitrary-object introspection remain missing | Nested objects / types / dimensions inspectable and refresh after execution |
-| Plot viewer | partial / Python PNG history and native R PDF capture via real Rscript graphics device implemented with bounded Flow-owned plot route, Node/IPC/HTTP/physical-browser acceptance added but not yet verified | png/svg plot history, zoom, save and deterministic device lifecycle |
+| Plot viewer | partial / native R PDF graphics capture accepted by real Ubuntu/macOS Flow/R HTTP CI #40168433903; actual physical-browser PDF rendering remains unverified | png/svg plot history, zoom, save and deterministic device lifecycle |
 | Project explorer | partial / browser Pages open/create/save and confirmed active-file delete with baseline conflict checks; 10 regression tests V8-shim passed; physical-browser deletion unverified | Open project, tree navigation, source-file creation and save; scoped delete is implemented, copy-verify-delete rename implemented with non-atomic filesystem race limits; physical-browser acceptance remains missing |
 | Data viewer | partial / CSV/TSV and browser Python/webR table snapshots; native Rscript data.frame/matrix bounded preview accepted by Ubuntu/macOS native Flow/HTTP CI #40163391932 (physical-browser pending); no remote data browsing | Interactive sortable/filterable tabular datasets including missing values |
 | Completion / language server | partial / browser Python/R runtime prefix completion cross-platform CI accepted; Flow lexical completion accepted by Ubuntu/macOS CI; explicit-type Flow struct and evolution-state member completion cross-platform CI accepted (#40095770668, 473 JS passes, 2 skips per platform, native Flow/HTTP accepted); physical-browser verification pending; full semantic/LSP completion missing | R, Flow and Python completion/diagnostics |
-| Packages pane | partial / browser Python inventory/install and webR 0.6.0 inventory/install; mocked Node tests, live interpreters unverified; native Rscript mode explicitly does not support package management | List, install, update with environment-aware package sources |
+| Packages pane | partial / browser Python and webR inventory/install; native Rscript installed-library inventory through Flow implemented with IPC/HTTP/browser tests (independent acceptance pending), native R installation/update still missing | List, install, update with environment-aware package sources |
 | Git pane | partial / native Flow status, diff, stage, unstage and commit previously accepted cross-platform; branch list/create/switch accepted by CI #40117614745 on Ubuntu/macOS (PR #37 merged); physical-browser verification missing; branch deletion, remote tracking and merge missing | Status, diff, stage, unstage, commit and branch operations |
 | Help pane | partial / browser Python live-global/builtin docstrings and installed R Rd help wired; Node/V8 contract tests, live Pyodide/webR and physical browser unverified; Flow help missing | Context-aware language/function docs |
 | Find / replace / cross-file search | partial / Node + V8-tested | Literal in-buffer find next/previous, single/all replacement and project-wide search implemented; incremental indexing, regex and physical-browser verification missing |
@@ -38,6 +38,21 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
 
 
+
+## 2026-10-25: native R installed-library inventory (implementation; acceptance pending)
+
+The persistent Rscript kernel reads the actual installed package database via
+`utils::installed.packages()` using read-only `K` IPC. Flow owns the
+intent/origin-gated `POST /api/packages/r` route. The browser session serializes
+package reads with execution/reset, rejects stale responses and validates
+bounded names, versions and counts. The existing package pane displays the
+selected native R library, with native R installation explicitly unsupported
+and disabled. Browser webR and native Rscript have separate libraries.
+
+Real Rscript/C IPC, Flow-owned HTTP, Node transport/UI and optional physical-
+browser acceptance scenarios have been added. **Independent CI and actual
+physical-browser acceptance have not yet passed for this change.**
+No hosted CI configuration changed. Full RStudio parity is not claimed.
 
 ## 2026-10-25: native Rscript PDF graphics capture (implementation; acceptance pending)
 

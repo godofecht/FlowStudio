@@ -412,6 +412,17 @@ def main() -> None:
         status, error = request("POST", "/api/table/r",
                                 "flowstudio_frame;stop('should not run')", accepted_headers)
         assert status == 422 and "Invalid R table name" in error, (status, error)
+        # Read-only native R package inventory is served through Flow, never eval.
+        assert request("POST", "/api/packages/r", "")[0] == 404
+        assert request("POST", "/api/packages/r", "",
+                       {"X-FlowStudio-Intent": "run",
+                        "Origin": "http://attacker.invalid"})[0] == 404
+        status, package_json = request("POST", "/api/packages/r", "", accepted_headers)
+        assert status == 200, (status, package_json[:120])
+        inventory = json.loads(package_json)
+        assert isinstance(inventory["packages"], list) and len(inventory["packages"]) <= 1000
+        assert any(item["name"] == "stats" for item in inventory["packages"]), inventory
+        assert isinstance(inventory["truncated"], bool)
         # Real native R graphics are produced by the persistent Rscript
         # device, then retrieved through a separate Flow-owned JSON route.
         assert request("POST", "/api/plot/r", "")[0] == 404

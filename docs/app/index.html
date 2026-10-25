@@ -131,7 +131,7 @@ function setBusy(value) {
 }
 const packagePanel = FlowStudioPackages.create({document, request, notice, target:$("packages"),
   input:$("packageName"), installButton:$("installPackage"), listButton:$("listPackages"),
-  language:()=>$("language").value, rSession:getRSession});
+  language:()=>$("language").value, rSession:getRSession, rReadOnly:nativeRSelected});
 if (typeof FlowStudioHelpPanel !== "undefined") FlowStudioHelpPanel.create({
   input:$("helpQuery"), button:$("lookupHelp"), target:$("workspace"), document, notice,
   language:()=>$("language").value,
@@ -500,10 +500,10 @@ $("rRuntime").addEventListener("change", () => {
   clearNotebookRecovery();
   environmentData.clear();
   $("environment").textContent = "(R engine changed; sessions are separate)";
-  packagePanel.clear();
+  packagePanel.updateLanguage();
   completion.clear();
   notice(nativeRSelected() ?
-    "Native Rscript selected. Source, console, notebook cells and environment use Flow's persistent R kernel. Browser-only R packages, tables, help, transfer and plotting are unavailable in this mode." :
+    "Native Rscript selected. Source, console, notebooks, environment, plots, tables and installed-package inventory use Flow's persistent R kernel. Package installation, help and variable transfer remain browser-only." :
     "Browser webR selected. This workspace is separate from the native Rscript kernel.");
 });
 $("language").addEventListener("change", () => { completion.clear(); notebookEntries = []; clearNotebookRecovery(); environmentData.clear(); packagePanel.updateLanguage?.(); $("tracePython").disabled = busy || $("language").value !== "python" || !globalThis.FlowStudioNativeFlow?.available?.(); queueDraft(); });

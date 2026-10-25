@@ -34,9 +34,15 @@ begin_plot_capture <- function() {
             try(grDevices::dev.off(which = device), silent = TRUE)
         }
         on.exit(unlink(path), add = TRUE)
-        if (!file.exists(path)) return(invisible(NULL))
+        if (!file.exists(path)) {
+            last_plot_warning <<- "diagnostic: PDF file missing after dev.off"
+            return(invisible(NULL))
+        }
         bytes <- file.info(path)$size
-        if (!is.finite(bytes) || bytes <= 0) return(invisible(NULL))
+        if (!is.finite(bytes) || bytes <= 0) {
+            last_plot_warning <<- paste0("diagnostic: PDF size=", bytes)
+            return(invisible(NULL))
+        }
         if (bytes > 60000L) {
             last_plot_warning <<- "Native R PDF exceeds the 60 KiB capture limit."
             return(invisible(NULL))
@@ -51,6 +57,8 @@ begin_plot_capture <- function() {
         # A device without a drawn page has no /Type /Page dictionary.
         printable <- paste(rawToChar(raw, multiple = TRUE), collapse = "")
         if (!grepl("/Type /Page([^sA-Za-z]|$)", printable, perl = TRUE)) {
+            last_plot_warning <<- paste0("diagnostic: no PDF page, bytes=", bytes,
+                                         ", hasPages=", grepl("/Type /Pages", printable, fixed = TRUE))
             return(invisible(NULL))
         }
         last_plot_pdf <<- paste(sprintf("%02x", as.integer(raw)), collapse = "")

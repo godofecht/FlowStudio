@@ -1,6 +1,6 @@
 # FlowStudio RStudio parity matrix
 
-## 2026-10-25: interactive evaluation at a paused native R expression (PR pending)
+## 2026-10-25: interactive evaluation at a paused native R expression (Linux/macOS CI passed)
 
 The native R debugger now exposes Flow-owned, origin/intent-gated
 `POST /api/debug/r/evaluate`. A dedicated C IPC opcode evaluates exactly
@@ -14,9 +14,19 @@ R execution, **not** a read-only watch, simulation, sandbox, or stack-frame
 evaluator: expressions may mutate variables, call functions, or perform I/O
 with the local user's permissions.
 
-Native R IPC, live Flow HTTP and browser-controller regressions are added,
-along with an opt-in physical-browser scenario. **Status: implemented;
-independent Linux/macOS CI and physical-browser acceptance pending.**
+Native R IPC, live Flow HTTP and browser-controller regressions are included,
+along with an opt-in physical-browser scenario. **Status: partial /
+independently verified native Linux/macOS CI; physical-browser acceptance
+pending.** [PR #62](https://github.com/godofecht/FlowStudio/pull/62)
+merged as [3749d5f](https://github.com/godofecht/FlowStudio/commit/3749d5f2d27ca2912b5cdb51b68636ef3e2a62d5)
+after [CI #40228176825](https://github.com/godofecht/FlowStudio/actions/runs/40228176825)
+completed all four jobs successfully. Ubuntu 24.04 and macOS 14 each passed
+621 JavaScript tests (2 skipped, 0 failed) and 76 Python unit tests
+(11 skipped). Both native jobs compiled Flow 2.0.0, passed real Rscript IPC
+evaluation and live Flow HTTP acceptance, and packaged the platform builds.
+An initial CI attempt failed a stale opcode contract expectation; it was
+corrected and independently rerun successfully. The physical-browser
+scenario was committed but not independently executed.
 No hosted CI configuration changed. Function breakpoints, step-into/over,
 stack-frame inspection, authenticated remote sessions and full RStudio
 parity remain unimplemented.

@@ -241,7 +241,7 @@ test("postmortem R frame selector evaluates in retained function environments", 
   assert.equal(await p.execute("start"), true);
   assert.equal(await p.execute("step"), true);
   assert.equal(await p.execute("step"), false);
-  assert.match(target.textContent, /Postmortem frame 2: inner\\(local_outer\\)/);
+  assert.ok(target.textContent.includes("Postmortem frame 2: inner(local_outer)"));
   assert.match(target.textContent, /local_inner/);
   assert.equal(frameInput.disabled, false);
   frameInput.value = "2";

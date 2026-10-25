@@ -175,7 +175,7 @@ int main(void)
         !strstr(out, "outer()") || !strstr(out, "inner()"))
         return failure(66, out);
     out = fs_r_run("cat(value)");
-    if (fs_r_status() != 200 || strcmp(out, "41") != 0)
+    if (fs_r_status() != 200 || strcmp(out, "42") != 0)
         return failure(67, out);
     out = fs_r_run("cat(value, '\\n', sep='')");
     if (fs_r_status() != 200 || strcmp(out, "42\n") != 0) return failure(4, out);

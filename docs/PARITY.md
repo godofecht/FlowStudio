@@ -46,7 +46,7 @@ No hosted CI configuration was changed.
 | Project explorer | partial / browser Pages open/create/save and confirmed active-file delete with baseline conflict checks; 10 regression tests V8-shim passed; physical-browser deletion unverified | Open project, tree navigation, source-file creation and save; scoped delete is implemented, copy-verify-delete rename implemented with non-atomic filesystem race limits; physical-browser acceptance remains missing |
 | Data viewer | partial / CSV/TSV and browser Python/webR table snapshots; native Rscript data.frame/matrix bounded preview accepted by Ubuntu/macOS native Flow/HTTP CI #40163391932 (physical-browser pending); no remote data browsing | Interactive sortable/filterable tabular datasets including missing values |
 | Completion / language server | partial / browser Python/R runtime prefix completion cross-platform CI accepted; Flow lexical completion accepted by Ubuntu/macOS CI; explicit-type Flow struct and evolution-state member completion cross-platform CI accepted (#40095770668, 473 JS passes, 2 skips per platform, native Flow/HTTP accepted); physical-browser verification pending; full semantic/LSP completion missing | R, Flow and Python completion/diagnostics |
-| Packages pane | partial / browser Python and webR inventory/install; native Rscript installed-library inventory accepted by Ubuntu/macOS native Flow/R HTTP CI #40168902761; native installed-package loading accepted by Linux/macOS real Flow/R HTTP CI #40170771561 (physical-browser acceptance pending); native R installation/update still missing | List, install, update with environment-aware package sources |
+| Packages pane | partial / browser Python and webR inventory/install; native Rscript installed-library inventory accepted by Ubuntu/macOS native Flow/R HTTP CI #40168902761; native installed-package loading accepted by Linux/macOS real Flow/R HTTP CI #40170771561 (physical-browser acceptance pending); native CRAN installation through persistent Flow/R kernel implemented in draft PR #50 (offline CI pending; fresh CRAN download and physical-browser acceptance unverified); native updates/removal missing | List, install, update with environment-aware package sources |
 | Git pane | partial / native Flow status, diff, stage, unstage and commit previously accepted cross-platform; branch list/create/switch accepted by CI #40117614745 on Ubuntu/macOS (PR #37 merged); physical-browser verification missing; branch deletion, remote tracking and merge missing | Status, diff, stage, unstage, commit and branch operations |
 | Help pane | partial / browser Python live-global/builtin docstrings and installed R Rd help wired; Node/V8 contract tests, live Pyodide/webR and physical browser unverified; Flow help missing | Context-aware language/function docs |
 | Find / replace / cross-file search | partial / Node + V8-tested | Literal in-buffer find next/previous, single/all replacement and project-wide search implemented; incremental indexing, regex and physical-browser verification missing |
@@ -1219,3 +1219,28 @@ fixture and intent/origin rejection, and packaged the executable. Merged as
 Physical-browser interaction remains unverified. Staging, commits, branches,
 remote Git and project-folder selection remain missing. No RStudio parity
 claim.
+
+
+## 2026-10-25: native R CRAN package installation (implementation; acceptance pending)
+
+The Flow-owned localhost backend now routes explicit package names through
+`POST /api/packages/r/install` to a new `N` IPC operation in the persistent
+Rscript kernel. Package names are validated in the browser and kernel;
+arbitrary R expressions, URLs, repository overrides and filesystem paths are
+rejected. New packages and required dependencies are downloaded from the
+fixed HTTPS CRAN mirror into a FlowStudio-specific user library, not the
+system library. The kernel adds that directory to `.libPaths()`, including
+on restart. The existing load-installed operation remains separately
+available in the package pane. Installation has a 180-second kernel deadline
+and a 190-second browser deadline; failures/timeout do not imply success.
+**CRAN installation executes third-party code with the local user's
+permissions; the native server is loopback-only and is not a sandbox.**
+
+Offline deterministic C/R IPC, Flow HTTP, browser transport and DOM regression
+tests verify installed-package no-download behavior, rejected names,
+session persistence, origin/intent gates, reset races and load/installation
+UI separation. **Status: partial / independent CI and real fresh-package
+download/install acceptance pending.** Physical-browser Pyodide/webR/native R
+acceptance is also pending. Package updates/removal, dependency conflict
+resolution and multi-user installation isolation remain unimplemented. No
+hosted CI configuration was changed.

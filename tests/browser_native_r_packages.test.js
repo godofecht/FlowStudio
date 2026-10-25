@@ -121,10 +121,51 @@ test("native R package load serializes with reset and discards stale results",as
   });
   assert.deepEqual(calls,["/api/packages/r/load","/api/reset/r"]);
 });
-test("native R package install is explicitly unsupported",async()=>{
-  const result=await native.createRSession().installPackage("ggplot2");
-  assert.equal(result.ok,false);
-  assert.match(result.output,/not available for native R/);
+test("native R install sends only a validated name to the Flow CRAN route",async()=>{
+  const calls=[];
+  await withBrowser(localhost,async(route,options)=>{
+    calls.push([route,options]);
+    return response("R package stats is already installed; no download performed.");
+  },async()=>{
+    const session=native.createRSession();
+    for(const name of ["", "a..b", "../stats", "stats;stop(1)", "a.", "x".repeat(81)]) {
+      const result=await session.installPackage(name);
+      assert.equal(result.ok,false);
+      assert.match(result.output,/Invalid R package name/);
+    }
+    const result=await session.installPackage("stats");
+    assert.equal(result.ok,true);
+    assert.match(result.output,/already installed/);
+  });
+  assert.equal(calls.length,1);
+  assert.equal(calls[0][0],"/api/packages/r/install");
+  assert.equal(calls[0][1].body,"stats");
+  assert.equal(calls[0][1].headers["X-FlowStudio-Intent"],"run");
+});
+test("native R package install cannot reach localhost from Pages",async()=>{
+  await withBrowser(new URL("https://godofecht.github.io/FlowStudio/app/"),
+    ()=>{throw Error("Unexpected network");},async()=>{
+      await assert.rejects(native.createRSession().installPackage("stats"),/native FlowStudio server/);
+    });
+});
+test("native R install serializes with reset and discards stale results",async()=>{
+  let release;
+  const calls=[];
+  await withBrowser(localhost,async route=>{
+    calls.push(route);
+    if(route==="/api/packages/r/install") await new Promise(resolve=>{release=resolve;});
+    return response(route==="/api/reset/r"?"R session reset.":"Installed R package stats.");
+  },async()=>{
+    const session=native.createRSession();
+    const pending=session.installPackage("stats");
+    for(let i=0;i<8&&!release;i++) await Promise.resolve();
+    assert.equal(typeof release,"function");
+    const reset=session.reset();
+    release();
+    assert.match((await pending).output,/discarded/);
+    assert.equal((await reset).ok,true);
+  });
+  assert.deepEqual(calls,["/api/packages/r/install","/api/reset/r"]);
 });
 test("Flow routes installed-library inventory through real R IPC",()=>{
   const root=path.join(__dirname,"..");
@@ -136,4 +177,7 @@ test("Flow routes installed-library inventory through real R IPC",()=>{
   assert.match(read("src/r_session.c"),/fs_r_load_package\(const char \*name\) \{ return request_r\(\x27L\x27, name\); \}/);
   assert.match(read("src/r_kernel.R"),/load_installed_package <- function\(name\)/);
   assert.match(read("docs/app/index.html"),/rNative:nativeRSelected/);
+  assert.match(read("src/main.flow"),/send_r_package_install\(fs_body\(\)\)/);
+  assert.match(read("src/r_session.c"),/fs_r_install_package\(const char \*name\)/);
+  assert.match(read("src/r_kernel.R"),/install_cran_package <- function\(name\)/);
 });

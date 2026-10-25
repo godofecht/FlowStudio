@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 extern const char *fs_r_run(const char *);
 extern const char *fs_r_check(const char *);
@@ -7,6 +8,7 @@ extern const char *fs_r_table(const char *);
 extern const char *fs_r_plot(void);
 extern const char *fs_r_packages(void);
 extern const char *fs_r_load_package(const char *);
+extern const char *fs_r_install_package(const char *);
 extern int fs_r_status(void);
 extern void fs_r_reset(void);
 static int failure(int step, const char *output)
@@ -42,6 +44,14 @@ int main(void)
     out = fs_r_load_package("FlowStudioPackageDefinitelyMissing");
     if (fs_r_status() != 422 || !strstr(out, "there is no package"))
         return failure(42, out);
+    /* Offline native install acceptance: installed base package does not
+     * download; malicious expressions cannot reach R's evaluator. */
+    out = fs_r_install_package("stats");
+    if (fs_r_status() != 200 || !strstr(out, "already installed"))
+        return failure(44, out);
+    out = fs_r_install_package("stats;system('false')");
+    if (fs_r_status() != 422 || !strstr(out, "Invalid R package name"))
+        return failure(45, out);
     out = fs_r_run("cat(value)");
     if (fs_r_status() != 200 || strcmp(out, "41") != 0) return failure(43, out);
     /* Parsing valid source must not evaluate assignments or errors. */
@@ -144,9 +154,26 @@ int main(void)
     out = fs_r_inspect();
     if (fs_r_status() != 200 || !strstr(out, "\"name\":\"danger\"") ||
         !strstr(out, "\"type\":\"active binding\"")) return failure(12, out);
+    /* Actual fresh-package installation from an offline CRAN-style source
+     * repository. The Python harness creates the tarball and PACKAGES index. */
+    if (getenv("FLOWSTUDIO_R_TEST_REPO"))
+    {
+        out = fs_r_install_package("FlowStudioFixture");
+        if (fs_r_status() != 200 || !strstr(out, "Installed R package FlowStudioFixture"))
+            return failure(46, out);
+        out = fs_r_run("cat(FlowStudioFixture::answer())");
+        if (fs_r_status() != 200 || strcmp(out, "42") != 0)
+            return failure(47, out);
+    }
     fs_r_reset();
     out = fs_r_inspect();
     if (fs_r_status() != 200 || !strstr(out, "\"variables\":[]")) return failure(13, out);
+    if (getenv("FLOWSTUDIO_R_TEST_REPO"))
+    {
+        out = fs_r_run("cat(FlowStudioFixture::answer())");
+        if (fs_r_status() != 200 || strcmp(out, "42") != 0)
+            return failure(48, out);
+    }
     out = fs_r_run("cat(exists('value', inherits=FALSE), '\\n', sep='')");
     if (fs_r_status() != 200 || strcmp(out, "FALSE\n") != 0) return failure(5, out);
     out = fs_r_run("cat(paste(rep('a', 200000), collapse=''))");

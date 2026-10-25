@@ -439,6 +439,21 @@ def main() -> None:
         status, output = request("POST", "/api/packages/r/load",
                                  "FlowStudioPackageDefinitelyMissing", accepted_headers)
         assert status == 422 and "there is no package" in output, (status, output)
+        # Native CRAN install is explicit and origin/intent gated. Test a
+        # preinstalled base package so CI never requires network access.
+        assert request("POST", "/api/packages/r/install", "stats")[0] == 404
+        assert request("POST", "/api/packages/r/install", "stats",
+                       {"X-FlowStudio-Intent": "run",
+                        "Origin": "http://attacker.invalid"})[0] == 404
+        status, output = request("POST", "/api/packages/r/install",
+                                 "stats", accepted_headers)
+        assert status == 200 and "already installed" in output, (status, output)
+        status, output = request("POST", "/api/packages/r/install",
+                                 "stats;stop('unsafe')", accepted_headers)
+        assert status == 422 and "Invalid R package name" in output, (status, output)
+        status, output = request("POST", "/api/run/r",
+                                 "cat(flowstudio_r_value)", accepted_headers)
+        assert status == 200 and output.strip() == "42", (status, output)
         # Real native R graphics are produced by the persistent Rscript
         # device, then retrieved through a separate Flow-owned JSON route.
         assert request("POST", "/api/plot/r", "")[0] == 404

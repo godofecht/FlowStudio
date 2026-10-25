@@ -1,6 +1,6 @@
 # FlowStudio native R kernel: length-framed, single-user persistent session.
 # This is not a sandbox. Evaluated R code inherits the local user's permissions.
-# stdin: E (execute), C (parse), I (inspect), T (table), P (plot), K (packages), L (load), N (install), V (update), U (remove), B (debug start), S (debug step), D (debug stop), Q (debug status) + 8 lowercase hex digits + UTF-8 payload.
+# stdin: E (execute), C (parse), I (inspect), T (table), P (plot), K (packages), L (load), N (install), V (update), U (remove), B (debug start), S (debug step), F (debug continue/target line), D (debug stop), Q (debug status) + 8 lowercase hex digits + UTF-8 payload.
 # fd 3: 0/1 + 8 lowercase hex digits + bounded UTF-8 output.
 MAX_SOURCE <- 131072L
 MAX_OUTPUT <- 131072L
@@ -205,6 +205,47 @@ debug_step <- function() {
     debug_state <<- if (!result$success) "error" else if (
         debug_index > length(debug_expressions)) "done" else "paused"
     debug_reply(result$success, rawToChar(result$payload), line)
+}
+
+# Continue real top-level R expressions, optionally stopping before a later
+# expression whose source reference starts on the specified line.
+debug_continue <- function(target_line) {
+    if (!identical(debug_state, "paused"))
+        return(debug_reply(FALSE, "No paused R expression is available."))
+    stop_index <- length(debug_expressions) + 1L
+    if (nzchar(target_line)) {
+        if (!grepl("^[1-9][0-9]{0,5}$", target_line))
+            return(debug_reply(FALSE, "Target must be a positive source line."))
+        line <- as.integer(target_line)
+        future <- which(seq_along(debug_lines) > debug_index &
+                        !is.na(debug_lines) & debug_lines == line)
+        if (!length(future))
+            return(debug_reply(FALSE, "No later top-level expression starts on that line."))
+        stop_index <- future[[1L]]
+    }
+    output <- character(0)
+    last_line <- NULL
+    truncated <- FALSE
+    while (identical(debug_state, "paused") && debug_index < stop_index) {
+        last_line <- debug_lines[[debug_index]]
+        expression <- as.expression(list(debug_expressions[[debug_index]]))
+        result <- evaluate_source("", expressions_override = expression)
+        debug_index <<- debug_index + 1L
+        debug_state <<- if (!result$success) "error" else if (
+            debug_index > length(debug_expressions)) "done" else "paused"
+        chunk <- rawToChar(result$payload)
+        if (!identical(chunk, "(No output)")) {
+            if (length(output) < 16L || !result$success) {
+                output <- c(output, chunk)
+            } else {
+                truncated <- TRUE
+            }
+        }
+        if (!result$success) break
+    }
+    if (truncated) output <- c(output, "[Earlier output truncated]")
+    debug_reply(!identical(debug_state, "error"),
+                paste(output, collapse = "\n"), last_line)
 }
 
 debug_stop <- function() {
@@ -657,7 +698,7 @@ repeat {
     header <- read_exact(9L)
     if (is.null(header)) break
     header_text <- rawToChar(header)
-    if (!grepl("^[ECITPKLNUVBSDQ][0-9a-f]{8}$", header_text)) break
+    if (!grepl("^[ECITPKLNUVBSFDQ][0-9a-f]{8}$", header_text)) break
     length_text <- substr(header_text, 2L, 9L)
     length_value <- strtoi(length_text, base = 16L)
     if (is.na(length_value) || length_value > MAX_SOURCE ||
@@ -693,6 +734,8 @@ repeat {
         debug_start(source)
     } else if (substr(header_text, 1L, 1L) == "S") {
         debug_step()
+    } else if (substr(header_text, 1L, 1L) == "F") {
+        debug_continue(source)
     } else if (substr(header_text, 1L, 1L) == "D") {
         debug_stop()
     } else if (substr(header_text, 1L, 1L) == "Q") {

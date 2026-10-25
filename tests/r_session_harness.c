@@ -4,6 +4,7 @@
 extern const char *fs_r_run(const char *);
 extern const char *fs_r_debug_start(const char *);
 extern const char *fs_r_debug_step(void);
+extern const char *fs_r_debug_continue(const char *);
 extern const char *fs_r_debug_stop(void);
 extern const char *fs_r_debug_status(void);
 extern const char *fs_r_check(const char *);
@@ -225,6 +226,33 @@ int main(void)
     out = fs_r_run("cat(debug_value)");
     if (fs_r_status() != 200 || strcmp(out, "100") != 0)
         return failure(81, out);
+    /* Continue pauses before future top-level expressions and preserves state. */
+    out = fs_r_debug_start("continue_value <- 40L\ncontinue_value <- continue_value + 2L\ncat(continue_value)");
+    if (fs_r_status() != 200) return failure(82, out);
+    out = fs_r_debug_continue("999");
+    if (fs_r_status() != 422 || !strstr(out, "No later top-level expression") ||
+        !strstr(out, "\"index\":1")) return failure(83, out);
+    out = fs_r_debug_continue("0");
+    if (fs_r_status() != 422 || !strstr(out, "positive source line"))
+        return failure(84, out);
+    out = fs_r_debug_continue("3");
+    if (fs_r_status() != 200 || !strstr(out, "\"state\":\"paused\"") ||
+        !strstr(out, "\"next_line\":3") ||
+        !strstr(out, "\"executed_line\":2")) return failure(85, out);
+    out = fs_r_run("cat(continue_value)");
+    if (fs_r_status() != 422) return failure(86, out);
+    out = fs_r_debug_continue("");
+    if (fs_r_status() != 200 || !strstr(out, "\"state\":\"done\"") ||
+        !strstr(out, "\"output\":\"42\"")) return failure(87, out);
+    out = fs_r_run("cat(continue_value)");
+    if (fs_r_status() != 200 || strcmp(out, "42") != 0) return failure(88, out);
+    out = fs_r_debug_start("continue_value <- 99L\nstop('continue failure')\ncontinue_value <- 100L");
+    if (fs_r_status() != 200) return failure(89, out);
+    out = fs_r_debug_continue("");
+    if (fs_r_status() != 422 || !strstr(out, "\"state\":\"error\"") ||
+        !strstr(out, "continue failure")) return failure(90, out);
+    out = fs_r_run("cat(continue_value)");
+    if (fs_r_status() != 200 || strcmp(out, "99") != 0) return failure(91, out);
     out = fs_r_run("cat(value, '\\n', sep='')");
     if (fs_r_status() != 200 || strcmp(out, "42\n") != 0) return failure(4, out);
     out = fs_r_run("makeActiveBinding('danger', function() stop('inspection executed binding'), environment())");

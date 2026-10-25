@@ -102,7 +102,7 @@ def main() -> None:
     # Real Flow HTTP -> C IPC -> persistent Rscript top-level stepping.
     # No interpreter mocks: the native acceptance job installs actual R.
     for route in ("/api/debug/r/start", "/api/debug/r/step",
-                  "/api/debug/r/stop", "/api/debug/r/status"):
+                  "/api/debug/r/continue", "/api/debug/r/stop", "/api/debug/r/status"):
         assert request("POST", route, "", {})[0] == 404
         assert request("POST", route, "",
                        {"X-FlowStudio-Intent": "run",
@@ -121,6 +121,19 @@ def main() -> None:
     assert status == 200, (status, body)
     debug = json.loads(body)
     assert debug["state"] == "done" and debug["output"] == "42", debug
+    status, body = request("POST", "/api/debug/r/start",
+                            "fs_debug_http <- 40L\nfs_debug_http <- fs_debug_http + 2L\ncat(fs_debug_http)",
+                            accepted_headers)
+    assert status == 200, (status, body)
+    status, body = request("POST", "/api/debug/r/continue", "3", accepted_headers)
+    debug = json.loads(body)
+    assert status == 200 and debug["state"] == "paused" and debug["next_line"] == 3, debug
+    assert debug["executed_line"] == 2, debug
+    status, body = request("POST", "/api/debug/r/continue", "1", accepted_headers)
+    assert status == 422 and json.loads(body)["next_line"] == 3, (status, body)
+    status, body = request("POST", "/api/debug/r/continue", "", accepted_headers)
+    assert status == 200 and json.loads(body)["state"] == "done", (status, body)
+    assert json.loads(body)["output"] == "42", body
     status, body = request("POST", "/api/debug/r/stop", "", accepted_headers)
     assert status == 200 and json.loads(body)["state"] == "idle", (status, body)
     # Native Git reads and writes require the existing intent/origin gate.

@@ -16,27 +16,34 @@ function format(result) {
   return lines.join("\n");
 }
 function create({native, source, language, runtime, startButton, stepButton,
-                 stopButton, statusButton, target, notice}) {
+                 continueButton, targetLine, stopButton, statusButton, target, notice}) {
   if (!native || !source || !language || !runtime || !startButton || !stepButton ||
-      !stopButton || !statusButton || !target) throw Error("Missing R debugger controls.");
+      !continueButton || !targetLine || !stopButton || !statusButton || !target)
+    throw Error("Missing R debugger controls.");
   const supported = native.available();
   let state = "idle", pending = false;
   function update() {
     const enabled = supported && language.value === "r" && runtime.value === "native";
     startButton.disabled = !enabled || pending || state === "paused";
     stepButton.disabled = !enabled || pending || state !== "paused";
+    continueButton.disabled = !enabled || pending || state !== "paused";
+    targetLine.disabled = !enabled || pending || state !== "paused";
     stopButton.disabled = !enabled || pending || state === "idle";
     statusButton.disabled = !enabled || pending;
   }
   async function execute(action) {
     if (pending || !supported || language.value !== "r" || runtime.value !== "native")
       return false;
-    if (action === "step" && state !== "paused") return false;
+    if ((action === "step" || action === "continue") && state !== "paused") return false;
     pending = true;
     update();
     try {
+      const line = action === "continue" ? targetLine.value.trim() : "";
+      if (line && !/^[1-9][0-9]{0,5}$/.test(line))
+        throw Error("R continue target must be a positive source line.");
       const result = action === "start" ?
-        await native.debugRStart(source.value) : await native.debugRCommand(action);
+        await native.debugRStart(source.value) :
+        await native.debugRCommand(action, line ? Number(line) : "");
       state = result.state;
       target.textContent = format(result);
       if (notice) notice("Native R expression debugger: " + state + ".");
@@ -52,6 +59,7 @@ function create({native, source, language, runtime, startButton, stepButton,
   }
   startButton.addEventListener("click", () => { void execute("start"); });
   stepButton.addEventListener("click", () => { void execute("step"); });
+  continueButton.addEventListener("click", () => { void execute("continue"); });
   stopButton.addEventListener("click", () => { void execute("stop"); });
   statusButton.addEventListener("click", () => { void execute("status"); });
   language.addEventListener("change", update);

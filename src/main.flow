@@ -22,6 +22,7 @@ extern {
     function fs_r_check(code: string) -> string
     function fs_r_debug_start(source: string) -> string
     function fs_r_debug_step() -> string
+    function fs_r_debug_continue(line: string) -> string
     function fs_r_debug_stop() -> string
     function fs_r_debug_status() -> string
     function fs_r_inspect() -> string
@@ -185,6 +186,8 @@ function send_r_debug(action: string, source: string) -> void {
         output = fs_r_debug_start(source)
     } elif eq(action, "step") {
         output = fs_r_debug_step()
+    } elif eq(action, "continue") {
+        output = fs_r_debug_continue(source)
     } elif eq(action, "stop") {
         output = fs_r_debug_stop()
     } else {
@@ -632,6 +635,10 @@ function dispatch() -> void {
         }
         if eq(path, "/api/debug/r/step") {
             send_r_debug("step", "")
+            return
+        }
+        if eq(path, "/api/debug/r/continue") {
+            send_r_debug("continue", fs_body())
             return
         }
         if eq(path, "/api/debug/r/stop") {

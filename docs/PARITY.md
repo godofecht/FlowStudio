@@ -1,5 +1,25 @@
 # FlowStudio RStudio parity matrix
 
+## 2026-10-25: native R top-level continue and run-to-line (PR pending)
+
+FlowStudio now has a Flow-owned `POST /api/debug/r/continue` route,
+native C opcode F, and a real persistent Rscript evaluator that resumes
+successive original top-level AST expressions. An optional positive source
+line pauses **before** the next later top-level expression starting on that
+line; invalid, nonexistent, or already-passed targets reject before any
+evaluation. Without a line it runs to completion or stops at the first real
+R error. The browser exposes Continue and an optional target-line field.
+Execution remains in the existing R workspace, with bounded output and
+no mock evaluator.
+
+**Status: implemented, native cross-platform and physical-browser acceptance
+not yet verified.** Added live Rscript IPC and Flow HTTP acceptance assertions,
+browser controller/client tests, and a physical-browser scenario. These tests
+must actually pass before promotion. The feature does **not** support
+breakpoints or stepping *inside* function bodies, stack-frame evaluation,
+authenticated remote sessions, or full RStudio parity. No hosted CI changes.
+
+
 ## 2026-10-25: native R top-level expression stepping (implementation; acceptance pending)
 
 FlowStudio's Flow-owned localhost server now exposes intent/origin-gated

@@ -1,6 +1,6 @@
 # FlowStudio RStudio parity matrix
 
-## 2026-10-25: native editor F12 go-to-definition (implementation; independent CI pending)
+## 2026-10-25: native editor F12 go-to-definition (Linux/macOS CI passed)
 
 The Flow-served native editor now resolves a source identifier at the caret
 to an actual declaration in the active Flow, R or Python buffer. If the active
@@ -17,11 +17,20 @@ unopened project files are not resolved.
 
 Added automated Node regression cases for Flow/R/Python, comment/string
 exclusion, nearest preceding definitions, unique/ambiguous open tabs and F12
-wiring. The new source resolver and all inline editor scripts passed direct
-local V8 validation. **Status: partial / independent Node and native
-Linux/macOS CI pending; physical-browser interaction unverified.** No
-RStudio parity claim is made; live function-level R debugging, authenticated
-remote sessions and physical-browser interpreter acceptance remain missing.
+wiring. The new source resolver and all six inline editor scripts passed direct
+local V8 validation. **Status: partial / independently verified Linux/macOS
+source, native and packaging CI; physical-browser interaction unverified.**
+[PR #66](https://github.com/godofecht/FlowStudio/pull/66) merged as
+[c2bbafa](https://github.com/godofecht/FlowStudio/commit/c2bbafa9c6ed95defb379cfbfc901b2c7875355f)
+after [CI #40246806828](https://github.com/godofecht/FlowStudio/actions/runs/40246806828)
+completed all four jobs successfully on Ubuntu 24.04 and macOS 14.
+Each source/transport job ran 633 JavaScript tests (631 passed, two skipped,
+zero failed), including seven new F12 regressions, and 76 Python unit tests
+(11 skipped). Both native jobs compiled Flow 2.0.0, passed live Flow-owned
+HTTP/Rscript acceptance and completed platform packaging. No hosted CI
+configuration was changed. This is not semantic LSP navigation or RStudio
+parity; live function-level R debugging, authenticated remote sessions and
+physical-browser interpreter acceptance remain missing.
 
 
 ## 2026-10-25: retained R postmortem user-function frames (implementation; validation pending)

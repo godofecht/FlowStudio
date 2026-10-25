@@ -175,4 +175,5 @@ const char *fs_r_plot(void) { return request_r('P', ""); }
 const char *fs_r_packages(void) { return request_r('K', ""); }
 const char *fs_r_load_package(const char *name) { return request_r('L', name); }
 const char *fs_r_install_package(const char *name) { return request_r('N', name); }
+const char *fs_r_remove_package(const char *name) { return request_r('U', name); }
 int fs_r_status(void) { return last_status; }

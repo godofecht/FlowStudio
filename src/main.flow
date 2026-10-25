@@ -19,6 +19,7 @@ extern {
     function fs_write_temp_flow(code: string) -> string
     function fs_make_temp_c() -> string
     function fs_r_run(code: string) -> string
+    function fs_r_check(code: string) -> string
     function fs_r_inspect() -> string
     function fs_r_status() -> i32
     function fs_r_reset() -> void
@@ -162,6 +163,12 @@ function send_mixed_demo() -> void {
 
 function send_r(code: string) -> void {
     let output: string = fs_r_run(code)
+    fs_reply(fs_r_status(), "text/plain; charset=utf-8", output)
+}
+
+# Parse with the actual persistent R interpreter; never evaluate user source.
+function send_r_check(code: string) -> void {
+    let output: string = fs_r_check(code)
     fs_reply(fs_r_status(), "text/plain; charset=utf-8", output)
 }
 
@@ -473,6 +480,10 @@ function dispatch() -> void {
     if eq(method, "POST") and fs_intent_allowed() == 1 {
         if eq(path, "/api/check/flow") {
             send_flow_check(fs_body())
+            return
+        }
+        if eq(path, "/api/check/r") {
+            send_r_check(fs_body())
             return
         }
         if eq(path, "/api/demo/python-r") {

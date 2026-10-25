@@ -324,7 +324,9 @@ async function checkSyntax() {
   notice("Checking " + language + " syntax without executing source.");
   try {
     const result = language === "flow" ? await globalThis.FlowStudioNativeFlow.checkSyntax(code) :
-      language === "r" ? await getRSession().checkSyntax(code) : await request("check", code);
+      language === "r" ? (globalThis.FlowStudioNativeFlow?.available?.() ?
+        await globalThis.FlowStudioNativeFlow.checkRSyntax(code) : await getRSession().checkSyntax(code)) :
+        await request("check", code);
     if (generation !== sessionGeneration || $("language").value !== language) return;
     if ($("source").value !== code) { notice("Source changed during syntax check; stale diagnostics discarded."); return; }
     const issue = Array.isArray(result.diagnostics) ? result.diagnostics[0] : null;

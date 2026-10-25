@@ -339,9 +339,24 @@ def main() -> None:
     assert status == 404, status
 
     if shutil.which("Rscript"):
+        status, _ = request("POST", "/api/check/r", "value <- 1")
+        assert status == 404, status
+        status, _ = request("POST", "/api/check/r", "value <- 1",
+                            {"X-FlowStudio-Intent": "run", "Origin": "http://attacker.invalid"})
+        assert status == 404, status
         status, output = request("POST", "/api/run/r",
                                  'flowstudio_r_value <- 41; cat(flowstudio_r_value, "\\n")',
                                  accepted_headers)
+        assert status == 200 and output.strip() == "41", (status, output)
+        status, output = request("POST", "/api/check/r",
+                                 "flowstudio_r_value <- 999; stop('must not run')",
+                                 accepted_headers)
+        assert status == 200 and "not executed" in output, (status, output)
+        status, output = request("POST", "/api/check/r", "flowstudio_r_value <- )",
+                                 accepted_headers)
+        assert status == 422 and "R syntax error:" in output and "<text>:" in output, (status, output)
+        status, output = request("POST", "/api/run/r",
+                                 'cat(flowstudio_r_value, "\\n")', accepted_headers)
         assert status == 200 and output.strip() == "41", (status, output)
         status, output = request("POST", "/api/run/r",
                                  'flowstudio_r_value <- flowstudio_r_value + 1; cat(flowstudio_r_value, "\\n")',

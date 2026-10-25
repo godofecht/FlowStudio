@@ -17,8 +17,10 @@ test("R IPC uses a separate zero-length inspection opcode and bounds response", 
   const transport = read("src/r_session.c");
   const kernel = read("src/r_kernel.R");
   assert.match(transport, /fs_r_inspect\(void\) \{ return request_r\('I', ""\); \}/);
-  assert.match(kernel, /\^\[EI\]\[0-9a-f\]\{8\}\$/);
+  assert.match(kernel, /\^\[ECI\]\[0-9a-f\]\{8\}\$/);
   assert.match(kernel, /inspect_workspace <- function\(\)/);
+  assert.match(transport, /fs_r_check\(const char \*code\) \{ return request_r\(\x27C\x27, code\); \}/);
+  assert.match(kernel, /check_source <- function\(source\)/);
   assert.match(kernel, /bindingIsActive\(name, workspace\)/);
   assert.match(kernel, /length\(entries\) >= 128L/);
   assert.match(kernel, /used \+ additional > 65000L/);

@@ -88,6 +88,20 @@ async function debugPythonResponse(route, body) {
   catch (_) { throw new Error("Native Python debugger returned invalid JSON."); }
   return data;
 }
+async function checkRSyntax(code) {
+  const response = await request("/api/check/r", code);
+  if (response.ok) return {ok:true, output:response.output, diagnostics:[]};
+  // Actual R parse() errors report <text>:LINE:COLUMN: message.
+  // Transport failures have no source location and remain ordinary errors.
+  const match = response.status === 422 ?
+    /(?:<text>|[^\s:]+):(\d+):(\d+):\s*([^\r\n]*)/.exec(response.output) : null;
+  const line = match ? Number(match[1]) : 0;
+  const column = match ? Number(match[2]) : 0;
+  const diagnostics = match && Number.isSafeInteger(line) && line > 0 &&
+    Number.isSafeInteger(column) && column > 0 ?
+    [{line, column, message:match[3].slice(0, 512)}] : [];
+  return {ok:false, output:response.output, diagnostics};
+}
 async function checkSyntax(code) {
   const response = await request("/api/check/flow", code);
   if (response.ok) return {ok:true, output:response.output, diagnostics:[]};
@@ -145,7 +159,7 @@ async function gitCreateBranch(name) {
 async function gitSwitchBranch(name) {
   return request("/api/git/branch/switch", checkedBranchName(name));
 }
-const api = Object.freeze({available, run, checkSyntax, tracePython, debugPythonStart, debugPythonCommand, gitStatus, gitDiff, gitStagedDiff, gitStage, gitUnstage, gitCommit, gitBranches, gitCreateBranch, gitSwitchBranch});
+const api = Object.freeze({available, run, checkSyntax, checkRSyntax, tracePython, debugPythonStart, debugPythonCommand, gitStatus, gitDiff, gitStagedDiff, gitStage, gitUnstage, gitCommit, gitBranches, gitCreateBranch, gitSwitchBranch});
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 global.FlowStudioNativeFlow = api;
 })(globalThis);

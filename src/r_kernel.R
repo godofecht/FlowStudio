@@ -1,6 +1,6 @@
 # FlowStudio native R kernel: length-framed, single-user persistent session.
 # This is not a sandbox. Evaluated R code inherits the local user's permissions.
-# stdin: E + 8 lowercase hex digits + UTF-8 source.
+# stdin: E (execute), C (parse only) or I (inspect) + 8 lowercase hex digits + UTF-8 source.
 # fd 3: 0/1 + 8 lowercase hex digits + bounded UTF-8 output.
 MAX_SOURCE <- 131072L
 MAX_OUTPUT <- 131072L
@@ -64,6 +64,24 @@ evaluate_source <- function(source) {
     list(success = success, payload = charToRaw(enc2utf8(output)))
 }
 
+# Check actual R grammar in the persistent interpreter without evaluating
+# expressions or touching the workspace. Keep parser source positions for the IDE.
+check_source <- function(source) {
+    diagnostic <- tryCatch({
+        parse(text = source, keep.source = TRUE)
+        NULL
+    }, error = function(error) conditionMessage(error))
+    if (is.null(diagnostic)) {
+        return(list(success = TRUE,
+                    payload = charToRaw("R syntax valid; source was not executed.")))
+    }
+    # Parser errors may contain user source; bound the IPC response.
+    bytes <- charToRaw(enc2utf8(paste0("R syntax error: ", diagnostic)))
+    if (length(bytes) > MAX_OUTPUT - 64L) {
+        bytes <- bytes[seq_len(MAX_OUTPUT - 64L)]
+    }
+    list(success = FALSE, payload = bytes)
+}
 
 # JSON encoding is deliberately dependency-free: jsonlite is not required.
 # Never serialize R values, call print(), or dispatch user-defined methods.
@@ -175,7 +193,7 @@ repeat {
     header <- read_exact(9L)
     if (is.null(header)) break
     header_text <- rawToChar(header)
-    if (!grepl("^[EI][0-9a-f]{8}$", header_text)) break
+    if (!grepl("^[ECI][0-9a-f]{8}$", header_text)) break
     length_text <- substr(header_text, 2L, 9L)
     length_value <- strtoi(length_text, base = 16L)
     if (is.na(length_value) || length_value > MAX_SOURCE ||
@@ -190,6 +208,8 @@ repeat {
         inspect_workspace()
     } else if (is.na(source)) {
         list(success = FALSE, payload = charToRaw("Invalid UTF-8 source."))
+    } else if (substr(header_text, 1L, 1L) == "C") {
+        check_source(source)
     } else {
         evaluate_source(source)
     }

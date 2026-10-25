@@ -17,8 +17,15 @@ frames; normal execution and paused evaluations do not expose function frames.
 
 Native C/R IPC tests and Flow HTTP acceptance exercise nested user closures,
 actual local bindings, evaluation and cleanup; browser tests cover frame
-selection and bounded response validation. **Status: implemented in PR branch;
-independent Linux/macOS CI and physical-browser acceptance not yet verified.**
+selection and bounded response validation. **Status: partial / independently verified native Linux/macOS CI;
+physical-browser acceptance pending.** [PR #65](https://github.com/godofecht/FlowStudio/pull/65)
+merged as [a2e6a5d](https://github.com/godofecht/FlowStudio/commit/a2e6a5dc58bffcebbde273e683e204b035b1099a)
+after [CI #40242509771](https://github.com/godofecht/FlowStudio/actions/runs/40242509771)
+passed all four jobs on Ubuntu 24.04 and macOS 14. Each source/transport
+job passed 624 of 626 JavaScript tests (2 skipped, 0 failed), plus 76 Python
+tests. Both native jobs compiled Flow 2.0.0, passed real Rscript/C IPC
+nested-function-frame acceptance and live Flow HTTP acceptance, and completed
+platform packaging. The physical-browser scenario was not executed.
 This is postmortem function-frame evaluation, **not live function breakpoints,
 step-into/over, or resumable stack frames**. Authenticated remote sessions,
 physical-browser Pyodide/webR/Rscript acceptance and full RStudio parity remain

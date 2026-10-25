@@ -14,16 +14,23 @@ R evaluation and package mutations are refused; status and read-only
 inspection remain available. Syntax errors and execution failures do not
 silently advance through remaining source.
 
-**Status: partial / implementation committed; independent native and physical
+**Status: partial / independently verified native Linux/macOS CI; physical
 browser acceptance pending.** Real Rscript IPC assertions cover source lines,
 three-expression stepping, workspace persistence, mutation exclusion, parse
 errors, failure handling and stop. Live Flow HTTP acceptance covers actual
 Rscript stepping and origin/intent rejection. Browser unit tests cover controls,
 client validation and static route wiring; the optional physical-browser
-runner now exercises real DOM-to-Rscript stepping. None of these new tests
-is claimed passing until executed. Local Rscript and Flow compilers are
-unavailable in the authoring environment; CI must compile Flow 2.0.0 on
-Linux/macOS and execute the real tests. This is **not** function breakpoints,
+runner now exercises real DOM-to-Rscript stepping. [PR #59](https://github.com/godofecht/FlowStudio/pull/59) merged as
+[7d25034](https://github.com/godofecht/FlowStudio/commit/7d25034e2f1573c3dd8e64e2f85221d962e3a704)
+after [CI #40213901345](https://github.com/godofecht/FlowStudio/actions/runs/40213901345)
+completed all four jobs successfully. Ubuntu 24.04 and macOS 14 each passed
+621 JavaScript tests (2 skips, zero failures), 76 Python unit tests, real
+Rscript IPC stepping, live Flow-owned HTTP acceptance and native packaging.
+A first CI attempt exposed an outdated IPC opcode fixture; a second exposed
+the Flow 2.0 requirement for `elif` rather than `else if`. Both were fixed
+before the independently passing run. Local Rscript and Flow compilers remain
+unavailable in the authoring environment; real physical-browser acceptance
+has not been executed. This is **not** function breakpoints,
 step-into/over, stack-frame evaluation or full RStudio debugging; an entire
 function call inside one top-level expression executes without interruption.
 Authenticated remote sessions and complete RStudio parity remain missing.

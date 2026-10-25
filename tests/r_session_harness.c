@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 extern const char *fs_r_run(const char *);
+extern const char *fs_r_check(const char *);
 extern const char *fs_r_inspect(void);
 extern int fs_r_status(void);
 extern void fs_r_reset(void);
@@ -15,6 +16,15 @@ int main(void)
 {
     const char *out = fs_r_run("value <- 41\ncat(value, '\\n', sep='')");
     if (fs_r_status() != 200 || strcmp(out, "41\n") != 0) return failure(1, out);
+    /* Parsing valid source must not evaluate assignments or errors. */
+    out = fs_r_check("value <- 999; stop('must not run')");
+    if (fs_r_status() != 200 || !strstr(out, "not executed")) return failure(21, out);
+    /* Invalid R grammar returns HTTP 422, but leaves the kernel alive. */
+    out = fs_r_check("value <- )");
+    if (fs_r_status() != 422 || !strstr(out, "R syntax error:") ||
+        !strstr(out, "<text>:")) return failure(22, out);
+    out = fs_r_run("cat(value, '\\n', sep='')");
+    if (fs_r_status() != 200 || strcmp(out, "41\\n") != 0) return failure(23, out);
     out = fs_r_inspect();
     if (fs_r_status() != 200 || !strstr(out, "\"name\":\"value\"") ||
         !strstr(out, "\"type\":\"double\"") ||
@@ -74,6 +84,6 @@ int main(void)
     out = fs_r_run("");
     if (fs_r_status() != 200 || strcmp(out, "(No output)") != 0) return failure(9, out);
     fs_r_reset();
-    puts("PASS: native persistent R, environment inspection, active bindings, exceptions, reset, bounded output, timeout recovery");
+    puts("PASS: native persistent R, nonexecuting syntax checks, environment inspection, active bindings, exceptions, reset, bounded output, timeout recovery");
     return 0;
 }

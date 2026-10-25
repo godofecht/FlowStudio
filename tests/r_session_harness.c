@@ -5,6 +5,7 @@ extern const char *fs_r_check(const char *);
 extern const char *fs_r_inspect(void);
 extern const char *fs_r_table(const char *);
 extern const char *fs_r_plot(void);
+extern const char *fs_r_packages(void);
 extern int fs_r_status(void);
 extern void fs_r_reset(void);
 static int failure(int step, const char *output)
@@ -18,6 +19,12 @@ int main(void)
 {
     const char *out = fs_r_run("value <- 41\ncat(value, '\\n', sep='')");
     if (fs_r_status() != 200 || strcmp(out, "41\n") != 0) return failure(1, out);
+    /* Real R library inventory is read-only, bounded and uses the same kernel. */
+    out = fs_r_packages();
+    if (fs_r_status() != 200 || !strstr(out, "\"packages\":[") ||
+        !strstr(out, "\"name\":\"stats\"") ||
+        !strstr(out, "\"truncated\":") || strlen(out) > 65000)
+        return failure(37, out);
     /* Parsing valid source must not evaluate assignments or errors. */
     out = fs_r_check("value <- 999; stop('must not run')");
     if (fs_r_status() != 200 || !strstr(out, "not executed")) return failure(21, out);

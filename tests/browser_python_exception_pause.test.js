@@ -45,7 +45,7 @@ test("browser sends opt-in exception pause through intent-gated localhost route"
     assert.deepEqual(calls[0][1].breakpoints,[]);
     assert.equal(calls[0][2],"run");
     await native.debugPythonStart("x=1",[1]);
-    assert.equal(calls[1][1].pause_on_exception,false);
+    assert.equal(Object.hasOwn(calls[1][1],"pause_on_exception"),false);
     await assert.rejects(native.debugPythonStart("x=1",[],1),/boolean/);
     assert.equal(calls.length,2);
   } finally {

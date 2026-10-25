@@ -17,7 +17,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Browser Python/R session snapshot export/import | partial / bounded scalar/vector JSON snapshots cross-platform CI accepted in PR #31; physical browser acceptance pending | Explicitly export and restore supported live interpreter values through a local file, reject tampering and stale sessions, verify live Pyodide/webR and cross-platform browser interactions; no implicit or arbitrary-object serialization |
 | Explicit Python/R variable transfer | partial / bounded plain scalar and atomic-vector copy wired; real CPython/Rscript query tests and native Flow HTTP accepted on Ubuntu/macOS CI; physical-browser Pyodide/webR round-trip unverified | Copy typed scalars/vectors both ways between persistent runtimes, reject unsupported objects/NA/NaN and active bindings, verify independent real-browser and cross-platform execution |
 | Variable inspector | partial / native Python and R bounded metadata snapshots cross-platform HTTP accepted; opt-in browser rendering of native R metadata cross-platform Node/Flow HTTP CI accepted (physical-browser pending); native Python exact-builtin nested metadata tree cross-platform CI accepted (unit/HTTP/DOM); R array dimensions and failed-lazy-binding recovery cross-platform HTTP accepted; browser R bounded two-level plain-list tree and active-binding protection accepted by Ubuntu/macOS CI #40090303070 (real Rscript, Node, native Flow/HTTP); side-effect-free bounded browser Python nested inspection accepted by cross-platform CI #40140193181 (real CPython/Node/native Flow HTTP), but real Pyodide physical-browser acceptance and arbitrary-object introspection remain missing | Nested objects / types / dimensions inspectable and refresh after execution |
-| Plot viewer | partial / Node-tested PNG import and integrated workspace tab; native unverified | png/svg plot history, zoom, save and deterministic device lifecycle |
+| Plot viewer | partial / Python PNG history and native R SVG capture via real Rscript graphics device implemented with bounded Flow-owned plot route, Node/IPC/HTTP/physical-browser acceptance added but not yet verified | png/svg plot history, zoom, save and deterministic device lifecycle |
 | Project explorer | partial / browser Pages open/create/save and confirmed active-file delete with baseline conflict checks; 10 regression tests V8-shim passed; physical-browser deletion unverified | Open project, tree navigation, source-file creation and save; scoped delete is implemented, copy-verify-delete rename implemented with non-atomic filesystem race limits; physical-browser acceptance remains missing |
 | Data viewer | partial / CSV/TSV and browser Python/webR table snapshots; native Rscript data.frame/matrix bounded preview accepted by Ubuntu/macOS native Flow/HTTP CI #40163391932 (physical-browser pending); no remote data browsing | Interactive sortable/filterable tabular datasets including missing values |
 | Completion / language server | partial / browser Python/R runtime prefix completion cross-platform CI accepted; Flow lexical completion accepted by Ubuntu/macOS CI; explicit-type Flow struct and evolution-state member completion cross-platform CI accepted (#40095770668, 473 JS passes, 2 skips per platform, native Flow/HTTP accepted); physical-browser verification pending; full semantic/LSP completion missing | R, Flow and Python completion/diagnostics |
@@ -38,6 +38,27 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
 
 
+
+## 2026-10-25: native Rscript SVG plotting (implementation; acceptance pending)
+
+A real Rscript graphics device is installed lazily for each native R execution.
+Base R plotting opens a temporary `grDevices::svg` device in the persistent
+kernel; its output is closed, bounded to 60 KiB, and exposed through a separate
+read-only `P` IPC operation. Flow owns the intent/origin-gated
+`POST /api/plot/r` route. The browser retrieves the actual SVG after native
+source or console execution, validates the bounded JSON response, and shows
+the image in the existing plot history with zoom and SVG download. No plot
+is returned for text-only execution. This does not require Cairo PNG output,
+third-party R packages, or a Python backend. The R kernel's source output
+and persistent variables retain their existing semantics.
+
+**Status: partial / implementation unverified.** Real Rscript IPC, Flow HTTP,
+Node transport/DOM, and optional physical-browser acceptance tests have been
+added but **have not passed independently** in this iteration. Multi-page
+graphics, native R notebook plot attachments, manual graphics-device handling,
+plot persistence across restart, and browser-runtime parity remain incomplete.
+The native SVG device is an ordinary R graphics device, not a sandbox. No
+hosted CI configuration was changed.
 
 ## 2026-10-25: native Rscript table previews (implementation; acceptance pending)
 
@@ -684,7 +705,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Editor selection execution | partial / Node-tested browser selection; native and physical-browser unverified | Selection runs without accidentally executing entire buffer |
 | Persistent REPL/session | partial / browser Pyodide/webR sessions; native Python process retention and reset added (local C harness and cross-platform Flow HTTP CI passed); native R persistent kernel passed real Rscript and Flow-owned HTTP acceptance on Linux/macOS CI | Incremental variables and package state persist until reset |
 | Variable inspector | partial / native Python and R bounded metadata snapshots cross-platform HTTP accepted; native Python exact-builtin nested metadata tree cross-platform CI accepted (unit/HTTP/DOM); R array dimensions and failed-lazy-binding recovery cross-platform HTTP accepted; browser Python/R metadata partial; arbitrary-object inspection and physical-browser acceptance missing | Nested objects / types / dimensions inspectable and refresh after execution |
-| Plot viewer | partial / Node-tested PNG import and integrated workspace tab; native unverified | png/svg plot history, zoom, save and deterministic device lifecycle |
+| Plot viewer | partial / Python PNG history and native R SVG capture via real Rscript graphics device implemented with bounded Flow-owned plot route, Node/IPC/HTTP/physical-browser acceptance added but not yet verified | png/svg plot history, zoom, save and deterministic device lifecycle |
 | Project explorer | partial / browser Pages open/create/save and confirmed active-file delete with baseline conflict checks; 10 regression tests V8-shim passed; physical-browser deletion unverified | Open project, tree navigation, source-file creation and save; scoped delete is implemented, copy-verify-delete rename implemented with non-atomic filesystem race limits; physical-browser acceptance remains missing |
 | Data viewer | partial / CSV/TSV plus bounded Python/R environment table snapshots wired; real Pyodide/webR and physical browser unverified | Interactive sortable/filterable tabular datasets including missing values |
 | Completion / language server | partial / browser Python AST and R parse-only syntax diagnostics; browser Python/R global-symbol prefix completion implemented with bounded interpreter namespace enumeration and keyboard insertion, pending cross-platform CI and physical-browser verification; native Flow strict compile-only diagnostics; Flow completion and member-aware completion missing | R, Flow and Python completion/diagnostics |

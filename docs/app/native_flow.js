@@ -194,6 +194,19 @@ function validateRInspection(payload) {
   return {ok:true, variables:payload.variables.map(node => convert(node, 0)),
     truncated:payload.truncated};
 }
+function validateRTable(payload) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload) ||
+      !Array.isArray(payload.columns) || payload.columns.length < 1 ||
+      payload.columns.length > 32 || !Array.isArray(payload.rows) ||
+      payload.rows.length > 200 || !Number.isSafeInteger(payload.totalRows) ||
+      payload.totalRows < payload.rows.length || typeof payload.truncated !== "boolean" ||
+      !payload.columns.every(value => typeof value === "string" && value.length <= 160) ||
+      !payload.rows.every(row => Array.isArray(row) &&
+        row.length === payload.columns.length &&
+        row.every(value => typeof value === "string" && value.length <= 160)))
+    throw new Error("Invalid native R table response.");
+  return payload;
+}
 function createRSession() {
   let epoch = 0;
   let serial = Promise.resolve();
@@ -227,6 +240,22 @@ function createRSession() {
       return validateRInspection(payload);
     });
   }
+  function table(name) {
+    if (typeof name !== "string" || !/^[A-Za-z][A-Za-z0-9._]{0,119}$/.test(name) ||
+        name.includes("..") || name.endsWith("."))
+      return Promise.resolve({ok:false, output:"Invalid R variable name."});
+    const generation = epoch;
+    return schedule(async () => {
+      if (generation !== epoch) return stale();
+      const response = await request("/api/table/r", name);
+      if (generation !== epoch) return stale();
+      if (!response.ok) return response;
+      let payload;
+      try { payload = JSON.parse(response.output); }
+      catch (_) { throw new Error("Native R table response was not JSON."); }
+      return {ok:true, table:validateRTable(payload)};
+    });
+  }
   function checkSyntax(code) {
     const generation = epoch;
     return schedule(async () => {
@@ -243,9 +272,9 @@ function createRSession() {
     });
   }
   const unsupported = () => Promise.resolve({ok:false,
-    output:"This operation is not available for native R yet. Select browser webR for packages, tables, help, completion or variable transfer; the two R workspaces are separate."});
+    output:"This operation is not available for native R yet. Select browser webR for packages, help, completion or variable transfer; the two R workspaces are separate."});
   return Object.freeze({run, inspect, checkSyntax, reset,
-    table:unsupported, packages:unsupported, installPackage:unsupported,
+    table, packages:unsupported, installPackage:unsupported,
     help:unsupported, complete:unsupported,
     exportVariable:unsupported, importVariable:unsupported});
 }

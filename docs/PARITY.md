@@ -30,7 +30,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Sequential percent-cell notebooks | partial / Python and R Run All wired with explicit per-cell Python/R/Flow language tags (cross-platform CI accepted; real browser pending); bounded browser-local text/Python PNG output recovery across reload; native and physical-browser acceptance unverified | Execute cells in order, retain interpreter state, show per-cell output and stop on error |
 | Jupyter `.ipynb` import/export | partial / browser UI wired and Node regression coverage; bounded output recovery is separate from `.ipynb` import/export; physical-browser file round-trip and live Python/R kernels unverified | Import/export nbformat 4 Python/R code and Markdown cells through file picker/download; validate with nbformat; preserve source; verify live outputs in Chromium and cross-platform acceptance |
 | R Markdown / Quarto | partial / offline HTML report export from Python/R percent-cell notebooks; no Quarto/R Markdown rendering | Render notebook with inline plots and HTML export; verify actual Quarto/R Markdown format compatibility |
-| Source debugger | partial / native CPython breakpoint/step/next/finish/continue/stop and bounded stack inspection passed cross-platform Flow/HTTP CI #40126891635; numeric-local conditional breakpoints accepted by Ubuntu/macOS CI #40144484561 (real CPython and Flow HTTP); opt-in raised-exception pause implemented, cross-platform CI pending; physical browser and R/Flow debugging missing | Breakpoints, stack, variables, step execution |
+| Source debugger | partial / native CPython breakpoint/step/next/finish/continue/stop and bounded stack inspection passed cross-platform Flow/HTTP CI #40126891635; numeric-local conditional breakpoints accepted by Ubuntu/macOS CI #40144484561 (real CPython and Flow HTTP); opt-in raised-exception pause passed Ubuntu/macOS CI #40148434956 (real CPython and Flow HTTP); physical browser and R/Flow debugging missing | Breakpoints, stack, variables, step execution |
 | Remote/server mode | missing | Authenticated, origin-aware multi-user sessions with isolation |
 | Diagnostics / profiling | partial / native CPython bounded line tracing cross-platform CI accepted; physical-browser acceptance pending | Resource/time tracing and useful language-specific diagnostics |
 | Cross-platform packaging | missing | Installable signed/reproducible macOS and Linux releases |
@@ -38,7 +38,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
 
 
-## 2026-10-25: native CPython pause on raised exceptions (acceptance pending)
+## 2026-10-25: native CPython pause on raised exceptions (cross-platform native acceptance passed)
 
 The Flow-owned localhost Python debugger now accepts an optional boolean
 `pause_on_exception` request flag. When enabled, CPython's actual exception
@@ -56,11 +56,18 @@ and an opt-in physical-browser scenario cover caught and uncaught exceptions,
 metadata validation, persistence, and safe previewing. The browser harness
 still requires real interpreter downloads and native Flow execution.
 
-**Status: partial / implementation committed on a feature branch.** Local
-CPython prototype tests passed (7 tests); repository CI, actual native Flow
-compilation, cross-platform acceptance and real physical-browser execution
-have **not yet been verified for this change**. This is not R or Flow source
-debugging, exception handling for external library frames, or RStudio parity.
+**Status: partial / cross-platform native acceptance passed.**
+[PR #43](https://github.com/godofecht/FlowStudio/pull/43) merged as
+[74d942b](https://github.com/godofecht/FlowStudio/commit/74d942b8bbe37cc58ca4fd6078178129d4777892)
+after [CI #40148434956](https://github.com/godofecht/FlowStudio/actions/runs/40148434956)
+passed all four jobs on Ubuntu 24.04 and macOS 14. Each source/transport
+platform passed 508 Node tests, 2 skips, 76 real Python tests, and native
+transport checks. Both native jobs compiled Flow 2.0.0, passed actual
+Flow-owned localhost HTTP exception-pause acceptance with real CPython,
+persistent R/Python checks, and produced platform tarballs.
+The new physical-browser exception-pause scenario **has not been run**.
+This is not R or Flow source debugging, exception handling for external
+library frames, or RStudio parity. No hosted CI configuration was changed.
 
 ## 2026-10-25: numeric conditional CPython breakpoints (acceptance pending)
 

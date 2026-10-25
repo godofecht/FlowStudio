@@ -503,7 +503,7 @@ $("rRuntime").addEventListener("change", () => {
   packagePanel.updateLanguage();
   completion.clear();
   notice(nativeRSelected() ?
-    "Native Rscript selected. Source, console, notebooks, environment, plots, tables and installed-package inventory use Flow's persistent R kernel. Package installation, help and variable transfer remain browser-only." :
+    "Native Rscript selected. Source, console, notebooks, environment, plots, tables and installed-package inventory/loading use Flow's persistent R kernel. Package installation, help and variable transfer remain browser-only." :
     "Browser webR selected. This workspace is separate from the native Rscript kernel.");
 });
 $("language").addEventListener("change", () => { completion.clear(); notebookEntries = []; clearNotebookRecovery(); environmentData.clear(); packagePanel.updateLanguage?.(); $("tracePython").disabled = busy || $("language").value !== "python" || !globalThis.FlowStudioNativeFlow?.available?.(); queueDraft(); });

@@ -166,6 +166,17 @@ int main(void)
     if (fs_r_status() != 200 || strcmp(out, "42\n") != 0) return failure(2, out);
     out = fs_r_run("stop('expected failure')");
     if (fs_r_status() != 422 || !strstr(out, "expected failure")) return failure(3, out);
+    /* Real nested R errors must preserve user call frames before unwinding,
+     * without killing the persistent interpreter or executing a traceback. */
+    out = fs_r_run("outer <- function() inner(); "
+                   "inner <- function() stop('nested failure'); outer()");
+    if (fs_r_status() != 422 || !strstr(out, "nested failure") ||
+        !strstr(out, "R call stack (most recent last):") ||
+        !strstr(out, "outer()") || !strstr(out, "inner()"))
+        return failure(66, out);
+    out = fs_r_run("cat(value)");
+    if (fs_r_status() != 200 || strcmp(out, "42") != 0)
+        return failure(67, out);
     out = fs_r_run("cat(value, '\\n', sep='')");
     if (fs_r_status() != 200 || strcmp(out, "42\n") != 0) return failure(4, out);
     out = fs_r_run("makeActiveBinding('danger', function() stop('inspection executed binding'), environment())");

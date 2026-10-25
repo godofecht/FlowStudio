@@ -1,5 +1,22 @@
 # FlowStudio RStudio parity matrix
 
+## 2026-10-25: bounded native R runtime call-stack diagnostics (PR validation pending)
+
+The persistent Rscript interpreter now captures a bounded deparsed call chain
+**at the point an uncaught error is signalled**, before R's exiting error
+handler unwinds the user frames. The existing Flow-owned `/api/run/r` route
+returns the actual error plus up to 16 syntax-only call frames (180 characters
+per frame), without evaluating or printing user objects. A real R/C IPC
+regression asserts nested `outer()` / `inner()` frames and verifies that the
+same interpreter continues executing after the error. No new network route,
+hosted CI change or Flow compiler syntax is introduced.
+
+**Status: implementation committed to a focused PR; real Rscript regression
+and Linux/macOS Flow-owned HTTP acceptance are not yet independently verified.**
+This is error traceback information, **not interactive R breakpoints,
+single-stepping or stack-frame evaluation**. Physical-browser execution,
+authenticated remote sessions and RStudio feature parity remain outstanding.
+
 ## 2026-10-25: one-level conflict-checked project replacement undo (Linux/macOS CI passed)
 
 Native and Pages editors now offer an explicit one-level undo after a fully

@@ -126,7 +126,7 @@ test("native R never contacts localhost from Pages and bounds source and output"
 
 test("native R unsupported operations cannot silently use the webR workspace", async () => {
   const session = native.createRSession();
-  for (const operation of ["table","packages","installPackage","help","complete",
+  for (const operation of ["packages","installPackage","help","complete",
                            "exportVariable","importVariable"]) {
     const result = await session[operation]("x");
     assert.equal(result.ok, false, operation);

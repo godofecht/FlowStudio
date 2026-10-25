@@ -8,16 +8,26 @@ function create(target) {
     const holder = document.createElement("div");
     holder.setAttribute("aria-label", "Python and R plot history");
     for (const item of items) {
-      const image = document.createElement("img");
-      image.alt = (item.svg ? "R plot " : "Python figure ") + item.number;
-      image.src = item.svg ? "data:image/svg+xml;charset=utf-8," + encodeURIComponent(item.svg) :
-        "data:image/png;base64," + item.png;
+      const image = document.createElement(item.pdf ? "embed" : "img");
+      const label = (item.svg || item.pdf ? "R plot " : "Python figure ") + item.number;
+      image.alt = label;
+      image.setAttribute("aria-label", label);
+      if (item.pdf) {
+        let binary = "";
+        for (let offset = 0; offset < item.pdf.length; offset += 2)
+          binary += String.fromCharCode(parseInt(item.pdf.slice(offset, offset + 2), 16));
+        image.src = "data:application/pdf;base64," + btoa(binary);
+        image.setAttribute("type", "application/pdf");
+      } else {
+        image.src = item.svg ? "data:image/svg+xml;charset=utf-8," + encodeURIComponent(item.svg) :
+          "data:image/png;base64," + item.png;
+      }
       image.loading = "lazy";
-      image.setAttribute("style", "max-width:100%;height:auto");
+      image.setAttribute("style", item.pdf ? "width:100%;height:32rem" : "max-width:100%;height:auto");
       holder.append(image);
       const save = document.createElement("a");
       save.href = image.src;
-      save.download = "flowstudio-figure-" + item.number + (item.svg ? ".svg" : ".png");
+      save.download = "flowstudio-figure-" + item.number + (item.pdf ? ".pdf" : item.svg ? ".svg" : ".png");
       save.textContent = "Save figure " + item.number;
       holder.append(save);
       const zoom = document.createElement("button");
@@ -27,7 +37,8 @@ function create(target) {
       let expanded = false;
       zoom.onclick = () => {
         expanded = !expanded;
-        image.setAttribute("style", expanded ? "max-width:none;height:auto" : "max-width:100%;height:auto");
+        image.setAttribute("style", item.pdf ? (expanded ? "width:160%;height:45rem" : "width:100%;height:32rem") :
+          (expanded ? "max-width:none;height:auto" : "max-width:100%;height:auto"));
         zoom.setAttribute("aria-pressed", String(expanded));
       };
       holder.append(zoom);
@@ -43,6 +54,10 @@ function create(target) {
       if (typeof plot.svg === "string" && new TextEncoder().encode(plot.svg).length <= 60000 &&
           /<svg[\s>]/.test(plot.svg) && plot.svg.includes("</svg>")) {
         items.push({number:plot.number, svg:plot.svg});
+      } else if (typeof plot.pdf === "string" && plot.pdf.length >= 8 &&
+                 plot.pdf.length <= 120000 && plot.pdf.length % 2 === 0 &&
+                 plot.pdf.startsWith("25504446") && /^[0-9a-f]+$/.test(plot.pdf)) {
+        items.push({number:plot.number, pdf:plot.pdf});
       } else if (typeof plot.png === "string" && plot.png.length <= 1398104 &&
                  plot.png.startsWith("iVBORw0KGgo") && /^[A-Za-z0-9+/=]+$/.test(plot.png)) {
         items.push({number:plot.number, png:plot.png});

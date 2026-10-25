@@ -138,9 +138,9 @@ def main() -> None:
     assert status == 200 and json.loads(body)["state"] == "idle", (status, body)
     # Actual Flow HTTP -> C IPC -> Rscript multiple breakpoint acceptance.
     status, body = request("POST", "/api/debug/r/start",
-                           "fs_multi_http <- 0L\\nfs_multi_http <- fs_multi_http + 1L\\n"
-                           "fs_multi_http <- fs_multi_http + 10L\\n"
-                           "fs_multi_http <- fs_multi_http + 100L\\ncat(fs_multi_http)",
+                           "fs_multi_http <- 0L\nfs_multi_http <- fs_multi_http + 1L\n"
+                           "fs_multi_http <- fs_multi_http + 10L\n"
+                           "fs_multi_http <- fs_multi_http + 100L\ncat(fs_multi_http)",
                            accepted_headers)
     assert status == 200 and json.loads(body)["state"] == "paused", (status, body)
     status, body = request("POST", "/api/debug/r/continue", "4,2", accepted_headers)

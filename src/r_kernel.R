@@ -503,7 +503,7 @@ repeat {
     header <- read_exact(9L)
     if (is.null(header)) break
     header_text <- rawToChar(header)
-    if (!grepl("^[ECITPKLN][0-9a-f]{8}$", header_text)) break
+    if (!grepl("^[ECITPKLNU][0-9a-f]{8}$", header_text)) break
     length_text <- substr(header_text, 2L, 9L)
     length_value <- strtoi(length_text, base = 16L)
     if (is.na(length_value) || length_value > MAX_SOURCE ||

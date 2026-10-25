@@ -131,7 +131,7 @@ function setBusy(value) {
 }
 const packagePanel = FlowStudioPackages.create({document, request, notice, target:$("packages"),
   input:$("packageName"), installButton:$("installPackage"), listButton:$("listPackages"),
-  language:()=>$("language").value, rSession:getRSession, rReadOnly:nativeRSelected});
+  language:()=>$("language").value, rSession:getRSession, rNative:nativeRSelected});
 if (typeof FlowStudioHelpPanel !== "undefined") FlowStudioHelpPanel.create({
   input:$("helpQuery"), button:$("lookupHelp"), target:$("workspace"), document, notice,
   language:()=>$("language").value,

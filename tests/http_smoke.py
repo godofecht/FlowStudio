@@ -136,6 +136,25 @@ def main() -> None:
     assert json.loads(body)["output"] == "42", body
     status, body = request("POST", "/api/debug/r/stop", "", accepted_headers)
     assert status == 200 and json.loads(body)["state"] == "idle", (status, body)
+    # Actual Flow HTTP -> C IPC -> Rscript multiple breakpoint acceptance.
+    status, body = request("POST", "/api/debug/r/start",
+                           "fs_multi_http <- 0L\nfs_multi_http <- fs_multi_http + 1L\n"
+                           "fs_multi_http <- fs_multi_http + 10L\n"
+                           "fs_multi_http <- fs_multi_http + 100L\ncat(fs_multi_http)",
+                           accepted_headers)
+    assert status == 200 and json.loads(body)["state"] == "paused", (status, body)
+    status, body = request("POST", "/api/debug/r/continue", "4,2", accepted_headers)
+    assert status == 200 and json.loads(body)["next_line"] == 2, (status, body)
+    status, body = request("POST", "/api/debug/r/continue", "2,,4", accepted_headers)
+    assert status == 422 and json.loads(body)["next_line"] == 2, (status, body)
+    status, body = request("POST", "/api/debug/r/continue", "4,2", accepted_headers)
+    assert status == 200 and json.loads(body)["next_line"] == 4, (status, body)
+    status, body = request("POST", "/api/debug/r/continue", "", accepted_headers)
+    assert status == 200 and json.loads(body)["state"] == "done", (status, body)
+    assert json.loads(body)["output"] == "111", body
+    status, body = request("POST", "/api/run/r", "cat(fs_multi_http)", accepted_headers)
+    assert status == 200 and body == "111", (status, body)
+
     # Native Git reads and writes require the existing intent/origin gate.
     assert request("GET", "/api/git/status")[0] == 404
     for route in ("/api/git/status", "/api/git/diff", "/api/git/diff/staged",

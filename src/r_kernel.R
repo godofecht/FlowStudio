@@ -208,19 +208,21 @@ debug_step <- function() {
 }
 
 # Continue real top-level R expressions, optionally stopping before a later
-# expression whose source reference starts on the specified line.
+# expression whose source reference starts on one of up to 64 specified lines.
+# Breakpoint lines are parsed as data, never evaluated as R expressions.
 debug_continue <- function(target_line) {
     if (!identical(debug_state, "paused"))
         return(debug_reply(FALSE, "No paused R expression is available."))
     stop_index <- length(debug_expressions) + 1L
     if (nzchar(target_line)) {
-        if (!grepl("^[1-9][0-9]{0,5}$", target_line))
-            return(debug_reply(FALSE, "Target must be a positive source line."))
-        line <- as.integer(target_line)
+        if (nchar(target_line, type = "bytes") > 447L ||
+            !grepl("^[1-9][0-9]{0,5}(,[1-9][0-9]{0,5}){0,63}$", target_line))
+            return(debug_reply(FALSE, "Target must contain 1 to 64 positive source lines (comma-separated)."))
+        lines <- as.integer(strsplit(target_line, ",", fixed = TRUE)[[1L]])
         future <- which(seq_along(debug_lines) > debug_index &
-                        !is.na(debug_lines) & debug_lines == line)
+                        !is.na(debug_lines) & debug_lines %in% lines)
         if (!length(future))
-            return(debug_reply(FALSE, "No later top-level expression starts on that line."))
+            return(debug_reply(FALSE, "No later top-level expression starts on any requested line."))
         stop_index <- future[[1L]]
     }
     output <- character(0)

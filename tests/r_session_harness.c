@@ -246,6 +246,24 @@ int main(void)
         !strstr(out, "\"output\":\"42\"")) return failure(87, out);
     out = fs_r_run("cat(continue_value)");
     if (fs_r_status() != 200 || strcmp(out, "42") != 0) return failure(88, out);
+    /* Multiple top-level breakpoints follow source order, not input order.
+     * Reusing the same list resumes to the next future breakpoint. */
+    out = fs_r_debug_start("multi <- 0L\nmulti <- multi + 1L\nmulti <- multi + 10L\nmulti <- multi + 100L\ncat(multi)");
+    if (fs_r_status() != 200) return failure(92, out);
+    out = fs_r_debug_continue("4,2");
+    if (fs_r_status() != 200 || !strstr(out, "\"next_line\":2") ||
+        !strstr(out, "\"executed_line\":1")) return failure(93, out);
+    out = fs_r_debug_continue("2,,4");
+    if (fs_r_status() != 422 || !strstr(out, "comma-separated") ||
+        !strstr(out, "\"next_line\":2")) return failure(94, out);
+    out = fs_r_debug_continue("4,2");
+    if (fs_r_status() != 200 || !strstr(out, "\"next_line\":4") ||
+        !strstr(out, "\"executed_line\":3")) return failure(95, out);
+    out = fs_r_debug_continue("");
+    if (fs_r_status() != 200 || !strstr(out, "\"state\":\"done\"") ||
+        !strstr(out, "\"output\":\"111\"")) return failure(96, out);
+    out = fs_r_run("cat(multi)");
+    if (fs_r_status() != 200 || strcmp(out, "111") != 0) return failure(97, out);
     out = fs_r_debug_start("continue_value <- 99L\nstop('continue failure')\ncontinue_value <- 100L");
     if (fs_r_status() != 200) return failure(89, out);
     out = fs_r_debug_continue("");

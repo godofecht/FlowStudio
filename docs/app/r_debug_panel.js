@@ -39,11 +39,12 @@ function create({native, source, language, runtime, startButton, stepButton,
     update();
     try {
       const line = action === "continue" ? targetLine.value.trim() : "";
-      if (line && !/^[1-9][0-9]{0,5}$/.test(line))
-        throw Error("R continue target must be a positive source line.");
+      if (line && (line.length > 447 ||
+          !/^[1-9][0-9]{0,5}(?:,[1-9][0-9]{0,5}){0,63}$/.test(line)))
+        throw Error("R continue targets must be 1 to 64 comma-separated positive source lines.");
       const result = action === "start" ?
         await native.debugRStart(source.value) :
-        await native.debugRCommand(action, line ? Number(line) : "");
+        await native.debugRCommand(action, line);
       state = result.state;
       target.textContent = format(result);
       if (notice) notice("Native R expression debugger: " + state + ".");

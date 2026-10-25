@@ -102,7 +102,8 @@ def main() -> None:
     # Real Flow HTTP -> C IPC -> persistent Rscript top-level stepping.
     # No interpreter mocks: the native acceptance job installs actual R.
     for route in ("/api/debug/r/start", "/api/debug/r/step",
-                  "/api/debug/r/continue", "/api/debug/r/stop", "/api/debug/r/status"):
+                  "/api/debug/r/continue", "/api/debug/r/evaluate",
+                  "/api/debug/r/stop", "/api/debug/r/status"):
         assert request("POST", route, "", {})[0] == 404
         assert request("POST", route, "",
                        {"X-FlowStudio-Intent": "run",
@@ -117,6 +118,19 @@ def main() -> None:
                    accepted_headers)[0] == 422
     status, body = request("POST", "/api/debug/r/step", "", accepted_headers)
     assert status == 200 and json.loads(body)["next_line"] == 2, (status, body)
+    status, body = request("POST", "/api/debug/r/evaluate",
+                           "fs_debug_http + 1L", accepted_headers)
+    debug = json.loads(body)
+    assert status == 200 and debug["state"] == "paused" and debug["index"] == 2, debug
+    assert debug["next_line"] == 2 and debug["output"] == "42", debug
+    status, body = request("POST", "/api/debug/r/evaluate",
+                           "stop('watch failed')", accepted_headers)
+    debug = json.loads(body)
+    assert status == 422 and debug["state"] == "paused" and debug["index"] == 2, debug
+    assert "watch failed" in debug["output"], debug
+    status, body = request("POST", "/api/debug/r/evaluate",
+                           "fs_debug_http <- 900L; fs_debug_http <- 0L", accepted_headers)
+    assert status == 422 and json.loads(body)["index"] == 2, (status, body)
     status, body = request("POST", "/api/debug/r/step", "", accepted_headers)
     assert status == 200, (status, body)
     debug = json.loads(body)

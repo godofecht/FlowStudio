@@ -262,6 +262,39 @@ def main() -> None:
                               accepted_headers)
     assert status == 422 and not json.loads(payload)["ok"], (status, payload)
 
+    # Exception pause uses real CPython trace events through Flow's HTTP router.
+    # Caught exceptions pause once at their origin, without evaluating repr/str.
+    exception_source = ('try:\\n    raise LookupError("caught")\\n'
+                        'except LookupError:\\n    exception_recovered = 42\\n')
+    status, payload = request("POST", "/api/debug/python/start",
+                              json.dumps({"source": exception_source,
+                                          "breakpoints": [],
+                                          "pause_on_exception": True}),
+                              accepted_headers)
+    exception_pause = json.loads(payload)
+    assert status == 200 and exception_pause["state"] == "paused", (status, payload)
+    assert exception_pause["exception"] == {"type": "LookupError", "line": 2}, payload
+    status, payload = request("POST", "/api/debug/python/continue", "", accepted_headers)
+    assert status == 200 and json.loads(payload)["state"] == "done", (status, payload)
+    assert json.loads(payload)["exception"] is None, payload
+    status, output = request("POST", "/api/run/python",
+                             "print(exception_recovered)", accepted_headers)
+    assert status == 200 and output.strip() == "42", (status, output)
+    status, payload = request("POST", "/api/debug/python/start",
+                              json.dumps({"source": 'raise ValueError("uncaught")\\n',
+                                          "breakpoints": [],
+                                          "pause_on_exception": True}),
+                              accepted_headers)
+    assert status == 200 and json.loads(payload)["exception"]["type"] == "ValueError", payload
+    status, payload = request("POST", "/api/debug/python/continue", "", accepted_headers)
+    assert status == 422 and json.loads(payload)["state"] == "done", (status, payload)
+    assert "ValueError: uncaught" in json.loads(payload)["output"], payload
+    status, payload = request("POST", "/api/debug/python/start",
+                              json.dumps({"source": "pass", "breakpoints": [],
+                                          "pause_on_exception": "true"}),
+                              accepted_headers)
+    assert status == 422 and not json.loads(payload)["ok"], (status, payload)
+
     # A single Python kernel retains variables between HTTP requests.
     status, output = request("POST", "/api/run/python",
                              "flowstudio_persistent = 40 + 2", accepted_headers)

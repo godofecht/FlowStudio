@@ -199,8 +199,8 @@ def main() -> None:
     status, body = request("POST", "/api/debug/r/start",
                            "fs_outer <- function(v) { fs_outer_local <- v + 1L; "
                            "fs_inner <- function(w) { fs_inner_local <- w + 2L; "
-                           "stop('frame failure') }; fs_inner(fs_outer_local) }\\n"
-                           "fs_outer(40L)\\ncat('unreachable')", accepted_headers)
+                           "stop('frame failure') }; fs_inner(fs_outer_local) }\n"
+                           "fs_outer(40L)\ncat('unreachable')", accepted_headers)
     assert status == 200, (status, body)
     assert request("POST", "/api/debug/r/step", "", accepted_headers)[0] == 200
     status, body = request("POST", "/api/debug/r/step", "", accepted_headers)
@@ -211,10 +211,10 @@ def main() -> None:
     assert "fs_outer_local" in frames["frames"][0]["locals"], frames
     assert "fs_inner_local" in frames["frames"][1]["locals"], frames
     status, body = request("POST", "/api/debug/r/evaluate",
-                           "@2\\nfs_inner_local", accepted_headers)
+                           "@2\nfs_inner_local", accepted_headers)
     assert status == 200 and json.loads(body)["output"].strip() == "[1] 43", (status, body)
     status, body = request("POST", "/api/debug/r/evaluate",
-                           "@8\\nfs_inner_local", accepted_headers)
+                           "@8\nfs_inner_local", accepted_headers)
     assert status == 422 and "No retained R function frame" in json.loads(body)["output"]
     status, body = request("POST", "/api/debug/r/stop", "", accepted_headers)
     assert status == 200 and json.loads(body)["frames"] == [], (status, body)
@@ -245,7 +245,7 @@ def main() -> None:
     if shutil.which("git"):
         probe = Path(__file__).resolve().parents[1] / ("flowstudio_git_probe_" + uuid.uuid4().hex + ".txt")
         try:
-            probe.write_text("native Git status acceptance\\n", encoding="utf-8")
+            probe.write_text("native Git status acceptance\n", encoding="utf-8")
             git_code, git_text = request("POST", "/api/git/status", "", accepted_headers)
             assert git_code == 200 and probe.name in git_text, (git_code, git_text)
             diff_code, diff_text = request("POST", "/api/git/diff", "", accepted_headers)
@@ -465,7 +465,7 @@ def main() -> None:
                             {"X-FlowStudio-Intent": "run", "Origin": "http://attacker.invalid"})
         assert status == 404, status
         status, output = request("POST", "/api/run/r",
-                                 'flowstudio_r_value <- 41; cat(flowstudio_r_value, "\\n")',
+                                 'flowstudio_r_value <- 41; cat(flowstudio_r_value, "\n")',
                                  accepted_headers)
         assert status == 200 and output.strip() == "41", (status, output)
         status, output = request("POST", "/api/check/r",
@@ -476,10 +476,10 @@ def main() -> None:
                                  accepted_headers)
         assert status == 422 and "R syntax error:" in output and "<text>:" in output, (status, output)
         status, output = request("POST", "/api/run/r",
-                                 'cat(flowstudio_r_value, "\\n")', accepted_headers)
+                                 'cat(flowstudio_r_value, "\n")', accepted_headers)
         assert status == 200 and output.strip() == "41", (status, output)
         status, output = request("POST", "/api/run/r",
-                                 'flowstudio_r_value <- flowstudio_r_value + 1; cat(flowstudio_r_value, "\\n")',
+                                 'flowstudio_r_value <- flowstudio_r_value + 1; cat(flowstudio_r_value, "\n")',
                                  accepted_headers)
         assert status == 200 and output.strip() == "42", (status, output)
         status, snapshot = request("POST", "/api/inspect/r", "", accepted_headers)
@@ -615,7 +615,7 @@ def main() -> None:
         else:
             assert bytes.fromhex(captured["pdf"]).startswith(b"%PDF"), captured
         status, output = request("POST", "/api/run/r",
-                                 "cat('text only\\n')", accepted_headers)
+                                 "cat('text only\n')", accepted_headers)
         assert status == 200, (status, output)
         status, plot_json = request("POST", "/api/plot/r", "", accepted_headers)
         assert status == 200 and json.loads(plot_json)["svg"] is None and json.loads(plot_json)["pdf"] is None, (status, plot_json)
@@ -625,14 +625,14 @@ def main() -> None:
                                  'stop("expected native R error")', accepted_headers)
         assert status == 422 and "expected native R error" in output, (status, output)
         status, output = request("POST", "/api/run/r",
-                                 'cat(flowstudio_r_value, "\\n")', accepted_headers)
+                                 'cat(flowstudio_r_value, "\n")', accepted_headers)
         assert status == 200 and output.strip() == "42", (status, output)
         status, output = request("POST", "/api/reset/r", "", accepted_headers)
         assert status == 200 and "reset" in output, (status, output)
         status, snapshot = request("POST", "/api/inspect/r", "", accepted_headers)
         assert status == 200 and json.loads(snapshot)["variables"] == [], (status, snapshot)
         status, output = request("POST", "/api/run/r",
-                                 'cat(exists("flowstudio_r_value", inherits=FALSE), "\\n")',
+                                 'cat(exists("flowstudio_r_value", inherits=FALSE), "\n")',
                                  accepted_headers)
         assert status == 200 and output.strip() == "FALSE", (status, output)
         status, _ = request("POST", "/api/reset/r", "")

@@ -32,6 +32,14 @@ The runner refuses non-loopback --url targets. With --flow it also
 requires a real browser interaction with the native CPython conditional
 debugger (pause on a live numeric local, continue, pause again, finish),
 and then the opt-in raised-exception pause on a real caught CPython exception.
+When --flow is requested without --python-only, the runner also selects
+native Rscript in the real browser, executes persistent source and console
+commands, runs sequential R notebook cells, verifies non-executing syntax
+checks, inspects the real native R environment, resets it, and confirms the
+separate webR workspace did not receive native variables. This new native R
+browser scenario is **not yet independently executed**; merely adding it does
+not establish a pass.
+
 Native Flow execution and debugging are not tested against a fake backend
 or GitHub Pages. Browser interpreter
 execution and native Flow use separate runtime paths. The server is not

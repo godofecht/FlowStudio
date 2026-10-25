@@ -126,6 +126,45 @@ def test_r(page, timeout: int):
     run_source(page, "r", "print(exists('fs_browser_value', envir=.GlobalEnv))", "FALSE", timeout)
 
 
+
+def test_native_r(page, timeout: int):
+    # Real browser -> Flow-owned localhost HTTP -> persistent Rscript kernel.
+    # This is distinct from webR; no mocked interpreter or worker interception.
+    page.locator("#rRuntime").select_option("native")
+    run_source(page, "r", "fs_native_browser <- 40L\ncat(fs_native_browser + 2L, '\\n')",
+               "42", timeout)
+    run_console(page, "r", "cat(fs_native_browser + 3L, '\\n')", "43", timeout)
+    assert "fs_native_browser" in page.locator("#environment").inner_text()
+
+    page.locator("#source").fill(
+        "# %% [r]\nfs_native_nb <- fs_native_browser + 1L\n"
+        "# %% [r]\ncat(fs_native_nb + 1L, '\\n')\n")
+    page.locator("#runNotebook").click()
+    page.wait_for_function(
+        "document.querySelector('#notice').textContent === 'Notebook executed 2 cells.'",
+        timeout=timeout)
+    assert "42" in page.locator("#notebookOutput").inner_text()
+
+    page.locator("#source").fill("fs_native_browser <- 999L\nvalue <- )")
+    page.locator("#checkSyntax").click()
+    page.wait_for_function(
+        "document.querySelector('#notice').textContent.includes('r syntax:')",
+        timeout=timeout)
+    run_console(page, "r", "cat(fs_native_browser, '\\n')", "40", timeout)
+
+    page.locator("#reset").click()
+    page.wait_for_function(
+        "document.querySelector('#notice').textContent === 'R state reset.'",
+        timeout=timeout)
+    run_source(page, "r",
+               "cat(exists('fs_native_browser', inherits=FALSE), '\\n')",
+               "FALSE", timeout)
+    page.locator("#rRuntime").select_option("browser")
+    run_source(page, "r",
+               "cat(exists('fs_native_browser', envir=.GlobalEnv), '\\n')",
+               "FALSE", timeout)
+
+
 def test_flow(page, timeout: int):
     run_source(page, "flow", 'function main() -> i32 {\n    println("Flow physical browser 42")\n    return 0\n}',
                "Flow physical browser 42", timeout)
@@ -213,6 +252,9 @@ def main():
                 if args.flow:
                     test_flow(page, args.timeout * 1000)
                     print("PASS real browser Flow via native Flow-owned server")
+                    if not args.python_only:
+                        test_native_r(page, args.timeout * 1000)
+                        print("PASS real browser native Rscript source, console, notebook, syntax, environment and reset")
                     test_native_conditional_debugger(page, args.timeout * 1000)
                     print("PASS real browser conditional CPython debugging via native Flow-owned server")
                 assert not errors, f"Uncaught browser exceptions: {errors}"

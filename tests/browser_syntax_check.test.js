@@ -102,7 +102,7 @@ test("R reset discards an in-flight syntax response", async () => {
 test("Pages exposes syntax check control and diagnostic navigation", () => {
   assert.match(app, /id="checkSyntax"/);
   assert.match(app, /getRSession\(\)\.checkSyntax\(code\)/);
-  assert.match(app, /FlowStudioNativeFlow\.checkRSyntax\(code\)/);
+  assert.match(app, /nativeRSession = FlowStudioNativeFlow\.createRSession\(\)/);
   assert.match(app, /request\("check", code\)/);
   assert.match(app, /code\.split\("\\n"\)/);
   assert.match(app, /setSelectionRange\(offset, offset\)/);

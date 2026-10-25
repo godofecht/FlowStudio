@@ -9,25 +9,25 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Four-pane IDE shell | unverified | Source, environment, console and plots render; keyboard/accessibility checks |
 | File open / save | partial / conflict-aware browser saves and Save As picker wired; physical browser and native unverified | Native file-picker and download fallback round-trip UTF-8 |
 | Flow source execution | partial / native Flow subprocess route integrated into browser IDE at /app/; physical-browser acceptance pending | Compile and run valid code; surface diagnostics for invalid code |
-| R source execution | partial / browser webR 0.6.0 integrated, Node-mock tested; real webR unverified; native persistent R IPC and Flow-owned HTTP acceptance passed on Linux/macOS CI; physical-browser acceptance pending | Run via installed R; preserve state across evaluations |
+| R source execution | partial / browser webR 0.6.0 integrated, Node-mock tested; opt-in native Rscript editor execution through the Flow-owned persistent HTTP kernel proposed (native HTTP accepted previously; browser integration CI and physical-browser acceptance pending) | Run via installed R; preserve state across evaluations |
 | Python source execution | partial / native persistent CPython kernel added; local C IPC and Flow-owned HTTP tested in Linux/macOS CI; physical-browser acceptance pending | Run via installed Python; preserve state across evaluations |
 | Editor selection execution | partial / Node-tested browser selection; native and physical-browser unverified | Selection runs without accidentally executing entire buffer |
 | Persistent REPL/session | partial / browser Pyodide/webR sessions; native Python process retention and reset added (local C harness and cross-platform Flow HTTP CI passed); native R persistent kernel passed real Rscript and Flow-owned HTTP acceptance on Linux/macOS CI | Incremental variables and package state persist until reset |
-| Interactive multi-language console | partial / Python and R browser sessions plus stateless native Flow full-program execution wired; per-language histories and unsent drafts implemented; 427/427 JS tests per platform and native Flow/HTTP CI passed on Ubuntu/macOS; live physical-browser acceptance pending | Console can execute selected Python/R/Flow independently of source editor; preserve Python/R state, histories and drafts; report Flow native-only limits and execution failures |
+| Interactive multi-language console | partial / Python and R browser sessions, opt-in native Rscript console routing (browser acceptance pending), plus stateless native Flow full-program execution wired; per-language histories and unsent drafts implemented; 427/427 JS tests per platform and native Flow/HTTP CI passed on Ubuntu/macOS; live physical-browser acceptance pending | Console can execute selected Python/R/Flow independently of source editor; preserve Python/R state, histories and drafts; report Flow native-only limits and execution failures |
 | Browser Python/R session snapshot export/import | partial / bounded scalar/vector JSON snapshots cross-platform CI accepted in PR #31; physical browser acceptance pending | Explicitly export and restore supported live interpreter values through a local file, reject tampering and stale sessions, verify live Pyodide/webR and cross-platform browser interactions; no implicit or arbitrary-object serialization |
 | Explicit Python/R variable transfer | partial / bounded plain scalar and atomic-vector copy wired; real CPython/Rscript query tests and native Flow HTTP accepted on Ubuntu/macOS CI; physical-browser Pyodide/webR round-trip unverified | Copy typed scalars/vectors both ways between persistent runtimes, reject unsupported objects/NA/NaN and active bindings, verify independent real-browser and cross-platform execution |
-| Variable inspector | partial / native Python and R bounded metadata snapshots cross-platform HTTP accepted; native Python exact-builtin nested metadata tree cross-platform CI accepted (unit/HTTP/DOM); R array dimensions and failed-lazy-binding recovery cross-platform HTTP accepted; browser R bounded two-level plain-list tree and active-binding protection accepted by Ubuntu/macOS CI #40090303070 (real Rscript, Node, native Flow/HTTP); side-effect-free bounded browser Python nested inspection accepted by cross-platform CI #40140193181 (real CPython/Node/native Flow HTTP), but real Pyodide physical-browser acceptance and arbitrary-object introspection remain missing | Nested objects / types / dimensions inspectable and refresh after execution |
+| Variable inspector | partial / native Python and R bounded metadata snapshots cross-platform HTTP accepted; opt-in browser rendering of native R metadata proposed (browser acceptance pending); native Python exact-builtin nested metadata tree cross-platform CI accepted (unit/HTTP/DOM); R array dimensions and failed-lazy-binding recovery cross-platform HTTP accepted; browser R bounded two-level plain-list tree and active-binding protection accepted by Ubuntu/macOS CI #40090303070 (real Rscript, Node, native Flow/HTTP); side-effect-free bounded browser Python nested inspection accepted by cross-platform CI #40140193181 (real CPython/Node/native Flow HTTP), but real Pyodide physical-browser acceptance and arbitrary-object introspection remain missing | Nested objects / types / dimensions inspectable and refresh after execution |
 | Plot viewer | partial / Node-tested PNG import and integrated workspace tab; native unverified | png/svg plot history, zoom, save and deterministic device lifecycle |
 | Project explorer | partial / browser Pages open/create/save and confirmed active-file delete with baseline conflict checks; 10 regression tests V8-shim passed; physical-browser deletion unverified | Open project, tree navigation, source-file creation and save; scoped delete is implemented, copy-verify-delete rename implemented with non-atomic filesystem race limits; physical-browser acceptance remains missing |
 | Data viewer | partial / CSV/TSV plus bounded Python/R environment table snapshots wired; real Pyodide/webR and physical browser unverified | Interactive sortable/filterable tabular datasets including missing values |
 | Completion / language server | partial / browser Python/R runtime prefix completion cross-platform CI accepted; Flow lexical completion accepted by Ubuntu/macOS CI; explicit-type Flow struct and evolution-state member completion cross-platform CI accepted (#40095770668, 473 JS passes, 2 skips per platform, native Flow/HTTP accepted); physical-browser verification pending; full semantic/LSP completion missing | R, Flow and Python completion/diagnostics |
-| Packages pane | partial / browser Python inventory/install and webR 0.6.0 inventory/install; mocked Node tests, live interpreters unverified | List, install, update with environment-aware package sources |
+| Packages pane | partial / browser Python inventory/install and webR 0.6.0 inventory/install; mocked Node tests, live interpreters unverified; native Rscript mode explicitly does not support package management | List, install, update with environment-aware package sources |
 | Git pane | partial / native Flow status, diff, stage, unstage and commit previously accepted cross-platform; branch list/create/switch accepted by CI #40117614745 on Ubuntu/macOS (PR #37 merged); physical-browser verification missing; branch deletion, remote tracking and merge missing | Status, diff, stage, unstage, commit and branch operations |
 | Help pane | partial / browser Python live-global/builtin docstrings and installed R Rd help wired; Node/V8 contract tests, live Pyodide/webR and physical browser unverified; Flow help missing | Context-aware language/function docs |
 | Find / replace / cross-file search | partial / Node + V8-tested | Literal in-buffer find next/previous, single/all replacement and project-wide search implemented; incremental indexing, regex and physical-browser verification missing |
 | Percent-delimited source cells | partial / lexical scanner unified across native editor and Pages, Node/HTTP acceptance pending; physical-browser execution unverified | Run only the active `# %%` code cell in Flow/R/Python; markdown and empty cells do not execute |
 | Portable mixed-language FlowStudio notebooks (`.fsnb`) | partial / source and display-only outputs round-trip in Node tests; cross-platform CI accepted in PR #33; physical-browser file interaction unverified | Import/export exact Flow/R/Python tagged source and bounded saved text/PNG results, verify physical-browser round-trip, no interpreter-state restoration claims |
-| Sequential percent-cell notebooks | partial / Python and R Run All wired with explicit per-cell Python/R/Flow language tags (cross-platform CI accepted; real browser pending); bounded browser-local text/Python PNG output recovery across reload; native and physical-browser acceptance unverified | Execute cells in order, retain interpreter state, show per-cell output and stop on error |
+| Sequential percent-cell notebooks | partial / Python and R Run All wired with explicit per-cell Python/R/Flow language tags (cross-platform CI accepted; opt-in native Rscript notebook route proposed; real browser pending); bounded browser-local text/Python PNG output recovery across reload; native and physical-browser acceptance unverified | Execute cells in order, retain interpreter state, show per-cell output and stop on error |
 | Jupyter `.ipynb` import/export | partial / browser UI wired and Node regression coverage; bounded output recovery is separate from `.ipynb` import/export; physical-browser file round-trip and live Python/R kernels unverified | Import/export nbformat 4 Python/R code and Markdown cells through file picker/download; validate with nbformat; preserve source; verify live outputs in Chromium and cross-platform acceptance |
 | R Markdown / Quarto | partial / offline HTML report export from Python/R percent-cell notebooks; no Quarto/R Markdown rendering | Render notebook with inline plots and HTML export; verify actual Quarto/R Markdown format compatibility |
 | Source debugger | partial / native CPython breakpoint/step/next/finish/continue/stop and bounded stack inspection passed cross-platform Flow/HTTP CI #40126891635; numeric-local conditional breakpoints accepted by Ubuntu/macOS CI #40144484561 (real CPython and Flow HTTP); opt-in raised-exception pause passed Ubuntu/macOS CI #40148434956 (real CPython and Flow HTTP); physical browser and R/Flow debugging missing | Breakpoints, stack, variables, step execution |
@@ -36,6 +36,37 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Cross-platform packaging | missing | Installable signed/reproducible macOS and Linux releases |
 | Accessibility | partial / unverified | Full keyboard navigation, screen reader labels, resize and contrast checks |
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
+
+
+
+## 2026-10-25: opt-in native Rscript execution from the browser IDE (proposed, not yet accepted)
+
+The browser IDE now offers an explicit R engine selector: the existing webR
+0.6.0 browser workspace remains the default, while the optional native
+Rscript engine (only when served by Flow on loopback port 8751) sends R source,
+console commands and notebook cells to the **existing real persistent R kernel**
+through the Flow-owned `/api/run/r` route. Native environment inspection uses
+`/api/inspect/r`, maps bounded metadata and nested list nodes to the existing
+accessible tree, and rejects malformed or oversized responses. Native syntax
+checks use the same selected kernel; native reset uses `/api/reset/r` and is
+serialized after in-flight requests. Stale results are discarded on reset.
+
+Browser webR and native Rscript are **separate workspaces**. Package management,
+data-frame previews, help, completion, variable transfer, snapshot export/import
+and graphical plot capture are not yet implemented for native Rscript mode:
+they explicitly report unavailable rather than silently operating on webR's
+different workspace. Switching back to webR restores the independent browser
+session. The existing browser-only execution path remains the default and
+GitHub Pages never connects to localhost.
+
+Tests cover native transport/intent headers, serialized requests, reset,
+source/error handling, bounded environment-tree validation, origin rejection,
+unsupported operations and UI wiring. The underlying native Flow/R HTTP
+execution and persistence were independently accepted on Linux and macOS in
+earlier CI, but **this new browser routing is unverified until the PR CI and
+physical-browser acceptance pass**. No hosted CI configuration was changed.
+This is not complete RStudio parity.
+
 
 
 ## 2026-10-25: non-executing native R syntax diagnostics (cross-platform native acceptance passed)

@@ -169,6 +169,32 @@ def main() -> None:
     status, body = request("POST", "/api/run/r", "cat(fs_multi_http)", accepted_headers)
     assert status == 200 and body == "111", (status, body)
 
+    # Conditional R breakpoints use real workspace values via Flow-owned HTTP.
+    status, body = request("POST", "/api/debug/r/start",
+                           "fs_conditional_http <- 0L\n"
+                           "fs_conditional_http <- fs_conditional_http + 1L\n"
+                           "fs_conditional_http <- fs_conditional_http + 1L\n"
+                           "cat(fs_conditional_http)", accepted_headers)
+    assert status == 200 and json.loads(body)["state"] == "paused", (status, body)
+    status, body = request("POST", "/api/debug/r/continue",
+                           "2?fs_conditional_http>=1,3?fs_conditional_http>=1", accepted_headers)
+    assert status == 200 and json.loads(body)["next_line"] == 3, (status, body)
+    status, body = request("POST", "/api/debug/r/continue", "", accepted_headers)
+    assert status == 200 and json.loads(body)["state"] == "done", (status, body)
+    assert json.loads(body)["output"] == "2", body
+    status, body = request("POST", "/api/debug/r/start",
+                           "fs_conditional_http <- 0L\n"
+                           "fs_conditional_http <- fs_conditional_http + 1L\n"
+                           "cat(fs_conditional_http)", accepted_headers)
+    assert status == 200, (status, body)
+    status, body = request("POST", "/api/debug/r/continue",
+                           "2?fs_conditional_http>=NaN", accepted_headers)
+    assert status == 422 and json.loads(body)["index"] == 1, (status, body)
+    status, body = request("POST", "/api/debug/r/continue",
+                           "3?fs_conditional_http>=2", accepted_headers)
+    assert status == 200 and json.loads(body)["state"] == "done", (status, body)
+    assert json.loads(body)["output"] == "1", body
+
     # Native Git reads and writes require the existing intent/origin gate.
     assert request("GET", "/api/git/status")[0] == 404
     for route in ("/api/git/status", "/api/git/diff", "/api/git/diff/staged",

@@ -289,6 +289,33 @@ int main(void)
         !strstr(out, "\"output\":\"111\"")) return failure(96, out);
     out = fs_r_run("cat(multi)");
     if (fs_r_status() != 200 || strcmp(out, "111") != 0) return failure(97, out);
+    /* Conditional breakpoints use real workspace numeric values. */
+    out = fs_r_debug_start("conditional_value <- 0L\nconditional_value <- conditional_value + 1L\nconditional_value <- conditional_value + 1L\ncat(conditional_value)");
+    if (fs_r_status() != 200) return failure(105, out);
+    out = fs_r_debug_continue("2?conditional_value>=1,3?conditional_value>=1");
+    if (fs_r_status() != 200 || !strstr(out, "\"next_line\":3") ||
+        !strstr(out, "\"executed_line\":2")) return failure(106, out);
+    out = fs_r_debug_evaluate("conditional_value");
+    if (fs_r_status() != 200 || !strstr(out, "\"output\":\"[1] 1"))
+        return failure(107, out);
+    out = fs_r_debug_continue("");
+    if (fs_r_status() != 200 || !strstr(out, "\"state\":\"done\"") ||
+        !strstr(out, "\"output\":\"2\"")) return failure(108, out);
+    out = fs_r_debug_start("conditional_value <- 0L\nconditional_value <- conditional_value + 1L\ncat(conditional_value)");
+    if (fs_r_status() != 200) return failure(109, out);
+    out = fs_r_debug_continue("2?conditional_value>=NaN");
+    if (fs_r_status() != 422 || !strstr(out, "\"index\":1"))
+        return failure(110, out);
+    out = fs_r_debug_continue("3?conditional_value>=2");
+    if (fs_r_status() != 200 || !strstr(out, "\"state\":\"done\"") ||
+        !strstr(out, "\"output\":\"1\"")) return failure(111, out);
+    out = fs_r_run("makeActiveBinding('conditional_tripwire', function() stop('active binding executed'), environment())");
+    if (fs_r_status() != 200) return failure(112, out);
+    out = fs_r_debug_start("conditional_value <- 0L\nconditional_value <- conditional_value + 1L\ncat(conditional_value)");
+    if (fs_r_status() != 200) return failure(113, out);
+    out = fs_r_debug_continue("3?conditional_tripwire>=1");
+    if (fs_r_status() != 200 || !strstr(out, "\"state\":\"done\"") ||
+        !strstr(out, "\"output\":\"1\"")) return failure(114, out);
     out = fs_r_debug_start("continue_value <- 99L\nstop('continue failure')\ncontinue_value <- 100L");
     if (fs_r_status() != 200) return failure(89, out);
     out = fs_r_debug_continue("");

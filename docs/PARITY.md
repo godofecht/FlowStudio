@@ -1,5 +1,27 @@
 # FlowStudio RStudio parity matrix
 
+## 2026-10-25: conditional native R top-level breakpoints (implementation; independent acceptance pending)
+
+The existing Flow-owned, origin/intent-gated `POST /api/debug/r/continue`
+endpoint accepts up to 64 future top-level source lines with optional numeric
+conditions, such as `2?counter>=3,4?counter==5`. The persistent real Rscript
+kernel evaluates conditions at the next matching top-level expression boundary,
+using only classless finite integer/double scalar bindings in its own workspace.
+It does **not** eval arbitrary breakpoint expressions, invoke active bindings,
+or dispatch overloaded comparison methods. Missing, nonnumeric and nonfinite
+values do not trigger a conditional stop. Lazy R promises may be forced by
+inspection, so breakpoint conditions are **not** guaranteed side-effect free.
+Malformed syntax and nonexistent future target lines reject before any source
+executes; false conditions allow execution to continue normally. Blank Continue
+still runs to completion. No new backend, network route or hosted CI change.
+
+Real Rscript/C IPC and live Flow HTTP acceptance cases, browser controller
+tests and an opt-in physical-browser scenario are committed. **Status: partial /
+implementation committed; native Linux/macOS CI and physical-browser
+acceptance not yet verified.** This does not implement breakpoints inside
+function bodies, step-into/over, stack-frame inspection, authenticated remote
+sessions or complete RStudio parity.
+
 ## 2026-10-25: interactive evaluation at a paused native R expression (Linux/macOS CI passed)
 
 The native R debugger now exposes Flow-owned, origin/intent-gated

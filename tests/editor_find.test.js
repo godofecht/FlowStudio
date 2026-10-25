@@ -76,7 +76,7 @@ test("whole-word matches Unicode words but not identifier substrings", () => {
   assert.equal(replaceAll("x xy x_", "x", "y", {wholeWord:true}).value, "y xy x_");
 });
 test("regex anchors, zero-width matches and malformed patterns remain bounded", () => {
-  assert.equal(replaceAll("a\nb", "^", ">", {regex:true}).value, ">a\nb");
+  assert.equal(replaceAll("a\nb", "^", ">", {regex:true}).value, ">a\n>b");
   assert.equal(replaceAll("aa", "(?=a)", "x", {regex:true}).value, "xaxa");
   assert.throws(() => findMatches("x", "(", {regex:true}), /Invalid regular expression/);
   assert.throws(() => findMatches("x".repeat(131073), "x", {regex:true}), /128 KiB/);

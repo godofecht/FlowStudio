@@ -201,7 +201,7 @@ int main(void)
         !strstr(out, "\"index\":2")) return failure(71, out);
     /* Real paused-console evaluation does not consume the next expression. */
     out = fs_r_debug_evaluate("debug_value + 2L");
-    if (fs_r_status() != 200 || !strstr(out, "\"output\":\"42\"") ||
+    if (fs_r_status() != 200 || !strstr(out, "\"output\":\"[1] 42") ||
         !strstr(out, "\"state\":\"paused\"") ||
         !strstr(out, "\"index\":2")) return failure(98, out);
     out = fs_r_debug_evaluate("debug_watch <- 99L");

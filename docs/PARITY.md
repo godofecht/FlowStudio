@@ -1,5 +1,21 @@
 # FlowStudio RStudio parity matrix
 
+## 2026-10-25: one-level conflict-checked project replacement undo (PR pending)
+
+Native and Pages editors now offer an explicit one-level undo after a fully
+successful project-wide replacement. The reverse operation uses actual
+File System Access writes with full preflight checks against disk snapshots
+and open editor tabs. External edits are never overwritten. Switching projects,
+another replacement, or an attempted undo invalidates history. Undo is
+in-memory only; multi-file writes remain non-atomic, and partial failures may
+require manual recovery. No source files are uploaded to the Flow backend.
+
+**Status: implemented / local V8 behavioral validation; independent Linux/macOS
+CI and physical-browser acceptance pending.** This improves editor safety
+without establishing RStudio parity. Native R/Flow interactive debugging and
+authenticated remote sessions remain missing.
+
+
 
 ## 2026-10-25: Pages project-wide replacement controls (Linux/macOS CI passed)
 

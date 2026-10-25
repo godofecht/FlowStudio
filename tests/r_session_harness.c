@@ -5,6 +5,7 @@ extern const char *fs_r_run(const char *);
 extern const char *fs_r_debug_start(const char *);
 extern const char *fs_r_debug_step(void);
 extern const char *fs_r_debug_continue(const char *);
+extern const char *fs_r_debug_evaluate(const char *);
 extern const char *fs_r_debug_stop(void);
 extern const char *fs_r_debug_status(void);
 extern const char *fs_r_check(const char *);
@@ -198,6 +199,24 @@ int main(void)
     out = fs_r_debug_status();
     if (fs_r_status() != 200 || !strstr(out, "\"state\":\"paused\"") ||
         !strstr(out, "\"index\":2")) return failure(71, out);
+    /* Real paused-console evaluation does not consume the next expression. */
+    out = fs_r_debug_evaluate("debug_value + 2L");
+    if (fs_r_status() != 200 || !strstr(out, "\"output\":\"[1] 42") ||
+        !strstr(out, "\"state\":\"paused\"") ||
+        !strstr(out, "\"index\":2")) return failure(98, out);
+    out = fs_r_debug_evaluate("debug_watch <- 99L");
+    if (fs_r_status() != 200 || !strstr(out, "\"state\":\"paused\"") ||
+        !strstr(out, "\"index\":2")) return failure(99, out);
+    out = fs_r_debug_evaluate("stop('watch failure')");
+    if (fs_r_status() != 422 || !strstr(out, "watch failure") ||
+        !strstr(out, "\"state\":\"paused\"") ||
+        !strstr(out, "\"index\":2")) return failure(100, out);
+    out = fs_r_debug_evaluate("debug_value <- 999L; debug_value <- 0L");
+    if (fs_r_status() != 422 || !strstr(out, "exactly one expression") ||
+        !strstr(out, "\"index\":2")) return failure(101, out);
+    out = fs_r_debug_evaluate("debug_value <- )");
+    if (fs_r_status() != 422 || !strstr(out, "R syntax error") ||
+        !strstr(out, "\"index\":2")) return failure(102, out);
     out = fs_r_debug_step();
     if (fs_r_status() != 200 || !strstr(out, "\"next_line\":3"))
         return failure(72, out);
@@ -210,6 +229,12 @@ int main(void)
     out = fs_r_run("cat(debug_value)");
     if (fs_r_status() != 200 || strcmp(out, "42") != 0)
         return failure(75, out);
+    out = fs_r_run("cat(debug_watch)");
+    if (fs_r_status() != 200 || strcmp(out, "99") != 0)
+        return failure(103, out);
+    out = fs_r_debug_evaluate("debug_value");
+    if (fs_r_status() != 422 || !strstr(out, "No paused R expression"))
+        return failure(104, out);
     out = fs_r_debug_start("debug_value <- )");
     if (fs_r_status() != 422 || !strstr(out, "R syntax error"))
         return failure(76, out);

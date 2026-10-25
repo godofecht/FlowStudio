@@ -1,5 +1,27 @@
 # FlowStudio RStudio parity matrix
 
+## 2026-10-25: interactive evaluation at a paused native R expression (PR pending)
+
+The native R debugger now exposes Flow-owned, origin/intent-gated
+`POST /api/debug/r/evaluate`. A dedicated C IPC opcode evaluates exactly
+one parsed R expression in the **real persistent R workspace** while the
+top-level expression debugger is paused. The pending source position does
+not advance, even if evaluation fails. Invalid syntax, multiple expressions,
+empty input, inputs above 4096 UTF-8 bytes, and evaluation without a paused
+session are rejected. The browser IDE exposes an explicit Evaluate control;
+R output and errors are returned as bounded debugger JSON. This is actual
+R execution, **not** a read-only watch, simulation, sandbox, or stack-frame
+evaluator: expressions may mutate variables, call functions, or perform I/O
+with the local user's permissions.
+
+Native R IPC, live Flow HTTP and browser-controller regressions are added,
+along with an opt-in physical-browser scenario. **Status: implemented;
+independent Linux/macOS CI and physical-browser acceptance pending.**
+No hosted CI configuration changed. Function breakpoints, step-into/over,
+stack-frame inspection, authenticated remote sessions and full RStudio
+parity remain unimplemented.
+
+
 ## 2026-10-25: multiple top-level R debugger breakpoints (Linux/macOS CI passed)
 
 The existing Flow-owned `POST /api/debug/r/continue` endpoint now accepts up to

@@ -4,6 +4,24 @@
 
 Legend: **unverified** = implementation exists but has not been built/executed in a validated environment; **partial** = explicitly narrower than baseline; **missing** = no implementation. A feature becomes **verified** only with repeatable end-to-end tests on macOS arm64 and Linux x86-64.
 
+## 2026-10-25: attach installed packages in persistent native R (acceptance pending)
+
+An explicit `Load installed R package` action is wired through the Flow-owned
+localhost `POST /api/packages/r/load` route, the bounded native C IPC
+transport and the real persistent Rscript interpreter. The operation calls
+R's actual `library()` for a validated package name, attaches the package
+to the current native search path, and returns real missing-package errors.
+Native and webR package workspaces remain independent. The browser retains
+webR's existing installation operation; native installation and updates are
+still **not implemented**. Loading a package executes its startup code with
+the local user's privileges and is not a sandbox.
+
+Real Rscript IPC and native Flow/HTTP acceptance assertions, browser request
+validation, reset serialization, package-panel behavior and origin/intent
+rejection tests have been added. **Status: implementation proposed; CI and
+physical-browser acceptance not yet verified.** This is not RStudio parity.
+No hosted CI configuration was changed.
+
 | Feature | 2026-10-15 state | Minimum acceptance criterion |
 | --- | --- | --- |
 | Four-pane IDE shell | unverified | Source, environment, console and plots render; keyboard/accessibility checks |
@@ -21,7 +39,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Project explorer | partial / browser Pages open/create/save and confirmed active-file delete with baseline conflict checks; 10 regression tests V8-shim passed; physical-browser deletion unverified | Open project, tree navigation, source-file creation and save; scoped delete is implemented, copy-verify-delete rename implemented with non-atomic filesystem race limits; physical-browser acceptance remains missing |
 | Data viewer | partial / CSV/TSV and browser Python/webR table snapshots; native Rscript data.frame/matrix bounded preview accepted by Ubuntu/macOS native Flow/HTTP CI #40163391932 (physical-browser pending); no remote data browsing | Interactive sortable/filterable tabular datasets including missing values |
 | Completion / language server | partial / browser Python/R runtime prefix completion cross-platform CI accepted; Flow lexical completion accepted by Ubuntu/macOS CI; explicit-type Flow struct and evolution-state member completion cross-platform CI accepted (#40095770668, 473 JS passes, 2 skips per platform, native Flow/HTTP accepted); physical-browser verification pending; full semantic/LSP completion missing | R, Flow and Python completion/diagnostics |
-| Packages pane | partial / browser Python and webR inventory/install; native Rscript read-only installed-library inventory independently accepted by Ubuntu/macOS native Flow/R HTTP CI #40168902761 (actual physical-browser acceptance pending); native R installation/update still missing | List, install, update with environment-aware package sources |
+| Packages pane | partial / browser Python and webR inventory/install; native Rscript installed-library inventory accepted by Ubuntu/macOS native Flow/R HTTP CI #40168902761; native installed-package loading proposed (cross-platform and physical-browser acceptance pending); native R installation/update still missing | List, install, update with environment-aware package sources |
 | Git pane | partial / native Flow status, diff, stage, unstage and commit previously accepted cross-platform; branch list/create/switch accepted by CI #40117614745 on Ubuntu/macOS (PR #37 merged); physical-browser verification missing; branch deletion, remote tracking and merge missing | Status, diff, stage, unstage, commit and branch operations |
 | Help pane | partial / browser Python live-global/builtin docstrings and installed R Rd help wired; Node/V8 contract tests, live Pyodide/webR and physical browser unverified; Flow help missing | Context-aware language/function docs |
 | Find / replace / cross-file search | partial / Node + V8-tested | Literal in-buffer find next/previous, single/all replacement and project-wide search implemented; incremental indexing, regex and physical-browser verification missing |

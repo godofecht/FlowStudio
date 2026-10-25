@@ -17,7 +17,7 @@ function control(value = "") {
 }
 function snapshot(state, overrides = {}) {
   return {state, ok:true, index:1, total:2, next_line:state === "paused" ? 1 : null,
-    executed_line:null, output:"", ...overrides};
+    executed_line:null, failed_line:null, output:"", ...overrides};
 }
 
 test("native R expression debugger panel only enables real localhost Rscript controls", async () => {
@@ -87,6 +87,52 @@ test("native R expression debugger panel only enables real localhost Rscript con
   assert.equal(await p.execute("start"), false);
 });
 
+test("native R debugger retains the failed line and permits postmortem workspace evaluation", async () => {
+  const source = control("x <- 100L\\nstop('failure')\\ncat('unreachable')");
+  const language = control("r"), runtime = control("native");
+  const startButton = control(), stepButton = control(), stopButton = control();
+  const continueButton = control(), targetLine = control("");
+  const watchExpression = control("x + 1L"), evaluateButton = control();
+  const statusButton = control(), target = control(), calls = [];
+  const native = {
+    available:() => true,
+    async debugRStart() { calls.push("start"); return snapshot("paused", {total:3}); },
+    async debugRCommand(action) {
+      calls.push(action);
+      if (action === "step" && calls.filter(item => item === "step").length === 1)
+        return snapshot("paused", {index:2, total:3, next_line:2});
+      if (action === "step")
+        return snapshot("error", {ok:false, index:3, total:3,
+          executed_line:2, failed_line:2, output:"Error: failure"});
+      if (action === "evaluate")
+        return snapshot("error", {index:3, total:3, failed_line:2, output:"[1] 101"});
+      if (action === "status")
+        return snapshot("error", {index:3, total:3, failed_line:2});
+      return snapshot("idle", {total:0});
+    }
+  };
+  const p = panel.create({native, source, language, runtime, startButton, stepButton,
+    continueButton, targetLine, watchExpression, evaluateButton,
+    stopButton, statusButton, target});
+  assert.equal(await p.execute("start"), true);
+  assert.equal(await p.execute("step"), true);
+  assert.equal(await p.execute("step"), false);
+  assert.match(target.textContent, /Failed expression at line 2/);
+  assert.equal(stepButton.disabled, true);
+  assert.equal(continueButton.disabled, true);
+  assert.equal(evaluateButton.disabled, false);
+  assert.equal(watchExpression.disabled, false);
+  assert.equal(await p.execute("step"), false);
+  assert.equal(await p.execute("evaluate"), true);
+  assert.match(target.textContent, /Output:\\n\[1\] 101/);
+  assert.match(target.textContent, /Failed expression at line 2/);
+  assert.equal(await p.execute("status"), true);
+  assert.match(target.textContent, /Failed expression at line 2/);
+  assert.equal(await p.execute("stop"), true);
+  assert.equal(evaluateButton.disabled, true);
+  assert.deepEqual(calls, ["start", "step", "step", "evaluate", "status", "stop"]);
+});
+
 test("Flow, C and R preserve distinct bounded debugger IPC operations", () => {
   const flow = read("src/main.flow"), c = read("src/r_session.c");
   const r = read("src/r_kernel.R"), html = read("docs/app/index.html");
@@ -147,6 +193,9 @@ test("native R debugger client rejects malformed and non-local responses", async
     await assert.rejects(native.debugRCommand("continue", "1,".repeat(64) + "2"), /comma-separated/);
     globalThis.fetch = async () => ({ok:true, status:200, headers:{get:()=>null},
       text:async () => '{"state":"paused","index":-1}'});
+    await assert.rejects(native.debugRCommand("status"), /Invalid native R debugger response/);
+    globalThis.fetch = async () => ({ok:true, status:200, headers:{get:()=>null},
+      text:async () => JSON.stringify(snapshot("error", {failed_line:-1}))});
     await assert.rejects(native.debugRCommand("status"), /Invalid native R debugger response/);
     globalThis.location = {protocol:"https:", hostname:"example.org", port:"443"};
     await assert.rejects(native.debugRStart("cat(1)"), /requires the native FlowStudio server/);

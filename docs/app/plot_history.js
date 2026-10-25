@@ -6,17 +6,18 @@ function create(target) {
   let current = null;
   function render() {
     const holder = document.createElement("div");
-    holder.setAttribute("aria-label", "Python plot history");
+    holder.setAttribute("aria-label", "Python and R plot history");
     for (const item of items) {
       const image = document.createElement("img");
-      image.alt = "Python figure " + item.number;
-      image.src = "data:image/png;base64," + item.png;
+      image.alt = (item.svg ? "R plot " : "Python figure ") + item.number;
+      image.src = item.svg ? "data:image/svg+xml;charset=utf-8," + encodeURIComponent(item.svg) :
+        "data:image/png;base64," + item.png;
       image.loading = "lazy";
       image.setAttribute("style", "max-width:100%;height:auto");
       holder.append(image);
       const save = document.createElement("a");
       save.href = image.src;
-      save.download = "flowstudio-figure-" + item.number + ".png";
+      save.download = "flowstudio-figure-" + item.number + (item.svg ? ".svg" : ".png");
       save.textContent = "Save figure " + item.number;
       holder.append(save);
       const zoom = document.createElement("button");
@@ -38,10 +39,14 @@ function create(target) {
     if (!Array.isArray(plots)) return 0;
     let count = 0;
     for (const plot of plots) {
-      if (!plot || !Number.isSafeInteger(plot.number) || plot.number < 0 ||
-          typeof plot.png !== "string" || plot.png.length > 1398104 ||
-          !plot.png.startsWith("iVBORw0KGgo") || !/^[A-Za-z0-9+/=]+$/.test(plot.png)) continue;
-      items.push({number:plot.number, png:plot.png});
+      if (!plot || !Number.isSafeInteger(plot.number) || plot.number < 0) continue;
+      if (typeof plot.svg === "string" && new TextEncoder().encode(plot.svg).length <= 60000 &&
+          /<svg(?:\\s|>)/.test(plot.svg) && plot.svg.includes("</svg>")) {
+        items.push({number:plot.number, svg:plot.svg});
+      } else if (typeof plot.png === "string" && plot.png.length <= 1398104 &&
+                 plot.png.startsWith("iVBORw0KGgo") && /^[A-Za-z0-9+/=]+$/.test(plot.png)) {
+        items.push({number:plot.number, png:plot.png});
+      } else continue;
       count++;
     }
     while (items.length > LIMIT) items.shift();

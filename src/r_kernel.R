@@ -18,7 +18,56 @@ read_exact <- function(count) {
     value
 }
 
+
+# Lazy SVG device: a plot opens a real graphics device only when R draws.
+# The interpreter remains persistent; each execution owns its temporary plot.
+last_plot_svg <- NULL
+last_plot_warning <- NULL
+begin_plot_capture <- function() {
+    path <- NULL
+    device <- NULL
+    original <- getOption("device")
+    options(device = function(...) {
+        path <<- tempfile("flowstudio-r-plot-", fileext = ".svg")
+        grDevices::svg(filename = path, width = 7, height = 5)
+        device <<- as.integer(grDevices::dev.cur())
+    })
+    function() {
+        options(device = original)
+        devices <- grDevices::dev.list()
+        if (!is.null(device) && !is.null(devices) && device %in% devices) {
+            try(grDevices::dev.off(which = device), silent = TRUE)
+        }
+        if (is.null(path)) return(invisible(NULL))
+        on.exit(unlink(path), add = TRUE)
+        if (!file.exists(path)) return(invisible(NULL))
+        bytes <- file.info(path)$size
+        if (!is.finite(bytes) || bytes <= 0) return(invisible(NULL))
+        if (bytes > 60000L) {
+            last_plot_warning <<- "Native R SVG exceeds the 60 KiB capture limit."
+            return(invisible(NULL))
+        }
+        svg <- tryCatch(readChar(path, nchars = as.integer(bytes), useBytes = TRUE),
+                        error = function(error) NULL)
+        if (is.null(svg) || !grepl("<svg", svg, fixed = TRUE)) {
+            last_plot_warning <<- "Native R SVG capture could not be read."
+            return(invisible(NULL))
+        }
+        svg <- iconv(svg, from = "UTF-8", to = "UTF-8", sub = NA_character_)
+        if (is.na(svg)) {
+            last_plot_warning <<- "Native R SVG capture contains invalid UTF-8."
+        } else {
+            last_plot_svg <<- svg
+        }
+        invisible(NULL)
+    }
+}
+
 evaluate_source <- function(source) {
+    last_plot_svg <<- NULL
+    last_plot_warning <<- NULL
+    finish_plot <- begin_plot_capture()
+    on.exit(finish_plot(), add = TRUE)
     output_file <- tempfile("flowstudio-r-")
     output_connection <- file(output_file, open = "wt", encoding = "UTF-8")
     original_sinks <- sink.number()
@@ -94,6 +143,17 @@ json_quote <- function(value) {
         intToUtf8(point)
     }, character(1), USE.NAMES = FALSE)
     paste0('"', paste0(escaped, collapse = ""), '"')
+}
+
+# Plot retrieval is read-only and never evaluates source. JSON stays bounded.
+plot_snapshot <- function() {
+    svg <- if (is.null(last_plot_svg)) "null" else json_quote(last_plot_svg)
+    warning <- if (is.null(last_plot_warning)) "null" else json_quote(last_plot_warning)
+    json <- paste0('{"svg":', svg, ',"warning":', warning, "}")
+    if (nchar(json, type = "bytes") > 131000L) {
+        json <- '{"svg":null,"warning":"Native R SVG JSON exceeds the IPC limit."}'
+    }
+    list(success = TRUE, payload = charToRaw(enc2utf8(json)))
 }
 
 # Inspect only ordinary R lists, not S3/S4 objects or arbitrary methods.
@@ -301,11 +361,11 @@ repeat {
     header <- read_exact(9L)
     if (is.null(header)) break
     header_text <- rawToChar(header)
-    if (!grepl("^[ECIT][0-9a-f]{8}$", header_text)) break
+    if (!grepl("^[ECITP][0-9a-f]{8}$", header_text)) break
     length_text <- substr(header_text, 2L, 9L)
     length_value <- strtoi(length_text, base = 16L)
     if (is.na(length_value) || length_value > MAX_SOURCE ||
-        (substr(header_text, 1L, 1L) == "I" && length_value != 0L)) break
+        (substr(header_text, 1L, 1L) %in% c("I", "P") && length_value != 0L)) break
     payload <- read_exact(length_value)
     if (is.null(payload)) break
     source <- if (length(payload) == 0L) "" else tryCatch(
@@ -314,6 +374,8 @@ repeat {
     )
     result <- if (substr(header_text, 1L, 1L) == "I") {
         inspect_workspace()
+    } else if (substr(header_text, 1L, 1L) == "P") {
+        plot_snapshot()
     } else if (is.na(source)) {
         list(success = FALSE, payload = charToRaw("Invalid UTF-8 source."))
     } else if (substr(header_text, 1L, 1L) == "C") {

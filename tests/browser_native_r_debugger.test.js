@@ -149,6 +149,7 @@ test("Flow, C and R preserve distinct bounded debugger IPC operations", () => {
   assert.match(c, /request_r\(\x27W\x27/);
   assert.match(smoke, /\/api\/debug\/r\/evaluate/);
   assert.match(html, /id="rDebugEvaluate"/);
+  assert.match(html, /id="rDebugFrame"/);
   assert.match(html, /id="rDebugContinue"/);
   assert.match(r, /expressions_override = expression/);
   assert.match(r, /debugger is paused; finish or stop/);
@@ -199,6 +200,87 @@ test("native R debugger client rejects malformed and non-local responses", async
     await assert.rejects(native.debugRCommand("status"), /Invalid native R debugger response/);
     globalThis.location = {protocol:"https:", hostname:"example.org", port:"443"};
     await assert.rejects(native.debugRStart("cat(1)"), /requires the native FlowStudio server/);
+  } finally {
+    globalThis.location = previous.location;
+    globalThis.fetch = previous.fetch;
+  }
+});
+
+test("postmortem R frame selector evaluates in retained function environments", async () => {
+  const source = control("outer <- function(x) stop('fail')\\nouter(41L)");
+  const language = control("r"), runtime = control("native");
+  const startButton = control(), stepButton = control(), stopButton = control();
+  const continueButton = control(), targetLine = control("");
+  const watchExpression = control("local_inner"), frameInput = control("0");
+  const evaluateButton = control(), statusButton = control(), target = control();
+  const calls = [];
+  const frames = [
+    {id:1, call:"outer(41L)", locals:["local_outer", "v"]},
+    {id:2, call:"inner(local_outer)", locals:["local_inner", "w"]}
+  ];
+  const native = {
+    available:() => true,
+    async debugRStart() { return snapshot("paused", {total:2, index:1}); },
+    async debugRCommand(action, line, frame) {
+      calls.push([action, line, frame]);
+      if (action === "step" && calls.filter(item => item[0] === "step").length === 1)
+        return snapshot("paused", {total:2, index:2});
+      if (action === "step") return snapshot("error", {
+        ok:false, index:3, total:2, failed_line:2, output:"failure", frames});
+      if (action === "evaluate") return snapshot("error", {
+        index:3, total:2, failed_line:2, output:"[1] 43", frames});
+      if (action === "status") return snapshot("error", {
+        index:3, total:2, failed_line:2, frames});
+      return snapshot("idle", {index:1, total:0, frames:[]});
+    }
+  };
+  const p = panel.create({native, source, language, runtime, startButton, stepButton,
+    continueButton, targetLine, watchExpression, frameInput, evaluateButton,
+    stopButton, statusButton, target});
+  assert.equal(frameInput.disabled, true);
+  assert.equal(await p.execute("start"), true);
+  assert.equal(await p.execute("step"), true);
+  assert.equal(await p.execute("step"), false);
+  assert.match(target.textContent, /Postmortem frame 2: inner\\(local_outer\\)/);
+  assert.match(target.textContent, /local_inner/);
+  assert.equal(frameInput.disabled, false);
+  frameInput.value = "2";
+  assert.equal(await p.execute("evaluate"), true);
+  assert.deepEqual(calls.at(-1), ["evaluate", "local_inner", 2]);
+  frameInput.value = "3";
+  assert.equal(await p.execute("evaluate"), false);
+  assert.equal(calls.length, 3);
+  frameInput.value = "1";
+  assert.equal(await p.execute("status"), true);
+  assert.equal(frameInput.value, "1");
+  assert.equal(await p.execute("stop"), true);
+  assert.equal(frameInput.value, "0");
+  assert.equal(frameInput.disabled, true);
+});
+
+test("native R frame evaluation protocol validates indexes and frame metadata", async () => {
+  const native = require("../docs/app/native_flow.js");
+  const previous = {location:globalThis.location, fetch:globalThis.fetch};
+  try {
+    globalThis.location = {protocol:"http:", hostname:"127.0.0.1", port:"8751"};
+    const bodies = [];
+    globalThis.fetch = async (url, options) => {
+      bodies.push(options.body);
+      return {ok:true, status:200, headers:{get:()=>null},
+        text:async () => JSON.stringify(snapshot("error", {
+          index:2, total:2, failed_line:2,
+          frames:[{id:1, call:"outer(41L)", locals:["v", "local_outer"]}]}))};
+    };
+    const result = await native.debugRCommand("evaluate", "local_outer", 1);
+    assert.equal(result.frames[0].locals[1], "local_outer");
+    assert.equal(bodies[0], "@1\\nlocal_outer");
+    await assert.rejects(native.debugRCommand("evaluate", "x", 9), /Invalid retained/);
+    await assert.rejects(native.debugRCommand("step", "", 1), /Only R evaluate/);
+    await assert.rejects(native.debugRCommand("evaluate", "x".repeat(4095), 1), /4096 bytes/);
+    globalThis.fetch = async () => ({ok:true, status:200, headers:{get:()=>null},
+      text:async () => JSON.stringify(snapshot("error", {
+        frames:[{id:2, call:"invalid", locals:[]}]}))});
+    await assert.rejects(native.debugRCommand("status"), /Invalid native R debugger response/);
   } finally {
     globalThis.location = previous.location;
     globalThis.fetch = previous.fetch;

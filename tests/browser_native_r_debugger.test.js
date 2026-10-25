@@ -25,12 +25,14 @@ test("native R expression debugger panel only enables real localhost Rscript con
   const language = control("r"), runtime = control("browser");
   const startButton = control(), stepButton = control(), stopButton = control();
   const continueButton = control(), targetLine = control("2");
+  const watchExpression = control("a + 1L"), evaluateButton = control();
   const statusButton = control(), target = control(), calls = [];
   const native = {
     available:() => true,
     async debugRStart(code) { calls.push(["start", code]); return snapshot("paused"); },
     async debugRCommand(action, line) {
       calls.push([action, line]);
+      if (action === "evaluate") return snapshot("paused", {output:"42"});
       if (action === "continue" && (line === "2" || line === "2,3"))
         return snapshot("paused", {index:2, next_line:2, executed_line:1});
       return action === "step" ? snapshot("done", {index:3, executed_line:2, output:"42"}) :
@@ -38,7 +40,8 @@ test("native R expression debugger panel only enables real localhost Rscript con
     }
   };
   const p = panel.create({native, source, language, runtime, startButton, stepButton,
-    continueButton, targetLine, stopButton, statusButton, target});
+    continueButton, targetLine, watchExpression, evaluateButton,
+    stopButton, statusButton, target});
   assert.equal(startButton.disabled, true);
   runtime.value = "native";
   runtime.emit("change");
@@ -49,6 +52,13 @@ test("native R expression debugger panel only enables real localhost Rscript con
   assert.equal(stepButton.disabled, false);
   assert.match(target.textContent, /paused/);
   assert.equal(continueButton.disabled, false);
+  assert.equal(evaluateButton.disabled, false);
+  watchExpression.value = "";
+  assert.equal(await p.execute("evaluate"), false);
+  watchExpression.value = "a + 1L";
+  assert.equal(await p.execute("evaluate"), true);
+  assert.match(target.textContent, /Output:\n42/);
+  assert.equal(stepButton.disabled, false);
   targetLine.value = "abc";
   assert.equal(await p.execute("continue"), false);
   targetLine.value = "2,,3";
@@ -62,7 +72,8 @@ test("native R expression debugger panel only enables real localhost Rscript con
   assert.equal(await p.execute("step"), true);
   assert.match(target.textContent, /Output:\n42/);
   assert.equal(stepButton.disabled, true);
-  assert.deepEqual(calls, [["start", source.value], ["continue", "2,3"], ["continue", "2"], ["step", ""]]);
+  assert.deepEqual(calls, [["start", source.value], ["evaluate", "a + 1L"],
+    ["continue", "2,3"], ["continue", "2"], ["step", ""]]);
   assert.equal(await p.execute("stop"), true);
   assert.equal(startButton.disabled, false);
   language.value = "python";
@@ -82,6 +93,11 @@ test("Flow, C and R preserve distinct bounded debugger IPC operations", () => {
   }
   assert.match(r, /debug_step <- function\(\)/);
   assert.match(r, /debug_continue <- function\(target_line\)/);
+  assert.match(r, /debug_evaluate <- function\(source\)/);
+  assert.match(flow, /"\/api\/debug\/r\/evaluate"/);
+  assert.match(c, /request_r\(\x27W\x27/);
+  assert.match(smoke, /\/api\/debug\/r\/evaluate/);
+  assert.match(html, /id="rDebugEvaluate"/);
   assert.match(html, /id="rDebugContinue"/);
   assert.match(r, /expressions_override = expression/);
   assert.match(r, /debugger is paused; finish or stop/);
@@ -109,11 +125,15 @@ test("native R debugger client rejects malformed and non-local responses", async
     await assert.rejects(native.debugRCommand("invalid"), /Unknown native R debugger action/);
     await assert.rejects(native.debugRCommand("continue", 0), /positive source line/);
     await assert.rejects(native.debugRCommand("step", 3), /Only R continue/);
+    await assert.rejects(native.debugRCommand("evaluate", ""), /requires 1 to 4096/);
+    await native.debugRCommand("evaluate", "a + 1L");
+    assert.equal(calls[1].url, "/api/debug/r/evaluate");
+    assert.equal(calls[1].opts.body, "a + 1L");
     await native.debugRCommand("continue", 3);
-    assert.equal(calls[1].url, "/api/debug/r/continue");
-    assert.equal(calls[1].opts.body, "3");
+    assert.equal(calls[2].url, "/api/debug/r/continue");
+    assert.equal(calls[2].opts.body, "3");
     await native.debugRCommand("continue", "3,7,12");
-    assert.equal(calls[2].opts.body, "3,7,12");
+    assert.equal(calls[3].opts.body, "3,7,12");
     await assert.rejects(native.debugRCommand("continue", "3,,7"), /comma-separated/);
     await assert.rejects(native.debugRCommand("continue", "1,".repeat(64) + "2"), /comma-separated/);
     globalThis.fetch = async () => ({ok:true, status:200, headers:{get:()=>null},

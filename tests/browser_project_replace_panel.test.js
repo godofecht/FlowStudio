@@ -58,6 +58,7 @@ function fixture(confirmChange = () => true) {
   const root = directory("work", [
     ["a.R", first.handle()], ["b.py", second.handle()]
   ]);
+  let selectedRoot = root;
   const source=node(""), filename=node(), language=node("r"), tree=node();
   source.value="start"; language.value="r";
   const messages=[];
@@ -66,7 +67,7 @@ function fixture(confirmChange = () => true) {
     openFolderButton:node(), saveFileButton:node(), newFileButton:node(),
     status:m=>messages.push(m), onDraft:()=>{},
     setFilename:(_,name)=>{filename.textContent=name;},
-    picker:async()=>root, confirmChange, promptName:()=>null
+    picker:async()=>selectedRoot, confirmChange, promptName:()=>null
   });
   const query=node("x"), replacement=node("y");
   query.value="x"; replacement.value="y";
@@ -80,6 +81,7 @@ function fixture(confirmChange = () => true) {
   return {
     first,second,root,source,workspace,panel,query,replacement,regex,wholeWord,
     previewButton,applyButton,output,messages,
+    selectRoot(next){selectedRoot=next;},
     cleanup(){global.document=previousDocument;}
   };
 }
@@ -147,6 +149,7 @@ test("Pages rejects project switches after preview",async()=>{
   try {
     await f.workspace.choose();
     await f.panel.preview();
+    f.selectRoot(directory("other", []));
     await f.workspace.choose();
     assert.equal(await f.panel.apply(),false);
     assert.match(f.output.textContent,/Project changed since replacement preview/);

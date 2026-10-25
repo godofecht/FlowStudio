@@ -1,5 +1,29 @@
 # FlowStudio RStudio parity matrix
 
+## 2026-10-25: native editor F12 go-to-definition (implementation; independent CI pending)
+
+The Flow-served native editor now resolves a source identifier at the caret
+to an actual declaration in the active Flow, R or Python buffer. If the active
+buffer has no matching declaration, it searches only already-open tabs of the
+same language and switches tabs **only when exactly one definition exists**.
+Ambiguous cross-tab matches are refused. F12 and Edit > Go to definition
+navigate to the declaration's line and column; no source is executed, no
+filesystem permission is requested, and no server route or hosted CI workflow
+changes. Lexical checks reject identifiers in comments, quoted text and Python
+triple-quoted strings. The existing bounded outline scanner supplies the
+declarations. This is a best-effort source-local lookup, **not** a language
+server: imports, dynamic bindings, member resolution, local variables and
+unopened project files are not resolved.
+
+Added automated Node regression cases for Flow/R/Python, comment/string
+exclusion, nearest preceding definitions, unique/ambiguous open tabs and F12
+wiring. The new source resolver and all inline editor scripts passed direct
+local V8 validation. **Status: partial / independent Node and native
+Linux/macOS CI pending; physical-browser interaction unverified.** No
+RStudio parity claim is made; live function-level R debugging, authenticated
+remote sessions and physical-browser interpreter acceptance remain missing.
+
+
 ## 2026-10-25: retained R postmortem user-function frames (implementation; validation pending)
 
 The persistent native Rscript kernel now captures up to eight **actual lexical

@@ -133,6 +133,7 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
         <button type="button" role="menuitem" data-command="findInProject">Find in project</button>
         <hr>
         <button type="button" role="menuitem" data-command="goToSymbol">Go to symbol…<kbd>Ctrl+Shift+O</kbd></button>
+        <button type="button" role="menuitem" data-command="goToDefinition">Go to definition<kbd>F12</kbd></button>
       </div>
     </div>
     <div class="menu">
@@ -1742,6 +1743,12 @@ document.addEventListener("keydown", event => {
     createUntitled();
     return;
   }
+  if (event.key === "F12" && event.target === src &&
+      !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) {
+    event.preventDefault();
+    goToDefinition();
+    return;
+  }
   if (command && event.shiftKey && !event.altKey && event.key.toLowerCase() === "o") {
     event.preventDefault();
     goToSymbol();
@@ -1803,6 +1810,7 @@ const commands = Object.freeze({
   findInProject: () => el("projectSearch").focus(),
   showOutline: () => el("tab-outline").click(),
   goToSymbol: () => goToSymbol(),
+  goToDefinition: () => goToDefinition(),
   refreshOutline: () => refreshOutline(),
   run: () => el("run").click(),
   runCell: () => el("runCell").click(),
@@ -1819,7 +1827,7 @@ const commands = Object.freeze({
     if (splitter) splitter.hidden = hide;
   },
   refreshEnvironment: () => el("refreshPythonEnvironment").click(),
-  shortcuts: () => status("Ctrl+Enter run · Ctrl+Shift+Enter cell · Ctrl+S save · Ctrl+W close tab · Ctrl+Tab next tab · Ctrl+F find · Ctrl+H replace · Ctrl+Shift+O outline", "ok"),
+  shortcuts: () => status("Ctrl+Enter run · Ctrl+Shift+Enter cell · Ctrl+S save · Ctrl+W close tab · Ctrl+Tab next tab · Ctrl+F find · Ctrl+H replace · Ctrl+Shift+O outline · F12 definition", "ok"),
   about: () => status("FlowStudio 0.1.0-alpha.1 · Flow-first local IDE · execution on 127.0.0.1:8751 only", "ok")
 });
 if (typeof window !== "undefined") {
@@ -1854,6 +1862,36 @@ function refreshOutline() {
 function scheduleOutlineRefresh() {
   if (outlineTimer) clearTimeout(outlineTimer);
   outlineTimer = setTimeout(() => { outlineTimer = 0; refreshOutline(); }, 250);
+}
+function goToDefinition() {
+  try {
+    const name = FlowStudioSymbols.identifierAt(language.value, src.value, src.selectionStart);
+    if (!name) {
+      status("Place the caret on a Flow, R or Python identifier.", "error");
+      return false;
+    }
+    const local = FlowStudioSymbols.findDefinition(
+      language.value, src.value, name, src.selectionStart);
+    if (local) {
+      revealPosition(local.line, local.column);
+      status("Definition: " + name + " (line " + local.line + ")", "ok");
+      return true;
+    }
+    const current = activeDocument();
+    const match = FlowStudioSymbols.uniqueOpenDefinition(
+      language.value, documents.list(), name, current ? current.id : null);
+    if (match.state === "unique" && activateDocument(match.documentId)) {
+      revealPosition(match.symbol.line, match.symbol.column);
+      status("Definition: " + name + " in another open tab", "ok");
+      return true;
+    }
+    status(match.state === "ambiguous"
+      ? "Multiple open files define " + name + "; select a file explicitly."
+      : "No definition of " + name + " found in open source buffers.", "error");
+  } catch (error) {
+    status("Definition navigation: " + (error.message || String(error)), "error");
+  }
+  return false;
 }
 function goToSymbol() {
   const tab = el("tab-outline");

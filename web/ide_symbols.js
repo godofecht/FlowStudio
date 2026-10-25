@@ -148,7 +148,118 @@ function parse(language, text) {
   return symbols;
 }
 
-const api = Object.freeze({ parse, glyph, clip, MAX_SOURCE, MAX_SYMBOLS, MAX_LINE, LANGUAGES, GLYPHS });
+
+/* F12 navigation is deliberately lexical and limited to open source buffers.
+ * It does not pretend to resolve imports, dynamic R bindings or Python members.
+ * Reject comments/strings and ambiguous cross-document definitions rather
+ * than navigating to an arbitrary symbol with a matching spelling. */
+function isCodeAt(language, text, offset) {
+  let quote = "";
+  let comment = false;
+  let escaped = false;
+  for (let index = 0; index < offset; index++) {
+    const char = text[index];
+    if (comment) {
+      if (char === "\n") comment = false;
+      continue;
+    }
+    if (quote) {
+      if (quote.length === 3) {
+        if (text.slice(index, index + 3) === quote) {
+          index += 2;
+          quote = "";
+        }
+      } else if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === quote) {
+        quote = "";
+      }
+      continue;
+    }
+    if (char === "#") {
+      comment = true;
+    } else if (char === "'" || char === '"' || (language === "r" && char === "\`")) {
+      if (language === "python" && text.slice(index, index + 3) === char.repeat(3)) {
+        quote = char.repeat(3);
+        index += 2;
+      } else {
+        quote = char;
+      }
+    }
+  }
+  return !comment && !quote;
+}
+
+function identifierAt(language, text, offset) {
+  if (!LANGUAGES.includes(language) || typeof text !== "string" ||
+      text.length > MAX_SOURCE || !Number.isInteger(offset) ||
+      offset < 0 || offset > text.length) return null;
+  const part = language === "r" ? /[A-Za-z0-9._]/ : /[A-Za-z0-9_]/;
+  let start = offset;
+  if (start >= text.length || !part.test(text[start])) start--;
+  if (start < 0 || !part.test(text[start])) return null;
+  let end = start + 1;
+  while (start > 0 && part.test(text[start - 1])) start--;
+  while (end < text.length && part.test(text[end])) end++;
+  const name = text.slice(start, end);
+  const valid = language === "r"
+    ? /^[A-Za-z._][A-Za-z0-9._]*$/
+    : /^[A-Za-z_][A-Za-z0-9_]*$/;
+  if (!valid.test(name) || !isCodeAt(language, text, start)) return null;
+  // A dotted member is not necessarily a declaration in this document.
+  if (language !== "r" && (text[start - 1] === "." || text[end] === ".")) return null;
+  return name;
+}
+
+function findDefinitions(language, text, name) {
+  if (!LANGUAGES.includes(language) || typeof name !== "string" ||
+      !/^[A-Za-z._][A-Za-z0-9._]*$/.test(name)) return [];
+  const matches = parse(language, text).filter(symbol =>
+    symbol.kind !== "import" && symbol.name === name);
+  if (!matches.length) return [];
+  const starts = [0];
+  for (let index = 0; index < text.length; index++)
+    if (text[index] === "\n") starts.push(index + 1);
+  return matches.filter(symbol =>
+    isCodeAt(language, text, starts[symbol.line - 1] + symbol.column - 1));
+}
+
+function findDefinition(language, text, name, offset) {
+  const matches = findDefinitions(language, text, name);
+  if (!matches.length) return null;
+  if (!Number.isInteger(offset) || offset < 0 || offset > text.length)
+    return matches[0];
+  const line = text.slice(0, offset).split("\n").length;
+  const earlier = matches.filter(symbol => symbol.line <= line);
+  return earlier.length ? earlier[earlier.length - 1] : matches[0];
+}
+
+function definitionAt(language, text, offset) {
+  const name = identifierAt(language, text, offset);
+  return name ? findDefinition(language, text, name, offset) : null;
+}
+
+/* Search only buffers already opened by the user. A single unambiguous
+ * definition is required before switching tabs; never read other disk files. */
+function uniqueOpenDefinition(language, documents, name, currentId) {
+  if (!Array.isArray(documents) || documents.length > 24)
+    throw new RangeError("Definition navigation supports up to 24 open documents.");
+  let found = null;
+  for (const doc of documents) {
+    if (!doc || doc.id === currentId || doc.language !== language) continue;
+    const matches = findDefinitions(language, doc.text, name);
+    for (const symbol of matches) {
+      if (found) return { state: "ambiguous" };
+      found = { state: "unique", documentId: doc.id, symbol };
+    }
+  }
+  return found || { state: "missing" };
+}
+
+const api = Object.freeze({ parse, glyph, clip, identifierAt, findDefinitions, findDefinition,
+  definitionAt, uniqueOpenDefinition, MAX_SOURCE, MAX_SYMBOLS, MAX_LINE, LANGUAGES, GLYPHS });
 root.FlowStudioSymbols = api;
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

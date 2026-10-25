@@ -24,9 +24,16 @@ not parse the language, skips lines over 400 characters, reports at most 400
 symbols, and never sends buffer text to the server. The outline re-reads the
 buffer 250 ms after typing stops and whenever the active document changes.
 
+Press **F12** with the caret on a Flow, R or Python identifier to navigate to
+its declaration in the active buffer. If absent, FlowStudio checks other
+already-open same-language tabs and switches only when there is exactly one
+match. The lookup is lexical and conservative, not semantic: imports,
+members, local bindings and unopened files are not resolved. It never executes
+source or reads additional files.
+
 Run its tests with:
 
-    node --test tests/ide_symbols.test.js tests/ide_outline.test.js
+    node --test tests/ide_symbols.test.js tests/ide_outline.test.js tests/ide_definition.test.js
 
 The browser can open several source files at once as tabs, save them, choose a local project folder, lazily browse its source tree, create a source file in the project root, refresh the tree, search project files for literal text with exact match navigation, run the selected text or whole buffer as Flow, R or Python, and display captured stdout/stderr. Project operations use the browser File System Access API and are unavailable in browsers without folder-picker support. The native server retains separate Python and R interpreter processes between evaluations, with explicit reset controls. These are single-user localhost sessions, not restart-persistent or remotely isolated kernels.
 

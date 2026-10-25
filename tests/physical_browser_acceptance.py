@@ -146,7 +146,7 @@ def test_native_r(page, timeout: int):
     assert "beta" in page.locator("#workspace").inner_text()
     # Real Rscript SVG device -> Flow plot endpoint -> browser plot history.
     run_source(page, "r",
-               "plot(c(1, 2, 3))\\ncat('native SVG ready 42\\\\n')",
+               "plot(c(1, 2, 3))\ncat('native SVG ready 42\\n')",
                "native SVG ready 42", timeout)
     plot_image = page.locator("#workspace img[alt^='R plot']").first
     plot_image.wait_for(timeout=timeout)

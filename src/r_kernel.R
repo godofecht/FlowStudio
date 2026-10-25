@@ -28,19 +28,24 @@ begin_plot_capture <- function() {
     path <- tempfile("flowstudio-r-plot-", fileext = ".pdf")
     grDevices::pdf(file = path, width = 7, height = 5, onefile = TRUE)
     device <- as.integer(grDevices::dev.cur())
+    plotted <- FALSE
+    previous_hook <- getHook("plot.new")
+    setHook("plot.new", function() { plotted <<- TRUE }, action = "append")
     function() {
+        setHook("plot.new", previous_hook, action = "replace")
         devices <- grDevices::dev.list()
         if (!is.null(devices) && device %in% devices) {
             try(grDevices::dev.off(which = device), silent = TRUE)
         }
         on.exit(unlink(path), add = TRUE)
+        if (!plotted) return(invisible(NULL))
         if (!file.exists(path)) {
-            last_plot_warning <<- "diagnostic: PDF file missing after dev.off"
+            last_plot_warning <<- "Native R PDF file was not produced."
             return(invisible(NULL))
         }
         bytes <- file.info(path)$size
         if (!is.finite(bytes) || bytes <= 0) {
-            last_plot_warning <<- paste0("diagnostic: PDF size=", bytes)
+            last_plot_warning <<- "Native R PDF file was empty."
             return(invisible(NULL))
         }
         if (bytes > 60000L) {
@@ -52,13 +57,6 @@ begin_plot_capture <- function() {
         close(reader)
         if (length(raw) < 4L || !identical(raw[1:4], charToRaw("%PDF"))) {
             last_plot_warning <<- "Native R PDF capture was invalid."
-            return(invisible(NULL))
-        }
-        # A device without a drawn page has no /Type /Page dictionary.
-        printable <- paste(rawToChar(raw, multiple = TRUE), collapse = "")
-        if (!grepl("/Type /Page([^sA-Za-z]|$)", printable, perl = TRUE)) {
-            last_plot_warning <<- paste0("diagnostic: no PDF page, bytes=", bytes,
-                                         ", hasPages=", grepl("/Type /Pages", printable, fixed = TRUE))
             return(invisible(NULL))
         }
         last_plot_pdf <<- paste(sprintf("%02x", as.integer(raw)), collapse = "")

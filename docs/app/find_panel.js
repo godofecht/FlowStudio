@@ -3,12 +3,12 @@
 (function (global) {
 "use strict";
 const MAX_SOURCE = 2 * 1024 * 1024;
-function create({source, query, replacement, caseSensitive, status,
+function create({source, query, replacement, caseSensitive, regex, wholeWord, status,
                  nextButton, previousButton, replaceButton, allButton, document,
                  engine = global.FlowStudioEditorFind}) {
   if (!engine || !source || !query || !replacement || !status)
     throw TypeError("Source find/replace requires its editor and search engine.");
-  function options() { return {caseSensitive:!!caseSensitive.checked}; }
+  function options() { return {caseSensitive:!!caseSensitive.checked, regex:!!regex?.checked, wholeWord:!!wholeWord?.checked}; }
   function report(message) { status.textContent = message; }
   function matches() {
     try {
@@ -48,7 +48,7 @@ function create({source, query, replacement, caseSensitive, status,
       if (result.value.length > MAX_SOURCE) throw Error("Replacement exceeds the 2 MiB editor limit.");
       // setRangeText retains the browser's native editing semantics where available.
       if (typeof source.setRangeText === "function")
-        source.setRangeText(replacement.value, result.start, source.selectionEnd, "select");
+        source.setRangeText(result.value.slice(result.start, result.end), result.start, source.selectionEnd, "select");
       else source.value = result.value;
       source.setSelectionRange(result.start, result.end);
       changed();
@@ -79,10 +79,12 @@ function create({source, query, replacement, caseSensitive, status,
     const found = matches();
     if (found) report(found.matches.length + (found.truncated ? "+" : "") + " matches.");
   });
-  caseSensitive.addEventListener("change", () => {
-    const found = matches();
-    if (found) report(found.matches.length + (found.truncated ? "+" : "") + " matches.");
-  });
+  for (const toggle of [caseSensitive, regex, wholeWord]) {
+    toggle?.addEventListener("change", () => {
+      const found = matches();
+      if (found) report(found.matches.length + (found.truncated ? "+" : "") + " matches.");
+    });
+  }
   source.addEventListener("keydown", event => {
     if ((event.ctrlKey || event.metaKey) && !event.altKey &&
         (event.key.toLowerCase() === "f" || event.key.toLowerCase() === "h")) {

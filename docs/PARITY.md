@@ -23,16 +23,19 @@ earlier files changed: **multi-file writes are not atomic** and no rollback is
 claimed. The Pages project API exposes the same preview/apply methods, but the
 Pages UI does not yet expose project-wide replacement controls.
 
-**Status: partial / source implementation committed on a feature branch,
-independent CI and physical-browser acceptance pending.** Automated tests cover
-real in-memory File System Access API handle semantics, regex captures, Unicode,
-zero-write previews, stale files, open-tab protection, truncated searches,
-aborts and partial write failures. The replacement API tests passed 18/18 in
-an isolated V8 execution of the actual source; this is not Node CI or a real
-browser pass. Native editor VM integration tests were added but not yet
-independently executed. No hosted CI configuration or Flow compiler syntax
-changed. R/Flow interactive debugging, authenticated remote sessions and
-RStudio feature parity remain incomplete.
+**Status: partial / independently accepted by Linux/macOS CI; physical-browser
+acceptance pending.** [PR #55](https://github.com/godofecht/FlowStudio/pull/55)
+merged as [1aae67c](https://github.com/godofecht/FlowStudio/commit/1aae67ce7d3a25b8b717bbbd7912beecf5cf5dc0)
+after [CI #40195397710](https://github.com/godofecht/FlowStudio/actions/runs/40195397710)
+passed all four jobs on Ubuntu 24.04 and macOS 14. Each source/transport
+job passed 594 JavaScript tests (2 skipped, zero failures), including native
+editor VM integration and 18 native/Pages replacement API tests; Python
+unittest completed 76 tests (11 skipped). Both native jobs compiled the real
+Flow 2.0.0 server, passed live Flow-owned HTTP acceptance and packaged the
+platform builds. Physical-browser file-picker replacement and real Pyodide/
+webR interpreter acceptance remain unverified. No hosted CI configuration
+or Flow compiler syntax changed. R/Flow interactive debugging, authenticated
+remote sessions and RStudio feature parity remain incomplete.
 
 
 ## 2026-10-25: project-wide regex and Unicode whole-word search (cross-platform CI passed)

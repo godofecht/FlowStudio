@@ -138,7 +138,7 @@ def test_native_r(page, timeout: int):
     # Real DOM View -> Flow POST -> persistent R table snapshot -> accessible grid.
     run_source(page, "r",
                "fs_native_frame <- data.frame(label=c('alpha', 'beta'), "
-               "score=c(42L, NA_integer_))\\ncat('native table ready 42\\n')",
+               "score=c(42L, NA_integer_))\ncat('native table ready 42\\n')",
                "native table ready 42", timeout)
     page.get_by_role("button", name="View fs_native_frame as table").click()
     page.get_by_role("heading", name="Snapshot: fs_native_frame").wait_for(timeout=timeout)

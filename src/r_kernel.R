@@ -239,9 +239,18 @@ install_cran_package <- function(name) {
         previous_timeout <- getOption("timeout")
         on.exit(options(timeout = previous_timeout), add = TRUE)
         options(timeout = 120L)
+        # The test harness supplies an offline file:// CRAN repository through
+        # its own process environment; HTTP callers cannot select repositories.
+        test_mode <- identical(Sys.getenv("FLOWSTUDIO_R_TEST_MODE"), "1")
+        mirror <- "https://cloud.r-project.org"
+        if (test_mode) {
+            local_mirror <- Sys.getenv("FLOWSTUDIO_R_TEST_REPO")
+            if (startsWith(local_mirror, "file://")) mirror <- local_mirror
+        }
         suppressWarnings(utils::install.packages(
             pkgs = name, lib = user_library,
-            repos = c(CRAN = "https://cloud.r-project.org"),
+            repos = c(CRAN = mirror),
+            type = if (test_mode) "source" else getOption("pkgType"),
             dependencies = NA, quiet = TRUE, Ncpus = 1L))
         installed <- utils::installed.packages(lib.loc = user_library)
         if (!(name %in% installed[, "Package"]))

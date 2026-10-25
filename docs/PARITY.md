@@ -1,7 +1,7 @@
 # FlowStudio RStudio parity matrix
 
 
-## 2026-10-25: Pages project-wide replacement controls (PR #56; acceptance pending)
+## 2026-10-25: Pages project-wide replacement controls (Linux/macOS CI passed)
 
 The Pages/browser workspace now exposes a real project-wide replacement panel
 backed by the existing browser-granted File System Access project engine.
@@ -19,9 +19,19 @@ Multi-file writes are **not atomic**; failures after some files were written
 are reported as partial changes, never as rollback. Project sources are not
 uploaded to the Flow backend.
 
-**Status: implemented / new Node regression tests committed; independent
-Linux/macOS CI and physical-browser acceptance not yet verified.**
-[PR #56](https://github.com/godofecht/FlowStudio/pull/56).
+**Status: partial / independently verified Linux/macOS CI; physical-browser
+acceptance still pending.** [PR #56](https://github.com/godofecht/FlowStudio/pull/56)
+merged as [41d8315](https://github.com/godofecht/FlowStudio/commit/41d83150ac3e2f875d0b19ad2981f1a1872d9db0)
+after [CI #40199211176](https://github.com/godofecht/FlowStudio/actions/runs/40199211176)
+completed all four jobs successfully on Ubuntu 24.04 and macOS 14.
+Each source/transport job passed 604 JavaScript tests (602 passing,
+2 skipped, zero failures), alongside 76 Python unit tests.
+Both native jobs compiled Flow 2.0.0, passed real Flow-owned HTTP acceptance
+and packaged the platform builds. Earlier CI exposed missing optional-module
+guards in browser VM fixtures and a stale native embedded project engine;
+both were fixed before the successful run. The physical-browser
+file-picker scenario and real Pyodide/webR/native R acceptance were not run
+in this CI workflow.
 No hosted CI configuration or Flow compiler syntax was changed. This
 improves the Pages project UI but does not establish RStudio parity;
 physical-browser interpreter acceptance, interactive R/Flow debugging,

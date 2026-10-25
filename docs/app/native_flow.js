@@ -71,14 +71,20 @@ async function debugRStart(source) {
     throw new Error("Native R debugger requires nonempty R source.");
   return debugRResponse("/api/debug/r/start", source);
 }
+function validRTargets(value) {
+  if (typeof value !== "string" || value.length > 4096) return false;
+  if (!value) return true;
+  const tokens = value.split(",");
+  return tokens.length <= 64 && tokens.every(token =>
+    /^[1-9][0-9]{0,5}(?:\?[A-Za-z][A-Za-z0-9._]*(?:==|!=|>=|<=|>|<)-?(?:0|[1-9][0-9]{0,12})(?:\.[0-9]{1,12})?)?$/.test(token));
+}
 async function debugRCommand(action, targetLine = "") {
   if (!["step", "continue", "evaluate", "stop", "status"].includes(action))
     throw new Error("Unknown native R debugger action.");
   if (action === "continue") {
     const lines = typeof targetLine === "number" ? String(targetLine) : targetLine;
-    if (typeof lines !== "string" || (lines && (lines.length > 447 ||
-        !/^[1-9][0-9]{0,5}(?:,[1-9][0-9]{0,5}){0,63}$/.test(lines))))
-      throw new Error("R continue target must be 1 to 64 comma-separated positive source lines.");
+    if (!validRTargets(lines))
+      throw new Error("R continue target must be 1 to 64 comma-separated positive source lines with optional numeric conditions.");
     return debugRResponse("/api/debug/r/continue", lines);
   }
   if (action === "evaluate") {

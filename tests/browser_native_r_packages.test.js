@@ -167,6 +167,52 @@ test("native R install serializes with reset and discards stale results",async()
   });
   assert.deepEqual(calls,["/api/packages/r/install","/api/reset/r"]);
 });
+test("native R package removal validates names and uses Flow-owned route",async()=>{
+  const calls=[];
+  await withBrowser(localhost,async(route,options)=>{
+    calls.push([route,options]);
+    return response("Removed R package FlowStudioFixture from the FlowStudio user library.");
+  },async()=>{
+    const session=native.createRSession();
+    for(const name of ["", "a..b", "../stats", "stats;stop(1)", "a.", "x".repeat(81)]) {
+      const result=await session.removePackage(name);
+      assert.equal(result.ok,false);
+      assert.match(result.output,/Invalid R package name/);
+    }
+    const result=await session.removePackage("FlowStudioFixture");
+    assert.equal(result.ok,true);
+    assert.match(result.output,/Removed R package FlowStudioFixture/);
+  });
+  assert.equal(calls.length,1);
+  assert.equal(calls[0][0],"/api/packages/r/remove");
+  assert.equal(calls[0][1].body,"FlowStudioFixture");
+  assert.equal(calls[0][1].headers["X-FlowStudio-Intent"],"run");
+});
+test("native R package removal is blocked on Pages",async()=>{
+  await withBrowser(new URL("https://godofecht.github.io/FlowStudio/app/"),
+    ()=>{throw Error("Unexpected network");},async()=>{
+      await assert.rejects(native.createRSession().removePackage("FlowStudioFixture"),/native FlowStudio server/);
+    });
+});
+test("native R removal serializes with reset and discards stale results",async()=>{
+  let release;
+  const calls=[];
+  await withBrowser(localhost,async route=>{
+    calls.push(route);
+    if(route==="/api/packages/r/remove") await new Promise(resolve=>{release=resolve;});
+    return response(route==="/api/reset/r"?"R session reset.":"Removed R package FlowStudioFixture.");
+  },async()=>{
+    const session=native.createRSession();
+    const pending=session.removePackage("FlowStudioFixture");
+    for(let i=0;i<8&&!release;i++) await Promise.resolve();
+    assert.equal(typeof release,"function");
+    const reset=session.reset();
+    release();
+    assert.equal((await pending).ok,false);
+    assert.equal((await reset).ok,true);
+  });
+  assert.deepEqual(calls,["/api/packages/r/remove","/api/reset/r"]);
+});
 test("Flow routes installed-library inventory through real R IPC",()=>{
   const root=path.join(__dirname,"..");
   const read=name=>fs.readFileSync(path.join(root,name),"utf8");
@@ -180,4 +226,7 @@ test("Flow routes installed-library inventory through real R IPC",()=>{
   assert.match(read("src/main.flow"),/send_r_package_install\(fs_body\(\)\)/);
   assert.match(read("src/r_session.c"),/fs_r_install_package\(const char \*name\)/);
   assert.match(read("src/r_kernel.R"),/install_cran_package <- function\(name\)/);
+  assert.match(read("src/main.flow"),/send_r_package_remove\(fs_body\(\)\)/);
+  assert.match(read("src/r_session.c"),/fs_r_remove_package\(const char \*name\)/);
+  assert.match(read("src/r_kernel.R"),/remove_user_package <- function\(name\)/);
 });

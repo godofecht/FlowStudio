@@ -39,6 +39,35 @@ test("native R package panel loads installed packages without network installati
   await new Promise(resolve=>setImmediate(resolve));
   assert.deepEqual(calls,["list","install:splines","list","load:splines","list","install:splines","list"]);
 });
+test("native R package removal requires confirmation and never appears in webR",async()=>{
+  const calls=[], notices=[];
+  const target=node(),input=node("input"),installButton=node("button"),
+    listButton=node("button"),loadButton=node("button"),removeButton=node("button");
+  let native=true, confirmed=false;
+  const panel=create({document:{createElement:node},target,input,installButton,
+    listButton,loadButton,removeButton,language:()=>"r",rNative:()=>native,
+    confirmRemove:name=>{assert.equal(name,"FlowStudioFixture");return confirmed;},
+    rSession:()=>({
+      async packages(){calls.push("list");return {ok:true,packages:[]};},
+      async removePackage(name){calls.push("remove:"+name);return {ok:true};}
+    }),request:async()=>{throw Error("wrong runtime");},notice:text=>notices.push(text)});
+  assert.equal(removeButton.hidden,false);
+  input.value="FlowStudioFixture";
+  removeButton.click();
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(calls,[]);
+  assert.ok(notices.some(text=>text.includes("cancelled")));
+  confirmed=true;
+  removeButton.click();
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(calls,["remove:FlowStudioFixture","list"]);
+  assert.ok(notices.some(text=>text.includes("removed from the native library")));
+  native=false;panel.updateLanguage();
+  assert.equal(removeButton.hidden,true);
+  removeButton.click();
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(calls,["remove:FlowStudioFixture","list"]);
+});
 test("native R package panel refuses expression injection before install or load",async()=>{
   const calls=[], notices=[];
   const target=node(),input=node("input"),installButton=node("button"),listButton=node("button");

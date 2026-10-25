@@ -451,6 +451,17 @@ def main() -> None:
         status, output = request("POST", "/api/packages/r/install",
                                  "stats;stop('unsafe')", accepted_headers)
         assert status == 422 and "Invalid R package name" in output, (status, output)
+        # Removal cannot touch system libraries or evaluate arbitrary source.
+        assert request("POST", "/api/packages/r/remove", "stats")[0] == 404
+        assert request("POST", "/api/packages/r/remove", "stats",
+                       {"X-FlowStudio-Intent": "run",
+                        "Origin": "http://attacker.invalid"})[0] == 404
+        status, output = request("POST", "/api/packages/r/remove",
+                                 "stats", accepted_headers)
+        assert status == 422 and "system packages cannot be removed" in output, (status, output)
+        status, output = request("POST", "/api/packages/r/remove",
+                                 "stats;stop('unsafe')", accepted_headers)
+        assert status == 422 and "Invalid R package name" in output, (status, output)
         status, output = request("POST", "/api/run/r",
                                  "cat(flowstudio_r_value)", accepted_headers)
         assert status == 200 and output.strip() == "42", (status, output)

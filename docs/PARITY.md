@@ -1219,3 +1219,28 @@ fixture and intent/origin rejection, and packaged the executable. Merged as
 Physical-browser interaction remains unverified. Staging, commits, branches,
 remote Git and project-folder selection remain missing. No RStudio parity
 claim.
+
+
+## 2026-10-25: native R CRAN package installation (implementation; acceptance pending)
+
+The Flow-owned localhost backend now routes explicit package names through
+`POST /api/packages/r/install` to a new `N` IPC operation in the persistent
+Rscript kernel. Package names are validated in the browser and kernel;
+arbitrary R expressions, URLs, repository overrides and filesystem paths are
+rejected. New packages and required dependencies are downloaded from the
+fixed HTTPS CRAN mirror into a FlowStudio-specific user library, not the
+system library. The kernel adds that directory to `.libPaths()`, including
+on restart. The existing load-installed operation remains separately
+available in the package pane. Installation has a 180-second kernel deadline
+and a 190-second browser deadline; failures/timeout do not imply success.
+**CRAN installation executes third-party code with the local user's
+permissions; the native server is loopback-only and is not a sandbox.**
+
+Offline deterministic C/R IPC, Flow HTTP, browser transport and DOM regression
+tests verify installed-package no-download behavior, rejected names,
+session persistence, origin/intent gates, reset races and load/installation
+UI separation. **Status: partial / independent CI and real fresh-package
+download/install acceptance pending.** Physical-browser Pyodide/webR/native R
+acceptance is also pending. Package updates/removal, dependency conflict
+resolution and multi-user installation isolation remain unimplemented. No
+hosted CI configuration was changed.

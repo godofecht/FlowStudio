@@ -295,6 +295,33 @@ def test_native_r_expression_debugger(page, timeout: int):
         "() => document.querySelector('#rDebugOutput').textContent.includes('R expression debugger: idle')",
         timeout=timeout)
 
+    # Conditional R breakpoint: line 2 fails at zero; line 3 matches at one.
+    page.locator("#source").fill(
+        "fs_r_browser_condition <- 0L\n"
+        "fs_r_browser_condition <- fs_r_browser_condition + 1L\n"
+        "fs_r_browser_condition <- fs_r_browser_condition + 1L\n"
+        "cat(fs_r_browser_condition)")
+    page.locator("#rDebugStart").click()
+    page.wait_for_function(
+        "() => document.querySelector('#rDebugOutput').textContent.includes('Next expression at line 1')",
+        timeout=timeout)
+    page.locator("#rDebugTargetLine").fill(
+        "2?fs_r_browser_condition>=1,3?fs_r_browser_condition>=1")
+    page.locator("#rDebugContinue").click()
+    page.wait_for_function(
+        "() => document.querySelector('#rDebugOutput').textContent.includes('Next expression at line 3')",
+        timeout=timeout)
+    page.locator("#rDebugTargetLine").fill("")
+    page.locator("#rDebugContinue").click()
+    page.wait_for_function(
+        "() => document.querySelector('#rDebugOutput').textContent.includes('R expression debugger: done')",
+        timeout=timeout)
+    assert "Output:\n2" in page.locator("#rDebugOutput").inner_text()
+    page.locator("#rDebugStop").click()
+    page.wait_for_function(
+        "() => document.querySelector('#rDebugOutput').textContent.includes('R expression debugger: idle')",
+        timeout=timeout)
+
 
 def test_native_conditional_debugger(page, timeout: int):
     # Actual Chromium/Firefox/WebKit DOM -> Flow localhost HTTP -> CPython.

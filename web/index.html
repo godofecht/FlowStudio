@@ -1325,6 +1325,15 @@ async function runProjectSearch() {
       button.title = "Open " + hit.path + " at line " + hit.line;
       button.addEventListener("click", async () => {
         try {
+          // Re-read the granted disk file before switching tabs: an already
+          // open editor tab may still hold an older, cached buffer.
+          const current = await hit.handle.getFile();
+          const limit = regex ? 128 * 1024 : 1024 * 1024;
+          if (current.size > limit ||
+              (await current.text()).slice(hit.index, hit.index + hit.length) !== hit.text) {
+            status("File changed since search; search again.", "error");
+            return;
+          }
           const opened = await openEditorHandle(hit.handle, hit.path);
           if (!opened) return;
           const selected = src.value.slice(hit.index, hit.index + hit.length);

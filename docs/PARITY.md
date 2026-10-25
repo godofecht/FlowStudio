@@ -1,23 +1,29 @@
 # FlowStudio RStudio parity matrix
 
-## 2026-10-25: native R top-level continue and run-to-line (PR pending)
+## 2026-10-25: native R top-level continue and run-to-line (Linux/macOS CI passed)
 
-FlowStudio now has a Flow-owned `POST /api/debug/r/continue` route,
-native C opcode F, and a real persistent Rscript evaluator that resumes
-successive original top-level AST expressions. An optional positive source
-line pauses **before** the next later top-level expression starting on that
-line; invalid, nonexistent, or already-passed targets reject before any
-evaluation. Without a line it runs to completion or stops at the first real
-R error. The browser exposes Continue and an optional target-line field.
-Execution remains in the existing R workspace, with bounded output and
-no mock evaluator.
+FlowStudio's Flow-owned `POST /api/debug/r/continue` route sends a distinct
+native C opcode F to the persistent Rscript interpreter. Continue executes
+actual parsed top-level R expressions in the existing workspace, stopping
+before an optional future top-level source line, at completion, or on the
+first real execution error. Invalid, missing and already-passed targets reject
+without running code. The browser exposes Continue and an optional target
+line; execution output and source positions remain bounded.
 
-**Status: implemented, native cross-platform and physical-browser acceptance
-not yet verified.** Added live Rscript IPC and Flow HTTP acceptance assertions,
-browser controller/client tests, and a physical-browser scenario. These tests
-must actually pass before promotion. The feature does **not** support
-breakpoints or stepping *inside* function bodies, stack-frame evaluation,
-authenticated remote sessions, or full RStudio parity. No hosted CI changes.
+**Status: partial / independently verified native Linux/macOS acceptance;
+physical-browser acceptance pending.** [PR #60](https://github.com/godofecht/FlowStudio/pull/60)
+merged as [1dd009f](https://github.com/godofecht/FlowStudio/commit/1dd009f3f863393f9fd843ee6d6d2c26f19cfb20)
+after [CI #40218879597](https://github.com/godofecht/FlowStudio/actions/runs/40218879597)
+completed all four jobs successfully on Ubuntu 24.04 and macOS 14.
+Each source/transport job passed 621 JavaScript tests (2 skipped, 0 failed),
+76 Python unit tests (11 skipped), plus additional transport checks.
+Native jobs compiled Flow 2.0.0, exercised real Rscript IPC continuation
+and live Flow-owned HTTP acceptance, and packaged both platforms.
+The first CI attempt caught an outdated opcode-regex fixture, corrected
+before the successful run. The optional physical-browser scenario has been
+committed but **not independently executed**. This does not provide function
+breakpoints, step-into/over, stack-frame evaluation, authenticated remote
+sessions or full RStudio parity. No hosted CI configuration changed.
 
 
 ## 2026-10-25: native R top-level expression stepping (implementation; acceptance pending)

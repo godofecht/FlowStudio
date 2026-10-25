@@ -68,7 +68,35 @@ def run_console(page, language: str, code: str, output: str, timeout: int):
         f"{language} console output did not contain {output!r}: {after[len(before):]!r}")
 
 
+
+def test_editor_find(page, timeout: int):
+    # Actual textarea selection, capture expansion, whole-word and invalid regex.
+    page.locator("#source").fill("cat1 cats cat2")
+    page.locator("#findQuery").fill(r"(cat)(\d)")
+    page.locator("#findRegex").check()
+    page.locator("#replaceText").fill("$2-$1")
+    page.locator("#findNext").click()
+    selection = page.locator("#source").evaluate(
+        "(node) => [node.selectionStart, node.selectionEnd]")
+    assert selection == [0, 4], selection
+    page.locator("#replaceOne").click()
+    assert page.locator("#source").input_value() == "1-cat cats cat2"
+    page.locator("#findRegex").uncheck()
+    page.locator("#findWholeWord").check()
+    page.locator("#findQuery").fill("cat")
+    assert "1 matches" in page.locator("#findStatus").inner_text()
+    page.locator("#findRegex").check()
+    page.locator("#findQuery").fill("(")
+    assert "Invalid regular expression" in page.locator("#findStatus").inner_text()
+    assert page.locator("#source").input_value() == "1-cat cats cat2"
+    page.locator("#findRegex").uncheck()
+    page.locator("#findWholeWord").uncheck()
+    page.locator("#findQuery").fill("")
+    print("PASS: physical browser source regex/whole-word find and capture replacement")
+
+
 def test_python(page, timeout: int):
+    test_editor_find(page, timeout)
     run_source(page, "python", "fs_browser_value = 39\nprint(fs_browser_value + 3)", "42", timeout)
     run_console(page, "python", "print(fs_browser_value + 4)", "43", timeout)
     assert "fs_browser_value" in page.locator("#environment").inner_text()

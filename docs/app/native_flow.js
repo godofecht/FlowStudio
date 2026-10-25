@@ -94,7 +94,7 @@ async function checkRSyntax(code) {
   // Actual R parse() errors report <text>:LINE:COLUMN: message.
   // Transport failures have no source location and remain ordinary errors.
   const match = response.status === 422 ?
-    /(?:<text>|[^\\s:]+):(\\d+):(\\d+):\\s*([^\\r\\n]*)/.exec(response.output) : null;
+    /(?:<text>|[^\s:]+):(\d+):(\d+):\s*([^\r\n]*)/.exec(response.output) : null;
   const line = match ? Number(match[1]) : 0;
   const column = match ? Number(match[2]) : 0;
   const diagnostics = match && Number.isSafeInteger(line) && line > 0 &&

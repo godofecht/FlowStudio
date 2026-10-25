@@ -2,9 +2,12 @@
 (function (global) {
 "use strict";
 function create({project, isOpenHandle, query, replacement, caseSensitive, regex, wholeWord,
-                 previewButton, applyButton, output, notice, confirmChange}) {
+                 previewButton, applyButton, undoButton, output, notice, confirmChange}) {
   if (!project || typeof project.previewReplace !== "function" ||
-      typeof project.applyReplace !== "function" || typeof isOpenHandle !== "function")
+      typeof project.applyReplace !== "function" ||
+      typeof project.undoReplace !== "function" ||
+      typeof project.hasUndoReplace !== "function" ||
+      typeof isOpenHandle !== "function" || !undoButton)
     throw new TypeError("Project replacement requires a writable project controller.");
   let plan = null, revision = 0, working = false, controller = null;
   const controls = [query, replacement, caseSensitive, regex, wholeWord];
@@ -44,6 +47,7 @@ function create({project, isOpenHandle, query, replacement, caseSensitive, regex
     controller = new AbortController();
     working = true;
     previewButton.disabled = true;
+    undoButton.disabled = true;
     try {
       const candidate = await project.previewReplace(query.value, replacement.value,
         {...options(), signal: controller.signal});
@@ -62,6 +66,7 @@ function create({project, isOpenHandle, query, replacement, caseSensitive, regex
       working = false;
       controller = null;
       previewButton.disabled = false;
+      undoButton.disabled = !project.hasUndoReplace();
     }
   }
   async function apply() {
@@ -76,6 +81,7 @@ function create({project, isOpenHandle, query, replacement, caseSensitive, regex
     controller = new AbortController();
     previewButton.disabled = true;
     applyButton.disabled = true;
+    undoButton.disabled = true;
     try {
       const result = await project.applyReplace(candidate, {
         signal: controller.signal,
@@ -84,7 +90,7 @@ function create({project, isOpenHandle, query, replacement, caseSensitive, regex
       if (token === revision) {
         plan = null;
         output.textContent = "Replaced " + result.matches + " matches in " +
-          result.files + " project files. Preview again before further changes.";
+          result.files + " project files. One-level undo is available.";
         notice(output.textContent);
       }
       return true;
@@ -99,6 +105,40 @@ function create({project, isOpenHandle, query, replacement, caseSensitive, regex
       working = false;
       controller = null;
       previewButton.disabled = false;
+      undoButton.disabled = !project.hasUndoReplace();
+    }
+  }
+  async function undo() {
+    if (working || !project.hasUndoReplace()) {
+      undoButton.disabled = true;
+      return false;
+    }
+    if (!confirmChange("Undo the last project-wide replacement? Files must be unchanged; multi-file writes are not atomic."))
+      return false;
+    working = true;
+    controller = new AbortController();
+    previewButton.disabled = true;
+    applyButton.disabled = true;
+    undoButton.disabled = true;
+    plan = null;
+    try {
+      const result = await project.undoReplace({
+        signal: controller.signal, isBlocked: entry => isOpenHandle(entry.handle)
+      });
+      output.textContent = "Restored " + result.files + " project files (" +
+        result.matches + " replacements undone).";
+      notice(output.textContent);
+      return true;
+    } catch (error) {
+      output.textContent = "Project undo failed: " + (error.message || String(error)) +
+        ". Review files before further changes.";
+      notice(output.textContent);
+      return false;
+    } finally {
+      working = false;
+      controller = null;
+      previewButton.disabled = false;
+      undoButton.disabled = !project.hasUndoReplace();
     }
   }
   for (const control of controls) {
@@ -107,8 +147,10 @@ function create({project, isOpenHandle, query, replacement, caseSensitive, regex
   }
   previewButton.addEventListener("click", () => { void preview(); });
   applyButton.addEventListener("click", () => { void apply(); });
+  undoButton.addEventListener("click", () => { void undo(); });
   applyButton.disabled = true;
-  return {preview, apply, invalidate};
+  undoButton.disabled = true;
+  return {preview, apply, undo, invalidate};
 }
 const api = Object.freeze({create});
 if (typeof module !== "undefined" && module.exports) module.exports = api;

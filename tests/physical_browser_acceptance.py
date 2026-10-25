@@ -250,7 +250,16 @@ def test_native_r_expression_debugger(page, timeout: int):
     page.wait_for_function(
         "() => document.querySelector('#rDebugOutput').textContent.includes('Next expression at line 1')",
         timeout=timeout)
-    for next_line in (2, 3):
+    page.locator("#rDebugStep").click()
+    page.wait_for_function(
+        "() => document.querySelector('#rDebugOutput').textContent.includes('Next expression at line 2')",
+        timeout=timeout)
+    page.locator("#rDebugWatch").fill("fs_r_browser_step + 2L")
+    page.locator("#rDebugEvaluate").click()
+    page.wait_for_function(
+        "() => { const text = document.querySelector('#rDebugOutput').textContent; return text.includes('Next expression at line 2') && text.includes('Output:\\n42'); }",
+        timeout=timeout)
+    for next_line in (3,):
         page.locator("#rDebugStep").click()
         page.wait_for_function(
             "line => document.querySelector('#rDebugOutput').textContent.includes('Next expression at line ' + line)",

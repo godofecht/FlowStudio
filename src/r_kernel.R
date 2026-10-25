@@ -677,6 +677,10 @@ repeat {
             list(success = FALSE, payload = charToRaw("R package inventory unavailable.")))
     } else if (is.na(source)) {
         list(success = FALSE, payload = charToRaw("Invalid UTF-8 source."))
+    } else if (identical(debug_state, "paused") &&
+               substr(header_text, 1L, 1L) %in% c("E", "L", "N", "V", "U")) {
+        list(success = FALSE, payload = charToRaw(
+            "R debugger is paused; finish or stop before executing other code."))
     } else if (substr(header_text, 1L, 1L) == "L") {
         load_installed_package(source)
     } else if (substr(header_text, 1L, 1L) == "N") {
@@ -693,10 +697,6 @@ repeat {
         debug_stop()
     } else if (substr(header_text, 1L, 1L) == "Q") {
         debug_reply()
-    } else if (identical(debug_state, "paused") &&
-               substr(header_text, 1L, 1L) %in% c("E", "L", "N", "V", "U")) {
-        list(success = FALSE, payload = charToRaw(
-            "R debugger is paused; finish or stop before executing other code."))
     } else if (substr(header_text, 1L, 1L) == "C") {
         check_source(source)
     } else if (substr(header_text, 1L, 1L) == "T") {

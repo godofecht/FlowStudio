@@ -314,7 +314,8 @@ repeat {
     } else if (substr(header_text, 1L, 1L) == "C") {
         check_source(source)
     } else if (substr(header_text, 1L, 1L) == "T") {
-        table_snapshot(source)
+        tryCatch(table_snapshot(source), error = function(error)
+            list(success = FALSE, payload = charToRaw("R table snapshot failed.")))
     } else {
         evaluate_source(source)
     }

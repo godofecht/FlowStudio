@@ -32,11 +32,32 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | R Markdown / Quarto | partial / offline HTML report export from Python/R percent-cell notebooks; no Quarto/R Markdown rendering | Render notebook with inline plots and HTML export; verify actual Quarto/R Markdown format compatibility |
 | Source debugger | partial / native CPython breakpoint/step/next/finish/continue/stop and bounded stack inspection passed cross-platform Flow/HTTP CI #40126891635; numeric-local conditional breakpoints accepted by Ubuntu/macOS CI #40144484561 (real CPython and Flow HTTP); opt-in raised-exception pause passed Ubuntu/macOS CI #40148434956 (real CPython and Flow HTTP); physical browser and R/Flow debugging missing | Breakpoints, stack, variables, step execution |
 | Remote/server mode | missing | Authenticated, origin-aware multi-user sessions with isolation |
-| Diagnostics / profiling | partial / native CPython bounded line tracing cross-platform CI accepted; physical-browser acceptance pending | Resource/time tracing and useful language-specific diagnostics |
+| Diagnostics / profiling | partial / native CPython bounded line tracing cross-platform CI accepted; native R parse-only diagnostics implemented on feature branch (cross-platform acceptance pending); physical-browser acceptance pending | Resource/time tracing and useful language-specific diagnostics |
 | Cross-platform packaging | missing | Installable signed/reproducible macOS and Linux releases |
 | Accessibility | partial / unverified | Full keyboard navigation, screen reader labels, resize and contrast checks |
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
 
+
+## 2026-10-25: non-executing native R syntax diagnostics (validation pending)
+
+The Flow-owned localhost backend now offers an intent/origin-gated
+`POST /api/check/r` route backed by the **same persistent real Rscript
+kernel** used for native R execution. A new `C` IPC operation calls
+`parse(text=source, keep.source=TRUE)` without `eval`, preserving
+workspace state and reporting R parser errors with source positions.
+The native browser IDE selects this parser for R syntax checks when
+served by Flow; GitHub Pages retains the existing webR parser path.
+The request and response are bounded by the existing transport limits.
+
+Regression coverage adds real-R IPC checks for valid/invalid syntax,
+non-execution and continued session persistence; Flow-owned HTTP smoke
+checks for intent/origin enforcement and parse status; and Node browser
+tests for route selection, locations, transport failures and remote
+origin rejection. **Status: implemented on feature branch; Rscript,
+native Flow compilation, cross-platform CI and physical-browser
+acceptance not yet independently verified.** This is not interactive
+R debugging, remote R sessions or full RStudio parity. Hosted CI
+configuration is unchanged.
 
 ## 2026-10-25: native CPython pause on raised exceptions (cross-platform native acceptance passed)
 

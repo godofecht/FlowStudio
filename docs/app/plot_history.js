@@ -41,7 +41,7 @@ function create(target) {
     for (const plot of plots) {
       if (!plot || !Number.isSafeInteger(plot.number) || plot.number < 0) continue;
       if (typeof plot.svg === "string" && new TextEncoder().encode(plot.svg).length <= 60000 &&
-          /<svg(?:\\s|>)/.test(plot.svg) && plot.svg.includes("</svg>")) {
+          /<svg[\s>]/.test(plot.svg) && plot.svg.includes("</svg>")) {
         items.push({number:plot.number, svg:plot.svg});
       } else if (typeof plot.png === "string" && plot.png.length <= 1398104 &&
                  plot.png.startsWith("iVBORw0KGgo") && /^[A-Za-z0-9+/=]+$/.test(plot.png)) {

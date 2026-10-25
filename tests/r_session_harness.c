@@ -4,6 +4,7 @@ extern const char *fs_r_run(const char *);
 extern const char *fs_r_check(const char *);
 extern const char *fs_r_inspect(void);
 extern const char *fs_r_table(const char *);
+extern const char *fs_r_plot(void);
 extern int fs_r_status(void);
 extern void fs_r_reset(void);
 static int failure(int step, const char *output)
@@ -72,6 +73,19 @@ int main(void)
     out = fs_r_table("unsafe_table");
     if (fs_r_status() != 422 || !strstr(out, "active binding") ||
         strstr(out, "table binding executed")) return failure(32, out);
+    /* Real graphics must be captured by the persistent R kernel, not faked. */
+    out = fs_r_run("plot(c(1, 2, 3), main='FlowStudio native SVG')");
+    if (fs_r_status() != 200) return failure(33, out);
+    out = fs_r_plot();
+    if (fs_r_status() != 200 ||
+        !((strstr(out, "\"svg\":\"<?xml") && strstr(out, "<svg") &&
+           strstr(out, "</svg>")) || strstr(out, "\"pdf\":\"25504446")))
+        return failure(34, out);
+    out = fs_r_run("cat('no plot\\n')");
+    if (fs_r_status() != 200) return failure(35, out);
+    out = fs_r_plot();
+    if (fs_r_status() != 200 || !strstr(out, "\"svg\":null") ||
+        !strstr(out, "\"pdf\":null")) return failure(36, out);
     /* Native R lists expose nested metadata without evaluating user methods. */
     out = fs_r_run("nested <- list(numbers=list(answer=42L, more=list(x=1L)), words=c('a','b'))\n"
                    "trap <- structure(list(secret=1L), class='flowstudio_trap')\n"

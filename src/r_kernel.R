@@ -1,6 +1,6 @@
 # FlowStudio native R kernel: length-framed, single-user persistent session.
 # This is not a sandbox. Evaluated R code inherits the local user's permissions.
-# stdin: E (execute), C (parse only), I (inspect) or T (table) + 8 lowercase hex digits + UTF-8 source.
+# stdin: E (execute), C (parse), I (inspect), T (table), P (plot) + 8 lowercase hex digits + UTF-8 payload.
 # fd 3: 0/1 + 8 lowercase hex digits + bounded UTF-8 output.
 MAX_SOURCE <- 131072L
 MAX_OUTPUT <- 131072L
@@ -18,7 +18,58 @@ read_exact <- function(count) {
     value
 }
 
+
+# R's built-in PDF device works without X11, Cairo, or third-party packages.
+# Open it before evaluating source; close it before exposing a bounded snapshot.
+last_plot_svg <- NULL
+last_plot_pdf <- NULL
+last_plot_warning <- NULL
+begin_plot_capture <- function() {
+    path <- tempfile("flowstudio-r-plot-", fileext = ".pdf")
+    grDevices::pdf(file = path, width = 7, height = 5, onefile = TRUE)
+    device <- as.integer(grDevices::dev.cur())
+    plotted <- FALSE
+    previous_hook <- getHook("plot.new")
+    setHook("plot.new", function() { plotted <<- TRUE }, action = "append")
+    function() {
+        setHook("plot.new", previous_hook, action = "replace")
+        devices <- grDevices::dev.list()
+        if (!is.null(devices) && device %in% devices) {
+            try(grDevices::dev.off(which = device), silent = TRUE)
+        }
+        on.exit(unlink(path), add = TRUE)
+        if (!plotted) return(invisible(NULL))
+        if (!file.exists(path)) {
+            last_plot_warning <<- "Native R PDF file was not produced."
+            return(invisible(NULL))
+        }
+        bytes <- file.info(path)$size
+        if (!is.finite(bytes) || bytes <= 0) {
+            last_plot_warning <<- "Native R PDF file was empty."
+            return(invisible(NULL))
+        }
+        if (bytes > 60000L) {
+            last_plot_warning <<- "Native R PDF exceeds the 60 KiB capture limit."
+            return(invisible(NULL))
+        }
+        reader <- file(path, open = "rb")
+        raw <- readBin(reader, what = "raw", n = as.integer(bytes))
+        close(reader)
+        if (length(raw) < 4L || !identical(raw[1:4], charToRaw("%PDF"))) {
+            last_plot_warning <<- "Native R PDF capture was invalid."
+            return(invisible(NULL))
+        }
+        last_plot_pdf <<- paste(sprintf("%02x", as.integer(raw)), collapse = "")
+        invisible(NULL)
+    }
+}
+
 evaluate_source <- function(source) {
+    last_plot_svg <<- NULL
+    last_plot_pdf <<- NULL
+    last_plot_warning <<- NULL
+    finish_plot <- begin_plot_capture()
+    on.exit(finish_plot(), add = TRUE)
     output_file <- tempfile("flowstudio-r-")
     output_connection <- file(output_file, open = "wt", encoding = "UTF-8")
     original_sinks <- sink.number()
@@ -47,7 +98,8 @@ evaluate_source <- function(source) {
             close(output_connection)
         }
     )
-    on.exit(unlink(output_file))
+    # Keep the plot finalizer registered above; default on.exit() replaces it.
+    on.exit(unlink(output_file), add = TRUE)
     file_size <- file.info(output_file)$size
     reader <- file(output_file, open = "rb")
     bytes <- readBin(reader, what = "raw", n = MAX_OUTPUT - 64L)
@@ -94,6 +146,18 @@ json_quote <- function(value) {
         intToUtf8(point)
     }, character(1), USE.NAMES = FALSE)
     paste0('"', paste0(escaped, collapse = ""), '"')
+}
+
+# Plot retrieval is read-only and never evaluates source. JSON stays bounded.
+plot_snapshot <- function() {
+    svg <- if (is.null(last_plot_svg)) "null" else json_quote(last_plot_svg)
+    pdf <- if (is.null(last_plot_pdf)) "null" else json_quote(last_plot_pdf)
+    warning <- if (is.null(last_plot_warning)) "null" else json_quote(last_plot_warning)
+    json <- paste0('{"svg":', svg, ',"pdf":', pdf, ',"warning":', warning, "}")
+    if (nchar(json, type = "bytes") > 131000L) {
+        json <- '{"svg":null,"pdf":null,"warning":"Native R plot JSON exceeds the IPC limit."}'
+    }
+    list(success = TRUE, payload = charToRaw(enc2utf8(json)))
 }
 
 # Inspect only ordinary R lists, not S3/S4 objects or arbitrary methods.
@@ -301,11 +365,11 @@ repeat {
     header <- read_exact(9L)
     if (is.null(header)) break
     header_text <- rawToChar(header)
-    if (!grepl("^[ECIT][0-9a-f]{8}$", header_text)) break
+    if (!grepl("^[ECITP][0-9a-f]{8}$", header_text)) break
     length_text <- substr(header_text, 2L, 9L)
     length_value <- strtoi(length_text, base = 16L)
     if (is.na(length_value) || length_value > MAX_SOURCE ||
-        (substr(header_text, 1L, 1L) == "I" && length_value != 0L)) break
+        (substr(header_text, 1L, 1L) %in% c("I", "P") && length_value != 0L)) break
     payload <- read_exact(length_value)
     if (is.null(payload)) break
     source <- if (length(payload) == 0L) "" else tryCatch(
@@ -314,6 +378,8 @@ repeat {
     )
     result <- if (substr(header_text, 1L, 1L) == "I") {
         inspect_workspace()
+    } else if (substr(header_text, 1L, 1L) == "P") {
+        plot_snapshot()
     } else if (is.na(source)) {
         list(success = FALSE, payload = charToRaw("Invalid UTF-8 source."))
     } else if (substr(header_text, 1L, 1L) == "C") {

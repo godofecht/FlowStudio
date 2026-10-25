@@ -256,6 +256,31 @@ function createRSession() {
       return {ok:true, table:validateRTable(payload)};
     });
   }
+  function plot() {
+    const generation = epoch;
+    return schedule(async () => {
+      if (generation !== epoch) return stale();
+      const response = await request("/api/plot/r", "");
+      if (generation !== epoch) return stale();
+      if (!response.ok) return response;
+      let payload;
+      try { payload = JSON.parse(response.output); }
+      catch (_) { throw new Error("Native R plot response was not JSON."); }
+      if (!payload || typeof payload !== "object" || Array.isArray(payload) ||
+          (payload.svg !== null && (typeof payload.svg !== "string" ||
+            new TextEncoder().encode(payload.svg).length > 60000 ||
+            !/<svg[\s>]/.test(payload.svg) || !payload.svg.includes("</svg>"))) ||
+          (payload.pdf !== null && (typeof payload.pdf !== "string" ||
+            payload.pdf.length > 120000 || payload.pdf.length < 8 ||
+            payload.pdf.length % 2 !== 0 || !payload.pdf.startsWith("25504446") ||
+            !/^[0-9a-f]+$/.test(payload.pdf))) ||
+          (payload.svg !== null && payload.pdf !== null) ||
+          (payload.warning !== null && (typeof payload.warning !== "string" ||
+            payload.warning.length > 200)))
+        throw new Error("Invalid native R SVG plot response.");
+      return {ok:true, svg:payload.svg, pdf:payload.pdf, warning:payload.warning};
+    });
+  }
   function checkSyntax(code) {
     const generation = epoch;
     return schedule(async () => {
@@ -274,7 +299,7 @@ function createRSession() {
   const unsupported = () => Promise.resolve({ok:false,
     output:"This operation is not available for native R yet. Select browser webR for packages, help, completion or variable transfer; the two R workspaces are separate."});
   return Object.freeze({run, inspect, checkSyntax, reset,
-    table, packages:unsupported, installPackage:unsupported,
+    table, plot, packages:unsupported, installPackage:unsupported,
     help:unsupported, complete:unsupported,
     exportVariable:unsupported, importVariable:unsupported});
 }

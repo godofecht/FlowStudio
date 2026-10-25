@@ -44,8 +44,12 @@ begin_plot_capture <- function() {
             try(grDevices::dev.off(which = device), silent = TRUE)
         }
         on.exit(unlink(path), add = TRUE)
-        if (!file.exists(path)) return(invisible(NULL))
+        if (!file.exists(path)) {
+            last_plot_warning <<- paste0("diagnostic: no ", format, " file after dev.off")
+            return(invisible(NULL))
+        }
         bytes <- file.info(path)$size
+        last_plot_warning <<- paste0("diagnostic: ", format, " bytes=", bytes)
         if (!is.finite(bytes) || bytes <= 0) return(invisible(NULL))
         if (bytes > 60000L) {
             last_plot_warning <<- "Native R plot exceeds the 60 KiB capture limit."
@@ -66,6 +70,7 @@ begin_plot_capture <- function() {
                 last_plot_warning <<- "Native R SVG capture contains invalid UTF-8."
             } else {
                 last_plot_svg <<- svg
+                last_plot_warning <<- NULL
             }
         } else {
             reader <- file(path, open = "rb")
@@ -81,6 +86,7 @@ begin_plot_capture <- function() {
                 return(invisible(NULL))
             }
             last_plot_pdf <<- paste(sprintf("%02x", as.integer(raw)), collapse = "")
+            last_plot_warning <<- NULL
         }
         invisible(NULL)
     }

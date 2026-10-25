@@ -16,9 +16,17 @@ executes; false conditions allow execution to continue normally. Blank Continue
 still runs to completion. No new backend, network route or hosted CI change.
 
 Real Rscript/C IPC and live Flow HTTP acceptance cases, browser controller
-tests and an opt-in physical-browser scenario are committed. **Status: partial /
-implementation committed; native Linux/macOS CI and physical-browser
-acceptance not yet verified.** This does not implement breakpoints inside
+tests and an opt-in physical-browser scenario are committed. **Status: partial / independently verified native Linux/macOS CI;
+physical-browser acceptance still pending.** [PR #63](https://github.com/godofecht/FlowStudio/pull/63)
+merged as [db16944](https://github.com/godofecht/FlowStudio/commit/db16944005276c440e568964af2d45f49b1491e0)
+after [CI #40232365726](https://github.com/godofecht/FlowStudio/actions/runs/40232365726)
+completed all four jobs successfully. Ubuntu 24.04 and macOS 14 each
+ran 623 JavaScript tests (621 passed, 2 skipped, 0 failed) and 76 Python
+unit tests (11 skipped). Native jobs compiled Flow 2.0.0, exercised real
+Rscript IPC and Flow-owned localhost HTTP conditional-breakpoint acceptance,
+and packaged both platforms. Local V8 client/controller exercises passed.
+The opt-in physical-browser scenario was committed but has **not** been run.
+No hosted CI configuration changed. This does not implement breakpoints inside
 function bodies, step-into/over, stack-frame inspection, authenticated remote
 sessions or complete RStudio parity.
 

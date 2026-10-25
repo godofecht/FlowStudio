@@ -227,28 +227,79 @@ debug_evaluate <- function(source) {
     debug_reply(result$success, rawToChar(result$payload))
 }
 
-# Continue real top-level R expressions, optionally stopping before a later
-# expression whose source reference starts on one of up to 64 specified lines.
-# Breakpoint lines are parsed as data, never evaluated as R expressions.
+# Conditional top-level breakpoints reuse Flow's existing intent-gated
+# Continue route. A condition is a restricted numeric scalar comparison, NOT
+# eval(parse(...)). Only future top-level expressions can be breakpoints.
+debug_parse_targets <- function(target_line) {
+    if (!nzchar(target_line)) return(list())
+    if (nchar(target_line, type = "bytes") > 4096L || endsWith(target_line, ","))
+        return(NULL)
+    tokens <- strsplit(target_line, ",", fixed = TRUE)[[1L]]
+    if (length(tokens) > 64L || any(!nzchar(tokens))) return(NULL)
+    pattern <- paste0("^([1-9][0-9]{0,5})(?:\\?([A-Za-z][A-Za-z0-9._]*)",
+                      "(==|!=|>=|<=|>|<)(-?(?:0|[1-9][0-9]{0,12})(?:\\.[0-9]{1,12})?))?$")
+    targets <- lapply(tokens, function(token) {
+        parts <- regmatches(token, regexec(pattern, token, perl = TRUE))[[1L]]
+        if (!length(parts)) return(NULL)
+        line <- as.integer(parts[[2L]])
+        if (length(parts) < 5L || !nzchar(parts[[3L]]))
+            return(list(line = line, condition = NULL))
+        number <- suppressWarnings(as.numeric(parts[[5L]]))
+        if (!is.finite(number)) return(NULL)
+        list(line = line, condition = list(name = parts[[3L]],
+             operator = parts[[4L]], number = number))
+    })
+    if (any(vapply(targets, is.null, logical(1L)))) return(NULL)
+    targets
+}
+
+debug_condition_met <- function(condition) {
+    if (is.null(condition)) return(TRUE)
+    name <- condition$name
+    # Active bindings are never invoked. Lazy promises can be forced by get():
+    # like ordinary R inspection this is not a side-effect-free sandbox.
+    if (!exists(name, envir = workspace, inherits = FALSE) ||
+        bindingIsActive(name, workspace)) return(FALSE)
+    value <- tryCatch(get(name, envir = workspace, inherits = FALSE),
+                      error = function(error) NULL)
+    if (is.null(value) || is.object(value) || length(value) != 1L ||
+        !(typeof(value) %in% c("integer", "double")) || !is.finite(value))
+        return(FALSE)
+    switch(condition$operator,
+           "==" = value == condition$number,
+           "!=" = value != condition$number,
+           ">=" = value >= condition$number,
+           "<=" = value <= condition$number,
+           ">" = value > condition$number,
+           "<" = value < condition$number,
+           FALSE)
+}
+
 debug_continue <- function(target_line) {
     if (!identical(debug_state, "paused"))
         return(debug_reply(FALSE, "No paused R expression is available."))
-    stop_index <- length(debug_expressions) + 1L
-    if (nzchar(target_line)) {
-        if (nchar(target_line, type = "bytes") > 447L ||
-            !grepl("^[1-9][0-9]{0,5}(,[1-9][0-9]{0,5}){0,63}$", target_line))
-            return(debug_reply(FALSE, "Target must contain 1 to 64 positive source lines (comma-separated)."))
-        lines <- as.integer(strsplit(target_line, ",", fixed = TRUE)[[1L]])
+    targets <- debug_parse_targets(target_line)
+    if (is.null(targets))
+        return(debug_reply(FALSE, paste0(
+            "Target must contain 1 to 64 comma-separated positive source lines",
+            " with optional numeric conditions (e.g. 3?counter>=2).")))
+    if (length(targets)) {
+        target_lines <- vapply(targets, function(item) item$line, integer(1L))
         future <- which(seq_along(debug_lines) > debug_index &
-                        !is.na(debug_lines) & debug_lines %in% lines)
+                        !is.na(debug_lines) & debug_lines %in% target_lines)
         if (!length(future))
             return(debug_reply(FALSE, "No later top-level expression starts on any requested line."))
-        stop_index <- future[[1L]]
     }
+    start_index <- debug_index
     output <- character(0)
     last_line <- NULL
     truncated <- FALSE
-    while (identical(debug_state, "paused") && debug_index < stop_index) {
+    while (identical(debug_state, "paused")) {
+        if (length(targets) && debug_index > start_index &&
+            any(vapply(targets, function(item) {
+                identical(debug_lines[[debug_index]], item$line) &&
+                    debug_condition_met(item$condition)
+            }, logical(1L)))) break
         last_line <- debug_lines[[debug_index]]
         expression <- as.expression(list(debug_expressions[[debug_index]]))
         result <- evaluate_source("", expressions_override = expression)

@@ -122,7 +122,7 @@ def main() -> None:
                            "fs_debug_http + 1L", accepted_headers)
     debug = json.loads(body)
     assert status == 200 and debug["state"] == "paused" and debug["index"] == 2, debug
-    assert debug["next_line"] == 2 and debug["output"] == "42", debug
+    assert debug["next_line"] == 2 and debug["output"].strip() == "[1] 42", debug
     status, body = request("POST", "/api/debug/r/evaluate",
                            "stop('watch failed')", accepted_headers)
     debug = json.loads(body)

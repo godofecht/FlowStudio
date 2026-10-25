@@ -153,5 +153,7 @@ test("Flow owns native R plot route and IDE fetches it after execution", () => {
   assert.match(read("src/main.flow"), /if eq\(path, "\/api\/plot\/r"\) \{\s*send_r_plot\(\)/);
   assert.match(read("src/r_session.c"), /fs_r_plot\(void\) \{ return request_r\('P', ""\); \}/);
   assert.match(read("src/r_kernel.R"), /plot_snapshot <- function\(\)/);
+  assert.match(read("src/r_kernel.R"), /on\.exit\(finish_plot\(\), add = TRUE\)/);
+  assert.match(read("src/r_kernel.R"), /on\.exit\(unlink\(output_file\), add = TRUE\)/);
   assert.match(read("docs/app/index.html"), /await getRSession\(\)\.plot\(\)/);
 });

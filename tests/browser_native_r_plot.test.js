@@ -27,10 +27,10 @@ test("native R SVG uses real Flow-owned plot IPC with intent gate", async () => 
   const calls = [];
   await withBrowser(localhost, async (route, options) => {
     calls.push([route, options]);
-    return response(JSON.stringify({svg, warning:null}));
+    return response(JSON.stringify({svg, pdf:null, warning:null}));
   }, async () => {
     const session = native.createRSession();
-    assert.deepEqual(await session.plot(), {ok:true, svg, warning:null});
+    assert.deepEqual(await session.plot(), {ok:true, svg, pdf:null, warning:null});
   });
   assert.equal(calls.length, 1);
   assert.equal(calls[0][0], "/api/plot/r");
@@ -42,8 +42,8 @@ test("native R SVG uses real Flow-owned plot IPC with intent gate", async () => 
 });
 
 test("native R SVG reports empty, warning and backend failures", async () => {
-  for (const payload of [{svg:null, warning:null},
-                        {svg:null, warning:"SVG capture exceeded limit."}]) {
+  for (const payload of [{svg:null, pdf:null, warning:null},
+                        {svg:null, pdf:null, warning:"SVG capture exceeded limit."}]) {
     await withBrowser(localhost, async () => response(JSON.stringify(payload)), async () =>
       assert.deepEqual(await native.createRSession().plot(), {ok:true, ...payload}));
   }
@@ -76,7 +76,7 @@ test("native R SVG never contacts localhost from Pages; reset invalidates in-fli
     calls.push(route);
     if (route === "/api/plot/r") await new Promise(resolve => { release = resolve; });
     return response(route === "/api/reset/r" ? "R session reset." :
-      JSON.stringify({svg, warning:null}));
+      JSON.stringify({svg, pdf:null, warning:null}));
   }, async () => {
     const session = native.createRSession();
     const pending = session.plot();
@@ -114,6 +114,33 @@ test("SVG plot history creates safe img data URI with zoom and SVG download", ()
     zoom.onclick();
     assert.equal(zoom.attributes["aria-pressed"], "true");
     assert.equal(history.append([{number:2, svg:"<script>bad</script>"}]), 0);
+  } finally {
+    if (original === undefined) delete globalThis.document;
+    else globalThis.document = original;
+  }
+});
+
+test("native R PDF fallback is validated and rendered with a PDF download", async () => {
+  const pdf = "255044462d312e340a";
+  await withBrowser(localhost, async () => response(JSON.stringify({svg:null, pdf, warning:null})),
+    async () => assert.deepEqual(await native.createRSession().plot(),
+      {ok:true, svg:null, pdf, warning:null}));
+  const original = globalThis.document;
+  const makeNode = tag => ({
+    tag, children:[], attributes:{}, firstChild:null,
+    setAttribute(name,value) { this.attributes[name] = value; },
+    append(child) { this.children.push(child); this.firstChild = this.children[0]; },
+    replaceChildren(...children) { this.children = children; this.firstChild = children[0] || null; }
+  });
+  globalThis.document = {createElement:makeNode};
+  try {
+    const target = makeNode("div");
+    assert.equal(plots.create(target).append([{number:3, pdf}]), 1);
+    const [image, save] = target.children[0].children;
+    assert.equal(image.tag, "embed");
+    assert.equal(image.attributes.type, "application/pdf");
+    assert.ok(image.src.startsWith("data:application/pdf;base64,"));
+    assert.equal(save.download, "flowstudio-figure-3.pdf");
   } finally {
     if (original === undefined) delete globalThis.document;
     else globalThis.document = original;

@@ -30,13 +30,37 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Sequential percent-cell notebooks | partial / Python and R Run All wired with explicit per-cell Python/R/Flow language tags (cross-platform CI accepted; real browser pending); bounded browser-local text/Python PNG output recovery across reload; native and physical-browser acceptance unverified | Execute cells in order, retain interpreter state, show per-cell output and stop on error |
 | Jupyter `.ipynb` import/export | partial / browser UI wired and Node regression coverage; bounded output recovery is separate from `.ipynb` import/export; physical-browser file round-trip and live Python/R kernels unverified | Import/export nbformat 4 Python/R code and Markdown cells through file picker/download; validate with nbformat; preserve source; verify live outputs in Chromium and cross-platform acceptance |
 | R Markdown / Quarto | partial / offline HTML report export from Python/R percent-cell notebooks; no Quarto/R Markdown rendering | Render notebook with inline plots and HTML export; verify actual Quarto/R Markdown format compatibility |
-| Source debugger | partial / native CPython breakpoint/step/next/finish/continue/stop and bounded stack inspection passed cross-platform Flow/HTTP CI #40126891635; numeric-local conditional breakpoints accepted by Ubuntu/macOS CI #40144484561 (real CPython and Flow HTTP); physical browser and R/Flow debugging missing | Breakpoints, stack, variables, step execution |
+| Source debugger | partial / native CPython breakpoint/step/next/finish/continue/stop and bounded stack inspection passed cross-platform Flow/HTTP CI #40126891635; numeric-local conditional breakpoints accepted by Ubuntu/macOS CI #40144484561 (real CPython and Flow HTTP); opt-in raised-exception pause implemented, cross-platform CI pending; physical browser and R/Flow debugging missing | Breakpoints, stack, variables, step execution |
 | Remote/server mode | missing | Authenticated, origin-aware multi-user sessions with isolation |
 | Diagnostics / profiling | partial / native CPython bounded line tracing cross-platform CI accepted; physical-browser acceptance pending | Resource/time tracing and useful language-specific diagnostics |
 | Cross-platform packaging | missing | Installable signed/reproducible macOS and Linux releases |
 | Accessibility | partial / unverified | Full keyboard navigation, screen reader labels, resize and contrast checks |
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
 
+
+## 2026-10-25: native CPython pause on raised exceptions (acceptance pending)
+
+The Flow-owned localhost Python debugger now accepts an optional boolean
+`pause_on_exception` request flag. When enabled, CPython's actual exception
+trace events pause execution at the originating FlowStudio source frame,
+including exceptions that are subsequently caught. The debugger displays
+bounded exception **type and line only**; it never calls user exception
+`__str__` or `__repr__`. Continue, stepping and stop remain available.
+With the flag enabled and no line breakpoints, source runs until an exception
+or completion instead of stopping automatically on line one. Legacy requests
+retain their original first-line stepping behavior.
+
+A browser checkbox exposes the mode on the native localhost IDE. New real
+CPython unit tests, Node client/UI tests, Flow-owned HTTP smoke assertions
+and an opt-in physical-browser scenario cover caught and uncaught exceptions,
+metadata validation, persistence, and safe previewing. The browser harness
+still requires real interpreter downloads and native Flow execution.
+
+**Status: partial / implementation committed on a feature branch.** Local
+CPython prototype tests passed (7 tests); repository CI, actual native Flow
+compilation, cross-platform acceptance and real physical-browser execution
+have **not yet been verified for this change**. This is not R or Flow source
+debugging, exception handling for external library frames, or RStudio parity.
 
 ## 2026-10-25: numeric conditional CPython breakpoints (acceptance pending)
 

@@ -75,11 +75,11 @@ async function debugRCommand(action, targetLine = "") {
   if (!["step", "continue", "stop", "status"].includes(action))
     throw new Error("Unknown native R debugger action.");
   if (action === "continue") {
-    if (targetLine !== "" && (!Number.isSafeInteger(targetLine) ||
-        targetLine < 1 || targetLine > 999999))
-      throw new Error("R continue target must be a positive source line.");
-    return debugRResponse("/api/debug/r/continue",
-      targetLine === "" ? "" : String(targetLine));
+    const lines = typeof targetLine === "number" ? String(targetLine) : targetLine;
+    if (typeof lines !== "string" || (lines && (lines.length > 447 ||
+        !/^[1-9][0-9]{0,5}(?:,[1-9][0-9]{0,5}){0,63}$/.test(lines))))
+      throw new Error("R continue target must be 1 to 64 comma-separated positive source lines.");
+    return debugRResponse("/api/debug/r/continue", lines);
   }
   if (targetLine !== "") throw new Error("Only R continue accepts a target line.");
   return debugRResponse("/api/debug/r/" + action, "");

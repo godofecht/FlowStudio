@@ -99,7 +99,7 @@ async function checkRSyntax(code) {
   const column = match ? Number(match[2]) : 0;
   const diagnostics = match && Number.isSafeInteger(line) && line > 0 &&
     Number.isSafeInteger(column) && column > 0 ?
-    [{line, column, message:match[4].slice(0, 512)}] : [];
+    [{line, column, message:match[3].slice(0, 512)}] : [];
   return {ok:false, output:response.output, diagnostics};
 }
 async function checkSyntax(code) {

@@ -239,6 +239,33 @@ def test_flow(page, timeout: int):
 
 
 
+def test_native_r_expression_debugger(page, timeout: int):
+    # Real DOM -> Flow-owned HTTP -> C IPC -> persistent Rscript AST evaluator.
+    page.locator("#rDebugPanel summary").click()
+    page.locator("#language").select_option("r")
+    page.locator("#rRuntime").select_option("native")
+    page.locator("#source").fill(
+        "fs_r_browser_step <- 40L\nfs_r_browser_step <- fs_r_browser_step + 2L\ncat(fs_r_browser_step)")
+    page.locator("#rDebugStart").click()
+    page.wait_for_function(
+        "() => document.querySelector('#rDebugOutput').textContent.includes('Next expression at line 1')",
+        timeout=timeout)
+    for next_line in (2, 3):
+        page.locator("#rDebugStep").click()
+        page.wait_for_function(
+            "line => document.querySelector('#rDebugOutput').textContent.includes('Next expression at line ' + line)",
+            arg=next_line, timeout=timeout)
+    page.locator("#rDebugStep").click()
+    page.wait_for_function(
+        "() => document.querySelector('#rDebugOutput').textContent.includes('R expression debugger: done')",
+        timeout=timeout)
+    assert "Output:\n42" in page.locator("#rDebugOutput").inner_text()
+    page.locator("#rDebugStop").click()
+    page.wait_for_function(
+        "() => document.querySelector('#rDebugOutput').textContent.includes('R expression debugger: idle')",
+        timeout=timeout)
+
+
 def test_native_conditional_debugger(page, timeout: int):
     # Actual Chromium/Firefox/WebKit DOM -> Flow localhost HTTP -> CPython.
     page.locator("#pythonDebugPanel summary").click()
@@ -323,6 +350,8 @@ def main():
                     if not args.python_only:
                         test_native_r(page, args.timeout * 1000)
                         print("PASS real browser native Rscript source, console, notebook, syntax, environment and reset")
+                        test_native_r_expression_debugger(page, args.timeout * 1000)
+                        print("PASS real browser native Rscript expression stepping")
                     test_native_conditional_debugger(page, args.timeout * 1000)
                     print("PASS real browser conditional CPython debugging via native Flow-owned server")
                 assert not errors, f"Uncaught browser exceptions: {errors}"

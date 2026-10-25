@@ -20,6 +20,10 @@ extern {
     function fs_make_temp_c() -> string
     function fs_r_run(code: string) -> string
     function fs_r_check(code: string) -> string
+    function fs_r_debug_start(source: string) -> string
+    function fs_r_debug_step() -> string
+    function fs_r_debug_stop() -> string
+    function fs_r_debug_status() -> string
     function fs_r_inspect() -> string
     function fs_r_table(name: string) -> string
     function fs_r_plot() -> string
@@ -171,6 +175,27 @@ function send_mixed_demo() -> void {
 function send_r(code: string) -> void {
     let output: string = fs_r_run(code)
     fs_reply(fs_r_status(), "text/plain; charset=utf-8", output)
+}
+
+# A bounded, cooperative R top-level-expression debugger. Flow owns the HTTP
+# intent/origin gate and the native C/R IPC; no browser() stdin interaction.
+function send_r_debug(action: string, source: string) -> void {
+    let mut output: string = ""
+    if eq(action, "start") {
+        output = fs_r_debug_start(source)
+    } elif eq(action, "step") {
+        output = fs_r_debug_step()
+    } elif eq(action, "stop") {
+        output = fs_r_debug_stop()
+    } else {
+        output = fs_r_debug_status()
+    }
+    let status: i32 = fs_r_status()
+    if status == 200 or status == 422 {
+        fs_reply(status, "application/json; charset=utf-8", output)
+    } else {
+        fs_reply(status, "text/plain; charset=utf-8", output)
+    }
 }
 
 # Parse with the actual persistent R interpreter; never evaluate user source.
@@ -599,6 +624,22 @@ function dispatch() -> void {
         }
         if eq(path, "/api/run/r") {
             send_r(fs_body())
+            return
+        }
+        if eq(path, "/api/debug/r/start") {
+            send_r_debug("start", fs_body())
+            return
+        }
+        if eq(path, "/api/debug/r/step") {
+            send_r_debug("step", "")
+            return
+        }
+        if eq(path, "/api/debug/r/stop") {
+            send_r_debug("stop", "")
+            return
+        }
+        if eq(path, "/api/debug/r/status") {
+            send_r_debug("status", "")
             return
         }
         if eq(path, "/api/run/python") {

@@ -49,6 +49,33 @@ async function tracePython(code) {
   catch (_) { throw new Error("Native Python trace response was not JSON."); }
   return {ok:response.ok, data, status:response.status};
 }
+async function debugRResponse(endpoint, body) {
+  const response = await request(endpoint, body);
+  if (response.status !== 200 && response.status !== 422)
+    throw new Error(response.output);
+  let data;
+  try { data = JSON.parse(response.output); }
+  catch (_) { throw new Error("Native R debugger returned invalid JSON."); }
+  if (!data || typeof data !== "object" || Array.isArray(data) ||
+      !["idle", "paused", "done", "error"].includes(data.state) ||
+      !Number.isSafeInteger(data.index) || data.index < 1 || data.index > 1025 ||
+      !Number.isSafeInteger(data.total) || data.total < 0 || data.total > 1024 ||
+      ![data.next_line, data.executed_line].every(line =>
+        line === null || (Number.isSafeInteger(line) && line > 0)) ||
+      typeof data.output !== "string" || data.output.length > 20000)
+    throw new Error("Invalid native R debugger response.");
+  return {...data, ok:response.ok};
+}
+async function debugRStart(source) {
+  if (typeof source !== "string" || !source.trim())
+    throw new Error("Native R debugger requires nonempty R source.");
+  return debugRResponse("/api/debug/r/start", source);
+}
+async function debugRCommand(action) {
+  if (!["step", "stop", "status"].includes(action))
+    throw new Error("Unknown native R debugger action.");
+  return debugRResponse("/api/debug/r/" + action, "");
+}
 async function debugPythonStart(source, breakpoints, pauseOnException = false) {
   if (typeof source !== "string" || !source.trim() ||
       !Array.isArray(breakpoints) || breakpoints.length > 64)
@@ -374,7 +401,7 @@ function createRSession() {
     exportVariable:unsupported, importVariable:unsupported});
 }
 
-const api = Object.freeze({available, run, createRSession, checkSyntax, checkRSyntax, tracePython, debugPythonStart, debugPythonCommand, gitStatus, gitDiff, gitStagedDiff, gitStage, gitUnstage, gitCommit, gitBranches, gitCreateBranch, gitSwitchBranch});
+const api = Object.freeze({available, run, createRSession, checkSyntax, checkRSyntax, tracePython, debugRStart, debugRCommand, debugPythonStart, debugPythonCommand, gitStatus, gitDiff, gitStagedDiff, gitStage, gitUnstage, gitCommit, gitBranches, gitCreateBranch, gitSwitchBranch});
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 global.FlowStudioNativeFlow = api;
 })(globalThis);

@@ -1,12 +1,18 @@
 # FlowStudio native R kernel: length-framed, single-user persistent session.
 # This is not a sandbox. Evaluated R code inherits the local user's permissions.
-# stdin: E (execute), C (parse), I (inspect), T (table), P (plot), K (packages), L (load), N (install from CRAN), V (update user package), U (remove user package) + 8 lowercase hex digits + UTF-8 payload.
+# stdin: E (execute), C (parse), I (inspect), T (table), P (plot), K (packages), L (load), N (install), V (update), U (remove), B (debug start), S (debug step), D (debug stop), Q (debug status) + 8 lowercase hex digits + UTF-8 payload.
 # fd 3: 0/1 + 8 lowercase hex digits + bounded UTF-8 output.
 MAX_SOURCE <- 131072L
 MAX_OUTPUT <- 131072L
 input <- file("stdin", open = "rb")
 protocol <- file("/dev/fd/3", open = "wb")
 workspace <- new.env(parent = globalenv())
+# A cooperative top-level expression debugger. It never invokes browser(),
+# which would consume the framed IPC stdin and corrupt the persistent kernel.
+debug_expressions <- NULL
+debug_lines <- integer(0)
+debug_index <- 1L
+debug_state <- "idle"
 # Persistent user-owned library; never install into the system R libraries.
 user_library <- file.path(tools::R_user_dir("FlowStudio", which = "data"), "library")
 if (dir.exists(user_library)) .libPaths(c(user_library, .libPaths()))
@@ -67,7 +73,7 @@ begin_plot_capture <- function() {
     }
 }
 
-evaluate_source <- function(source) {
+evaluate_source <- function(source, expressions_override = NULL) {
     last_plot_svg <<- NULL
     last_plot_pdf <<- NULL
     last_plot_warning <<- NULL
@@ -81,7 +87,8 @@ evaluate_source <- function(source) {
     sink(output_connection)
     tryCatch(
         withCallingHandlers({
-            expressions <- parse(text = source, keep.source = FALSE)
+            expressions <- if (is.null(expressions_override))
+                parse(text = source, keep.source = FALSE) else expressions_override
             for (expression in expressions) {
                 value <- withVisible(eval(expression, envir = workspace))
                 if (value$visible) print(value$value)
@@ -141,6 +148,71 @@ evaluate_source <- function(source) {
         output <- if (success) "(No output)" else "Execution failed."
     }
     list(success = success, payload = charToRaw(enc2utf8(output)))
+}
+
+# This debugger deliberately steps over one complete top-level R expression at
+# a time. Calls within that expression are NOT interruptible or inspectable.
+# Keep parsed language objects, not deparsed/reconstructed source, so evaluation
+# retains the actual R AST and the persistent user workspace.
+debug_reply <- function(success = TRUE, output = "", executed_line = NULL) {
+    next_line <- if (identical(debug_state, "paused") &&
+                     debug_index <= length(debug_lines)) debug_lines[[debug_index]] else NULL
+    line_json <- function(value) if (is.null(value) || is.na(value)) "null" else as.character(value)
+    json <- paste0('{"state":', json_quote(debug_state),
+                   ',"next_line":', line_json(next_line),
+                   ',"executed_line":', line_json(executed_line),
+                   ',"index":', debug_index,
+                   ',"total":', length(debug_lines),
+                   ',"output":', json_quote(substr(output, 1L, 2048L)), "}")
+    if (nchar(json, type = "bytes") > 20000L)
+        json <- '{"state":"error","next_line":null,"executed_line":null,"index":0,"total":0,"output":"Debug output exceeds limit."}'
+    list(success = success, payload = charToRaw(enc2utf8(json)))
+}
+
+debug_start <- function(source) {
+    if (identical(debug_state, "paused"))
+        return(debug_reply(FALSE, "Stop the paused R debug session before starting another."))
+    # Parsing is nonexecuting. A syntax failure must leave no pending work.
+    debug_expressions <<- NULL
+    debug_lines <<- integer(0)
+    debug_index <<- 1L
+    debug_state <<- "idle"
+    parsed <- tryCatch(parse(text = source, keep.source = TRUE),
+                       error = function(error) error)
+    if (inherits(parsed, "error"))
+        return(debug_reply(FALSE, paste0("R syntax error: ", conditionMessage(parsed))))
+    if (length(parsed) > 1024L)
+        return(debug_reply(FALSE, "R debugger supports at most 1024 top-level expressions."))
+    refs <- attr(parsed, "srcref", exact = TRUE)
+    debug_lines <<- vapply(seq_along(parsed), function(index) {
+        if (length(refs) < index || is.null(refs[[index]])) return(NA_integer_)
+        as.integer(refs[[index]][[1L]])
+    }, integer(1L), USE.NAMES = FALSE)
+    debug_expressions <<- parsed
+    debug_state <<- if (length(parsed)) "paused" else "done"
+    debug_reply()
+}
+
+debug_step <- function() {
+    if (!identical(debug_state, "paused"))
+        return(debug_reply(FALSE, "No paused R expression is available."))
+    line <- debug_lines[[debug_index]]
+    # Execute exactly one parsed expression, preserving all existing R evaluation,
+    # warning, stdout, error and plot-capture behavior.
+    expression <- as.expression(list(debug_expressions[[debug_index]]))
+    result <- evaluate_source("", expressions_override = expression)
+    debug_index <<- debug_index + 1L
+    debug_state <<- if (!result$success) "error" else if (
+        debug_index > length(debug_expressions)) "done" else "paused"
+    debug_reply(result$success, rawToChar(result$payload), line)
+}
+
+debug_stop <- function() {
+    debug_expressions <<- NULL
+    debug_lines <<- integer(0)
+    debug_index <<- 1L
+    debug_state <<- "idle"
+    debug_reply()
 }
 
 # Check actual R grammar in the persistent interpreter without evaluating
@@ -585,11 +657,11 @@ repeat {
     header <- read_exact(9L)
     if (is.null(header)) break
     header_text <- rawToChar(header)
-    if (!grepl("^[ECITPKLNUV][0-9a-f]{8}$", header_text)) break
+    if (!grepl("^[ECITPKLNUVBSDQ][0-9a-f]{8}$", header_text)) break
     length_text <- substr(header_text, 2L, 9L)
     length_value <- strtoi(length_text, base = 16L)
     if (is.na(length_value) || length_value > MAX_SOURCE ||
-        (substr(header_text, 1L, 1L) %in% c("I", "P", "K") && length_value != 0L)) break
+        (substr(header_text, 1L, 1L) %in% c("I", "P", "K", "S", "D", "Q") && length_value != 0L)) break
     payload <- read_exact(length_value)
     if (is.null(payload)) break
     source <- if (length(payload) == 0L) "" else tryCatch(
@@ -605,6 +677,10 @@ repeat {
             list(success = FALSE, payload = charToRaw("R package inventory unavailable.")))
     } else if (is.na(source)) {
         list(success = FALSE, payload = charToRaw("Invalid UTF-8 source."))
+    } else if (identical(debug_state, "paused") &&
+               substr(header_text, 1L, 1L) %in% c("E", "L", "N", "V", "U")) {
+        list(success = FALSE, payload = charToRaw(
+            "R debugger is paused; finish or stop before executing other code."))
     } else if (substr(header_text, 1L, 1L) == "L") {
         load_installed_package(source)
     } else if (substr(header_text, 1L, 1L) == "N") {
@@ -613,6 +689,14 @@ repeat {
         update_cran_package(source)
     } else if (substr(header_text, 1L, 1L) == "U") {
         remove_user_package(source)
+    } else if (substr(header_text, 1L, 1L) == "B") {
+        debug_start(source)
+    } else if (substr(header_text, 1L, 1L) == "S") {
+        debug_step()
+    } else if (substr(header_text, 1L, 1L) == "D") {
+        debug_stop()
+    } else if (substr(header_text, 1L, 1L) == "Q") {
+        debug_reply()
     } else if (substr(header_text, 1L, 1L) == "C") {
         check_source(source)
     } else if (substr(header_text, 1L, 1L) == "T") {

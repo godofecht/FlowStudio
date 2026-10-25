@@ -1,5 +1,35 @@
 # FlowStudio RStudio parity matrix
 
+## 2026-10-25: native R top-level expression stepping (implementation; acceptance pending)
+
+FlowStudio's Flow-owned localhost server now exposes intent/origin-gated
+`POST /api/debug/r/{start,step,stop,status}` operations. The existing C
+length-framed IPC sends distinct operations to the persistent Rscript kernel.
+Starting parses actual R source with source references but **does not execute**.
+Each Step evaluates exactly one original parsed top-level expression in the
+existing R workspace, preserving ordinary stdout, warnings, error handling
+and plot capture. The browser's R expression debugger panel displays next
+source line, completed expression and bounded output. While paused, ordinary
+R evaluation and package mutations are refused; status and read-only
+inspection remain available. Syntax errors and execution failures do not
+silently advance through remaining source.
+
+**Status: partial / implementation committed; independent native and physical
+browser acceptance pending.** Real Rscript IPC assertions cover source lines,
+three-expression stepping, workspace persistence, mutation exclusion, parse
+errors, failure handling and stop. Live Flow HTTP acceptance covers actual
+Rscript stepping and origin/intent rejection. Browser unit tests cover controls,
+client validation and static route wiring; the optional physical-browser
+runner now exercises real DOM-to-Rscript stepping. None of these new tests
+is claimed passing until executed. Local Rscript and Flow compilers are
+unavailable in the authoring environment; CI must compile Flow 2.0.0 on
+Linux/macOS and execute the real tests. This is **not** function breakpoints,
+step-into/over, stack-frame evaluation or full RStudio debugging; an entire
+function call inside one top-level expression executes without interruption.
+Authenticated remote sessions and complete RStudio parity remain missing.
+No hosted CI configuration was changed.
+
+
 ## 2026-10-25: bounded native R runtime call-stack diagnostics (Linux/macOS CI passed)
 
 The persistent Rscript interpreter now captures a bounded deparsed call chain

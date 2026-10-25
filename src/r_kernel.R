@@ -1,6 +1,6 @@
 # FlowStudio native R kernel: length-framed, single-user persistent session.
 # This is not a sandbox. Evaluated R code inherits the local user's permissions.
-# stdin: E (execute), C (parse), I (inspect), T (table), P (plot), K (packages), L (load), N (install from CRAN), U (remove user package) + 8 lowercase hex digits + UTF-8 payload.
+# stdin: E (execute), C (parse), I (inspect), T (table), P (plot), K (packages), L (load), N (install from CRAN), V (update user package), U (remove user package) + 8 lowercase hex digits + UTF-8 payload.
 # fd 3: 0/1 + 8 lowercase hex digits + bounded UTF-8 output.
 MAX_SOURCE <- 131072L
 MAX_OUTPUT <- 131072L
@@ -263,6 +263,64 @@ install_cran_package <- function(name) {
     })
 }
 
+
+# Update an existing user-library package only when CRAN advertises a newer
+# version. Never overwrite system libraries or packages loaded in this kernel.
+# Package installation runs third-party code as the local user; no rollback is
+# promised if an external package installer fails partway through.
+update_cran_package <- function(name) {
+    if (!grepl("^[A-Za-z][A-Za-z0-9.]{0,79}$", name) ||
+        grepl("..", name, fixed = TRUE) || endsWith(name, ".")) {
+        return(list(success = FALSE, payload = charToRaw("Invalid R package name.")))
+    }
+    tryCatch({
+        if (!dir.exists(user_library))
+            stop("R package is not installed in the FlowStudio user library; system packages cannot be updated.")
+        installed <- utils::installed.packages(lib.loc = user_library)
+        index <- match(name, installed[, "Package"])
+        if (is.na(index))
+            stop("R package is not installed in the FlowStudio user library; system packages cannot be updated.")
+        if (paste0("package:", name) %in% search() || name %in% loadedNamespaces())
+            stop("R package is loaded in the native session; reset the R session before updating it.")
+        if (file.access(user_library, 2L) != 0L)
+            stop("FlowStudio user R library is not writable.")
+        old_version <- installed[index, "Version"]
+        test_mode <- identical(Sys.getenv("FLOWSTUDIO_R_TEST_MODE"), "1")
+        mirror <- "https://cloud.r-project.org"
+        if (test_mode) {
+            local_mirror <- Sys.getenv("FLOWSTUDIO_R_TEST_REPO")
+            if (startsWith(local_mirror, "file://")) mirror <- local_mirror
+        }
+        package_type <- if (test_mode) "source" else getOption("pkgType")
+        previous_timeout <- getOption("timeout")
+        on.exit(options(timeout = previous_timeout), add = TRUE)
+        options(timeout = 120L)
+        repository <- utils::available.packages(
+            repos = c(CRAN = mirror), type = package_type, cacheOK = FALSE)
+        remote_index <- match(name, repository[, "Package"])
+        if (is.na(remote_index))
+            stop("R package is unavailable from the configured CRAN repository.")
+        remote_version <- repository[remote_index, "Version"]
+        if (utils::compareVersion(remote_version, old_version) <= 0L)
+            return(list(success = TRUE, payload = charToRaw(enc2utf8(
+                paste0("R package ", name, " is up to date at ", old_version, ".")))))
+        suppressWarnings(utils::install.packages(
+            pkgs = name, lib = user_library, repos = c(CRAN = mirror),
+            type = package_type, dependencies = NA, quiet = TRUE, Ncpus = 1L))
+        after <- utils::installed.packages(lib.loc = user_library)
+        after_index <- match(name, after[, "Package"])
+        if (is.na(after_index) ||
+            utils::compareVersion(after[after_index, "Version"], remote_version) < 0L)
+            stop("R package update did not complete. Check connectivity, build tools and the user library.")
+        list(success = TRUE, payload = charToRaw(enc2utf8(paste0(
+            "Updated R package ", name, " from ", old_version, " to ",
+            after[after_index, "Version"], " in the FlowStudio user library."))))
+    }, error = function(error) {
+        list(success = FALSE, payload = charToRaw(enc2utf8(
+            substr(conditionMessage(error), 1L, 1024L))))
+    })
+}
+
 # Remove only packages installed into FlowStudio's own user library.
 # Never remove base/site libraries, and refuse loaded namespaces to avoid
 # deleting package files that the persistent R process is still using.
@@ -503,7 +561,7 @@ repeat {
     header <- read_exact(9L)
     if (is.null(header)) break
     header_text <- rawToChar(header)
-    if (!grepl("^[ECITPKLNU][0-9a-f]{8}$", header_text)) break
+    if (!grepl("^[ECITPKLNUV][0-9a-f]{8}$", header_text)) break
     length_text <- substr(header_text, 2L, 9L)
     length_value <- strtoi(length_text, base = 16L)
     if (is.na(length_value) || length_value > MAX_SOURCE ||
@@ -527,6 +585,8 @@ repeat {
         load_installed_package(source)
     } else if (substr(header_text, 1L, 1L) == "N") {
         install_cran_package(source)
+    } else if (substr(header_text, 1L, 1L) == "V") {
+        update_cran_package(source)
     } else if (substr(header_text, 1L, 1L) == "U") {
         remove_user_package(source)
     } else if (substr(header_text, 1L, 1L) == "C") {

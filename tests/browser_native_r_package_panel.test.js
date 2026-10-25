@@ -68,6 +68,37 @@ test("native R package removal requires confirmation and never appears in webR",
   await new Promise(resolve=>setImmediate(resolve));
   assert.deepEqual(calls,["remove:FlowStudioFixture","list"]);
 });
+
+test("native R package update requires confirmation and is hidden for webR",async()=>{
+  const calls=[],notices=[];
+  const target=node(),input=node("input"),installButton=node("button"),
+    listButton=node("button"),updateButton=node("button");
+  let native=true,confirmed=false;
+  const panel=create({document:{createElement:node},target,input,installButton,listButton,
+    updateButton,language:()=>"r",rNative:()=>native,
+    confirmUpdate:name=>{assert.equal(name,"FlowStudioFixture");return confirmed;},
+    rSession:()=>({
+      async packages(){calls.push("list");return {ok:true,packages:[{name:"FlowStudioFixture",version:"0.0.2"}]};},
+      async updatePackage(name){calls.push("update:"+name);return {ok:true,output:"Updated R package "+name+" from 0.0.1 to 0.0.2."};}
+    }),request:async()=>{throw Error("wrong runtime");},notice:text=>notices.push(text)});
+  assert.equal(updateButton.hidden,false);
+  input.value="FlowStudioFixture";
+  updateButton.click();
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(calls,[]);
+  assert.ok(notices.some(text=>text.includes("cancelled")));
+  confirmed=true;
+  updateButton.click();
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(calls,["update:FlowStudioFixture","list"]);
+  assert.ok(notices.some(text=>text.includes("from 0.0.1 to 0.0.2")));
+  native=false;panel.updateLanguage();
+  assert.equal(updateButton.hidden,true);
+  updateButton.click();
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(calls,["update:FlowStudioFixture","list"]);
+});
+
 test("native R package panel refuses expression injection before install or load",async()=>{
   const calls=[], notices=[];
   const target=node(),input=node("input"),installButton=node("button"),listButton=node("button");

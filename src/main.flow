@@ -27,6 +27,7 @@ extern {
     function fs_r_load_package(name: string) -> string
     function fs_r_install_package(name: string) -> string
     function fs_r_remove_package(name: string) -> string
+    function fs_r_update_package(name: string) -> string
     function fs_r_status() -> i32
     function fs_r_reset() -> void
     function fs_py_run(code: string) -> string
@@ -222,6 +223,13 @@ function send_r_package_install(name: string) -> void {
 # Loaded packages and system libraries cannot be removed.
 function send_r_package_remove(name: string) -> void {
     let output: string = fs_r_remove_package(name)
+    fs_reply(fs_r_status(), "text/plain; charset=utf-8", output)
+}
+
+# Update only packages in FlowStudio's dedicated user library; R rejects
+# loaded namespaces, system libraries and unavailable CRAN updates.
+function send_r_package_update(name: string) -> void {
+    let output: string = fs_r_update_package(name)
     fs_reply(fs_r_status(), "text/plain; charset=utf-8", output)
 }
 
@@ -623,6 +631,10 @@ function dispatch() -> void {
         }
         if eq(path, "/api/packages/r/remove") {
             send_r_package_remove(fs_body())
+            return
+        }
+        if eq(path, "/api/packages/r/update") {
+            send_r_package_update(fs_body())
             return
         }
         if eq(path, "/api/debug/python/start") {

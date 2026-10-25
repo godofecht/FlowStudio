@@ -19,7 +19,7 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | Variable inspector | partial / native Python and R bounded metadata snapshots cross-platform HTTP accepted; opt-in browser rendering of native R metadata cross-platform Node/Flow HTTP CI accepted (physical-browser pending); native Python exact-builtin nested metadata tree cross-platform CI accepted (unit/HTTP/DOM); R array dimensions and failed-lazy-binding recovery cross-platform HTTP accepted; browser R bounded two-level plain-list tree and active-binding protection accepted by Ubuntu/macOS CI #40090303070 (real Rscript, Node, native Flow/HTTP); side-effect-free bounded browser Python nested inspection accepted by cross-platform CI #40140193181 (real CPython/Node/native Flow HTTP), but real Pyodide physical-browser acceptance and arbitrary-object introspection remain missing | Nested objects / types / dimensions inspectable and refresh after execution |
 | Plot viewer | partial / Node-tested PNG import and integrated workspace tab; native unverified | png/svg plot history, zoom, save and deterministic device lifecycle |
 | Project explorer | partial / browser Pages open/create/save and confirmed active-file delete with baseline conflict checks; 10 regression tests V8-shim passed; physical-browser deletion unverified | Open project, tree navigation, source-file creation and save; scoped delete is implemented, copy-verify-delete rename implemented with non-atomic filesystem race limits; physical-browser acceptance remains missing |
-| Data viewer | partial / CSV/TSV plus bounded Python/R environment table snapshots wired; real Pyodide/webR and physical browser unverified | Interactive sortable/filterable tabular datasets including missing values |
+| Data viewer | partial / CSV/TSV and browser Python/webR table snapshots; native Rscript data.frame/matrix bounded preview implemented on feature branch (real Rscript/Flow HTTP and physical-browser CI pending); no remote data browsing | Interactive sortable/filterable tabular datasets including missing values |
 | Completion / language server | partial / browser Python/R runtime prefix completion cross-platform CI accepted; Flow lexical completion accepted by Ubuntu/macOS CI; explicit-type Flow struct and evolution-state member completion cross-platform CI accepted (#40095770668, 473 JS passes, 2 skips per platform, native Flow/HTTP accepted); physical-browser verification pending; full semantic/LSP completion missing | R, Flow and Python completion/diagnostics |
 | Packages pane | partial / browser Python inventory/install and webR 0.6.0 inventory/install; mocked Node tests, live interpreters unverified; native Rscript mode explicitly does not support package management | List, install, update with environment-aware package sources |
 | Git pane | partial / native Flow status, diff, stage, unstage and commit previously accepted cross-platform; branch list/create/switch accepted by CI #40117614745 on Ubuntu/macOS (PR #37 merged); physical-browser verification missing; branch deletion, remote tracking and merge missing | Status, diff, stage, unstage, commit and branch operations |
@@ -38,6 +38,28 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
 
 
+
+## 2026-10-25: native Rscript table previews (implementation; acceptance pending)
+
+The persistent native R kernel adds a read-only `T` IPC operation for named
+base `data.frame` and classless atomic matrix variables. Flow owns the
+origin/intent-gated `POST /api/table/r` route; the existing native R browser
+session serializes table requests with execution and reset. The environment
+View action displays the same bounded sortable/filterable grid as browser
+webR, with up to 200 rows, 32 columns, 160 characters per cell and a
+65 KiB output budget. NA cells are blank, plain factors display labels,
+and classed/unsupported columns are explicitly marked. Active bindings,
+invalid variable names and non-tabular objects are rejected without eval.
+As with existing environment inspection, forcing a lazy R promise may
+still have side effects; this is not a sandbox.
+
+Automated coverage has been added for real Rscript IPC, Flow HTTP
+origin/intent rejection, browser response validation and reset races,
+and optional physical-browser View interaction. **Status: implemented,
+not independently verified** until Ubuntu/macOS native CI and actual
+browser acceptance pass. No hosted CI configuration was changed.
+Native R plotting, package management, debugging and remote sessions
+remain unimplemented; this is not RStudio parity.
 
 ## 2026-10-25: opt-in native Rscript execution from the browser IDE (cross-platform native CI accepted; physical browser pending)
 

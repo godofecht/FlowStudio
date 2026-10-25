@@ -387,6 +387,31 @@ def main() -> None:
         assert nested["type"] == "list" and nested["size"] == 2, nested
         assert nested["children"][0]["name"] == "[[1]] numbers", nested
         assert nested["children"][0]["children"][0]["type"] == "integer", nested
+        # Native R table preview is a read-only IPC operation in the same session.
+        assert request("POST", "/api/table/r", "flowstudio_matrix")[0] == 404
+        assert request("POST", "/api/table/r", "flowstudio_matrix",
+                       {"X-FlowStudio-Intent": "run",
+                        "Origin": "http://attacker.invalid"})[0] == 404
+        status, table_json = request("POST", "/api/table/r", "flowstudio_matrix",
+                                     accepted_headers)
+        assert status == 200, (status, table_json)
+        table = json.loads(table_json)
+        assert table["columns"] == ["Column 1", "Column 2", "Column 3"], table
+        assert table["rows"] == [["1", "3", "5"], ["2", "4", "6"]], table
+        assert table["totalRows"] == 2 and not table["truncated"], table
+        status, _ = request("POST", "/api/run/r",
+                            "flowstudio_frame <- data.frame(x=c('a', 'b'), y=c(NA, 42))",
+                            accepted_headers)
+        assert status == 200, status
+        status, table_json = request("POST", "/api/table/r", "flowstudio_frame",
+                                     accepted_headers)
+        assert status == 200, (status, table_json)
+        frame = json.loads(table_json)
+        assert frame["columns"] == ["x", "y"], frame
+        assert frame["rows"] == [["a", ""], ["b", "42"]], frame
+        status, error = request("POST", "/api/table/r",
+                                "flowstudio_frame;stop('should not run')", accepted_headers)
+        assert status == 422 and "Invalid R table name" in error, (status, error)
         status, _ = request("POST", "/api/inspect/r", "")
         assert status == 404, status
         status, output = request("POST", "/api/run/r",

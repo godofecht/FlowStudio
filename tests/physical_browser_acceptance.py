@@ -135,6 +135,15 @@ def test_native_r(page, timeout: int):
                "42", timeout)
     run_console(page, "r", "cat(fs_native_browser + 3L, '\\n')", "43", timeout)
     assert "fs_native_browser" in page.locator("#environment").inner_text()
+    # Real DOM View -> Flow POST -> persistent R table snapshot -> accessible grid.
+    run_source(page, "r",
+               "fs_native_frame <- data.frame(label=c('alpha', 'beta'), "
+               "score=c(42L, NA_integer_))\ncat('native table ready 42\\n')",
+               "native table ready 42", timeout)
+    page.get_by_role("button", name="View fs_native_frame as table").click()
+    page.get_by_role("heading", name="Snapshot: fs_native_frame").wait_for(timeout=timeout)
+    assert "alpha" in page.locator("#workspace").inner_text()
+    assert "beta" in page.locator("#workspace").inner_text()
 
     page.locator("#source").fill(
         "# %% [r]\nfs_native_nb <- fs_native_browser + 1L\n"

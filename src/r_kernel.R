@@ -1,6 +1,6 @@
 # FlowStudio native R kernel: length-framed, single-user persistent session.
 # This is not a sandbox. Evaluated R code inherits the local user's permissions.
-# stdin: E (execute), C (parse only) or I (inspect) + 8 lowercase hex digits + UTF-8 source.
+# stdin: E (execute), C (parse only), I (inspect) or T (table) + 8 lowercase hex digits + UTF-8 source.
 # fd 3: 0/1 + 8 lowercase hex digits + bounded UTF-8 output.
 MAX_SOURCE <- 131072L
 MAX_OUTPUT <- 131072L
@@ -189,11 +189,119 @@ inspect_workspace <- function() {
     list(success = TRUE, payload = charToRaw(enc2utf8(json)))
 }
 
+
+# Bounded read-only previews from the persistent R workspace. Restrict access
+# to exact base data.frames and classless atomic matrices; never eval a name.
+table_snapshot <- function(name) {
+    if (!grepl("^[A-Za-z][A-Za-z0-9._]{0,119}$", name) ||
+        grepl("\\.\\.", name) || grepl("\\.$", name)) {
+        return(list(success = FALSE, payload = charToRaw("Invalid R table name.")))
+    }
+    if (!exists(name, envir = workspace, inherits = FALSE) ||
+        bindingIsActive(name, workspace)) {
+        return(list(success = FALSE, payload = charToRaw("R table not found or active binding.")))
+    }
+    value <- tryCatch(get(name, envir = workspace, inherits = FALSE),
+                      error = function(error) NULL)
+    if (is.null(value)) {
+        return(list(success = FALSE, payload = charToRaw("R table unavailable.")))
+    }
+    shape <- attr(value, "dim", exact = TRUE)
+    frame <- identical(typeof(value), "list") &&
+             identical(attr(value, "class", exact = TRUE), "data.frame")
+    matrix <- !is.object(value) &&
+              typeof(value) %in% c("logical", "integer", "double", "character") &&
+              is.integer(shape) && length(shape) == 2L &&
+              all(!is.na(shape)) && all(shape >= 0L)
+    if (!frame && !matrix) {
+        return(list(success = FALSE, payload = charToRaw("Select a plain data.frame or atomic matrix.")))
+    }
+    if (frame) {
+        total_columns <- length(unclass(value))
+        if (total_columns < 1L) {
+            return(list(success = FALSE, payload = charToRaw("R table has no columns.")))
+        }
+        columns_data <- unclass(value)
+        first_column <- columns_data[[1L]]
+        total_rows <- length(if (is.object(first_column)) unclass(first_column) else first_column)
+        labels <- attr(value, "names", exact = TRUE)
+    } else {
+        total_rows <- shape[[1L]]
+        total_columns <- shape[[2L]]
+        if (total_columns < 1L) {
+            return(list(success = FALSE, payload = charToRaw("R matrix has no columns.")))
+        }
+        dim_names <- attr(value, "dimnames", exact = TRUE)
+        labels <- if (is.list(dim_names) && !is.object(dim_names) &&
+                      length(dim_names) == 2L && is.character(dim_names[[2L]]) &&
+                      !is.object(dim_names[[2L]])) dim_names[[2L]] else NULL
+    }
+    take_columns <- min(total_columns, 32L)
+    take_rows <- min(total_rows, 200L)
+    label <- function(index) {
+        if (is.character(labels) && !is.object(labels) && length(labels) >= index &&
+            !is.na(labels[[index]]) && nzchar(labels[[index]])) {
+            return(substr(labels[[index]], 1L, 160L))
+        }
+        paste0("Column ", index)
+    }
+    cell_text <- function(row, column) {
+        if (frame) {
+            values <- columns_data[[column]]
+            if (is.object(values)) {
+                levels <- attr(values, "levels", exact = TRUE)
+                if (!identical(attr(values, "class", exact = TRUE), "factor") ||
+                    typeof(values) != "integer" || !is.character(levels) ||
+                    is.object(levels)) {
+                    return("[unsupported column]")
+                }
+                plain <- unclass(values)
+                if (length(plain) < row) return("[invalid column]")
+                code <- plain[[row]]
+                if (is.na(code)) return("")
+                if (code < 1L || code > length(levels)) return("[invalid factor]")
+                return(substr(levels[[code]], 1L, 160L))
+            }
+            if (length(values) < row) return("[invalid column]")
+            if (!typeof(values) %in% c("logical", "integer", "double", "character")) {
+                return("[unsupported column]")
+            }
+            cell <- values[[row]]
+        } else {
+            cell <- value[row, column]
+        }
+        if (is.na(cell)) return("")
+        substr(as.character(cell), 1L, 160L)
+    }
+    column_json <- vapply(seq_len(take_columns), function(i) json_quote(label(i)),
+                          character(1), USE.NAMES = FALSE)
+    rows <- character(0)
+    used <- sum(nchar(column_json, type = "bytes")) + 128L
+    truncated <- total_rows > take_rows || total_columns > take_columns
+    if (take_rows > 0L) for (row in seq_len(take_rows)) {
+        fields <- vapply(seq_len(take_columns),
+                         function(column) json_quote(cell_text(row, column)),
+                         character(1), USE.NAMES = FALSE)
+        entry <- paste0("[", paste(fields, collapse = ","), "]")
+        if (used + nchar(entry, type = "bytes") + 1L > 65000L) {
+            truncated <- TRUE
+            break
+        }
+        rows <- c(rows, entry)
+        used <- used + nchar(entry, type = "bytes") + 1L
+    }
+    json <- paste0('{"columns":[', paste(column_json, collapse = ","),
+                   '],"rows":[', paste(rows, collapse = ","),
+                   '],"totalRows":', total_rows,
+                   ',"truncated":', if (truncated) "true" else "false", "}")
+    list(success = TRUE, payload = charToRaw(enc2utf8(json)))
+}
+
 repeat {
     header <- read_exact(9L)
     if (is.null(header)) break
     header_text <- rawToChar(header)
-    if (!grepl("^[ECI][0-9a-f]{8}$", header_text)) break
+    if (!grepl("^[ECIT][0-9a-f]{8}$", header_text)) break
     length_text <- substr(header_text, 2L, 9L)
     length_value <- strtoi(length_text, base = 16L)
     if (is.na(length_value) || length_value > MAX_SOURCE ||
@@ -210,6 +318,9 @@ repeat {
         list(success = FALSE, payload = charToRaw("Invalid UTF-8 source."))
     } else if (substr(header_text, 1L, 1L) == "C") {
         check_source(source)
+    } else if (substr(header_text, 1L, 1L) == "T") {
+        tryCatch(table_snapshot(source), error = function(error)
+            list(success = FALSE, payload = charToRaw("R table snapshot failed.")))
     } else {
         evaluate_source(source)
     }

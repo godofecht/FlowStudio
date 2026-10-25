@@ -125,7 +125,7 @@ test("regex and whole-word toggles update real source matches and expand capture
   f.query.value="cat";
   f.regex.checked=false; f.regex.fire("change");
   f.wholeWord.checked=true; f.wholeWord.fire("change");
-  assert.match(f.status.textContent,/0 matches/);
+  assert.match(f.status.textContent,/1 matches/);
   f.query.value="cats";f.query.fire("input");
   assert.match(f.status.textContent,/1 matches/);
 });

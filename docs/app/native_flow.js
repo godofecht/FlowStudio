@@ -270,10 +270,15 @@ function createRSession() {
           (payload.svg !== null && (typeof payload.svg !== "string" ||
             new TextEncoder().encode(payload.svg).length > 60000 ||
             !/<svg[\s>]/.test(payload.svg) || !payload.svg.includes("</svg>"))) ||
+          (payload.pdf !== null && (typeof payload.pdf !== "string" ||
+            payload.pdf.length > 120000 || payload.pdf.length < 8 ||
+            payload.pdf.length % 2 !== 0 || !payload.pdf.startsWith("25504446") ||
+            !/^[0-9a-f]+$/.test(payload.pdf))) ||
+          (payload.svg !== null && payload.pdf !== null) ||
           (payload.warning !== null && (typeof payload.warning !== "string" ||
             payload.warning.length > 200)))
         throw new Error("Invalid native R SVG plot response.");
-      return {ok:true, svg:payload.svg, warning:payload.warning};
+      return {ok:true, svg:payload.svg, pdf:payload.pdf, warning:payload.warning};
     });
   }
   function checkSyntax(code) {

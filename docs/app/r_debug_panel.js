@@ -44,7 +44,7 @@ function create({native, source, language, runtime, startButton, stepButton,
     try {
       const line = action === "continue" ? targetLine.value.trim() :
         action === "evaluate" ? watchExpression.value : "";
-      if (line && (line.length > 447 ||
+      if (action === "continue" && line && (line.length > 447 ||
           !/^[1-9][0-9]{0,5}(?:,[1-9][0-9]{0,5}){0,63}$/.test(line)))
         throw Error("R continue targets must be 1 to 64 comma-separated positive source lines.");
       if (action === "evaluate" && (!line.trim() ||

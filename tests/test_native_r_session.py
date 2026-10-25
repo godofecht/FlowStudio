@@ -47,6 +47,8 @@ class NativeRSessionTest(unittest.TestCase):
             mirror.mkdir(parents=True)
             shutil.move(str(archive), str(mirror / archive.name))
             environment = os.environ.copy()
+            environment["HOME"] = str(Path(temp))
+            environment["XDG_DATA_HOME"] = str(Path(temp) / "xdg-data")
             environment["FLOWSTUDIO_R_TEST_MODE"] = "1"
             environment["FLOWSTUDIO_R_TEST_REPO"] = (Path(temp) / "cran").as_uri()
             subprocess.run(

@@ -33,7 +33,7 @@ test("native R expression debugger panel only enables real localhost Rscript con
     async debugRCommand(action, line) {
       calls.push([action, line]);
       if (action === "evaluate") return snapshot("paused", {output:"42"});
-      if (action === "continue" && (line === "2" || line === "2,3"))
+      if (action === "continue" && (line === "2" || line === "2,3" || line === "2?counter>=3,3?counter<9"))
         return snapshot("paused", {index:2, next_line:2, executed_line:1});
       return action === "step" ? snapshot("done", {index:3, executed_line:2, output:"42"}) :
         snapshot("idle", {total:0});
@@ -66,6 +66,10 @@ test("native R expression debugger panel only enables real localhost Rscript con
   targetLine.value = "2,3";
   assert.equal(await p.execute("continue"), true);
   assert.match(target.textContent, /Next expression at line 2/);
+  targetLine.value = "2?counter>=3,3?counter<9";
+  assert.equal(await p.execute("continue"), true);
+  targetLine.value = "2?counter>=NaN";
+  assert.equal(await p.execute("continue"), false);
   targetLine.value = "2";
   assert.equal(await p.execute("continue"), true);
   assert.match(target.textContent, /Next expression at line 2/);
@@ -73,7 +77,8 @@ test("native R expression debugger panel only enables real localhost Rscript con
   assert.match(target.textContent, /Output:\n42/);
   assert.equal(stepButton.disabled, true);
   assert.deepEqual(calls, [["start", source.value], ["evaluate", "a + 1L"],
-    ["continue", "2,3"], ["continue", "2"], ["step", ""]]);
+    ["continue", "2,3"], ["continue", "2?counter>=3,3?counter<9"],
+    ["continue", "2"], ["step", ""]]);
   assert.equal(await p.execute("stop"), true);
   assert.equal(startButton.disabled, false);
   language.value = "python";
@@ -134,6 +139,10 @@ test("native R debugger client rejects malformed and non-local responses", async
     assert.equal(calls[2].opts.body, "3");
     await native.debugRCommand("continue", "3,7,12");
     assert.equal(calls[3].opts.body, "3,7,12");
+    await native.debugRCommand("continue", "2?counter>=3,4?counter==5");
+    assert.equal(calls[4].opts.body, "2?counter>=3,4?counter==5");
+    await assert.rejects(native.debugRCommand("continue", "2?counter>=NaN"), /numeric conditions/);
+    await assert.rejects(native.debugRCommand("continue", "2?counter>=1;stop(1)"), /numeric conditions/);
     await assert.rejects(native.debugRCommand("continue", "3,,7"), /comma-separated/);
     await assert.rejects(native.debugRCommand("continue", "1,".repeat(64) + "2"), /comma-separated/);
     globalThis.fetch = async () => ({ok:true, status:200, headers:{get:()=>null},

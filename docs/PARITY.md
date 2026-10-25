@@ -1,5 +1,40 @@
 # FlowStudio RStudio parity matrix
 
+
+## 2026-10-25: project-wide literal/regex replacement (implementation; cross-platform CI pending)
+
+The native four-pane IDE now previews project-wide literal or Unicode whole-word
+regex replacements, including numbered and named capture groups, over actual
+browser-granted local source files. A separate, explicit confirmation is required
+before any writes. The project API uses the same tested editor replacement
+engine as in-buffer replacement and never sends project source to the Flow
+server. The Flow-owned localhost execution backend remains unchanged.
+
+A preview is refused if the project search was truncated or skipped large files,
+if a match moved before preview, if more than 50 files would change, or if the
+8-million-character combined before/after preview budget is exceeded. Search
+itself remains limited to 200 matches and to 128 KiB files for regex or 1 MiB
+files for literal matching. Before writing, the implementation verifies every
+target file still matches its preview and rejects any target open in an editor
+tab (including clean tabs), avoiding stale editor buffers and accidental
+overwrites of unsaved work. Each file is rechecked before its write and the
+written content is verified. A later permission or filesystem failure may leave
+earlier files changed: **multi-file writes are not atomic** and no rollback is
+claimed. The Pages project API exposes the same preview/apply methods, but the
+Pages UI does not yet expose project-wide replacement controls.
+
+**Status: partial / source implementation committed on a feature branch,
+independent CI and physical-browser acceptance pending.** Automated tests cover
+real in-memory File System Access API handle semantics, regex captures, Unicode,
+zero-write previews, stale files, open-tab protection, truncated searches,
+aborts and partial write failures. The replacement API tests passed 18/18 in
+an isolated V8 execution of the actual source; this is not Node CI or a real
+browser pass. Native editor VM integration tests were added but not yet
+independently executed. No hosted CI configuration or Flow compiler syntax
+changed. R/Flow interactive debugging, authenticated remote sessions and
+RStudio feature parity remain incomplete.
+
+
 ## 2026-10-25: project-wide regex and Unicode whole-word search (cross-platform CI passed)
 
 The native four-pane project search now supports explicit Regex and Word

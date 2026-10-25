@@ -31,7 +31,7 @@ test("native R expression debugger panel only enables real localhost Rscript con
     async debugRStart(code) { calls.push(["start", code]); return snapshot("paused"); },
     async debugRCommand(action, line) {
       calls.push([action, line]);
-      if (action === "continue" && line === 2)
+      if (action === "continue" && (line === "2" || line === "2,3"))
         return snapshot("paused", {index:2, next_line:2, executed_line:1});
       return action === "step" ? snapshot("done", {index:3, executed_line:2, output:"42"}) :
         snapshot("idle", {total:0});
@@ -51,13 +51,18 @@ test("native R expression debugger panel only enables real localhost Rscript con
   assert.equal(continueButton.disabled, false);
   targetLine.value = "abc";
   assert.equal(await p.execute("continue"), false);
+  targetLine.value = "2,,3";
+  assert.equal(await p.execute("continue"), false);
+  targetLine.value = "2,3";
+  assert.equal(await p.execute("continue"), true);
+  assert.match(target.textContent, /Next expression at line 2/);
   targetLine.value = "2";
   assert.equal(await p.execute("continue"), true);
   assert.match(target.textContent, /Next expression at line 2/);
   assert.equal(await p.execute("step"), true);
   assert.match(target.textContent, /Output:\n42/);
   assert.equal(stepButton.disabled, true);
-  assert.deepEqual(calls, [["start", source.value], ["continue", 2], ["step", ""]]);
+  assert.deepEqual(calls, [["start", source.value], ["continue", "2,3"], ["continue", "2"], ["step", ""]]);
   assert.equal(await p.execute("stop"), true);
   assert.equal(startButton.disabled, false);
   language.value = "python";
@@ -107,6 +112,10 @@ test("native R debugger client rejects malformed and non-local responses", async
     await native.debugRCommand("continue", 3);
     assert.equal(calls[1].url, "/api/debug/r/continue");
     assert.equal(calls[1].opts.body, "3");
+    await native.debugRCommand("continue", "3,7,12");
+    assert.equal(calls[2].opts.body, "3,7,12");
+    await assert.rejects(native.debugRCommand("continue", "3,,7"), /comma-separated/);
+    await assert.rejects(native.debugRCommand("continue", "1,".repeat(64) + "2"), /comma-separated/);
     globalThis.fetch = async () => ({ok:true, status:200, headers:{get:()=>null},
       text:async () => '{"state":"paused","index":-1}'});
     await assert.rejects(native.debugRCommand("status"), /Invalid native R debugger response/);

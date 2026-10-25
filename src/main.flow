@@ -183,9 +183,9 @@ function send_r_debug(action: string, source: string) -> void {
     let mut output: string = ""
     if eq(action, "start") {
         output = fs_r_debug_start(source)
-    } else if eq(action, "step") {
+    } elif eq(action, "step") {
         output = fs_r_debug_step()
-    } else if eq(action, "stop") {
+    } elif eq(action, "stop") {
         output = fs_r_debug_stop()
     } else {
         output = fs_r_debug_status()

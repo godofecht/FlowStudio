@@ -153,6 +153,23 @@ def test_native_conditional_debugger(page, timeout: int):
         timeout=timeout)
     assert "4" in page.locator("#pythonDebugOutput").inner_text()
 
+    # Opt-in exception tracing must pause on a real caught CPython exception.
+    page.locator("#pythonBreakpoints").fill("")
+    page.locator("#pythonPauseExceptions").check()
+    page.locator("#source").fill(
+        "try:\n    raise LookupError('caught')\n"
+        "except LookupError:\n    browser_recovered = 42\n")
+    page.locator("#pythonDebugStart").click()
+    page.wait_for_function(
+        "() => document.querySelector('#pythonDebugOutput').textContent.includes('Exception: LookupError at line 2')",
+        timeout=timeout)
+    assert "Python debugger: paused" in page.locator("#pythonDebugOutput").inner_text()
+    page.locator("#pythonDebugContinue").click()
+    page.wait_for_function(
+        "() => document.querySelector('#pythonDebugOutput').textContent.includes('Python debugger: done')",
+        timeout=timeout)
+    assert "Exception: LookupError" not in page.locator("#pythonDebugOutput").inner_text()
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)

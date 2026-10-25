@@ -113,11 +113,15 @@ class DebugSession:
         self.message = ""
         self.stop_requested = False
         self.thread: threading.Thread | None = None
+        self.pause_on_exception = False
+        self.last_exception: BaseException | None = None
+        self.exception: dict[str, object] | None = None
 
     def _snapshot(self) -> dict[str, object]:
         output = self.writer.result().decode("utf-8", "replace")[:MAX_OUTPUT] if self.writer else ""
         return {"state": self.state, "ok": self.ok, "stack": self.frames,
-                "output": output, "message": self.message[:1024]}
+                "output": output, "message": self.message[:1024],
+                "exception": self.exception}
 
     def snapshot(self) -> dict[str, object]:
         with self.cv:
@@ -139,18 +143,34 @@ class DebugSession:
         return bool(_COMPARE[comparison](value, number))
 
     def _trace(self, frame: Any, event: str, arg: object) -> Any:
-        if event != "line" or frame.f_code.co_filename != SOURCE_NAME:
+        if frame.f_code.co_filename != SOURCE_NAME or event not in ("line", "exception"):
             return self._trace
         with self.cv:
             if self.stop_requested:
                 raise _Stopped()
-            depth = _source_depth(frame)
-            pause = (self._breakpoint_hit(frame) or self.mode == "step" or
-                     (self.mode == "next" and depth <= self.anchor_depth) or
-                     (self.mode == "finish" and depth < self.anchor_depth))
+            if event == "exception":
+                if not self.pause_on_exception:
+                    return self._trace
+                exception_type, exception_value, _ = arg
+                # A raised exception propagates through several source frames.
+                # Pause at its first source frame, not once per unwinding frame.
+                if exception_value is self.last_exception:
+                    return self._trace
+                self.last_exception = exception_value
+                # Never invoke user exception __str__, __repr__ or attributes.
+                self.exception = {"type": type.__getattribute__(exception_type, "__name__")[:80],
+                                  "line": frame.f_lineno}
+                pause = True
+            else:
+                depth = _source_depth(frame)
+                pause = (self._breakpoint_hit(frame) or self.mode == "step" or
+                         (self.mode == "next" and depth <= self.anchor_depth) or
+                         (self.mode == "finish" and depth < self.anchor_depth))
+                if pause:
+                    self.exception = None
             if not pause:
                 return self._trace
-            self.anchor_depth = depth
+            self.anchor_depth = _source_depth(frame)
             self.frames = _stack(frame)
             self.state = "paused"
             self.cv.notify_all()
@@ -175,6 +195,8 @@ class DebugSession:
             finally:
                 sys.settrace(None)
         with self.cv:
+            self.last_exception = None
+            self.exception = None
             self.ok = ok
             self.message = message
             self.state = "stopped" if self.stop_requested else "done"
@@ -187,8 +209,12 @@ class DebugSession:
     def start(self, data: str, namespace: dict[str, object], writer: Any) -> dict[str, object]:
         try:
             request = json.loads(data)
-            if type(request) is not dict or set(request) != {"source", "breakpoints"}:
-                raise ValueError("Expected source and breakpoints.")
+            if type(request) is not dict or set(request) not in (
+                    {"source", "breakpoints"}, {"source", "breakpoints", "pause_on_exception"}):
+                raise ValueError("Expected source, breakpoints and optional pause_on_exception.")
+            pause_on_exception = request.get("pause_on_exception", False)
+            if type(pause_on_exception) is not bool:
+                raise ValueError("pause_on_exception must be a boolean.")
             source, points = request["source"], request["breakpoints"]
             if type(source) is not str or not source or len(source.encode("utf-8")) > 120000:
                 raise ValueError("Source must contain 1 to 120000 UTF-8 bytes.")
@@ -199,7 +225,7 @@ class DebugSession:
             if self.state in ("running", "paused"):
                 return {"state": self.state, "ok": False, "stack": [], "output": "", "message": "Debugger already active."}
             self.state = "running"
-            self.mode = "run" if parsed else "step"
+            self.mode = "run" if parsed or pause_on_exception else "step"
             self.anchor_depth = 0
             self.breakpoints = parsed
             self.frames = []
@@ -207,6 +233,9 @@ class DebugSession:
             self.ok = True
             self.message = ""
             self.stop_requested = False
+            self.pause_on_exception = pause_on_exception
+            self.last_exception = None
+            self.exception = None
             self.thread = threading.Thread(target=self._execute, args=(source, namespace), daemon=True)
             self.thread.start()
             return self._wait()

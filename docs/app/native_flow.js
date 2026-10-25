@@ -49,10 +49,12 @@ async function tracePython(code) {
   catch (_) { throw new Error("Native Python trace response was not JSON."); }
   return {ok:response.ok, data, status:response.status};
 }
-async function debugPythonStart(source, breakpoints) {
+async function debugPythonStart(source, breakpoints, pauseOnException = false) {
   if (typeof source !== "string" || !source.trim() ||
       !Array.isArray(breakpoints) || breakpoints.length > 64)
     throw new Error("Python debugger requires source and up to 64 valid breakpoint lines.");
+  if (typeof pauseOnException !== "boolean")
+    throw new Error("Pause on exception must be a boolean.");
   const lineCount = source.split(/\r\n|\r|\n/).length;
   const condition = /^[A-Za-z_][A-Za-z_0-9]*(?:==|!=|>=|<=|>|<)-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$/;
   const lines = breakpoints.map(point => {
@@ -68,7 +70,9 @@ async function debugPythonStart(source, breakpoints) {
   if (lines.some(line => !Number.isSafeInteger(line) || line < 1 || line > lineCount) ||
       new Set(lines).size !== lines.length)
     throw new Error("Python debugger requires distinct valid breakpoint lines.");
-  return debugPythonResponse("/api/debug/python/start", JSON.stringify({source, breakpoints}));
+  const payload = pauseOnException ? {source, breakpoints, pause_on_exception:true} :
+    {source, breakpoints};
+  return debugPythonResponse("/api/debug/python/start", JSON.stringify(payload));
 }
 async function debugPythonCommand(action) {
   if (!["step", "next", "finish", "continue", "stop", "status"].includes(action))

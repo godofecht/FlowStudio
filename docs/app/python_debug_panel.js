@@ -10,6 +10,14 @@ function validate(data) {
       data.stack.length > 16 || typeof data.output !== "string" ||
       data.output.length > 131072 || typeof data.message !== "string" ||
       data.message.length > 1024) throw Error("Invalid native debugger response.");
+  if (data.exception !== undefined && data.exception !== null &&
+      (!data.exception || typeof data.exception !== "object" ||
+       Array.isArray(data.exception) ||
+       Object.keys(data.exception).sort().join(",") !== "line,type" ||
+       typeof data.exception.type !== "string" ||
+       data.exception.type.length > 80 ||
+       !Number.isSafeInteger(data.exception.line) || data.exception.line < 1))
+    throw Error("Invalid native debugger exception metadata.");
   for (const frame of data.stack) {
     if (!frame || !Number.isSafeInteger(frame.line) || frame.line < 1 ||
         typeof frame.function !== "string" || frame.function.length > 80 ||
@@ -46,6 +54,8 @@ function format(data) {
   validate(data);
   const lines = ["Python debugger: " + data.state + (data.ok ? "" : " (error)")];
   if (data.message) lines.push(data.message);
+  if (data.exception) lines.push("Exception: " + data.exception.type +
+    " at line " + data.exception.line + " (raised; may be caught)");
   for (const frame of data.stack) {
     lines.push("Line " + frame.line + " in " + frame.function);
     for (const [name, value] of Object.entries(frame.locals))
@@ -54,7 +64,7 @@ function format(data) {
   if (data.output) lines.push("Output:\n" + data.output);
   return lines.join("\n");
 }
-function create({native, source, language, breakpoints, startButton, stepButton,
+function create({native, source, language, breakpoints, pauseOnException, startButton, stepButton,
                  nextButton, finishButton, continueButton, stopButton, statusButton, target, notice}) {
   if (!native || !source || !language || !breakpoints || !startButton ||
       !stepButton || !nextButton || !finishButton || !continueButton || !stopButton || !statusButton || !target)
@@ -82,7 +92,8 @@ function create({native, source, language, breakpoints, startButton, stepButton,
       if (action === "start") {
         if (language.value !== "python") throw Error("Select Python to debug native source.");
         const lines = source.value.split(/\r\n|\r|\n/).length;
-        result = await native.debugPythonStart(source.value, parseBreakpoints(breakpoints.value, lines));
+        result = await native.debugPythonStart(source.value, parseBreakpoints(breakpoints.value, lines),
+          !!(pauseOnException && pauseOnException.checked));
       } else result = await native.debugPythonCommand(action);
       validate(result);
       state = result.state;

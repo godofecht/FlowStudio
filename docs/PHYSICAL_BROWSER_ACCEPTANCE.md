@@ -30,7 +30,8 @@ the repository root, then run:
 
 The runner refuses non-loopback --url targets. With --flow it also
 requires a real browser interaction with the native CPython conditional
-debugger (pause on a live numeric local, continue, pause again, finish).
+debugger (pause on a live numeric local, continue, pause again, finish),
+and then the opt-in raised-exception pause on a real caught CPython exception.
 Native Flow execution and debugging are not tested against a fake backend
 or GitHub Pages. Browser interpreter
 execution and native Flow use separate runtime paths. The server is not
@@ -44,7 +45,7 @@ The companion test_physical_browser_harness.py only verifies the runner's
 real static asset server and localhost safety contract; **its success does
 not validate the browser runtimes**.
 
-Status as of 2026-10-24: **runner implemented; physical-browser acceptance
+Status as of 2026-10-25: **runner implemented; physical-browser acceptance
 not yet independently executed or verified**. Do not promote RStudio parity
 on the basis of this harness or of mock/contract tests. Plot capture,
 notebook file import, package installation, native debugging, remote

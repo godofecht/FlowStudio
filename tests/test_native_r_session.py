@@ -26,17 +26,17 @@ class NativeRSessionTest(unittest.TestCase):
             package = Path(temp) / "FlowStudioFixture"
             (package / "R").mkdir(parents=True)
             (package / "DESCRIPTION").write_text(
-                "Package: FlowStudioFixture\\n"
-                "Version: 0.0.1\\n"
-                "Title: FlowStudio Native R Installation Fixture\\n"
-                "Description: Minimal offline fixture for real CRAN-style installation.\\n"
-                "Authors@R: person('Flow', 'Studio', email='flowstudio@example.org', role=c('aut','cre'))\\n"
-                "License: MIT\\n"
-                "Encoding: UTF-8\\n",
+                "Package: FlowStudioFixture\n"
+                "Version: 0.0.1\n"
+                "Title: FlowStudio Native R Installation Fixture\n"
+                "Description: Minimal offline fixture for real CRAN-style installation.\n"
+                "Authors@R: person('Flow', 'Studio', email='flowstudio@example.org', role=c('aut','cre'))\n"
+                "License: MIT\n"
+                "Encoding: UTF-8\n",
                 encoding="utf-8")
-            (package / "NAMESPACE").write_text("export(answer)\\n", encoding="utf-8")
+            (package / "NAMESPACE").write_text("export(answer)\n", encoding="utf-8")
             (package / "R" / "answer.R").write_text(
-                "answer <- function() 42L\\n", encoding="utf-8")
+                "answer <- function() 42L\n", encoding="utf-8")
             built = subprocess.run(
                 ["R", "CMD", "build", "--no-build-vignettes", str(package)],
                 cwd=temp, check=False, capture_output=True, text=True, timeout=30)

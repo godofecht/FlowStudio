@@ -269,7 +269,7 @@ function createRSession() {
       if (!payload || typeof payload !== "object" || Array.isArray(payload) ||
           (payload.svg !== null && (typeof payload.svg !== "string" ||
             new TextEncoder().encode(payload.svg).length > 60000 ||
-            !/<svg(?:\\s|>)/.test(payload.svg) || !payload.svg.includes("</svg>"))) ||
+            !/<svg[\s>]/.test(payload.svg) || !payload.svg.includes("</svg>"))) ||
           (payload.warning !== null && (typeof payload.warning !== "string" ||
             payload.warning.length > 200)))
         throw new Error("Invalid native R SVG plot response.");

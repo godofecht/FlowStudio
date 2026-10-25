@@ -61,7 +61,8 @@ still requires real interpreter downloads and native Flow execution.
 [74d942b](https://github.com/godofecht/FlowStudio/commit/74d942b8bbe37cc58ca4fd6078178129d4777892)
 after [CI #40148434956](https://github.com/godofecht/FlowStudio/actions/runs/40148434956)
 passed all four jobs on Ubuntu 24.04 and macOS 14. Each source/transport
-platform passed 508 Node tests, 2 skips, 76 real Python tests, and native
+platform passed 508 Node tests, 2 skips, 76 Python unit tests (including
+real CPython debugger cases and verification-harness tests), and native
 transport checks. Both native jobs compiled Flow 2.0.0, passed actual
 Flow-owned localhost HTTP exception-pause acceptance with real CPython,
 persistent R/Python checks, and produced platform tarballs.

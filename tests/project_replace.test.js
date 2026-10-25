@@ -123,3 +123,74 @@ for (const [name, api] of [["native", native], ["Pages", pages]]) {
     assert.deepEqual(await api.applyProjectReplacement(plan), {files:0,matches:0});
   });
 }
+
+for (const [name, api] of [["native", native], ["Pages", pages]]) {
+  function controller(root) {
+    const previous = global.document;
+    global.document = {createElement() {
+      return {append() {}, addEventListener() {}, replaceChildren() {}};
+    }};
+    const explorer = api.createProjectExplorer({
+      tree:{append() {}, replaceChildren() {}}, status() {},
+      openHandle:async()=>true, picker:async()=>root
+    });
+    return {explorer, cleanup() {global.document=previous;}};
+  }
+  test(name + " restores the last verified project-wide replacement once", async () => {
+    const {root,r,py}=corpus(), {explorer,cleanup}=controller(root);
+    try {
+      await explorer.choose();
+      assert.deepEqual(await explorer.applyReplace(await explorer.previewReplace("x","z")),
+        {files:2,matches:3});
+      assert.equal(explorer.hasUndoReplace(),true);
+      assert.deepEqual(await explorer.undoReplace(),{files:2,matches:3});
+      assert.equal(r.contents,"x <- 1\nx <- 2\n");
+      assert.equal(py.contents,"x = 2\n");
+      assert.equal(explorer.hasUndoReplace(),false);
+      await assert.rejects(explorer.undoReplace(),/No completed project replacement/);
+    } finally {cleanup();}
+  });
+  test(name + " undo refuses changed files before writing any earlier files", async () => {
+    const {root,r,py}=corpus(), {explorer,cleanup}=controller(root);
+    try {
+      await explorer.choose();
+      await explorer.applyReplace(await explorer.previewReplace("x","z"));
+      py.contents="external edit";
+      await assert.rejects(explorer.undoReplace(),/File changed since preview; no files replaced/);
+      assert.equal(r.contents,"z <- 1\nz <- 2\n");
+      assert.equal(py.contents,"external edit");
+      assert.equal(explorer.hasUndoReplace(),false);
+    } finally {cleanup();}
+  });
+  test(name + " undo blocks open editor tabs", async () => {
+    const {root,r}=corpus(), {explorer,cleanup}=controller(root);
+    try {
+      await explorer.choose();
+      await explorer.applyReplace(await explorer.previewReplace("x","z"));
+      await assert.rejects(explorer.undoReplace({isBlocked:entry=>entry.handle===r}),
+        /Close the open editor tab/);
+      assert.equal(r.contents,"z <- 1\nz <- 2\n");
+      assert.equal(explorer.hasUndoReplace(),false);
+    } finally {cleanup();}
+  });
+  test(name + " changing projects discards undo history", async () => {
+    const {root}=corpus(), {explorer,cleanup}=controller(root);
+    try {
+      await explorer.choose();
+      await explorer.applyReplace(await explorer.previewReplace("x","z"));
+      assert.equal(explorer.hasUndoReplace(),true);
+      await explorer.choose();
+      assert.equal(explorer.hasUndoReplace(),false);
+    } finally {cleanup();}
+  });
+  test(name + " failed multi-file replacement never enables undo", async () => {
+    const a=file("a.R","x"),b=file("b.R","x",{failWrite:true});
+    const {explorer,cleanup}=controller(directory("work",[["a.R",a],["b.R",b]]));
+    try {
+      await explorer.choose();
+      await assert.rejects(explorer.applyReplace(await explorer.previewReplace("x","z")),
+        /earlier writes remain/);
+      assert.equal(explorer.hasUndoReplace(),false);
+    } finally {cleanup();}
+  });
+}

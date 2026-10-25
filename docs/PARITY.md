@@ -1,6 +1,6 @@
 # FlowStudio RStudio parity matrix
 
-## 2026-10-25: project-wide regex and Unicode whole-word search (PR #54; verification pending)
+## 2026-10-25: project-wide regex and Unicode whole-word search (cross-platform CI passed)
 
 The native four-pane project search now supports explicit Regex and Word
 options in addition to case-sensitive literal matching. It scans actual
@@ -13,13 +13,23 @@ Native and Pages implementations retain limits of 12 directory levels,
 skips files above 128 KiB. The file-size bound does not guarantee a time
 bound for pathological JavaScript regular expressions.
 
-**Status: partial / implemented in PR #54; independent CI and physical-browser
-acceptance pending.** Added 11 Node tests across both modules and the native
-inline HTML integration. Six direct V8 functional preflight cases passed
-during authoring; they are not a substitute for the repository test suite.
-No Flow compiler syntax, Flow-owned backend, or hosted CI was changed.
-Physical-browser interpreter acceptance, native R/Flow debugging, remote
-sessions and full RStudio parity remain outstanding.
+**Status: partial / independently verified Linux/macOS CI; physical-browser
+acceptance pending.** [PR #54](https://github.com/godofecht/FlowStudio/pull/54)
+merged as [5e4aa39](https://github.com/godofecht/FlowStudio/commit/5e4aa396fac3c051ca1a349c31b138ab094660e2)
+after [CI #40190601719](https://github.com/godofecht/FlowStudio/actions/runs/40190601719)
+passed all four jobs on Ubuntu 24.04 and macOS 14. Each source/transport
+job recorded 575 JavaScript tests (573 passing, 2 skipped, zero failures)
+and 76 Python unit tests (11 skipped). Both native jobs compiled the real
+Flow 2.0.0 server, completed live HTTP acceptance and packaged the build.
+The new tests cover both standalone modules and native inline search wiring;
+a native-editor integration regression also verifies actual result selection
+and rejection of disk changes when an editor tab is cached. The initial CI
+run caught missing DOM fixture controls; the next run caught stale on-disk
+navigation. Both defects were fixed before the successful CI run.
+Physical-browser acceptance has not been executed independently. No Flow
+compiler syntax, Flow-owned backend or hosted CI configuration changed.
+Native R/Flow debugging, authenticated remote sessions and full RStudio
+parity remain outstanding.
 
 
 ## 2026-10-25: regex and Unicode whole-word source find/replace (PR acceptance pending)

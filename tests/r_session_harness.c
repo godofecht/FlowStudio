@@ -7,6 +7,7 @@ extern const char *fs_r_table(const char *);
 extern const char *fs_r_plot(void);
 extern const char *fs_r_packages(void);
 extern const char *fs_r_load_package(const char *);
+extern const char *fs_r_install_package(const char *);
 extern int fs_r_status(void);
 extern void fs_r_reset(void);
 static int failure(int step, const char *output)
@@ -42,6 +43,14 @@ int main(void)
     out = fs_r_load_package("FlowStudioPackageDefinitelyMissing");
     if (fs_r_status() != 422 || !strstr(out, "there is no package"))
         return failure(42, out);
+    /* Offline native install acceptance: installed base package does not
+     * download; malicious expressions cannot reach R's evaluator. */
+    out = fs_r_install_package("stats");
+    if (fs_r_status() != 200 || !strstr(out, "already installed"))
+        return failure(44, out);
+    out = fs_r_install_package("stats;system('false')");
+    if (fs_r_status() != 422 || !strstr(out, "Invalid R package name"))
+        return failure(45, out);
     out = fs_r_run("cat(value)");
     if (fs_r_status() != 200 || strcmp(out, "41") != 0) return failure(43, out);
     /* Parsing valid source must not evaluate assignments or errors. */

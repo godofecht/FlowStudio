@@ -412,6 +412,25 @@ def main() -> None:
         status, error = request("POST", "/api/table/r",
                                 "flowstudio_frame;stop('should not run')", accepted_headers)
         assert status == 422 and "Invalid R table name" in error, (status, error)
+        # Real native R graphics are produced by the persistent Rscript
+        # device, then retrieved through a separate Flow-owned JSON route.
+        assert request("POST", "/api/plot/r", "")[0] == 404
+        assert request("POST", "/api/plot/r", "",
+                       {"X-FlowStudio-Intent": "run",
+                        "Origin": "http://attacker.invalid"})[0] == 404
+        status, output = request("POST", "/api/run/r",
+                                 "plot(c(1, 2, 3))", accepted_headers)
+        assert status == 200, (status, output)
+        status, plot_json = request("POST", "/api/plot/r", "", accepted_headers)
+        assert status == 200, (status, plot_json[:120])
+        captured = json.loads(plot_json)
+        assert isinstance(captured["svg"], str) and "<svg" in captured["svg"], captured
+        assert "</svg>" in captured["svg"] and captured["warning"] is None, captured
+        status, output = request("POST", "/api/run/r",
+                                 "cat('text only\\n')", accepted_headers)
+        assert status == 200, (status, output)
+        status, plot_json = request("POST", "/api/plot/r", "", accepted_headers)
+        assert status == 200 and json.loads(plot_json)["svg"] is None, (status, plot_json)
         status, _ = request("POST", "/api/inspect/r", "")
         assert status == 404, status
         status, output = request("POST", "/api/run/r",

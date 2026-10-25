@@ -25,13 +25,13 @@ function element(value = "") {
   };
 }
 function fixture(value="One one ONE") {
-  const source=element(value), query=element(), replacement=element(), caseSensitive=element();
+  const source=element(value), query=element(), replacement=element(), caseSensitive=element(), regex=element(), wholeWord=element();
   const status=element(), nextButton=element(), previousButton=element(), replaceButton=element(), allButton=element();
   let inputs=0;
   source.addEventListener("input",()=>inputs++);
-  const api=create({source,query,replacement,caseSensitive,status,nextButton,previousButton,
+  const api=create({source,query,replacement,caseSensitive,regex,wholeWord,status,nextButton,previousButton,
     replaceButton,allButton,document:{},engine});
-  return {source,query,replacement,caseSensitive,status,nextButton,previousButton,
+  return {source,query,replacement,caseSensitive,regex,wholeWord,status,nextButton,previousButton,
     replaceButton,allButton,api,inputs:()=>inputs};
 }
 test("find navigates forwards/backwards with wrap, case sensitivity and status",()=>{
@@ -106,8 +106,36 @@ test("Pages HTML loads search modules, accessible controls and drafts through in
   const html=fs.readFileSync(path.join(__dirname,"../docs/app/index.html"),"utf8");
   assert.match(html, /<script src="\.\/editor_find\.js"><\/script>/);
   assert.match(html, /<script src="\.\/find_panel\.js"><\/script>/);
-  for(const id of ["findQuery","replaceText","findCase","findPrevious","findNext","replaceOne","replaceAll","findStatus"])
+  for(const id of ["findQuery","replaceText","findCase","findRegex","findWholeWord","findPrevious","findNext","replaceOne","replaceAll","findStatus"])
     assert.match(html,new RegExp('id="'+id+'"'));
   assert.match(html,/FlowStudioFindPanel\.create/);
   assert.match(html,/source"\)\.addEventListener\("input", \(\) => \{ notebookEntries = \[\]; clearNotebookRecovery\(\); queueDraft\(\); \}\)/);
+});
+
+test("regex and whole-word toggles update real source matches and expand captures", () => {
+  const f=fixture("cat1 cats cat2");
+  f.query.value="(cat)(\\d)";
+  f.regex.checked=true; f.regex.fire("change");
+  assert.match(f.status.textContent,/2 matches/);
+  f.replacement.value="$2-$1";
+  assert.equal(f.api.move(),true);
+  assert.equal(f.api.replaceOne(),true);
+  assert.equal(f.source.value,"1-cat cats cat2");
+  assert.equal(f.inputs(),1);
+  f.query.value="cat";
+  f.regex.checked=false; f.regex.fire("change");
+  f.wholeWord.checked=true; f.wholeWord.fire("change");
+  assert.match(f.status.textContent,/0 matches/);
+  f.query.value="cats";f.query.fire("input");
+  assert.match(f.status.textContent,/1 matches/);
+});
+test("invalid regex reports error without modifying source or drafts", () => {
+  const f=fixture("print(42)");
+  f.query.value="(";f.regex.checked=true;
+  f.regex.fire("change");
+  assert.match(f.status.textContent,/Invalid regular expression/);
+  f.replacement.value="X";
+  assert.equal(f.api.replaceAll(),0);
+  assert.equal(f.source.value,"print(42)");
+  assert.equal(f.inputs(),0);
 });

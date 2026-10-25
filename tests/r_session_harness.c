@@ -9,6 +9,7 @@ extern const char *fs_r_plot(void);
 extern const char *fs_r_packages(void);
 extern const char *fs_r_load_package(const char *);
 extern const char *fs_r_install_package(const char *);
+extern const char *fs_r_remove_package(const char *);
 extern int fs_r_status(void);
 extern void fs_r_reset(void);
 static int failure(int step, const char *output)
@@ -52,6 +53,13 @@ int main(void)
     out = fs_r_install_package("stats;system('false')");
     if (fs_r_status() != 422 || !strstr(out, "Invalid R package name"))
         return failure(45, out);
+    /* System packages and injected expressions must not be removed. */
+    out = fs_r_remove_package("stats");
+    if (fs_r_status() != 422 || !strstr(out, "system packages cannot be removed"))
+        return failure(49, out);
+    out = fs_r_remove_package("stats;system('false')");
+    if (fs_r_status() != 422 || !strstr(out, "Invalid R package name"))
+        return failure(51, out);
     out = fs_r_run("cat(value)");
     if (fs_r_status() != 200 || strcmp(out, "41") != 0) return failure(43, out);
     /* Parsing valid source must not evaluate assignments or errors. */
@@ -173,6 +181,24 @@ int main(void)
         out = fs_r_run("cat(FlowStudioFixture::answer())");
         if (fs_r_status() != 200 || strcmp(out, "42") != 0)
             return failure(48, out);
+    }
+    if (getenv("FLOWSTUDIO_R_TEST_REPO"))
+    {
+        /* The fixture was loaded through :: above; reset is required to
+         * unload its namespace before removal. */
+        out = fs_r_remove_package("FlowStudioFixture");
+        if (fs_r_status() != 422 || !strstr(out, "loaded in the native session"))
+            return failure(52, out);
+        fs_r_reset();
+        out = fs_r_remove_package("FlowStudioFixture");
+        if (fs_r_status() != 200 || !strstr(out, "Removed R package FlowStudioFixture"))
+            return failure(53, out);
+        out = fs_r_run("cat(requireNamespace('FlowStudioFixture', quietly=TRUE))");
+        if (fs_r_status() != 200 || strcmp(out, "FALSE") != 0)
+            return failure(54, out);
+        out = fs_r_remove_package("FlowStudioFixture");
+        if (fs_r_status() != 422 || !strstr(out, "not installed in the FlowStudio user library"))
+            return failure(55, out);
     }
     out = fs_r_run("cat(exists('value', inherits=FALSE), '\\n', sep='')");
     if (fs_r_status() != 200 || strcmp(out, "FALSE\n") != 0) return failure(5, out);

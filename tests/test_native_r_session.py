@@ -39,7 +39,8 @@ class NativeRSessionTest(unittest.TestCase):
                 "answer <- function() 42L\\n", encoding="utf-8")
             built = subprocess.run(
                 ["R", "CMD", "build", "--no-build-vignettes", str(package)],
-                cwd=temp, check=True, capture_output=True, text=True, timeout=30)
+                cwd=temp, check=False, capture_output=True, text=True, timeout=30)
+            self.assertEqual(built.returncode, 0, built.stdout + built.stderr)
             self.assertIn("FlowStudioFixture", built.stdout + built.stderr)
             archive = Path(temp) / "FlowStudioFixture_0.0.1.tar.gz"
             self.assertTrue(archive.is_file(), built.stdout + built.stderr)

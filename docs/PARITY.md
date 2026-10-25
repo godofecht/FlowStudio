@@ -13,10 +13,16 @@ native HTML-embedded engine mirrors the browser module exactly, including
 multiline anchors. Regex is evaluated locally by the browser JavaScript
 engine; the input limit is not a guarantee against expensive patterns.
 
-**Status: partial / automated Node and physical-browser acceptance pending.**
-V8-isolate execution of the actual committed source and test callbacks
-passed 23/23 checks during authoring, including browser-controller tests
-under a DOM shim. This is not Node CI, native Flow compilation, or a real
+**Status: partial / independently verified native Linux/macOS acceptance.**
+[CI #40186276335](https://github.com/godofecht/FlowStudio/actions/runs/40186276335)
+completed all four jobs successfully on Ubuntu 24.04 and macOS 14.
+Each source/transport job passed 561 JavaScript tests (two skipped, zero
+failures), 76 Python unit tests (11 skipped), plus the real C transport
+suites. Both native jobs compiled Flow 2.0.0, passed Flow-owned HTTP
+acceptance and completed packaging. [PR #53](https://github.com/godofecht/FlowStudio/pull/53)
+merged as [c4eea38](https://github.com/godofecht/FlowStudio/commit/c4eea38788b0e2488f507d9cb62f2bb6ca2354f9).
+V8-isolate execution of the editor-specific committed source and test callbacks
+also passed 23/23 checks during authoring. This is not a real
 physical-browser pass. The optional physical-browser runner now exercises
 actual textarea selections, capture replacement, whole-word matching and
 invalid-pattern feedback; that scenario has not been independently run.
@@ -127,7 +133,7 @@ No hosted CI configuration was changed.
 | Packages pane | partial / browser Python and webR inventory/install; native Rscript installed-library inventory accepted by Ubuntu/macOS native Flow/R HTTP CI #40168902761; native installed-package loading accepted by Linux/macOS real Flow/R HTTP CI #40170771561 (physical-browser acceptance pending); native CRAN installation through persistent Flow/R kernel and real offline source-package install/restart accepted on Ubuntu/macOS CI #40174758087 (PR #50 merged); public CRAN download and physical-browser acceptance unverified; native user-library update passed real offline Linux/macOS Rscript/Flow HTTP CI #40182126305 (physical-browser pending); user-library removal passed real Linux/macOS Flow/R CI #40178422509 (physical-browser pending) | List, install, update with environment-aware package sources |
 | Git pane | partial / native Flow status, diff, stage, unstage and commit previously accepted cross-platform; branch list/create/switch accepted by CI #40117614745 on Ubuntu/macOS (PR #37 merged); physical-browser verification missing; branch deletion, remote tracking and merge missing | Status, diff, stage, unstage, commit and branch operations |
 | Help pane | partial / browser Python live-global/builtin docstrings and installed R Rd help wired; Node/V8 contract tests, live Pyodide/webR and physical browser unverified; Flow help missing | Context-aware language/function docs |
-| Find / replace / cross-file search | partial / Node + V8-tested | Literal in-buffer find next/previous, single/all replacement and project-wide search implemented; incremental indexing and physical-browser verification missing; opt-in bounded regex and Unicode whole-word matching implemented (Node CI pending) |
+| Find / replace / cross-file search | partial / Node + V8-tested | Literal in-buffer find next/previous, single/all replacement and project-wide search implemented; incremental indexing and physical-browser verification missing; opt-in bounded regex and Unicode whole-word matching passed Linux/macOS Node CI #40186276335 |
 | Percent-delimited source cells | partial / lexical scanner unified across native editor and Pages, Node/HTTP acceptance pending; physical-browser execution unverified | Run only the active `# %%` code cell in Flow/R/Python; markdown and empty cells do not execute |
 | Portable mixed-language FlowStudio notebooks (`.fsnb`) | partial / source and display-only outputs round-trip in Node tests; cross-platform CI accepted in PR #33; physical-browser file interaction unverified | Import/export exact Flow/R/Python tagged source and bounded saved text/PNG results, verify physical-browser round-trip, no interpreter-state restoration claims |
 | Sequential percent-cell notebooks | partial / Python and R Run All wired with explicit per-cell Python/R/Flow language tags (cross-platform CI accepted; opt-in native Rscript notebook route cross-platform Node/Flow HTTP CI accepted; real browser pending); bounded browser-local text/Python PNG output recovery across reload; native and physical-browser acceptance unverified | Execute cells in order, retain interpreter state, show per-cell output and stop on error |

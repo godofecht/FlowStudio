@@ -1,6 +1,6 @@
 # FlowStudio native R kernel: length-framed, single-user persistent session.
 # This is not a sandbox. Evaluated R code inherits the local user's permissions.
-# stdin: E (execute), C (parse), I (inspect), T (table), P (plot), K (packages) + 8 lowercase hex digits + UTF-8 payload.
+# stdin: E (execute), C (parse), I (inspect), T (table), P (plot), K (packages), L (load installed package) + 8 lowercase hex digits + UTF-8 payload.
 # fd 3: 0/1 + 8 lowercase hex digits + bounded UTF-8 output.
 MAX_SOURCE <- 131072L
 MAX_OUTPUT <- 131072L
@@ -189,6 +189,27 @@ package_snapshot <- function() {
     json <- paste0('{"packages":[', paste(entries, collapse = ","),
                    '],"truncated":', if (truncated) "true" else "false", "}")
     list(success = TRUE, payload = charToRaw(enc2utf8(json)))
+}
+
+# Attach an already-installed package to the persistent R session. Unlike
+# installation this requires no network, and only an explicit package name is
+# accepted. Package startup code executes with the user's local permissions.
+load_installed_package <- function(name) {
+    if (!grepl("^[A-Za-z][A-Za-z0-9.]{0,79}$", name) ||
+        grepl("..", name, fixed = TRUE) || endsWith(name, ".")) {
+        return(list(success = FALSE, payload = charToRaw("Invalid R package name.")))
+    }
+    tryCatch({
+        suppressPackageStartupMessages(
+            base::library(package = name, character.only = TRUE,
+                          quietly = TRUE, warn.conflicts = FALSE))
+        list(success = TRUE,
+             payload = charToRaw(enc2utf8(paste0("Loaded installed R package ", name, "."))))
+    }, error = function(error) {
+        # Report the actual missing-package/load failure without losing the kernel.
+        message <- substr(conditionMessage(error), 1L, 1024L)
+        list(success = FALSE, payload = charToRaw(enc2utf8(message)))
+    })
 }
 
 # Inspect only ordinary R lists, not S3/S4 objects or arbitrary methods.
@@ -396,7 +417,7 @@ repeat {
     header <- read_exact(9L)
     if (is.null(header)) break
     header_text <- rawToChar(header)
-    if (!grepl("^[ECITPK][0-9a-f]{8}$", header_text)) break
+    if (!grepl("^[ECITPKL][0-9a-f]{8}$", header_text)) break
     length_text <- substr(header_text, 2L, 9L)
     length_value <- strtoi(length_text, base = 16L)
     if (is.na(length_value) || length_value > MAX_SOURCE ||
@@ -416,6 +437,8 @@ repeat {
             list(success = FALSE, payload = charToRaw("R package inventory unavailable.")))
     } else if (is.na(source)) {
         list(success = FALSE, payload = charToRaw("Invalid UTF-8 source."))
+    } else if (substr(header_text, 1L, 1L) == "L") {
+        load_installed_package(source)
     } else if (substr(header_text, 1L, 1L) == "C") {
         check_source(source)
     } else if (substr(header_text, 1L, 1L) == "T") {

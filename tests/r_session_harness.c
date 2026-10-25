@@ -184,25 +184,25 @@ int main(void)
     /* Cooperative R debugger evaluates real parsed expressions one at a time.
      * Source locations, workspace persistence and ordinary-run exclusion are
      * asserted against the live Rscript process, not a simulated evaluator. */
-    out = fs_r_debug_start("debug_value <- 40L\\ndebug_value <- debug_value + 2L\\ncat(debug_value)");
-    if (fs_r_status() != 200 || !strstr(out, "\\\"state\\\":\\\"paused\\\"") ||
-        !strstr(out, "\\\"next_line\\\":1") || !strstr(out, "\\\"total\\\":3"))
+    out = fs_r_debug_start("debug_value <- 40L\ndebug_value <- debug_value + 2L\ncat(debug_value)");
+    if (fs_r_status() != 200 || !strstr(out, "\\"state\\":\\"paused\\"") ||
+        !strstr(out, "\\"next_line\\":1") || !strstr(out, "\\"total\\":3"))
         return failure(68, out);
     out = fs_r_run("debug_value <- 999L");
     if (fs_r_status() != 422 || !strstr(out, "debugger is paused"))
         return failure(69, out);
     out = fs_r_debug_step();
-    if (fs_r_status() != 200 || !strstr(out, "\\\"executed_line\\\":1") ||
-        !strstr(out, "\\\"next_line\\\":2")) return failure(70, out);
+    if (fs_r_status() != 200 || !strstr(out, "\\"executed_line\\":1") ||
+        !strstr(out, "\\"next_line\\":2")) return failure(70, out);
     out = fs_r_debug_status();
-    if (fs_r_status() != 200 || !strstr(out, "\\\"state\\\":\\\"paused\\\"") ||
-        !strstr(out, "\\\"index\\\":2")) return failure(71, out);
+    if (fs_r_status() != 200 || !strstr(out, "\\"state\\":\\"paused\\"") ||
+        !strstr(out, "\\"index\\":2")) return failure(71, out);
     out = fs_r_debug_step();
-    if (fs_r_status() != 200 || !strstr(out, "\\\"next_line\\\":3"))
+    if (fs_r_status() != 200 || !strstr(out, "\\"next_line\\":3"))
         return failure(72, out);
     out = fs_r_debug_step();
-    if (fs_r_status() != 200 || !strstr(out, "\\\"state\\\":\\\"done\\\"") ||
-        !strstr(out, "\\\"output\\\":\\\"42\\\"")) return failure(73, out);
+    if (fs_r_status() != 200 || !strstr(out, "\\"state\\":\\"done\\"") ||
+        !strstr(out, "\\"output\\":\\"42\\"")) return failure(73, out);
     out = fs_r_debug_step();
     if (fs_r_status() != 422 || !strstr(out, "No paused R expression"))
         return failure(74, out);
@@ -212,15 +212,15 @@ int main(void)
     out = fs_r_debug_start("debug_value <- )");
     if (fs_r_status() != 422 || !strstr(out, "R syntax error"))
         return failure(76, out);
-    out = fs_r_debug_start("debug_value <- 100L\\nstop('debug trap')\\ncat('must not run')");
+    out = fs_r_debug_start("debug_value <- 100L\nstop('debug trap')\ncat('must not run')");
     if (fs_r_status() != 200) return failure(77, out);
     out = fs_r_debug_step();
     if (fs_r_status() != 200) return failure(78, out);
     out = fs_r_debug_step();
-    if (fs_r_status() != 422 || !strstr(out, "\\\"state\\\":\\\"error\\\"") ||
+    if (fs_r_status() != 422 || !strstr(out, "\\"state\\":\\"error\\"") ||
         !strstr(out, "debug trap")) return failure(79, out);
     out = fs_r_debug_stop();
-    if (fs_r_status() != 200 || !strstr(out, "\\\"state\\\":\\\"idle\\\""))
+    if (fs_r_status() != 200 || !strstr(out, "\\"state\\":\\"idle\\""))
         return failure(80, out);
     out = fs_r_run("cat(debug_value)");
     if (fs_r_status() != 200 || strcmp(out, "100") != 0)

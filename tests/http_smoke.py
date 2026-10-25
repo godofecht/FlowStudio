@@ -264,8 +264,8 @@ def main() -> None:
 
     # Exception pause uses real CPython trace events through Flow's HTTP router.
     # Caught exceptions pause once at their origin, without evaluating repr/str.
-    exception_source = ('try:\\n    raise LookupError("caught")\\n'
-                        'except LookupError:\\n    exception_recovered = 42\\n')
+    exception_source = ('try:\n    raise LookupError("caught")\n'
+                        'except LookupError:\n    exception_recovered = 42\n')
     status, payload = request("POST", "/api/debug/python/start",
                               json.dumps({"source": exception_source,
                                           "breakpoints": [],
@@ -281,7 +281,7 @@ def main() -> None:
                              "print(exception_recovered)", accepted_headers)
     assert status == 200 and output.strip() == "42", (status, output)
     status, payload = request("POST", "/api/debug/python/start",
-                              json.dumps({"source": 'raise ValueError("uncaught")\\n',
+                              json.dumps({"source": 'raise ValueError("uncaught")\n',
                                           "breakpoints": [],
                                           "pause_on_exception": True}),
                               accepted_headers)

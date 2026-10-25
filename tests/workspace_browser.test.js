@@ -80,7 +80,7 @@ function workspace(folder) {
     "source", "language", "console", "resultStatus", "fileLabel", "dirty",
     "cursor", "run", "runCell", "resetR", "resetPython", "refreshPythonEnvironment", "pythonEnvironment", "open", "save", "clear", "fallbackOpen", "runtimeInfo",
     "projectTree", "folder", "newFile", "refreshProject",
-    "projectSearch", "caseSensitive", "searchProject", "searchResults",
+    "projectSearch", "caseSensitive", "projectRegex", "projectWholeWord", "searchProject", "searchResults",
     "editorFind", "editorReplace", "findNext", "findPrevious",
     "replaceOne", "replaceAll", "editorCaseSensitive", "editorRegex", "editorWholeWord", "editorFindCount",
     "docTabs", "newDocument", "newDocumentTab", "findBar"
@@ -498,4 +498,26 @@ test("native R execution and reset refresh bounded environment through Flow inte
   assert.equal(app.fetches[1].url, "/api/reset/r");
   assert.equal(app.inspectionFetches.length, 2);
   assert.equal(app.inspectionFetches[1].url, "/api/inspect/r");
+});
+
+test("project regex search selects real matches and rejects stale changed file text", async () => {
+  const target = file("analysis.R", "α αβ\nfoo_2 = 1\nfoo_3 = 2");
+  const app = workspace(directory("research", [["analysis.R", target]]));
+  await app.el("folder").fire("click");
+  app.el("projectSearch").value = "foo_(\\d)";
+  app.el("projectRegex").checked = true;
+  app.el("projectWholeWord").checked = true;
+  await app.el("searchProject").fire("click");
+  const results = app.el("searchResults");
+  assert.equal(results.children.length, 3);
+  assert.match(results.children[0].textContent, /2 matches in 1 files/);
+  await results.children[2].fire("click");
+  assert.equal(app.el("source").selectionStart, 16);
+  assert.equal(app.el("source").selectionEnd, 21);
+  assert.equal(app.el("source").value.slice(16, 21), "foo_3");
+  const writable = await target.createWritable();
+  await writable.write("α αβ\nfoo_2 = 1\nbar_3 = 2");
+  await writable.close();
+  await results.children[2].fire("click");
+  assert.match(app.el("resultStatus").textContent, /File changed since search/);
 });

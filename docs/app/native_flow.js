@@ -70,8 +70,9 @@ async function debugPythonStart(source, breakpoints, pauseOnException = false) {
   if (lines.some(line => !Number.isSafeInteger(line) || line < 1 || line > lineCount) ||
       new Set(lines).size !== lines.length)
     throw new Error("Python debugger requires distinct valid breakpoint lines.");
-  return debugPythonResponse("/api/debug/python/start", JSON.stringify({source, breakpoints,
-    pause_on_exception:pauseOnException}));
+  const payload = pauseOnException ? {source, breakpoints, pause_on_exception:true} :
+    {source, breakpoints};
+  return debugPythonResponse("/api/debug/python/start", JSON.stringify(payload));
 }
 async function debugPythonCommand(action) {
   if (!["step", "next", "finish", "continue", "stop", "status"].includes(action))

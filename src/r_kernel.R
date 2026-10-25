@@ -1,6 +1,6 @@
 # FlowStudio native R kernel: length-framed, single-user persistent session.
 # This is not a sandbox. Evaluated R code inherits the local user's permissions.
-# stdin: E (execute), C (parse), I (inspect), T (table), P (plot), K (packages), L (load), N (install from CRAN) + 8 lowercase hex digits + UTF-8 payload.
+# stdin: E (execute), C (parse), I (inspect), T (table), P (plot), K (packages), L (load), N (install from CRAN), U (remove user package) + 8 lowercase hex digits + UTF-8 payload.
 # fd 3: 0/1 + 8 lowercase hex digits + bounded UTF-8 output.
 MAX_SOURCE <- 131072L
 MAX_OUTPUT <- 131072L
@@ -263,6 +263,41 @@ install_cran_package <- function(name) {
     })
 }
 
+# Remove only packages installed into FlowStudio's own user library.
+# Never remove base/site libraries, and refuse loaded namespaces to avoid
+# deleting package files that the persistent R process is still using.
+remove_user_package <- function(name) {
+    if (!grepl("^[A-Za-z][A-Za-z0-9.]{0,79}$", name) ||
+        grepl("..", name, fixed = TRUE) || endsWith(name, ".")) {
+        return(list(success = FALSE, payload = charToRaw("Invalid R package name.")))
+    }
+    tryCatch({
+        if (!dir.exists(user_library)) {
+            stop("R package is not installed in the FlowStudio user library; system packages cannot be removed.")
+        }
+        installed <- utils::installed.packages(lib.loc = user_library)
+        if (!(name %in% installed[, "Package"])) {
+            stop("R package is not installed in the FlowStudio user library; system packages cannot be removed.")
+        }
+        if (paste0("package:", name) %in% search() || name %in% loadedNamespaces()) {
+            stop("R package is loaded in the native session; reset the R session before removing it.")
+        }
+        if (file.access(user_library, 2L) != 0L) {
+            stop("FlowStudio user R library is not writable.")
+        }
+        utils::remove.packages(pkgs = name, lib = user_library)
+        remaining <- utils::installed.packages(lib.loc = user_library)
+        if (name %in% remaining[, "Package"]) {
+            stop("R package removal did not complete.")
+        }
+        list(success = TRUE, payload = charToRaw(enc2utf8(
+            paste0("Removed R package ", name, " from the FlowStudio user library."))))
+    }, error = function(error) {
+        list(success = FALSE, payload = charToRaw(enc2utf8(
+            substr(conditionMessage(error), 1L, 1024L))))
+    })
+}
+
 # Inspect only ordinary R lists, not S3/S4 objects or arbitrary methods.
 # Two child levels, twelve entries per container and 256 total child nodes.
 # The same bounded metadata schema is consumed by the native Python tree UI.
@@ -492,6 +527,8 @@ repeat {
         load_installed_package(source)
     } else if (substr(header_text, 1L, 1L) == "N") {
         install_cran_package(source)
+    } else if (substr(header_text, 1L, 1L) == "U") {
+        remove_user_package(source)
     } else if (substr(header_text, 1L, 1L) == "C") {
         check_source(source)
     } else if (substr(header_text, 1L, 1L) == "T") {

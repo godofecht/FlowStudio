@@ -62,9 +62,9 @@ test("native R syntax check rejects remote origins and oversized input", async (
     async () => assert.rejects(native.checkRSyntax("x".repeat(65537)), /64 KiB/));
 });
 
-test("IDE prefers native R parser but retains webR fallback on GitHub Pages", () => {
+test("IDE uses the selected native R parser or browser webR parser without mixing workspaces", () => {
   const html = fs.readFileSync(path.join(__dirname, "../docs/app/index.html"), "utf8");
-  assert.match(html, /FlowStudioNativeFlow\.checkRSyntax\(code\)/);
+  assert.match(html, /nativeRSession = FlowStudioNativeFlow\.createRSession\(\)/);
   assert.match(html, /getRSession\(\)\.checkSyntax\(code\)/);
   assert.match(html, /FlowStudioNativeFlow\?\.available\?\.\(\)/);
 });

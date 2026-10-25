@@ -108,7 +108,7 @@ def main() -> None:
                        {"X-FlowStudio-Intent": "run",
                         "Origin": "http://attacker.invalid"})[0] == 404
     status, body = request("POST", "/api/debug/r/start",
-                           "fs_debug_http <- 41L\\ncat(fs_debug_http + 1L)",
+                           "fs_debug_http <- 41L\ncat(fs_debug_http + 1L)",
                            accepted_headers)
     assert status == 200, (status, body)
     debug = json.loads(body)

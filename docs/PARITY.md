@@ -32,13 +32,13 @@ Legend: **unverified** = implementation exists but has not been built/executed i
 | R Markdown / Quarto | partial / offline HTML report export from Python/R percent-cell notebooks; no Quarto/R Markdown rendering | Render notebook with inline plots and HTML export; verify actual Quarto/R Markdown format compatibility |
 | Source debugger | partial / native CPython breakpoint/step/next/finish/continue/stop and bounded stack inspection passed cross-platform Flow/HTTP CI #40126891635; numeric-local conditional breakpoints accepted by Ubuntu/macOS CI #40144484561 (real CPython and Flow HTTP); opt-in raised-exception pause passed Ubuntu/macOS CI #40148434956 (real CPython and Flow HTTP); physical browser and R/Flow debugging missing | Breakpoints, stack, variables, step execution |
 | Remote/server mode | missing | Authenticated, origin-aware multi-user sessions with isolation |
-| Diagnostics / profiling | partial / native CPython bounded line tracing cross-platform CI accepted; native R parse-only diagnostics implemented on feature branch (cross-platform acceptance pending); physical-browser acceptance pending | Resource/time tracing and useful language-specific diagnostics |
+| Diagnostics / profiling | partial / native CPython bounded line tracing cross-platform CI accepted; native R parse-only diagnostics passed Ubuntu/macOS native Flow/HTTP CI #40156177608; physical-browser acceptance pending; physical-browser acceptance pending | Resource/time tracing and useful language-specific diagnostics |
 | Cross-platform packaging | missing | Installable signed/reproducible macOS and Linux releases |
 | Accessibility | partial / unverified | Full keyboard navigation, screen reader labels, resize and contrast checks |
 | RStudio project import | partial / browser-local .Rproj editor; Node-tested, native unverified | Open and preserve basic .Rproj project settings |
 
 
-## 2026-10-25: non-executing native R syntax diagnostics (validation pending)
+## 2026-10-25: non-executing native R syntax diagnostics (cross-platform native acceptance passed)
 
 The Flow-owned localhost backend now offers an intent/origin-gated
 `POST /api/check/r` route backed by the **same persistent real Rscript
@@ -53,11 +53,16 @@ Regression coverage adds real-R IPC checks for valid/invalid syntax,
 non-execution and continued session persistence; Flow-owned HTTP smoke
 checks for intent/origin enforcement and parse status; and Node browser
 tests for route selection, locations, transport failures and remote
-origin rejection. **Status: implemented on feature branch; Rscript,
-native Flow compilation, cross-platform CI and physical-browser
-acceptance not yet independently verified.** This is not interactive
-R debugging, remote R sessions or full RStudio parity. Hosted CI
-configuration is unchanged.
+origin rejection. **Status: partial / independently accepted on Ubuntu 24.04 and macOS 14
+native Flow/HTTP CI; physical-browser acceptance remains unverified.** [PR #44](https://github.com/godofecht/FlowStudio/pull/44) merged as
+[0b57013](https://github.com/godofecht/FlowStudio/commit/0b570137c649f6c8e2dc4aaa64bcdc0966124d80)
+after [CI #40156177608](https://github.com/godofecht/FlowStudio/actions/runs/40156177608)
+passed all four jobs. Each source/transport platform recorded 513 passing
+JavaScript tests, two skips and zero failures, plus 76 Python unit tests.
+Both native jobs compiled Flow 2.0.0, exercised actual Rscript parser-only
+IPC and the intent-gated Flow HTTP route, and completed packaging.
+This is not interactive R debugging, remote R sessions or full RStudio
+parity. Hosted CI configuration is unchanged.
 
 ## 2026-10-25: native CPython pause on raised exceptions (cross-platform native acceptance passed)
 

@@ -65,13 +65,13 @@ test("Flow, C and R preserve distinct bounded debugger IPC operations", () => {
     assert.match(c, new RegExp("request_r\\('" + opcode + "'"));
     assert.match(smoke, new RegExp("/api/debug/r/" + action));
   }
-  assert.match(r, /debug_step <- function\\(\\)/);
+  assert.match(r, /debug_step <- function\(\)/);
   assert.match(r, /expressions_override = expression/);
   assert.match(r, /debugger is paused; finish or stop/);
   assert.match(html, /id="rDebugStep"/);
-  assert.match(html, /r_debug_panel\\.js/);
-  assert.match(routes, /"\\/app\\/r_debug_panel\\.js"/);
-  assert.match(read("tests/r_session_harness.c"), /failure\\(79, out\\)/);
+  assert.match(html, /r_debug_panel\.js/);
+  assert.match(routes, /"\/app\/r_debug_panel\.js"/);
+  assert.match(read("tests/r_session_harness.c"), /failure\(79, out\)/);
 });
 
 test("native R debugger client rejects malformed and non-local responses", async () => {

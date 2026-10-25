@@ -39,13 +39,18 @@ begin_plot_capture <- function() {
     }
     device <- as.integer(grDevices::dev.cur())
     function() {
+        last_plot_warning <<- paste0("capture-finalizer:", format, " device=", device)
         devices <- grDevices::dev.list()
         if (!is.null(devices) && device %in% devices) {
             try(grDevices::dev.off(which = device), silent = TRUE)
         }
         on.exit(unlink(path), add = TRUE)
-        if (!file.exists(path)) return(invisible(NULL))
+        if (!file.exists(path)) {
+            last_plot_warning <<- paste0("capture-missing-file:", format)
+            return(invisible(NULL))
+        }
         bytes <- file.info(path)$size
+        last_plot_warning <<- paste0("capture-file:", format, " bytes=", bytes)
         if (!is.finite(bytes) || bytes <= 0) return(invisible(NULL))
         if (bytes > 60000L) {
             last_plot_warning <<- "Native R plot exceeds the 60 KiB capture limit."

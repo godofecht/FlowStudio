@@ -14,6 +14,9 @@ function format(result) {
   if (Number.isSafeInteger(result.failed_line) && result.failed_line > 0)
     lines.push("Failed expression at line " + result.failed_line + " (top-level workspace only)");
   lines.push("Expression " + Math.min(result.index, result.total) + " of " + result.total);
+  if (Array.isArray(result.frames)) for (const frame of result.frames)
+    lines.push("Postmortem frame " + frame.id + ": " + frame.call +
+      " (locals: " + (frame.locals.join(", ") || "none") + ")");
   if (result.output) lines.push("Output:\n" + result.output);
   return lines.join("\n");
 }
@@ -25,14 +28,14 @@ function validRTargets(value) {
     /^[1-9][0-9]{0,5}(?:\?[A-Za-z][A-Za-z0-9._]*(?:==|!=|>=|<=|>|<)-?(?:0|[1-9][0-9]{0,12})(?:\.[0-9]{1,12})?)?$/.test(token));
 }
 function create({native, source, language, runtime, startButton, stepButton,
-                 continueButton, targetLine, watchExpression, evaluateButton,
+                 continueButton, targetLine, watchExpression, frameInput, evaluateButton,
                  stopButton, statusButton, target, notice}) {
   if (!native || !source || !language || !runtime || !startButton || !stepButton ||
       !continueButton || !targetLine || !watchExpression || !evaluateButton ||
       !stopButton || !statusButton || !target)
     throw Error("Missing R debugger controls.");
   const supported = native.available();
-  let state = "idle", pending = false;
+  let state = "idle", pending = false, frameCount = 0;
   function update() {
     const enabled = supported && language.value === "r" && runtime.value === "native";
     startButton.disabled = !enabled || pending || state === "paused";
@@ -40,6 +43,7 @@ function create({native, source, language, runtime, startButton, stepButton,
     continueButton.disabled = !enabled || pending || state !== "paused";
     targetLine.disabled = !enabled || pending || state !== "paused";
     watchExpression.disabled = !enabled || pending || (state !== "paused" && state !== "error");
+    if (frameInput) frameInput.disabled = !enabled || pending || state !== "error" || !frameCount;
     evaluateButton.disabled = !enabled || pending || (state !== "paused" && state !== "error");
     stopButton.disabled = !enabled || pending || state === "idle";
     statusButton.disabled = !enabled || pending;
@@ -56,13 +60,23 @@ function create({native, source, language, runtime, startButton, stepButton,
         action === "evaluate" ? watchExpression.value : "";
       if (action === "continue" && !validRTargets(line))
         throw Error("R continue targets must be 1 to 64 comma-separated positive source lines with optional numeric conditions.");
+      const selectedFrame = action === "evaluate" && frameInput ?
+        Number(frameInput.value) : 0;
+      if (action === "evaluate" && (!Number.isSafeInteger(selectedFrame) ||
+          selectedFrame < 0 || selectedFrame > frameCount ||
+          (selectedFrame !== 0 && state !== "error")))
+        throw Error("Select an available postmortem function frame, or 0 for the workspace.");
       if (action === "evaluate" && (!line.trim() ||
-          new TextEncoder().encode(line).length > 4096))
+          new TextEncoder().encode((selectedFrame ? "@" + selectedFrame + "\n" : "") + line).length > 4096))
         throw Error("R debugger evaluation requires 1 to 4096 bytes of source.");
       const result = action === "start" ?
         await native.debugRStart(source.value) :
-        await native.debugRCommand(action, line);
+        await native.debugRCommand(action, line, selectedFrame);
       state = result.state;
+      frameCount = state === "error" && Array.isArray(result.frames) ? result.frames.length : 0;
+      if (frameInput && (!Number.isSafeInteger(Number(frameInput.value)) ||
+          Number(frameInput.value) > frameCount || state !== "error"))
+        frameInput.value = "0";
       target.textContent = format(result);
       if (notice) notice("Native R expression debugger: " + state + ".");
       return result.ok;

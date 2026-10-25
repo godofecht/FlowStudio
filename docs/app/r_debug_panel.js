@@ -15,6 +15,13 @@ function format(result) {
   if (result.output) lines.push("Output:\n" + result.output);
   return lines.join("\n");
 }
+function validRTargets(value) {
+  if (typeof value !== "string" || value.length > 4096) return false;
+  if (!value) return true;
+  const tokens = value.split(",");
+  return tokens.length <= 64 && tokens.every(token =>
+    /^[1-9][0-9]{0,5}(?:\?[A-Za-z][A-Za-z0-9._]*(?:==|!=|>=|<=|>|<)-?(?:0|[1-9][0-9]{0,12})(?:\.[0-9]{1,12})?)?$/.test(token));
+}
 function create({native, source, language, runtime, startButton, stepButton,
                  continueButton, targetLine, watchExpression, evaluateButton,
                  stopButton, statusButton, target, notice}) {
@@ -44,9 +51,8 @@ function create({native, source, language, runtime, startButton, stepButton,
     try {
       const line = action === "continue" ? targetLine.value.trim() :
         action === "evaluate" ? watchExpression.value : "";
-      if (action === "continue" && line && (line.length > 447 ||
-          !/^[1-9][0-9]{0,5}(?:,[1-9][0-9]{0,5}){0,63}$/.test(line)))
-        throw Error("R continue targets must be 1 to 64 comma-separated positive source lines.");
+      if (action === "continue" && !validRTargets(line))
+        throw Error("R continue targets must be 1 to 64 comma-separated positive source lines with optional numeric conditions.");
       if (action === "evaluate" && (!line.trim() ||
           new TextEncoder().encode(line).length > 4096))
         throw Error("R debugger evaluation requires 1 to 4096 bytes of source.");

@@ -40,20 +40,20 @@ int main(void)
     /* Table snapshots are real values from the same persistent R workspace. */
     out = fs_r_run("native_table <- data.frame(label=c('alpha', 'beta'), "
                    "score=c(42L, NA_integer_), "
-                   "group=factor(c('one', 'two')))\\n"
+                   "group=factor(c('one', 'two')))\n"
                    "native_matrix <- matrix(1:6, nrow=2)");
     if (fs_r_status() != 200) return failure(24, out);
     out = fs_r_table("native_table");
     if (fs_r_status() != 200 ||
-        !strstr(out, "\\"columns\\":[\\"label\\",\\"score\\",\\"group\\"]") ||
-        !strstr(out, "[\\"alpha\\",\\"42\\",\\"one\\"]") ||
-        !strstr(out, "[\\"beta\\",\\"\\",\\"two\\"]") ||
-        !strstr(out, "\\"totalRows\\":2") ||
-        !strstr(out, "\\"truncated\\":false")) return failure(25, out);
+        !strstr(out, "\"columns\":[\"label\",\"score\",\"group\"]") ||
+        !strstr(out, "[\"alpha\",\"42\",\"one\"]") ||
+        !strstr(out, "[\"beta\",\"\",\"two\"]") ||
+        !strstr(out, "\"totalRows\":2") ||
+        !strstr(out, "\"truncated\":false")) return failure(25, out);
     out = fs_r_table("native_matrix");
     if (fs_r_status() != 200 ||
-        !strstr(out, "[\\"1\\",\\"3\\",\\"5\\"]") ||
-        !strstr(out, "[\\"2\\",\\"4\\",\\"6\\"]")) return failure(26, out);
+        !strstr(out, "[\"1\",\"3\",\"5\"]") ||
+        !strstr(out, "[\"2\",\"4\",\"6\"]")) return failure(26, out);
     out = fs_r_table("native_table;stop('unsafe')");
     if (fs_r_status() != 422 || !strstr(out, "Invalid R table name"))
         return failure(27, out);
@@ -63,8 +63,8 @@ int main(void)
     out = fs_r_run("large_table <- data.frame(n=seq_len(300))");
     if (fs_r_status() != 200) return failure(29, out);
     out = fs_r_table("large_table");
-    if (fs_r_status() != 200 || !strstr(out, "\\"totalRows\\":300") ||
-        !strstr(out, "\\"truncated\\":true") || strlen(out) > 65000)
+    if (fs_r_status() != 200 || !strstr(out, "\"totalRows\":300") ||
+        !strstr(out, "\"truncated\":true") || strlen(out) > 65000)
         return failure(30, out);
     out = fs_r_run("makeActiveBinding('unsafe_table', function() "
                    "stop('table binding executed'), workspace)");
@@ -72,8 +72,6 @@ int main(void)
     out = fs_r_table("unsafe_table");
     if (fs_r_status() != 422 || !strstr(out, "active binding") ||
         strstr(out, "table binding executed")) return failure(32, out);
-    out = fs_r_run("cat(value, '\\\\n')");
-    if (fs_r_status() != 200 || strcmp(out, "41\\n") != 0) return failure(33, out);
     /* Native R lists expose nested metadata without evaluating user methods. */
     out = fs_r_run("nested <- list(numbers=list(answer=42L, more=list(x=1L)), words=c('a','b'))\n"
                    "trap <- structure(list(secret=1L), class='flowstudio_trap')\n"

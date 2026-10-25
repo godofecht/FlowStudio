@@ -512,9 +512,9 @@ test("project regex search selects real matches and rejects stale changed file t
   assert.equal(results.children.length, 3);
   assert.match(results.children[0].textContent, /2 matches in 1 files/);
   await results.children[2].fire("click");
-  assert.equal(app.el("source").selectionStart, 16);
-  assert.equal(app.el("source").selectionEnd, 21);
-  assert.equal(app.el("source").value.slice(16, 21), "foo_3");
+  assert.equal(app.el("source").selectionStart, 15);
+  assert.equal(app.el("source").selectionEnd, 20);
+  assert.equal(app.el("source").value.slice(15, 20), "foo_3");
   const writable = await target.createWritable();
   await writable.write("α αβ\nfoo_2 = 1\nbar_3 = 2");
   await writable.close();

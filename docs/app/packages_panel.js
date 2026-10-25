@@ -1,4 +1,4 @@
-/* Browser-local Python (Pyodide) and R (webR) package controls. */
+/* Browser Python/webR and Flow-owned native R package controls. */
 (function (global) {
 "use strict";
 const SPEC = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}(?:==[0-9][A-Za-z0-9.!+_-]{0,39})?$/;
@@ -8,7 +8,8 @@ function validRName(name) {
 }
 function create(options) {
   const {document, request, notice, target, input, installButton, listButton,
-    language = () => "python", rSession = null, rNative = () => false} = options;
+    loadButton = null, language = () => "python", rSession = null,
+    rNative = () => false} = options;
   let busy = false, revision = 0;
   function render(packages, kind) {
     target.replaceChildren();
@@ -42,10 +43,14 @@ function create(options) {
     target.setAttribute?.("aria-label", "Installed " + (kind === "r" ? "R" : "Python") + " packages");
     input.placeholder = kind === "r" ? "ggplot2" : "package==version";
     input.setAttribute?.("aria-label", kind === "r" ? "R package name" : "Python package name");
-    installButton.textContent = kind === "r" ? (rNative() ? "Load installed R package" : "Install R package") : "Install package";
+    installButton.textContent = kind === "r" ? "Install R package" : "Install package";
     listButton.textContent = kind === "r" ? "List R packages" : "List packages";
     installButton.disabled = busy || kind === "flow";
     listButton.disabled = busy || kind === "flow";
+    if (loadButton) {
+      loadButton.hidden = kind !== "r" || !rNative();
+      loadButton.disabled = busy || loadButton.hidden;
+    }
   }
   async function perform(operation, code) {
     if (busy) return false;
@@ -55,18 +60,22 @@ function create(options) {
       notice("Browser package management supports Python and R, not Flow.");
       return false;
     }
+    if (operation === "load" && (kind !== "r" || !rNative())) return false;
     busy = true;
     installButton.disabled = listButton.disabled = true;
-    notice(operation === "install" ? (kind === "r" && rNative() ? "Loading installed R package…" : "Installing into the selected " + kind + " session…") :
+    if (loadButton) loadButton.disabled = true;
+    notice(operation === "load" ? "Loading installed native R package…" :
+      operation === "install" ? "Installing into the selected " + kind + " session…" :
       "Inspecting installed " + kind + " packages…");
     try {
       let inventory;
       if (kind === "r") {
         if (typeof rSession !== "function") throw Error("R package session unavailable.");
         const session = rSession();
-        if (operation === "install") {
-          const installed = rNative() ? await session.loadPackage(code) : await session.installPackage(code);
-          if (!installed.ok) throw Error(installed.output || "R installation failed");
+        if (operation === "install" || operation === "load") {
+          const installed = operation === "load" ? await session.loadPackage(code) :
+            await session.installPackage(code);
+          if (!installed.ok) throw Error(installed.output || "R package operation failed");
         }
         if (token !== revision) return false;
         inventory = await session.packages();
@@ -87,7 +96,8 @@ function create(options) {
           item.name.length > 100 || item.version.length > 100))
         throw Error("Invalid package inventory response.");
       render(inventory.packages, kind);
-      notice(operation === "install" ? (kind === "r" && rNative() ? "Installed R package loaded into the native session." : "Package installed in the current " + kind + " session.") :
+      notice(operation === "load" ? "Installed R package loaded into the native session." :
+        operation === "install" ? "Package installation completed in the current " + kind + " session." :
         kind + " package inventory updated.");
       return true;
     } catch (error) {
@@ -98,6 +108,7 @@ function create(options) {
       busy = false;
       installButton.disabled = currentLanguage() === "flow";
       listButton.disabled = currentLanguage() === "flow";
+      if (loadButton) loadButton.disabled = currentLanguage() !== "r" || !rNative();
     }
   }
   listButton.addEventListener("click", () => { void perform("packages"); });
@@ -110,6 +121,14 @@ function create(options) {
       return;
     }
     void perform("install", spec);
+  });
+  if (loadButton) loadButton.addEventListener("click", () => {
+    const spec = input.value.trim();
+    if (!validRName(spec)) {
+      notice("Enter a valid R package name (no versions, URLs or paths).");
+      return;
+    }
+    void perform("load", spec);
   });
   updateLanguage();
   return {list: () => perform("packages"), clear: () => { revision++; target.replaceChildren(); }, updateLanguage};

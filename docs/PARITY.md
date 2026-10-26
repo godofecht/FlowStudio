@@ -1,6 +1,6 @@
 # FlowStudio RStudio parity matrix
 
-## 2026-10-26: run notebook from caret (implementation; CI pending)
+## 2026-10-26: run notebook from caret (Linux/macOS CI passed)
 
 The Pages and native Flow-served /app/ notebook toolbar now provides **Run from here**.
 It resolves the current percent-cell from the real textarea caret and executes
@@ -11,12 +11,21 @@ bounds and stop-on-error remain in effect. Preceding cells are not replayed,
 so dependencies must already exist in the selected kernel. Results show only
 the executed subset, never stale earlier outputs.
 
-**Status: partial / local V8 checks passed; Linux/macOS CI and physical-browser
-interpreter acceptance pending.** Six Node regressions and opt-in physical-browser scenarios for actual
-Pyodide and webR execution were added; the browser scenarios have not yet
-been run independently. Native Flow routes, compiler and hosted CI workflow
-were not modified. This is not
-function-level R debugging, remote isolation or RStudio parity.
+**Status: partial / independently verified Linux/macOS source, native
+Flow HTTP and packaging CI; physical-browser interpreter acceptance pending.**
+[PR #73](https://github.com/godofecht/FlowStudio/pull/73) merged as
+[dd07fe5](https://github.com/godofecht/FlowStudio/commit/dd07fe59bfea1b44e57ae704e91775687c82cf71)
+after [CI #40276233646](https://github.com/godofecht/FlowStudio/actions/runs/40276233646)
+passed all four jobs on Ubuntu 24.04 and macOS 14. Each source/transport
+job ran 690 JavaScript tests (688 passed, two skipped, zero failed) and
+78 Python tests (11 skipped). Both native jobs compiled Flow 2.0.0, passed
+live Flow-owned HTTP/Rscript acceptance and packaged the platform binaries.
+Local V8 selected-cell and Flow-preflight assertions passed. Six Node
+regressions and opt-in physical-browser scenarios for actual Pyodide and
+webR execution were committed, but the physical-browser scenarios have
+**not** been independently run. Native Flow routes, compiler and hosted
+CI workflow were not modified. This is not function-level R debugging,
+remote isolation or RStudio parity.
 
 
 ## 2026-10-26: safe Jupyter saved-output import (cross-platform CI pending)

@@ -1,5 +1,27 @@
 # FlowStudio RStudio parity matrix
 
+## 2026-10-26: literal knitr eval options on R Markdown import (verification pending)
+
+The existing R Markdown importer now recognizes literal `eval=TRUE` and
+`eval=FALSE` on R and Python code chunks. `eval=TRUE` remains an executable
+FlowStudio code cell. `eval=FALSE` is imported as an inert Markdown cell
+containing the original fenced chunk, so notebook execution cannot run it,
+and an R Markdown export retains the disabled knitr option. Arbitrary knitr
+options and nonliteral expressions such as `eval=F` remain rejected rather
+than silently changing execution semantics. The existing 64 KiB cell,
+percent-marker, source and input limits still apply.
+
+**Status: partial / source change committed; CI and physical-browser
+acceptance pending.** Six new Node regression cases exercise both languages,
+round-trip preservation, notebook-runner non-execution, malformed input and
+bounds. Local JavaScript-isolate assertions passed for disabled/enabled
+classification and unsupported options; these are not substitutes for the
+repository's Node suite, native Flow/Rscript HTTP acceptance or a physical
+browser. No native Flow routes or hosted CI configuration were changed.
+Actual knitr rendering, arbitrary chunk options, live R function debugging,
+remote sessions and full RStudio parity remain unimplemented or unverified.
+
+
 ## 2026-10-26: run notebook from caret (Linux/macOS CI passed)
 
 The Pages and native Flow-served /app/ notebook toolbar now provides **Run from here**.

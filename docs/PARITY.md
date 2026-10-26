@@ -1,26 +1,32 @@
 # FlowStudio RStudio parity matrix
 
-## 2026-10-26: supported R Markdown YAML frontmatter roundtrip (validation pending)
+## 2026-10-26: supported R Markdown YAML frontmatter roundtrip (Linux/macOS CI passed)
 
-The R Markdown importer now retains the existing strictly accepted scalar
-`title`, `author`, `date` and `html_document` YAML header as an inert first
-Markdown source cell, instead of discarding it. The R Markdown exporter
-recognizes and validates that first-cell header and reuses it rather than
-writing a duplicate default header. Unsupported or malformed edited YAML
-is rejected; a normal Markdown thematic break remains ordinary Markdown.
-No YAML is evaluated by import/export. The notebook preview may display
-the retained frontmatter as Markdown text; this is source preservation,
-not actual knitr rendering.
+The R Markdown importer retains the strictly accepted scalar `title`,
+`author`, `date` and `html_document` YAML header as an inert first Markdown
+source cell, rather than discarding it. The exporter recognizes and validates
+that first-cell header and reuses it instead of writing a duplicate default
+header. Unsupported or malformed edited YAML is rejected; a normal Markdown
+thematic break remains ordinary Markdown. No YAML is evaluated by
+import/export. The notebook preview may display retained frontmatter as
+Markdown text; this is source preservation, not knitr rendering.
 
-**Status: partial / direct V8 source-module roundtrip and rejection checks
-passed; Node regression suite, Linux/macOS native CI, physical-browser
-acceptance and actual knitr rendering pending.** Three regression cases
-cover header roundtrip, YAML-only documents and invalid edited metadata.
-Existing tests were updated to reflect retained metadata. The native
-Flow 2.0.0 backend, HTTP routes and hosted CI configuration are unchanged.
-Full RStudio parity, live R function debugging and authenticated remote
-sessions remain outstanding.
-
+**Status: partial / independently verified Linux/macOS source, native Flow
+HTTP/Rscript and packaging CI; physical-browser and actual knitr acceptance
+pending.** [PR #76](https://github.com/godofecht/FlowStudio/pull/76)
+merged as [027bb60](https://github.com/godofecht/FlowStudio/commit/027bb6042fc9da4dcd0b16c90249ce4bd7db2fa0)
+after [CI #40298315062](https://github.com/godofecht/FlowStudio/actions/runs/40298315062)
+passed all four jobs on Ubuntu 24.04 and macOS 14. Each source job
+completed 704 JavaScript tests (702 passed, two skipped, zero failures)
+and 78 Python tests (11 skipped). Native jobs compiled real Flow 2.0.0,
+passed Rscript/HTTP acceptance and completed platform packaging.
+Twenty-nine direct V8 source regression cases also passed locally
+(excluding DOM/filesystem wiring). Three new regression cases cover YAML
+roundtrip, YAML-only documents and unsupported edited metadata. Existing
+roundtrip tests were updated for the retained inert Markdown cell.
+The Flow-owned backend, routes and hosted CI configuration did not change.
+Full RStudio parity, physical-browser Pyodide/webR acceptance, live R
+function debugging and authenticated remote sessions remain outstanding.
 
 ## 2026-10-26: named R Markdown code chunks (verification pending)
 

@@ -1,3 +1,26 @@
+## 2026-10-26: native R named-list member completion in Monaco (PR; validation pending)
+
+The native FlowStudio Monaco editor now suggests **actual named members of
+ordinary R lists** using the existing Flow-owned, intent-gated
+`POST /api/inspect/r` snapshot. `analysis$model$sc` completes only
+inspected `scale`/`score` children; `$` invokes completion with an empty
+prefix, and the replacement range preserves the receiver expression.
+Up to two nested member levels are supported by the existing bounded R
+inspector. Suggestions are derived from inert metadata; no user expressions,
+active bindings, class methods or arbitrary object attributes are evaluated
+for completion. Invalid labels, unsafe names, unknown objects and absent
+metadata produce no member suggestions. Normal Python/R root-symbol and Flow
+lexical completion remain separate.
+
+**Status: partial / direct V8 execution of the exact completion core and
+Monaco provider passed representative nested-list, insertion-range, missing
+binding and Python/R regression checks.** Four committed Node regression
+cases await independent Linux/macOS CI. Real Rscript/Monaco physical-browser
+interaction is not yet independently verified. The native Flow 2.0.0 backend,
+HTTP routes, interpreter protocol and hosted CI configuration are unchanged.
+This is not data.frame column completion, function-level R debugging,
+authenticated remote sessions, knitr rendering or RStudio parity.
+
 ## 2026-10-26: clear saved notebook outputs without resetting interpreters (validation pending)
 
 The browser workspace now offers **Clear cell output** and **Clear all outputs**
@@ -10,8 +33,9 @@ results remain, rewritten with only those results. Subsequent .ipynb, .fsnb
 and HTML exports cannot reintroduce cleared outputs. Failed persistence is
 reported explicitly. No backend routes, Flow compiler or hosted CI changes.
 
-**Status: partial / implementation and seven automated Node regressions added;
-independent CI and physical-browser acceptance pending.** This is output
+**Status: partial / PR #87 merged as fc23e427 after all four
+Ubuntu 24.04/macOS 14 jobs in CI #40399045181 passed.** Seven Node
+regressions were added; physical-browser acceptance remains unverified. This is output
 management, not interpreter state recovery, real knitr rendering, resumable
 function-level R debugging, authenticated remote sessions or RStudio parity.
 

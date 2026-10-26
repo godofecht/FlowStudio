@@ -1,4 +1,4 @@
-## 2026-10-26: loss-aware Jupyter output record round-trip (CI pending)
+## 2026-10-26: loss-aware Jupyter output record round-trip (Linux/macOS CI passed)
 
 The browser notebook importer now retains the original **safe, inert Jupyter
 output types** (ordered stdout/stderr streams, genuine error type/message and
@@ -17,13 +17,20 @@ import loss notice. Source edits clear the snapshot. Browser recovery and
 portable .fsnb files still retain only flattened display snapshots, so a
 page reload does not promise preservation of individual Jupyter record types.
 
-**Status: partial / 16 existing-and-new Jupyter output tests executed against
-the actual changed modules in a local V8 test harness; 16 passed, zero
-failed.** This is not a Node CI, native Flow/Rscript, or physical-browser
-acceptance pass. Cross-platform CI and physical-browser import/export are
-pending. No Flow backend, interpreter route, hosted CI or compiler was
-changed. Live R function debugging, knitr rendering and authenticated remote
-sessions remain outstanding; RStudio feature parity is not achieved.
+**Status: partial / independently verified Linux/macOS source and native CI;
+physical-browser import/export pending.** [PR #84](https://github.com/godofecht/FlowStudio/pull/84)
+merged as [1aca6a1](https://github.com/godofecht/FlowStudio/commit/1aca6a16ed5997aea2d28f9e987fc152e66aaaee)
+after [CI #40371879210](https://github.com/godofecht/FlowStudio/actions/runs/40371879210)
+passed all four Ubuntu 24.04/macOS 14 jobs. Each source job ran 750
+JavaScript tests (748 passed, two skipped, zero failures), including four new
+output-fidelity regressions, and 78 Python tests (11 skipped). Both native
+jobs compiled Flow 2.0.0, passed real Rscript/HTTP acceptance and completed
+packaging. Sixteen Jupyter output test cases also passed against the changed
+modules in a local V8 harness. This is not evidence of physical-browser
+import/export or actual knitr rendering. No Flow backend, interpreter route,
+hosted CI or compiler changed. Live R function debugging, knitr rendering
+and authenticated remote sessions remain outstanding; RStudio feature parity
+is not achieved.
 
 ## 2026-10-26: notebook execution through the current caret cell (validation pending)
 

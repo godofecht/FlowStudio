@@ -45,7 +45,7 @@ export function registerCompletion(monaco, app, fetchFn = (typeof fetch !== 'und
   const disposers = [];
   for (const language of ['flow', 'python', 'r']) {
     const disposable = monaco.languages.registerCompletionItemProvider(language, {
-      triggerCharacters: language === 'r' ? ['.', '
+      triggerCharacters: language === 'r' ? ['.', '$'] : [],
       provideCompletionItems: async (model, position) => {
         const beforeCursor = (model.getLineContent(position.lineNumber) || '')
           .slice(0, position.column - 1);
@@ -85,54 +85,6 @@ export function registerCompletion(monaco, app, fetchFn = (typeof fetch !== 'und
               startLineNumber: position.lineNumber, endLineNumber: position.lineNumber,
               startColumn: position.column - prefix.length, endColumn: position.column
             } : wordRange(model, position, prefix)
-          }))
-        };
-      }
-    });
-    disposers.push(disposable);
-  }
-  // Session symbols re-cache after every run; the editor app clears the cache.
-  return () => { for (const dispose of disposers) dispose(); cache.clear(); };
-}
-
-function wordRange(model, position, prefix) {
-  const word = model.getWordUntilPosition(position);
-  const column = Math.max(1, (word?.startColumn ?? position.column) - prefix.length);
-  return { startLineNumber: position.lineNumber, endLineNumber: position.lineNumber,
-    startColumn: column, endColumn: position.column };
-}
-] : [],
-      provideCompletionItems: async (model, position) => {
-        const prefix = prefixAt(model, position, language);
-        if (!prefix) return { suggestions: [] };
-        const doc = app.documents.active();
-        const source = model.getValue();
-        let session = [];
-        if (INSPECT_ROUTES[language]) {
-          const cached = cache.get(language);
-          if (cached && Date.now() - cached.at < 5000) {
-            try { session = await cached.promise; } catch (_) { session = []; }
-          } else {
-            if (cached) { try { cached.controller.abort(); } catch (_) {} cache.delete(language); }
-            const controller = new AbortController();
-            const entry = { promise: sessionSymbols(fetchFn, language, controller.signal), controller, at: Date.now() };
-            cache.set(language, entry);
-            try { session = await entry.promise; } catch (_) { session = []; }
-          }
-        }
-        const lexical = language === 'flow'
-          ? (core.flowSymbols(source, model.getOffsetAt(position), prefix) || [])
-          : [...core.bufferIdentifiers(source, prefix, language, 262144)];
-        const items = core.suggestionsFor(language, { prefix, session, lexical });
-        return {
-          suggestions: items.map(item => ({
-            label: item.label,
-            kind: item.kind === 'snippet' ? monaco.languages.CompletionItemKind.Snippet :
-              item.kind === 'keyword' ? monaco.languages.CompletionItemKind.Keyword :
-              item.kind === 'variable' ? monaco.languages.CompletionItemKind.Variable :
-              monaco.languages.CompletionItemKind.Text,
-            insertText: item.insert,
-            range: wordRange(model, position, prefix)
           }))
         };
       }

@@ -661,7 +661,8 @@ FlowStudioNotebookIO.create({
     notebookExecutionSource = null;
     notebookExecutionLanguage = null;
     if (notebookOutput) notebookOutput.replaceChildren();
-    if (Array.isArray(imported.entries)) {
+    if (Array.isArray(imported.entries) &&
+        (imported.entries.length > 0 || imported.hadOutputs === undefined)) {
       notebookExecutionSource = imported.source;
       notebookExecutionLanguage = imported.language;
       notebookOutput = document.createElement("div");

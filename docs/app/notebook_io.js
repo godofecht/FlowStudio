@@ -19,7 +19,11 @@ function create(options) {
       const imported = format.decode(json);
       if (!canReplace()) return;
       await onImported(imported, file.name);
-      notice("Notebook imported. Previous outputs and metadata were not loaded.");
+      notice(imported.entries?.length ?
+        "Notebook imported with display-only saved outputs; interpreter state and metadata were not restored." +
+          (imported.ignoredOutputs ? " Unsupported or oversized outputs were omitted." : "") :
+        "Notebook imported. " + (imported.ignoredOutputs ? "Unsupported outputs were omitted. " : "") +
+          "Interpreter state and metadata were not loaded.");
     } catch (error) { notice("Notebook import failed: " + String(error.message || error)); }
   });
   saveButton.addEventListener("click", () => {

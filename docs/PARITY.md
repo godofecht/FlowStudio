@@ -1,5 +1,25 @@
 # FlowStudio RStudio parity matrix
 
+## 2026-10-26: safe Jupyter saved-output import (cross-platform CI pending)
+
+The existing .ipynb importer now retains **display-only** stdout/stderr,
+plain-text execute/display results, traceback text and PNG images in the
+FlowStudio notebook output pane. Imported source and saved output are never
+executed, and no HTML, SVG, JavaScript, widget MIME or external image URL is
+rendered. Unsupported or oversized outputs are omitted with an explicit
+loss notice. Per-cell text is capped at 128 KiB, aggregate imported text at
+1 MiB, PNGs at 512 KiB, plots at eight per cell, output objects at 64 per
+cell, and imported results at 128. UTF-8 truncation preserves code points.
+Only already-supported Python/R single-kernel notebooks are imported.
+Re-export does not invent Jupyter execution counts.
+
+**Status: partial / implementation committed, 11 actual-source V8 smoke
+assertions passed locally; full Node, native Linux/macOS CI and physical-browser
+acceptance pending.** This does not restore interpreter state, preserve
+execution counts, reconstruct HTML/widget outputs or provide RStudio parity.
+The Flow-owned native backend and hosted CI configuration are unchanged.
+
+
 ## 2026-10-26: bounded R Markdown (.Rmd) import (CI pending)
 
 The browser notebook toolbar can open real .Rmd text files as editable

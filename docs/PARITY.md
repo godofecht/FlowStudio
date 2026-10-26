@@ -1,5 +1,30 @@
 # FlowStudio RStudio parity matrix
 
+## 2026-10-26: bounded R Markdown (.Rmd) import (CI pending)
+
+The browser notebook toolbar can open real .Rmd text files as editable
+FlowStudio percent-cell source. A non-executing parser recognizes standard
+backtick/tilde `{r}` and `{python}` chunks (including longer fences),
+preserves ordinary Markdown and non-executable fenced examples, normalizes
+line endings, and selects the first executable chunk's language. Import is
+guarded by the existing unsaved-editor confirmation and notebook-busy checks.
+The decoder enforces 4 MiB input, 2 MiB editor, 64 KiB per cell and 256-cell
+limits, and validates the resulting representation with the actual source-cell
+parser. Scalar title/author/date/html_document YAML may be read but is
+**explicitly discarded** with a user-facing notice. Unsupported YAML,
+knitr chunk options, non-R/Python engines, unterminated executable chunks and
+percent-cell markers reject instead of silently changing source semantics.
+Inline R in Markdown is retained as inert text and is not executed by
+FlowStudio. Nothing is knitted or executed during import.
+
+**Status: partial / 10 of 10 new regression cases exercised in a local V8
+isolate; Node, physical-browser, native Flow and Linux/macOS CI acceptance
+pending.** This is a deliberately narrow, loss-aware importer, not general
+R Markdown or RStudio parity. No native backend, Flow compiler or hosted CI
+configuration was modified. Next gates are the repository's Node/Python
+source suites, native Flow HTTP/Rscript acceptance, and physical-browser
+interpreter checks.
+
 ## 2026-10-26: R Markdown (.Rmd) source export (Linux/macOS CI passed)
 
 The browser notebook toolbar now exports genuine R Markdown source with

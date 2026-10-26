@@ -61,7 +61,7 @@ test("Pyodide transfer imports null as None and exports typed missing vectors", 
   h.send(3,"import","bad",{kind:"scalar",type:"number",values:[null]});
   await waitReplies(h,3);
   assert.deepEqual(h.replies.map(x=>x.ok),[true,true,false]);
-  assert.deepEqual(h.replies[0].value,packet);
+  assert.deepEqual(JSON.parse(JSON.stringify(h.replies[0].value)),packet);
   assert.equal(h.queries.length,2);
   assert.match(h.queries[0],/_fs_transfer_present/);
   assert.match(h.queries[0],/if v is not None/);

@@ -151,8 +151,66 @@ function importCellOutputs(cell, index, language, state) {
   if (cell.outputs.length > MAX_IMPORT_OUTPUTS) state.ignored = true;
   if (result.output || result.plots.length || !result.ok) {
     delete result.used;
+    const preserved = safeJupyterOutputs(cell.outputs, result);
+    if (preserved) result.jupyterOutputs = preserved;
     state.entries.push(result);
   }
+}
+
+/* Preserve only inert Jupyter output records that exactly match the bounded
+ * display snapshot. No HTML, SVG, widgets, original execution counts or metadata.
+ */
+function safeJupyterOutputs(items, result) {
+  if (!Array.isArray(items) || items.length > MAX_IMPORT_OUTPUTS ||
+      !result || result.truncated || typeof result.output !== "string" ||
+      !Array.isArray(result.plots) || typeof result.ok !== "boolean") return null;
+  const safe = [], pngs = [];
+  let text = "", failed = false;
+  try {
+    for (const item of items) {
+      if (!item || typeof item !== "object") return null;
+      if (item.output_type === "stream" && ["stdout", "stderr"].includes(item.name)) {
+        const value = sourceString(item.text);
+        text += value;
+        safe.push({output_type:"stream", name:item.name, text:value});
+      } else if (item.output_type === "error") {
+        if (typeof item.ename !== "string" || typeof item.evalue !== "string" ||
+            bytes(item.ename) > 256 || bytes(item.evalue) > 1024 ||
+            !Array.isArray(item.traceback) || item.traceback.length > 64 ||
+            !item.traceback.every(line => typeof line === "string" && bytes(line) <= 4096))
+          return null;
+        failed = true;
+        text += item.traceback.join("\n");
+        safe.push({output_type:"error", ename:item.ename, evalue:item.evalue,
+          traceback:[...item.traceback]});
+      } else if (item.output_type === "display_data" || item.output_type === "execute_result") {
+        if (!item.data || typeof item.data !== "object" || Array.isArray(item.data) ||
+            Object.keys(item.data).length === 0 ||
+            Object.keys(item.data).some(key => key !== "text/plain" && key !== "image/png"))
+          return null;
+        const payload = {};
+        if (Object.hasOwn(item.data, "text/plain")) {
+          payload["text/plain"] = sourceString(item.data["text/plain"]);
+          text += payload["text/plain"];
+        }
+        if (Object.hasOwn(item.data, "image/png")) {
+          const png = sourceString(item.data["image/png"]).replace(/\s/g, "");
+          if (png.length > MAX_IMPORT_PNG || !PNG.test(png)) return null;
+          pngs.push(png);
+          payload["image/png"] = png;
+        }
+        const output = {output_type:item.output_type, metadata:{}, data:payload};
+        if (item.output_type === "execute_result") output.execution_count = null;
+        safe.push(output);
+      } else return null;
+      if (bytes(text) > MAX_IMPORT_TEXT || pngs.length > MAX_IMPORT_PLOTS) return null;
+    }
+  } catch (_) { return null; }
+  if (text !== result.output || failed !== !result.ok ||
+      pngs.length !== result.plots.length ||
+      pngs.some((png, index) => !result.plots[index] || result.plots[index].png !== png))
+    return null;
+  return safe;
 }
 
 function decode(json) {
@@ -228,6 +286,11 @@ function encode(source, language, entries, parseCells) {
     if (cell.kind === "markdown") return {cell_type:"markdown", metadata:cellMetadata, source:body, ...cellId};
     const result = outputs.get(cell.index);
     const rendered = [];
+    if (result && result.jupyterOutputs !== undefined) {
+      const preserved = safeJupyterOutputs(result.jupyterOutputs, result);
+      if (!preserved) throw Error("Saved Jupyter output records no longer match the displayed snapshot.");
+      rendered.push(...preserved);
+    } else {
     if (result && typeof result.output === "string" && result.output) {
       rendered.push({output_type:"stream", name:result.ok === false ? "stderr" : "stdout",
         text:checkText(result.output, 131072, "Cell output")});
@@ -237,6 +300,7 @@ function encode(source, language, entries, parseCells) {
         if (plot && typeof plot.png === "string" && plot.png.length <= MAX_PNG_BASE64 && PNG.test(plot.png))
           rendered.push({output_type:"display_data", metadata:{}, data:{"image/png":plot.png}});
       }
+    }
     }
     return {cell_type:"code", metadata:cellMetadata, source:body,
       execution_count:null, outputs:rendered, ...cellId};

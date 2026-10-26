@@ -235,6 +235,17 @@ def test_native_r(page, timeout: int):
         "() => document.querySelector('[aria-label=\"Environment table snapshot\"] [role=\"status\"]').textContent.includes('loaded rows 1-200 of 251, page 4/4')",
         timeout=timeout)
     assert table_view.get_by_role("cell", name="200", exact=True).count() == 1
+    # Direct row seek uses a real offset rather than traversing every page.
+    table_view.get_by_role("textbox", name="Jump to R row").fill("251")
+    table_view.get_by_role("button", name="Go to row").click()
+    page.wait_for_function(
+        "() => document.querySelector('[aria-label=\\"Environment table snapshot\\"] [role=\\"status\\"]').textContent.includes('loaded rows 251-251 of 251')",
+        timeout=timeout)
+    assert table_view.get_by_role("cell", name="251", exact=True).count() == 1
+    table_view.get_by_role("button", name="Previous page").click()
+    page.wait_for_function(
+        "() => document.querySelector('[aria-label=\\"Environment table snapshot\\"] [role=\\"status\\"]').textContent.includes('loaded rows 1-200 of 251, page 4/4')",
+        timeout=timeout)
     # Native installed-library inventory must come from Rscript, not webR.
     page.locator("#listPackages").click()
     page.locator("#packages table[aria-label='Installed R packages']").wait_for(timeout=timeout)

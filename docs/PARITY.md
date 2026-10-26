@@ -1,30 +1,37 @@
 # FlowStudio RStudio parity matrix
 
-## 2026-10-26: F2 previewed lexical identifier rename (pending independent CI)
+## 2026-10-26: F2 previewed lexical identifier rename (Linux/macOS CI passed)
 
 The Flow-served native editor now offers Edit > Rename identifier and F2.
 The user selects a Flow, R or Python identifier, supplies a valid non-keyword
 replacement, explicitly previews affected occurrences and applies the change
 to the active buffer or, opt-in, other already-open tabs of the same language.
-Changes update the real open-document model and its dirty indicators; **nothing
+Changes update the real open-document model and dirty indicators; **nothing
 is written to disk until the user saves**. A 24-document/200-reference/2-MiB
 bound, collision rejection, comment/string/member exclusion, and full-buffer
 snapshot checks prevent silent truncation or overwriting edits made after
 preview. All buffers are validated before the transactional in-memory update.
-The scanner also now excludes spaced Python member and R member/namespace
-access. No hosted CI, Flow compiler, or Flow-owned backend routes changed.
+The scanner also excludes spaced Python member and R member/namespace access.
+No hosted CI, Flow compiler, or Flow-owned backend routes changed.
 
-**Status: partial / locally V8-tested, independent CI and physical-browser
-interaction not yet verified.** Ten new regression cases passed in a direct
-V8 harness against the actual branch source and all six inline editor scripts
-parsed successfully. The GitHub Node test suite and native Linux/macOS
-acceptance have not yet run for this branch at the time of writing.
+**Status: partial / independently verified Linux/macOS source, native and
+packaging CI; physical-browser interaction unverified.**
+[PR #68](https://github.com/godofecht/FlowStudio/pull/68) merged as
+[28ec02d](https://github.com/godofecht/FlowStudio/commit/28ec02dd91d3bd62afcda732912da312a586c2c0)
+after [CI #40255793082](https://github.com/godofecht/FlowStudio/actions/runs/40255793082)
+completed all four jobs successfully on Ubuntu 24.04 and macOS 14.
+Each source/transport job ran 649 JavaScript tests (647 passed, two skipped,
+zero failures), including ten new rename regressions, and 76 Python tests
+(11 skipped). Both native jobs pinned Flow 2.0.0, compiled the real backend,
+passed native Rscript/Flow HTTP acceptance and completed packaging. Local
+V8 execution of the ten new regression cases passed; all six inline editor
+scripts parsed. Physical-browser F2 interaction was not independently run.
+
 This is deliberately **lexical** rename, not semantic refactoring: shadowed
 bindings, imports, dynamic R names, Python f-string expressions and unopened
 files are not resolved. It does not establish RStudio feature parity.
 Live function-level R breakpoints, authenticated remote sessions and real
 physical-browser interpreter acceptance remain outstanding.
-
 
 ## 2026-10-26: native editor Shift+F12 lexical references (Linux/macOS CI passed)
 

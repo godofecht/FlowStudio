@@ -12,16 +12,19 @@ explicitly **slice-local**, not full-dataset operations. WebR/Python retain
 their existing bounded snapshots. The native backend is still Flow 2.0.0;
 no new route or hosted CI configuration was introduced.
 
-**Status: partial / implementation and automated regressions committed;
-native GNU R, Flow HTTP, Linux/macOS packaging and physical-browser
-acceptance are not yet independently verified for this change.** The
-existing preview and CSV functionality remain bounded. This is not
-server-side global sort/filter, arbitrary R object viewing, complete
-dataset export, authenticated remote execution or RStudio feature parity.
-Run `node --test tests/browser_native_r_paging.test.js
-tests/browser_environment_paging.test.js tests/browser_data_export.test.js`
-and `python3 scripts/verify_native.py --require-r` with installed Flow
-2.0.0 and Rscript. Verify real Chromium interaction separately.
+**Status: partial / independently verified Linux/macOS source, native
+Flow/Rscript HTTP and packaging CI; physical-browser navigation and CSV
+download still unverified.** [PR #79](https://github.com/godofecht/FlowStudio/pull/79)
+merged as [a9d5932](https://github.com/godofecht/FlowStudio/commit/a9d59322a4462ee8c9ade99b3b645c79f0b153f3)
+after [CI #40318334700](https://github.com/godofecht/FlowStudio/actions/runs/40318334700)
+passed all four jobs on Ubuntu 24.04 and macOS 14, including native
+Flow 2.0.0 compilation, real Rscript/HTTP acceptance and packaging.
+The opt-in physical-browser acceptance runner now includes real R table
+page navigation, 201-251 slice verification, bounded CSV download and
+backward navigation, but has not itself been executed independently.
+It must be run with a compiled native server, Rscript and browser runtime.
+This is not global sorting/filtering, complete dataset export,
+authenticated remote execution or RStudio feature parity.
 
 ## 2026-10-26: bounded CSV export for tabular previews (verification pending)
 

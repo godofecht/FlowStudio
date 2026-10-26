@@ -1,3 +1,20 @@
+## 2026-10-26: native Monaco R list completion source (draft PR #89; not shipped)
+
+The native Monaco completion provider source can now derive syntactically safe
+`$` member suggestions for ordinary R lists from the existing Flow-owned
+`POST /api/inspect/r` metadata, including nested lists and correct insertion
+ranges. Four Node regression cases were added and exact-source V8 provider
+checks passed. No R source expressions are submitted for completion; the
+underlying inspector can still force lazy promises while inspecting roots.
+
+**Status: implementation partial / checked-in generated runtime bundle is
+stale.** `frontend/completion.js` must be rebuilt with `npm ci && npm run
+build:ui` and the generated `web/ui/workbench.js` committed before native
+Monaco users receive the feature. The draft PR must not merge before
+independent Node/Linux/macOS CI and physical-browser validation of that
+generated bundle. Flow 2.0.0 remains the backend; no CI or HTTP route changed.
+RStudio parity is not achieved.
+
 ## 2026-10-26: clear saved notebook outputs without resetting interpreters (validation pending)
 
 The browser workspace now offers **Clear cell output** and **Clear all outputs**

@@ -425,8 +425,10 @@ function renderNotebookCell(entry) {
   }
   notebookOutput.append(card);
   if (entry.kind === "code") {
-    notebookEntries.push({index:entry.index, kind:entry.kind, language:entry.language,
-      ok:entry.ok, output:entry.output, truncated:entry.truncated === true, plots:entry.plots});
+    const saved = {index:entry.index, kind:entry.kind, language:entry.language,
+      ok:entry.ok, output:entry.output, truncated:entry.truncated === true, plots:entry.plots};
+    if (Array.isArray(entry.jupyterOutputs)) saved.jupyterOutputs = entry.jupyterOutputs;
+    notebookEntries.push(saved);
     if (notebookExecutionSource !== null && !FlowStudioNotebookRecovery.save(
       draftStorage, notebookExecutionSource, notebookExecutionLanguage, notebookEntries) && !notebookRecoveryFailed) {
       notebookRecoveryFailed = true;

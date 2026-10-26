@@ -142,7 +142,7 @@ function rMemberContext(lineBeforeCursor) {
       if (c === "\\") { if (++i < lineBeforeCursor.length) masked += " "; }
       else if (c === quote) quote = null;
     } else if (c === "#") break;
-    else if (c === "'" || c === '"' || c === "\`") { quote = c; masked += " "; }
+    else if (c === "'" || c === '"' || c === "\x60") { quote = c; masked += " "; }
     else masked += c;
   }
   const name = "(?:[A-Za-z]|\\.[A-Za-z_])[A-Za-z0-9._]{0,79}";
@@ -156,7 +156,7 @@ function rMemberContext(lineBeforeCursor) {
 }
 function rListMembers(variables, path, prefix = "") {
   if (!Array.isArray(variables) || !Array.isArray(path) ||
-      path.length < 1 || path.length > 3 || !path.every(part => R_MEMBER.test(part)) ||
+      path.length < 1 || path.length > 3 || !path.every(rSafeName) ||
       typeof prefix !== "string" || prefix.length > 80 ||
       (prefix && !/^[A-Za-z._][A-Za-z0-9._]*$/.test(prefix))) return [];
   let node = variables.slice(0, 128).find(item =>

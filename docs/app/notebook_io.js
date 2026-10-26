@@ -4,7 +4,8 @@
 function create(options) {
   const {openButton, fileInput, saveButton, source, language, format, parseCells,
     isBusy, canReplace, onImported, onExport, getResults, getFilename, notice,
-    bundleOpenButton, bundleFileInput, bundleSaveButton} = options;
+    bundleOpenButton, bundleFileInput, bundleSaveButton,
+    rMarkdownOpenButton, rMarkdownFileInput, rMarkdown} = options;
   openButton.addEventListener("click", () => fileInput.click());
   fileInput.addEventListener("change", async event => {
     const file = event.target.files?.[0];
@@ -61,6 +62,28 @@ function create(options) {
         notice("Portable FlowStudio notebook exported locally.");
       } catch (error) {
         notice("FlowStudio notebook export failed: " + String(error.message || error));
+      }
+    });
+  }
+  if (rMarkdownOpenButton && rMarkdownFileInput && rMarkdown) {
+    rMarkdownOpenButton.addEventListener("click", () => rMarkdownFileInput.click());
+    rMarkdownFileInput.addEventListener("change", async event => {
+      const file = event.target.files?.[0];
+      event.target.value = "";
+      if (!file) return;
+      if (isBusy()) { notice("Wait for notebook execution to finish."); return; }
+      if (file.size > 4 * 1024 * 1024) { notice("R Markdown exceeds 4 MiB."); return; }
+      try {
+        const text = await file.text();
+        if (isBusy()) { notice("Wait for notebook execution to finish."); return; }
+        const imported = rMarkdown.decode(text, parseCells);
+        if (!canReplace()) return;
+        await onImported(imported, file.name);
+        notice("R Markdown imported as source cells. " +
+          (imported.metadataDiscarded ? "YAML metadata was not retained. " : "") +
+          "Inline R remains Markdown text; no code was executed.");
+      } catch (error) {
+        notice("R Markdown import failed: " + String(error.message || error));
       }
     });
   }

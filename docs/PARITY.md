@@ -1,5 +1,25 @@
 # FlowStudio RStudio parity matrix
 
+## 2026-10-26: named R Markdown code chunks (verification pending)
+
+The .Rmd importer recognizes bounded, case-sensitive chunk labels on R and
+Python engines (for example, `{r Setup.1}` and `{python fig-2, eval=TRUE}`).
+Labels are preserved in the percent-cell marker as `label=...` metadata, not
+in executable code, and restored on R Markdown export. Literal `eval=FALSE`
+chunks remain inert Markdown with their original headers. Import and export
+reject duplicate labels; import rejects unsupported or expression-valued labels,
+and export refuses malformed `label=` source markers. Unnamed cells retain
+their existing object shape and behavior. Five Node regression cases cover
+roundtrips, disabled chunks, duplicates, invalid labels and compatibility.
+
+**Status: partial / local JavaScript V8 validation only; independent Node,
+Linux/macOS native CI and physical-browser acceptance pending.** Fifteen
+direct V8 assertions passed against the changed source modules; the three
+modules and new test file parsed. This is not actual knitr rendering, live R
+function debugging, authenticated remote sessions or RStudio parity. The
+Flow 2.0.0 native backend and hosted CI configuration were not changed.
+[PR #75](https://github.com/godofecht/FlowStudio/pull/75).
+
 ## 2026-10-26: literal knitr eval options on R Markdown import (verification pending)
 
 The existing R Markdown importer now recognizes literal `eval=TRUE` and

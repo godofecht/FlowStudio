@@ -42,15 +42,16 @@ function decode(input, parseCells) {
     metadataDiscarded = true;
   }
   const chunks = [];
+  const chunkLabels = new Set();
   let markdown = "";
-  function append(kind, body, language) {
+  function append(kind, body, language, label = null) {
     if (utf8Bytes(body) > MAX_CELL)
       throw new Error("R Markdown cells must be at most 64 KiB.");
     if (/^[ \t]*#[ \t]*%%(?:[ \t]|$)/m.test(body))
       throw new Error("R Markdown contains a percent-cell marker that cannot be imported without changing source.");
     if (chunks.length >= MAX_CELLS)
       throw new Error("R Markdown import supports at most 256 cells.");
-    chunks.push({kind, body, language});
+    chunks.push({kind, body, language, label});
   }
   function flushMarkdown() {
     if (markdown.trim()) append("markdown", markdown, null);
@@ -74,19 +75,24 @@ function decode(input, parseCells) {
       if (info.startsWith("{")) {
         // Only constant eval=TRUE/FALSE is safe to translate: arbitrary knitr
         // options are R expressions and cannot be silently discarded.
-        const header = /^\{(r|python)(?:\s*,\s*eval\s*=\s*(TRUE|FALSE))?\}$/.exec(info);
+        const header = /^\{(r|python)(?:[ \t]+([A-Za-z][A-Za-z0-9_.-]{0,79}))?(?:\s*,\s*eval\s*=\s*(TRUE|FALSE))?\}$/.exec(info);
         if (!header)
-          throw new Error("Unsupported R Markdown chunk engine or options; only {r}, {python} and literal eval=TRUE/FALSE are accepted.");
+          throw new Error("Unsupported R Markdown chunk engine, label or options; only R/Python, a safe optional label and literal eval=TRUE/FALSE are accepted.");
+        if (header[2]) {
+          if (chunkLabels.has(header[2]))
+            throw new Error("Duplicate R Markdown chunk label: " + header[2]);
+          chunkLabels.add(header[2]);
+        }
         if (end < 0) throw new Error("Unterminated R Markdown executable chunk.");
         flushMarkdown();
         const body = lines.slice(index + 1, end).join("\n") + (end > index + 1 ? "\n" : "");
-        if (header[2] === "FALSE") {
+        if (header[3] === "FALSE") {
           // Keep the original disabled knitr chunk intact as inert Markdown.
           // It stays non-executable in FlowStudio and remains eval=FALSE
           // if the notebook is exported back to R Markdown.
           append("markdown", lines.slice(index, end + 1).join("\n") + "\n", null);
         } else {
-          append("code", body, header[1]);
+          append("code", body, header[1], header[2] || null);
         }
         index = end + 1;
         continue;
@@ -104,7 +110,8 @@ function decode(input, parseCells) {
   if (!chunks.length) throw new Error("R Markdown has no supported Markdown or executable cells.");
   let source = "";
   for (const chunk of chunks) {
-    source += "# %% " + (chunk.kind === "markdown" ? "[markdown]" : "[" + chunk.language + "]") + "\n";
+    source += "# %% " + (chunk.kind === "markdown" ? "[markdown]" :
+      "[" + chunk.language + "]" + (chunk.label ? " label=" + chunk.label : "")) + "\n";
     source += chunk.body;
     if (chunk.body && !chunk.body.endsWith("\n")) source += "\n";
     if (utf8Bytes(source) > MAX_SOURCE)
@@ -113,7 +120,8 @@ function decode(input, parseCells) {
   const parsed = parseCells(source);
   if (!Array.isArray(parsed) || parsed.length !== chunks.length ||
       parsed.some((cell, i) => cell.kind !== chunks[i].kind ||
-        (cell.kind === "code" && cell.language !== chunks[i].language)))
+        (cell.kind === "code" && (cell.language !== chunks[i].language ||
+          (cell.label || null) !== chunks[i].label))))
     throw new Error("R Markdown cannot be represented safely as FlowStudio source cells.");
   const firstCode = chunks.find(chunk => chunk.kind === "code");
   return {source, language:firstCode ? firstCode.language : "r", metadataDiscarded};

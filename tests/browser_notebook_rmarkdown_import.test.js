@@ -78,7 +78,7 @@
     }
   });
   test("rejects unsupported knitr engines, options and unterminated chunks", () => {
-    for (const header of ["{bash}", "{r, echo=FALSE}", "{python analysis}", "{flow}"]) {
+    for (const header of ["{bash}", "{r, echo=FALSE}", "{python 1invalid}", "{flow}"]) {
       assert.throws(() => decode(tick.repeat(3) + header + "\nx\n" + tick.repeat(3), parseCells),
         /Unsupported R Markdown chunk/);
     }

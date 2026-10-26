@@ -27,6 +27,7 @@ function encode(source, defaultLanguage, parseCells) {
   if (!Array.isArray(cells) || cells.length > MAX_CELLS)
     throw new Error("R Markdown export supports at most 256 cells.");
   let output = "---\ntitle: \"FlowStudio notebook\"\noutput: html_document\n---\n\n";
+  const chunkLabels = new Set();
   for (const cell of cells) {
     if (!cell || (cell.kind !== "code" && cell.kind !== "markdown") ||
         typeof cell.code !== "string")
@@ -40,8 +41,18 @@ function encode(source, defaultLanguage, parseCells) {
       const language = cell.language || defaultLanguage;
       if (language !== "r" && language !== "python")
         throw new Error("R Markdown cannot execute Flow cells; export .fsnb or HTML instead.");
+      const label = cell.label || "";
+      if (label && !/^[A-Za-z][A-Za-z0-9_.-]{0,79}$/.test(label))
+        throw new Error("Invalid R Markdown chunk label.");
+      // Never silently discard malformed label metadata on export.
+      const marker = source.slice(cell.start, cell.codeStart);
+      if (/\blabel\s*=/.test(marker) && !label)
+        throw new Error("Invalid R Markdown chunk label in source marker.");
+      if (label && chunkLabels.has(label))
+        throw new Error("Duplicate R Markdown chunk label: " + label);
+      if (label) chunkLabels.add(label);
       const fence = fenceFor(body);
-      output += fence + "{" + language + "}\n" +
+      output += fence + "{" + language + (label ? " " + label : "") + "}\n" +
         body + (body.endsWith("\n") || !body ? "" : "\n") + fence + "\n\n";
     }
     if (byteLength(output) > MAX_OUTPUT_BYTES)

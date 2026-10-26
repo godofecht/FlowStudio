@@ -692,10 +692,19 @@ $("exportReport").addEventListener("click", () => {
     const currentSource = $("source").value;
     const results = notebookExecutionSource === currentSource &&
       notebookExecutionLanguage === selectedLanguage ? notebookEntries : [];
-    const json = FlowStudioNotebookFormat.encode(currentSource, selectedLanguage,
-      results, FlowStudioSourceCells.parseCells);
-    const reportName = fileName.replace(/\.(?:py|r|flow|ipynb)$/i, "") || "notebook";
-    const html = FlowStudioNotebookReport.render(json, reportName);
+    const parsed = FlowStudioSourceCells.parseCells(currentSource);
+    const mixedOrFlow = selectedLanguage === "flow" ||
+      parsed.some(cell => cell.kind === "code" && cell.language && cell.language !== selectedLanguage);
+    const json = mixedOrFlow ?
+      FlowStudioNotebookFormat.encodeBundle(currentSource, selectedLanguage,
+        results, FlowStudioSourceCells.parseCells) :
+      FlowStudioNotebookFormat.encode(currentSource, selectedLanguage,
+        results, FlowStudioSourceCells.parseCells);
+    const reportName = fileName.replace(/\.(?:py|r|flow|ipynb|fsnb)$/i, "") || "notebook";
+    const html = mixedOrFlow ?
+      FlowStudioNotebookReport.renderBundle(json, FlowStudioNotebookFormat,
+        FlowStudioSourceCells.parseCells, reportName) :
+      FlowStudioNotebookReport.render(json, reportName);
     const url = URL.createObjectURL(new Blob([html], {type:"text/html;charset=utf-8"}));
     const anchor = document.createElement("a");
     anchor.href = url;

@@ -27,7 +27,7 @@ function setup(fetchPage, first = table(0,200)) {
 
 test("native R jump navigates a loaded row without an extra kernel call", () => {
   const {holder}=setup(()=>{throw Error("Unexpected fetch");});
-  assert.equal(holder.children.length,10);
+  assert.equal(holder.children.length,11);
   const input=holder.children[8], button=holder.children[9];
   input.value="151";
   button.listeners.click();

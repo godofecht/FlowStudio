@@ -5,6 +5,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 const recovery = require("../docs/app/notebook_recovery.js");
+const format = require("../docs/app/notebook_format.js");
+const {parseCells} = require("../docs/app/source_cells.js");
 
 function storage() {
   const values = new Map();
@@ -77,4 +79,50 @@ test("browser workspace wires incremental save, exact-match recovery and reset",
   const inline = html.match(/<script>\s*([\s\S]*?)<\/script>/);
   assert.ok(inline);
   assert.doesNotThrow(()=>new vm.Script(inline[1]));
+});
+
+test("Jupyter streams, traceback and PNG survive browser recovery and nbformat export", () => {
+  const png = "iVBORw0KGgoAAA==";
+  const notebook = {nbformat:4, nbformat_minor:4,
+    metadata:{language_info:{name:"python"}}, cells:[{cell_type:"code", metadata:{},
+      source:"raise ValueError('bad')", execution_count:12, outputs:[
+        {output_type:"stream", name:"stdout", text:"before\\n"},
+        {output_type:"stream", name:"stderr", text:"warning\\n"},
+        {output_type:"display_data", data:{"text/plain":"figure", "image/png":png}},
+        {output_type:"error", ename:"ValueError", evalue:"bad",
+          traceback:["Traceback", "ValueError: bad"]}
+      ]}]};
+  const imported = format.decode(JSON.stringify(notebook));
+  const store = storage();
+  assert.equal(recovery.save(store, imported.source, imported.language, imported.entries), true);
+  const restored = recovery.read(store, imported.source, imported.language);
+  assert.equal(restored[0].jupyterOutputs.length, 4);
+  const exported = JSON.parse(format.encode(imported.source, imported.language, restored, parseCells));
+  assert.equal(exported.cells[0].execution_count, null);
+  assert.deepEqual(exported.cells[0].outputs, [
+    notebook.cells[0].outputs[0], notebook.cells[0].outputs[1],
+    {output_type:"display_data", metadata:{},
+      data:{"text/plain":"figure", "image/png":png}},
+    notebook.cells[0].outputs[3]
+  ]);
+  assert.equal(recovery.read(store, imported.source + " ", imported.language), null);
+});
+test("recovery rejects mismatched, unsupported and noncanonical Jupyter records", () => {
+  const store = storage();
+  const valid = {...entry(0,"safe"),
+    jupyterOutputs:[{output_type:"stream", name:"stdout", text:"safe"}]};
+  assert.equal(recovery.save(store,"x","python",[valid]),true);
+  assert.deepEqual(recovery.read(store,"x","python")[0].jupyterOutputs,valid.jupyterOutputs);
+  assert.equal(recovery.save(store,"x","python",[
+    {...valid, jupyterOutputs:[{output_type:"stream",name:"stdout",text:"changed"}]}]),false);
+  assert.equal(recovery.save(store,"x","python",[
+    {...valid, jupyterOutputs:[{output_type:"stream",name:"stdout",text:"safe",metadata:{}}]}]),false);
+  assert.equal(recovery.save(store,"x","python",[
+    {...valid, jupyterOutputs:[{output_type:"display_data",
+      data:{"text/plain":"safe", "text/html":"<script>unsafe</script>"}}]}]),false);
+  assert.deepEqual(recovery.read(store,"x","python")[0].jupyterOutputs,valid.jupyterOutputs);
+  const tampered = JSON.parse(store.raw());
+  tampered.entries[0].jupyterOutputs[0].text = "changed";
+  store.setItem(recovery.KEY,JSON.stringify(tampered));
+  assert.equal(recovery.read(store,"x","python"),null);
 });

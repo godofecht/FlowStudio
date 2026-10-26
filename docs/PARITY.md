@@ -11,10 +11,17 @@ file is downloaded after an error or view closure. The current visible slice,
 local filtering and local sorting are not changed; those operations are not
 misrepresented as global.
 
-**Status: partial / implementation and eight Node regression cases added;
-native Flow/Rscript HTTP, Linux/macOS CI and physical-browser execution
-not yet independently verified.** The opt-in Playwright suite now contains
-a 251-row real native R CSV-download assertion, but has not been run here.
+**Status: partial / independently verified Linux/macOS source, native
+Flow 2.0.0 compilation, real Rscript/HTTP acceptance and packaging;
+physical-browser CSV interaction unverified.** [PR #82](https://github.com/godofecht/FlowStudio/pull/82)
+merged as [0867704](https://github.com/godofecht/FlowStudio/commit/0867704f7decc31182d09830df5ef84d71df5d3e)
+after [CI #40352789712](https://github.com/godofecht/FlowStudio/actions/runs/40352789712)
+passed all four Ubuntu 24.04/macOS 14 jobs. Each source job ran 738
+JavaScript tests (736 passed, two skipped, zero failures) and 78 Python
+tests (11 skipped). Both native jobs compiled the real Flow 2.0.0 backend,
+passed live Rscript/HTTP acceptance and completed packaging. The opt-in
+Playwright suite contains a 251-row real native R CSV-download assertion,
+but that physical-browser scenario has **not** been independently run.
 The existing R kernel only returns the first 32 columns and at most 160
 characters per cell; exports are not full-fidelity raw R datasets and
 cannot guarantee atomic consistency if R data mutate between requests.

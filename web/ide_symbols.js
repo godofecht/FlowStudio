@@ -208,8 +208,12 @@ function identifierAt(language, text, offset) {
     ? /^[A-Za-z._][A-Za-z0-9._]*$/
     : /^[A-Za-z_][A-Za-z0-9_]*$/;
   if (!valid.test(name) || !isCodeAt(language, text, start)) return null;
-  // A dotted member is not necessarily a declaration in this document.
-  if (language !== "r" && (text[start - 1] === "." || text[end] === ".")) return null;
+  // Do not treat spaced member access as a free identifier.
+  let previous = start - 1;
+  while (previous >= 0 && (text[previous] === " " || text[previous] === "\t")) previous--;
+  const prefix = previous >= 0 ? text[previous] : "";
+  if (language === "r" && (prefix === "$" || prefix === "@" || prefix === ":")) return null;
+  if (language !== "r" && (prefix === "." || text[end] === ".")) return null;
   return name;
 }
 
@@ -320,7 +324,9 @@ function findReferences(language, text, name, limit = MAX_REFERENCES) {
       const begin = i, tokenLine = line, tokenColumn = column;
       while (i < text.length && part.test(text[i])) advance();
       const token = text.slice(begin, i);
-      const prefix = begin > 0 ? text[begin - 1] : "";
+      let previous = begin - 1;
+      while (previous >= 0 && (text[previous] === " " || text[previous] === "\t")) previous--;
+      const prefix = previous >= 0 ? text[previous] : "";
       const member = language === "r"
         ? prefix === "$" || prefix === "@" || prefix === ":"
         : prefix === ".";
@@ -360,7 +366,78 @@ function findOpenReferences(language, documents, name, currentId) {
   return { matches, truncated };
 }
 
-const api = Object.freeze({ parse, glyph, clip, identifierAt, findDefinitions, findDefinition,
+
+/* Previewed lexical rename only; not semantic refactoring. Source snapshots
+ * make application fail closed if an open buffer changes after preview. */
+const RENAME_RESERVED = Object.freeze({
+  flow: new Set("let mut const function return struct enum import export if elif else while for in to true false and or not".split(" ")),
+  r: new Set("if else repeat while function for in next break TRUE FALSE NULL Inf NaN NA NA_integer_ NA_real_ NA_complex_ NA_character_".split(" ")),
+  python: new Set("False None True and as assert async await break class continue def del elif else except finally for from global if import in is lambda nonlocal not or pass raise return try while with yield match case".split(" "))
+});
+
+function planOpenRename(language, documents, oldName, newName, currentId, allOpen = false) {
+  if (!LANGUAGES.includes(language)) throw new TypeError("Unsupported rename language.");
+  if (!Array.isArray(documents) || documents.length > 24)
+    throw new RangeError("Rename supports up to 24 open documents.");
+  const valid = language === "r"
+    ? /^[A-Za-z._][A-Za-z0-9._]*$/ : /^[A-Za-z_][A-Za-z0-9_]*$/;
+  if (typeof oldName !== "string" || !valid.test(oldName) || RENAME_RESERVED[language].has(oldName))
+    throw new TypeError("Place the caret on a valid non-keyword identifier.");
+  if (typeof newName !== "string" || !valid.test(newName) || RENAME_RESERVED[language].has(newName))
+    throw new TypeError("Replacement must be a valid non-keyword identifier.");
+  if (oldName === newName) throw new Error("Replacement must differ from the original name.");
+  const active = documents.find(doc => doc && doc.id === currentId);
+  if (!active || active.language !== language)
+    throw new Error("The active source document is unavailable.");
+  const selected = allOpen ? documents.filter(doc => doc && doc.language === language) : [active];
+  const entries = [];
+  let total = 0;
+  for (const doc of selected) {
+    const found = findReferences(language, doc.text, oldName);
+    if (found.truncated || total + found.matches.length > MAX_REFERENCES)
+      throw new RangeError("Rename exceeds 200 lexical references; no changes made.");
+    if (!found.matches.length) continue;
+    if (findReferences(language, doc.text, newName).matches.length)
+      throw new Error("Replacement name already occurs in " + (doc.path || doc.name) + "; no changes made.");
+    let updated = doc.text;
+    for (let index = found.matches.length - 1; index >= 0; index--) {
+      const start = found.matches[index].index;
+      updated = updated.slice(0, start) + newName + updated.slice(start + oldName.length);
+    }
+    if (updated.length > MAX_SOURCE)
+      throw new RangeError("Renamed source exceeds the 2 MiB editor limit.");
+    entries.push({ id: doc.id, label: doc.path || doc.name, before: doc.text,
+      after: updated, count: found.matches.length });
+    total += found.matches.length;
+  }
+  if (!total) throw new Error("No lexical references found in selected open buffers.");
+  return { language, oldName, newName, allOpen: Boolean(allOpen), entries, count: total };
+}
+
+function applyOpenRename(model, plan) {
+  if (!model || typeof model.find !== "function" || typeof model.setText !== "function" ||
+      !plan || !Array.isArray(plan.entries) || !plan.entries.length)
+    throw new TypeError("Invalid rename plan or document model.");
+  for (const entry of plan.entries) {
+    const doc = model.find(entry.id);
+    if (!doc || doc.language !== plan.language || doc.text !== entry.before)
+      throw new Error("An open buffer changed after rename preview; preview again.");
+  }
+  const changed = [];
+  try {
+    for (const entry of plan.entries) {
+      if (!model.setText(entry.id, entry.after))
+        throw new Error("Could not update " + entry.label + ".");
+      changed.push(entry);
+    }
+  } catch (error) {
+    for (const entry of changed.reverse()) model.setText(entry.id, entry.before);
+    throw error;
+  }
+  return { documents: changed.length, references: plan.count };
+}
+
+const api = Object.freeze({ planOpenRename, applyOpenRename, parse, glyph, clip, identifierAt, findDefinitions, findDefinition,
   definitionAt, uniqueOpenDefinition, findReferences, findOpenReferences, MAX_REFERENCES, MAX_SOURCE, MAX_SYMBOLS, MAX_LINE, LANGUAGES, GLYPHS });
 root.FlowStudioSymbols = api;
 if (typeof module !== "undefined" && module.exports) module.exports = api;

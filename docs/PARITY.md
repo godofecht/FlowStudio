@@ -10,9 +10,11 @@ and tables are rejected. R's encoded literal `"@NA@"` string remains distinct
 from its missing-value wire marker. Both import paths use real existing
 Pyodide/webR interpreter operations; no simulated interpreter was added.
 
-**Status: partial / local direct V8 protocol assertions passed; cross-platform
+**Status: partial / eight direct V8 protocol assertions passed; cross-platform
 CI and real Rscript/browser acceptance pending.** The new Node suite includes
-real CPython generated-query execution and optional real Rscript checks. No
+real CPython generated-query execution and optional real Rscript checks. The
+opt-in Playwright runner now includes real Pyodide → webR → Pyodide NA/None
+round-trip assertions; this scenario has not been executed independently. No
 native Flow compiler, server routes or hosted CI configuration changed.
 This does not establish tabular interchange, interpreter-state persistence,
 function-level R debugging, authenticated remote sessions or RStudio parity.

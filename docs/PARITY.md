@@ -11,13 +11,21 @@ options and nonliteral expressions such as `eval=F` remain rejected rather
 than silently changing execution semantics. The existing 64 KiB cell,
 percent-marker, source and input limits still apply.
 
-**Status: partial / source change committed; CI and physical-browser
-acceptance pending.** Six new Node regression cases exercise both languages,
+**Status: partial / independently verified Linux/macOS source, native
+Flow HTTP/Rscript and packaging CI; physical-browser acceptance pending.**
+[PR #74](https://github.com/godofecht/FlowStudio/pull/74) merged as
+[75fba1d](https://github.com/godofecht/FlowStudio/commit/75fba1dc6b52f23306b57c8f9720e24c8b31dbef)
+after [CI #40282340119](https://github.com/godofecht/FlowStudio/actions/runs/40282340119)
+completed all four jobs successfully on Ubuntu 24.04 and macOS 14.
+Each source/transport job ran 696 JavaScript tests (694 passed, two skipped,
+zero failures) and 78 Python tests (11 skipped). Both native jobs compiled
+the real pinned Flow 2.0.0 backend, ran native HTTP/Rscript acceptance and
+completed packaging. Six new Node regression cases exercise both languages,
 round-trip preservation, notebook-runner non-execution, malformed input and
-bounds. Local JavaScript-isolate assertions passed for disabled/enabled
-classification and unsupported options; these are not substitutes for the
-repository's Node suite, native Flow/Rscript HTTP acceptance or a physical
-browser. No native Flow routes or hosted CI configuration were changed.
+bounds. Local JavaScript-isolate checks additionally passed for real module
+import/export roundtrip and notebook execution non-execution. Physical-browser
+interaction and actual knitr rendering were not run. No native Flow routes
+or hosted CI configuration were changed.
 Actual knitr rendering, arbitrary chunk options, live R function debugging,
 remote sessions and full RStudio parity remain unimplemented or unverified.
 

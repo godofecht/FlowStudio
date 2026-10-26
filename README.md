@@ -12,6 +12,31 @@ A **Flow-first scientific IDE** intended to become a capable successor to RStudi
 
 The initial implementation includes a native Flow server (src/main.flow), a small POSIX sockets/temp-file bridge (src/http_bridge.c), and a tabbed browser workspace (web/index.html) with a menu bar, one tab per open document (unsaved markers, close controls, Ctrl/⌘+Tab cycling), a resizable project sidebar, an environment panel and a console dock.
 
+### Workbench UI development
+
+The native workspace uses Monaco Editor and Lucide icons. Editor assets and its
+worker are bundled locally in `web/ui/`; opening the IDE needs no editor CDN.
+The Pages demo in `docs/app/` has a separate frontend.
+
+To rebuild the checked-in UI assets:
+
+```sh
+npm ci
+npm run build:ui
+```
+
+UI sources live in `frontend/`. Each open document has a Monaco model for undo
+history and cursor state. Ctrl+K opens the command menu. Flow syntax coloring is
+lexical; it does not provide compiler diagnostics or a language server.
+
+Run `npm test` for module tests and `python3 scripts/verify_native.py` for the real
+Flow build and HTTP checks. With the native server running, `npm run test:ui`
+exercises the Monaco workspace in headless Chromium. Install its browser with
+`npx playwright install chromium`. Captures go in `build/ui/`.
+
+The native build and HTTP checks pass locally. Browser verification remains
+pending because the local browser processes fail before loading the workspace.
+
 ### Document outline
 
 An **Outline** workspace tab lists the symbols of the active buffer for Flow
@@ -44,6 +69,59 @@ Use Ctrl/⌘+F to focus the in-buffer literal search, F3 / Shift+F3 for next/pre
 Run the additional pure-module tests with:
 
     node --test tests/editor_find.test.js
+
+## Terminal console, packages, examples, debugger (native workspace)
+
+The native workspace console renders as a terminal: ANSI-colored output,
+'classed error and prompt lines and a bounded keeper buffer, so real and
+fake browser environments stay honest (tests still read the plain buffer).
+
+**Flow MLIR backend.** The topbar has a **Backend** selector (next to
+Runtime). Running a Flow buffer with Backend set to MLIR sends the source
+to the real `flow` process with `--backend=mlir`; the default backend keeps
+the documented C path. The server exposes this as
+`POST /api/run/flow-mlir` and always returns the compiler's own stdout and
+stderr. A Flow build without LLVM shows exactly that error. Verified live
+against the real compiler on macOS arm64 (see below for both pipelines).
+
+**Packages tab.** A sidebar tab installs and lists real packages through
+the persistent local sessions: pip (`pip install --user`, pinned
+`name==version` specs allowed) and R `install.packages(...)` from the CRAN
+cloud mirror. Specs are validated in the browser before any request; the
+local 15 s per-session execution budget applies to installs.
+
+**Examples tab.** Curated local examples show Flow, Python and R working in
+one project: a Python → data-file → R pipeline, a stats-in-Python/visuals-in-R
+pair, a one-shot Python → R handshake through `POST /api/demo/python-r`, and
+a Flow example meant to run with the MLIR backend. "Open" adds each file to
+the editor with the right language.
+
+**Debug tab (Python replay tracer).** Toggle breakpoints at the cursor
+(per buffer), run the real CPython line trace (`POST /api/trace/python`,
+@traced by the persistent kernel) and scrub recorded states: click a step to
+jump the caret to that line and read the bounded locals captured there.
+Only builtin scalar values are previewed; complex values show type only.
+This is an execution replay, not a live pause/resume kernel debugger, and
+it is Python-only: Flow and R tracing remain missing.
+
+**Completion.** The Monaco workbench merges lexical Flow symbols (same
+bounded scanner as the Pages editor), live Python/R session variable names
+(refreshed on a short TTL after runs) keywords and snippets. Suggestions
+are editable-text inserts only: no signature help, members or LSP.
+
+Tests:
+
+    node --test tests/terminal_render.test.js tests/workspace_console.test.js \
+      tests/packages_panel.test.js tests/examples_gallery.test.js \
+      tests/debug_panel.test.js tests/ide_completion_core.test.js \
+      tests/workspace_panels_contract.test.js
+
+Live acceptance run on macOS arm64 26 October 2026 with Flow 2.x + LLVM:
+`/api/run/flow-mlir` produced the full FLOW → MLIR → LLVM → executable
+pipeline and program output; the same program on `/api/run/flow` used the
+FLOW → C path. `python3 scripts/verify_native.py` passes for the native
+build and HTTP smoke; native R persistence was skipped locally because
+`Rscript` is not installed on the verification machine.
 
 ## Independent Python/R/Flow console (browser workspace)
 
@@ -208,7 +286,7 @@ After a successful native build and acceptance test (`python3 scripts/verify_nat
              |
        Flow / R / Python
 
-Current API: GET /, GET /health, POST /api/run/flow, POST /api/run/r, POST /api/reset/r, POST /api/run/python, POST /api/inspect/python and POST /api/reset/python. POST sends UTF-8 source text and requires an X-FlowStudio-Intent: run request header. Persistent Python and R sessions each have a 15-second evaluation timeout and explicit reset; Flow has a 60-second compile-and-run budget to accommodate cold compiler start. All processes have bounded, captured output. No shell command-string evaluation is used.
+Current API: GET /, GET /health, POST /api/run/flow, POST /api/run/flow-mlir, POST /api/check/flow, POST /api/run/r, POST /api/reset/r, POST /api/inspect/r, POST /api/run/python, POST /api/trace/python, POST /api/inspect/python, POST /api/demo/python-r and POST /api/reset/python. POST sends UTF-8 source text and requires an X-FlowStudio-Intent: run request header. Persistent Python and R sessions each have a 15-second evaluation timeout and explicit reset; Flow has a 60-second compile-and-run budget to accommodate cold compiler start. All processes have bounded, captured output. No shell command-string evaluation is used.
 
 ## Security and scope
 
@@ -218,4 +296,4 @@ The native C shims handle OS-facing sockets, temporary files and framed interpre
 
 ## Licensing
 
-This is a new independent codebase, not a translation of RStudio's AGPLv3 source. Flow itself has [separate licensing terms](https://github.com/flooooooooooow/flow/blob/main/LICENSE). No third-party RStudio source code is incorporated into this repository. The source and distributed preview are **all rights reserved**; see [LICENSE](LICENSE). External Flow, R and Python installations remain under their own terms.
+This is a new independent codebase. It is not a translation of RStudio's AGPLv3 source. Flow itself has [separate licensing terms](https://github.com/flooooooooooow/flow/blob/main/LICENSE). No third-party RStudio source code is incorporated into this repository. The source and distributed preview are **all rights reserved**; see [LICENSE](LICENSE). External Flow, R and Python installations remain under their own terms.

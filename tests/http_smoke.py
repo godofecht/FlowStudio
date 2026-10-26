@@ -63,6 +63,16 @@ def main() -> None:
     status, html = request("GET", "/")
     assert status == 200 and "<title>FlowStudio" in html, (status, html[:100])
 
+    # Fetch full local bundles through the real Flow router. Large bundles must
+    # survive text reads and HTTP writes unchanged.
+    for asset in ("workbench.js", "workbench.css", "editor.worker.js",
+                  "workbench.js.LEGAL.txt", "THIRD_PARTY_LICENSES.txt"):
+        status, body = request("GET", "/ui/" + asset)
+        expected = (Path(__file__).resolve().parents[1] / "web/ui" / asset).read_text()
+        assert status == 200 and body == expected, (asset, status, len(body), len(expected))
+    status, _ = request("GET", "/ui/not-allowlisted.js")
+    assert status == 404, status
+
     # Native editor must fetch the same multiline-safe source-cell parser tested
     # by Node; a missing Flow static route silently breaks Run Cell.
     assert '<script src="/source_cells.js"></script>' in html

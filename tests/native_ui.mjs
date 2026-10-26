@@ -1,0 +1,97 @@
+/* Run against a real, already running Flow server: npm run test:ui. */
+import { chromium } from 'playwright';
+import assert from 'node:assert/strict';
+import { mkdir } from 'node:fs/promises';
+
+const browser = await chromium.launch({ headless: true,
+  ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}) });
+try {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 950 } });
+  const page = await context.newPage();
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  page.on('response', response => {
+    if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`);
+  });
+  await page.goto('http://127.0.0.1:8751');
+  await page.waitForFunction(() => globalThis.FlowStudioEditor?.editor);
+  assert.equal(await page.locator('#source').isVisible(), false);
+  assert.equal(await page.locator('.monaco-editor').isVisible(), true);
+  await mkdir('build/ui', { recursive: true });
+  await page.screenshot({ path: 'build/ui/workbench.png' });
+
+  // A user edit updates the document model and draft indicators.
+  await page.evaluate(() => FlowStudioEditor.editor.focus());
+  await page.keyboard.press('ControlOrMeta+End');
+  await page.keyboard.insertText('\n# editor regression');
+  assert.equal(await page.evaluate(() => FlowStudioApp.documents.active().dirty), true);
+  const firstId = await page.evaluate(() => FlowStudioApp.documents.active().id);
+  await page.locator('#newDocumentTab').click();
+  await page.keyboard.insertText('second_buffer = 9');
+  const secondId = await page.evaluate(() => FlowStudioApp.documents.active().id);
+  await page.evaluate(id => FlowStudioApp.activateDocument(id), firstId);
+  assert.match(await page.evaluate(() => document.getElementById('source').value), /editor regression/);
+  await page.keyboard.press('ControlOrMeta+z');
+  assert.doesNotMatch(await page.evaluate(() => document.getElementById('source').value), /editor regression/);
+  await page.evaluate(id => FlowStudioApp.activateDocument(id), secondId);
+  assert.equal(await page.evaluate(() => document.getElementById('source').value), 'second_buffer = 9');
+
+  // Existing find/replace uses the visible Monaco selection and retains undo.
+  await page.keyboard.press('ControlOrMeta+h');
+  await page.locator('#editorFind').fill('second_buffer');
+  await page.locator('#editorReplace').fill('answer');
+  await page.locator('#replaceAll').click();
+  assert.equal(await page.evaluate(() => FlowStudioEditor.editor.getValue()), 'answer = 9');
+
+  // Native Python executes the actual editor selection through the real router.
+  await page.locator('#language').selectOption('python');
+  await page.evaluate(() => {
+    const source = document.getElementById('source');
+    source.value = 'print("monaco-native-ok")\nraise RuntimeError("unselected")';
+    source.dispatchEvent(new Event('input', { bubbles: true }));
+    source.setSelectionRange(0, source.value.indexOf('\n'));
+    source.focus();
+  });
+  await page.keyboard.press('ControlOrMeta+Enter');
+  await page.waitForFunction(() => document.getElementById('console').textContent.includes('monaco-native-ok'));
+  await page.waitForFunction(() => !document.getElementById('run').disabled);
+  assert.doesNotMatch(await page.locator('#console').innerText(), /RuntimeError/);
+
+  await page.locator('#commandLauncher').click();
+  await page.locator('#commandQuery').fill('go to symbol');
+  await page.keyboard.press('Enter');
+  assert.equal(await page.locator('#tab-outline').getAttribute('aria-selected'), 'true');
+  await page.locator('#tab-files').click();
+  await page.locator('#commandLauncher').click();
+  await page.locator('#commandQuery').fill('zzzz-missing');
+  assert.equal(await page.locator('#commandResults').innerText(), 'No matching commands.');
+  await page.keyboard.press('Escape');
+  await page.locator('#language').selectOption('flow');
+  await page.evaluate(id => FlowStudioApp.activateDocument(id), firstId);
+
+  // Exercise the worker path and wait beyond rendering and deferred callbacks.
+  const workerResult = await page.evaluate(async () => {
+    const worker = MonacoEnvironment.getWorker();
+    let workerError = null;
+    worker.onerror = event => { workerError = event.message; };
+    worker.postMessage(null);
+    const editor = FlowStudioEditor.editor;
+    const point = editor.getModel().getPositionAt(0);
+    editor.setPosition(point);
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    await new Promise(resolve => setTimeout(resolve, 350));
+    worker.terminate();
+    if (workerError) throw new Error(workerError);
+    return editor.getModel().getLanguageId();
+  });
+  assert.equal(workerResult, 'flow');
+  await page.screenshot({ path: 'build/ui/workbench-tested.png' });
+  await page.setViewportSize({ width: 600, height: 850 });
+  await page.waitForFunction(() => document.querySelector('.monaco-editor').clientWidth < 600);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  await page.screenshot({ path: 'build/ui/workbench-narrow.png' });
+  assert.deepEqual(errors, [], 'The affected flow must have clean runtime logs');
+  console.log('PASS: Monaco editing, per-document undo, find/replace, native selection execution, commands, worker and narrow layout');
+  await context.close();
+} finally { await browser.close(); }

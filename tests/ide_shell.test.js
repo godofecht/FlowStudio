@@ -111,10 +111,10 @@ function build() {
 test("the shell applies the default pane layout as CSS variables", () => {
   const app = build();
   const controller = shell.mount(app.doc, { storage: app.storage, commands: {} });
-  assert.equal(app.shellNode.style.vars["--sidebar-width"], "290px");
-  assert.equal(app.shellNode.style.vars["--right-width"], "320px");
-  assert.equal(app.shellNode.style.vars["--dock-height"], "190px");
-  assert.deepEqual(controller.layout(), { sidebar: 290, right: 320, dock: 190 });
+  assert.equal(app.shellNode.style.vars["--sidebar-width"], "260px");
+  assert.equal(app.shellNode.style.vars["--right-width"], "280px");
+  assert.equal(app.shellNode.style.vars["--dock-height"], "240px");
+  assert.deepEqual(controller.layout(), { sidebar: 260, right: 280, dock: 240 });
 });
 
 test("clicking a menu trigger opens one popup and closes the other", () => {
@@ -152,8 +152,8 @@ test("arrow keys on a splitter resize the pane and persist the layout", () => {
   const app = build();
   shell.mount(app.doc, { storage: app.storage, commands: {} });
   app.splitter.fire("keydown", { key: "ArrowRight", preventDefault() {} });
-  assert.equal(app.shellNode.style.vars["--sidebar-width"], "306px");
-  assert.equal(JSON.parse(app.storage.getItem(shell.LAYOUT_KEY)).sidebar, 306);
+  assert.equal(app.shellNode.style.vars["--sidebar-width"], "276px");
+  assert.equal(JSON.parse(app.storage.getItem(shell.LAYOUT_KEY)).sidebar, 276);
   for (let step = 0; step < 40; step++)
     app.splitter.fire("keydown", { key: "ArrowLeft", preventDefault() {} });
   assert.equal(JSON.parse(app.storage.getItem(shell.LAYOUT_KEY)).sidebar, 180);
@@ -163,7 +163,7 @@ test("stored layout preferences are restored within documented limits", () => {
   const app = build();
   app.storage.setItem(shell.LAYOUT_KEY, JSON.stringify({ sidebar: 420, right: 9999, dock: "wide" }));
   const controller = shell.mount(app.doc, { storage: app.storage, commands: {} });
-  assert.deepEqual(controller.layout(), { sidebar: 420, right: 560, dock: 190 });
+  assert.deepEqual(controller.layout(), { sidebar: 420, right: 560, dock: 240 });
 });
 
 test("document tab strips move focus with arrow keys without activating", () => {

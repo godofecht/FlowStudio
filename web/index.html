@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark">
-<title>FlowStudio — Scientific IDE</title>
+<title>FlowStudio | Scientific IDE</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23151b26'/%3E%3Ctext x='16' y='23' font-size='19' text-anchor='middle' fill='%235b93ff'%3E%E2%97%88%3C/text%3E%3C/svg%3E">
 <style>
-:root{color-scheme:dark;--bg:#0d1119;--surface:#151b26;--surface-2:#1b2331;--line:#283344;--ink:#e7edf8;--muted:#9db0cb;--accent:#5b93ff;--accent-dim:#22385f;--ok:#8ee0b1;--warn:#f0c37b;--error:#ffb4a8;--sidebar-width:290px;--right-width:320px;--dock-height:190px;font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink)}
+:root{color-scheme:dark;--bg:#0d1119;--surface:#151b26;--surface-2:#1b2331;--line:#283344;--ink:#e7edf8;--muted:#9db0cb;--accent:#5b93ff;--accent-dim:#22385f;--ok:#8ee0b1;--warn:#f0c37b;--error:#ffb4a8;--mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;--titlebar-height:35px;--panel-header-height:35px;--statusbar-height:22px;--sash:5px;--sidebar-width:290px;--right-width:320px;--dock-height:190px;font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink)}
 *{box-sizing:border-box}
 body{margin:0;height:100dvh;overflow:hidden;background:var(--bg)}
 button,select,textarea{font:inherit;color:inherit}
@@ -16,31 +16,43 @@ button,select{background:var(--surface-2);border:1px solid #3a4a63;border-radius
 button:hover:not(:disabled),select:hover{border-color:#6d90cf}
 button:disabled{opacity:.45;cursor:not-allowed}
 button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
-.shell{height:100dvh;display:grid;grid-template-rows:auto minmax(0,1fr) 5px var(--dock-height) auto}
-.topbar{display:flex;align-items:center;gap:10px;padding:6px 12px;background:var(--surface);border-bottom:1px solid var(--line);flex-wrap:wrap}
-.brand{font-weight:700;white-space:nowrap;letter-spacing:-.01em}
+.shell{height:100dvh;display:grid;grid-template-rows:auto minmax(0,1fr) var(--sash) var(--dock-height) auto}
+.topbar{display:flex;align-items:center;gap:8px;min-height:var(--titlebar-height);padding:3px 10px;background:var(--surface);border-bottom:1px solid var(--line);flex-wrap:wrap;row-gap:3px}
+.brand{display:flex;align-items:center;gap:8px;font-weight:600;font-size:13.5px;white-space:nowrap;letter-spacing:-.01em;padding-right:10px;margin-right:2px;border-right:1px solid var(--line)}
 .brand b{color:#8fb8ff}
-.menubar{display:flex;gap:2px;align-items:center}
+.brand-mark{display:grid;place-items:center;width:22px;height:22px;border-radius:5px;background:var(--accent-dim);color:#8fb8ff}
+.menubar{display:flex;gap:1px;align-items:center}
 .menu{position:relative}
-.menu-trigger{background:transparent;border:1px solid transparent;padding:4px 9px}
-.menu-trigger[aria-expanded="true"]{background:var(--accent-dim);border-color:#3d5c95}
+.menu-trigger{background:transparent;border:1px solid transparent;padding:3px 8px;border-radius:5px;font-size:13px}
+.menu-trigger:hover{background:#ffffff12}
+.menu-trigger[aria-expanded="true"]{background:#ffffff1c;border-color:transparent}
 .menu-popup{position:absolute;top:calc(100% + 4px);left:0;z-index:50;min-width:240px;padding:5px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;box-shadow:0 18px 34px #0009}
 .menu-popup button{display:flex;justify-content:space-between;gap:18px;width:100%;padding:7px 9px;background:transparent;border:0;border-radius:5px;text-align:left}
 .menu-popup button:hover,.menu-popup button:focus-visible{background:var(--accent-dim)}
 .menu-popup kbd{color:var(--muted);font:11px ui-monospace,monospace}
 .menu-popup hr{border:0;border-top:1px solid var(--line);margin:4px 2px}
-.topbar-actions{margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-.topbar-actions label{color:var(--muted);font-size:12px}
+.topbar-actions{margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap;row-gap:3px;padding:1px 0}
+.topbar-actions label{color:var(--muted);font-size:11.5px}
+.topbar-actions button,.topbar-actions select{padding:4px 9px;font-size:12.5px;border-radius:6px;line-height:1.25}
 .primary{background:#2f5db8;border-color:#4275d6}
-.workspace{display:grid;grid-template-columns:var(--sidebar-width) 5px minmax(0,1fr) 5px var(--right-width);min-height:0}
+.command-launcher{display:flex;align-items:center;gap:8px;min-width:200px;max-width:320px;background:#0f141d;border:1px solid #33415a;border-radius:6px;padding:4px 9px;color:var(--muted);font-size:12.5px}
+.command-launcher span{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.command-launcher kbd{margin-left:auto;color:#8fa2c0;font:11px/1 var(--mono);background:#ffffff0d;border:1px solid #33415a;border-radius:4px;padding:2px 5px}
+.command-launcher:hover{border-color:#4a5f85}
+.workspace{display:grid;grid-template-columns:var(--sidebar-width) var(--sash) minmax(0,1fr) var(--sash) var(--right-width);min-height:0}
 .splitter{position:relative;background:var(--bg);cursor:col-resize}
 .splitter::after{content:"";position:absolute;inset:0 2px;background:var(--line)}
 .splitter:hover::after,.splitter:focus-visible::after{background:var(--accent)}
 .splitter-horizontal{cursor:row-resize}
 .splitter-horizontal::after{inset:2px 0}
 .panel{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--surface)}
-.panel>h2{margin:0;padding:8px 12px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:8px}
-.panel>h2 button{padding:1px 8px;font-size:11px;text-transform:none;letter-spacing:0}
+.panel>h2{margin:0;min-height:var(--panel-header-height);padding:0 12px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:8px;flex:none}
+.workspace-heading{display:flex;align-items:center;justify-content:flex-start;gap:8px;min-height:var(--panel-header-height);padding:0 12px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);background:var(--surface);border-bottom:1px solid var(--line);flex:none}
+.panel>h2 button{background:transparent;border:0;color:#a8badd;padding:3px 9px;border-radius:5px;font-size:11px;text-transform:none;letter-spacing:0;flex:none}
+.panel>h2 button:hover{background:#ffffff14;color:#fff}
+.panel>h2 svg{width:13px;height:13px;color:var(--muted)}
+.local-badge,.console-label,.panel-tag{margin-left:9px;padding:2px 7px;border-radius:9px;font-size:9.5px;font-weight:500;letter-spacing:.05em;background:#ffffff0d;color:var(--muted);text-transform:uppercase}
+.workspace-heading .local-badge{margin-left:auto}
 .sidebar{border-right:1px solid var(--line)}
 .rightpanel{border-left:1px solid var(--line)}
 .panel .body{flex:1;min-height:0;overflow:auto;padding:10px 12px}
@@ -80,7 +92,23 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
 #projectTree .project-file:hover{background:var(--accent-dim)}
 .hint{font-size:12px;max-width:46ch}
 .muted{color:var(--muted)}
+.example-card{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:10px;background:var(--surface-2)}
+.example-card h3{margin:0 0 4px;font-size:13.5px}
+.example-card button{display:block;width:100%;text-align:left;font-size:12.5px;margin-top:6px}
+.example-card ol{margin:8px 0 2px;padding-left:20px;font-size:12px;color:var(--muted)}
+#debugSteps{max-height:200px;overflow:auto;display:flex;flex-direction:column;gap:2px;margin-bottom:8px}
+.debug-step button{width:100%;text-align:left;font:11.5px/1.4 var(--mono);padding:3px 7px;background:transparent;border:1px solid transparent;border-radius:5px}
+.debug-step button:hover{background:var(--accent-dim)}
+.debug-step button[data-step-index].debug-step-active{background:var(--accent-dim);border-color:#3d5c95}
+.debug-step-here button{color:var(--warn)}
+.debug-locals table{border-collapse:collapse;width:100%;font:12px/1.5 var(--mono)}
+.debug-locals td,.debug-locals th{border:1px solid var(--line);padding:3px 7px;text-align:left;overflow-wrap:anywhere}
+#packageTable table,#pythonEnvironment table{border-collapse:collapse;width:100%;font:12px/1.5 var(--mono)}
+#packageTable td,#packageTable th,#pythonEnvironment td,#pythonEnvironment th{border:1px solid var(--line);padding:3px 7px;text-align:left}
 .editor-area{display:flex;flex-direction:column;min-width:0;min-height:0;background:#111721}
+.editor-breadcrumb{display:flex;align-items:center;gap:6px;padding:3px 12px;font-size:11.5px;color:var(--muted);background:#111721;border-bottom:1px solid #202a3a;flex:none}
+.editor-breadcrumb svg{width:12px;height:12px}
+.editor-engine{margin-left:auto;font-size:10.5px;color:#7c92b8;background:#ffffff08;padding:1px 7px;border-radius:8px}
 .doc-tabs-row{display:flex;align-items:stretch;background:var(--surface);border-bottom:1px solid var(--line);min-height:35px}
 .doc-tabs{display:flex;flex:1;min-width:0;overflow-x:auto;gap:1px}
 .doc-tabs-empty{padding:9px 12px;font-size:12px;color:var(--muted)}
@@ -98,10 +126,32 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
 .editor-find button{padding:4px 8px;font-size:12px}
 #editorFindCount{font-size:12px;color:var(--muted)}
 #source{flex:1;width:100%;min-height:0;resize:none;border:0;padding:12px 16px;background:#111721;color:#e9f0fb;font:14px/1.65 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;tab-size:4}
-.dock{border-top:1px solid var(--line)}
-.dock .body{display:flex;flex-direction:column;gap:6px;padding:8px 11px;overflow:auto}
-#console{margin:0;overflow:auto;flex:1;min-height:60px;white-space:pre-wrap;overflow-wrap:anywhere;font:12.5px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;color:#cbd9ec}
-.statusbar{display:flex;align-items:center;gap:14px;padding:3px 12px;background:#121924;border-top:1px solid var(--line);font-size:12px;color:var(--muted);overflow:hidden;white-space:nowrap}
+.dock{border-top:1px solid var(--line);background:var(--surface)}
+.dock-title{display:flex;align-items:center;gap:8px}
+.dock .body{display:flex;flex-direction:column;gap:6px;padding:6px 12px 10px;overflow:hidden}
+#console{margin:0;overflow:auto;flex:1;min-height:0;padding:8px 2px;white-space:pre-wrap;overflow-wrap:anywhere;font:12.5px/1.55 var(--mono);color:#b9c9e2;background:transparent}
+#console::-webkit-scrollbar{width:12px;height:10px}
+#console::-webkit-scrollbar-thumb{background:#ffffff22;border:3px solid #0000;background-clip:padding-box;border-radius:7px}
+#console::-webkit-scrollbar-thumb:hover{background:#ffffff38;border:3px solid #0000;background-clip:padding-box;border-radius:7px}
+#console::-webkit-scrollbar-corner{background:transparent}
+#console .fs-prompt-line{color:#8fb8ff;font-weight:600}
+#console .fs-error-line{color:var(--error)}
+#console .fs-black{color:#5a647a}#console .fs-red{color:#ff9d8f}#console .fs-green{color:#8ee0b1}#console .fs-yellow{color:#f0c37b}#console .fs-blue{color:#7aa7ff}#console .fs-magenta{color:#d3a7ff}#console .fs-cyan{color:#7fc9dd}#console .fs-white{color:#e7edf8}
+#console .fs-bright-black{color:#8296b3}#console .fs-bright-red{color:#ffc4b8}#console .fs-bright-green{color:#b3efc9}#console .fs-bright-yellow{color:#f7d79b}#console .fs-bright-blue{color:#a9c4ff}#console .fs-bright-magenta{color:#e3c2ff}#console .fs-bright-cyan{color:#a5dce9}#console .fs-bright-white{color:#fff}
+#console .fs-bold{font-weight:700}#console .fs-dim{opacity:.62}
+.dock .body>label[for="consoleInput"]{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}
+#consoleInput{flex:0 0 auto!important;height:64px;min-height:44px!important;max-height:40vh;resize:vertical!important;padding:7px 10px!important;background:#0f141d!important;border:1px solid #33415a!important;border-radius:6px!important;font:12.5px/1.5 var(--mono);color:#d7e2f2}
+#consoleInput::placeholder{color:#5d7195}
+#consoleInput:focus{outline:none;border-color:var(--accent)!important;box-shadow:0 0 0 1px #5b93ff55}
+.dock .body>div{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.dock .body>div span{font-size:11px;color:var(--muted)}
+.dock .body>div button{font-size:12px;padding:4px 13px}
+#consoleExecute{background:#2f5db8;border-color:#4275d6;color:#fff}
+.dock .body>label:not([for="consoleInput"]){display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--muted)}
+#consoleClearHistory{font-size:11.5px;padding:3px 9px}
+.statusbar{display:flex;align-items:center;gap:16px;min-height:var(--statusbar-height);padding:2px 12px;background:#10151f;border-top:1px solid var(--line);font-size:12px;color:#8298b8;overflow:hidden;white-space:nowrap}
+#cursor{font-variant-numeric:tabular-nums}
+.shortcut-hint{font-size:11px;color:#6d80a0}
 #resultStatus[data-state="error"]{color:var(--error)}
 #resultStatus[data-state="ok"]{color:var(--ok)}
 #fileLabel{color:#c4d3e8}
@@ -109,14 +159,16 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
 .statusbar .spacer{margin-left:auto}
 #editorRecovery{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--warn)}
 [hidden]{display:none !important}
+svg{width:14px;height:14px;vertical-align:-2px;flex:none}
 @media(max-width:900px){.workspace{grid-template-columns:minmax(0,1fr)}.sidebar,.rightpanel,.workspace>.splitter{display:none}}
-@media(max-width:760px){.shell{grid-template-rows:auto minmax(0,1fr) 5px 40vh auto}.topbar-actions{margin-left:0}}
+@media(max-width:760px){.shell{grid-template-rows:auto minmax(0,1fr) var(--sash) 40vh auto}.topbar-actions{margin-left:0}}
 </style>
+<link rel="stylesheet" href="/ui/workbench.css">
 </head>
 <body>
 <div class="shell" id="ideShell">
 <header class="topbar">
-  <div class="brand" aria-label="FlowStudio">◈ <b>FlowStudio</b></div>
+  <div class="brand" aria-label="FlowStudio"><span class="brand-mark"><i data-lucide="blocks"></i></span><b>FlowStudio</b></div>
   <nav class="menubar" aria-label="Main menu">
     <div class="menu">
       <button class="menu-trigger" id="menuFile" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="menuFilePopup">File</button>
@@ -174,9 +226,12 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
     </div>
   </nav>
   <div class="topbar-actions" aria-label="Editor actions">
+    <button id="commandLauncher" class="command-launcher" type="button" aria-haspopup="dialog" aria-controls="commandPalette" title="Search commands (Ctrl+K)"><i data-lucide="search"></i><span>Search commands...</span><kbd>Ctrl K</kbd></button>
     <label for="language">Runtime</label>
     <select id="language" aria-label="Execution language"><option value="flow">Flow</option><option value="r">R</option><option value="python">Python</option></select>
-    <button id="run" class="primary" title="Run selection or entire buffer (Ctrl/⌘+Enter)">▶ Run</button>
+    <label for="flowBackend">Backend</label>
+    <select id="flowBackend" aria-label="Flow compiler backend" title="Compiler backend for Flow runs"><option value="" selected>C (default)</option><option value="mlir">MLIR (experimental)</option></select>
+    <button id="run" class="primary" title="Run selection or entire buffer (Ctrl/⌘+Enter)"><i data-lucide="play"></i>Run</button>
     <button id="runCell" title="Run current # %% cell (Ctrl/⌘+Shift+Enter)">Run cell</button>
     <button id="resetR" type="button" title="Discard native R variables and restart its interpreter">Reset R</button>
     <button id="resetPython" type="button" title="Discard native Python variables and restart its interpreter">Reset Python</button>
@@ -185,17 +240,21 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
 </header>
 <div class="workspace">
   <aside class="panel sidebar" aria-label="Project files, outline, plots and data">
+    <div class="workspace-heading"><i data-lucide="folder-open"></i>Workspace<span class="local-badge">Local</span></div>
     <div class="workspace-tabs" role="tablist" aria-label="Workspace views">
-      <button type="button" id="tab-files" role="tab" aria-controls="view-files" aria-selected="true" tabindex="0">Files</button>
-      <button type="button" id="tab-outline" role="tab" aria-controls="view-outline" aria-selected="false" tabindex="-1">Outline</button>
-      <button type="button" id="tab-plots" role="tab" aria-controls="view-plots" aria-selected="false" tabindex="-1">Plots</button>
-      <button type="button" id="tab-data" role="tab" aria-controls="view-data" aria-selected="false" tabindex="-1">Data</button>
+      <button type="button" id="tab-files" role="tab" aria-controls="view-files" aria-selected="true" tabindex="0"><i data-lucide="files"></i>Files</button>
+      <button type="button" id="tab-outline" role="tab" aria-controls="view-outline" aria-selected="false" tabindex="-1"><i data-lucide="list-tree"></i>Outline</button>
+      <button type="button" id="tab-plots" role="tab" aria-controls="view-plots" aria-selected="false" tabindex="-1"><i data-lucide="chart-no-axes-combined"></i>Plots</button>
+      <button type="button" id="tab-data" role="tab" aria-controls="view-data" aria-selected="false" tabindex="-1"><i data-lucide="table-2"></i>Data</button>
+      <button type="button" id="tab-packages" role="tab" aria-controls="view-packages" aria-selected="false" tabindex="-1"><i data-lucide="package"></i>Packages</button>
+      <button type="button" id="tab-examples" role="tab" aria-controls="view-examples" aria-selected="false" tabindex="-1"><i data-lucide="library"></i>Examples</button>
+      <button type="button" id="tab-debug" role="tab" aria-controls="view-debug" aria-selected="false" tabindex="-1"><i data-lucide="bug"></i>Debug</button>
     </div>
     <div class="body project-body" id="view-files" role="tabpanel" aria-labelledby="tab-files">
       <div class="project-tools">
-        <button id="folder" type="button">Open folder</button>
-        <button id="newFile" type="button" title="Create a new source file in the opened project">New file</button>
-        <button id="refreshProject" type="button" title="Refresh project tree">Refresh</button>
+        <button id="folder" type="button"><i data-lucide="folder-open"></i>Open folder</button>
+        <button id="newFile" type="button" title="Create a new source file in the opened project"><i data-lucide="file-plus-2"></i>New file</button>
+        <button id="refreshProject" type="button" title="Refresh project tree" aria-label="Refresh project tree"><i data-lucide="rotate-cw"></i></button>
       </div>
       <div class="project-search" role="search" aria-label="Search project files">
         <label for="projectSearch">Find in project</label>
@@ -209,8 +268,8 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
         <button id="undoProjectReplace" type="button" disabled title="Undo the last verified project-wide replacement">Undo project replace</button>
       </div>
       <div id="searchResults" aria-live="polite" aria-label="Project search results"></div>
-      <div id="projectTree" role="navigation" aria-label="Project files"><p class="muted">Open a folder to browse source files.</p></div>
-      <p class="muted hint">Project files stay on this device. Plot and data viewers accept locally selected files.</p>
+      <div id="projectTree" role="navigation" aria-label="Project files"><div class="project-empty"><i data-lucide="folder-open"></i><p><strong>Your workspace starts here</strong></p><p>Open a folder to browse and edit your source files.</p></div></div>
+      <p class="muted hint">Files stay on this device.</p>
     </div>
     <div class="body outline-body" id="view-outline" role="tabpanel" aria-labelledby="tab-outline" hidden>
       <div class="outline-head"><span id="outlineLabel">Document symbols</span><button id="outlineRefresh" type="button" title="Re-read the buffer">Refresh</button></div>
@@ -232,6 +291,35 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
     </div>
     <div id="view-plots" class="workspace-frame" role="tabpanel" aria-labelledby="tab-plots" hidden><iframe title="Local plot history" loading="lazy"></iframe></div>
     <div id="view-data" class="workspace-frame" role="tabpanel" aria-labelledby="tab-data" hidden><iframe title="Local CSV and TSV data viewer" loading="lazy"></iframe></div>
+    <div class="body packages-body" id="view-packages" role="tabpanel" aria-labelledby="tab-packages" hidden>
+      <p class="muted hint">Installs run on this device through the persistent local Python / R sessions (each under the 15 s execution budget). R installs use the CRAN cloud mirror.</p>
+      <div class="project-search">
+        <label for="packageSpec">Package</label>
+        <input id="packageSpec" type="text" maxlength="96" placeholder="package==version" aria-label="Package spec">
+      </div>
+      <div class="project-tools">
+        <button id="packageInstall" type="button"><i data-lucide="download"></i>Install package</button>
+        <button id="packageList" type="button"><i data-lucide="list"></i>List packages</button>
+      </div>
+      <p id="packageNotice" class="muted" role="status" aria-live="polite"></p>
+      <div id="packageTable" aria-label="Installed packages"></div>
+    </div>
+    <div class="body examples-body" id="view-examples" role="tabpanel" aria-labelledby="tab-examples" hidden>
+      <p class="muted hint">Curated local examples showing Flow, Python and R working in one project. Everything executes on this device.</p>
+      <div id="examplesHost"></div>
+    </div>
+    <div class="body debug-body" id="view-debug" role="tabpanel" aria-labelledby="tab-debug" hidden>
+      <p class="muted hint">Replay debugger for Python: breakpoints, the real line trace, click through recorded states.</p>
+      <div class="project-tools">
+        <button id="debugToggleBp" type="button"><i data-lucide="octagon"></i>Breakpoint at cursor</button>
+        <button id="debugClearBp" type="button">Clear</button>
+        <button id="debugRun" type="button"><i data-lucide="play"></i>Run trace</button>
+      </div>
+      <p id="debugBreakpoints" class="muted" aria-live="polite">No breakpoints yet.</p>
+      <p id="debugSummary" class="muted"></p>
+      <div id="debugSteps" class="debug-steps"></div>
+      <div id="debugLocals" class="debug-locals"></div>
+    </div>
   </aside>
   <div class="splitter" data-splitter data-axis="x" data-panel="sidebar" role="separator" aria-orientation="vertical" aria-label="Resize project sidebar" tabindex="0"></div>
   <main class="editor-area" aria-label="Source editor">
@@ -239,6 +327,7 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
       <div class="doc-tabs" id="docTabs" role="tablist" aria-label="Open documents"></div>
       <button id="newDocumentTab" class="doc-tab-new" type="button" title="New buffer (Ctrl+Alt+N)" aria-label="New buffer">+</button>
     </div>
+    <div class="editor-breadcrumb"><i data-lucide="file-code-2"></i><span>Workspace</span><i data-lucide="chevron-right"></i><span>Source</span><span id="editorEngine" class="editor-engine">Text editor</span></div>
     <div class="editor-find" id="findBar" hidden><input id="editorFind" type="text" aria-label="Find text"><button id="findNext">Next</button>
     <label for="editorReplace">Replace with</label><input id="editorReplace" type="text" aria-label="Replacement text"><button id="replaceOne">Replace</button><button id="replaceAll">Replace all</button><button id="findPrevious">Previous</button><label><input id="editorCaseSensitive" type="checkbox"> Match case</label><label><input id="editorRegex" type="checkbox"> Regex</label><label><input id="editorWholeWord" type="checkbox"> Whole word</label><span id="editorFindCount" role="status" aria-live="polite"></span></div>
     <textarea id="source" spellcheck="false" aria-label="Source code editor">function main() -> i32 {
@@ -246,22 +335,23 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
     return 0
 }
 </textarea>
+    <div id="monacoHost" hidden></div>
   </main>
   <div class="splitter" data-splitter data-axis="x" data-panel="right" role="separator" aria-orientation="vertical" aria-label="Resize environment panel" tabindex="0"></div>
   <aside class="panel rightpanel" aria-label="Environment">
-    <h2>Environment</h2>
+    <h2><i data-lucide="sliders-horizontal"></i>Environment<span class="panel-tag">Native session</span></h2>
     <div class="body">
       <p id="runtimeInfo">Flow execution available when Flow is installed.</p>
-      <button id="refreshPythonEnvironment" type="button">Refresh selected environment</button>
+      <button id="refreshPythonEnvironment" type="button"><i data-lucide="rotate-cw"></i>Refresh environment</button>
       <div id="pythonEnvironment" aria-live="polite"><p class="muted">Select Python or R to inspect its native session.</p></div>
-      <p class="muted hint">Native R and Python retain separate variables until their respective Reset controls. Flow runs are independent.</p>
-      <p class="muted hint">The IDE executes code with your local OS permissions. Only run code you trust.</p>
+      <p class="muted hint">Python and R keep their variables between runs. Reset a session from the Run menu.</p>
+      <p class="muted hint">Code runs on your computer with your OS permissions.</p>
     </div>
   </aside>
 </div>
 <div class="splitter splitter-horizontal" id="dockSplitter" data-splitter data-axis="y" data-panel="dock" role="separator" aria-orientation="horizontal" aria-label="Resize console dock" tabindex="0"></div>
 <section class="panel dock" id="consoleDock" aria-label="Console output">
-    <h2>Console <button id="clear" type="button">Clear</button></h2>
+    <h2><span class="dock-title"><i data-lucide="terminal"></i>Console<span class="console-label">Local execution</span></span><button id="clear" type="button">Clear</button></h2>
     <div class="body"><pre id="console" role="log" aria-live="polite">Ready. Press Ctrl/⌘+Enter to execute selection or buffer.
 </pre></div>
   </section>
@@ -271,9 +361,10 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
   <span id="dirty" hidden>● unsaved</span>
   <span id="cursor">Ln 1, Col 1</span>
   <span class="spacer"></span>
-  <span>Ctrl/⌘+S Save · Ctrl/⌘+Enter Run · Ctrl/⌘+Shift+Enter Cell · Ctrl/⌘+W Close tab · Ctrl/⌘+Shift+O Outline</span>
+  <span class="shortcut-hint">Ctrl+K Commands &nbsp; Ctrl+Enter Run</span>
 </footer>
 </div>
+<dialog id="commandPalette" aria-label="Search commands"><div class="command-search"><i data-lucide="search"></i><input id="commandQuery" type="search" placeholder="Type a command..." aria-label="Search commands" autocomplete="off"><button id="closePalette" type="button" aria-label="Close commands"><i data-lucide="x"></i></button></div><div id="commandResults" aria-live="polite"></div><div class="command-footer">Arrow keys to navigate &nbsp; Enter to select &nbsp; Esc to close</div></dialog>
 <!-- BEGIN EMBEDDED PROJECT MODULE: mirrors web/project.js -->
 <script>
 /* FlowStudio project explorer. Browser File System Access API only. */
@@ -910,6 +1001,12 @@ const src = el("source");
 const language = el("language");
 const consolePane = el("console");
 const resultStatus = el("resultStatus");
+/* All console writers funnel through the bounded terminal buffer; fall back
+ * to direct text appends if the terminal module is not available. */
+function writeConsole(text) {
+  if (globalThis.FlowStudioConsoleIO) globalThis.FlowStudioConsoleIO.write(text);
+  else consolePane.textContent += text;
+}
 const documents = FlowStudioDocuments.createModel();
 documents.open({ name: "untitled.flow", text: src.value,
   language: language.value || "flow", baseline: src.value });
@@ -1085,6 +1182,7 @@ function renderTabs() {
 }
 function loadDocumentIntoEditor(doc) {
   if (!doc) return false;
+  globalThis.FlowStudioEditor?.activate(doc);
   src.value = doc.text;
   language.value = doc.language;
   el("fileLabel").textContent = FlowStudioDocuments.label(doc);
@@ -1288,15 +1386,17 @@ async function executeCode(code, label) {
   el("run").disabled = true;
   el("runCell").disabled = true;
   status("Running " + language.value + " …");
-  consolePane.textContent += "\n> " + label + " (" + language.value + ")\n";
+  writeConsole("\n> " + label + " (" + language.value + ")\n");
   try {
-    const response = await fetch("/api/run/" + language.value, {
+    const backend = language.value === "flow" ? el("flowBackend").value : "";
+    const response = await fetch("/api/run/" + language.value +
+      (backend ? "-" + backend : ""), {
       method: "POST",
       headers: { "Content-Type": "text/plain; charset=utf-8", "X-FlowStudio-Intent": "run" },
       body: code
     });
     const output = await response.text();
-    consolePane.textContent += output + "\n";
+    writeConsole(output + "\n");
     const message = response.ok ? "Finished" :
       response.status === 422 ? "Execution failed" :
       response.status === 503 ? "Interpreter unavailable" :
@@ -1304,7 +1404,7 @@ async function executeCode(code, label) {
       "HTTP error " + response.status;
     status(message, response.ok ? "ok" : "error");
   } catch (error) {
-    consolePane.textContent += String(error) + "\n";
+    writeConsole(String(error) + "\n");
     status("Execution request failed", "error");
   } finally {
     if (language.value === "python" || language.value === "r") {
@@ -1729,7 +1829,10 @@ el("resetPython").addEventListener("click", async () => {
 });
 el("open").addEventListener("click", openFile);
 el("save").addEventListener("click", saveFile);
-el("clear").addEventListener("click", () => { consolePane.textContent = ""; });
+el("clear").addEventListener("click", () => {
+  if (globalThis.FlowStudioConsoleIO) globalThis.FlowStudioConsoleIO.clear();
+  else consolePane.textContent = "";
+});
 el("fallbackOpen").addEventListener("change", async event => {
   const file = event.target.files[0];
   if (!file) return;
@@ -1748,6 +1851,9 @@ el("fallbackOpen").addEventListener("change", async event => {
 });
 document.addEventListener("keydown", event => {
   const command = event.ctrlKey || event.metaKey;
+  // Handle IDE shortcuts before Monaco's own keybinding service.
+  if (command && ["w", "Tab", "n", "o", "f", "h", "Enter", "s"].includes(event.key.length === 1 ? event.key.toLowerCase() : event.key))
+    event.stopPropagation?.();
   if (command && !event.altKey && event.key.toLowerCase() === "w") {
     event.preventDefault();
     closeDocument();
@@ -1786,6 +1892,11 @@ document.addEventListener("keydown", event => {
     goToSymbol();
     return;
   }
+  if (command && !event.altKey && event.key.toLowerCase() === "o") {
+    event.preventDefault();
+    void openFile();
+    return;
+  }
   if (command && event.key.toLowerCase() === "f") {
     event.preventDefault();
     showFindBar();
@@ -1819,7 +1930,7 @@ document.addEventListener("keydown", event => {
     event.preventDefault();
     saveFile();
   }
-});
+}, true);
 
 el("newDocument").addEventListener("click", () => createUntitled());
 el("newDocumentTab").addEventListener("click", () => createUntitled());
@@ -1859,6 +1970,7 @@ const commands = Object.freeze({
     const hide = !dock.hidden;
     dock.hidden = hide;
     if (splitter) splitter.hidden = hide;
+    el("ideShell").classList.toggle("dock-hidden", hide);
   },
   refreshEnvironment: () => el("refreshPythonEnvironment").click(),
   shortcuts: () => status("Ctrl+Enter run · Ctrl+Shift+Enter cell · Ctrl+S save · Ctrl+W close tab · Ctrl+Tab next tab · Ctrl+F find · Ctrl+H replace · Ctrl+Shift+O outline · F12 definition · Shift+F12 references · F2 rename", "ok"),
@@ -1874,8 +1986,12 @@ renderTabs();
 <script src="/editor_recovery.js"></script>
 <script src="/workspace_tabs.js"></script>
 <script>FlowStudioWorkspaceTabs.mount();</script>
+<script src="/terminal_render.js"></script>
 <script src="/console.js"></script>
 <script src="/workspace_console.js"></script>
+<script src="/packages_panel.js"></script>
+<script src="/examples_gallery.js"></script>
+<script src="/debug_panel.js"></script>
 <script src="/ide_shell.js"></script>
 <script src="/ide_symbols.js"></script>
 <script src="/ide_outline.js"></script>
@@ -2062,5 +2178,8 @@ const outlineRefreshButton = el("outlineRefresh");
 if (outlineRefreshButton) outlineRefreshButton.addEventListener("click", refreshOutline);
 refreshOutline();
 </script>
+<script src="/workspace_panels.js"></script>
+</script>
+<script type="module" src="/ui/workbench.js"></script>
 </body>
 </html>

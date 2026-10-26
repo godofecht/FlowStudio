@@ -9,7 +9,7 @@ const LIMITS = Object.freeze({
   right: [200, 560],
   dock: [90, 620]
 });
-const DEFAULTS = Object.freeze({ sidebar: 290, right: 320, dock: 190 });
+const DEFAULTS = Object.freeze({ sidebar: 260, right: 280, dock: 240 });
 
 function clamp(panel, value) {
   const range = LIMITS[panel];

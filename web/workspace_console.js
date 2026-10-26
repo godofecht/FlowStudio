@@ -1,7 +1,12 @@
 /* Integrated interactive console for the FlowStudio source workspace.
- * Execution stays on the Flow-owned localhost HTTP routes. */
+ * Execution stays on the Flow-owned localhost HTTP routes. Console output is
+ * kept as plain text (bounds-checked) and rendered as safe terminal markup:
+ * script content, truthy HTML or ANSI color noise is never interpreted. */
 (function (root) {
 "use strict";
+const TERMINAL = (typeof module !== "undefined" && module.exports) ?
+  require("./terminal_render.js") : (root.FlowStudioTerminal || null);
+
 function mount(doc = document, request = fetch) {
   // Progressive enhancement: keep the large tested editor HTML unchanged.
   // The Flow server injects this script after the editor's inline scripts.
@@ -41,15 +46,32 @@ function mount(doc = document, request = fetch) {
   const result = el("resultStatus"), editorRun = el("run"), editorCell = el("runCell");
   const drafts = {flow:"",r:"",python:""};
   let activeLanguage = language.value;
+  /* Plain-text terminal buffer; the single source of truth for the view. */
+  let buffer = output.textContent || "";
+  function paint() {
+    // Plain text first (the bounded buffer), then the classed terminal view:
+    // on a real DOM the markup write wins; test fakes keep textContent.
+    output.textContent = buffer;
+    output.innerHTML = TERMINAL ? TERMINAL.render(buffer) : "";
+  }
+  paint();
+  /* Singleton so every console writer (editor runs, installs, traces)
+   * feeds the same terminal with one bounded buffer. */
+  if (!root.FlowStudioConsoleIO) {
+    root.FlowStudioConsoleIO = Object.freeze({
+      write(text) { append(text); },
+      clear() { buffer = ""; paint(); }
+    });
+  }
   function status(message, kind = "") {
     result.textContent = message;
     result.dataset.state = kind;
   }
   function append(message) {
-    output.textContent += message;
-    if (output.textContent.length > 262144)
-      output.textContent = "[Older output truncated]\n" + output.textContent.slice(-250000);
-    output.scrollTop = output.scrollHeight;
+    buffer += message;
+    if (buffer.length > 262144)
+      buffer = "[Older output truncated]\n" + buffer.slice(-250000);
+    paint();
   }
   function syncLanguage() {
     if (activeLanguage === language.value) return;

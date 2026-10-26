@@ -1,0 +1,19 @@
+{
+  "name": "flowstudio-ui",
+  "private": true,
+  "scripts": {
+    "build:ui": "node scripts/build-ui.mjs",
+    "test": "node --test tests/*.test.js",
+    "test:ui": "node tests/native_ui.mjs"
+  },
+  "dependencies": {
+    "dompurify": "3.4.17",
+    "lucide": "0.468.0",
+    "monaco-editor": "0.57.0"
+  },
+  "overrides": { "dompurify": "3.4.17" },
+  "devDependencies": {
+    "esbuild": "0.25.12",
+    "playwright": "1.62.1"
+  }
+}

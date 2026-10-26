@@ -5,7 +5,7 @@
 # sandbox executed code. Python and R retain separate local interpreter sessions.
 
 import std.process { ProcCmd, ProcResult, proc_cmd, proc_arg, proc_timeout_ms, proc_run }
-import std.io { FileRead, io_read_text }
+import std.io { FileRead, io_read_text, io_read_file }
 import .data_routes { StaticAsset, data_route }
 
 extern {
@@ -62,7 +62,9 @@ struct ExecutionResult {
     output: string
 }
 
-function execute(language: string, code: string, check_only: bool) -> ExecutionResult {
+# backend selects the compiler backend for Flow runs: "" uses the default
+# C backend, "mlir" passes --backend=mlir to the real flow process.
+function execute(language: string, code: string, check_only: bool, backend: string) -> ExecutionResult {
     let mut command: ptr<ProcCmd> = proc_cmd("flow")
     let mut temp_path: string = ""
     let mut output_path: string = ""
@@ -88,6 +90,9 @@ function execute(language: string, code: string, check_only: bool) -> ExecutionR
         } else {
             proc_arg(command, "run")
             proc_arg(command, temp_path)
+            if not eq(backend, "") {
+                proc_arg(command, "--backend=" + backend)
+            }
         }
     } else {
         return ExecutionResult { status: 400, output: "Unsupported language." }
@@ -147,8 +152,8 @@ function execute(language: string, code: string, check_only: bool) -> ExecutionR
     return ExecutionResult { status: 200, output: output }
 }
 
-function send_execution(language: string, code: string) -> void {
-    let result: ExecutionResult = execute(language, code, false)
+function send_execution(language: string, code: string, backend: string) -> void {
+    let result: ExecutionResult = execute(language, code, false, backend)
     fs_reply(result.status, "text/plain; charset=utf-8", result.output)
 }
 
@@ -340,7 +345,7 @@ function send_python_environment() -> void {
 }
 
 function send_flow_check(code: string) -> void {
-    let result: ExecutionResult = execute("flow", code, true)
+    let result: ExecutionResult = execute("flow", code, true, "")
     fs_reply(result.status, "text/plain; charset=utf-8", result.output)
 }
 
@@ -566,7 +571,9 @@ function dispatch() -> void {
     if eq(method, "GET") {
         let asset: StaticAsset = data_route(path)
         if asset.found {
-            let file: FileRead = io_read_text(asset.path)
+            # These are trusted, checked-in assets. io_read_text validates each
+            # code point with repeated length scans, which stalls large bundles.
+            let file: FileRead = io_read_file(asset.path)
             if file.ok {
                 fs_reply(200, asset.mime, file.data)
             } else {
@@ -625,7 +632,12 @@ function dispatch() -> void {
             return
         }
         if eq(path, "/api/run/flow") {
-            send_execution("flow", fs_body())
+            send_execution("flow", fs_body(), "")
+            return
+        }
+        # Same real flow process with the MLIR backend selected.
+        if eq(path, "/api/run/flow-mlir") {
+            send_execution("flow", fs_body(), "mlir")
             return
         }
         if eq(path, "/api/run/r") {

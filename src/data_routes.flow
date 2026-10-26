@@ -6,6 +6,21 @@ export struct StaticAsset {
 }
 
 export function data_route(url: string) -> StaticAsset {
+    if url == "/ui/workbench.js" {
+        return StaticAsset { path: "web/ui/workbench.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/ui/workbench.css" {
+        return StaticAsset { path: "web/ui/workbench.css", mime: "text/css; charset=utf-8", found: true }
+    }
+    if url == "/ui/editor.worker.js" {
+        return StaticAsset { path: "web/ui/editor.worker.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/ui/workbench.js.LEGAL.txt" {
+        return StaticAsset { path: "web/ui/workbench.js.LEGAL.txt", mime: "text/plain; charset=utf-8", found: true }
+    }
+    if url == "/ui/THIRD_PARTY_LICENSES.txt" {
+        return StaticAsset { path: "web/ui/THIRD_PARTY_LICENSES.txt", mime: "text/plain; charset=utf-8", found: true }
+    }
     if url == "/data" or url == "/data.html" {
         return StaticAsset { path: "web/data.html", mime: "text/html; charset=utf-8", found: true }
     }
@@ -62,6 +77,24 @@ export function data_route(url: string) -> StaticAsset {
     }
     if url == "/workspace_console.js" {
         return StaticAsset { path: "web/workspace_console.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/packages_panel.js" {
+        return StaticAsset { path: "web/packages_panel.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/examples_gallery.js" {
+        return StaticAsset { path: "web/examples_gallery.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/debug_panel.js" {
+        return StaticAsset { path: "web/debug_panel.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/workspace_panels.js" {
+        return StaticAsset { path: "web/workspace_panels.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/ide_completion_core.js" {
+        return StaticAsset { path: "web/ide_completion_core.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/terminal_render.js" {
+        return StaticAsset { path: "web/terminal_render.js", mime: "text/javascript; charset=utf-8", found: true }
     }
     if url == "/ide_symbols.js" {
         return StaticAsset { path: "web/ide_symbols.js", mime: "text/javascript; charset=utf-8", found: true }

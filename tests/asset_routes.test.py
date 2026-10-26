@@ -15,7 +15,7 @@ class AssetRoutesTest(unittest.TestCase):
     def test_dispatcher_invokes_allowlist_only_for_get(self):
         self.assertIn("import .data_routes { StaticAsset, data_route }", self.main)
         self.assertRegex(self.main, r'if eq\(method, "GET"\) \{\s*let asset: StaticAsset = data_route\(path\)')
-        self.assertIn("io_read_text(asset.path)", self.main)
+        self.assertIn("io_read_file(asset.path)", self.main)
         self.assertNotIn("io_read_text(path)", self.main)
 
     def test_declared_assets_exist(self):

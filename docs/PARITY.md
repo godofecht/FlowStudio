@@ -1,3 +1,20 @@
+## 2026-10-26: clear saved notebook outputs without resetting interpreters (validation pending)
+
+The browser workspace now offers **Clear cell output** and **Clear all outputs**
+for saved code-cell results. Clearing the selected code cell leaves other code
+results and Markdown cards intact; clearing all removes saved code results
+without changing source or the persistent Python/R kernel state. Both actions
+reject active execution, stale source/language and unsupported Markdown
+selection. The browser-local recovery record is invalidated and, when any
+results remain, rewritten with only those results. Subsequent .ipynb, .fsnb
+and HTML exports cannot reintroduce cleared outputs. Failed persistence is
+reported explicitly. No backend routes, Flow compiler or hosted CI changes.
+
+**Status: partial / implementation and six automated Node regressions added;
+independent CI and physical-browser acceptance pending.** This is output
+management, not interpreter state recovery, real knitr rendering, resumable
+function-level R debugging, authenticated remote sessions or RStudio parity.
+
 ## 2026-10-26: portable .fsnb v2 retains safe Jupyter output records (new PR; validation pending)
 
 Portable FlowStudio notebook export now emits v2 only when a cell has validated
@@ -10,8 +27,12 @@ rejected. This is **display-only file persistence**, not interpreter state
 restoration or full Jupyter compatibility. The Flow native backend and hosted
 CI are unchanged.
 
-**Status: partial / direct V8 source checks passed; Node, Linux/macOS native
-CI and physical-browser import/export not yet independently verified.**
+**Status: partial / independent Linux/macOS source and native CI passed;
+physical-browser import/export remains unverified.** [PR #86](https://github.com/godofecht/FlowStudio/pull/86)
+merged as [b8b65b6](https://github.com/godofecht/FlowStudio/commit/b8b65b6eee1eb3298da40094668b96dfa2a515c6)
+after [CI #40390075606](https://github.com/godofecht/FlowStudio/actions/runs/40390075606)
+completed all four Ubuntu 24.04/macOS 14 jobs successfully, including native
+Flow 2.0.0 compilation, real Rscript/HTTP acceptance and packaging.
 Actual knitr rendering, function-level R debugging, authenticated remote
 sessions and RStudio feature parity remain outstanding.
 

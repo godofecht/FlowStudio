@@ -1,6 +1,6 @@
-## 2026-10-26: prevent implicit knitr execution from Markdown cells (validation pending)
+## 2026-10-26: prevent implicit knitr execution from Markdown cells (Linux/macOS CI passed)
 
-R Markdown export now rejects executable fenced knitr chunks and inline R
+R Markdown export rejects executable fenced knitr chunks and inline R
 expressions embedded in FlowStudio **Markdown** cells. Such cells are inert in
 the editor, but knitr would otherwise execute their contents after .Rmd export.
 Literal `eval=FALSE` R/Python fenced chunks remain portable and inert;
@@ -9,11 +9,17 @@ The exporter refuses unknown knitr options instead of silently changing
 execution semantics. This change affects `docs/app/` export only; it does not
 execute R, install knitr, or introduce a new backend.
 
-**Status: partial / 12 direct V8 checks passed; independent Node and
-Linux/macOS CI pending.** Four Node regression cases were added. Real knitr
-rendering and physical-browser acceptance are still unimplemented or unverified.
-Flow 2.0.0 remains the primary native backend. No hosted CI configuration changed.
-RStudio parity is not achieved.
+**Status: partial / independent Linux/macOS source and native CI passed.**
+[PR #90](https://github.com/godofecht/FlowStudio/pull/90) merged as
+[8930d49](https://github.com/godofecht/FlowStudio/commit/8930d495bde1edec62df289e8527960f830a9b81)
+after [CI #40415902244](https://github.com/godofecht/FlowStudio/actions/runs/40415902244)
+passed all four jobs on Ubuntu 24.04 and macOS 14. Each source job ran
+801 JavaScript tests (799 passed, two skipped, zero failures), 78 Python
+tests (11 skipped), and transport checks. Both native jobs compiled the
+real Flow 2.0.0 server, passed live Rscript/HTTP acceptance and packaged it.
+Four new Node regression cases and 12 direct V8 assertions passed. Physical-
+browser R Markdown export and real knitr rendering remain unverified or
+unimplemented. No hosted CI configuration changed; RStudio parity is not achieved.
 
 ## 2026-10-26: real browser R named-list member completion (Linux/macOS CI passed)
 

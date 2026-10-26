@@ -128,6 +128,10 @@ function bufferIdentifiers(source, prefix, language, cursorLimit) {
 /* Complete only names already present in the native R inspector's bounded,
  * inert list metadata. Never evaluate R expressions or infer S3 methods. */
 const R_MEMBER = /^(?:[A-Za-z]|\.[A-Za-z_])[A-Za-z0-9._]{0,79}$/;
+const R_RESERVED = new Set(["if", "else", "repeat", "while", "function",
+  "for", "in", "next", "break", "TRUE", "FALSE", "NULL", "Inf", "NaN",
+  "NA", "NA_integer_", "NA_real_", "NA_complex_", "NA_character_"]);
+const rSafeName = name => R_MEMBER.test(name) && !R_RESERVED.has(name);
 function rMemberContext(lineBeforeCursor) {
   if (typeof lineBeforeCursor !== "string" || lineBeforeCursor.length > 4096) return null;
   let masked = "", quote = null;
@@ -147,7 +151,7 @@ function rMemberContext(lineBeforeCursor) {
   const match = pattern.exec(masked);
   if (!match) return null;
   const path = match[1].split("$");
-  if (!path.every(part => R_MEMBER.test(part))) return null;
+  if (!path.every(rSafeName)) return null;
   return { path, prefix: match[2] || "" };
 }
 function rListMembers(variables, path, prefix = "") {
@@ -171,7 +175,7 @@ function rListMembers(variables, path, prefix = "") {
     if (!child || typeof child.name !== "string") continue;
     const match = /^\[\[[1-9][0-9]{0,3}\]\] (.+)$/.exec(child.name);
     const name = match && match[1];
-    if (name && R_MEMBER.test(name) && name.startsWith(prefix)) found.add(name);
+    if (name && rSafeName(name) && name.startsWith(prefix)) found.add(name);
   }
   return [...found].sort().slice(0, MAX_ITEMS)
     .map(name => ({label:name, kind:"variable", insert:name}));

@@ -1,3 +1,27 @@
+## 2026-10-26: bounded native R multi-page preview CSV export (verification pending)
+
+The environment table viewer can now export all **preview rows** of a native
+GNU R data.frame/matrix via the existing Flow-owned POST /api/table/r route.
+It starts at row zero, follows the kernel's exact nextOffset across
+response-size-shortened pages, and writes a single CSV header with rows in
+kernel order. It refuses gaps, empty intermediate pages, inconsistent schemas
+or row counts, more than 25,000 rows, more than 512 pages, and more than 8 MiB
+of UTF-8 CSV. Existing formula escaping applies to every page. No partial
+file is downloaded after an error or view closure. The current visible slice,
+local filtering and local sorting are not changed; those operations are not
+misrepresented as global.
+
+**Status: partial / implementation and eight Node regression cases added;
+native Flow/Rscript HTTP, Linux/macOS CI and physical-browser execution
+not yet independently verified.** The opt-in Playwright suite now contains
+a 251-row real native R CSV-download assertion, but has not been run here.
+The existing R kernel only returns the first 32 columns and at most 160
+characters per cell; exports are not full-fidelity raw R datasets and
+cannot guarantee atomic consistency if R data mutate between requests.
+No native backend routes, compiler or hosted CI configuration changed.
+Full RStudio parity, live function-level R debugging and authenticated
+remote sessions remain outstanding.
+
 ## 2026-10-26: direct native R table row navigation (verification pending)
 
 The browser environment table viewer can jump directly to a specified 1-based

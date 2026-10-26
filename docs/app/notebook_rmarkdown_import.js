@@ -21,6 +21,7 @@ function decode(input, parseCells) {
   const lines = input.replace(/\r\n?/g, "\n").split("\n");
   let index = 0;
   let metadataDiscarded = false;
+  let preservedYaml = "";
   if (lines[0] === "---") {
     let end = -1;
     for (let i = 1; i < Math.min(lines.length, 66); i++) {
@@ -38,12 +39,13 @@ function decode(input, parseCells) {
           !/^(?:html_document|"html_document"|'html_document')$/.test(match[2].trim()))
         throw new Error("Only R Markdown html_document output is supported.");
     }
+    // Preserve supported YAML as inert Markdown; no metadata is evaluated.
+    preservedYaml = lines.slice(0, end + 1).join("\n") + "\n";
     index = end + 1;
-    metadataDiscarded = true;
   }
   const chunks = [];
   const chunkLabels = new Set();
-  let markdown = "";
+  let markdown = preservedYaml;
   function append(kind, body, language, label = null) {
     if (utf8Bytes(body) > MAX_CELL)
       throw new Error("R Markdown cells must be at most 64 KiB.");

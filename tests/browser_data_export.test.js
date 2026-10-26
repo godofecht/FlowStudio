@@ -60,10 +60,10 @@ test("environment export respects current filter and never calls kernel", () => 
   holder.children[1].value="keep";
   holder.children[1].listeners.input();
   const button=holder.children[6];
-  assert.equal(button.textContent,"Export sampled CSV");
+  assert.equal(button.textContent,"Export loaded CSV");
   button.listeners.click();
   assert.equal(downloads.length,1);
-  assert.equal(downloads[0].name,"sample-sampled");
+  assert.equal(downloads[0].name,"sample-loaded-slice");
   assert.deepEqual(data.parseDelimited(downloads[0].csv).rows,[["1","keep"]]);
   assert.match(holder.children[7].textContent,/not a full kernel dataset/);
 });

@@ -11,11 +11,19 @@ the existing 1 MiB total limit and exact source/language match; no interpreter
 state is restored or code executed. A failed write leaves the previous stored
 record intact. Portable .fsnb remains snapshot-only.
 
-**Status: partial / local V8 end-to-end codec/recovery checks passed; repository
-Node suite, Linux/macOS CI and physical-browser reload/export not yet verified.**
-This is not evidence of real Pyodide/webR execution, knitr rendering, live R
-function debugging, authenticated remote sessions or RStudio parity. The
-Flow 2.0.0 native backend and hosted CI configuration are unchanged.
+**Status: partial / independent Linux/macOS source and native CI passed;
+physical-browser reload/export still unverified.** [PR #85](https://github.com/godofecht/FlowStudio/pull/85)
+merged as [8726160](https://github.com/godofecht/FlowStudio/commit/87261600f74c1780c8585256fa0a297de9c68bff)
+after [CI #40381335618](https://github.com/godofecht/FlowStudio/actions/runs/40381335618)
+passed all four Ubuntu 24.04/macOS 14 jobs. Each source job completed
+752 JavaScript tests (750 passed, two skipped, zero failures), plus 78 Python
+tests (11 skipped). Both native jobs compiled Flow 2.0.0, passed live
+Rscript/HTTP acceptance and packaged the native executable. Eight focused
+recovery tests also passed in a local V8 harness with Node built-in shims;
+this is not an independent physical-browser pass. Post-merge main validation
+remains unconfirmed. This is not evidence of real Pyodide/webR browser
+execution, knitr rendering, live R function debugging, authenticated remote
+sessions or RStudio parity. The Flow native backend and hosted CI are unchanged.
 
 ## 2026-10-26: loss-aware Jupyter output record round-trip (Linux/macOS CI passed)
 

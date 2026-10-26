@@ -11,7 +11,7 @@ th{position:sticky;top:0;background:#24324a}.missing{color:#9aa8bf}
 <body>
 <header><a href="./index.html">← Editor</a><h1>FlowStudio Data Viewer</h1><button id="open">Open CSV/TSV</button><input id="fallback" type="file" accept=".csv,.tsv" hidden></header>
 <label for="filter">Filter</label><input id="filter" type="search" maxlength="256" disabled>
-<button id="previous" disabled>Previous</button><button id="next" disabled>Next</button>
+<button id="previous" disabled>Previous</button><button id="next" disabled>Next</button><button id="exportCSV" type="button" disabled title="Download all filtered and sorted preview rows, not just the visible page; spreadsheet formula fields are escaped">Export filtered CSV</button>
 <span id="summary" role="status" aria-live="polite">No dataset loaded.</span>
 <div id="grid" role="region" aria-label="Dataset table" tabindex="0"></div>
 <p id="status" role="status" aria-live="polite">Local-only CSV/TSV preview. Files are not uploaded.</p>

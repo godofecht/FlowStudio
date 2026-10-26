@@ -101,6 +101,6 @@ test("native R table route is owned by Flow, not an eval-string client shim", ()
   const read = name => fs.readFileSync(path.join(root, name), "utf8");
   assert.match(read("src/main.flow"), /if eq\(path, "\/api\/table\/r"\) \{\s*send_r_table\(fs_body\(\)\)/);
   assert.match(read("src/r_session.c"), /fs_r_table\(const char \*name\) \{ return request_r\('T', name\); \}/);
-  assert.match(read("src/r_kernel.R"), /table_snapshot <- function\(name\)/);
+  assert.match(read("src/r_kernel.R"), /table_snapshot <- function\(query\)/);
   assert.match(read("docs/app/index.html"), /await getRSession\(\)\.table\(name\)/);
 });

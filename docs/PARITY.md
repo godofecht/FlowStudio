@@ -1,3 +1,20 @@
+## 2026-10-26: prevent implicit knitr execution from Markdown cells (validation pending)
+
+R Markdown export now rejects executable fenced knitr chunks and inline R
+expressions embedded in FlowStudio **Markdown** cells. Such cells are inert in
+the editor, but knitr would otherwise execute their contents after .Rmd export.
+Literal `eval=FALSE` R/Python fenced chunks remain portable and inert;
+ordinary fenced examples and escaped inline examples remain Markdown.
+The exporter refuses unknown knitr options instead of silently changing
+execution semantics. This change affects `docs/app/` export only; it does not
+execute R, install knitr, or introduce a new backend.
+
+**Status: partial / 12 direct V8 checks passed; independent Node and
+Linux/macOS CI pending.** Four Node regression cases were added. Real knitr
+rendering and physical-browser acceptance are still unimplemented or unverified.
+Flow 2.0.0 remains the primary native backend. No hosted CI configuration changed.
+RStudio parity is not achieved.
+
 ## 2026-10-26: real browser R named-list member completion (Linux/macOS CI passed)
 
 The `docs/app/` browser workspace now completes named members of ordinary R

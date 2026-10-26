@@ -42,7 +42,8 @@ function importOutputText(value, state, cell) {
   try { raw = sourceString(value); }
   catch (_) { state.ignored = true; return; }
   for (const character of raw) {
-    const length = bytes(character);
+    const point = character.codePointAt(0);
+    const length = point <= 127 ? 1 : point <= 2047 ? 2 : point <= 65535 ? 3 : 4;
     if (cell.used + length > MAX_IMPORT_TEXT || state.used + length > MAX_IMPORT_TOTAL) {
       cell.truncated = true;
       state.ignored = true;

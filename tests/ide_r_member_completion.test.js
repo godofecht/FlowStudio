@@ -12,7 +12,9 @@ const snapshot = [
       {name:"[[1]] score", type:"double"},
       {name:"[[2]] scale", type:"double"},
       {name:"[[3]] invalid name", type:"integer"},
-      {name:"[[4]] <script>", type:"character"}
+      {name:"[[4]] <script>", type:"character"},
+      {name:"[[5]] if", type:"integer"},
+      {name:"[[6]] NA", type:"logical"}
     ]},
     {name:"[[2]] seed", type:"integer"},
     {name:"[[3]] model", type:"list", children:[]}
@@ -78,6 +80,7 @@ test("R member lookup does not execute, guess attributes, or trust malformed lab
   assert.equal(core.rMemberContext("analysis$"+String.fromCharCode(96)+"unsafe"+String.fromCharCode(96)),null);
   assert.equal(core.rMemberContext("analysis$child$nested$too$deep"),null);
   assert.equal(core.rMemberContext("analysis[1]$sc"),null);
+  assert.equal(core.rMemberContext("analysis$if$"),null);
 });
 
 test("Monaco $ completion inserts only the member, preserving receiver expression", async () => {

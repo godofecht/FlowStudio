@@ -51,7 +51,10 @@ function render(json, title = "FlowStudio notebook report") {
       sections.push('<section class="markdown">' + markdown(source) + "</section>");
       continue;
     }
-    let section = '<section class="cell"><h2>Cell ' + (i + 1) +
+    const cellLanguage = cell.metadata?.flowstudio?.language;
+    const languageLabel = ["flow", "python", "r"].includes(cellLanguage) ?
+      " (" + (cellLanguage === "r" ? "R" : cellLanguage === "flow" ? "Flow" : "Python") + ")" : "";
+    let section = '<section class="cell"><h2>Cell ' + (i + 1) + languageLabel +
       '</h2><pre class="source"><code>' + escapeHTML(source) + "</code></pre>";
     const outputs = cell.outputs || [];
     if (!Array.isArray(outputs) || outputs.length > 32) throw Error("Invalid notebook outputs.");
@@ -96,7 +99,33 @@ function render(json, title = "FlowStudio notebook report") {
   if (encoder.encode(html).length > 7340032) throw Error("HTML report exceeds 7 MiB.");
   return html;
 }
-const api = Object.freeze({render, markdown});
+
+/* Portable .fsnb reports preserve each cell's actual runtime. This is an
+ * offline display export, not a claim of multi-kernel Jupyter execution. */
+function renderBundle(json, format, parseCells, title = "FlowStudio notebook report") {
+  if (!format || typeof format.decodeBundle !== "function" || typeof parseCells !== "function")
+    throw TypeError("FlowStudio notebook decoder and source-cell parser are required.");
+  const imported = format.decodeBundle(json, parseCells);
+  const entries = new Map(imported.entries.map(entry => [entry.index, entry]));
+  const cells = parseCells(imported.source).map(cell => {
+    if (cell.kind === "markdown")
+      return {cell_type:"markdown", metadata:{}, source:cell.code};
+    const result = entries.get(cell.index);
+    const outputs = [];
+    if (result) {
+      if (result.output) outputs.push({output_type:"stream",
+        name:result.ok ? "stdout" : "stderr", text:result.output});
+      if (result.truncated) outputs.push({output_type:"stream", name:"stderr",
+        text:"[FlowStudio output was truncated]"});
+      for (const plot of result.plots)
+        outputs.push({output_type:"display_data", metadata:{}, data:{"image/png":plot.png}});
+    }
+    return {cell_type:"code", metadata:{flowstudio:{language:cell.language || imported.language}},
+      source:cell.code, outputs};
+  });
+  return render(JSON.stringify({nbformat:4, cells}), title);
+}
+const api = Object.freeze({render, renderBundle, markdown});
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 global.FlowStudioNotebookReport = api;
 })(globalThis);

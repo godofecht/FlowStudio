@@ -16,6 +16,8 @@ function validate(packet) {
       (packet.kind === "scalar" && packet.values.length !== 1))
     throw Error("Unsupported transfer value: expected a typed scalar or vector.");
   for (const value of packet.values) {
+    // Null is a typed missing element, never an untyped scalar.
+    if (value === null && packet.kind === "vector") continue;
     if (packet.type === "number" &&
         (typeof value !== "number" || !Number.isFinite(value) ||
          Math.abs(value) > Number.MAX_SAFE_INTEGER)) throw Error("Transfer number is not finite or safe.");

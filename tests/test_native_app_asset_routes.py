@@ -16,6 +16,10 @@ class NativeAppAssetRoutesTest(unittest.TestCase):
             r'return StaticAsset \{ path: "(docs/app/[^"]+)", '
             r'mime: "([^"]+)", found: true \}', text
         )
+        self.assertIn('url == "/app/index.html"', text)
+        self.assertIn('path: "docs/app/index.html"', text)
+        routes.append(("/app/index.html", "docs/app/index.html",
+                       "text/html; charset=utf-8"))
         self.assertEqual(len(routes), len(set(route for route, _, _ in routes)),
                          "duplicate native application URLs")
         actual = {path.relative_to(ROOT).as_posix() for path in APP.iterdir()

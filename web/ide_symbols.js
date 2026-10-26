@@ -258,8 +258,110 @@ function uniqueOpenDefinition(language, documents, name, currentId) {
   return found || { state: "missing" };
 }
 
+
+const MAX_REFERENCES = 200;
+
+/* Lexical references in user-opened buffers only. This is not language-server
+ * binding resolution: imports, shadowing, dynamic R evaluation and Python
+ * f-string expressions are not semantically analyzed. No code is executed. */
+function findReferences(language, text, name, limit = MAX_REFERENCES) {
+  if (!LANGUAGES.includes(language)) throw new TypeError("Unsupported reference language.");
+  if (typeof text !== "string" || text.length > MAX_SOURCE)
+    throw new RangeError("Reference source exceeds the 2 MiB limit.");
+  const valid = language === "r"
+    ? /^[A-Za-z._][A-Za-z0-9._]*$/ : /^[A-Za-z_][A-Za-z0-9_]*$/;
+  if (typeof name !== "string" || !valid.test(name))
+    throw new TypeError("Expected a valid source identifier.");
+  if (!Number.isInteger(limit) || limit < 1 || limit > MAX_REFERENCES)
+    throw new RangeError("Reference limit must be 1–200.");
+  const part = language === "r" ? /[A-Za-z0-9._]/ : /[A-Za-z0-9_]/;
+  const start = language === "r" ? /[A-Za-z._]/ : /[A-Za-z_]/;
+  const matches = [];
+  let truncated = false;
+  let quote = "";
+  let comment = false;
+  let escaped = false;
+  let line = 1;
+  let column = 1;
+  let i = 0;
+  function advance(count = 1) {
+    for (let n = 0; n < count; n++) {
+      if (text[i] === "\n") { line++; column = 1; comment = false; }
+      else column++;
+      i++;
+    }
+  }
+  while (i < text.length) {
+    const char = text[i];
+    if (comment) { advance(); continue; }
+    if (quote) {
+      if (quote.length === 3 && text.slice(i, i + 3) === quote) {
+        advance(3); quote = ""; continue;
+      }
+      if (quote.length === 1 && !escaped && char === quote) {
+        advance(); quote = ""; continue;
+      }
+      if (quote.length === 1 && !escaped && char === "\\") {
+        escaped = true; advance(); continue;
+      }
+      escaped = false;
+      advance();
+      continue;
+    }
+    if (char === "#") { comment = true; advance(); continue; }
+    if (char === "'" || char === '"' || (language === "r" && char === "\`")) {
+      if (language === "python" && text.slice(i, i + 3) === char.repeat(3)) {
+        quote = char.repeat(3); advance(3);
+      } else { quote = char; advance(); }
+      escaped = false;
+      continue;
+    }
+    if (start.test(char) && (i === 0 || !part.test(text[i - 1]))) {
+      const begin = i, tokenLine = line, tokenColumn = column;
+      while (i < text.length && part.test(text[i])) advance();
+      const token = text.slice(begin, i);
+      const prefix = begin > 0 ? text[begin - 1] : "";
+      const member = language === "r"
+        ? prefix === "$" || prefix === "@" || prefix === ":"
+        : prefix === ".";
+      if (token === name && !member) {
+        if (matches.length === limit) { truncated = true; break; }
+        const lineStart = text.lastIndexOf("\n", begin - 1) + 1;
+        let lineEnd = text.indexOf("\n", begin);
+        if (lineEnd < 0) lineEnd = text.length;
+        matches.push({ index: begin, line: tokenLine, column: tokenColumn,
+          preview: text.slice(lineStart, Math.min(lineEnd, lineStart + 160)).trim() });
+      }
+      continue;
+    }
+    advance();
+  }
+  return { matches, truncated };
+}
+
+function findOpenReferences(language, documents, name, currentId) {
+  if (!Array.isArray(documents) || documents.length > 24)
+    throw new RangeError("Reference search supports up to 24 open documents.");
+  const ordered = documents.slice().sort((a, b) =>
+    Number(b && b.id === currentId) - Number(a && a.id === currentId));
+  const matches = [];
+  let truncated = false;
+  for (const doc of ordered) {
+    if (!doc || doc.language !== language) continue;
+    const result = findReferences(language, doc.text, name);
+    for (const hit of result.matches) {
+      if (matches.length >= MAX_REFERENCES) { truncated = true; break; }
+      matches.push({ ...hit, documentId: doc.id,
+        documentLabel: doc.path || doc.name || "Untitled" });
+    }
+    if (result.truncated) truncated = true;
+    if (truncated) break;
+  }
+  return { matches, truncated };
+}
+
 const api = Object.freeze({ parse, glyph, clip, identifierAt, findDefinitions, findDefinition,
-  definitionAt, uniqueOpenDefinition, MAX_SOURCE, MAX_SYMBOLS, MAX_LINE, LANGUAGES, GLYPHS });
+  definitionAt, uniqueOpenDefinition, findReferences, findOpenReferences, MAX_REFERENCES, MAX_SOURCE, MAX_SYMBOLS, MAX_LINE, LANGUAGES, GLYPHS });
 root.FlowStudioSymbols = api;
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

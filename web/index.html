@@ -59,6 +59,8 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
 .outline-name{color:var(--ink);overflow:hidden;text-overflow:ellipsis}
 .outline-detail{color:var(--muted);overflow:hidden;text-overflow:ellipsis}
 .outline-note{padding:4px 6px;font-size:11px;color:var(--muted)}
+#referenceResults{display:flex;flex-direction:column;gap:2px;min-width:0;overflow-wrap:anywhere}
+#referenceResults .outline-item{white-space:normal;overflow-wrap:anywhere}
 .project-tools{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:9px}
 .project-tools button{padding:4px 9px;font-size:12px}
 .project-search{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:9px}
@@ -134,6 +136,7 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
         <hr>
         <button type="button" role="menuitem" data-command="goToSymbol">Go to symbol…<kbd>Ctrl+Shift+O</kbd></button>
         <button type="button" role="menuitem" data-command="goToDefinition">Go to definition<kbd>F12</kbd></button>
+        <button type="button" role="menuitem" data-command="findReferences">Find references<kbd>Shift+F12</kbd></button>
       </div>
     </div>
     <div class="menu">
@@ -208,6 +211,7 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
       <div class="outline-head"><span id="outlineLabel">Document symbols</span><button id="outlineRefresh" type="button" title="Re-read the buffer">Refresh</button></div>
       <ul id="outlineList" aria-label="Document outline"></ul>
       <p id="outlineEmpty" class="muted">Open a Flow, R or Python file to see its structure.</p>
+      <div id="referenceResults" role="group" aria-label="Source references" aria-live="polite"></div>
       <p class="muted hint">Select a symbol to move the caret to it. The outline follows the active buffer.</p>
     </div>
     <div id="view-plots" class="workspace-frame" role="tabpanel" aria-labelledby="tab-plots" hidden><iframe title="Local plot history" loading="lazy"></iframe></div>
@@ -1749,6 +1753,12 @@ document.addEventListener("keydown", event => {
     goToDefinition();
     return;
   }
+  if (event.key === "F12" && event.target === src && event.shiftKey &&
+      !event.ctrlKey && !event.metaKey && !event.altKey) {
+    event.preventDefault();
+    findReferencesAtCaret();
+    return;
+  }
   if (command && event.shiftKey && !event.altKey && event.key.toLowerCase() === "o") {
     event.preventDefault();
     goToSymbol();
@@ -1811,6 +1821,7 @@ const commands = Object.freeze({
   showOutline: () => el("tab-outline").click(),
   goToSymbol: () => goToSymbol(),
   goToDefinition: () => goToDefinition(),
+  findReferences: () => findReferencesAtCaret(),
   refreshOutline: () => refreshOutline(),
   run: () => el("run").click(),
   runCell: () => el("runCell").click(),
@@ -1893,6 +1904,50 @@ function goToDefinition() {
   }
   return false;
 }
+
+function findReferencesAtCaret() {
+  try {
+    const name = FlowStudioSymbols.identifierAt(language.value, src.value, src.selectionStart);
+    if (!name) {
+      status("Place the caret on a Flow, R or Python identifier.", "error");
+      return false;
+    }
+    const current = activeDocument();
+    if (!current) return false;
+    documents.setText(current.id, src.value);
+    const result = FlowStudioSymbols.findOpenReferences(
+      language.value, documents.list(), name, current.id);
+    const node = el("referenceResults");
+    const title = document.createElement("p");
+    title.className = "outline-note";
+    title.textContent = "Lexical references: " + name + " (" + result.matches.length +
+      (result.truncated ? "+, capped at 200" : "") + "). Open tabs only; not semantic resolution.";
+    const buttons = result.matches.map(match => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "outline-item";
+      button.title = match.documentLabel + ":" + match.line + ":" + match.column;
+      button.textContent = match.documentLabel + ":" + match.line + ":" + match.column +
+        "  " + match.preview;
+      button.addEventListener("click", () => {
+        if (activateDocument(match.documentId)) {
+          revealPosition(match.line, match.column);
+          status("Reference: " + name + " in " + match.documentLabel, "ok");
+        }
+      });
+      return button;
+    });
+    node.replaceChildren(title, ...buttons);
+    el("tab-outline").click();
+    status("Found " + result.matches.length + (result.truncated ? "+" : "") +
+      " lexical references to " + name + " in open tabs.", "ok");
+    return true;
+  } catch (error) {
+    status("Reference search: " + (error.message || String(error)), "error");
+    return false;
+  }
+}
+
 function goToSymbol() {
   const tab = el("tab-outline");
   if (tab) tab.click();

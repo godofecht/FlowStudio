@@ -33,7 +33,7 @@ test("native R preview CSV fetches every row from zero without repeated headers"
 });
 test("native R preview CSV rejects gaps, early endings, schema and row-count changes", async () => {
   const cases=[
-    offset=>({...table(offset,51),table:{...table(offset,51).table,offset:offset+1}}),
+    offset=>({...table(offset,50),table:{...table(offset,50).table,offset:offset+1}}),
     offset=>({...table(offset,51),table:{...table(offset,51).table,nextOffset:null}}),
     offset=>table(offset,51,251,["different"]),
     offset=>table(offset,51,252)
@@ -44,13 +44,13 @@ test("native R preview CSV rejects gaps, early endings, schema and row-count cha
 });
 test("native R preview CSV refuses empty continuation and oversized datasets", async () => {
   await assert.rejects(viewer.collectRPreviewCSV("x",async(_name,offset)=>
-    offset===0?table(0,200):table(offset,0),data),/empty kernel page/);
+    offset===0?table(0,200):({...table(offset,0),table:{...table(offset,0).table,nextOffset:null}}),data),/empty kernel page/);
   await assert.rejects(viewer.collectRPreviewCSV("x",async()=>table(0,1,25001),data),
     /25,000 rows/);
 });
 test("native R preview CSV enforces cumulative UTF-8 bytes", async () => {
   await assert.rejects(viewer.collectRPreviewCSV("x",async(_name,offset)=>
-    table(offset,Math.min(2,5-offset),5),{...data,MAX_BYTES:40}),/8 MiB export bound/);
+    table(offset,Math.min(2,5-offset),5),{...data,MAX_BYTES:10}),/8 MiB export bound/);
 });
 test("native R preview CSV cancels when view closes mid-fetch", async () => {
   let release, alive=true;

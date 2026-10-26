@@ -23,7 +23,7 @@ class NativeAppAssetRoutesTest(unittest.TestCase):
         served = {path for _, path, _ in routes}
         self.assertEqual(actual, served)
         for url, path, mime in routes:
-            self.assertEqual(url, "/" + path.removeprefix("docs"))
+            self.assertEqual(url, "/" + path.removeprefix("docs/"))
             if path.endswith(".js"):
                 self.assertEqual(mime, "text/javascript; charset=utf-8")
             elif path.endswith(".html"):

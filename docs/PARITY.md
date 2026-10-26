@@ -12,8 +12,10 @@ so dependencies must already exist in the selected kernel. Results show only
 the executed subset, never stale earlier outputs.
 
 **Status: partial / local V8 checks passed; Linux/macOS CI and physical-browser
-interpreter acceptance pending.** Six Node regressions were added; native Flow
-routes, compiler and hosted CI workflow were not modified. This is not
+interpreter acceptance pending.** Six Node regressions and opt-in physical-browser scenarios for actual
+Pyodide and webR execution were added; the browser scenarios have not yet
+been run independently. Native Flow routes, compiler and hosted CI workflow
+were not modified. This is not
 function-level R debugging, remote isolation or RStudio parity.
 
 

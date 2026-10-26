@@ -20,10 +20,12 @@ function create(options) {
       if (!canReplace()) return;
       await onImported(imported, file.name);
       notice(imported.entries?.length ?
-        "Notebook imported with display-only saved outputs; interpreter state and metadata were not restored." +
+        "Notebook imported with display-only saved outputs; interpreter state was not restored." +
+          (imported.ignoredMetadata ? " Unsupported cell metadata was omitted." : "") +
           (imported.ignoredOutputs ? " Unsupported or oversized outputs were omitted." : "") :
-        "Notebook imported. " + (imported.ignoredOutputs ? "Unsupported outputs were omitted. " : "") +
-          "Interpreter state and metadata were not loaded.");
+        "Notebook imported. " + (imported.ignoredMetadata ? "Unsupported cell metadata was omitted. " : "") +
+          (imported.ignoredOutputs ? "Unsupported outputs were omitted. " : "") +
+          "Interpreter state was not loaded.");
     } catch (error) { notice("Notebook import failed: " + String(error.message || error)); }
   });
   saveButton.addEventListener("click", () => {

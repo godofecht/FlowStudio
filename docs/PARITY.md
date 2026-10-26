@@ -1,3 +1,19 @@
+## 2026-10-26: Jupyter cell IDs and tags (PR verification pending)
+
+The .ipynb importer preserves valid nbformat 4.5 cell IDs and bounded
+Jupyter `metadata.tags` in inert percent-cell markers for code and Markdown.
+Export restores them, upgrades to 4.5 only when IDs are present, and
+assigns deterministic collision-free IDs to cells missing them.
+Duplicate IDs and malformed edited markers are rejected. Unsupported
+metadata and attachments are omitted with explicit loss notices. The
+existing plain 4.4 export is unchanged. Metadata never executes.
+
+**Status: partial / direct V8 codec assertions passed; independent Node,
+Linux/macOS native CI and physical-browser acceptance pending.**
+This does not restore interpreter state, preserve arbitrary Jupyter metadata,
+render knitr documents, provide live R function debugging or establish
+RStudio parity. Flow-owned native backend and hosted CI were not changed.
+
 # FlowStudio RStudio parity matrix
 
 ## 2026-10-26: supported R Markdown YAML frontmatter roundtrip (Linux/macOS CI passed)

@@ -11,6 +11,7 @@ const MAX_PNG_BASE64 = 1398104;
 const MARKER = /^[ \t]*#[ \t]*%%(?:[ \t][^\r\n]*)?$/m;
 const PNG = /^iVBORw0KGgo[A-Za-z0-9+/]*={0,2}$/;
 const encoder = new TextEncoder();
+const MAX_CELL_META = 2048;
 function bytes(text) { return encoder.encode(text).length; }
 function checkText(text, max, name) {
   if (typeof text !== "string" || bytes(text) > max) throw Error(name + " exceeds its supported size or is not text.");
@@ -26,6 +27,62 @@ function sourceString(value) {
   if (typeof value === "string") return value;
   if (Array.isArray(value) && value.every(part => typeof part === "string")) return value.join("");
   throw Error("Notebook cell source must be a string or array of strings.");
+}
+/* Inert cell metadata: no execution, HTML rendering or dynamic imports. */
+function validId(id) {
+  return typeof id === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(id);
+}
+function validTags(tags) {
+  return Array.isArray(tags) && tags.length <= 32 && tags.every(tag => {
+    if (typeof tag !== "string" || bytes(tag) > 80 || tag.includes("\0")) return false;
+    try { encodeURIComponent(tag); return true; } catch (_) { return false; }
+  });
+}
+function importMetadata(cell, state) {
+  const meta = {};
+  if (cell.id !== undefined) {
+    if (validId(cell.id)) meta.id = cell.id;
+    else state.ignoredMetadata = true;
+  }
+  if (cell.metadata !== undefined) {
+    if (!cell.metadata || typeof cell.metadata !== "object" || Array.isArray(cell.metadata)) {
+      state.ignoredMetadata = true;
+    } else {
+      if (Object.keys(cell.metadata).some(key => key !== "tags"))
+        state.ignoredMetadata = true;
+      if (cell.metadata.tags !== undefined) {
+        if (validTags(cell.metadata.tags)) meta.tags = cell.metadata.tags;
+        else state.ignoredMetadata = true;
+      }
+    }
+  }
+  if (cell.attachments !== undefined) state.ignoredMetadata = true;
+  if (!Object.keys(meta).length) return "";
+  let encoded = encodeURIComponent(JSON.stringify(meta));
+  if (bytes(encoded) > MAX_CELL_META) {
+    delete meta.tags;
+    state.ignoredMetadata = true;
+    if (!Object.keys(meta).length) return "";
+    encoded = encodeURIComponent(JSON.stringify(meta));
+  }
+  return " meta=" + encoded;
+}
+function exportMetadata(marker) {
+  const tokens = marker.match(/(?:^|\s)meta=/g);
+  if (!tokens) return {};
+  const match = /(?:^|\s)meta=([^\s\r\n]+)/.exec(marker);
+  if (tokens.length !== 1 || !match || bytes(match[1]) > MAX_CELL_META)
+    throw Error("Invalid Jupyter cell metadata marker.");
+  let meta;
+  try { meta = JSON.parse(decodeURIComponent(match[1])); }
+  catch (_) { throw Error("Invalid Jupyter cell metadata marker."); }
+  if (!meta || typeof meta !== "object" || Array.isArray(meta) ||
+      !Object.keys(meta).length ||
+      Object.keys(meta).some(key => key !== "id" && key !== "tags") ||
+      (meta.id !== undefined && !validId(meta.id)) ||
+      (meta.tags !== undefined && !validTags(meta.tags)))
+    throw Error("Invalid Jupyter cell metadata marker.");
+  return meta;
 }
 
 /* Import only inert text and PNG snapshots from untrusted Jupyter output.
@@ -108,7 +165,8 @@ function decode(json) {
   const language = languageOf(notebook.metadata?.language_info?.name || notebook.metadata?.kernelspec?.language);
   if (!language) throw Error("Only Python and R notebooks can be opened in the browser workspace.");
   let source = "";
-  const imported = {entries:[], ignored:false, hadOutputs:false, used:0};
+  const imported = {entries:[], ignored:false, hadOutputs:false, used:0, ignoredMetadata:false};
+  const seenIds = new Set();
   for (let index = 0; index < notebook.cells.length; index++) {
     const cell = notebook.cells[index];
     if (!cell || (cell.cell_type !== "code" && cell.cell_type !== "markdown"))
@@ -119,12 +177,18 @@ function decode(json) {
       throw Error("Cell " + (index + 1) + " contains a percent-cell marker that cannot be represented without changing source.");
     const appendNewline = index + 1 < notebook.cells.length && body.length > 0 && !/[\r\n]$/.test(body);
     const label = cell.cell_type === "markdown" ? " [markdown]" : "";
-    source += "# %%" + label + (appendNewline ? " [noeol]" : "") + "\n" + body + (appendNewline ? "\n" : "");
+    const metadata = importMetadata(cell, imported);
+    if (validId(cell.id)) {
+      if (seenIds.has(cell.id)) throw Error("Duplicate Jupyter cell ID: " + cell.id);
+      seenIds.add(cell.id);
+    }
+    source += "# %%" + label + (appendNewline ? " [noeol]" : "") + metadata + "\n" + body + (appendNewline ? "\n" : "");
     if (bytes(source) > MAX_SOURCE_BYTES) throw Error("Notebook source exceeds the 2 MiB editor limit.");
     if (cell.cell_type === "code") importCellOutputs(cell, index, language, imported);
   }
   return {language, source, entries:imported.entries,
-    ignoredOutputs:imported.ignored, hadOutputs:imported.hadOutputs};
+    ignoredOutputs:imported.ignored, hadOutputs:imported.hadOutputs,
+    ignoredMetadata:imported.ignoredMetadata};
 }
 function encode(source, language, entries, parseCells) {
   if (!languageOf(language) || languageOf(language) !== language)
@@ -141,17 +205,27 @@ function encode(source, language, entries, parseCells) {
     if (entry && Number.isInteger(entry.index) && entry.index >= 0 && entry.index < parsed.length && entry.kind === "code")
       outputs.set(entry.index, entry);
   }
+  const usedIds = new Set();
+  let hasIds = false;
   const cells = parsed.map(cell => {
     if (!cell || !["code", "markdown"].includes(cell.kind) || typeof cell.code !== "string")
       throw Error("Invalid parsed notebook cell.");
     let body = cell.code;
     const marker = /^[ \t]*#[ \t]*%%[^\r\n]*(?:\r\n|\n|\r|$)/.exec(source.slice(cell.start))?.[0] || "";
+    const meta = exportMetadata(marker);
+    if (meta.id) {
+      if (usedIds.has(meta.id)) throw Error("Duplicate Jupyter cell ID: " + meta.id);
+      usedIds.add(meta.id);
+      hasIds = true;
+    }
+    const cellMetadata = meta.tags === undefined ? {} : {tags:meta.tags};
+    const cellId = meta.id ? {id:meta.id} : {};
     if (/\[noeol\]/i.test(marker)) {
       if (!body.endsWith("\n")) throw Error("Invalid no-EOL notebook cell marker.");
       body = body.slice(0, -1);
     }
     checkText(body, MAX_CELL_BYTES, "Notebook cell");
-    if (cell.kind === "markdown") return {cell_type:"markdown", metadata:{}, source:body};
+    if (cell.kind === "markdown") return {cell_type:"markdown", metadata:cellMetadata, source:body, ...cellId};
     const result = outputs.get(cell.index);
     const rendered = [];
     if (result && typeof result.output === "string" && result.output) {
@@ -164,12 +238,21 @@ function encode(source, language, entries, parseCells) {
           rendered.push({output_type:"display_data", metadata:{}, data:{"image/png":plot.png}});
       }
     }
-    return {cell_type:"code", metadata:{}, source:body,
-      execution_count:null, outputs:rendered};
+    return {cell_type:"code", metadata:cellMetadata, source:body,
+      execution_count:null, outputs:rendered, ...cellId};
   });
+  // Jupyter 4.5 requires unique IDs on every cell.
+  if (hasIds) for (let index = 0; index < cells.length; index++) {
+    if (cells[index].id) continue;
+    const base = "flowstudio-" + (index + 1);
+    let candidate = base, suffix = 1;
+    while (usedIds.has(candidate)) candidate = base + "-" + suffix++;
+    cells[index].id = candidate;
+    usedIds.add(candidate);
+  }
   const name = language === "r" ? "ir" : "python3";
   const notebook = {cells, metadata:{kernelspec:{display_name:language === "r" ? "R" : "Python 3",
-    language, name}, language_info:{name:language}}, nbformat:4, nbformat_minor:4};
+    language, name}, language_info:{name:language}}, nbformat:4, nbformat_minor:hasIds ? 5 : 4};
   const json = JSON.stringify(notebook, null, 2) + "\n";
   checkText(json, MAX_JSON_BYTES, "Exported notebook");
   return json;

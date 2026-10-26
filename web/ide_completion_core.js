@@ -127,7 +127,7 @@ function bufferIdentifiers(source, prefix, language, cursorLimit) {
 
 /* Complete only names already present in the native R inspector's bounded,
  * inert list metadata. Never evaluate R expressions or infer S3 methods. */
-const R_MEMBER = /^(?:[A-Za-z]|\\.[A-Za-z_])[A-Za-z0-9._]{0,79}$/;
+const R_MEMBER = /^(?:[A-Za-z]|\.[A-Za-z_])[A-Za-z0-9._]{0,79}$/;
 function rMemberContext(lineBeforeCursor) {
   if (typeof lineBeforeCursor !== "string" || lineBeforeCursor.length > 4096) return null;
   let masked = "", quote = null;
@@ -135,15 +135,15 @@ function rMemberContext(lineBeforeCursor) {
     const c = lineBeforeCursor[i];
     if (quote) {
       masked += " ";
-      if (c === "\\\\") { if (++i < lineBeforeCursor.length) masked += " "; }
+      if (c === "\\") { if (++i < lineBeforeCursor.length) masked += " "; }
       else if (c === quote) quote = null;
     } else if (c === "#") break;
-    else if (c === "'" || c === '"' || c === "`") { quote = c; masked += " "; }
+    else if (c === "'" || c === '"' || c === "\`") { quote = c; masked += " "; }
     else masked += c;
   }
-  const name = "(?:[A-Za-z]|\\\\.[A-Za-z_])[A-Za-z0-9._]{0,79}";
+  const name = "(?:[A-Za-z]|\\.[A-Za-z_])[A-Za-z0-9._]{0,79}";
   const pattern = new RegExp("(?:^|[^A-Za-z0-9._$])(" + name +
-    "(?:\\\\$" + name + "){0,2})\\\\$([A-Za-z._][A-Za-z0-9._]{0,79})?$");
+    "(?:\\$" + name + "){0,2})\\$([A-Za-z._][A-Za-z0-9._]{0,79})?$");
   const match = pattern.exec(masked);
   if (!match) return null;
   const path = match[1].split("$");
@@ -161,7 +161,7 @@ function rListMembers(variables, path, prefix = "") {
     if (!node || !Array.isArray(node.children) || node.children.length > 12) return [];
     node = node.children.find(item => {
       if (!item || typeof item.name !== "string") return false;
-      const match = /^\\[\\[[1-9][0-9]{0,3}\\]\\] (.+)$/.exec(item.name);
+      const match = /^\[\[[1-9][0-9]{0,3}\]\] (.+)$/.exec(item.name);
       return match && match[1] === part && item.type === "list";
     });
   }
@@ -169,7 +169,7 @@ function rListMembers(variables, path, prefix = "") {
   const found = new Set();
   for (const child of node.children) {
     if (!child || typeof child.name !== "string") continue;
-    const match = /^\\[\\[[1-9][0-9]{0,3}\\]\\] (.+)$/.exec(child.name);
+    const match = /^\[\[[1-9][0-9]{0,3}\]\] (.+)$/.exec(child.name);
     const name = match && match[1];
     if (name && R_MEMBER.test(name) && name.startsWith(prefix)) found.add(name);
   }

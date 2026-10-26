@@ -130,3 +130,12 @@ test("browser import renders saved output provenance notice and never calls exec
   assert.match(messages.at(-1), /display-only saved outputs/);
   assert.match(messages.at(-1), /interpreter state/);
 });
+
+test("real browser renderer uses inert text and only validated PNG data", () => {
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const html = fs.readFileSync(path.join(__dirname, "../docs/app/index.html"), "utf8");
+  assert.match(html, /output\.textContent = entry\.kind/);
+  assert.match(html, /image\.src = "data:image\/png;base64," \+ plot\.png/);
+  assert.match(html, /imported\.entries\.length > 0 \|\| imported\.hadOutputs === undefined/);
+});

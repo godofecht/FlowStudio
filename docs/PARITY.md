@@ -1,5 +1,24 @@
 # FlowStudio RStudio parity matrix
 
+## 2026-10-26: R Markdown (.Rmd) source export (PR validation pending)
+
+The browser notebook toolbar now exports genuine R Markdown source with
+Markdown, R and Python code chunks from the existing percent-cell parser.
+The output has an `html_document` YAML header, Pandoc-compatible variable-
+length backtick fences (so embedded fences cannot prematurely close a code
+chunk), explicit per-cell runtime engines, and bounded source/cell/output
+sizes. Flow-default and Flow-tagged code are rejected rather than silently
+presented as executable knitr chunks. Exports never evaluate source, and
+captured outputs are intentionally not embedded: knitting is an external
+execution step. Python chunks require a configured Python/reticulate engine.
+
+**Status: partial / local V8 smoke and inline-script syntax checks passed;
+cross-platform Node CI and actual rmarkdown::render/knitr acceptance pending;
+physical-browser download interaction unverified.** This is an export-only
+interoperability feature, not R Markdown import, RStudio rendering parity,
+Flow execution through knitr, or full RStudio compatibility. The native
+Flow-owned backend and hosted CI configuration are unchanged.
+
 ## 2026-10-26: offline HTML reports for Flow and mixed-language notebooks (verification pending)
 
 The browser Export HTML report path now uses the validated portable .fsnb

@@ -172,6 +172,34 @@ def test_r(page, timeout: int):
         "document.querySelector('#notice').textContent === 'Notebook executed 1 cells from cursor.'",
         timeout=timeout)
     assert "cursor-only-r-47" in page.locator("#notebookOutput").inner_text()
+    # Real Pyodide -> real webR and back: typed missing values must survive.
+    # This is opt-in physical-browser acceptance, never a mocked-kernel pass.
+    run_source(page, "python",
+               "fs_py_missing = [1, None, 2.5]\\nprint('missing Python ready')",
+               "missing Python ready", timeout)
+    page.locator("#transferDirection").select_option("python-to-r")
+    page.locator("#transferSource").fill("fs_py_missing")
+    page.locator("#transferDestination").fill("fs_r_missing")
+    page.locator("#transferVariable").click()
+    page.wait_for_function(
+        "() => document.querySelector('#notice').textContent.includes('Transferred fs_py_missing to fs_r_missing')",
+        timeout=timeout)
+    run_console(page, "r",
+                "stopifnot(identical(fs_r_missing, c(1, NA_real_, 2.5))); cat('missing R accepted')",
+                "missing R accepted", timeout)
+    run_source(page, "r",
+               "fs_r_labels <- c('@NA@', NA_character_, 'é')\\ncat('R labels ready')",
+               "R labels ready", timeout)
+    page.locator("#transferDirection").select_option("r-to-python")
+    page.locator("#transferSource").fill("fs_r_labels")
+    page.locator("#transferDestination").fill("fs_py_labels")
+    page.locator("#transferVariable").click()
+    page.wait_for_function(
+        "() => document.querySelector('#notice').textContent.includes('Transferred fs_r_labels to fs_py_labels')",
+        timeout=timeout)
+    run_console(page, "python",
+                "assert fs_py_labels == ['@NA@', None, 'é']; print('missing Python accepted')",
+                "missing Python accepted", timeout)
     page.locator("#reset").click()
     assert "R state reset" in page.locator("#notice").inner_text()
     run_source(page, "r", "print(exists('fs_browser_value', envir=.GlobalEnv))", "FALSE", timeout)

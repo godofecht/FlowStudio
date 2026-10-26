@@ -128,6 +128,23 @@ int main(void)
     if (fs_r_status() != 200 || !strstr(out, "\"totalRows\":300") ||
         !strstr(out, "\"truncated\":true") || strlen(out) > 65000)
         return failure(30, out);
+    /* Paging reads later real rows, never reruns a user-supplied expression. */
+    if (!strstr(out, "\"offset\":0") || !strstr(out, "\"nextOffset\":200"))
+        return failure(60, out);
+    out = fs_r_table("large_table\t200");
+    if (fs_r_status() != 200 || !strstr(out, "\"offset\":200") ||
+        !strstr(out, "\"nextOffset\":null") ||
+        !strstr(out, "[\"201\"]") || !strstr(out, "[\"300\"]") ||
+        strlen(out) > 65000) return failure(61, out);
+    out = fs_r_table("large_table\t301");
+    if (fs_r_status() != 422 || !strstr(out, "offset exceeds row count"))
+        return failure(62, out);
+    out = fs_r_table("large_table\t200;stop('unsafe')");
+    if (fs_r_status() != 422 || !strstr(out, "Invalid R table name"))
+        return failure(63, out);
+    out = fs_r_table("large_table\t0001");
+    if (fs_r_status() != 422 || !strstr(out, "Invalid R table name"))
+        return failure(64, out);
     out = fs_r_run("makeActiveBinding('unsafe_table', function() "
                    "stop('table binding executed'), workspace)");
     if (fs_r_status() != 200) return failure(31, out);

@@ -1,5 +1,24 @@
 # FlowStudio RStudio parity matrix
 
+## 2026-10-26: offline HTML reports for Flow and mixed-language notebooks (verification pending)
+
+The browser Export HTML report path now uses the validated portable .fsnb
+codec for Flow-default or mixed Flow/R/Python source, preserving per-cell
+runtime labels, escaped code, markdown, captured stdout/stderr, truncation
+notices and PNG plots. The original single-kernel Jupyter report path remains
+unchanged for homogeneous Python/R notebooks. This is an offline display
+artifact; it neither runs Flow in the browser nor asserts Jupyter multi-kernel
+execution. Output snapshots are included only when source and default language
+match the executed notebook. The existing size and provenance bounds of the
+.fsnb decoder and HTML renderer apply.
+
+**Status: implemented / local JavaScript smoke validated; GitHub Linux/macOS
+CI and physical-browser interaction pending.** The Flow-owned native backend
+and hosted CI configuration are unchanged. This does not establish RStudio
+parity. Function-level live R debugging, authenticated remote sessions and
+physical-browser Pyodide/webR/native Flow acceptance remain outstanding.
+
+
 ## 2026-10-26: F2 previewed lexical identifier rename (Linux/macOS CI passed)
 
 The Flow-served native editor now offers Edit > Rename identifier and F2.

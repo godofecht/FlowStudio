@@ -5,7 +5,7 @@ import '/ide_completion_core.js';
 
 const INSPECT_ROUTES = { python: '/api/inspect/python', r: '/api/inspect/r' };
 
-export function sessionSnapshot(fetchFn, language, signal) {
+export function sessionSymbols(fetchFn, language, signal) {
   const route = INSPECT_ROUTES[language];
   if (!route) return Promise.resolve([]);
   return fetchFn(route, {
@@ -14,12 +14,10 @@ export function sessionSnapshot(fetchFn, language, signal) {
     body: ''
   }).then(response => response.ok ? response.json() : { variables: [] })
     .then(snapshot => (snapshot && Array.isArray(snapshot.variables))
-      ? snapshot.variables.filter(v => v && typeof v.name === 'string').slice(0, 128)
+      ? snapshot.variables.filter(v => v && typeof v.name === 'string')
+          .slice(0, 128).map(v => v.name)
       : [])
     .catch(() => []);
-}
-export function sessionSymbols(fetchFn, language, signal) {
-  return sessionSnapshot(fetchFn, language, signal).then(variables => variables.map(v => v.name));
 }
 
 const WORD_AT = /[A-Za-z0-9_.]*$/;
@@ -45,34 +43,29 @@ export function registerCompletion(monaco, app, fetchFn = (typeof fetch !== 'und
   const disposers = [];
   for (const language of ['flow', 'python', 'r']) {
     const disposable = monaco.languages.registerCompletionItemProvider(language, {
-      triggerCharacters: language === 'r' ? ['.', '$'] : [],
+      triggerCharacters: language === 'r' ? ['.'] : [],
       provideCompletionItems: async (model, position) => {
-        const beforeCursor = (model.getLineContent(position.lineNumber) || '')
-          .slice(0, position.column - 1);
-        const member = language === 'r' ? core.rMemberContext(beforeCursor) : null;
-        const prefix = member ? member.prefix : prefixAt(model, position, language);
-        if (!prefix && !member) return { suggestions: [] };
+        const prefix = prefixAt(model, position, language);
+        if (!prefix) return { suggestions: [] };
+        const doc = app.documents.active();
         const source = model.getValue();
-        let variables = [];
+        let session = [];
         if (INSPECT_ROUTES[language]) {
           const cached = cache.get(language);
           if (cached && Date.now() - cached.at < 5000) {
-            try { variables = await cached.promise; } catch (_) { variables = []; }
+            try { session = await cached.promise; } catch (_) { session = []; }
           } else {
             if (cached) { try { cached.controller.abort(); } catch (_) {} cache.delete(language); }
             const controller = new AbortController();
-            const entry = { promise: sessionSnapshot(fetchFn, language, controller.signal), controller, at: Date.now() };
+            const entry = { promise: sessionSymbols(fetchFn, language, controller.signal), controller, at: Date.now() };
             cache.set(language, entry);
-            try { variables = await entry.promise; } catch (_) { variables = []; }
+            try { session = await entry.promise; } catch (_) { session = []; }
           }
         }
-        const lexical = member ? [] : language === 'flow'
+        const lexical = language === 'flow'
           ? (core.flowSymbols(source, model.getOffsetAt(position), prefix) || [])
           : [...core.bufferIdentifiers(source, prefix, language, 262144)];
-        const items = member
-          ? core.rListMembers(variables, member.path, prefix)
-          : core.suggestionsFor(language, { prefix,
-              session: variables.map(variable => variable.name), lexical });
+        const items = core.suggestionsFor(language, { prefix, session, lexical });
         return {
           suggestions: items.map(item => ({
             label: item.label,
@@ -81,10 +74,7 @@ export function registerCompletion(monaco, app, fetchFn = (typeof fetch !== 'und
               item.kind === 'variable' ? monaco.languages.CompletionItemKind.Variable :
               monaco.languages.CompletionItemKind.Text,
             insertText: item.insert,
-            range: member ? {
-              startLineNumber: position.lineNumber, endLineNumber: position.lineNumber,
-              startColumn: position.column - prefix.length, endColumn: position.column
-            } : wordRange(model, position, prefix)
+            range: wordRange(model, position, prefix)
           }))
         };
       }

@@ -1,5 +1,36 @@
 # FlowStudio RStudio parity matrix
 
+## 2026-10-26: bounded R Markdown (.Rmd) import (CI pending)
+
+The browser notebook toolbar can open real .Rmd text files as editable
+FlowStudio percent-cell source. A non-executing parser recognizes standard
+backtick/tilde `{r}` and `{python}` chunks (including longer fences),
+preserves ordinary Markdown and non-executable fenced examples, normalizes
+line endings, and selects the first executable chunk's language. Import is
+guarded by the existing unsaved-editor confirmation and notebook-busy checks.
+The decoder enforces 4 MiB input, 2 MiB editor, 64 KiB per cell and 256-cell
+limits, and validates the resulting representation with the actual source-cell
+parser. Scalar title/author/date/html_document YAML may be read but is
+**explicitly discarded** with a user-facing notice. Unsupported YAML,
+knitr chunk options, non-R/Python engines, unterminated executable chunks and
+percent-cell markers reject instead of silently changing source semantics.
+Inline R in Markdown is retained as inert text and is not executed by
+FlowStudio. Nothing is knitted or executed during import.
+
+**Status: partial / 10 of 10 new regression cases exercised in a local V8
+isolate; Node, physical-browser, native Flow and Linux/macOS CI acceptance
+pending.** This is a deliberately narrow, loss-aware importer, not general
+R Markdown or RStudio parity. The Flow-owned static asset allowlist was extended to serve both R Markdown
+modules and two previously omitted mixed-language assets; no execution route,
+compiler implementation or hosted CI configuration was modified. An initial CI run exposed isolated test harnesses that do not load optional
+browser modules; bootstrap now tolerates the absent optional import module.
+The following source/transport jobs passed on Linux and macOS, but native
+acceptance was not yet established. A newly discovered omission in the
+native Flow static asset allowlist is now corrected, with a discoverable
+Python regression test that checks all browser assets. Next gates are the
+latest Linux/macOS Node/Python and native Flow HTTP/Rscript CI jobs and
+physical-browser interpreter checks.
+
 ## 2026-10-26: R Markdown (.Rmd) source export (Linux/macOS CI passed)
 
 The browser notebook toolbar now exports genuine R Markdown source with

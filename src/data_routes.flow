@@ -122,6 +122,18 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/app/native_flow.js" {
         return StaticAsset { path: "docs/app/native_flow.js", mime: "text/javascript; charset=utf-8", found: true }
     }
+    if url == "/app/mixed.html" {
+        return StaticAsset { path: "docs/app/mixed.html", mime: "text/html; charset=utf-8", found: true }
+    }
+    if url == "/app/mixed_languages.js" {
+        return StaticAsset { path: "docs/app/mixed_languages.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/app/notebook_rmarkdown.js" {
+        return StaticAsset { path: "docs/app/notebook_rmarkdown.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/app/notebook_rmarkdown_import.js" {
+        return StaticAsset { path: "docs/app/notebook_rmarkdown_import.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
     if url == "/app/notebook_format.js" {
         return StaticAsset { path: "docs/app/notebook_format.js", mime: "text/javascript; charset=utf-8", found: true }
     }

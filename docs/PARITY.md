@@ -1,3 +1,24 @@
+## 2026-10-26: notebook execution through the current caret cell (validation pending)
+
+The browser notebook toolbar now offers **Run through here**, executing the
+inclusive source-cell range from the beginning of the buffer through the cell
+containing the caret. It dispatches actual Flow/R/Python code to the same
+existing kernels as **Run all cells** and **Run from here**, renders intervening
+Markdown without executing it, and never evaluates later cells. Flow preflight,
+128 executable-cell and 64 KiB per-cell limits apply to the selected range
+only; execution stops on the first interpreter failure. Invalid/reversed ranges
+are rejected before contacting an interpreter. The current run's output and
+saved snapshots refer only to executed cells. Existing **Run cell** still
+executes its cell in the console rather than the notebook results pane.
+
+**Status: partial / source implementation and eight new regression cases
+committed; 26 actual-source V8 assertions passed locally across new and
+existing notebook suites using Node builtin shims.** Native Flow 2.0.0 and
+real Rscript/browser Pyodide/webR execution were not available in the local
+authoring runtime. Node CLI, Linux/macOS CI, real physical-browser interaction
+and post-merge validation are pending. This adds no new execution backend,
+remote-session isolation or RStudio feature parity. Hosted CI is unchanged.
+
 ## 2026-10-26: bounded native R multi-page preview CSV export (verification pending)
 
 The environment table viewer can now export all **preview rows** of a native

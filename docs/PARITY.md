@@ -1,25 +1,32 @@
-## 2026-10-26: native R named-list member completion in Monaco (PR; validation pending)
+## 2026-10-26: real browser R named-list member completion (PR #88; CI pending)
 
-The native FlowStudio Monaco editor now suggests **actual named members of
-ordinary R lists** using the existing Flow-owned, intent-gated
-`POST /api/inspect/r` snapshot. `analysis$model$sc` completes only
-inspected `scale`/`score` children; `$` invokes completion with an empty
-prefix, and the replacement range preserves the receiver expression.
-Up to two nested member levels are supported by the existing bounded R
-inspector. Suggestions are derived from inert metadata; no user expressions,
-active bindings, class methods or arbitrary object attributes are evaluated
-for completion. Invalid labels, unsafe names, unknown objects and absent
-metadata produce no member suggestions. Normal Python/R root-symbol and Flow
-lexical completion remain separate.
+The `docs/app/` browser workspace now completes named members of ordinary R
+lists from **real webR or native R inspector snapshots** through the existing
+serialized `getRSession().inspect()` path. The Flow-owned native route is
+`POST /api/inspect/r`; the webR path uses its existing bounded inspection
+query. `analysis$model$sc` offers inspected `scale`/`score` children
+without replacing the receiver; `$` works with an empty prefix. Existing
+Python/R root completion and Flow lexical completion are unchanged. No new
+interpreter or simulated response was introduced.
 
-**Status: partial / direct V8 execution of the exact completion core and
-Monaco provider passed representative nested-list, insertion-range, missing
-binding and Python/R regression checks.** Four committed Node regression
-cases await independent Linux/macOS CI. Real Rscript/Monaco physical-browser
-interaction is not yet independently verified. The native Flow 2.0.0 backend,
-HTTP routes, interpreter protocol and hosted CI configuration are unchanged.
-This is not data.frame column completion, function-level R debugging,
-authenticated remote sessions, knitr rendering or RStudio parity.
+The list traversal is bounded to the first twelve children per container and
+two nested member levels. It rejects unsafe or reserved identifiers, malformed
+labels, active bindings and classed objects without child metadata; it does
+not evaluate submitted completion expressions. **The underlying native R
+inspector can still force lazy promises during root binding lookup**, so this
+is not side-effect-free for all possible R workspaces.
+
+**Status: partial / direct V8 execution of the actual browser completion
+module, inspected-member dispatch and insertion passed locally.** Two new
+Node regression cases plus updated completion contracts await Linux/macOS CI.
+Actual webR/Rscript and physical-browser interaction have not been
+independently accepted. The separate native Monaco provider is under
+[draft PR #89](https://github.com/godofecht/FlowStudio/pull/89);
+its checked-in `web/ui/workbench.js` bundle still needs regeneration and
+physical-browser acceptance before the native Monaco feature can ship.
+No Flow compiler, HTTP route or hosted CI configuration changed.
+This is not data.frame column completion, knitr rendering, function-level
+R debugging, authenticated remote sessions or RStudio parity.
 
 ## 2026-10-26: clear saved notebook outputs without resetting interpreters (validation pending)
 

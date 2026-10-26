@@ -43,7 +43,8 @@
     const imported = decode(encode(source, "r", parseCells), parseCells);
     const cells = parseCells(imported.source);
     assert.equal(imported.language, "r");
-    assert.equal(imported.metadataDiscarded, true);
+    assert.equal(imported.metadataDiscarded, false);
+    assert.match(cells[0].code, /title: "FlowStudio notebook"/);
     assert.deepEqual(cells.map(cell => [cell.kind,cell.language]),
       [["markdown",null],["code","r"],["code","python"]]);
     assert.match(cells[1].code, /x <- 4/);
@@ -54,8 +55,11 @@
       tick.repeat(3) + "{python}\r\nprint('μ')\r\n" + tick.repeat(3) + "\r\n";
     const imported = decode(input, parseCells);
     assert.equal(imported.language, "python");
-    assert.equal(imported.metadataDiscarded, true);
-    assert.equal(parseCells(imported.source)[0].language, "python");
+    assert.equal(imported.metadataDiscarded, false);
+    assert.equal(parseCells(imported.source)[0].kind, "markdown");
+    assert.equal(parseCells(imported.source)[1].language, "python");
+    assert.match(encode(imported.source, imported.language, parseCells),
+      /title: 'Résumé'\nauthor: Ada\ndate: 2026-10-26\noutput: html_document/);
     assert.match(imported.source, /μ/);
     assert.doesNotMatch(imported.source, /\r/);
   });
@@ -100,7 +104,7 @@
     assert.throws(() => decode(Array(257).fill(tick.repeat(3) + "{r}\nx\n" +
       tick.repeat(3)).join("\n"), parseCells), /256 cells/);
   });
-  test("browser controller imports real Rmd data and reports discarded YAML", async () => {
+  test("browser controller imports real Rmd data and retains supported YAML", async () => {
     const ui = controls();
     const input = "---\ntitle: test\noutput: html_document\n---\n\n" +
       tick.repeat(3) + "{r}\nx <- 7\n" + tick.repeat(3);
@@ -108,7 +112,7 @@
     assert.equal(ui.imported.length, 1);
     assert.equal(ui.imported[0].name, "analysis.Rmd");
     assert.match(ui.imported[0].value.source, /x <- 7/);
-    assert.match(ui.messages.join(" "), /YAML metadata was not retained/);
+    assert.match(ui.messages.join(" "), /Supported YAML metadata is retained/);
     assert.match(ui.messages.join(" "), /no code was executed/);
   });
   test("browser controller refuses busy, oversized and unconfirmed imports", async () => {
@@ -125,6 +129,32 @@
     assert.match(ui.messages.join(" "), /Wait for notebook execution/);
     assert.match(ui.messages.join(" "), /exceeds 4 MiB/);
     assert.match(ui.messages.join(" "), /import failed/);
+  });
+  test("supported R Markdown YAML survives import/export without duplicate header", () => {
+    const input = "---\ntitle: 'My research'\nauthor: Researcher\noutput: html_document\n---\n\n" +
+      "# Intro\n\n" + tick.repeat(3) + "{r setup}\nx <- 9\n" + tick.repeat(3) + "\n";
+    const imported = decode(input, parseCells);
+    const cells = parseCells(imported.source);
+    assert.equal(cells[0].kind, "markdown");
+    assert.equal(cells[1].label, "setup");
+    const exported = encode(imported.source, "r", parseCells);
+    assert.equal((exported.match(/title:/g) || []).length, 1);
+    assert.match(exported, /^---\ntitle: 'My research'\nauthor: Researcher\noutput: html_document\n---/);
+    assert.match(exported, /# Intro/);
+    assert.equal(decode(exported, parseCells).metadataDiscarded, false);
+  });
+  test("YAML-only documents remain inert and preserve metadata", () => {
+    const source = decode("---\ntitle: 'Notes'\n---\n", parseCells).source;
+    assert.deepEqual(parseCells(source).map(cell => cell.kind), ["markdown"]);
+    assert.match(encode(source, "r", parseCells), /^---\ntitle: 'Notes'\n---/);
+  });
+  test("unsupported edited YAML is rejected and thematic breaks remain Markdown", () => {
+    assert.throws(() => encode("# %% [markdown]\n---\ntitle: Test\nparams: bad\n---\n",
+      "r", parseCells), /Unsupported R Markdown YAML metadata/);
+    assert.throws(() => encode("# %% [markdown]\n---\ntitle: Test\nno terminator",
+      "r", parseCells), /not terminated/);
+    assert.match(encode("# %% [markdown]\n---\nHello\n", "r", parseCells),
+      /title: "FlowStudio notebook"/);
   });
   test("browser R Markdown import controls and bootstrap remain syntactically valid", () => {
     const html = fs.readFileSync(path.join(__dirname, "../docs/app/index.html"), "utf8");

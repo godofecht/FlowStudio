@@ -5,7 +5,7 @@ import '/ide_completion_core.js';
 
 const INSPECT_ROUTES = { python: '/api/inspect/python', r: '/api/inspect/r' };
 
-export function sessionSymbols(fetchFn, language, signal) {
+export function sessionSnapshot(fetchFn, language, signal) {
   const route = INSPECT_ROUTES[language];
   if (!route) return Promise.resolve([]);
   return fetchFn(route, {
@@ -14,10 +14,12 @@ export function sessionSymbols(fetchFn, language, signal) {
     body: ''
   }).then(response => response.ok ? response.json() : { variables: [] })
     .then(snapshot => (snapshot && Array.isArray(snapshot.variables))
-      ? snapshot.variables.filter(v => v && typeof v.name === 'string')
-          .slice(0, 128).map(v => v.name)
+      ? snapshot.variables.filter(v => v && typeof v.name === 'string').slice(0, 128)
       : [])
     .catch(() => []);
+}
+export function sessionSymbols(fetchFn, language, signal) {
+  return sessionSnapshot(fetchFn, language, signal).then(variables => variables.map(v => v.name));
 }
 
 const WORD_AT = /[A-Za-z0-9_.]*$/;
@@ -43,7 +45,63 @@ export function registerCompletion(monaco, app, fetchFn = (typeof fetch !== 'und
   const disposers = [];
   for (const language of ['flow', 'python', 'r']) {
     const disposable = monaco.languages.registerCompletionItemProvider(language, {
-      triggerCharacters: language === 'r' ? ['.'] : [],
+      triggerCharacters: language === 'r' ? ['.', '
+      provideCompletionItems: async (model, position) => {
+        const beforeCursor = (model.getLineContent(position.lineNumber) || '')
+          .slice(0, position.column - 1);
+        const member = language === 'r' ? core.rMemberContext(beforeCursor) : null;
+        const prefix = member ? member.prefix : prefixAt(model, position, language);
+        if (!prefix && !member) return { suggestions: [] };
+        const source = model.getValue();
+        let variables = [];
+        if (INSPECT_ROUTES[language]) {
+          const cached = cache.get(language);
+          if (cached && Date.now() - cached.at < 5000) {
+            try { variables = await cached.promise; } catch (_) { variables = []; }
+          } else {
+            if (cached) { try { cached.controller.abort(); } catch (_) {} cache.delete(language); }
+            const controller = new AbortController();
+            const entry = { promise: sessionSnapshot(fetchFn, language, controller.signal), controller, at: Date.now() };
+            cache.set(language, entry);
+            try { variables = await entry.promise; } catch (_) { variables = []; }
+          }
+        }
+        const lexical = member ? [] : language === 'flow'
+          ? (core.flowSymbols(source, model.getOffsetAt(position), prefix) || [])
+          : [...core.bufferIdentifiers(source, prefix, language, 262144)];
+        const items = member
+          ? core.rListMembers(variables, member.path, prefix)
+          : core.suggestionsFor(language, { prefix,
+              session: variables.map(variable => variable.name), lexical });
+        return {
+          suggestions: items.map(item => ({
+            label: item.label,
+            kind: item.kind === 'snippet' ? monaco.languages.CompletionItemKind.Snippet :
+              item.kind === 'keyword' ? monaco.languages.CompletionItemKind.Keyword :
+              item.kind === 'variable' ? monaco.languages.CompletionItemKind.Variable :
+              monaco.languages.CompletionItemKind.Text,
+            insertText: item.insert,
+            range: member ? {
+              startLineNumber: position.lineNumber, endLineNumber: position.lineNumber,
+              startColumn: position.column - prefix.length, endColumn: position.column
+            } : wordRange(model, position, prefix)
+          }))
+        };
+      }
+    });
+    disposers.push(disposable);
+  }
+  // Session symbols re-cache after every run; the editor app clears the cache.
+  return () => { for (const dispose of disposers) dispose(); cache.clear(); };
+}
+
+function wordRange(model, position, prefix) {
+  const word = model.getWordUntilPosition(position);
+  const column = Math.max(1, (word?.startColumn ?? position.column) - prefix.length);
+  return { startLineNumber: position.lineNumber, endLineNumber: position.lineNumber,
+    startColumn: column, endColumn: position.column };
+}
+] : [],
       provideCompletionItems: async (model, position) => {
         const prefix = prefixAt(model, position, language);
         if (!prefix) return { suggestions: [] };

@@ -1,3 +1,22 @@
+## 2026-10-26: Jupyter output records survive bounded browser reload recovery (local validation only)
+
+The existing browser-local notebook recovery now retains validated, inert Jupyter
+output records alongside displayed snapshots. On a matching source/language
+reload, exporting .ipynb can preserve stdout/stderr ordering, error tracebacks,
+plain-text display results and bounded PNG output instead of flattening them.
+The recovery path uses the same canonical validator as .ipynb import/export,
+rejects mismatched or unsupported records, and preserves compatibility with
+older v1 recovery entries that contain only flattened output. Storage retains
+the existing 1 MiB total limit and exact source/language match; no interpreter
+state is restored or code executed. A failed write leaves the previous stored
+record intact. Portable .fsnb remains snapshot-only.
+
+**Status: partial / local V8 end-to-end codec/recovery checks passed; repository
+Node suite, Linux/macOS CI and physical-browser reload/export not yet verified.**
+This is not evidence of real Pyodide/webR execution, knitr rendering, live R
+function debugging, authenticated remote sessions or RStudio parity. The
+Flow 2.0.0 native backend and hosted CI configuration are unchanged.
+
 ## 2026-10-26: loss-aware Jupyter output record round-trip (Linux/macOS CI passed)
 
 The browser notebook importer now retains the original **safe, inert Jupyter

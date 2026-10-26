@@ -404,7 +404,7 @@ function decodeBundle(json, parseCells) {
     entries:results.map(result => ({...result, kind:"code", images:[]}))};
 }
 
-const api = Object.freeze({decode, encode, encodeBundle, decodeBundle, MAX_JSON_BYTES});
+const api = Object.freeze({decode, encode, encodeBundle, decodeBundle, safeJupyterOutputs, MAX_JSON_BYTES});
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 global.FlowStudioNotebookFormat = api;
 })(globalThis);

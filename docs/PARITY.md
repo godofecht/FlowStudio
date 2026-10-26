@@ -1,5 +1,27 @@
 # FlowStudio RStudio parity matrix
 
+## 2026-10-26: supported R Markdown YAML frontmatter roundtrip (validation pending)
+
+The R Markdown importer now retains the existing strictly accepted scalar
+`title`, `author`, `date` and `html_document` YAML header as an inert first
+Markdown source cell, instead of discarding it. The R Markdown exporter
+recognizes and validates that first-cell header and reuses it rather than
+writing a duplicate default header. Unsupported or malformed edited YAML
+is rejected; a normal Markdown thematic break remains ordinary Markdown.
+No YAML is evaluated by import/export. The notebook preview may display
+the retained frontmatter as Markdown text; this is source preservation,
+not actual knitr rendering.
+
+**Status: partial / direct V8 source-module roundtrip and rejection checks
+passed; Node regression suite, Linux/macOS native CI, physical-browser
+acceptance and actual knitr rendering pending.** Three regression cases
+cover header roundtrip, YAML-only documents and invalid edited metadata.
+Existing tests were updated to reflect retained metadata. The native
+Flow 2.0.0 backend, HTTP routes and hosted CI configuration are unchanged.
+Full RStudio parity, live R function debugging and authenticated remote
+sessions remain outstanding.
+
+
 ## 2026-10-26: named R Markdown code chunks (verification pending)
 
 The .Rmd importer recognizes bounded, case-sensitive chunk labels on R and

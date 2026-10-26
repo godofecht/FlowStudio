@@ -1,3 +1,30 @@
+## 2026-10-26: loss-aware Jupyter output record round-trip (CI pending)
+
+The browser notebook importer now retains the original **safe, inert Jupyter
+output types** (ordered stdout/stderr streams, genuine error type/message and
+traceback, text/plain display data, and bounded PNG display data). Immediate
+.ipynb export preserves their order and output semantics while explicitly
+clearing historical execution counts and discarding unsupported metadata.
+Previously, all text was collapsed into a single stdout/stderr stream and
+failed-cell traceback records were exported as ordinary stderr, losing
+Jupyter's error semantics. Imported source and output are never executed.
+
+Preservation is **conditional on exact agreement with the bounded displayed
+snapshot**. Unsupported HTML/SVG/widgets, oversized/truncated output or
+tampered snapshots cannot be exported as trusted Jupyter records; unsupported
+records fall back to the existing inert preview representation with the
+import loss notice. Source edits clear the snapshot. Browser recovery and
+portable .fsnb files still retain only flattened display snapshots, so a
+page reload does not promise preservation of individual Jupyter record types.
+
+**Status: partial / 16 existing-and-new Jupyter output tests executed against
+the actual changed modules in a local V8 test harness; 16 passed, zero
+failed.** This is not a Node CI, native Flow/Rscript, or physical-browser
+acceptance pass. Cross-platform CI and physical-browser import/export are
+pending. No Flow backend, interpreter route, hosted CI or compiler was
+changed. Live R function debugging, knitr rendering and authenticated remote
+sessions remain outstanding; RStudio feature parity is not achieved.
+
 ## 2026-10-26: notebook execution through the current caret cell (validation pending)
 
 The browser notebook toolbar now offers **Run through here**, executing the

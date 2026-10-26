@@ -1,5 +1,22 @@
 # FlowStudio RStudio parity matrix
 
+## 2026-10-26: run notebook from caret (implementation; CI pending)
+
+The Pages and native Flow-served /app/ notebook toolbar now provides **Run from here**.
+It resolves the current percent-cell from the real textarea caret and executes
+only that cell and subsequent code cells through the existing Flow/R/Python
+runtimes. Markdown is rendered but never executed. Native Flow preflight,
+mixed-language tags, persistent R/Python state, cancellation, per-cell/output
+bounds and stop-on-error remain in effect. Preceding cells are not replayed,
+so dependencies must already exist in the selected kernel. Results show only
+the executed subset, never stale earlier outputs.
+
+**Status: partial / local V8 checks passed; Linux/macOS CI and physical-browser
+interpreter acceptance pending.** Six Node regressions were added; native Flow
+routes, compiler and hosted CI workflow were not modified. This is not
+function-level R debugging, remote isolation or RStudio parity.
+
+
 ## 2026-10-26: safe Jupyter saved-output import (cross-platform CI pending)
 
 The existing .ipynb importer now retains **display-only** stdout/stderr,

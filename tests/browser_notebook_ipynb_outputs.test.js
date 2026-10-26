@@ -22,9 +22,12 @@ test("imports real Jupyter stdout, stderr, display text and PNG without executin
     {output_type:"display_data", data:{"image/png":png}}
   ])]));
   assert.equal(data.entries.length, 1);
-  assert.deepEqual(data.entries[0], {index:0, kind:"code", language:"python",
+  const {jupyterOutputs, ...display} = data.entries[0];
+  assert.deepEqual(display, {index:0, kind:"code", language:"python",
     ok:true, output:"42\nwarning\n[1] 42", truncated:false,
     plots:[{png}], images:[]});
+  assert.deepEqual(jupyterOutputs.map(item => item.output_type),
+    ["stream", "stream", "execute_result", "display_data"]);
   assert.equal(data.ignoredOutputs, false);
   assert.equal(data.hadOutputs, true);
 });
@@ -138,4 +141,63 @@ test("real browser renderer uses inert text and only validated PNG data", () => 
   assert.match(html, /output\.textContent = entry\.kind/);
   assert.match(html, /image\.src = "data:image\/png;base64," \+ plot\.png/);
   assert.match(html, /imported\.entries\.length > 0 \|\| imported\.hadOutputs === undefined/);
+});
+
+test("roundtrip preserves ordered stdout, stderr and real Jupyter error tracebacks", () => {
+  const original = format.decode(ipynb([code("raise ValueError('bad')", [
+    stream("before\n"), stream("warning\n", "stderr"),
+    {output_type:"error", ename:"ValueError", evalue:"bad",
+      traceback:["Traceback (most recent call last):", "ValueError: bad"]},
+    stream("after\n")
+  ])]));
+  assert.equal(original.entries[0].ok, false);
+  const exported = JSON.parse(format.encode(original.source, "python", original.entries, parseCells));
+  assert.equal(exported.cells[0].execution_count, null);
+  assert.deepEqual(exported.cells[0].outputs, [
+    {output_type:"stream", name:"stdout", text:"before\n"},
+    {output_type:"stream", name:"stderr", text:"warning\n"},
+    {output_type:"error", ename:"ValueError", evalue:"bad",
+      traceback:["Traceback (most recent call last):", "ValueError: bad"]},
+    {output_type:"stream", name:"stdout", text:"after\n"}
+  ]);
+  const reimported = format.decode(JSON.stringify(exported));
+  assert.equal(reimported.entries[0].output, original.entries[0].output);
+  assert.equal(reimported.entries[0].ok, false);
+});
+
+test("safe text and PNG display outputs retain order without inventing execution counts", () => {
+  const imported = format.decode(ipynb([code("display(x)", [
+    {output_type:"display_data", data:{"text/plain":"figure", "image/png":png}},
+    {output_type:"execute_result", execution_count:17, data:{"text/plain":"42"}}
+  ])]));
+  const exported = JSON.parse(format.encode(imported.source, "python", imported.entries, parseCells));
+  assert.deepEqual(exported.cells[0].outputs, [
+    {output_type:"display_data", metadata:{}, data:{"text/plain":"figure", "image/png":png}},
+    {output_type:"execute_result", metadata:{}, data:{"text/plain":"42"}, execution_count:null}
+  ]);
+});
+
+test("unsupported, truncated and modified Jupyter records are never exported verbatim", () => {
+  const unsafe = format.decode(ipynb([code("display(x)", [
+    {output_type:"display_data", data:{"text/plain":"safe", "text/html":"<script>x</script>"}}
+  ])]));
+  assert.equal(unsafe.entries[0].jupyterOutputs, undefined);
+  assert.equal(unsafe.ignoredOutputs, true);
+  assert.deepEqual(JSON.parse(format.encode(unsafe.source, "python", unsafe.entries, parseCells))
+    .cells[0].outputs, [{output_type:"stream", name:"stdout", text:"safe"}]);
+  const truncated = format.decode(ipynb([code("x", [stream("a".repeat(131073))])]));
+  assert.equal(truncated.entries[0].jupyterOutputs, undefined);
+  const valid = format.decode(ipynb([code("print(42)", [stream("42")])]));
+  valid.entries[0].jupyterOutputs[0].text = "<script>alert(1)</script>";
+  assert.throws(() => format.encode(valid.source, "python", valid.entries, parseCells),
+    /no longer match the displayed snapshot/);
+});
+
+test("native notebook renderer retains validated Jupyter records for immediate export", () => {
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const html = fs.readFileSync(path.join(__dirname, "../docs/app/index.html"), "utf8");
+  assert.match(html, /Array\.isArray\(entry\.jupyterOutputs\)/);
+  assert.match(html, /saved\.jupyterOutputs = entry\.jupyterOutputs/);
+  assert.match(html, /notebookExecutionSource === currentSource/);
 });

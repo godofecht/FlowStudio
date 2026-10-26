@@ -55,6 +55,13 @@ function create({target, document, dataApi, fetchPage = null}) {
     const exportButton = document.createElement("button");
     const exportStatus = document.createElement("span");
     exportStatus.setAttribute("role", "status");
+    const jumpInput = document.createElement("input");
+    jumpInput.type = "text";
+    jumpInput.inputMode = "numeric";
+    jumpInput.maxLength = 10;
+    jumpInput.setAttribute("aria-label", "Jump to R row");
+    const jumpButton = document.createElement("button");
+    jumpButton.textContent = "Go to row";
     previous.textContent = "Previous page";
     next.textContent = "Next page";
     exportButton.textContent = "Export loaded CSV";
@@ -70,6 +77,8 @@ function create({target, document, dataApi, fetchPage = null}) {
       previous.disabled = loading || (page === 0 && !priorSlice);
       next.disabled = loading || (page >= view.pageCount - 1 && !nextSlice);
       exportButton.disabled = loading;
+      jumpInput.disabled = loading;
+      jumpButton.disabled = loading;
       const offset = pageable ? tableData.offset : 0;
       const loaded = tableData.rows.length;
       const range = loaded ? (offset + 1) + "-" + (offset + loaded) : "empty";
@@ -99,14 +108,7 @@ function create({target, document, dataApi, fetchPage = null}) {
       }
       grid.replaceChildren(element);
     }
-    async function move(direction) {
-      if (loading || !holder._alive || current !== holder) return;
-      const view = dataApi.viewRows(tableData, {filter:search.value, page, sortColumn, descending});
-      if (direction > 0 && page < view.pageCount - 1) { page++; render(); return; }
-      if (direction < 0 && page > 0) { page--; render(); return; }
-      if (!pageable) return;
-      const offset = direction > 0 ? tableData.nextOffset : history[history.length - 1];
-      if (!Number.isSafeInteger(offset)) return;
+    async function loadSlice(offset, requestedPage, historyAction) {
       loading = true;
       render();
       try {
@@ -116,10 +118,12 @@ function create({target, document, dataApi, fetchPage = null}) {
         if (nextTable.offset !== offset || nextTable.totalRows !== tableData.totalRows ||
             JSON.stringify(nextTable.columns) !== JSON.stringify(tableData.columns))
           throw Error("R table changed while paging; reopen the variable.");
-        if (direction > 0) history.push(tableData.offset);
-        else history.pop();
+        if (historyAction === "push") {
+          if (history.length >= 128) history.shift();
+          history.push({offset:tableData.offset, page});
+        } else if (historyAction === "pop") history.pop();
         tableData = nextTable;
-        page = direction < 0 ? Math.max(0, Math.ceil(tableData.rows.length / 50) - 1) : 0;
+        page = requestedPage;
         // A filter/sort on one slice cannot be represented as a global query.
         search.value = "";
         sortColumn = null;
@@ -133,9 +137,48 @@ function create({target, document, dataApi, fetchPage = null}) {
         if (holder._alive && current === holder) render();
       }
     }
+    async function move(direction) {
+      if (loading || !holder._alive || current !== holder) return;
+      const view = dataApi.viewRows(tableData, {filter:search.value, page, sortColumn, descending});
+      if (direction > 0 && page < view.pageCount - 1) { page++; render(); return; }
+      if (direction < 0 && page > 0) { page--; render(); return; }
+      if (!pageable) return;
+      const prior = history[history.length - 1];
+      const offset = direction > 0 ? tableData.nextOffset : prior?.offset;
+      if (!Number.isSafeInteger(offset)) return;
+      await loadSlice(offset, direction > 0 ? 0 : prior.page,
+        direction > 0 ? "push" : "pop");
+    }
+    async function jumpToRow() {
+      if (!pageable || loading || !holder._alive || current !== holder) return;
+      const raw = jumpInput.value.trim();
+      if (!/^[1-9][0-9]{0,9}$/.test(raw) ||
+          Number(raw) > tableData.totalRows || Number(raw) > 10000000000) {
+        exportStatus.textContent = "Enter a whole row number between 1 and " +
+          tableData.totalRows + ".";
+        return;
+      }
+      const row = Number(raw);
+      if (row > tableData.offset && row <= tableData.offset + tableData.rows.length) {
+        search.value = "";
+        sortColumn = null;
+        descending = false;
+        page = Math.floor((row - 1 - tableData.offset) / 50);
+        exportStatus.textContent = "";
+        render();
+        return;
+      }
+      // The R kernel accepts arbitrary offsets; start exactly at the
+      // requested row even when response-size limits shorten a 200-row slice.
+      await loadSlice(row - 1, 0, "push");
+    }
     search.addEventListener("input", () => { page = 0; render(); });
     previous.addEventListener("click", () => { void move(-1); });
     next.addEventListener("click", () => { void move(1); });
+    jumpButton.addEventListener("click", () => { void jumpToRow(); });
+    jumpInput.addEventListener("keydown", event => {
+      if (event.key === "Enter") { event.preventDefault(); void jumpToRow(); }
+    });
     exportButton.addEventListener("click", () => {
       try {
         const result = dataApi.exportCSV(tableData, {filter:search.value,
@@ -148,6 +191,7 @@ function create({target, document, dataApi, fetchPage = null}) {
       }
     });
     holder.append(heading, search, summary, grid, previous, next, exportButton, exportStatus);
+    if (pageable) holder.append(jumpInput, jumpButton);
     target.replaceChildren(holder);
     current = holder;
     render();

@@ -1,3 +1,24 @@
+## 2026-10-26: direct native R table row navigation (verification pending)
+
+The browser environment table viewer can jump directly to a specified 1-based
+row of a native GNU R data.frame or matrix. It uses the existing Flow-owned
+`POST /api/table/r` route and persistent kernel with a literal variable name
+and exact bounded row offset, even when a 65 KiB response limit shortens a
+slice. Rows already loaded navigate locally. Previous-page navigation restores
+the prior slice and browser page; invalid, out-of-range and non-decimal row
+inputs are rejected before HTTP. The jump control is not shown for Python or
+webR preview-only snapshots. At most 128 previous slice positions are kept.
+Sorting, filtering and CSV export remain explicitly limited to the loaded
+slice; no complete dataset export or new native route is introduced.
+
+**Status: partial / source implementation, six automated regression cases
+and an opt-in real-browser native R scenario committed; Linux/macOS CI,
+actual Flow/Rscript jump interaction and physical-browser acceptance not yet
+independently verified.**
+Flow 2.0.0 remains the primary backend. No hosted CI changes.
+This is not live R function-level debugging, authenticated remote sessions
+or RStudio parity.
+
 ## 2026-10-26: persistent native R table paging (validation pending)
 
 The existing Flow-owned `POST /api/table/r` route now accepts a literal R

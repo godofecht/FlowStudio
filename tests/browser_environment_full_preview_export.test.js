@@ -33,8 +33,8 @@ test("native R preview CSV fetches every row from zero without repeated headers"
 });
 test("native R preview CSV rejects gaps, early endings, schema and row-count changes", async () => {
   const cases=[
-    offset=>({...table(offset,50),table:{...table(offset,50).table,offset:offset+1}}),
-    offset=>({...table(offset,51),table:{...table(offset,51).table,nextOffset:null}}),
+    offset=>table(offset+1,50),
+    offset=>({...table(offset,50),table:{...table(offset,50).table,nextOffset:null}}),
     offset=>table(offset,51,251,["different"]),
     offset=>table(offset,51,252)
   ];

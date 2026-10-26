@@ -40,8 +40,9 @@ test("disabled chunk stays disabled across R Markdown export and reimport", () =
   const exported = encode(source, "r", parseCells);
   assert.match(exported, /\{r, eval=FALSE\}/);
   const roundtrip = parseCells(imported(exported).source);
-  assert.deepEqual(roundtrip.map(cell => cell.kind), ["markdown", "code"]);
-  assert.match(roundtrip[0].code, /stop\('inert'\)/);
+  assert.deepEqual(roundtrip.map(cell => cell.kind), ["markdown", "markdown", "code"]);
+  assert.match(roundtrip[0].code, /title: "FlowStudio notebook"/);
+  assert.match(roundtrip[1].code, /stop\('inert'\)/);
 });
 
 test("notebook execution never sends imported eval=FALSE chunks to R or Python", async () => {

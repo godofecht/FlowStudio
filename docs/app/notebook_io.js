@@ -84,7 +84,8 @@ function create(options) {
         if (!canReplace()) return;
         await onImported(imported, file.name);
         notice("R Markdown imported as source cells. " +
-          (imported.metadataDiscarded ? "YAML metadata was not retained. " : "") +
+          (imported.metadataDiscarded ? "YAML metadata was not retained. " :
+            "Supported YAML metadata is retained as inert Markdown. ") +
           "Inline R remains Markdown text; no code was executed.");
       } catch (error) {
         notice("R Markdown import failed: " + String(error.message || error));

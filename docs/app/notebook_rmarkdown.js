@@ -16,6 +16,28 @@ function fenceFor(code) {
   }
   return TICK.repeat(Math.max(3, longest + 1));
 }
+function preservedFrontmatter(body) {
+  if (!body.startsWith("---\n")) return null;
+  const lines = body.split("\n");
+  // A Markdown thematic break is not YAML metadata.
+  if (!/^[A-Za-z][A-Za-z0-9_-]*:/.test(lines[1] || "")) return null;
+  const end = lines.indexOf("---", 1);
+  if (end < 0 || end > 64)
+    throw new Error("R Markdown YAML header is not terminated within 64 lines.");
+  const seen = new Set();
+  for (let i = 1; i < end; i++) {
+    if (!lines[i].trim()) continue;
+    const match = /^(title|author|date|output):[ \t]*(.+)$/i.exec(lines[i]);
+    if (!match || seen.has(match[1].toLowerCase()))
+      throw new Error("Unsupported R Markdown YAML metadata.");
+    seen.add(match[1].toLowerCase());
+    if (match[1].toLowerCase() === "output" &&
+        !/^(?:html_document|"html_document"|'html_document')$/.test(match[2].trim()))
+      throw new Error("Only R Markdown html_document output is supported.");
+  }
+  return {header:lines.slice(0, end + 1).join("\n") + "\n\n",
+    remainder:lines.slice(end + 1).join("\n").replace(/^\n/, "")};
+}
 function encode(source, defaultLanguage, parseCells) {
   if (defaultLanguage !== "r" && defaultLanguage !== "python")
     throw new Error("R Markdown export requires an R or Python default language; Flow chunks are unsupported.");
@@ -28,15 +50,20 @@ function encode(source, defaultLanguage, parseCells) {
     throw new Error("R Markdown export supports at most 256 cells.");
   let output = "---\ntitle: \"FlowStudio notebook\"\noutput: html_document\n---\n\n";
   const chunkLabels = new Set();
-  for (const cell of cells) {
+  for (const [index, cell] of cells.entries()) {
     if (!cell || (cell.kind !== "code" && cell.kind !== "markdown") ||
         typeof cell.code !== "string")
       throw new Error("Invalid source cell in R Markdown export.");
-    const body = cell.code.replace(/\r\n?/g, "\n");
+    let body = cell.code.replace(/\r\n?/g, "\n");
     if (byteLength(body) > MAX_CELL_BYTES || body.includes("\0"))
       throw new Error("R Markdown cells must be at most 64 KiB without NUL bytes.");
     if (cell.kind === "markdown") {
-      output += body + (body.endsWith("\n") || !body ? "" : "\n") + "\n";
+      const metadata = index === 0 ? preservedFrontmatter(body) : null;
+      if (metadata) {
+        output = metadata.header;
+        body = metadata.remainder;
+      }
+      if (body.trim()) output += body + (body.endsWith("\n") ? "" : "\n") + "\n";
     } else {
       const language = cell.language || defaultLanguage;
       if (language !== "r" && language !== "python")

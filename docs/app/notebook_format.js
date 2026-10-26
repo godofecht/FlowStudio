@@ -27,6 +27,76 @@ function sourceString(value) {
   if (Array.isArray(value) && value.every(part => typeof part === "string")) return value.join("");
   throw Error("Notebook cell source must be a string or array of strings.");
 }
+
+/* Import only inert text and PNG snapshots from untrusted Jupyter output.
+ * HTML, JavaScript, SVG, widgets, metadata and execution state are never loaded.
+ */
+const MAX_IMPORT_RESULTS = 128;
+const MAX_IMPORT_OUTPUTS = 64;
+const MAX_IMPORT_PLOTS = 8;
+const MAX_IMPORT_PNG = 524288;
+const MAX_IMPORT_TEXT = 131072;
+const MAX_IMPORT_TOTAL = 1048576;
+function importOutputText(value, state, cell) {
+  let raw;
+  try { raw = sourceString(value); }
+  catch (_) { state.ignored = true; return; }
+  for (const character of raw) {
+    const length = bytes(character);
+    if (cell.used + length > MAX_IMPORT_TEXT || state.used + length > MAX_IMPORT_TOTAL) {
+      cell.truncated = true;
+      state.ignored = true;
+      return;
+    }
+    cell.output += character;
+    cell.used += length;
+    state.used += length;
+  }
+}
+function importCellOutputs(cell, index, language, state) {
+  if (cell.outputs === undefined || cell.outputs === null) return;
+  if (!Array.isArray(cell.outputs)) { state.ignored = true; return; }
+  if (!cell.outputs.length) return;
+  state.hadOutputs = true;
+  if (state.entries.length >= MAX_IMPORT_RESULTS) { state.ignored = true; return; }
+  const result = {index, kind:"code", language, ok:true, output:"",
+    truncated:false, plots:[], images:[], used:0};
+  for (const item of cell.outputs.slice(0, MAX_IMPORT_OUTPUTS)) {
+    if (!item || typeof item !== "object") { state.ignored = true; continue; }
+    if (item.output_type === "stream" && ["stdout", "stderr"].includes(item.name)) {
+      importOutputText(item.text, state, result);
+    } else if (item.output_type === "error") {
+      result.ok = false;
+      const fallback = String(item.ename || "Error") + ": " + String(item.evalue || "");
+      const traceback = Array.isArray(item.traceback) ? item.traceback : null;
+      importOutputText(traceback && traceback.every(line => typeof line === "string")
+        ? traceback.join("\n") : fallback, state, result);
+    } else if (item.output_type === "execute_result" || item.output_type === "display_data") {
+      if (!item.data || typeof item.data !== "object" || Array.isArray(item.data)) {
+        state.ignored = true;
+        continue;
+      }
+      if (Object.hasOwn(item.data, "text/plain"))
+        importOutputText(item.data["text/plain"], state, result);
+      if (Object.hasOwn(item.data, "image/png")) {
+        let png;
+        try { png = sourceString(item.data["image/png"]).replace(/\s/g, ""); }
+        catch (_) { png = ""; }
+        if (png.length <= MAX_IMPORT_PNG && PNG.test(png) &&
+            result.plots.length < MAX_IMPORT_PLOTS) result.plots.push({png});
+        else state.ignored = true;
+      }
+      if (Object.keys(item.data).some(key => key !== "text/plain" && key !== "image/png"))
+        state.ignored = true;
+    } else state.ignored = true;
+  }
+  if (cell.outputs.length > MAX_IMPORT_OUTPUTS) state.ignored = true;
+  if (result.output || result.plots.length || !result.ok) {
+    delete result.used;
+    state.entries.push(result);
+  }
+}
+
 function decode(json) {
   checkText(json, MAX_JSON_BYTES, "Notebook JSON");
   let notebook;
@@ -37,6 +107,7 @@ function decode(json) {
   const language = languageOf(notebook.metadata?.language_info?.name || notebook.metadata?.kernelspec?.language);
   if (!language) throw Error("Only Python and R notebooks can be opened in the browser workspace.");
   let source = "";
+  const imported = {entries:[], ignored:false, hadOutputs:false, used:0};
   for (let index = 0; index < notebook.cells.length; index++) {
     const cell = notebook.cells[index];
     if (!cell || (cell.cell_type !== "code" && cell.cell_type !== "markdown"))
@@ -49,8 +120,10 @@ function decode(json) {
     const label = cell.cell_type === "markdown" ? " [markdown]" : "";
     source += "# %%" + label + (appendNewline ? " [noeol]" : "") + "\n" + body + (appendNewline ? "\n" : "");
     if (bytes(source) > MAX_SOURCE_BYTES) throw Error("Notebook source exceeds the 2 MiB editor limit.");
+    if (cell.cell_type === "code") importCellOutputs(cell, index, language, imported);
   }
-  return {language, source, ignoredOutputs: notebook.cells.some(cell => Array.isArray(cell.outputs) && cell.outputs.length > 0)};
+  return {language, source, entries:imported.entries,
+    ignoredOutputs:imported.ignored, hadOutputs:imported.hadOutputs};
 }
 function encode(source, language, entries, parseCells) {
   if (!languageOf(language) || languageOf(language) !== language)
@@ -91,7 +164,7 @@ function encode(source, language, entries, parseCells) {
       }
     }
     return {cell_type:"code", metadata:{}, source:body,
-      execution_count:result && result.ok ? 1 : null, outputs:rendered};
+      execution_count:null, outputs:rendered};
   });
   const name = language === "r" ? "ir" : "python3";
   const notebook = {cells, metadata:{kernelspec:{display_name:language === "r" ? "R" : "Python 3",

@@ -106,3 +106,10 @@ test("normal Python and R symbol completion continues to use the same inspector"
   const names = await app.api.sessionSymbols(async()=>({ok:true,json:async()=>({variables:snapshot})}),"r");
   assert.deepEqual(Array.from(names),["analysis","trap","df"]);
 });
+
+
+test("checked-in native Monaco bundle contains the member provider before release", () => {
+  const bundle = fs.readFileSync(path.join(__dirname, "../web/ui/workbench.js"), "utf8");
+  assert.match(bundle, /rMemberContext/, "Run npm ci && npm run build:ui and commit the generated workbench bundle.");
+  assert.match(bundle, /rListMembers/, "Native R member completion must be present in the shipped bundle.");
+});

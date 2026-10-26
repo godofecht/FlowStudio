@@ -66,7 +66,7 @@ test("preserves cell indices across markdown and empty cells", () => {
   ]));
   assert.deepEqual(data.entries.map(e => e.index), [2]);
   assert.match(data.source, /# %% \[markdown\]/);
-  assert.match(data.source, /# %%\nx = 1/);
+  assert.match(data.source, /# %% \[noeol\]\nx = 1/);
 });
 
 test("UTF-8 output truncation does not split astral characters", () => {

@@ -1,3 +1,28 @@
+## 2026-10-26: persistent native R table paging (validation pending)
+
+The existing Flow-owned `POST /api/table/r` route now accepts a literal R
+workspace variable name and an optional decimal row offset. The real
+persistent GNU R kernel returns a bounded page of at most 200 rows and
+65 KiB, with the exact `offset` and `nextOffset` based on **emitted**
+rows (not the nominal page size). It rejects injected expressions, invalid
+offsets, active bindings and unsupported object types. No user code is
+evaluated to navigate a table. The browser environment viewer can move
+between real native R slices; its filtering, sorting and CSV export remain
+explicitly **slice-local**, not full-dataset operations. WebR/Python retain
+their existing bounded snapshots. The native backend is still Flow 2.0.0;
+no new route or hosted CI configuration was introduced.
+
+**Status: partial / implementation and automated regressions committed;
+native GNU R, Flow HTTP, Linux/macOS packaging and physical-browser
+acceptance are not yet independently verified for this change.** The
+existing preview and CSV functionality remain bounded. This is not
+server-side global sort/filter, arbitrary R object viewing, complete
+dataset export, authenticated remote execution or RStudio feature parity.
+Run `node --test tests/browser_native_r_paging.test.js
+tests/browser_environment_paging.test.js tests/browser_data_export.test.js`
+and `python3 scripts/verify_native.py --require-r` with installed Flow
+2.0.0 and Rscript. Verify real Chromium interaction separately.
+
 ## 2026-10-26: bounded CSV export for tabular previews (verification pending)
 
 The browser CSV/TSV viewer now exports all filtered and sorted preview rows

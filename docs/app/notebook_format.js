@@ -291,16 +291,16 @@ function encode(source, language, entries, parseCells) {
       if (!preserved) throw Error("Saved Jupyter output records no longer match the displayed snapshot.");
       rendered.push(...preserved);
     } else {
-    if (result && typeof result.output === "string" && result.output) {
-      rendered.push({output_type:"stream", name:result.ok === false ? "stderr" : "stdout",
-        text:checkText(result.output, 131072, "Cell output")});
-    }
-    if (result && Array.isArray(result.plots)) {
-      for (const plot of result.plots.slice(0, 8)) {
-        if (plot && typeof plot.png === "string" && plot.png.length <= MAX_PNG_BASE64 && PNG.test(plot.png))
-          rendered.push({output_type:"display_data", metadata:{}, data:{"image/png":plot.png}});
+      if (result && typeof result.output === "string" && result.output) {
+        rendered.push({output_type:"stream", name:result.ok === false ? "stderr" : "stdout",
+          text:checkText(result.output, 131072, "Cell output")});
       }
-    }
+      if (result && Array.isArray(result.plots)) {
+        for (const plot of result.plots.slice(0, 8)) {
+          if (plot && typeof plot.png === "string" && plot.png.length <= MAX_PNG_BASE64 && PNG.test(plot.png))
+            rendered.push({output_type:"display_data", metadata:{}, data:{"image/png":plot.png}});
+        }
+      }
     }
     return {cell_type:"code", metadata:cellMetadata, source:body,
       execution_count:null, outputs:rendered, ...cellId};

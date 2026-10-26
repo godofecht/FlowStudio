@@ -9,10 +9,20 @@ spreadsheet-formula escaping apply. Potential formulas gain a leading
 apostrophe, so these fields do not round-trip byte-for-byte. No new server
 routes, native Flow backend or hosted CI configuration changes.
 
-**Status: partial / local V8 serializer and syntax checks; new Node regression
-tests added but independent Linux/macOS CI, real-browser downloads and
-interpreter acceptance are pending.** This does not establish RStudio parity,
-live R function-level debugging or authenticated remote sessions.
+**Status: partial / independently verified Linux/macOS source, native
+Flow/Rscript HTTP and packaging CI; physical-browser download and live
+interpreter interaction still unverified.** [PR #78](https://github.com/godofecht/FlowStudio/pull/78)
+merged as [0b2d802](https://github.com/godofecht/FlowStudio/commit/0b2d802b258da39c7407744293bee3b4fe073a7b)
+after [CI #40310164610](https://github.com/godofecht/FlowStudio/actions/runs/40310164610)
+passed all four jobs on Ubuntu 24.04 and macOS 14. Each source job ran
+717 JavaScript tests (715 passed, two skipped, zero failures), including
+six new CSV-export regressions, and 78 Python tests (11 skipped). Both
+native jobs compiled Flow 2.0.0, passed real Rscript and live localhost
+HTTP acceptance, and completed platform packaging. Direct V8 serializer
+and size-bound checks also passed locally. The actual CSV download buttons
+were not independently exercised in a physical browser. This does not
+establish full RStudio parity, full unsampled kernel dataset export, live
+R function-level debugging or authenticated remote sessions.
 
 ## 2026-10-26: Jupyter cell IDs and tags (Linux/macOS CI passed)
 

@@ -12,8 +12,8 @@ Pyodide/webR interpreter operations; no simulated interpreter was added.
 
 **Status: partial / eight direct V8 protocol assertions passed; cross-platform
 CI and real Rscript/browser acceptance pending.** The new Node suite includes
-real CPython generated-query execution and optional real Rscript checks. The
-opt-in Playwright runner now includes real Pyodide → webR → Pyodide NA/None
+real CPython generated-query execution and real Rscript checks required by
+the native verification harness (not yet passing). The opt-in Playwright runner now includes real Pyodide → webR → Pyodide NA/None
 round-trip assertions; this scenario has not been executed independently. No
 native Flow compiler, server routes or hosted CI configuration changed.
 This does not establish tabular interchange, interpreter-state persistence,

@@ -1,4 +1,4 @@
-## 2026-10-26: Jupyter cell IDs and tags (PR verification pending)
+## 2026-10-26: Jupyter cell IDs and tags (Linux/macOS CI passed)
 
 The .ipynb importer preserves valid nbformat 4.5 cell IDs and bounded
 Jupyter `metadata.tags` in inert percent-cell markers for code and Markdown.
@@ -8,8 +8,17 @@ Duplicate IDs and malformed edited markers are rejected. Unsupported
 metadata and attachments are omitted with explicit loss notices. The
 existing plain 4.4 export is unchanged. Metadata never executes.
 
-**Status: partial / direct V8 codec assertions passed; independent Node,
-Linux/macOS native CI and physical-browser acceptance pending.**
+**Status: partial / independently verified Linux/macOS source, native Flow
+HTTP/Rscript and packaging CI; physical-browser acceptance pending.**
+[PR #77](https://github.com/godofecht/FlowStudio/pull/77) merged as
+[8b59a8f](https://github.com/godofecht/FlowStudio/commit/8b59a8f94e47381fceb5108a4df0f5ff8c4429af)
+after [CI #40302638842](https://github.com/godofecht/FlowStudio/actions/runs/40302638842)
+passed all four jobs on Ubuntu 24.04 and macOS 14. Each source job
+completed 711 JavaScript tests (709 passed, two skipped, zero failures),
+including seven new metadata regressions, and 78 Python tests (11 skipped).
+Both native jobs compiled Flow 2.0.0, ran real HTTP/Rscript acceptance and
+completed packaging. Seven direct V8 codec checks also passed locally.
+Physical-browser import/export was not independently exercised.
 This does not restore interpreter state, preserve arbitrary Jupyter metadata,
 render knitr documents, provide live R function debugging or establish
 RStudio parity. Flow-owned native backend and hosted CI were not changed.

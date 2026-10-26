@@ -175,7 +175,7 @@ def test_r(page, timeout: int):
     # Real Pyodide -> real webR and back: typed missing values must survive.
     # This is opt-in physical-browser acceptance, never a mocked-kernel pass.
     run_source(page, "python",
-               "fs_py_missing = [1, None, 2.5]\\nprint('missing Python ready')",
+               "fs_py_missing = [1, None, 2.5]\nprint('missing Python ready')",
                "missing Python ready", timeout)
     page.locator("#transferDirection").select_option("python-to-r")
     page.locator("#transferSource").fill("fs_py_missing")
@@ -188,7 +188,7 @@ def test_r(page, timeout: int):
                 "stopifnot(identical(fs_r_missing, c(1, NA_real_, 2.5))); cat('missing R accepted')",
                 "missing R accepted", timeout)
     run_source(page, "r",
-               "fs_r_labels <- c('@NA@', NA_character_, 'é')\\ncat('R labels ready')",
+               "fs_r_labels <- c('@NA@', NA_character_, 'é')\ncat('R labels ready')",
                "R labels ready", timeout)
     page.locator("#transferDirection").select_option("r-to-python")
     page.locator("#transferSource").fill("fs_r_labels")

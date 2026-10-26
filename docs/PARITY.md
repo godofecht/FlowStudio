@@ -20,10 +20,16 @@ FlowStudio. Nothing is knitted or executed during import.
 **Status: partial / 10 of 10 new regression cases exercised in a local V8
 isolate; Node, physical-browser, native Flow and Linux/macOS CI acceptance
 pending.** This is a deliberately narrow, loss-aware importer, not general
-R Markdown or RStudio parity. No native backend, Flow compiler or hosted CI
-configuration was modified. Next gates are the repository's Node/Python
-source suites, native Flow HTTP/Rscript acceptance, and physical-browser
-interpreter checks.
+R Markdown or RStudio parity. The Flow-owned static asset allowlist was extended to serve both R Markdown
+modules and two previously omitted mixed-language assets; no execution route,
+compiler implementation or hosted CI configuration was modified. An initial CI run exposed isolated test harnesses that do not load optional
+browser modules; bootstrap now tolerates the absent optional import module.
+The following source/transport jobs passed on Linux and macOS, but native
+acceptance was not yet established. A newly discovered omission in the
+native Flow static asset allowlist is now corrected, with a discoverable
+Python regression test that checks all browser assets. Next gates are the
+latest Linux/macOS Node/Python and native Flow HTTP/Rscript CI jobs and
+physical-browser interpreter checks.
 
 ## 2026-10-26: R Markdown (.Rmd) source export (Linux/macOS CI passed)
 

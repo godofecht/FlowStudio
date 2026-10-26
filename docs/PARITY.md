@@ -1,3 +1,20 @@
+## 2026-10-26: portable .fsnb v2 retains safe Jupyter output records (new PR; validation pending)
+
+Portable FlowStudio notebook export now emits v2 only when a cell has validated
+Jupyter output records. The v2 decoder preserves ordered stdout/stderr streams,
+real error tracebacks, bounded text/plain results and PNG display data for
+later .ipynb export. Ordinary snapshots remain v1 and existing v1 files
+continue to import. Records must exactly match the displayed snapshot; altered,
+active HTML/SVG, noncanonical metadata and Flow-cell Jupyter provenance are
+rejected. This is **display-only file persistence**, not interpreter state
+restoration or full Jupyter compatibility. The Flow native backend and hosted
+CI are unchanged.
+
+**Status: partial / direct V8 source checks passed; Node, Linux/macOS native
+CI and physical-browser import/export not yet independently verified.**
+Actual knitr rendering, function-level R debugging, authenticated remote
+sessions and RStudio feature parity remain outstanding.
+
 ## 2026-10-26: Jupyter output records survive bounded browser reload recovery (local validation only)
 
 The existing browser-local notebook recovery now retains validated, inert Jupyter

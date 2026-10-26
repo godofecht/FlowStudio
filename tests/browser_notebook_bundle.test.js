@@ -54,7 +54,7 @@ test("reject forged results, wrong language, duplicates and non-code cells", () 
   invalid(o => {o.results[0].output = "x".repeat(131073);});
   invalid(o => {o.results[1].plots[0].png = "not-a-png";});
   invalid(o => {o.language = "javascript";});
-  invalid(o => {o.version = 2;});
+  invalid(o => {o.version = 3;});
   invalid(o => {o.extra = true;});
   invalid(o => {o.source = "# %% [markdown]\nhello\n" + o.source;});
   assert.throws(() => format.decodeBundle("invalid", parseCells));

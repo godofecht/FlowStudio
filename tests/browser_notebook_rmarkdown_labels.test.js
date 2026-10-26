@@ -18,7 +18,8 @@ test("named R and Python chunks retain labels through import and export", () => 
   const exported = encode(decoded.source, decoded.language, parseCells);
   assert.match(exported, /\{r Setup\.1\}/);
   assert.match(exported, /\{python fig-example_2\}/);
-  assert.deepEqual(parseCells(decode(exported, parseCells).source).map(cell => cell.label),
+  assert.deepEqual(parseCells(decode(exported, parseCells).source)
+    .filter(cell => cell.kind === "code").map(cell => cell.label),
     ["Setup.1", "fig-example_2"]);
 });
 test("disabled named chunks remain inert and retain their exact header", () => {

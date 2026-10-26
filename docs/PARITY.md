@@ -1,23 +1,28 @@
-## 2026-10-26: typed R NA / Python None vector transfer (PR validation pending)
+## 2026-10-26: typed R NA / Python None vector transfer (Linux/macOS CI passed)
 
-The existing browser-local Python ↔ R transfer protocol now preserves missing
-values in typed vectors. Python homogeneous list/tuple elements may contain
-`None`; R classless atomic vectors may contain type-specific `NA`. R integer
-vectors still map to the numeric wire type and import as R doubles. The
-transfer remains bounded to 256 elements and 32 KiB. Scalar `None`, untyped
-all-`None` Python lists, mixed non-missing types, NaN, Inf, classed R objects,
-and tables are rejected. R's encoded literal `"@NA@"` string remains distinct
-from its missing-value wire marker. Both import paths use real existing
-Pyodide/webR interpreter operations; no simulated interpreter was added.
+The browser-local Python ↔ R transfer now preserves missing values in typed
+vectors. Homogeneous Python lists/tuples may contain `None`; R classless atomic
+vectors may contain type-specific `NA`. R integers still map to numeric wire
+values and import as R doubles. Transfers retain the 256-item / 32-KiB bounds.
+Scalar `None`, all-`None` Python lists (untyped), heterogeneous nonmissing
+values, NaN, Inf, classed R objects and tables remain rejected. The R literal
+string `"@NA@"` remains distinct from its missing-value wire sentinel.
 
-**Status: partial / eight direct V8 protocol assertions passed; cross-platform
-CI and real Rscript/browser acceptance pending.** The new Node suite includes
-real CPython generated-query execution and real Rscript checks required by
-the native verification harness (not yet passing). The opt-in Playwright runner now includes real Pyodide → webR → Pyodide NA/None
-round-trip assertions; this scenario has not been executed independently. No
-native Flow compiler, server routes or hosted CI configuration changed.
-This does not establish tabular interchange, interpreter-state persistence,
-function-level R debugging, authenticated remote sessions or RStudio parity.
+**Status: partial / independent Linux/macOS source and native CI passed.**
+[PR #91](https://github.com/godofecht/FlowStudio/pull/91) merged as
+[7612894](https://github.com/godofecht/FlowStudio/commit/761289493953cfd075e72dd304fb4e7b51eaeacd)
+after [CI #40422754617](https://github.com/godofecht/FlowStudio/actions/runs/40422754617)
+passed all four jobs. Each source job ran 806 JavaScript tests (803 passed,
+three skipped, zero failures), Python suites and C transport checks. Both
+native jobs compiled Flow 2.0.0, passed real Rscript/HTTP acceptance and
+packaging. All five new transfer tests passed without skips on both native
+platforms, including real Rscript NA/NaN/Inf and literal sentinel assertions.
+Eight direct V8 protocol assertions also passed locally. The opt-in
+Playwright runner includes real Pyodide → webR → Pyodide NA/None round-trip
+assertions, but physical-browser execution is **not yet verified**.
+No hosted CI configuration or native Flow route changed. This is not
+tabular interchange, restart-persistent interpreters, live function-level
+R debugging, authenticated remote sessions or RStudio parity.
 
 ## 2026-10-26: prevent implicit knitr execution from Markdown cells (Linux/macOS CI passed)
 

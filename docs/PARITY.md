@@ -11,13 +11,20 @@ are rejected before contacting an interpreter. The current run's output and
 saved snapshots refer only to executed cells. Existing **Run cell** still
 executes its cell in the console rather than the notebook results pane.
 
-**Status: partial / source implementation and eight new regression cases
-committed; 26 actual-source V8 assertions passed locally across new and
-existing notebook suites using Node builtin shims.** Native Flow 2.0.0 and
-real Rscript/browser Pyodide/webR execution were not available in the local
-authoring runtime. Node CLI, Linux/macOS CI, real physical-browser interaction
-and post-merge validation are pending. This adds no new execution backend,
-remote-session isolation or RStudio feature parity. Hosted CI is unchanged.
+**Status: partial / independently verified Linux/macOS source and native
+CI; physical-browser acceptance pending.** [PR #83](https://github.com/godofecht/FlowStudio/pull/83)
+merged as [38b83d3](https://github.com/godofecht/FlowStudio/commit/38b83d3e5f892c301bbf2c59a92bb05356b9c916)
+after [CI #40362319668](https://github.com/godofecht/FlowStudio/actions/runs/40362319668)
+passed all four Ubuntu 24.04/macOS 14 jobs. Each source job ran 746
+JavaScript tests (744 passed, two skipped, zero failures), including eight new
+range-execution regressions, and 78 Python tests (11 skipped). Both native
+jobs compiled the pinned real Flow 2.0.0 backend, passed live Rscript/HTTP
+acceptance and completed packaging. Twenty-six actual-source V8 assertions
+also passed locally using Node builtin shims. These native tests do not
+establish physical-browser run-through-caret behavior: real Pyodide/webR
+interaction and post-merge `main` validation remain unverified. This adds
+no new execution backend, remote-session isolation or RStudio feature parity.
+Hosted CI is unchanged.
 
 ## 2026-10-26: bounded native R multi-page preview CSV export (verification pending)
 

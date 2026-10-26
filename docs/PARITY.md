@@ -13,9 +13,15 @@ cell, and imported results at 128. UTF-8 truncation preserves code points.
 Only already-supported Python/R single-kernel notebooks are imported.
 Re-export does not invent Jupyter execution counts.
 
-**Status: partial / implementation committed, 11 actual-source V8 smoke
-assertions passed locally; full Node, native Linux/macOS CI and physical-browser
-acceptance pending.** This does not restore interpreter state, preserve
+**Status: partial / independently verified source, native Flow and packaging
+CI on Linux/macOS; physical-browser acceptance pending.** [PR #72](https://github.com/godofecht/FlowStudio/pull/72)
+merged as [86f121a](https://github.com/godofecht/FlowStudio/commit/86f121a10baa66f068b4fb18f789af1d92939a4c)
+after [CI #40273394782](https://github.com/godofecht/FlowStudio/actions/runs/40273394782)
+passed all four jobs on Ubuntu 24.04 and macOS 14. Each source/transport job
+ran 684 JavaScript tests (682 passed, two skipped, zero failed), including
+12 new notebook regressions; native jobs compiled Flow 2.0.0, passed live
+HTTP/Rscript acceptance and completed platform packaging. Eleven
+actual-source V8 smoke assertions also passed locally. This does not restore interpreter state, preserve
 execution counts, reconstruct HTML/widget outputs or provide RStudio parity.
 The Flow-owned native backend and hosted CI configuration are unchanged.
 

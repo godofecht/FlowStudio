@@ -1,6 +1,6 @@
 # FlowStudio RStudio parity matrix
 
-## 2026-10-26: native editor Shift+F12 lexical references (implementation, validation pending)
+## 2026-10-26: native editor Shift+F12 lexical references (Linux/macOS CI passed)
 
 The Flow-served native editor now offers Edit > Find references and Shift+F12.
 A bounded single-pass scanner finds exact Flow, R and Python identifier tokens
@@ -13,8 +13,18 @@ active buffer are included. This is **lexical occurrence search**, not semantic
 binding resolution: shadowing, imports, dynamic R bindings, f-string expressions
 and unopened project files are not resolved. No native Flow HTTP route or CI
 configuration changed. Added six Node regression tests and V8 lexical checks.
-**Status: partial / local V8 syntax and scanner checks passed; independent
-Linux/macOS CI and physical-browser acceptance pending.**
+**Status: partial / independently verified Linux/macOS source, native and
+packaging CI; physical-browser interaction unverified.** [PR #67](https://github.com/godofecht/FlowStudio/pull/67)
+merged as [28f22bf](https://github.com/godofecht/FlowStudio/commit/28f22bf110f18178c354bc21e08677e4a2fe9a81)
+after [CI #40251541713](https://github.com/godofecht/FlowStudio/actions/runs/40251541713)
+completed all four jobs successfully on Ubuntu 24.04 and macOS 14.
+Each source/transport job ran 639 JavaScript tests (637 passed, 2 skipped,
+0 failed), including the six new reference regressions, and 76 Python tests
+(11 skipped). Both native jobs compiled Flow 2.0.0, passed real Rscript IPC
+and live Flow-owned HTTP acceptance, and completed platform packaging.
+Physical-browser Shift+F12 interaction and Pyodide/webR acceptance were not
+executed. Function-level R breakpoints, authenticated remote sessions and
+complete RStudio parity remain outstanding. No hosted CI configuration changed.
 
 ## 2026-10-25: native editor F12 go-to-definition (Linux/macOS CI passed)
 

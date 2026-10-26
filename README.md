@@ -115,6 +115,18 @@ the hosted editor continues to execute Python/R through browser WebAssembly.
 Flow notebooks are not yet supported by the Python/R-only Jupyter export or
 HTML report exporter. Physical-browser end-to-end acceptance remains pending.
 
+### Run notebook through the caret
+
+In the browser workspace, **Run through here** executes every notebook code
+cell from the beginning through the cell containing the caret, in source order,
+through the existing Flow, Python and R execution backends. Markdown is
+rendered but never evaluated; cells after the caret are not run. The existing
+**Run from here** action executes the opposite range. The bounded notebook
+runner validates the selected range before invoking any kernel, and stops on
+the first error. Flow still requires the native localhost server. This is
+not an RStudio-compatible kernel debugger or a guarantee of physical-browser
+acceptance.
+
 ## Native Python source debugging
 
 The Flow-owned localhost server now has an experimental interactive CPython

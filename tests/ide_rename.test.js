@@ -45,6 +45,15 @@ test("Python triple strings and member attributes are excluded", () => {
   assert.match(plan.entries[0].after, /obj\.task\(\)/);
 });
 
+test("spaced member and namespace access cannot be renamed as free references", () => {
+  const r = "foo.bar <- 1\nx $ foo.bar\nx @ foo.bar\npkg :: foo.bar\nfoo.bar";
+  const python = "def task():\n    obj . task()\n    task()";
+  assert.equal(symbols.findReferences("r",r,"foo.bar").matches.length,2);
+  assert.equal(symbols.findReferences("python",python,"task").matches.length,2);
+  assert.equal(symbols.identifierAt("python","obj . task",7),null);
+  assert.equal(symbols.identifierAt("r","x $ foo.bar",6),null);
+});
+
 test("scope defaults to the active tab and never crosses languages", () => {
   const docs = model([
     {name:"a.py",text:"value = 1",language:"python"},

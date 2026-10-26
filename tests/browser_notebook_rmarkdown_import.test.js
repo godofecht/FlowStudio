@@ -131,7 +131,7 @@
     for (const id of ["openRMarkdown","rMarkdownFile"])
       assert.ok(html.includes('id="' + id + '"'));
     assert.ok(html.includes('src="./notebook_rmarkdown_import.js"'));
-    assert.ok(html.includes("rMarkdown:FlowStudioRMarkdownImport"));
+    assert.ok(html.includes('rMarkdown:typeof FlowStudioRMarkdownImport === "undefined" ? null : FlowStudioRMarkdownImport'));
     assert.match(html, /ipynb\|fsnb\|rmd/);
     const inline = html.match(/<script>\s*([\s\S]*?)<\/script>/);
     assert.ok(inline);

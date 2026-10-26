@@ -230,6 +230,18 @@ def test_native_r(page, timeout: int):
         assert rows[0] == ["n"], rows[:1]
         assert len(rows) == 52 and rows[1] == ["201"] and rows[-1] == ["251"], (
             len(rows), rows[:2], rows[-2:])
+    # Actual Chromium -> native Flow HTTP -> persistent Rscript -> CSV download.
+    # All rows are preview values, not full-fidelity R serialization.
+    with page.expect_download(timeout=timeout) as all_preview_csv:
+        table_view.get_by_role("button", name="Export R preview rows").click()
+    with tempfile.TemporaryDirectory() as folder:
+        csv_path = Path(folder) / "all-preview.csv"
+        all_preview_csv.value.save_as(csv_path)
+        with csv_path.open(newline="", encoding="utf-8-sig") as stream:
+            rows = list(csv.reader(stream))
+        assert len(rows) == 252 and rows[0] == ["n"], len(rows)
+        assert rows[1] == ["1"] and rows[200] == ["200"] and rows[-1] == ["251"]
+    assert "Not a raw dataset export" in table_view.inner_text()
     table_view.get_by_role("button", name="Previous page").click()
     page.wait_for_function(
         "() => document.querySelector('[aria-label=\"Environment table snapshot\"] [role=\"status\"]').textContent.includes('loaded rows 1-200 of 251, page 4/4')",

@@ -1,5 +1,21 @@
 # FlowStudio RStudio parity matrix
 
+## 2026-10-26: native editor Shift+F12 lexical references (implementation, validation pending)
+
+The Flow-served native editor now offers Edit > Find references and Shift+F12.
+A bounded single-pass scanner finds exact Flow, R and Python identifier tokens
+in already-open buffers, skips comments and quoted strings (including Python
+triple strings), excludes member-field tokens, and displays navigable file,
+line and column results. It searches at most 24 open documents and returns at
+most 200 results with an explicit truncation marker. Results are rendered as
+inert text and never execute code or read unopened files. Unsaved edits in the
+active buffer are included. This is **lexical occurrence search**, not semantic
+binding resolution: shadowing, imports, dynamic R bindings, f-string expressions
+and unopened project files are not resolved. No native Flow HTTP route or CI
+configuration changed. Added six Node regression tests and V8 lexical checks.
+**Status: partial / local V8 syntax and scanner checks passed; independent
+Linux/macOS CI and physical-browser acceptance pending.**
+
 ## 2026-10-25: native editor F12 go-to-definition (Linux/macOS CI passed)
 
 The Flow-served native editor now resolves a source identifier at the caret

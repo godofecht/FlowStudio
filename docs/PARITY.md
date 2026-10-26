@@ -10,7 +10,7 @@ results remain, rewritten with only those results. Subsequent .ipynb, .fsnb
 and HTML exports cannot reintroduce cleared outputs. Failed persistence is
 reported explicitly. No backend routes, Flow compiler or hosted CI changes.
 
-**Status: partial / implementation and six automated Node regressions added;
+**Status: partial / implementation and seven automated Node regressions added;
 independent CI and physical-browser acceptance pending.** This is output
 management, not interpreter state recovery, real knitr rendering, resumable
 function-level R debugging, authenticated remote sessions or RStudio parity.

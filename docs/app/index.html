@@ -166,6 +166,12 @@ const completion = FlowStudioCompletion.create({
   source:$("source"), button:$("completeSource"), target:$("completions"),
   language:()=>$("language").value,
   python:prefix=>request("complete", prefix), r:prefix=>getRSession().complete(prefix),
+  rMembers:async (path, prefix) => {
+    const result = await getRSession().inspect();
+    if (!result?.ok) return result || {ok:false, output:"R inspection unavailable."};
+    return {ok:true, items:FlowStudioCompletion.rListMembers(result.variables, path, prefix)
+      .map(item => item.label)};
+  },
   generation:()=>sessionGeneration, isBusy:()=>busy || !!notebookRunner?.isRunning(),
   notice, document
 });

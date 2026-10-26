@@ -1,3 +1,33 @@
+## 2026-10-26: real browser R named-list member completion (PR #88; CI pending)
+
+The `docs/app/` browser workspace now completes named members of ordinary R
+lists from **real webR or native R inspector snapshots** through the existing
+serialized `getRSession().inspect()` path. The Flow-owned native route is
+`POST /api/inspect/r`; the webR path uses its existing bounded inspection
+query. `analysis$model$sc` offers inspected `scale`/`score` children
+without replacing the receiver; `$` works with an empty prefix. Existing
+Python/R root completion and Flow lexical completion are unchanged. No new
+interpreter or simulated response was introduced.
+
+The list traversal is bounded to the first twelve children per container and
+two nested member levels. It rejects unsafe or reserved identifiers, malformed
+labels, active bindings and classed objects without child metadata; it does
+not evaluate submitted completion expressions. **The underlying native R
+inspector can still force lazy promises during root binding lookup**, so this
+is not side-effect-free for all possible R workspaces.
+
+**Status: partial / direct V8 execution of the actual browser completion
+module, inspected-member dispatch and insertion passed locally.** Two new
+Node regression cases plus updated completion contracts await Linux/macOS CI.
+Actual webR/Rscript and physical-browser interaction have not been
+independently accepted. The separate native Monaco provider is under
+[draft PR #89](https://github.com/godofecht/FlowStudio/pull/89);
+its checked-in `web/ui/workbench.js` bundle still needs regeneration and
+physical-browser acceptance before the native Monaco feature can ship.
+No Flow compiler, HTTP route or hosted CI configuration changed.
+This is not data.frame column completion, knitr rendering, function-level
+R debugging, authenticated remote sessions or RStudio parity.
+
 ## 2026-10-26: clear saved notebook outputs without resetting interpreters (validation pending)
 
 The browser workspace now offers **Clear cell output** and **Clear all outputs**
@@ -10,8 +40,9 @@ results remain, rewritten with only those results. Subsequent .ipynb, .fsnb
 and HTML exports cannot reintroduce cleared outputs. Failed persistence is
 reported explicitly. No backend routes, Flow compiler or hosted CI changes.
 
-**Status: partial / implementation and seven automated Node regressions added;
-independent CI and physical-browser acceptance pending.** This is output
+**Status: partial / PR #87 merged as fc23e427 after all four
+Ubuntu 24.04/macOS 14 jobs in CI #40399045181 passed.** Seven Node
+regressions were added; physical-browser acceptance remains unverified. This is output
 management, not interpreter state recovery, real knitr rendering, resumable
 function-level R debugging, authenticated remote sessions or RStudio parity.
 

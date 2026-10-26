@@ -144,6 +144,22 @@ and native Flow execution remains unverified.
 
 `node --test tests/browser_console_repl.test.js tests/browser_console_multilanguage.test.js tests/browser_console_repl_integration.test.js`
 
+## Browser R named-list completion
+
+In the `docs/app/` editor, select browser webR or native R and type a named
+ordinary-list member access such as `analysis$model$sc`, then press
+**Ctrl/⌘+Space**. Suggestions come from the selected **real R session's
+existing environment inspection**, not from executing the completion text.
+Selecting `score` inserts only that member. A trailing `$` lists the
+inspected names, including nested lists to the inspector's two-level limit.
+
+The native R path still uses the Flow-owned loopback server. Only the first
+twelve children per list and syntactically safe unquoted names are offered.
+Class methods, data-frame columns, active bindings and uninspected members
+are not guessed. The underlying R inspector may force lazy promises; do not
+treat inspection as a sandbox. This is separate from the generated native
+Monaco workbench, whose member-completion bundle is pending.
+
 ## Flow source-local symbol completion
 
 The GitHub Pages editor and native-served `/app/` editor also support

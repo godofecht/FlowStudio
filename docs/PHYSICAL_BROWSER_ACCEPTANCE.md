@@ -40,6 +40,13 @@ separate webR workspace did not receive native variables. This new native R
 browser scenario is **not yet independently executed**; merely adding it does
 not establish a pass.
 
+The native R scenario also checks real persistent data-frame pagination:
+the first 200 rows are traversed in the browser's 50-row UI pages,
+the Flow-owned endpoint fetches rows 201-251, the downloaded CSV contains
+only those 51 loaded rows, and previous-page navigation returns to the
+earlier slice. These are **new assertions, not a recorded browser pass**.
+They require `--url http://127.0.0.1:8751/app/ --flow` and installed Rscript.
+
 Native Flow execution and debugging are not tested against a fake backend
 or GitHub Pages. Browser interpreter
 execution and native Flow use separate runtime paths. The server is not

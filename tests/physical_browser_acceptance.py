@@ -195,6 +195,46 @@ def test_native_r(page, timeout: int):
     page.get_by_role("heading", name="Snapshot: fs_native_frame").wait_for(timeout=timeout)
     assert "alpha" in page.locator("#workspace").inner_text()
     assert "beta" in page.locator("#workspace").inner_text()
+
+    # Real Chromium -> Flow-owned table route -> persistent GNU R: traverse
+    # all four 50-row UI pages and fetch the unsampled 201-251 kernel slice.
+    run_source(page, "r",
+               "fs_native_paged <- data.frame(n=seq_len(251))\n"
+               "cat('native paging ready 42\\n')",
+               "native paging ready 42", timeout)
+    page.get_by_role("button", name="View fs_native_paged as table").click()
+    table_view = page.locator("#workspace [aria-label='Environment table snapshot']")
+    table_view.wait_for(timeout=timeout)
+    assert "loaded rows 1-200 of 251" in table_view.inner_text()
+    next_page = table_view.get_by_role("button", name="Next page")
+    for first_row in (51, 101, 151):
+        next_page.click()
+        page.wait_for_function(
+            "first => document.querySelector('[aria-label=\"Environment table snapshot\"] [role=\"status\"]').textContent.includes('loaded rows 1-200 of 251, page ' + ((first - 1) / 50 + 1) + '/4')",
+            arg=first_row, timeout=timeout)
+    next_page.click()
+    page.wait_for_function(
+        "() => document.querySelector('[aria-label=\"Environment table snapshot\"] [role=\"status\"]').textContent.includes('loaded rows 201-251 of 251')",
+        timeout=timeout)
+    assert table_view.get_by_role("cell", name="201", exact=True).count() == 1
+    assert table_view.get_by_role("cell", name="251", exact=True).count() == 0
+    # CSV export is intentionally only the loaded 51-row slice, not 251 rows.
+    with page.expect_download(timeout=timeout) as paged_csv:
+        table_view.get_by_role("button", name="Export loaded CSV").click()
+    with tempfile.TemporaryDirectory() as folder:
+        csv_path = Path(folder) / "paged.csv"
+        paged_csv.value.save_as(csv_path)
+        import csv
+        with csv_path.open(newline="", encoding="utf-8-sig") as stream:
+            rows = list(csv.reader(stream))
+        assert rows[0] == ["n"], rows[:1]
+        assert len(rows) == 52 and rows[1] == ["201"] and rows[-1] == ["251"], (
+            len(rows), rows[:2], rows[-2:])
+    table_view.get_by_role("button", name="Previous page").click()
+    page.wait_for_function(
+        "() => document.querySelector('[aria-label=\"Environment table snapshot\"] [role=\"status\"]').textContent.includes('loaded rows 1-200 of 251, page 4/4')",
+        timeout=timeout)
+    assert table_view.get_by_role("cell", name="200", exact=True).count() == 1
     # Native installed-library inventory must come from Rscript, not webR.
     page.locator("#listPackages").click()
     page.locator("#packages table[aria-label='Installed R packages']").wait_for(timeout=timeout)

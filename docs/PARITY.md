@@ -1,5 +1,31 @@
 # FlowStudio RStudio parity matrix
 
+## 2026-10-26: F2 previewed lexical identifier rename (pending independent CI)
+
+The Flow-served native editor now offers Edit > Rename identifier and F2.
+The user selects a Flow, R or Python identifier, supplies a valid non-keyword
+replacement, explicitly previews affected occurrences and applies the change
+to the active buffer or, opt-in, other already-open tabs of the same language.
+Changes update the real open-document model and its dirty indicators; **nothing
+is written to disk until the user saves**. A 24-document/200-reference/2-MiB
+bound, collision rejection, comment/string/member exclusion, and full-buffer
+snapshot checks prevent silent truncation or overwriting edits made after
+preview. All buffers are validated before the transactional in-memory update.
+The scanner also now excludes spaced Python member and R member/namespace
+access. No hosted CI, Flow compiler, or Flow-owned backend routes changed.
+
+**Status: partial / locally V8-tested, independent CI and physical-browser
+interaction not yet verified.** Ten new regression cases passed in a direct
+V8 harness against the actual branch source and all six inline editor scripts
+parsed successfully. The GitHub Node test suite and native Linux/macOS
+acceptance have not yet run for this branch at the time of writing.
+This is deliberately **lexical** rename, not semantic refactoring: shadowed
+bindings, imports, dynamic R names, Python f-string expressions and unopened
+files are not resolved. It does not establish RStudio feature parity.
+Live function-level R breakpoints, authenticated remote sessions and real
+physical-browser interpreter acceptance remain outstanding.
+
+
 ## 2026-10-26: native editor Shift+F12 lexical references (Linux/macOS CI passed)
 
 The Flow-served native editor now offers Edit > Find references and Shift+F12.

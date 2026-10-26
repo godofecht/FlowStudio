@@ -137,6 +137,18 @@ def test_python(page, timeout: int):
                            timeout=timeout)
     assert "44" in page.locator("#notebookOutput").inner_text()
 
+    # Real Pyodide must skip an earlier failing cell when running from the caret.
+    page.locator("#source").fill(
+        "# %% [python]\nraise RuntimeError('must not execute')\n"
+        "# %% [python]\nprint('cursor-only-python-47')\n")
+    page.locator("#source").evaluate(
+        "(node) => {const pos = node.value.indexOf('print('); node.setSelectionRange(pos, pos);}")
+    page.locator("#runFromCell").click()
+    page.wait_for_function(
+        "document.querySelector('#notice').textContent === 'Notebook executed 1 cells from cursor.'",
+        timeout=timeout)
+    assert "cursor-only-python-47" in page.locator("#notebookOutput").inner_text()
+
     # Exercise real matplotlib capture and the rendered PNG history.
     run_source(page, "python", "import matplotlib.pyplot as plt\nplt.figure()\nplt.plot([1, 2, 3])\nprint('plot ready 42')",
                "plot ready 42", timeout)
@@ -149,6 +161,17 @@ def test_r(page, timeout: int):
     assert "fs_browser_value" in page.locator("#environment").inner_text()
     run_source(page, "r", "plot(c(1, 2, 3))\nprint('r plot ready 42')", "r plot ready 42", timeout)
     page.locator("#workspace canvas").first.wait_for(timeout=timeout)
+    # Real webR must skip an earlier failing R cell when running from the caret.
+    page.locator("#source").fill(
+        "# %% [r]\nstop('must not execute')\n"
+        "# %% [r]\ncat('cursor-only-r-47')\n")
+    page.locator("#source").evaluate(
+        "(node) => {const pos = node.value.indexOf('cat('); node.setSelectionRange(pos, pos);}")
+    page.locator("#runFromCell").click()
+    page.wait_for_function(
+        "document.querySelector('#notice').textContent === 'Notebook executed 1 cells from cursor.'",
+        timeout=timeout)
+    assert "cursor-only-r-47" in page.locator("#notebookOutput").inner_text()
     page.locator("#reset").click()
     assert "R state reset" in page.locator("#notice").inner_text()
     run_source(page, "r", "print(exists('fs_browser_value', envir=.GlobalEnv))", "FALSE", timeout)

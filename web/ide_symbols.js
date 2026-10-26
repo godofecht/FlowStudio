@@ -208,8 +208,12 @@ function identifierAt(language, text, offset) {
     ? /^[A-Za-z._][A-Za-z0-9._]*$/
     : /^[A-Za-z_][A-Za-z0-9_]*$/;
   if (!valid.test(name) || !isCodeAt(language, text, start)) return null;
-  // A dotted member is not necessarily a declaration in this document.
-  if (language !== "r" && (text[start - 1] === "." || text[end] === ".")) return null;
+  // Do not treat spaced member access as a free identifier.
+  let previous = start - 1;
+  while (previous >= 0 && (text[previous] === " " || text[previous] === "\t")) previous--;
+  const prefix = previous >= 0 ? text[previous] : "";
+  if (language === "r" && (prefix === "$" || prefix === "@" || prefix === ":")) return null;
+  if (language !== "r" && (prefix === "." || text[end] === ".")) return null;
   return name;
 }
 
@@ -320,7 +324,9 @@ function findReferences(language, text, name, limit = MAX_REFERENCES) {
       const begin = i, tokenLine = line, tokenColumn = column;
       while (i < text.length && part.test(text[i])) advance();
       const token = text.slice(begin, i);
-      const prefix = begin > 0 ? text[begin - 1] : "";
+      let previous = begin - 1;
+      while (previous >= 0 && (text[previous] === " " || text[previous] === "\t")) previous--;
+      const prefix = previous >= 0 ? text[previous] : "";
       const member = language === "r"
         ? prefix === "$" || prefix === "@" || prefix === ":"
         : prefix === ".";

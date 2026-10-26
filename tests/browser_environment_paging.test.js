@@ -22,7 +22,7 @@ test("real R table pages advance beyond 50-row local UI pages and return", async
   const ui=viewer.create({target,document:{createElement:node},dataApi:data,
     fetchPage:async (name, offset) => {
       calls.push([name,offset]);
-      return table(offset,3);
+      return table(offset,offset === 0 ? 50 : 3);
     }});
   assert.equal(ui.show("measurements",table(0,50)),50);
   const holder=target.firstChild, summary=holder.children[2];
@@ -39,7 +39,7 @@ test("real R table pages advance beyond 50-row local UI pages and return", async
   prev.listeners.click();
   await flush();
   assert.deepEqual(calls,[["measurements",50],["measurements",0]]);
-  assert.match(summary.textContent,/loaded rows 1-3 of 53/);
+  assert.match(summary.textContent,/loaded rows 1-50 of 53/);
 });
 
 test("local filtering and CSV export never pretend to query unseen R rows", async () => {

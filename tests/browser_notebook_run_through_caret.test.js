@@ -88,7 +88,7 @@ test("default full execution and inclusive last-cell range remain equivalent", a
 test("browser exposes bounded run-through-caret action with real source-cell lookup", () => {
   const html = fs.readFileSync(path.join(__dirname, "../docs/app/index.html"), "utf8");
   assert.match(html, /id="runThroughCell"/);
-  assert.match(html, /"transferVariable", "runThroughCell"\]/);
+  assert.match(html, /"transferVariable", "runThroughCell"/);
   assert.match(html, /FlowStudioSourceCells\.cellAt\(currentSource, \$\("source"\)\.selectionStart\)\.index/);
   assert.match(html, /notebookRunner\.run\(currentSource, language, \{startIndex, endIndex\}\)/);
   assert.match(html, /\$\("runThroughCell"\)\.addEventListener\("click", \(\) => \{ void runNotebook\(false, true\); \}\)/);

@@ -11,10 +11,18 @@ webR preview-only snapshots. At most 128 previous slice positions are kept.
 Sorting, filtering and CSV export remain explicitly limited to the loaded
 slice; no complete dataset export or new native route is introduced.
 
-**Status: partial / source implementation, six automated regression cases
-and an opt-in real-browser native R scenario committed; Linux/macOS CI,
-actual Flow/Rscript jump interaction and physical-browser acceptance not yet
-independently verified.**
+**Status: partial / independently verified Linux/macOS source tests,
+native Flow 2.0.0 compilation, real Rscript/HTTP acceptance and packaging;
+physical-browser direct-row interaction still unverified.**
+[PR #81](https://github.com/godofecht/FlowStudio/pull/81)
+merged as [45ef85e](https://github.com/godofecht/FlowStudio/commit/45ef85e94c94329c360ac8664e5cd0754d9a7f12)
+after [CI #40343594736](https://github.com/godofecht/FlowStudio/actions/runs/40343594736)
+passed all four Ubuntu 24.04/macOS 14 jobs. Each source job completed
+730 JavaScript tests (728 passed, two skipped, zero failures) and 78 Python
+tests (11 skipped). Both native jobs built the real Flow-owned backend,
+passed Rscript/HTTP acceptance and completed packaging. The opt-in
+physical-browser jump scenario has **not** been executed; existing HTTP
+acceptance is not evidence that the new UI interaction works in Chromium.
 Flow 2.0.0 remains the primary backend. No hosted CI changes.
 This is not live R function-level debugging, authenticated remote sessions
 or RStudio parity.

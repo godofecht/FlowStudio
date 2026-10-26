@@ -1,4 +1,4 @@
-## 2026-10-26: real browser R named-list member completion (PR #88; CI pending)
+## 2026-10-26: real browser R named-list member completion (Linux/macOS CI passed)
 
 The `docs/app/` browser workspace now completes named members of ordinary R
 lists from **real webR or native R inspector snapshots** through the existing
@@ -16,11 +16,17 @@ not evaluate submitted completion expressions. **The underlying native R
 inspector can still force lazy promises during root binding lookup**, so this
 is not side-effect-free for all possible R workspaces.
 
-**Status: partial / direct V8 execution of the actual browser completion
-module, inspected-member dispatch and insertion passed locally.** Two new
-Node regression cases plus updated completion contracts await Linux/macOS CI.
-Actual webR/Rscript and physical-browser interaction have not been
-independently accepted. The separate native Monaco provider is under
+**Status: partial / independent Linux/macOS source and native CI passed.**
+[PR #88](https://github.com/godofecht/FlowStudio/pull/88) merged as
+[5895687](https://github.com/godofecht/FlowStudio/commit/589568749c0e64b45ced52be9570852d2f470478)
+after [CI #40408659163](https://github.com/godofecht/FlowStudio/actions/runs/40408659163)
+passed all four jobs on Ubuntu 24.04 and macOS 14. Each source job ran
+797 JavaScript tests (795 passed, two skipped, zero failures) and 78 Python
+tests (11 skipped). Both native jobs compiled the real Flow 2.0.0 server,
+passed Rscript/HTTP acceptance and packaged the executable. Direct V8
+execution of the actual browser completion module, inspected-member dispatch
+and insertion also passed locally. These gates do **not** establish a physical
+browser webR/Rscript completion pass; that interaction remains unverified. The separate native Monaco provider is under
 [draft PR #89](https://github.com/godofecht/FlowStudio/pull/89);
 its checked-in `web/ui/workbench.js` bundle still needs regeneration and
 physical-browser acceptance before the native Monaco feature can ship.

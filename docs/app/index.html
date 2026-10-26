@@ -103,7 +103,18 @@ if (typeof FlowStudioRDebugPanel !== "undefined" && typeof FlowStudioNativeFlow 
     stopButton:$("rDebugStop"), statusButton:$("rDebugStatus"),
     target:$("rDebugOutput"), notice});
 const plotHistory = FlowStudioPlotHistory.create($("workspace"));
-const environmentData = FlowStudioEnvironmentData.create({target:$("workspace"), document, dataApi:FlowStudioData});
+const environmentData = FlowStudioEnvironmentData.create({
+  target:$("workspace"), document, dataApi:FlowStudioData,
+  fetchPage:async (name, offset) => {
+    if ($("language").value !== "r" || !nativeRSelected())
+      throw Error("Native R table paging requires the active native R session.");
+    const generation = sessionGeneration;
+    const result = await getRSession().table(name, offset);
+    if (generation !== sessionGeneration || $("language").value !== "r" || !nativeRSelected())
+      throw Error("R session changed while paging.");
+    return result;
+  }
+});
 let rSession = null, nativeRSession = null;
 const nativeAvailable = globalThis.FlowStudioNativeFlow?.available?.() === true;
 $("rRuntime").disabled = !nativeAvailable;

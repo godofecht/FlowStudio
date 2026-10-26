@@ -743,7 +743,20 @@ inspect_workspace <- function() {
 
 # Bounded read-only previews from the persistent R workspace. Restrict access
 # to exact base data.frames and classless atomic matrices; never eval a name.
-table_snapshot <- function(name) {
+table_snapshot <- function(query) {
+    # The protocol accepts a literal name or name<TAB>decimal offset only.
+    # This never parses or evaluates submitted R source.
+    parts <- strsplit(query, "\t", fixed = TRUE)[[1L]]
+    if (length(parts) < 1L || length(parts) > 2L ||
+        !identical(paste(parts, collapse = "\t"), query) ||
+        (length(parts) == 2L && !grepl("^(0|[1-9][0-9]{0,9})$", parts[[2L]]))) {
+        return(list(success = FALSE, payload = charToRaw("Invalid R table name or offset.")))
+    }
+    name <- parts[[1L]]
+    offset <- if (length(parts) == 2L) as.double(parts[[2L]]) else 0
+    if (!is.finite(offset) || offset < 0 || offset > 9999999999) {
+        return(list(success = FALSE, payload = charToRaw("Invalid R table offset.")))
+    }
     if (!grepl("^[A-Za-z][A-Za-z0-9._]{0,119}$", name) ||
         grepl("\\.\\.", name) || grepl("\\.$", name)) {
         return(list(success = FALSE, payload = charToRaw("Invalid R table name.")))
@@ -787,8 +800,11 @@ table_snapshot <- function(name) {
                       length(dim_names) == 2L && is.character(dim_names[[2L]]) &&
                       !is.object(dim_names[[2L]])) dim_names[[2L]] else NULL
     }
+    if (offset > total_rows) {
+        return(list(success = FALSE, payload = charToRaw("R table offset exceeds row count.")))
+    }
     take_columns <- min(total_columns, 32L)
-    take_rows <- min(total_rows, 200L)
+    take_rows <- min(total_rows - offset, 200L)
     label <- function(index) {
         if (is.character(labels) && !is.object(labels) && length(labels) >= index &&
             !is.na(labels[[index]]) && nzchar(labels[[index]])) {
@@ -829,7 +845,7 @@ table_snapshot <- function(name) {
     rows <- character(0)
     used <- sum(nchar(column_json, type = "bytes")) + 128L
     truncated <- total_rows > take_rows || total_columns > take_columns
-    if (take_rows > 0L) for (row in seq_len(take_rows)) {
+    if (take_rows > 0L) for (row in seq.int(offset + 1, length.out = take_rows)) {
         fields <- vapply(seq_len(take_columns),
                          function(column) json_quote(cell_text(row, column)),
                          character(1), USE.NAMES = FALSE)
@@ -841,9 +857,17 @@ table_snapshot <- function(name) {
         rows <- c(rows, entry)
         used <- used + nchar(entry, type = "bytes") + 1L
     }
+    # A page may stop before 200 rows to stay within the IPC response bound.
+    # Advance by emitted rows, not by the nominal page size.
+    next_offset <- offset + length(rows)
+    next_json <- if (length(rows) == 0L || next_offset >= total_rows ||
+                     next_offset > 9999999999) "null" else
+        format(next_offset, scientific = FALSE, trim = TRUE)
     json <- paste0('{"columns":[', paste(column_json, collapse = ","),
                    '],"rows":[', paste(rows, collapse = ","),
                    '],"totalRows":', total_rows,
+                   ',"offset":', format(offset, scientific = FALSE, trim = TRUE),
+                   ',"nextOffset":', next_json,
                    ',"truncated":', if (truncated) "true" else "false", "}")
     list(success = TRUE, payload = charToRaw(enc2utf8(json)))
 }

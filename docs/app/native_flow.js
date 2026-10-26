@@ -255,7 +255,7 @@ function validateRInspection(payload) {
   return {ok:true, variables:payload.variables.map(node => convert(node, 0)),
     truncated:payload.truncated};
 }
-function validateRTable(payload) {
+function validateRTable(payload, requestedOffset = 0) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload) ||
       !Array.isArray(payload.columns) || payload.columns.length < 1 ||
       payload.columns.length > 32 || !Array.isArray(payload.rows) ||
@@ -266,6 +266,22 @@ function validateRTable(payload) {
         row.length === payload.columns.length &&
         row.every(value => typeof value === "string" && value.length <= 160)))
     throw new Error("Invalid native R table response.");
+  // Old preview responses without paging metadata are accepted at offset zero
+  // only. Paged responses must identify the requested slice exactly.
+  if (payload.offset === undefined) {
+    if (requestedOffset !== 0 || payload.nextOffset !== undefined)
+      throw new Error("Invalid native R table page metadata.");
+  } else if (!Number.isSafeInteger(payload.offset) ||
+             payload.offset !== requestedOffset || payload.offset < 0 ||
+             payload.offset > payload.totalRows ||
+             payload.rows.length > payload.totalRows - payload.offset ||
+             !(payload.nextOffset === null ||
+               (Number.isSafeInteger(payload.nextOffset) &&
+                payload.rows.length > 0 &&
+                payload.nextOffset === payload.offset + payload.rows.length &&
+                payload.nextOffset < payload.totalRows))) {
+    throw new Error("Invalid native R table page metadata.");
+  }
   return payload;
 }
 function createRSession() {
@@ -301,20 +317,21 @@ function createRSession() {
       return validateRInspection(payload);
     });
   }
-  function table(name) {
+  function table(name, offset = 0) {
     if (typeof name !== "string" || !/^[A-Za-z][A-Za-z0-9._]{0,119}$/.test(name) ||
-        name.includes("..") || name.endsWith("."))
-      return Promise.resolve({ok:false, output:"Invalid R variable name."});
+        name.includes("..") || name.endsWith(".") ||
+        !Number.isSafeInteger(offset) || offset < 0 || offset > 9999999999)
+      return Promise.resolve({ok:false, output:"Invalid R variable name or row offset."});
     const generation = epoch;
     return schedule(async () => {
       if (generation !== epoch) return stale();
-      const response = await request("/api/table/r", name);
+      const response = await request("/api/table/r", name + (offset ? "\t" + offset : ""));
       if (generation !== epoch) return stale();
       if (!response.ok) return response;
       let payload;
       try { payload = JSON.parse(response.output); }
       catch (_) { throw new Error("Native R table response was not JSON."); }
-      return {ok:true, table:validateRTable(payload)};
+      return {ok:true, table:validateRTable(payload, offset)};
     });
   }
   function plot() {

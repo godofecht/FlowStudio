@@ -4,7 +4,8 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");
 const path = require("node:path");
-const {cellAt} = require("../docs/app/source_cells.js");
+const {cellAt, parseCells} = require("../docs/app/source_cells.js");
+const format = require("../docs/app/notebook_format.js");
 
 const html = fs.readFileSync(path.join(__dirname, "../docs/app/index.html"), "utf8");
 const found = html.match(/function clearNotebookOutputs\(onlyCaret = false\) \{[\s\S]*?\n\}\nasync function runNotebook/);
@@ -30,7 +31,10 @@ function fixture(options = {}) {
   const ctx = {
     busy:options.busy || false,
     notebookRunner:options.running ? {isRunning:()=>true} : null,
-    notebookEntries:[{index:0, output:"first"}, {index:2, output:"second"}],
+    notebookEntries:[
+      {index:0, kind:"code", language:"python", ok:true, output:"first", truncated:false, plots:[], images:[]},
+      {index:2, kind:"code", language:"python", ok:true, output:"second", truncated:false, plots:[], images:[]}
+    ],
     notebookExecutionSource:source,
     notebookExecutionLanguage:"python",
     notebookOutput:{children:cards},
@@ -111,6 +115,21 @@ test("failed recovery save reports loss of reload persistence without restoring 
   assert.deepEqual(Array.from(f.ctx.notebookEntries, entry=>entry.index), [0]);
   assert.equal(f.ctx.notebookRecoveryFailed, true);
   assert.match(f.messages.at(-1), /could not be saved for reload recovery/);
+});
+
+test("cleared snapshots are absent from real .ipynb and portable .fsnb exports", () => {
+  const f = fixture();
+  f.clear(true);
+  const ipynb = JSON.parse(format.encode(source, "python", f.ctx.notebookEntries, parseCells));
+  assert.deepEqual(ipynb.cells.filter(cell=>cell.cell_type === "code")
+    .map(cell=>cell.outputs.length), [1, 0]);
+  const portable = JSON.parse(format.encodeBundle(source, "python",
+    f.ctx.notebookEntries, parseCells));
+  assert.deepEqual(portable.results.map(entry=>entry.index), [0]);
+  f.clear();
+  const cleared = JSON.parse(format.encodeBundle(source, "python",
+    f.ctx.notebookEntries, parseCells));
+  assert.equal(cleared.results.length, 0);
 });
 
 test("actual browser controls are wired, guarded during execution, and bootstrap parses", () => {

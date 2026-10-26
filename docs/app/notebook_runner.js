@@ -44,7 +44,10 @@ function create({parseCells, execute, onCell, notice, allowNativeFlow = false}) 
     const startIndex = options && options.startIndex !== undefined ? options.startIndex : 0;
     if (!Number.isSafeInteger(startIndex) || startIndex < 0 || startIndex >= cells.length)
       return {ok:false, executed:0, error:"Notebook start cell is outside the source buffer."};
-    const selectedCells = cells.slice(startIndex);
+    const endIndex = options && options.endIndex !== undefined ? options.endIndex : cells.length - 1;
+    if (!Number.isSafeInteger(endIndex) || endIndex < startIndex || endIndex >= cells.length)
+      return {ok:false, executed:0, error:"Notebook end cell is outside the selected source range."};
+    const selectedCells = cells.slice(startIndex, endIndex + 1);
     const runnable = selectedCells.filter(cell => cell.kind === "code" && typeof cell.code === "string" && cell.code.trim());
     if (!runnable.length) return {ok:false, executed:0, error:"No executable source cells."};
     const languages = runnable.map(cell => cell.language || language);

@@ -532,6 +532,27 @@ def main() -> None:
         status, error = request("POST", "/api/table/r",
                                 "flowstudio_frame;stop('should not run')", accepted_headers)
         assert status == 422 and "Invalid R table name" in error, (status, error)
+        # Real paged reads go through the Flow router and the same persistent R
+        # workspace. A second page must return rows that were never previewed.
+        status, _ = request("POST", "/api/run/r",
+                            "flowstudio_paged <- data.frame(n=seq_len(251))",
+                            accepted_headers)
+        assert status == 200, status
+        status, page_json = request("POST", "/api/table/r", "flowstudio_paged",
+                                     accepted_headers)
+        assert status == 200, (status, page_json)
+        first_page = json.loads(page_json)
+        assert first_page["offset"] == 0 and first_page["nextOffset"] == 200
+        assert len(first_page["rows"]) == 200, first_page
+        status, page_json = request("POST", "/api/table/r", "flowstudio_paged\\t200",
+                                     accepted_headers)
+        assert status == 200, (status, page_json)
+        second_page = json.loads(page_json)
+        assert second_page["offset"] == 200 and second_page["nextOffset"] is None
+        assert second_page["rows"][0] == ["201"] and second_page["rows"][-1] == ["251"]
+        status, error = request("POST", "/api/table/r",
+                                "flowstudio_paged\\t200;stop('unsafe')", accepted_headers)
+        assert status == 422 and "Invalid R table name" in error, (status, error)
         # Read-only native R package inventory is served through Flow, never eval.
         assert request("POST", "/api/packages/r", "")[0] == 404
         assert request("POST", "/api/packages/r", "",

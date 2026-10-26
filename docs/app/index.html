@@ -644,7 +644,7 @@ FlowStudioNotebookIO.create({
   openButton:$("openNotebook"), fileInput:$("notebookFile"), saveButton:$("saveNotebook"),
   bundleOpenButton:$("openFlowNotebook"), bundleFileInput:$("flowNotebookFile"), bundleSaveButton:$("saveFlowNotebook"),
   rMarkdownOpenButton:$("openRMarkdown"), rMarkdownFileInput:$("rMarkdownFile"),
-  rMarkdown:FlowStudioRMarkdownImport,
+  rMarkdown:typeof FlowStudioRMarkdownImport === "undefined" ? null : FlowStudioRMarkdownImport,
   source:$("source"), language:$("language"), format:FlowStudioNotebookFormat,
   parseCells:FlowStudioSourceCells.parseCells,
   isBusy:()=>busy || !!notebookRunner?.isRunning(),

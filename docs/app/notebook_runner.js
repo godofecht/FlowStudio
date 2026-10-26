@@ -33,7 +33,7 @@ function create({parseCells, execute, onCell, notice, allowNativeFlow = false}) 
   // Invalidate UI results immediately, but do not admit a new notebook until
   // the in-flight interpreter call has settled. webR PostMessage cannot interrupt.
   function cancel() { generation++; }
-  async function run(source, language) {
+  async function run(source, language, options = {}) {
     if (active) return {ok:false, executed:0, error:"Notebook execution is already running."};
     if (!["python", "r", "flow"].includes(language))
       return {ok:false, executed:0, error:"Unsupported default notebook language."};
@@ -41,7 +41,11 @@ function create({parseCells, execute, onCell, notice, allowNativeFlow = false}) 
     try { cells = parseCells(source); }
     catch (error) { return {ok:false, executed:0, error:String(error.message || error)}; }
     if (!Array.isArray(cells)) return {ok:false, executed:0, error:"Invalid source cell list."};
-    const runnable = cells.filter(cell => cell.kind === "code" && typeof cell.code === "string" && cell.code.trim());
+    const startIndex = options && options.startIndex !== undefined ? options.startIndex : 0;
+    if (!Number.isSafeInteger(startIndex) || startIndex < 0 || startIndex >= cells.length)
+      return {ok:false, executed:0, error:"Notebook start cell is outside the source buffer."};
+    const selectedCells = cells.slice(startIndex);
+    const runnable = selectedCells.filter(cell => cell.kind === "code" && typeof cell.code === "string" && cell.code.trim());
     if (!runnable.length) return {ok:false, executed:0, error:"No executable source cells."};
     const languages = runnable.map(cell => cell.language || language);
     if (languages.some(selected => !["python", "r", "flow"].includes(selected)))
@@ -58,7 +62,7 @@ function create({parseCells, execute, onCell, notice, allowNativeFlow = false}) 
     active = true;
     let executed = 0, remaining = MAX_OUTPUT_TOTAL;
     try {
-      for (const cell of cells) {
+      for (const cell of selectedCells) {
         if (token !== generation) return {ok:false, executed, cancelled:true};
         if (cell.kind === "markdown") {
           onCell({index:cell.index, kind:"markdown", code:String(cell.code).slice(0, 16384)});

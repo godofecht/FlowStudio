@@ -1,6 +1,6 @@
 # FlowStudio RStudio parity matrix
 
-## 2026-10-26: R Markdown (.Rmd) source export (PR validation pending)
+## 2026-10-26: R Markdown (.Rmd) source export (Linux/macOS CI passed)
 
 The browser notebook toolbar now exports genuine R Markdown source with
 Markdown, R and Python code chunks from the existing percent-cell parser.
@@ -12,9 +12,18 @@ presented as executable knitr chunks. Exports never evaluate source, and
 captured outputs are intentionally not embedded: knitting is an external
 execution step. Python chunks require a configured Python/reticulate engine.
 
-**Status: partial / local V8 smoke and inline-script syntax checks passed;
-cross-platform Node CI and actual rmarkdown::render/knitr acceptance pending;
-physical-browser download interaction unverified.** This is an export-only
+**Status: partial / independently verified source and native Linux/macOS CI;
+physical-browser download and actual rmarkdown::render/knitr acceptance
+unverified.** [PR #70](https://github.com/godofecht/FlowStudio/pull/70)
+merged as [88472da](https://github.com/godofecht/FlowStudio/commit/88472dafd80c0ba594dcc23caa0ab41fca95bda4)
+after [CI #40265718458](https://github.com/godofecht/FlowStudio/actions/runs/40265718458)
+completed all four jobs successfully on Ubuntu 24.04 and macOS 14.
+Each source/transport job ran 662 JavaScript tests (660 passed, two skipped,
+zero failures), including seven new R Markdown regressions, and 76 Python
+tests (11 skipped). Both native jobs compiled the real Flow 2.0 backend,
+passed existing Flow HTTP/Rscript acceptance and completed packaging.
+Local V8 acceptance passed 11/11 checks against the committed serializer,
+source-cell parser and browser HTML. This is an export-only
 interoperability feature, not R Markdown import, RStudio rendering parity,
 Flow execution through knitr, or full RStudio compatibility. The native
 Flow-owned backend and hosted CI configuration are unchanged.

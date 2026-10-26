@@ -2,7 +2,8 @@
 
 The existing browser-local Python ↔ R transfer protocol now preserves missing
 values in typed vectors. Python homogeneous list/tuple elements may contain
-`None`; R classless atomic vectors may contain type-specific `NA`. The
+`None`; R classless atomic vectors may contain type-specific `NA`. R integer
+vectors still map to the numeric wire type and import as R doubles. The
 transfer remains bounded to 256 elements and 32 KiB. Scalar `None`, untyped
 all-`None` Python lists, mixed non-missing types, NaN, Inf, classed R objects,
 and tables are rejected. R's encoded literal `"@NA@"` string remains distinct

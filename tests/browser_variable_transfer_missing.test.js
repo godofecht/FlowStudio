@@ -27,6 +27,35 @@ test("typed vector protocol preserves missing values without admitting untyped s
   ]) assert.throws(() => transfer.validate(packet));
 });
 
+test("transfer controller forwards missing values unchanged in both directions", async () => {
+  const control=value=>({value,disabled:false,addEventListener(){}});
+  const direction=control("python-to-r"), source=control("samples"),
+    destination=control("copied"), button=control("");
+  const packet={kind:"vector",type:"string",values:["@NA@",null,"é"]};
+  const imports=[], notices=[];
+  let busy=false;
+  const controller=transfer.create({
+    direction,source,destination,button,
+    python:async(op,name,value)=>{
+      if(op==="export") return {ok:true,value:packet};
+      imports.push(["python",name,value]);return {ok:true};
+    },
+    rSession:()=>({
+      exportVariable:async()=>({ok:true,value:packet}),
+      importVariable:async(name,value)=>{imports.push(["r",name,value]);return {ok:true};}
+    }),
+    notice:message=>notices.push(message),isBusy:()=>busy,setBusy:value=>{busy=value;},
+    generation:()=>0
+  });
+  assert.equal(await controller.transfer(),true);
+  direction.value="r-to-python";
+  assert.equal(await controller.transfer(),true);
+  assert.deepEqual(imports,[["r","copied",packet],["python","copied",packet]]);
+  assert.equal(button.disabled,false);
+  assert.equal(busy,false);
+  assert.match(notices.at(-1),/Transferred samples/);
+});
+
 function workerHarness() {
   const replies=[], queries=[];
   const py={async runPythonAsync(code) {

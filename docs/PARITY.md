@@ -1,3 +1,24 @@
+## 2026-10-26: typed R NA / Python None vector transfer (PR validation pending)
+
+The existing browser-local Python ↔ R transfer protocol now preserves missing
+values in typed vectors. Python homogeneous list/tuple elements may contain
+`None`; R classless atomic vectors may contain type-specific `NA`. R integer
+vectors still map to the numeric wire type and import as R doubles. The
+transfer remains bounded to 256 elements and 32 KiB. Scalar `None`, untyped
+all-`None` Python lists, mixed non-missing types, NaN, Inf, classed R objects,
+and tables are rejected. R's encoded literal `"@NA@"` string remains distinct
+from its missing-value wire marker. Both import paths use real existing
+Pyodide/webR interpreter operations; no simulated interpreter was added.
+
+**Status: partial / eight direct V8 protocol assertions passed; cross-platform
+CI and real Rscript/browser acceptance pending.** The new Node suite includes
+real CPython generated-query execution and real Rscript checks required by
+the native verification harness (not yet passing). The opt-in Playwright runner now includes real Pyodide → webR → Pyodide NA/None
+round-trip assertions; this scenario has not been executed independently. No
+native Flow compiler, server routes or hosted CI configuration changed.
+This does not establish tabular interchange, interpreter-state persistence,
+function-level R debugging, authenticated remote sessions or RStudio parity.
+
 ## 2026-10-26: prevent implicit knitr execution from Markdown cells (Linux/macOS CI passed)
 
 R Markdown export rejects executable fenced knitr chunks and inline R

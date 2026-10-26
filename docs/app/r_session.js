@@ -409,12 +409,14 @@ function create({load = () => import(CDN)} = {}) {
           't <- base::typeof(v); ' +
           'if (!is.null(base::attributes(v)) || !(t %in% c("double","integer","logical","character"))) ' +
           'stop("Only classless atomic R vectors can be transferred"); ' +
-          'if (length(v) > 256L || anyNA(v)) stop("R vector exceeds limit or contains NA"); ' +
+          'if (length(v) > 256L) stop("R vector exceeds limit"); ' +
           'if (t %in% c("double","integer") && ' +
-          '(any(!is.finite(v)) || any(abs(v) > 9007199254740991))) stop("R number is not finite or safe"); ' +
-          'if (t == "character" && any(nchar(v, type="chars") > 512L)) stop("R string exceeds limit"); ' +
+          '(any(is.infinite(v)) || (t == "double" && any(is.nan(v))) || ' +
+          'any(abs(v[!is.na(v)]) > 9007199254740991))) stop("R number is not finite or safe"); ' +
+          'if (t == "character" && any(nchar(v[!is.na(v)], type="chars") > 512L)) stop("R string exceeds limit"); ' +
           's <- if (t == "double") format(v, digits=17L, scientific=TRUE, trim=TRUE, decimal.mark=".") else as.character(v); ' +
-          'c(t, vapply(s, function(x) utils::URLencode(x, reserved=TRUE), character(1))) })';
+          'c(t, vapply(seq_along(v), function(i) if (is.na(v[[i]])) "@NA@" else ' +
+          'utils::URLencode(s[[i]], reserved=TRUE), character(1))) })';
         const rows = await r.evalRRaw(query, "string[]");
         if (generation !== epoch) return {ok:false, output:"R session reset."};
         if (!Array.isArray(rows) || !rows.length || rows.length > 257 ||
@@ -423,6 +425,8 @@ function create({load = () => import(CDN)} = {}) {
           throw Error("Invalid R transfer response.");
         const type = rows[0] === "logical" ? "boolean" : rows[0] === "character" ? "string" : "number";
         const values = rows.slice(1).map(raw => {
+          // R's NA sentinel is outside URL-encoded data; literal "@NA@" is %40NA%40.
+          if (raw === "@NA@") return null;
           const decoded = decodeURIComponent(raw);
           if (type === "boolean") {
             if (!["TRUE", "FALSE"].includes(decoded)) throw Error("Invalid R logical value.");
@@ -450,7 +454,9 @@ function create({load = () => import(CDN)} = {}) {
       if (generation !== epoch) return {ok:false, output:"R session reset."};
       try {
         const r = await get();
-        const atom = value => packet.type === "number" ? String(value) :
+        const atom = value => value === null
+          ? {number:"NA_real_", boolean:"NA", string:"NA_character_"}[packet.type]
+          : packet.type === "number" ? String(value) :
           packet.type === "boolean" ? (value ? "TRUE" : "FALSE") :
           'utils::URLdecode(' + JSON.stringify(encodeURIComponent(value)) + ')';
         const empty = {number:"base::numeric(0L)", boolean:"base::logical(0L)", string:"base::character(0L)"};

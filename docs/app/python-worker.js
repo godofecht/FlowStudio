@@ -19,6 +19,7 @@ function validTransferPacket(packet) {
       (packet.kind === "scalar" && packet.values.length !== 1))
     return false;
   for (const value of packet.values) {
+    if (value === null && packet.kind === "vector") continue;
     if (packet.type === "number" &&
         (typeof value !== "number" || !Number.isFinite(value) || Math.abs(value) > Number.MAX_SAFE_INTEGER))
       return false;
@@ -143,8 +144,9 @@ async function handle(event) {
         "if not _fs_transfer_values or len(_fs_transfer_values) > 256: raise ValueError('Python vector is empty or exceeds limit')",
         "def _fs_transfer_type(v):",
         "    return 'boolean' if type(v) is bool else 'number' if type(v) in (int, float) else 'string' if type(v) is str else None",
-        "_fs_transfer_type_name = _fs_transfer_type(_fs_transfer_values[0])",
-        "if _fs_transfer_type_name is None or any(_fs_transfer_type(v) != _fs_transfer_type_name for v in _fs_transfer_values): raise ValueError('Only homogeneous plain scalar/list/tuple values can be transferred')",
+        "_fs_transfer_present = [_fs_transfer_type(v) for v in _fs_transfer_values if v is not None]",
+        "if not _fs_transfer_present or _fs_transfer_present[0] is None or any(t != _fs_transfer_present[0] for t in _fs_transfer_present): raise ValueError('Only homogeneous plain scalar/list/tuple values can be transferred')",
+        "_fs_transfer_type_name = _fs_transfer_present[0]",
         "if any(type(v) is str and (len(v) > 512 or '\\x00' in v) for v in _fs_transfer_values): raise ValueError('Python string exceeds limit or contains NUL')",
         "if any(type(v) in (int, float) and (not _fs_transfer_math.isfinite(v) or abs(v) > 9007199254740991) for v in _fs_transfer_values): raise ValueError('Python number is not finite or safe')",
         "_fs_transfer_json.dumps({'kind': _fs_transfer_kind, 'type': _fs_transfer_type_name, 'values': _fs_transfer_values}, allow_nan=False)"

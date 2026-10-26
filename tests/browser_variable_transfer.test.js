@@ -86,7 +86,9 @@ test("R export validates classless atomic wire values and import uses base assig
   const exported=await m.session.exportVariable("measure");
   assert.deepEqual(exported,{ok:true,value:{kind:"vector",type:"number",values:[1.25,2.5]}});
   assert.match(m.queries[0][0],/bindingIsActive/);
-  assert.match(m.queries[0][0],/is\.finite/);
+  assert.match(m.queries[0][0],/is\.infinite/);
+  assert.match(m.queries[0][0],/is\.nan/);
+  assert.match(m.queries[0][0],/!is\.na/);
   assert.match(m.queries[0][0],/format\(v, digits=17L/);
   assert.equal((await m.session.importVariable("copied",exported.value)).ok,true);
   assert.match(m.queries[1][0],/base::assign\(n, base::c\(1\.25,2\.5\), envir=\.GlobalEnv\)/);

@@ -1,3 +1,19 @@
+## 2026-10-26: bounded CSV export for tabular previews (verification pending)
+
+The browser CSV/TSV viewer now exports all filtered and sorted preview rows
+across pages. The Python/R environment table viewer exports its captured,
+bounded table snapshot (at most 200 rows) with the current filter/sort;
+it does not fetch unseen kernel rows or claim full dataset export.
+RFC-4180 quoting, 8 MiB UTF-8 export limits, shape validation and
+spreadsheet-formula escaping apply. Potential formulas gain a leading
+apostrophe, so these fields do not round-trip byte-for-byte. No new server
+routes, native Flow backend or hosted CI configuration changes.
+
+**Status: partial / local V8 serializer and syntax checks; new Node regression
+tests added but independent Linux/macOS CI, real-browser downloads and
+interpreter acceptance are pending.** This does not establish RStudio parity,
+live R function-level debugging or authenticated remote sessions.
+
 ## 2026-10-26: Jupyter cell IDs and tags (Linux/macOS CI passed)
 
 The .ipynb importer preserves valid nbformat 4.5 cell IDs and bounded

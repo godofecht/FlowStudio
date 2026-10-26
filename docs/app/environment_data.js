@@ -37,8 +37,13 @@ function create({target, document, dataApi}) {
     const grid = document.createElement("div");
     grid.style.overflow = "auto";
     const previous = document.createElement("button"), next = document.createElement("button");
+    const exportButton = document.createElement("button");
+    const exportStatus = document.createElement("span");
+    exportStatus.setAttribute("role", "status");
     previous.textContent = "Previous page";
     next.textContent = "Next page";
+    exportButton.textContent = "Export sampled CSV";
+    exportButton.title = "Download only the bounded table snapshot (up to 200 rows), with current filter and sort; never the complete kernel variable.";
     let page = 0, sortColumn = null, descending = false;
     function render() {
       const view = dataApi.viewRows(tableData, {filter:search.value, page, sortColumn, descending});
@@ -73,7 +78,18 @@ function create({target, document, dataApi}) {
     search.addEventListener("input", () => { page = 0; render(); });
     previous.addEventListener("click", () => { page--; render(); });
     next.addEventListener("click", () => { page++; render(); });
-    holder.append(heading, search, summary, grid, previous, next);
+    exportButton.addEventListener("click", () => {
+      try {
+        const result = dataApi.exportCSV(tableData, {filter:search.value,
+          sortColumn, descending});
+        dataApi.downloadCSV(result.csv, name + "-sampled", document);
+        exportStatus.textContent = "Exported " + result.count +
+          " sampled, filtered rows; this is not a full kernel dataset export.";
+      } catch (error) {
+        exportStatus.textContent = "CSV export failed: " + String(error.message || error);
+      }
+    });
+    holder.append(heading, search, summary, grid, previous, next, exportButton, exportStatus);
     target.replaceChildren(holder);
     current = holder;
     render();

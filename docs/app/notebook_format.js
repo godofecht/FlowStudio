@@ -347,14 +347,16 @@ function bundleCells(source, parseCells) {
   }
   return cells;
 }
-function bundleResults(entries, cells, language, strict) {
+function bundleResults(entries, cells, language, strict, version = 1) {
   if (!Array.isArray(entries) || entries.length > MAX_BUNDLE_RESULTS)
     throw Error("FlowStudio notebook exceeds the 128-result limit.");
   const results = [];
   let previous = -1;
   for (const entry of entries) {
     if (!entry || typeof entry !== "object" ||
-        (strict && !exactKeys(entry, ["index", "language", "ok", "output", "truncated", "plots"])))
+        (strict && !exactKeys(entry, ["index", "language", "ok", "output", "truncated", "plots"]) &&
+          !(version === 2 && exactKeys(entry,
+            ["index", "language", "ok", "output", "truncated", "plots", "jupyterOutputs"]))))
       throw Error("Invalid FlowStudio notebook result.");
     const index = entry.index;
     const cell = Number.isSafeInteger(index) && index >= 0 ? cells[index] : null;
@@ -374,8 +376,17 @@ function bundleResults(entries, cells, language, strict) {
         throw Error("Invalid or oversized notebook PNG.");
       return {png:plot.png};
     });
-    results.push({index, language:selected, ok:entry.ok,
-      output:entry.output, truncated:entry.truncated, plots});
+    const result = {index, language:selected, ok:entry.ok,
+      output:entry.output, truncated:entry.truncated, plots};
+    if (entry.jupyterOutputs !== undefined) {
+      if (version !== 2 || selected === "flow")
+        throw Error("Jupyter output records require a Python/R FlowStudio notebook v2.");
+      const canonical = safeJupyterOutputs(entry.jupyterOutputs, {...entry, plots});
+      if (!canonical || JSON.stringify(canonical) !== JSON.stringify(entry.jupyterOutputs))
+        throw Error("Saved Jupyter output records no longer match the displayed snapshot.");
+      result.jupyterOutputs = canonical;
+    }
+    results.push(result);
     previous = index;
   }
   return results;
@@ -384,8 +395,10 @@ function encodeBundle(source, language, entries, parseCells) {
   if (!["flow", "python", "r"].includes(language))
     throw Error("Unsupported FlowStudio notebook default language.");
   const cells = bundleCells(source, parseCells);
-  const results = bundleResults(entries, cells, language, false);
-  const json = JSON.stringify({format:BUNDLE_FORMAT, version:1, language, source, results}, null, 2) + "\n";
+  const version = Array.isArray(entries) && entries.some(entry =>
+    entry && entry.jupyterOutputs !== undefined) ? 2 : 1;
+  const results = bundleResults(entries, cells, language, false, version);
+  const json = JSON.stringify({format:BUNDLE_FORMAT, version, language, source, results}, null, 2) + "\n";
   checkText(json, MAX_JSON_BYTES, "FlowStudio notebook");
   return json;
 }
@@ -395,11 +408,11 @@ function decodeBundle(json, parseCells) {
   try { data = JSON.parse(json); }
   catch (_) { throw Error("FlowStudio notebook is not valid JSON."); }
   if (!exactKeys(data, ["format", "version", "language", "source", "results"]) ||
-      data.format !== BUNDLE_FORMAT || data.version !== 1 ||
+      data.format !== BUNDLE_FORMAT || ![1, 2].includes(data.version) ||
       !["flow", "python", "r"].includes(data.language))
     throw Error("Not a supported FlowStudio notebook v1.");
   const cells = bundleCells(data.source, parseCells);
-  const results = bundleResults(data.results, cells, data.language, true);
+  const results = bundleResults(data.results, cells, data.language, true, data.version);
   return {language:data.language, source:data.source,
     entries:results.map(result => ({...result, kind:"code", images:[]}))};
 }

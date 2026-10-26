@@ -11,9 +11,10 @@ webR preview-only snapshots. At most 128 previous slice positions are kept.
 Sorting, filtering and CSV export remain explicitly limited to the loaded
 slice; no complete dataset export or new native route is introduced.
 
-**Status: partial / source implementation and six automated regression cases
-committed; Linux/macOS CI, actual Flow/Rscript kernel interaction and
-physical-browser jump interaction not yet independently verified.**
+**Status: partial / source implementation, six automated regression cases
+and an opt-in real-browser native R scenario committed; Linux/macOS CI,
+actual Flow/Rscript jump interaction and physical-browser acceptance not yet
+independently verified.**
 Flow 2.0.0 remains the primary backend. No hosted CI changes.
 This is not live R function-level debugging, authenticated remote sessions
 or RStudio parity.

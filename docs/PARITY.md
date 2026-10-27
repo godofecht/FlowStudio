@@ -1,3 +1,25 @@
+## 2026-10-27: opt-in R data.frame → Python pandas DataFrame (validation pending)
+
+The existing browser-local R → Python Copy variable path now has an explicit
+**R table → pandas DataFrame** option. The native Flow-owned R export and
+bounded typed-table wire protocol remain unchanged. When enabled, the
+persistent Pyodide worker loads real pandas, constructs ordered nullable
+`Float64`, `boolean` and `string` columns (including entirely missing
+columns), and assigns the completed DataFrame to the selected Python
+workspace variable. The default destination remains a dictionary of lists;
+scalar/vector transfers with the pandas option are rejected before import.
+No generated assets or hosted CI workflow changes are required.
+
+**Status: partial / independent CI and physical-browser acceptance pending.**
+The new regression suite covers controller routing, worker preflight,
+unavailable pandas, failed acknowledgements, real CPython pandas 2.2.3
+nullable construction, zero-row tables and failure atomicity. Local CPython
+2.2.3 construction was exercised, but this is not real Pyodide/webR browser
+acceptance. The existing 16-column, 128-row and 32-KiB transfer limits
+remain. No pandas dtype round-trip back to R is promised; R integer storage
+still transfers as numeric. Real knitr rendering, live R function stepping,
+authenticated remote sessions and RStudio feature parity remain outstanding.
+
 ## 2026-10-27: fail-closed R Markdown YAML metadata (Linux/macOS CI passed)
 
 R Markdown import and export now refuse executable YAML tags such as `!expr`,

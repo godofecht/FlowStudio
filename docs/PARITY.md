@@ -1,4 +1,4 @@
-## 2026-10-27: fail-closed R Markdown YAML metadata (validation pending)
+## 2026-10-27: fail-closed R Markdown YAML metadata (Linux/macOS CI passed)
 
 R Markdown import and export now refuse executable YAML tags such as `!expr`,
 anchors/aliases, block scalars, collections, embedded comments and other
@@ -7,10 +7,18 @@ existing `output: html_document` restriction remains in force. Ordinary
 single-line literal metadata, including quoted Unicode titles, is preserved
 without execution. Regression tests cover both directions and safe round trips.
 
-**Status: implemented / local scalar-gate assertions passed; independent CI
-and real knitr rendering are not yet verified.** This closes an import/export
-safety gap but does not add knitr rendering, physical-browser acceptance,
-resumable R debugging, authenticated remote sessions or RStudio parity.
+**Status: partial / independent Linux/macOS source and native CI passed.**
+[PR #95](https://github.com/godofecht/FlowStudio/pull/95) merged as
+[d6f67f5](https://github.com/godofecht/FlowStudio/commit/d6f67f5c2c738602d4128492c2cf65f31b21391e)
+after [CI #40451725324](https://github.com/godofecht/FlowStudio/actions/runs/40451725324)
+passed all four Ubuntu 24.04/macOS 14 jobs on 27 October 2026. Both source
+jobs ran 823 JavaScript tests (818 passed, five skipped, zero failures),
+including both new YAML rejection/round-trip cases. Both native jobs compiled
+Flow 2.0.0, passed real Rscript/HTTP acceptance and packaged the executable.
+The local scalar-gate assertions also passed (7 accepted, 15 rejected).
+This closes an import/export safety gap but does not add real knitr rendering,
+physical-browser acceptance, resumable R debugging, authenticated remote
+sessions or RStudio parity.
 
 ## 2026-10-27: bounded pandas DataFrame → R data.frame transfer (Linux/macOS CI passed)
 

@@ -57,9 +57,10 @@ function validateValues(type, values, allowMissing) {
     }
   }
 }
-function create({direction, source, destination, button, python, rSession,
+function create({direction, source, destination, button, pandas = null, python, rSession,
                  notice, isBusy, setBusy, generation, refresh = async () => {}}) {
   if (![direction, source, destination, button].every(Boolean) ||
+      (pandas !== null && typeof pandas.checked !== "boolean") ||
       [python, rSession, notice, isBusy, setBusy, generation, refresh].some(fn => typeof fn !== "function"))
     throw TypeError("Variable transfer requires controls and runtime callbacks.");
   async function transfer() {
@@ -81,13 +82,16 @@ function create({direction, source, destination, button, python, rSession,
       if (generation() !== epoch) throw Error("Session changed during transfer.");
       if (!origin || origin.ok !== true) throw Error(origin?.output || "Source variable could not be exported.");
       const packet = validate(origin.value);
+      const asPandas = route === "r-to-python" && pandas?.checked === true;
+      if (asPandas && packet.kind !== "table")
+        throw Error("Pandas destination requires an R data.frame.");
       const target = route === "python-to-r" ? await rSession().importVariable(to, packet) :
-        await python("import", to, packet);
+        await python(asPandas ? "import-pandas" : "import", to, packet);
       if (generation() !== epoch) throw Error("Session changed during transfer.");
       if (!target || target.ok !== true) throw Error(target?.output || "Destination rejected transfer.");
       await refresh(route === "python-to-r" ? "r" : "python");
       if (generation() !== epoch) throw Error("Session changed during transfer.");
-      notice("Transferred " + from + " to " + to + " (" + (packet.kind === "table" ? packet.columns.length + " table columns" : packet.type + " " + packet.kind) + ").");
+      notice("Transferred " + from + " to " + to + " (" + (packet.kind === "table" ? packet.columns.length + " table columns" : packet.type + " " + packet.kind) + (asPandas ? " as pandas DataFrame" : "") + ").");
       return true;
     } catch (error) {
       if (generation() === epoch) notice("Variable transfer failed: " + String(error.message || error).slice(0, 300));

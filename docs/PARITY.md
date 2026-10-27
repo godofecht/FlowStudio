@@ -1,3 +1,24 @@
+## 2026-10-27: bounded NumPy ndarray → R vector transfer (verification pending)
+
+The existing browser-local Python → R Copy variable action now accepts exact
+one-dimensional NumPy ndarrays of 1–256 elements through the same typed vector
+packet as plain Python lists. Approved native dtypes are signed/unsigned
+8/16/32/64-bit integers, float16/32/64 and boolean. Numeric values must be
+finite and within JavaScript's safe-integer bound; floating NaN becomes a typed
+missing value when other values establish the numeric type. Unsupported
+dtypes, complex/object arrays, ndarray subclasses, unsafe integers, empty,
+all-missing, multidimensional and oversized arrays are rejected before
+transferring. NumPy must already be imported in the Python session; ordinary
+lists do not require it. The receiving R vector remains a double/logical
+vector; exact NumPy dtype is not preserved. No Flow route, interpreter,
+dependency, or hosted CI configuration changed.
+
+**Status: partial / worker syntax and mock-response dispatch checked locally;
+real NumPy CPython acceptance and independent CI pending.** New regression
+tests execute the actual worker-generated Python query with NumPy and require
+it in source CI via the existing pinned pandas dependency. Physical-browser
+Pyodide/webR acceptance and RStudio feature parity remain unverified.
+
 ## 2026-10-27: fail-closed identity checks for destructive browser project operations (Linux/macOS CI passed)
 
 Project-file deletion and rename now refuse destructive operations when the

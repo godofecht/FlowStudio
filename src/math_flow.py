@@ -422,7 +422,7 @@ def simulate(model: Model, *, grid: int | None = None, until: float | None = Non
         raise FlowMathError("Time step violates conservative advection/diffusion stability bound")
     # The positive operator -D_backward G_forward is symmetric positive
     # semidefinite. Zero-mean pressure removes its periodic nullspace.
-     def pressure_solve(rhs):
+    def pressure_solve(rhs):
         b = -rhs + np.mean(rhs)
         solution = np.zeros_like(b)
         residual = b.copy()

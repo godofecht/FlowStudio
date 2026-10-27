@@ -367,7 +367,6 @@ def initial_component(tokens: list[str], x, y):
     source = source.replace("π", "*pi*").replace("−", "-")
     source = source.replace("m/s", "").replace("m", "")
     source = re.sub(r"(?<=\d)(?=[A-Za-z_(])", "*", source)
-    source = source.replace("**", "^") if False else source
     try:
         tree = ast.parse(source, mode="eval")
     except SyntaxError as exc:
@@ -421,12 +420,33 @@ def simulate(model: Model, *, grid: int | None = None, until: float | None = Non
     if dt * max(np.max(np.abs(u)) / dx + np.max(np.abs(v)) / dy,
                 2 * model.viscosity * (1 / dx**2 + 1 / dy**2)) > .8:
         raise FlowMathError("Time step violates conservative advection/diffusion stability bound")
-    # D_backward G_forward is the exact discrete Laplacian used in projection.
-    kx = np.fft.fftfreq(nx)
-    ky = np.fft.fftfreq(ny)
-    eigen = -4 * ((np.sin(np.pi * kx) / dx)**2)[:, None] \
-            -4 * ((np.sin(np.pi * ky) / dy)**2)[None, :]
-    eigen[0, 0] = 1.0
+    # The positive operator -D_backward G_forward is symmetric positive
+    # semidefinite. Zero-mean pressure removes its periodic nullspace.
+     def pressure_solve(rhs):
+        b = -rhs + np.mean(rhs)
+        solution = np.zeros_like(b)
+        residual = b.copy()
+        direction = residual.copy()
+        rr = float(np.sum(residual * residual))
+        initial_norm = math.sqrt(rr)
+        if initial_norm == 0.0:
+            return solution
+        threshold = model.tolerance * initial_norm
+        for _ in range(min(8 * max(nx, ny), 5000)):
+            applied = -laplacian(direction)
+            denom = float(np.sum(direction * applied))
+            if denom <= 0:
+                raise FlowMathError("Pressure conjugate gradient lost positive definiteness")
+            alpha = rr / denom
+            solution += alpha * direction
+            residual -= alpha * applied
+            next_rr = float(np.sum(residual * residual))
+            if math.sqrt(next_rr) <= threshold:
+                return solution - np.mean(solution)
+            beta = next_rr / rr
+            direction = residual + beta * direction
+            rr = next_rr
+        raise FlowMathError("Pressure conjugate gradient did not converge")
 
     def forward(a, axis, h):
         return (np.roll(a, -1, axis=axis) - a) / h
@@ -446,9 +466,7 @@ def simulate(model: Model, *, grid: int | None = None, until: float | None = Non
 
     def project(a, b, stage_dt):
         rhs = divergence(a, b) * model.density / stage_dt
-        transformed = np.fft.fft2(rhs)
-        transformed[0, 0] = 0
-        pressure = np.fft.ifft2(transformed / eigen).real
+        pressure = pressure_solve(rhs)
         return (a - stage_dt * forward(pressure, 0, dx) / model.density,
                 b - stage_dt * forward(pressure, 1, dy) / model.density, pressure)
 
@@ -477,7 +495,7 @@ def simulate(model: Model, *, grid: int | None = None, until: float | None = Non
             "kinetic_energy": energy,
             "vorticity_rms": float(np.sqrt(np.mean(vorticity*vorticity))),
             "pressure_mean": float(np.mean(pressure)),
-            "pressure_solver": "periodic FFT exact inverse of D_backward G_forward"}
+            "pressure_solver": "conjugate gradient of periodic -D_backward G_forward"}
 
 
 def main() -> int:

@@ -129,6 +129,62 @@ function bufferIdentifiers(source, prefix, language, cursorLimit) {
   return found;
 }
 
+/* Complete only names already present in the native R inspector's bounded,
+ * inert list metadata. Never evaluate R expressions or infer S3 methods. */
+const R_MEMBER = /^(?:[A-Za-z]|\.[A-Za-z_])[A-Za-z0-9._]{0,79}$/;
+const R_RESERVED = new Set(["if", "else", "repeat", "while", "function",
+  "for", "in", "next", "break", "TRUE", "FALSE", "NULL", "Inf", "NaN",
+  "NA", "NA_integer_", "NA_real_", "NA_complex_", "NA_character_"]);
+const rSafeName = name => R_MEMBER.test(name) && !R_RESERVED.has(name);
+function rMemberContext(lineBeforeCursor) {
+  if (typeof lineBeforeCursor !== "string" || lineBeforeCursor.length > 4096) return null;
+  let masked = "", quote = null;
+  for (let i = 0; i < lineBeforeCursor.length; i++) {
+    const c = lineBeforeCursor[i];
+    if (quote) {
+      masked += " ";
+      if (c === "\\") { if (++i < lineBeforeCursor.length) masked += " "; }
+      else if (c === quote) quote = null;
+    } else if (c === "#") break;
+    else if (c === "'" || c === '"' || c === "\x60") { quote = c; masked += " "; }
+    else masked += c;
+  }
+  const name = "(?:[A-Za-z]|\\.[A-Za-z_])[A-Za-z0-9._]{0,79}";
+  const pattern = new RegExp("(?:^|[^A-Za-z0-9._$])(" + name +
+    "(?:\\$" + name + "){0,2})\\$([A-Za-z._][A-Za-z0-9._]{0,79})?$");
+  const match = pattern.exec(masked);
+  if (!match) return null;
+  const path = match[1].split("$");
+  if (!path.every(rSafeName)) return null;
+  return { path, prefix: match[2] || "" };
+}
+function rListMembers(variables, path, prefix = "") {
+  if (!Array.isArray(variables) || !Array.isArray(path) ||
+      path.length < 1 || path.length > 3 || !path.every(rSafeName) ||
+      typeof prefix !== "string" || prefix.length > 80 ||
+      (prefix && !/^[A-Za-z._][A-Za-z0-9._]*$/.test(prefix))) return [];
+  let node = variables.slice(0, 128).find(item =>
+    item && item.name === path[0] && item.type === "list");
+  for (const part of path.slice(1)) {
+    if (!node || !Array.isArray(node.children) || node.children.length > 12) return [];
+    node = node.children.find(item => {
+      if (!item || typeof item.name !== "string") return false;
+      const match = /^\[\[[1-9][0-9]{0,3}\]\] (.+)$/.exec(item.name);
+      return match && match[1] === part && item.type === "list";
+    });
+  }
+  if (!node || !Array.isArray(node.children) || node.children.length > 12) return [];
+  const found = new Set();
+  for (const child of node.children) {
+    if (!child || typeof child.name !== "string") continue;
+    const match = /^\[\[[1-9][0-9]{0,3}\]\] (.+)$/.exec(child.name);
+    const name = match && match[1];
+    if (name && rSafeName(name) && name.startsWith(prefix)) found.add(name);
+  }
+  return [...found].sort().slice(0, MAX_ITEMS)
+    .map(name => ({label:name, kind:"variable", insert:name}));
+}
+
 function suggestionsFor(language, data) {
   if (!["flow", "python", "r"].includes(language)) return [];
   const prefix = data.prefix || "";
@@ -150,7 +206,7 @@ function suggestionsFor(language, data) {
 }
 
 const api = Object.freeze({ suggestionsFor, flowSymbols, bufferIdentifiers,
-  validPrefix, SNIPPETS, KEYWORDS, MAX_ITEMS });
+  validPrefix, rMemberContext, rListMembers, SNIPPETS, KEYWORDS, MAX_ITEMS });
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 global.FlowStudioCompletionCore = api;
 })(globalThis);

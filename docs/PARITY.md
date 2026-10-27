@@ -1,3 +1,9 @@
+## 2026-10-27: native Monaco R list member completion (PR #89)
+
+The native Monaco provider derives bounded, syntax-safe `$` member suggestions for ordinary R lists from existing `POST /api/inspect/r` metadata. It supports nested list members, rejects invalid identifiers and active bindings, and preserves receiver text during insertion. The shipped `web/ui/workbench.js` was rebuilt with the pinned npm toolchain. The integrated source passed 918 Node tests (26 skipped) in the real GitHub Actions Linux job.
+
+**Status: implementation tested in Node and native bundle generated; physical Chromium acceptance pending.** No R source is executed to obtain suggestions. The inspector may still force lazy root promises. RStudio feature parity is not claimed.
+
 ## 2026-10-27: restricted Quarto .qmd R/Python source interchange (CI pending)
 
 Browser notebook controls can import and export Quarto HTML source with

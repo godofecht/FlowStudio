@@ -89,7 +89,7 @@ Real CPython/NumPy tests and Rscript acceptance when available are included
 in `tests/browser_variable_transfer_numpy_matrix.test.js`. Independent CI
 and physical-browser Pyodide/webR acceptance have not yet been verified.
 
-## 2026-10-27: opt-in homogeneous R data.frame → NumPy 2D ndarray (CI pending)
+## 2026-10-27: opt-in homogeneous R data.frame → NumPy 2D ndarray (CI passed)
 
 The browser Copy variable operation now accepts an ordinary R data.frame as
 an explicit NumPy destination only when every column has the same wire type.
@@ -102,9 +102,32 @@ transfers are unchanged. R column names, integer storage, factors and custom
 row names are not preserved in the ndarray. Existing table protocol limits
 (1–16 columns, 1–128 rows, 32 KiB) apply.
 
-**Status: partial / source and real-CPython regression tests committed;
-independent Linux/macOS CI and physical Chromium Pyodide/webR execution
-pending.** Tests cover exact NumPy shape/dtype, Unicode, missing numeric
+**Status: partial / four Linux/macOS CI jobs passed in [PR #106](https://github.com/godofecht/FlowStudio/pull/106) ([CI #40534281335](https://github.com/godofecht/FlowStudio/actions/runs/40534281335)); physical Chromium Pyodide/webR execution pending.** Tests cover exact NumPy shape/dtype, Unicode, missing numeric
 cells, invalid tables and destination preservation on constructor failure.
 This is not general R matrix identity interchange or RStudio parity.
 
+
+## 2026-10-27: plain R matrix → NumPy ndarray (independent validation pending)
+
+The browser-local R → Python **Copy variable** operation now accepts exact
+unlabelled, unclassed, two-dimensional base R matrices of numeric, integer,
+logical or character storage. The existing webR exporter converts the matrix
+into a bounded typed table with V1–V16 column names, and the existing NumPy
+worker constructs a real two-dimensional ndarray in the persistent Python
+session when the NumPy destination is selected. Matrix rows and columns retain
+their order (R is column-major). Ordinary default dictionary transfers remain
+available. Numeric missing values become NaN; logical and character matrices
+with missing cells are rejected in NumPy mode.
+
+The exporter rejects dimnames, custom attributes, classed matrices, zero-sized
+matrices, dimensions beyond 128 rows or 16 columns, unsafe numbers and invalid
+strings. The 32-KiB wire limit remains. This conversion does **not** preserve
+R matrix identity in the wire protocol, original column names, integer storage
+width or other R attributes. It is not an R matrix round-trip: Python → R
+still imports the same typed table as an R data.frame.
+
+`tests/browser_variable_transfer_r_matrix.test.js` checks the webR query,
+worker handoff, real CPython/NumPy construction, Unicode, and actual Rscript
+matrix acceptance/rejection where installed. Native verification now requires
+that test with Rscript. **Status: partial; Linux/macOS CI and physical
+Chromium Pyodide/webR execution not yet verified.**

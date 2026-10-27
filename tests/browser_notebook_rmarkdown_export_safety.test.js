@@ -45,3 +45,47 @@ test("ordinary fenced code and escaped inline examples remain inert", () => {
   const normal = encode("# %% [markdown]\n# Analysis\n# %% [r]\nprint(42)\n", "r", parseCells);
   assert.ok(normal.includes(fence + "{r}\nprint(42)\n" + fence));
 });
+
+
+test("R Markdown import and export reject executable YAML tags and structured metadata", () => {
+  const unsafe = [
+    "title: !expr system('touch /tmp/flowstudio-yaml-executed')",
+    "author: !expr Sys.getenv('HOME')",
+    "date: !include /tmp/secret",
+    "title: &anchor Research",
+    "title: *alias",
+    "title: |",
+    "title: >",
+    "title: [one, two]",
+    "title: {x: 1}",
+    "title: hello # comment",
+    "title: hello: nested",
+    "title: ${unsafe}",
+    "title: " + JSON.stringify("a".repeat(257))
+  ];
+  for (const field of unsafe) {
+    const input = "---\n" + field + "\noutput: html_document\n---\n\n# Notes\n";
+    assert.throws(() => decode(input, parseCells), /YAML scalar/,
+      "Import accepted unsafe metadata: " + field);
+    assert.throws(() => encode(markdown(input), "r", parseCells), /YAML scalar/,
+      "Export accepted unsafe metadata: " + field);
+  }
+});
+
+test("R Markdown import and export preserve inert literal YAML scalars", () => {
+  const safe = [
+    "title: 'Research: phase 2'",
+    "title: \"!expr system('not executed')\"",
+    "title: 'O''Brien'",
+    "author: Ada Lovelace",
+    "date: 2026-10-27",
+    "title: 'Résumé'"
+  ];
+  for (const field of safe) {
+    const input = "---\n" + field + "\noutput: html_document\n---\n\n# Notes\n";
+    const imported = decode(input, parseCells);
+    assert.equal(imported.metadataDiscarded, false);
+    assert.ok(encode(imported.source, imported.language, parseCells).includes(field));
+    assert.ok(encode(markdown(input), "r", parseCells).includes(field));
+  }
+});

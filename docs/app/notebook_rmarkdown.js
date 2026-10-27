@@ -16,6 +16,16 @@ function fenceFor(code) {
   }
   return TICK.repeat(Math.max(3, longest + 1));
 }
+/* Imported Markdown is inert, but YAML !expr and tags can execute in knitr.
+ * Preserve only a single-line literal scalar; reject tags, anchors, aliases,
+ * collections, block scalars, YAML comments and escape sequences. */
+function safeYamlScalar(value) {
+  const text = value.trim();
+  if (!text || text.length > 256 || /[\x00-\x1f\x7f]/.test(value)) return false;
+  if (/^'(?:[^']|'')*'$/.test(text) || /^"[^"\\]*"$/.test(text)) return true;
+  return /^[\p{L}\p{N}][\p{L}\p{N} .,_'()+/:-]*$/u.test(text) &&
+    !/:\s|(?:^|\s)#/.test(text);
+}
 function preservedFrontmatter(body) {
   if (!body.startsWith("---\n")) return null;
   const lines = body.split("\n");
@@ -31,6 +41,8 @@ function preservedFrontmatter(body) {
     if (!match || seen.has(match[1].toLowerCase()))
       throw new Error("Unsupported R Markdown YAML metadata.");
     seen.add(match[1].toLowerCase());
+    if (match[1].toLowerCase() !== "output" && !safeYamlScalar(match[2]))
+      throw new Error("Unsupported R Markdown YAML scalar; executable tags and complex values are forbidden.");
     if (match[1].toLowerCase() === "output" &&
         !/^(?:html_document|"html_document"|'html_document')$/.test(match[2].trim()))
       throw new Error("Only R Markdown html_document output is supported.");

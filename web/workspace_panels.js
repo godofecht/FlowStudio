@@ -38,17 +38,62 @@ function mountPanel(name, thing, run) {
 
 /* Examples first: a curated gallery must load even if debug wiring changes. */
 mountPanel("FlowStudioExamples", global.FlowStudioExamples, Examples => {
+  const openedProjects = new Map();
+  function syncDoc(doc, file) {
+    const documents = global.FlowStudioApp.documents;
+    if (doc && !doc.dirty) documents.setText(doc.id, file.text);
+    else if (!doc) {
+      const created = documents.open({ name: file.name, text: file.text,
+        language: file.language, baseline: "" });
+      return created.document.id;
+    }
+    return doc.id;
+  }
+  function activateEntry(entry) {
+    global.FlowStudioApp.activateDocument(entry.id);
+    language.value = entry.language;
+    language.dispatchEvent(new Event("change"));
+  }
   Examples.mount(global.document, {
     host: el("examplesHost"),
+    onOpenProject: (example) => {
+      try {
+        const documents = global.FlowStudioApp.documents;
+        if (!example.files.length) {
+          el("resultStatus").textContent = "This example runs in the console instead.";
+          el("resultStatus").dataset.state = "ok";
+          return;
+        }
+        const known = openedProjects.get(example.id) || [];
+        const docIds = [];
+        for (const file of example.files) {
+          const existing = known.find(id => {
+            const doc = documents.find(id);
+            return doc && doc.name === file.name && doc.language === file.language;
+          });
+          docIds.push(syncDoc(documents.find(existing), file));
+        }
+        openedProjects.set(example.id, docIds);
+        const entryId = docIds[0];
+        activateEntry({ id: entryId, language: example.files[0].language });
+        el("resultStatus").textContent = "Opened " + example.title + " as " +
+          docIds.length + " editor tab(s).";
+        el("resultStatus").dataset.state = "ok";
+        if (typeof global.console !== "undefined" && global.console.log) {
+          global.console.log("FlowStudioExamples opened " + example.id +
+            " (" + docIds.length + " buffers).");
+        }
+      } catch (error) {
+        el("resultStatus").textContent = error.message || String(error);
+        el("resultStatus").dataset.state = "error";
+      }
+    },
     onOpen: (example, file) => {
       try {
         const current = global.FlowStudioApp.documents.active();
         if (current) global.FlowStudioApp.documents.setText(current.id, document.getElementById("source").value);
-        const opened = global.FlowStudioApp.documents.open({ name: file.name,
-          text: file.text, language: file.language, baseline: "" });
-        global.FlowStudioApp.activateDocument(opened.document.id);
-        language.value = file.language;
-        language.dispatchEvent(new Event("change"));
+        const openedId = syncDoc(null, file);
+        activateEntry({ id: openedId, language: file.language });
         el("resultStatus").textContent = "Opened example: " + example.title;
         el("resultStatus").dataset.state = "ok";
       } catch (error) {

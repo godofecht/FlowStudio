@@ -143,42 +143,68 @@ function validate() {
 }
 
 function mount(document, options) {
-  const { host, onOpen, onDemo, notice = () => {} } = options || {};
+  const { host, onOpen, onOpenProject, onDemo, notice = () => {} } = options || {};
   if (!host) throw new TypeError("Examples gallery needs a host element.");
   const problem = validate();
   if (problem) throw new Error("Examples dataset problem: " + problem);
-  if (typeof onOpen !== "function" || (onDemo && typeof onDemo !== "function"))
-    throw new TypeError("Examples gallery needs onOpen and onDemo callbacks.");
+  if (typeof onOpen !== "function" ||
+      (onOpenProject && typeof onOpenProject !== "function") ||
+      (onDemo && typeof onDemo !== "function"))
+    throw new TypeError("Examples gallery needs onOpen and optional onOpenProject and onDemo callbacks.");
   for (const example of EXAMPLES) {
     const card = document.createElement("section");
     card.className = "example-card";
+    const head = document.createElement("div");
+    head.className = "example-head";
     const title = document.createElement("h3");
     title.textContent = example.title;
-    card.append(title);
+    head.append(title);
+    const langs = document.createElement("span");
+    langs.className = "example-langs";
+    const kinds = [...new Set(example.files.map(file => file.language))];
+    langs.textContent = kinds.length ? kinds.join(" · ") : "Python + R (one-shot)";
+    head.append(langs);
+    card.append(head);
     const description = document.createElement("p");
     description.className = "muted";
     description.textContent = example.description;
     card.append(description);
-    for (const file of example.files) {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.textContent = "Open " + file.name + " (" + file.language + ")";
-      button.addEventListener("click", () => onOpen(example, file));
-      card.append(button);
+    if (onOpenProject && !example.demoRoute) {
+      const primary = document.createElement("button");
+      primary.type = "button";
+      primary.className = "primary";
+      primary.textContent = "Open project in editor (" + example.files.length + " " +
+        (example.files.length === 1 ? "file" : "files") + ")";
+      primary.addEventListener("click", () => onOpenProject(example));
+      card.append(primary);
     }
     if (example.demoRoute && onDemo) {
       const demo = document.createElement("button");
       demo.type = "button";
-      demo.textContent = "Run demo (Python + R)";
+      demo.textContent = "Run demo in the console (Python + R)";
       demo.addEventListener("click", () => onDemo(example));
       card.append(demo);
     }
-    const steps = document.createElement("ol");
+    for (const file of example.files) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "example-file-btn";
+      button.textContent = file.name + " · " + file.language;
+      button.addEventListener("click", () => onOpen(example, file));
+      card.append(button);
+    }
+    const steps = document.createElement("details");
+    steps.className = "example-runbook";
+    const summary = document.createElement("summary");
+    summary.textContent = "How to run";
+    steps.append(summary);
+    const ordered = document.createElement("ol");
     for (const step of example.steps) {
       const item = document.createElement("li");
       item.textContent = step;
-      steps.append(item);
+      ordered.append(item);
     }
+    steps.append(ordered);
     card.append(steps);
     host.append(card);
   }

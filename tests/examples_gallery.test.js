@@ -48,3 +48,37 @@ test("gallery mounts example cards with open and demo actions", () => {
   assert.ok(opened.length >= 1, "open callback fired for file buttons");
   assert.ok(demos.includes("python-r-handshake"), "one-shot demo wired");
 });
+
+test("primary open-project action loads every example file at once", () => {
+  const opened = [];
+  const demos = [];
+  const created = [];
+  const doc = {
+    createElement(tag) {
+      const node = { tag, children: [], textContent: "", className: "",
+        listeners: {}, append(...nodes) { node.children.push(...nodes); } };
+      node.addEventListener = (name, fn) => { node.listeners[name] = fn; };
+      created.push(node);
+      return node;
+    }
+  };
+  let card = null;
+  const host = { children: [], append(node) { card = node; host.children.push(node); } };
+  gallery.mount(doc, {
+    host,
+    onOpen: example => opened.push([example.id, "single"]),
+    onOpenProject: example => opened.push([example.id, "project"]),
+    onDemo: example => demos.push(example.id)
+  });
+  const examples = gallery.examples();
+  const cards = host.children;
+  assert.equal(cards.length, examples.length);
+  for (const card of cards) for (const child of card.children)
+    if (child.listeners) child.listeners.click?.();
+  const flowExample = examples.find(example => example.id === "flow-backend-mlir");
+  assert.ok(opened.some(fired => fired[0] === "flow-backend-mlir" && fired[1] === "project"),
+    "flow example exposes one-shot project open");
+  assert.ok(demos.includes("python-r-handshake"));
+  const chipNodes = created.filter(node => node.className === "example-langs");
+  assert.ok(chipNodes.length >= 3, "every card shows language chips");
+});

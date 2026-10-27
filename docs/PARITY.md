@@ -1,4 +1,4 @@
-## 2026-10-27: fail-closed identity checks for destructive browser project operations (PR validation pending)
+## 2026-10-27: fail-closed identity checks for destructive browser project operations (Linux/macOS CI passed)
 
 Project-file deletion and rename now refuse destructive operations when the
 browser cannot establish that the current directory entry is the originally
@@ -9,8 +9,16 @@ verification, so typing during that read cannot silently discard an unsaved
 edit. Rename checks source identity and destination distinctness before
 writing, and only cleans up a verified empty destination after failed copying.
 
-**Status: partial / implementation and regression tests submitted; independent
-Linux/macOS CI and physical-browser File System Access acceptance pending.**
+**Status: partial / independent Linux/macOS source and native CI passed;
+physical-browser File System Access acceptance pending.**
+[PR #101](https://github.com/godofecht/FlowStudio/pull/101)
+passed all four Ubuntu 24.04/macOS 14 jobs in
+[CI #40491600189](https://github.com/godofecht/FlowStudio/actions/runs/40491600189)
+on 27 October 2026. Both source platforms completed 873 JavaScript tests
+(868 passed, five skipped, zero failures), including all four new destructive
+file-operation regressions. Both native platforms compiled pinned Flow 2.0.0,
+passed live Rscript/HTTP acceptance and packaged executables. No local
+physical-browser test was executed.
 This is not an atomic filesystem transaction. The browser File System Access
 API cannot prevent an external process from replacing or modifying a file
 between the final check and `removeEntry`, nor guarantee exclusive creation

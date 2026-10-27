@@ -2,7 +2,7 @@
 (function (global) {
 "use strict";
 function create({projectApi, fileSaveApi, source, filename, language, tree,
-                 openFolderButton, saveFileButton, saveAsButton, newFileButton, newFolderButton, deleteFileButton, renameFileButton, status,
+                 openFolderButton, saveFileButton, reloadFileButton, saveAsButton, newFileButton, newFolderButton, deleteFileButton, renameFileButton, status,
                  setFilename, onDraft, picker, saveAsPicker, saveAsApi, projectRenameApi, confirmChange, promptName}) {
   if (!projectApi || !fileSaveApi) throw new TypeError("Project and save APIs are required.");
   let activeHandle = null;
@@ -22,6 +22,7 @@ function create({projectApi, fileSaveApi, source, filename, language, tree,
     diskBaseline = null;
     editorBaseline = source.value;
     saveFileButton.disabled = true;
+    if (reloadFileButton) reloadFileButton.disabled = true;
   }
   async function openHandle(handle, path, parent) {
     if (deleting || saving) return false;
@@ -47,6 +48,7 @@ function create({projectApi, fileSaveApi, source, filename, language, tree,
     diskBaseline = text;
     editorBaseline = text;
     saveFileButton.disabled = false;
+    if (reloadFileButton) reloadFileButton.disabled = false;
     onDraft();
     status("Opened " + path);
     return true;
@@ -76,6 +78,52 @@ function create({projectApi, fileSaveApi, source, filename, language, tree,
       return false;
     } finally { saving = false; }
   }
+  async function reloadFile() {
+    if (saving || deleting) { status("File operation already running."); return false; }
+    if (!activeHandle) { status("Open a project file before reloading from disk."); return false; }
+    if (dirty() && !confirmChange("Discard unsaved editor changes and reload from disk?"))
+      return false;
+    const handle = activeHandle, parent = activeParent, name = activeName;
+    const previousSource = source.value;
+    saving = true; // Serialize reload with project switching and all disk mutations.
+    try {
+      let current = handle;
+      async function checkIdentity() {
+        if (!parent || !name) return;
+        if (typeof parent.getFileHandle !== "function")
+          throw new Error("Cannot verify the project file location.");
+        const found = await parent.getFileHandle(name);
+        const same = typeof found.isSameEntry === "function"
+          ? await found.isSameEntry(handle)
+          : typeof handle.isSameEntry === "function"
+            ? await handle.isSameEntry(found) : false;
+        if (!same) throw new Error("Project file was replaced or cannot be verified.");
+        current = found;
+      }
+      await checkIdentity();
+      const disk = await fileSaveApi.readSnapshot(current);
+      await checkIdentity();
+      if (await fileSaveApi.readSnapshot(current) !== disk)
+        throw new Error("File changed during reload; retry.");
+      if (activeHandle !== handle || source.value !== previousSource)
+        throw new Error("Editor changed during reload; source retained.");
+      if (disk === diskBaseline && disk === previousSource) {
+        status("Source already matches disk.");
+        return true;
+      }
+      source.value = disk;
+      diskBaseline = disk;
+      editorBaseline = disk;
+      // The filename callback also invalidates notebook outputs from old source.
+      if (disk !== previousSource) setFilename(name || handle.name, filename.textContent);
+      onDraft();
+      status("Reloaded " + filename.textContent + " from disk.");
+      return true;
+    } catch (error) {
+      status("Reload failed: " + (error.message || String(error)));
+      return false;
+    } finally { saving = false; }
+  }
   async function saveAs() {
     if (saving || deleting) { status("File operation already running."); return false; }
     saving = true;
@@ -102,6 +150,7 @@ function create({projectApi, fileSaveApi, source, filename, language, tree,
       else if (extension === "r") language.value = "r";
       setFilename(result.name, result.name);
       saveFileButton.disabled = false;
+      if (reloadFileButton) reloadFileButton.disabled = false;
       if (deleteFileButton) deleteFileButton.disabled = true;
       if (renameFileButton) renameFileButton.disabled = true;
       onDraft();
@@ -171,6 +220,7 @@ function create({projectApi, fileSaveApi, source, filename, language, tree,
       diskBaseline = null;
       editorBaseline = "";
       saveFileButton.disabled = true;
+      if (reloadFileButton) reloadFileButton.disabled = true;
       if (deleteFileButton) deleteFileButton.disabled = true;
       if (renameFileButton) renameFileButton.disabled = true;
       const extension = name.includes(".") ? "." + name.split(".").pop() : ".txt";
@@ -226,12 +276,14 @@ function create({projectApi, fileSaveApi, source, filename, language, tree,
   }
   openFolderButton.addEventListener("click", () => { void choose(); });
   saveFileButton.addEventListener("click", () => { void save(); });
+  if (reloadFileButton) reloadFileButton.addEventListener("click", () => { void reloadFile(); });
   if (saveAsButton) saveAsButton.addEventListener("click", () => { void saveAs(); });
   newFileButton.addEventListener("click", () => { void createFile(); });
   if (newFolderButton) newFolderButton.addEventListener("click", () => { void createFolder(); });
   if (deleteFileButton) deleteFileButton.addEventListener("click", () => { void deleteFile(); });
   if (renameFileButton) renameFileButton.addEventListener("click", () => { void renameFile(); });
   saveFileButton.disabled = true;
+  if (reloadFileButton) reloadFileButton.disabled = true;
   if (deleteFileButton) deleteFileButton.disabled = true;
   if (renameFileButton) renameFileButton.disabled = true;
   async function isOpenHandle(handle) {
@@ -245,7 +297,7 @@ function create({projectApi, fileSaveApi, source, filename, language, tree,
     // risk overwriting a file currently held in the editor.
     throw new Error("Cannot verify whether the project file is open in the editor.");
   }
-  return {project, choose, save, saveAs, createFile, createFolder, deleteFile, renameFile, openHandle, notifyExternalOpen, dirty,
+  return {project, choose, save, reloadFile, saveAs, createFile, createFolder, deleteFile, renameFile, openHandle, notifyExternalOpen, dirty,
     isOpenHandle, hasActiveFile: () => activeHandle !== null};
 }
 const api = {create};

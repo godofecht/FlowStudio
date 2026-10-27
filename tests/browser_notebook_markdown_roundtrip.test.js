@@ -89,10 +89,13 @@ test("altered Markdown display snapshot is rejected for .ipynb and .fsnb export"
     /no longer match the displayed snapshot/);
 });
 
-test("oversized Markdown snapshots are not exported as successful display records", () => {
+test("oversized Markdown snapshots are truncated and lose Jupyter MIME provenance", () => {
   const imported = format.decode(ipynb([display({"text/markdown":"a".repeat(131073)})]));
   assert.equal(imported.ignoredOutputs, true);
-  assert.equal(imported.entries.length, 0);
+  assert.equal(imported.entries.length, 1);
+  assert.equal(imported.entries[0].output.length, 131072);
+  assert.equal(imported.entries[0].truncated, true);
+  assert.equal(imported.entries[0].jupyterOutputs, undefined);
 });
 
 test("oversized plain fallback cannot hide behind a small Markdown representation", () => {

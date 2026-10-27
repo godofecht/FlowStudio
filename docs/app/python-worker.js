@@ -10,24 +10,46 @@ let serial = Promise.resolve();
 const MAX_QUEUED = 32;
 const MAX_OUTPUT = 131072;
 const TRANSFER_NAME = /^[A-Za-z][A-Za-z0-9_]{0,79}$/;
-function validTransferPacket(packet) {
-  if (!packet || typeof packet !== "object" || Array.isArray(packet) ||
-      Object.keys(packet).sort().join(",") !== "kind,type,values" ||
-      !["scalar", "vector"].includes(packet.kind) ||
-      !["number", "boolean", "string"].includes(packet.type) ||
-      !Array.isArray(packet.values) || packet.values.length > 256 ||
-      (packet.kind === "scalar" && packet.values.length !== 1))
-    return false;
-  for (const value of packet.values) {
-    if (value === null && packet.kind === "vector") continue;
-    if (packet.type === "number" &&
+function validTransferValues(type, values, missing) {
+  for (const value of values) {
+    if (value === null && missing) continue;
+    if (type === "number" &&
         (typeof value !== "number" || !Number.isFinite(value) || Math.abs(value) > Number.MAX_SAFE_INTEGER))
       return false;
-    if (packet.type === "boolean" && typeof value !== "boolean") return false;
-    if (packet.type === "string") {
+    if (type === "boolean" && typeof value !== "boolean") return false;
+    if (type === "string") {
       if (typeof value !== "string" || value.length > 512 || value.includes("\0")) return false;
       try { encodeURIComponent(value); } catch (_) { return false; }
     }
+  }
+  return true;
+}
+function validTransferPacket(packet) {
+  if (!packet || typeof packet !== "object" || Array.isArray(packet)) return false;
+  if (packet.kind === "table") {
+    if (Object.keys(packet).sort().join(",") !== "columns,kind" ||
+        !Array.isArray(packet.columns) || packet.columns.length < 1 ||
+        packet.columns.length > 16) return false;
+    const names = new Set();
+    let count = null;
+    for (const col of packet.columns) {
+      if (!col || typeof col !== "object" || Array.isArray(col) ||
+          Object.keys(col).sort().join(",") !== "name,type,values" ||
+          typeof col.name !== "string" || !TRANSFER_NAME.test(col.name) || names.has(col.name) ||
+          !["number", "boolean", "string"].includes(col.type) ||
+          !Array.isArray(col.values) || col.values.length > 128 ||
+          (count !== null && count !== col.values.length) ||
+          !validTransferValues(col.type, col.values, true)) return false;
+      names.add(col.name);
+      count = col.values.length;
+    }
+  } else {
+    if (Object.keys(packet).sort().join(",") !== "kind,type,values" ||
+        !["scalar", "vector"].includes(packet.kind) ||
+        !["number", "boolean", "string"].includes(packet.type) ||
+        !Array.isArray(packet.values) || packet.values.length > 256 ||
+        (packet.kind === "scalar" && packet.values.length !== 1) ||
+        !validTransferValues(packet.type, packet.values, packet.kind === "vector")) return false;
   }
   return new TextEncoder().encode(JSON.stringify(packet)).length <= 32768;
 }
@@ -135,21 +157,40 @@ async function handle(event) {
     if (op === "export") {
       // Only exact Python builtins are traversed; no user iterators, descriptors or repr().
       const query = [
-        "import json as _fs_transfer_json, math as _fs_transfer_math",
+        "import json as _fs_transfer_json, math as _fs_transfer_math, re as _fs_transfer_re",
         "_fs_transfer_name = " + JSON.stringify(code),
         "if _fs_transfer_name not in globals(): raise ValueError('Unknown Python variable')",
         "_fs_transfer_obj = globals()[_fs_transfer_name]",
-        "_fs_transfer_kind = 'vector' if type(_fs_transfer_obj) in (list, tuple) else 'scalar'",
-        "_fs_transfer_values = list(_fs_transfer_obj) if _fs_transfer_kind == 'vector' else [_fs_transfer_obj]",
-        "if not _fs_transfer_values or len(_fs_transfer_values) > 256: raise ValueError('Python vector is empty or exceeds limit')",
+        "_fs_transfer_kind = 'table' if type(_fs_transfer_obj) is dict else 'vector' if type(_fs_transfer_obj) in (list, tuple) else 'scalar'",
         "def _fs_transfer_type(v):",
         "    return 'boolean' if type(v) is bool else 'number' if type(v) in (int, float) else 'string' if type(v) is str else None",
-        "_fs_transfer_present = [_fs_transfer_type(v) for v in _fs_transfer_values if v is not None]",
-        "if not _fs_transfer_present or _fs_transfer_present[0] is None or any(t != _fs_transfer_present[0] for t in _fs_transfer_present): raise ValueError('Only homogeneous plain scalar/list/tuple values can be transferred')",
-        "_fs_transfer_type_name = _fs_transfer_present[0]",
-        "if any(type(v) is str and (len(v) > 512 or '\\x00' in v) for v in _fs_transfer_values): raise ValueError('Python string exceeds limit or contains NUL')",
-        "if any(type(v) in (int, float) and (not _fs_transfer_math.isfinite(v) or abs(v) > 9007199254740991) for v in _fs_transfer_values): raise ValueError('Python number is not finite or safe')",
-        "_fs_transfer_json.dumps({'kind': _fs_transfer_kind, 'type': _fs_transfer_type_name, 'values': _fs_transfer_values}, allow_nan=False)"
+        "def _fs_transfer_check(_fs_transfer_values, _fs_transfer_limit):",
+        "    if not _fs_transfer_values or len(_fs_transfer_values) > _fs_transfer_limit: raise ValueError('Python vector is empty or exceeds limit')",
+        "    _fs_transfer_present = [_fs_transfer_type(v) for v in _fs_transfer_values if v is not None]",
+        "    if not _fs_transfer_present or _fs_transfer_present[0] is None or any(t != _fs_transfer_present[0] for t in _fs_transfer_present): raise ValueError('Only homogeneous plain scalar/list/tuple values can be transferred')",
+        "    if any(type(v) is str and (len(v) > 512 or '\\x00' in v) for v in _fs_transfer_values): raise ValueError('Python string exceeds limit or contains NUL')",
+        "    if any(type(v) in (int, float) and (not _fs_transfer_math.isfinite(v) or abs(v) > 9007199254740991) for v in _fs_transfer_values): raise ValueError('Python number is not finite or safe')",
+        "    return _fs_transfer_present[0]",
+        "if _fs_transfer_kind == 'table':",
+        "    if not 1 <= len(_fs_transfer_obj) <= 16: raise ValueError('Python table requires 1-16 columns')",
+        "    _fs_transfer_columns = []",
+        "    _fs_transfer_rows = None",
+        "    for _fs_transfer_key, _fs_transfer_column in _fs_transfer_obj.items():",
+        "        if type(_fs_transfer_key) is not str or _fs_transfer_re.fullmatch('[A-Za-z][A-Za-z0-9_]{0,79}', _fs_transfer_key) is None: raise ValueError('Invalid Python table column name')",
+        "        if type(_fs_transfer_column) not in (list, tuple): raise ValueError('Python table columns must be plain lists or tuples')",
+        "        if len(_fs_transfer_column) > 128: raise ValueError(\'Python table exceeds row limit\')",
+        "        _fs_transfer_values = list(_fs_transfer_column)",
+        "        if _fs_transfer_rows is not None and len(_fs_transfer_values) != _fs_transfer_rows: raise ValueError('Python table columns have unequal lengths')",
+        "        _fs_transfer_rows = len(_fs_transfer_values)",
+        "        _fs_transfer_type_name = _fs_transfer_check(_fs_transfer_values, 128)",
+        "        _fs_transfer_columns.append({'name': _fs_transfer_key, 'type': _fs_transfer_type_name, 'values': _fs_transfer_values})",
+        "    _fs_transfer_packet = {'kind': 'table', 'columns': _fs_transfer_columns}",
+        "else:",
+        "    if _fs_transfer_kind == 'vector' and len(_fs_transfer_obj) > 256: raise ValueError(\'Python vector exceeds limit\')",
+        "    _fs_transfer_values = list(_fs_transfer_obj) if _fs_transfer_kind == 'vector' else [_fs_transfer_obj]",
+        "    _fs_transfer_type_name = _fs_transfer_check(_fs_transfer_values, 256)",
+        "    _fs_transfer_packet = {'kind': _fs_transfer_kind, 'type': _fs_transfer_type_name, 'values': _fs_transfer_values}",
+        "_fs_transfer_json.dumps(_fs_transfer_packet, allow_nan=False)",
       ].join("\n");
       const raw = await py.runPythonAsync(query);
       if (typeof raw !== "string" || new TextEncoder().encode(raw).length > 32768)
@@ -164,7 +205,7 @@ async function handle(event) {
       const query = [
         "import json as _fs_transfer_json",
         "_fs_transfer_packet = _fs_transfer_json.loads(" + JSON.stringify(JSON.stringify(transferValue)) + ")",
-        "globals()[" + JSON.stringify(code) + "] = _fs_transfer_packet['values'] if _fs_transfer_packet['kind'] == 'vector' else _fs_transfer_packet['values'][0]",
+        "globals()[" + JSON.stringify(code) + "] = {c['name']: c['values'] for c in _fs_transfer_packet['columns']} if _fs_transfer_packet['kind'] == 'table' else (_fs_transfer_packet['values'] if _fs_transfer_packet['kind'] == 'vector' else _fs_transfer_packet['values'][0])",
         "'ok'"
       ].join("\n");
       const acknowledgement = await py.runPythonAsync(query);

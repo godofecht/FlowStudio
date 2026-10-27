@@ -406,7 +406,34 @@ function create({load = () => import(CDN)} = {}) {
           '; if (!base::exists(n, envir=.GlobalEnv, inherits=FALSE) || ' +
           'base::bindingIsActive(n, .GlobalEnv)) stop("Unknown or active R binding"); ' +
           'v <- base::get(n, envir=.GlobalEnv, inherits=FALSE); ' +
-          't <- base::typeof(v); ' +
+                     "if (base::is.data.frame(v)) { " +
+           "if (!base::identical(base::class(v), \"data.frame\") || base::ncol(v) < 1L || " +
+           "base::ncol(v) > 16L || base::nrow(v) > 128L || " +
+           "!base::identical(base::rownames(v), base::as.character(base::seq_len(base::nrow(v))))) " +
+           "stop(\"Only bounded plain R data.frames with default row names can be transferred\"); " +
+           "cn <- base::names(v); " +
+           "if (base::anyDuplicated(cn) || base::any(!base::grepl(\"^[A-Za-z][A-Za-z0-9_]{0,79}$\", cn))) " +
+           "stop(\"Invalid R table column names\"); " +
+           "out <- base::unlist(base::lapply(base::seq_along(v), function(i) { " +
+           "col <- v[[i]]; ct <- base::typeof(col); " +
+           "if (!base::is.null(base::attributes(col)) || " +
+           "!(ct %in% c(\"double\",\"integer\",\"logical\",\"character\"))) " +
+           "stop(\"Only plain atomic R table columns can be transferred\"); " +
+           "if (ct %in% c(\"double\",\"integer\") && (base::any(base::is.infinite(col)) || " +
+           "base::any(base::is.nan(col)) || " +
+           "base::any(base::abs(col[!base::is.na(col)]) > 9007199254740991))) " +
+           "stop(\"R table number is not finite or safe\"); " +
+           "if (ct == \"character\" && " +
+           "base::any(base::nchar(col[!base::is.na(col)], type=\"chars\") > 512L)) " +
+           "stop(\"R table string exceeds limit\"); " +
+           "formatted <- if (ct == \"double\") base::format(col, digits=17L, scientific=TRUE, trim=TRUE, decimal.mark=\".\") else base::as.character(col); " +
+           "base::c(utils::URLencode(cn[[i]], reserved=TRUE), ct, " +
+           "base::vapply(base::seq_along(col), function(j) if (base::is.na(col[[j]])) \"@NA@\" else " +
+           "utils::URLencode(formatted[[j]], reserved=TRUE), character(1))) " +
+           "}), use.names=FALSE); " +
+           "base::c(\"@TABLE@\", base::as.character(base::ncol(v)), base::as.character(base::nrow(v)), out) " +
+           "} else { " +
+           't <- base::typeof(v); ' +
           'if (!is.null(base::attributes(v)) || !(t %in% c("double","integer","logical","character"))) ' +
           'stop("Only classless atomic R vectors can be transferred"); ' +
           'if (length(v) > 256L) stop("R vector exceeds limit"); ' +
@@ -416,16 +443,13 @@ function create({load = () => import(CDN)} = {}) {
           'if (t == "character" && any(nchar(v[!is.na(v)], type="chars") > 512L)) stop("R string exceeds limit"); ' +
           's <- if (t == "double") format(v, digits=17L, scientific=TRUE, trim=TRUE, decimal.mark=".") else as.character(v); ' +
           'c(t, vapply(seq_along(v), function(i) if (is.na(v[[i]])) "@NA@" else ' +
-          'utils::URLencode(s[[i]], reserved=TRUE), character(1))) })';
+          'utils::URLencode(s[[i]], reserved=TRUE), character(1))) } })';
         const rows = await r.evalRRaw(query, "string[]");
         if (generation !== epoch) return {ok:false, output:"R session reset."};
-        if (!Array.isArray(rows) || !rows.length || rows.length > 257 ||
-            !rows.every(row => typeof row === "string" && row.length <= 2048) ||
-            !["double", "integer", "logical", "character"].includes(rows[0]))
+        if (!Array.isArray(rows) || !rows.length ||
+            !rows.every(row => typeof row === "string" && row.length <= 2048))
           throw Error("Invalid R transfer response.");
-        const type = rows[0] === "logical" ? "boolean" : rows[0] === "character" ? "string" : "number";
-        const values = rows.slice(1).map(raw => {
-          // R's NA sentinel is outside URL-encoded data; literal "@NA@" is %40NA%40.
+        const decode = (raw, type) => {
           if (raw === "@NA@") return null;
           const decoded = decodeURIComponent(raw);
           if (type === "boolean") {
@@ -438,8 +462,38 @@ function create({load = () => import(CDN)} = {}) {
             return Number(decoded);
           }
           return decoded;
-        });
-        const packet = global.FlowStudioVariableTransfer.validate({kind:"vector", type, values});
+        };
+        let packet;
+        if (rows[0] === "@TABLE@") {
+          if (rows.length < 5 || !/^[1-9][0-9]?$/.test(rows[1]) ||
+              !/^(?:0|[1-9][0-9]{0,2})$/.test(rows[2]))
+            throw Error("Invalid R table dimensions.");
+          const count = Number(rows[1]), size = Number(rows[2]);
+          if (count > 16 || size > 128 || rows.length !== 3 + count * (2 + size))
+            throw Error("Invalid R table response size.");
+          let offset = 3;
+          const columns = [];
+          for (let i = 0; i < count; i++) {
+            const columnName = decodeURIComponent(rows[offset++]);
+            const rawType = rows[offset++];
+            if (!["double", "integer", "logical", "character"].includes(rawType))
+              throw Error("Unsupported R table column type.");
+            const type = rawType === "logical" ? "boolean" :
+              rawType === "character" ? "string" : "number";
+            const values = rows.slice(offset, offset + size).map(raw => decode(raw, type));
+            offset += size;
+            columns.push({name:columnName, type, values});
+          }
+          packet = global.FlowStudioVariableTransfer.validate({kind:"table", columns});
+        } else {
+          if (rows.length > 257 ||
+              !["double", "integer", "logical", "character"].includes(rows[0]))
+            throw Error("Invalid R transfer response.");
+          const type = rows[0] === "logical" ? "boolean" :
+            rows[0] === "character" ? "string" : "number";
+          const values = rows.slice(1).map(raw => decode(raw, type));
+          packet = global.FlowStudioVariableTransfer.validate({kind:"vector", type, values});
+        }
         return {ok:true, value:packet};
       } catch (error) { return {ok:false, output:String(error.message || error).slice(0, 300)}; }
     });
@@ -454,14 +508,21 @@ function create({load = () => import(CDN)} = {}) {
       if (generation !== epoch) return {ok:false, output:"R session reset."};
       try {
         const r = await get();
-        const atom = value => value === null
-          ? {number:"NA_real_", boolean:"NA", string:"NA_character_"}[packet.type]
-          : packet.type === "number" ? String(value) :
-          packet.type === "boolean" ? (value ? "TRUE" : "FALSE") :
+        const atom = (value, type) => value === null
+          ? {number:"NA_real_", boolean:"NA", string:"NA_character_"}[type]
+          : type === "number" ? String(value) :
+          type === "boolean" ? (value ? "TRUE" : "FALSE") :
           'utils::URLdecode(' + JSON.stringify(encodeURIComponent(value)) + ')';
         const empty = {number:"base::numeric(0L)", boolean:"base::logical(0L)", string:"base::character(0L)"};
-        const expression = packet.kind === "scalar" ? atom(packet.values[0]) :
-          packet.values.length ? "base::c(" + packet.values.map(atom).join(",") + ")" : empty[packet.type];
+        const vector = (values, type) => values.length ?
+          "base::c(" + values.map(value => atom(value, type)).join(",") + ")" : empty[type];
+        const expression = packet.kind === "table"
+          ? "base::as.data.frame(base::structure(base::list(" +
+            packet.columns.map(col => vector(col.values, col.type)).join(",") +
+            "), names=base::c(" + packet.columns.map(col => JSON.stringify(col.name)).join(",") +
+            ")), optional=TRUE, stringsAsFactors=FALSE)"
+          : packet.kind === "scalar" ? atom(packet.values[0], packet.type) :
+            vector(packet.values, packet.type);
         const query = 'local({ n <- ' + JSON.stringify(name) +
           '; if (base::exists(n, envir=.GlobalEnv, inherits=FALSE) && ' +
           '(base::bindingIsActive(n, .GlobalEnv) || base::bindingIsLocked(n, .GlobalEnv))) ' +

@@ -20,3 +20,29 @@ For the next iteration, add real-browser acceptance of transfer and interpreter 
 ## Typed missing-value extension (26 October 2026)
 
 The new regression suite `tests/browser_variable_transfer_missing.test.js` exercises the real worker-generated Python code under CPython, both webR transfer query directions, protocol validation, and actual Rscript when installed. The native verification harness now requires this test with real Rscript on both Linux and macOS; source-only Node runs may skip it. Independent [Linux/macOS CI #40422754617](https://github.com/godofecht/FlowStudio/actions/runs/40422754617) passed all four jobs, including five new transfer tests without skips on each native platform and real Rscript NA/NaN/Inf and literal-string assertions. The extension merged in [PR #91](https://github.com/godofecht/FlowStudio/pull/91). Real webR/Pyodide physical-browser round trips are still unverified, despite an opt-in acceptance scenario. The existing Flow-owned native server and hosted CI configuration are unchanged. This is typed vector interoperability, **not** tabular/data.frame interchange or RStudio parity.
+
+
+## Bounded typed tables (27 October 2026; validation pending)
+
+The same Copy variable control additionally accepts a `{kind:"table",
+columns:[{name,type,values},...]}` packet. The Python source must be an
+exact built-in dictionary mapping valid column names to exact built-in
+list/tuple columns; the R source must be an ordinary base `data.frame` with
+default row names and classless atomic columns. The destination is a real
+base R `data.frame` or Python dictionary of lists. Column names, ordering,
+typed `NA` / `None` and literal `"@NA@"` values are preserved. R integer
+columns are imported as doubles. Bounds: 1–16 columns, at most 128 rows,
+equal column lengths, at most 512 characters per string and 32 KiB per packet.
+Unsafe names, duplicate columns, custom row names, factors, pandas objects,
+classed columns, NaN/Inf, mixed nonmissing types, and nested values are
+rejected before assignment. Python cannot infer types from empty or all-None
+columns, so exporting those dictionaries is unsupported; a zero-row typed
+R table can be imported into Python but cannot be exported back without
+explicit nonempty type evidence.
+
+`tests/browser_variable_transfer_table.test.js` checks protocol rejection,
+worker dispatch, generated CPython source, webR query construction and real
+Rscript table round trips where installed. `scripts/verify_native.py
+--require-r` requires the Rscript test in the native build gate. This is
+**pending independent CI and physical-browser verification**; no full
+RStudio or pandas parity is claimed.

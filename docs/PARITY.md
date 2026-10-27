@@ -1,3 +1,27 @@
+## 2026-10-27: bounded typed Python/R tabular interchange (validation pending)
+
+The browser-local Copy variable path now accepts a **typed table packet** with
+1–16 unique ASCII column names and 0–128 rows, equal-length columns, only
+number/boolean/string types, and per-column missing values. Total encoded
+JSON remains limited to 32 KiB. Exact Python built-in dictionaries of
+homogeneous plain list/tuple columns export as R data.frames; plain base R
+data.frames with default row names and unclassed atomic columns export as
+Python dictionaries of lists. The existing scalar/vector protocol and native
+Flow-owned server routes are unchanged. No new interpreter or demo backend
+was added.
+
+**Status: partial / new automated regression tests committed; independent
+Linux/macOS CI and physical-browser Pyodide/webR execution are pending.**
+The native verification harness requires real Rscript table acceptance rather
+than treating an optional local Rscript skip as passing evidence. Python
+empty-column dictionaries and all-None columns cannot be typed and are
+rejected; R zero-row typed data.frames can be transferred one-way to Python.
+Factors, custom row names, dates, pandas DataFrames, nested objects, nonfinite
+numbers and unsafe names remain unsupported. R integer storage is not
+preserved on import. This is not Arrow/pandas compatibility, remote-session
+isolation, knitr rendering, function-level R debugging or RStudio parity.
+
+
 ## 2026-10-26: typed R NA / Python None vector transfer (Linux/macOS CI passed)
 
 The browser-local Python ↔ R transfer now preserves missing values in typed

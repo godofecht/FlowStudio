@@ -1,3 +1,35 @@
+## 2026-10-27: bounded plain R matrix → NumPy 2D ndarray (validation pending)
+
+Browser R → Python Copy variable now exports exact unclassed, unlabelled
+two-dimensional base R numeric, integer, logical or character matrices as
+bounded typed-table packets. The existing NumPy destination reconstructs a
+real two-dimensional ndarray, preserving row/column order. R matrix attributes
+and integer storage widths are not preserved; Python → R continues to import
+typed tables as data.frames, not R matrices. Invalid dimensions (including
+empty, >128 rows or >16 columns), custom attributes, classes, dimnames,
+unsafe numeric values and invalid strings are rejected before export. Missing
+numeric values become NaN; missing logical/character cells are rejected in
+NumPy mode. Existing 32-KiB wire limit applies.
+
+**Status: partial / new automated tests committed, independent CI pending;
+physical-browser Pyodide/webR acceptance unexecuted.** Native verification
+requires actual Rscript matrix acceptance and rejection, and source tests
+exercise real CPython/NumPy construction when installed. No native Flow route
+or hosted CI configuration changes. Flow 2.0.0 remains the primary backend.
+RStudio parity remains incomplete.
+
+## 2026-10-27: homogeneous R data.frame → NumPy 2D ndarray (Linux/macOS CI passed)
+
+[PR #106](https://github.com/godofecht/FlowStudio/pull/106) merged as
+[450d986](https://github.com/godofecht/FlowStudio/commit/450d986cf6c078546165c82fafb4dae5c46a9e5c)
+after all four independent Ubuntu/macOS CI jobs passed in
+[CI #40534281335](https://github.com/godofecht/FlowStudio/actions/runs/40534281335)
+on 27 October 2026. The opt-in browser transfer constructs real 2D NumPy
+arrays from homogeneous R data.frames; numeric NA maps to NaN, while missing
+boolean/string cells and mixed columns are rejected. R column labels and
+integer storage widths are lost. Physical-browser acceptance remains
+unexecuted; RStudio parity is not achieved.
+
 ## 2026-10-27: opt-in homogeneous R data.frame → NumPy 2D ndarray (CI pending)
 
 The browser Copy variable operation now accepts an ordinary R data.frame as

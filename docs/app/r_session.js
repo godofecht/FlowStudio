@@ -404,7 +404,10 @@ function create({load = () => import(CDN)} = {}) {
       } catch (error) { return {ok:false, output:String(error).slice(0, 300)}; }
     });
   }
-  // Export only classless, non-missing atomic vectors. Never evaluate a variable name as source.
+  // Export bounded plain R vectors, data.frames and unlabelled atomic matrices.
+  // Matrix columns use V1..V16 in the existing typed-table protocol; source
+  // dimensions and storage widths are not represented in the destination.
+  // Never evaluate a variable name as source.
   async function exportVariable(name) {
     if (!/^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(name))
       return {ok:false, output:"Invalid shared Python/R variable name."};
@@ -417,6 +420,16 @@ function create({load = () => import(CDN)} = {}) {
           '; if (!base::exists(n, envir=.GlobalEnv, inherits=FALSE) || ' +
           'base::bindingIsActive(n, .GlobalEnv)) stop("Unknown or active R binding"); ' +
           'v <- base::get(n, envir=.GlobalEnv, inherits=FALSE); ' +
+          "if (base::is.matrix(v) && !base::is.object(v)) { " +
+          "d <- base::attr(v, \"dim\", exact=TRUE); " +
+          "if (!base::identical(base::names(base::attributes(v)), \"dim\") || " +
+          "!base::is.integer(d) || base::length(d) != 2L || " +
+          "d[[1L]] < 1L || d[[1L]] > 128L || d[[2L]] < 1L || d[[2L]] > 16L || " +
+          "!(base::typeof(v) %in% c(\"double\",\"integer\",\"logical\",\"character\"))) " +
+          "stop(\"Only bounded, unlabelled, plain atomic R matrices can be transferred\"); " +
+          "v <- base::as.data.frame.matrix(v, optional=TRUE, stringsAsFactors=FALSE); " +
+          "base::names(v) <- base::paste0(\"V\", base::seq_len(base::ncol(v))); " +
+          "}; " +
                      "if (base::is.data.frame(v)) { " +
            "if (!base::identical(base::class(v), \"data.frame\") || base::ncol(v) < 1L || " +
            "base::ncol(v) > 16L || base::nrow(v) > 128L || " +

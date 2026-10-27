@@ -1,3 +1,16 @@
+## Optional Python → R matrix destination
+
+In the browser Copy variable panel, select **Python → R** and **Python homogeneous
+table or 2D NumPy ndarray → R matrix**. The destination is a real base R
+matrix rather than the default data.frame. Only homogeneous typed tables with
+1–128 rows and 1–16 columns are eligible; all existing packet and string
+limits apply. Values are inserted column-major to preserve Python 2D ndarray
+row/column order. Numeric missing cells become `NA_real_`; missing logical
+and character cells retain their R missing-value types. Mixed-type and empty
+tables fail without replacing the destination. The operation intentionally
+loses column labels, dtype widths and other Python/NumPy metadata, and cannot
+guarantee that a table came from NumPy rather than pandas or a dictionary.
+
 # Explicit Python ↔ R variable transfer (browser workspace)
 
 The `docs/app/` workspace now has a **Copy variable** control in the Environment pane. Choose Python → R or R → Python, provide an existing source variable name and optionally a destination name, and execute the transfer. The destination receives a **copy**; the interpreters do not share references, processes or implicit state. Both interpreter sessions remain browser-local. Flow program execution remains owned by the native Flow backend; Flow values are not transferable through this feature.

@@ -56,8 +56,8 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
 .sidebar{border-right:1px solid var(--line)}
 .rightpanel{border-left:1px solid var(--line)}
 .panel .body{flex:1;min-height:0;overflow:auto;padding:10px 12px}
-.workspace-tabs{display:flex;gap:4px;padding:6px 8px;border-bottom:1px solid var(--line)}
-.workspace-tabs button{flex:1;min-width:0;padding:4px 6px;font-size:12px;background:transparent;border-color:transparent}
+.workspace-tabs{display:flex;flex:none;flex-wrap:wrap;overflow-x:auto;gap:4px 3px;padding:6px 8px;border-bottom:1px solid var(--line)}
+.workspace-tabs button{flex:1 1 auto;font-size:12px;background:transparent;border-color:transparent;white-space:nowrap}
 .workspace-tabs [aria-selected="true"]{background:var(--accent-dim);border-color:#3d5c95}
 .workspace-frame{flex:1;min-height:0}
 .workspace-frame iframe{display:block;width:100%;height:100%;border:0;background:#10141e}
@@ -93,8 +93,9 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
 .hint{font-size:12px;max-width:46ch}
 .muted{color:var(--muted)}
 .example-card{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:10px;background:var(--surface-2)}
-.example-card h3{margin:0 0 4px;font-size:13.5px}
-.example-card button{display:block;width:100%;text-align:left;font-size:12.5px;margin-top:6px}
+.example-card h3{margin:0 0 4px;font-size:13.5px;overflow-wrap:anywhere}
+.example-card p{margin:2px 0 8px;font-size:12.5px;line-height:1.55;overflow-wrap:anywhere}
+.example-card button{display:block;width:100%;text-align:left;font-size:12.5px;margin-top:6px;white-space:normal;overflow-wrap:anywhere}
 .example-card ol{margin:8px 0 2px;padding-left:20px;font-size:12px;color:var(--muted)}
 #debugSteps{max-height:200px;overflow:auto;display:flex;flex-direction:column;gap:2px;margin-bottom:8px}
 .debug-step button{width:100%;text-align:left;font:11.5px/1.4 var(--mono);padding:3px 7px;background:transparent;border:1px solid transparent;border-radius:5px}
@@ -150,6 +151,7 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
 .dock .body>label:not([for="consoleInput"]){display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--muted)}
 #consoleClearHistory{font-size:11.5px;padding:3px 9px}
 .statusbar{display:flex;align-items:center;gap:16px;min-height:var(--statusbar-height);padding:2px 12px;background:#10151f;border-top:1px solid var(--line);font-size:12px;color:#8298b8;overflow:hidden;white-space:nowrap}
+#resultStatus{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
 #cursor{font-variant-numeric:tabular-nums}
 .shortcut-hint{font-size:11px;color:#6d80a0}
 #resultStatus[data-state="error"]{color:var(--error)}
@@ -1973,8 +1975,7 @@ const commands = Object.freeze({
     el("ideShell").classList.toggle("dock-hidden", hide);
   },
   refreshEnvironment: () => el("refreshPythonEnvironment").click(),
-  shortcuts: () => status("Ctrl+Enter run · Ctrl+Shift+Enter cell · Ctrl+S save · Ctrl+W close tab · Ctrl+Tab next tab · Ctrl+F find · Ctrl+H replace · Ctrl+Shift+O outline · F12 definition · Shift+F12 references · F2 rename", "ok"),
-  about: () => status("FlowStudio 0.1.0-alpha.1 · Flow-first local IDE · execution on 127.0.0.1:8751 only", "ok")
+  shortcuts: () => status("Ctrl+Enter run · Ctrl+Shift+Enter cell · Ctrl+S save · Ctrl+W close tab · Ctrl+Tab next tab · Ctrl+F find · Ctrl+H replace · Ctrl+Shift+O outline · F12 definition · Shift+F12 references · F2 rename", "ok"),    about: () => status("FlowStudio 0.2.0-alpha.1 · Flow-first local IDE · execution on 127.0.0.1:8751 only", "ok")
 });
 if (typeof window !== "undefined") {
   window.FlowStudioApp = Object.freeze({
@@ -2179,7 +2180,6 @@ if (outlineRefreshButton) outlineRefreshButton.addEventListener("click", refresh
 refreshOutline();
 </script>
 <script src="/workspace_panels.js"></script>
-</script>
 <script type="module" src="/ui/workbench.js"></script>
 </body>
 </html>

@@ -6,7 +6,7 @@ const {mount} = require("../web/workspace_tabs.js");
 function fixture(initial = null, unavailable = false) {
   const nodes = new Map();
   const focus = [];
-  for (const name of ["files", "outline", "plots", "data"]) {
+  for (const name of ["files", "outline", "plots", "data", "packages", "examples", "debug"]) {
     const tab = {
       attributes: {}, tabIndex: 0, listeners: {},
       setAttribute(key, value) { this.attributes[key] = value; },
@@ -57,12 +57,24 @@ test("supports roving keyboard focus and wraps", () => {
   const tabs = mount(f.doc, f.storage);
   let prevented = 0;
   f.nodes.get("tab-files").listeners.keydown({key: "ArrowLeft", preventDefault() {prevented++;}});
-  assert.equal(tabs.current(), "data");
-  assert.deepEqual(f.focus, ["data"]);
-  f.nodes.get("tab-data").listeners.keydown({key: "Home", preventDefault() {prevented++;}});
+  assert.equal(tabs.current(), "debug");
+  assert.deepEqual(f.focus, ["debug"]);
+  f.nodes.get("tab-debug").listeners.keydown({key: "Home", preventDefault() {prevented++;}});
   assert.equal(tabs.current(), "files");
   assert.equal(prevented, 2);
-  assert.equal(f.nodes.get("tab-data").tabIndex, -1);
+  assert.equal(f.nodes.get("tab-debug").tabIndex, -1);
+});
+
+test("switches the sidebar panels tab and shows its panel", () => {
+  const f = fixture();
+  const tabs = mount(f.doc, f.storage);
+  for (const name of ["packages", "examples", "debug"]) {
+    f.nodes.get("tab-" + name).listeners.click();
+    assert.equal(tabs.current(), name, name);
+    assert.equal(f.nodes.get("view-" + name).hidden, false, name);
+    assert.equal(f.nodes.get("tab-" + name).attributes["aria-selected"], "true", name);
+    assert.equal(f.nodes.get("view-files").hidden, true, name);
+  }
 });
 
 test("recovers from invalid and inaccessible session storage", () => {

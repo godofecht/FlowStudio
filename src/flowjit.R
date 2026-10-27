@@ -6,6 +6,9 @@ flowjit_compile <- local({
     operators <- c("+", "-", "*")
 
     validate <- function(node, args) {
+        # Parentheses are syntax-only grouping; they do not change arithmetic.
+        if (is.call(node) && identical(node[[1L]], as.name("(")) &&
+            length(node) == 2L) return(validate(node[[2L]], args))
         if (is.symbol(node)) {
             if (!(as.character(node) %in% args)) stop("Native expressions may only reference formals.")
             return(invisible(TRUE))
@@ -27,6 +30,8 @@ flowjit_compile <- local({
     }
 
     emit <- function(node, args) {
+        if (is.call(node) && identical(node[[1L]], as.name("(")) &&
+            length(node) == 2L) return(emit(node[[2L]], args))
         if (is.symbol(node)) {
             index <- match(as.character(node), args) - 1L
             return(sprintf("v[%d][lengths[%d] == 1 ? 0 : i]", index, index))

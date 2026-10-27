@@ -742,7 +742,7 @@ FlowStudioNotebookIO.create({
     $("source").value = imported.source;
     $("language").value = imported.language;
     packagePanel.updateLanguage?.();
-    fileName = name.replace(/\.(?:ipynb|fsnb|rmd)$/i, "") + (imported.language === "r" ? ".R" : imported.language === "flow" ? ".flow" : ".py");
+    fileName = name.replace(/\.(?:ipynb|fsnb|rmd|qmd)$/i, "") + (imported.language === "r" ? ".R" : imported.language === "flow" ? ".flow" : ".py");
     $("filename").textContent = name + " (imported notebook)";
     projectWorkspace.notifyExternalOpen();
     notebookEntries = [];
@@ -786,7 +786,7 @@ $("exportRMarkdown").addEventListener("click", () => {
     const currentSource = $("source").value;
     const rmd = FlowStudioRMarkdown.encode(currentSource, selectedLanguage,
       FlowStudioSourceCells.parseCells);
-    const reportName = fileName.replace(/\.(?:py|r|flow|ipynb|fsnb|rmd)$/i, "") || "notebook";
+    const reportName = fileName.replace(/\.(?:py|r|flow|ipynb|fsnb|rmd|qmd)$/i, "") || "notebook";
     const url = URL.createObjectURL(new Blob([rmd], {type:"text/markdown;charset=utf-8"}));
     const anchor = document.createElement("a");
     anchor.href = url;

@@ -11,25 +11,100 @@ function text(value) {
   throw Error("Invalid notebook text.");
 }
 function markdown(value) {
+  // Deliberately inert Markdown subset for offline notebook reports.
+  // Raw HTML and link/image URLs are never interpreted.
   const blocks = [];
-  let paragraph = [], list = [];
-  function flush() {
-    if (paragraph.length) blocks.push("<p>" + paragraph.map(escapeHTML).join("<br>") + "</p>");
-    if (list.length) blocks.push("<ul>" + list.map(x => "<li>" + escapeHTML(x) + "</li>").join("") + "</ul>");
-    paragraph = []; list = [];
+  let paragraph = [], list = [], listTag = null, quote = [];
+  let fence = null, code = [];
+  function inline(source) {
+    let result = "", i = 0;
+    while (i < source.length) {
+      if (source[i] === "\`") {
+        let end = i + 1;
+        while (source[end] === "\`") end++;
+        const delimiter = source.slice(i, end);
+        const close = source.indexOf(delimiter, end);
+        if (close !== -1) {
+          result += "<code>" + escapeHTML(source.slice(end, close)) + "</code>";
+          i = close + delimiter.length;
+          continue;
+        }
+        result += escapeHTML(delimiter);
+        i = end;
+      } else {
+        let end = source.indexOf("\`", i);
+        if (end === -1) end = source.length;
+        result += escapeHTML(source.slice(i, end));
+        i = end;
+      }
+    }
+    return result;
+  }
+  function flushParagraph() {
+    if (paragraph.length) blocks.push("<p>" + paragraph.map(inline).join("<br>") + "</p>");
+    paragraph = [];
+  }
+  function flushList() {
+    if (list.length) blocks.push("<" + listTag + ">" +
+      list.map(item => "<li>" + inline(item) + "</li>").join("") +
+      "</" + listTag + ">");
+    list = []; listTag = null;
+  }
+  function flushQuote() {
+    if (quote.length) blocks.push("<blockquote><p>" + quote.map(inline).join("<br>") +
+      "</p></blockquote>");
+    quote = [];
+  }
+  function flush() { flushParagraph(); flushList(); flushQuote(); }
+  function flushFence() {
+    const language = fence.language;
+    blocks.push("<pre><code" + (language ? ' class="language-' + language + '"' : "") +
+      ">" + escapeHTML(code.join("\n")) + "</code></pre>");
+    fence = null; code = [];
   }
   for (const line of value.replace(/\r\n?/g, "\n").split("\n")) {
-    const heading = /^\s{0,3}(#{1,6})\s+(.+)$/.exec(line);
-    const item = /^\s{0,3}[-*+]\s+(.+)$/.exec(line);
+    if (fence) {
+      const closing = /^ {0,3}(\`+|~+)[ \t]*$/.exec(line);
+      if (closing && closing[1][0] === fence.character &&
+          closing[1].length >= fence.length) flushFence();
+      else code.push(line);
+      continue;
+    }
+    const opening = /^ {0,3}(\`{3,}|~{3,})(.*)$/.exec(line);
+    if (opening && (opening[1][0] === "~" || !opening[2].includes("\`"))) {
+      flush();
+      const info = opening[2].trim();
+      fence = { character: opening[1][0], length: opening[1].length,
+        language: /^[A-Za-z0-9_+.-]{1,32}$/.test(info) ? info : "" };
+      code = [];
+      continue;
+    }
+    const heading = /^ {0,3}(#{1,6})\s+(.+)$/.exec(line);
+    const item = /^ {0,3}(?:([-*+])|(\d{1,9}[.)]))\s+(.+)$/.exec(line);
+    const quoted = /^ {0,3}>\s?(.*)$/.exec(line);
     if (heading) {
-      flush(); const n = heading[1].length;
-      blocks.push("<h" + n + ">" + escapeHTML(heading[2]) + "</h" + n + ">");
+      flush();
+      const n = heading[1].length;
+      blocks.push("<h" + n + ">" + inline(heading[2]) + "</h" + n + ">");
+    } else if (/^ {0,3}(?:-{3,}|\*{3,}|_{3,})[ \t]*$/.test(line)) {
+      flush(); blocks.push("<hr>");
     } else if (item) {
-      if (paragraph.length) flush();
-      list.push(item[1]);
-    } else if (!line.trim()) flush();
-    else { if (list.length) flush(); paragraph.push(line); }
+      flushParagraph(); flushQuote();
+      const tag = item[2] ? "ol" : "ul";
+      if (listTag && listTag !== tag) flushList();
+      listTag = tag;
+      list.push(item[3]);
+    } else if (quoted) {
+      flushParagraph(); flushList();
+      quote.push(quoted[1]);
+    } else if (!line.trim()) {
+      flush();
+    } else {
+      flushList(); flushQuote();
+      paragraph.push(line);
+    }
   }
+  if (fence) flushFence();
   flush();
   return blocks.join("\n");
 }
@@ -71,6 +146,11 @@ function render(json, title = "FlowStudio notebook report") {
             /^iVBORw0KGgo[A-Za-z0-9+/]*={0,2}$/.test(png))
           section += '<img alt="Plot from cell ' + (i + 1) +
             '" src="data:image/png;base64,' + png + '">';
+        else if (output.data?.["text/markdown"] !== undefined) {
+          const value = text(output.data["text/markdown"]);
+          if (encoder.encode(value).length > 131072) throw Error("Output exceeds 128 KiB.");
+          section += '<div class="markdown-output">' + markdown(value) + '</div>';
+        }
         else if (output.data?.["text/plain"] !== undefined) {
           const value = text(output.data["text/plain"]);
           if (encoder.encode(value).length > 131072) throw Error("Output exceeds 128 KiB.");

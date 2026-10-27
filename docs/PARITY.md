@@ -1,3 +1,20 @@
+## 2026-10-27: safe Markdown rendering in offline notebook reports (source-tested; CI pending)
+
+Offline HTML notebook reports now render escaped fenced Flow/R/Python code,
+inline backtick code, ordered/unordered lists, blockquotes and thematic breaks.
+Jupyter `display_data` / `execute_result` outputs with `text/markdown`
+are rendered through the same inert subset, preferring it to `text/plain`
+when both are present. Raw HTML, links and image URLs are never interpreted.
+Language labels are constrained to safe class tokens, output size remains
+bounded to 128 KiB, and the report's restrictive CSP is unchanged. This
+is **not** a general CommonMark/GFM or knitr/Quarto renderer; nested lists,
+HTML output and live R Markdown execution remain unsupported.
+
+**Status: partial / nine exact-source regression tests passed in isolated
+V8 execution, hosted Linux/macOS CI and physical Chromium acceptance pending.**
+The change does not modify Flow's native compiler/backend, native HTTP routes,
+or hosted CI configuration. Full RStudio parity remains incomplete.
+
 ## 2026-10-27: opt-in Python typed table / NumPy 2D ndarray → real R matrix (Linux/macOS CI passed)
 
 The browser Python → R Copy variable operation now exposes an explicit **R matrix**

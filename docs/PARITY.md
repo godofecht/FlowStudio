@@ -1,4 +1,4 @@
-## 2026-10-27: bounded bidirectional NumPy Unicode vector transfer (validation pending)
+## 2026-10-27: bounded bidirectional NumPy Unicode vector transfer (Linux/macOS CI passed)
 
 Browser Python → R Copy variable now accepts exact one-dimensional NumPy Unicode
 ndarrays with native dtype kind `U` and storage width at most 512 code points
@@ -12,13 +12,21 @@ converted into the literal string `"None"`; the default Python-list
 destination continues to preserve missing values as `None`. Existing numeric
 NaN and logical array behavior is unchanged.
 
-**Status: partial / source implementation committed; hosted Linux/macOS CI
-and physical-browser Pyodide/webR acceptance pending.** Focused local V8
-execution of the actual controller and worker passed transfer, missing-value
-and invalid-string rejection checks; local CPython/NumPy 2.3.5 constructed
-the real Unicode ndarray. These checks are not evidence of native Flow/Rscript
-compilation, physical-browser execution or RStudio parity. No hosted CI or
-native Flow backend configuration changed.
+**Status: partial / independent Linux/macOS source and native CI passed;
+physical-browser Pyodide/webR acceptance remains unexecuted.**
+[PR #104](https://github.com/godofecht/FlowStudio/pull/104) merged as
+[bc8ec80](https://github.com/godofecht/FlowStudio/commit/bc8ec8087ab640e6a4b9368273fc6c8084d61144)
+after all four Ubuntu 24.04/macOS 14 jobs passed in
+[CI #40515203015](https://github.com/godofecht/FlowStudio/actions/runs/40515203015)
+on 27 October 2026. Both source jobs ran 886 JavaScript tests (881 passed,
+five skipped, zero failures), including real CPython/NumPy Unicode export
+and import. Both native jobs compiled Flow 2.0.0, passed live Rscript/HTTP
+acceptance and packaged executables. Focused local V8 execution of the
+actual controller and worker passed transfer, missing-value and invalid-string
+rejection checks; local CPython/NumPy 2.3.5 constructed a Unicode ndarray.
+The physical Chromium Pyodide/webR Unicode round-trip and missing-string
+rejection scenarios were added but **not executed**. No hosted CI or native
+Flow backend configuration changed. This is not RStudio parity.
 
 
 ## 2026-10-27: opt-in R atomic vector → NumPy ndarray destination (pending independent CI)

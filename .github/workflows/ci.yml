@@ -35,7 +35,7 @@ jobs:
         run: node --test tests/*.test.js
       - name: Python syntax and verification harness
         run: |
-          python3 -m py_compile scripts/*.py tests/*.py
+          python3 -m py_compile scripts/*.py tests/*.py src/math_flow.py
           python3 -m unittest discover -s tests -p 'test_*.py' -v
       - name: Real C transport tests
         run: |

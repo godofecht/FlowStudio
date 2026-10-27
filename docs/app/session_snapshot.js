@@ -4,6 +4,7 @@
 (function (global) {
 "use strict";
 const FORMAT = "flowstudio-session-v1";
+const FORMAT_V2 = "flowstudio-session-v2";
 const MAX_BYTES = 131072;
 const MAX_VARIABLES = 64;
 const MAX_INSPECTED = 128;
@@ -17,7 +18,7 @@ function byteLength(text) { return new TextEncoder().encode(text).length; }
 function validate(snapshot) {
   if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot) ||
       Object.keys(snapshot).sort().join(",") !== "format,language,omitted,truncated,variables" ||
-      snapshot.format !== FORMAT || !["python", "r"].includes(snapshot.language) ||
+      ![FORMAT, FORMAT_V2].includes(snapshot.format) || !["python", "r"].includes(snapshot.language) ||
       !Array.isArray(snapshot.variables) || snapshot.variables.length > MAX_VARIABLES ||
       !Number.isSafeInteger(snapshot.omitted) || snapshot.omitted < 0 ||
       snapshot.omitted > MAX_INSPECTED ||
@@ -25,9 +26,12 @@ function validate(snapshot) {
     throw Error("Invalid FlowStudio session snapshot.");
   const names = new Set();
   for (const entry of snapshot.variables) {
+    const restoreAs = entry && Object.prototype.hasOwnProperty.call(entry, "restoreAs");
     if (!entry || typeof entry !== "object" || Array.isArray(entry) ||
-        Object.keys(entry).sort().join(",") !== "name,value" ||
-        !validName(entry.name) || names.has(entry.name))
+        Object.keys(entry).sort().join(",") !== (restoreAs ? "name,restoreAs,value" : "name,value") ||
+        !validName(entry.name) || names.has(entry.name) ||
+        (restoreAs && (snapshot.format !== FORMAT_V2 || snapshot.language !== "python" ||
+          entry.restoreAs !== "pandas" || entry.value?.kind !== "table")))
       throw Error("Snapshot contains an invalid or duplicate variable name.");
     names.add(entry.name);
     if (!transfer || typeof transfer.validate !== "function")
@@ -68,12 +72,22 @@ async function capture({language, inspect, exportValue, generation}) {
       same(generation, epoch);
       if (!result || result.ok !== true) { snapshot.omitted++; continue; }
       const value = transfer.validate(result.value);
-      const candidate = {...snapshot, variables:[...snapshot.variables, {name, value}]};
+      if (result.origin !== undefined && result.origin !== "pandas")
+        throw Error("Unsupported session snapshot source type.");
+      const entry = {name, value};
+      if (result.origin === "pandas") {
+        if (language !== "python" || value.kind !== "table")
+          throw Error("Pandas origin requires a Python typed table.");
+        entry.restoreAs = "pandas";
+      }
+      const nextFormat = entry.restoreAs ? FORMAT_V2 : snapshot.format;
+      const candidate = {...snapshot, format:nextFormat, variables:[...snapshot.variables, entry]};
       if (byteLength(JSON.stringify(candidate)) > MAX_BYTES) {
         snapshot.omitted++;
         continue;
       }
-      snapshot.variables.push({name, value});
+      snapshot.format = nextFormat;
+      snapshot.variables.push(entry);
     } catch (error) {
       same(generation, epoch);
       snapshot.omitted++;
@@ -90,7 +104,7 @@ async function restore({snapshot, language, importValue, generation}) {
   for (const entry of snapshot.variables) {
     same(generation, epoch);
     let result;
-    try { result = await importValue(language, entry.name, entry.value); }
+    try { result = await importValue(language, entry.name, entry.value, entry.restoreAs || null); }
     catch (error) {
       same(generation, epoch);
       throw Error("Restored " + imported + " of " + snapshot.variables.length +
@@ -131,7 +145,7 @@ function create({exportButton, importButton, fileInput, language, inspect, expor
       notice("Exported " + snapshot.variables.length + " " + selected + " variables" +
         (snapshot.omitted || snapshot.truncated ? " (partial: " + snapshot.omitted +
           " omitted" + (snapshot.truncated ? "; inspection truncated" : "") + ")" : "") +
-        ". Only plain scalar/vector values are supported.");
+        ". Only bounded scalar, vector and typed-table values are saved; pandas identity is retained when supported.");
       return true;
     } catch (error) {
       if (currentGeneration() === epoch) notice("Session export failed: " + String(error.message || error).slice(0, 350));
@@ -193,7 +207,7 @@ function create({exportButton, importButton, fileInput, language, inspect, expor
   });
   return Object.freeze({exportCurrent, importFile});
 }
-const api = Object.freeze({FORMAT, MAX_BYTES, MAX_VARIABLES, validate, capture, restore, create});
+const api = Object.freeze({FORMAT, FORMAT_V2, MAX_BYTES, MAX_VARIABLES, validate, capture, restore, create});
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 global.FlowStudioSessionSnapshot = api;
 })(globalThis);

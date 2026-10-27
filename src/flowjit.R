@@ -157,8 +157,9 @@ flowjit_compile <- local({
             # Opt-in STRICT semantics: pure numeric arguments are forced.
             values <- list(...)
             state$calls <- state$calls + 1L
+            operators_safe <- operators_unchanged(fn, expression)
             ready <- suitable(values, length(args), as.integer(min_length)) &&
-                     operators_unchanged(fn, expression)
+                     operators_safe
             if (ready && state$calls >= hot && !state$attempted) {
                 state$attempted <- TRUE
                 compiled <- tryCatch(build_native(c_source(expression, args)),
@@ -177,7 +178,9 @@ flowjit_compile <- local({
                 }
             }
             state$fallback <- state$fallback + 1L
-            do.call(baseline, values, envir = parent.frame())
+            # Byte-compilation may specialize primitive operators. Preserve
+            # lexical operator shadowing by executing the original closure.
+            do.call(if (operators_safe) baseline else fn, values, envir = parent.frame())
         }
         attr(wrapper, "flowjit_state") <- state
         wrapper

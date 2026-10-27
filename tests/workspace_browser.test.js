@@ -78,7 +78,7 @@ function workspace(folder) {
   const elements = new Map();
   const ids = [
     "source", "language", "console", "resultStatus", "fileLabel", "dirty",
-    "cursor", "run", "runCell", "resetR", "resetPython", "refreshPythonEnvironment", "pythonEnvironment", "open", "save", "clear", "fallbackOpen", "runtimeInfo",
+    "cursor", "run", "runMathFlow", "runCell", "resetR", "resetPython", "refreshPythonEnvironment", "pythonEnvironment", "open", "save", "clear", "fallbackOpen", "runtimeInfo",
     "projectTree", "folder", "newFile", "refreshProject",
     "projectSearch", "caseSensitive", "projectRegex", "projectWholeWord", "searchProject", "searchResults", "projectReplace", "replaceProject", "undoProjectReplace",
     "editorFind", "editorReplace", "findNext", "findPrevious",
@@ -594,4 +594,14 @@ test("native project undo refuses external edits without overwriting", async () 
   assert.equal(target.content, "external");
   assert.match(app.el("resultStatus").textContent, /Project undo failed.*File changed since preview/);
   assert.equal(app.el("undoProjectReplace").disabled, true);
+});
+
+test("mathematical Flow action sends the full buffer to the real native dialect route", async () => {
+  const app = workspace(directory("project"));
+  app.el("source").value = "domain FluidDomain {}";
+  await app.el("runMathFlow").click();
+  assert.equal(app.fetches.length, 1);
+  assert.equal(app.fetches[0].url, "/api/run/mathflow");
+  assert.equal(app.fetches[0].options.body, "domain FluidDomain {}");
+  assert.equal(app.fetches[0].options.headers["X-FlowStudio-Intent"], "run");
 });

@@ -109,6 +109,23 @@ def main() -> None:
     assert status == 404, status
 
     accepted_headers = {"X-FlowStudio-Intent": "run"}
+    # End-to-end Unicode mathematical Flow: actual native Flow HTTP routing,
+    # Python frontend, NumPy pressure solver and numerical validation.
+    math_source = (Path(__file__).resolve().parents[1] / "examples/navier_stokes_proposed.flow").read_text(encoding="utf-8")
+    math_small = (Path(__file__).resolve().parents[1] / "examples/navier_stokes_smoke.flow").read_text(encoding="utf-8")
+    assert request("POST", "/api/run/mathflow", math_small)[0] == 404
+    assert request("POST", "/api/run/mathflow", math_small,
+                   {"X-FlowStudio-Intent": "run", "Origin": "http://attacker.invalid"})[0] == 404
+    status, body = request("POST", "/api/check/mathflow", math_small, accepted_headers)
+    assert status == 200 and json.loads(body)["ok"], (status, body)
+    status, body = request("POST", "/api/run/mathflow", math_small, accepted_headers)
+    result = json.loads(body)
+    assert status == 200 and result["ok"] and result["steps"] == 10, (status, result)
+    assert result["max_divergence"] < 1e-5, result
+    assert result["kinetic_energy"] <= result["initial_kinetic_energy"] * 1.001, result
+    bad_math = math_small.replace("kinematicViscosity ∇²velocity", "kinematicViscosity velocity")
+    status, body = request("POST", "/api/check/mathflow", bad_math, accepted_headers)
+    assert status == 422 and not json.loads(body)["ok"], (status, body)
     # Real Flow HTTP -> C IPC -> persistent Rscript top-level stepping.
     # No interpreter mocks: the native acceptance job installs actual R.
     for route in ("/api/debug/r/start", "/api/debug/r/step",

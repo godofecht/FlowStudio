@@ -66,10 +66,23 @@ struct ExecutionResult {
 # C backend, "mlir" passes --backend=mlir to the real flow process.
 function execute(language: string, code: string, check_only: bool, backend: string) -> ExecutionResult {
     let mut command: ptr<ProcCmd> = proc_cmd("flow")
+    if eq(language, "mathflow") {
+        command = proc_cmd("python3")
+    }
     let mut temp_path: string = ""
     let mut output_path: string = ""
 
-    if eq(language, "flow") {
+    if eq(language, "mathflow") {
+        temp_path = fs_write_temp_flow(code)
+        if eq(temp_path, "") {
+            return ExecutionResult { status: 500, output: "FlowStudio: unable to create temporary mathematical Flow source." }
+        }
+        proc_arg(command, "src/math_flow.py")
+        if check_only {
+            proc_arg(command, "--check")
+        }
+        proc_arg(command, temp_path)
+    } elif eq(language, "flow") {
         temp_path = fs_write_temp_flow(code)
         if eq(temp_path, "") {
             return ExecutionResult { status: 500, output: "FlowStudio: unable to create temporary Flow source file." }
@@ -103,7 +116,7 @@ function execute(language: string, code: string, check_only: bool, backend: stri
     # A cold Flow compiler bootstrap can exceed the ordinary interpreter budget.
     # Both budgets remain bounded by the native process-group timeout.
     let mut deadline_ms: i32 = 15000
-    if eq(language, "flow") {
+    if eq(language, "flow") or eq(language, "mathflow") {
         deadline_ms = 60000
     }
     proc_timeout_ms(command, deadline_ms)
@@ -124,13 +137,13 @@ function execute(language: string, code: string, check_only: bool, backend: stri
         output = output + "\nProcess error: " + result.error
     }
     if result.timed_out {
-        if eq(language, "flow") {
+        if eq(language, "flow") or eq(language, "mathflow") {
             output = output + "\nFlow compilation or execution stopped after 60 seconds."
         } else {
             output = output + "\nExecution stopped after 15 seconds."
         }
     }
-    if result.exit_code != 0 {
+    if result.exit_code != 0 and not eq(language, "mathflow") {
         output = output + "\nProcess exited unsuccessfully."
     }
     if eq(output, "") {
@@ -583,6 +596,16 @@ function dispatch() -> void {
         }
     }
     if eq(method, "POST") and fs_intent_allowed() == 1 {
+        if eq(path, "/api/check/mathflow") {
+            let result: ExecutionResult = execute("mathflow", fs_body(), true, "")
+            fs_reply(result.status, "application/json; charset=utf-8", result.output)
+            return
+        }
+        if eq(path, "/api/run/mathflow") {
+            let result: ExecutionResult = execute("mathflow", fs_body(), false, "")
+            fs_reply(result.status, "application/json; charset=utf-8", result.output)
+            return
+        }
         if eq(path, "/api/check/flow") {
             send_flow_check(fs_body())
             return

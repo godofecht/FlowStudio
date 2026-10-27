@@ -45,5 +45,6 @@ test("MLIR backend is a real compiler invocation behind an explicit route", () =
   assert.match(main, /send_execution\("flow", fs_body\(\), ""\)/);
   assert.match(main, /execute\("flow", code, true, ""\)/);
   assert.match(html, /<select id="flowBackend"[\s\S]*?<option value="mlir">MLIR/);
-  assert.match(html, /\/api\/run\/" \+ language\.value \+\s*\n\s*\(backend \? "-" \+ backend : ""\)/);
+  assert.match(html, /const executionLanguage = languageOverride \|\| language\.value/);
+  assert.match(html, /\/api\/run\/" \+ executionLanguage \+\s*\n\s*\(backend \? "-" \+ backend : ""\)/);
 });

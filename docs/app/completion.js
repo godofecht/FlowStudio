@@ -158,8 +158,8 @@ function flowMembers(source, cursor, receiver, prefix) {
     [...fields].filter(name => name.startsWith(prefix)).sort().slice(0, MAX_ITEMS) : []};
 }
 
-/* Complete only names already present in the native R inspector's bounded,
- * inert list metadata. Never evaluate R expressions or infer S3 methods. */
+/* Complete only names already present in bounded webR list or exact base
+ * data.frame metadata. Never evaluate submitted member expressions. */
 const R_MEMBER = /^(?:[A-Za-z]|\.[A-Za-z_])[A-Za-z0-9._]{0,79}$/;
 const R_RESERVED = new Set(["if", "else", "repeat", "while", "function",
   "for", "in", "next", "break", "TRUE", "FALSE", "NULL", "Inf", "NaN",
@@ -187,19 +187,20 @@ function rMemberContext(lineBeforeCursor) {
   if (!path.every(rSafeName)) return null;
   return { path, prefix: match[2] || "" };
 }
+const rMemberContainer = node => node && (node.type === "list" || node.type === "data.frame");
 function rListMembers(variables, path, prefix = "") {
   if (!Array.isArray(variables) || !Array.isArray(path) ||
       path.length < 1 || path.length > 3 || !path.every(rSafeName) ||
       typeof prefix !== "string" || prefix.length > 80 ||
       (prefix && !/^[A-Za-z._][A-Za-z0-9._]*$/.test(prefix))) return [];
   let node = variables.slice(0, 128).find(item =>
-    item && item.name === path[0] && item.type === "list");
+    item && item.name === path[0] && rMemberContainer(item));
   for (const part of path.slice(1)) {
     if (!node || !Array.isArray(node.children) || node.children.length > 12) return [];
     node = node.children.find(item => {
       if (!item || typeof item.name !== "string") return false;
       const match = /^\[\[[1-9][0-9]{0,3}\]\] (.+)$/.exec(item.name);
-      return match && match[1] === part && item.type === "list";
+      return match && match[1] === part && rMemberContainer(item);
     });
   }
   if (!node || !Array.isArray(node.children) || node.children.length > 12) return [];

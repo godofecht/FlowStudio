@@ -10,10 +10,18 @@ Python dictionaries of lists. The existing scalar/vector protocol and native
 Flow-owned server routes are unchanged. No new interpreter or demo backend
 was added.
 
-**Status: partial / new automated regression tests committed; independent
-Linux/macOS CI and physical-browser Pyodide/webR execution are pending.**
-The native verification harness requires real Rscript table acceptance rather
-than treating an optional local Rscript skip as passing evidence. Python
+**Status: partial / independently verified Linux/macOS source and native
+CI; physical-browser Pyodide/webR execution remains unverified.**
+[PR #92](https://github.com/godofecht/FlowStudio/pull/92) merged as
+[9ee78f7](https://github.com/godofecht/FlowStudio/commit/9ee78f7a56a3b6a0054db5e1d53dcc285e17c960)
+after [CI #40428898996](https://github.com/godofecht/FlowStudio/actions/runs/40428898996)
+passed all four Ubuntu 24.04/macOS 14 jobs. Each source job ran 812
+JavaScript tests (808 passed, four skipped, zero failed). Both native
+jobs compiled Flow 2.0.0, passed live Rscript/HTTP acceptance and packaged
+the executable. All six new table tests passed without skips on both native
+platforms, including actual CPython and Rscript round trips and rejection
+cases. The native verification harness requires real Rscript table acceptance
+rather than treating an optional local Rscript skip as passing evidence. Python
 empty-column dictionaries and all-None columns cannot be typed and are
 rejected; R zero-row typed data.frames can be transferred one-way to Python.
 Factors, custom row names, dates, pandas DataFrames, nested objects, nonfinite

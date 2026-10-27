@@ -1,3 +1,26 @@
+## 2026-10-27: opt-in Python typed table / NumPy 2D ndarray → real R matrix (validation pending)
+
+The browser Python → R Copy variable operation now exposes an explicit **R matrix**
+destination. It accepts only nonempty homogeneous typed tables (1–16 columns,
+1–128 rows, existing 32-KiB bound) and constructs a real base R matrix in the
+persistent webR session, preserving row and column order through column-major
+construction. Numeric missing values become typed `NA_real_`; logical and
+character missing values remain their respective typed R NA. Unicode text is
+URL-decoded safely. Default Python → R table import still produces a data.frame.
+Mixed-type tables, empty tables, malformed packets, invalid options, and
+active/locked destination bindings fail closed before assignment. Python/R
+session generation checks remain in place. Column labels, NumPy dtype widths,
+array subclasses, and metadata are not preserved; the wire format does not
+identify whether a table originated from NumPy, pandas, or a plain dictionary.
+
+**Status: partial / source-level syntax checks passed; independent Linux/macOS
+CI, real Rscript acceptance and physical Chromium Pyodide/webR acceptance
+pending.** New automated tests cover controller routing, preflight rejection,
+column-major R expression generation, Unicode, NA values, real Rscript matrix
+construction and active-binding protection. Native verification explicitly
+requires the Rscript tests. No hosted CI workflow or native Flow backend
+configuration changed. This is not RStudio parity.
+
 ## 2026-10-27: bounded plain R matrix → NumPy 2D ndarray (validation pending)
 
 Browser R → Python Copy variable now exports exact unclassed, unlabelled

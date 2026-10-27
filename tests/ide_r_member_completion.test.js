@@ -26,6 +26,7 @@ const snapshot = [
 function providerHarness() {
   let source = fs.readFileSync(path.join(__dirname, "../frontend/completion.js"), "utf8");
   source = source.replace(/^import '\/ide_completion_core\.js';\s*/m, "")
+    .replace(/^export \{[^}]+\};?\s*$/gm, "")
     .replace(/^export function /gm, "function ");
   const context = {FlowStudioCompletionCore:core, AbortController, Date, Promise};
   vm.runInNewContext(source + "\nglobalThis.__provider = {registerCompletion, sessionSymbols};", context);

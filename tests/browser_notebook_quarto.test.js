@@ -37,6 +37,15 @@ test("preserves supported scalar Quarto YAML and Unicode through roundtrip", () 
   assert.equal((exported.match(/format:/g) || []).length, 1);
 });
 
+
+test("title-only Quarto frontmatter gains explicit HTML format on export", () => {
+  const qmd = "---\ntitle: Notes\n---\n\n" + fence + "{r}\nprint(1)\n" + fence;
+  const imported = quarto.decode(qmd, parseCells);
+  const exported = quarto.encode(imported.source, "r", parseCells);
+  assert.match(exported, /^---\ntitle: Notes\nformat: html\n---/);
+  assert.equal((exported.match(/format: html/g) || []).length, 1);
+});
+
 test("accepts Quarto documents without YAML using default HTML", () => {
   const restored = quarto.decode("# Heading\n\n" + fence + "{python}\nprint(2)\n" + fence, parseCells);
   assert.equal(restored.language, "python");

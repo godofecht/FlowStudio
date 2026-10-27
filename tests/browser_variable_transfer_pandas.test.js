@@ -84,6 +84,34 @@ test("actual pandas nullable data frame transfers typed values and missing cells
   assert.deepEqual(decoded.columns[1].values,[true,false,true]);
 });
 
+test("fixed-width pandas numeric dtypes preserve exact values and reject unsafe uint64", async t => {
+  const probe=spawnSync("python3",["-c","import pandas"],{encoding:"utf8"});
+  if (probe.status!==0) {
+    if (process.env.FLOWSTUDIO_REQUIRE_PANDAS === "1") assert.fail("pandas is required for numeric dtype acceptance: " + (probe.stderr || probe.error || "import failed"));
+    return t.skip("pandas unavailable locally");
+  }
+  const query=await exportQuery();
+  const result=runPython(query,
+    "import pandas as pd\\n" +
+    "data = pd.DataFrame({'half':pd.Series([1.5,2],dtype='float16')," +
+    "'single':pd.Series([1.25,float('nan')],dtype='float32')," +
+    "'signed':pd.Series([-2,3],dtype='int32')," +
+    "'unsigned':pd.Series([4,5],dtype='uint32')})");
+  assert.equal(result.status,0,result.stderr);
+  const packet=JSON.parse(result.stdout);
+  assert.deepEqual(packet,{kind:"table",columns:[
+    {name:"half",type:"number",values:[1.5,2]},
+    {name:"single",type:"number",values:[1.25,null]},
+    {name:"signed",type:"number",values:[-2,3]},
+    {name:"unsigned",type:"number",values:[4,5]}
+  ]});
+  assert.equal(transfer.validate(packet),packet);
+  const unsafe=runPython(query,
+    "import pandas as pd\\n" +
+    "data = pd.DataFrame({'large':pd.Series([9007199254740992],dtype='uint64')})");
+  assert.notEqual(unsafe.status,0,"uint64 above JS safe integer range must be rejected");
+});
+
 test("pandas export rejects lossy or unsafe frames before packet creation", async t => {
   const probe=spawnSync("python3",["-c","import pandas"],{encoding:"utf8"});
   if (probe.status!==0) {

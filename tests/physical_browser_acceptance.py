@@ -203,10 +203,10 @@ def test_r(page, timeout: int):
     # Exact pandas DataFrame -> actual webR data.frame -> Python dictionary.
     # Pyodide's existing loadPackagesFromImports loads pandas for this source.
     run_source(page, "python",
-               "import pandas as pd\\n"
+               "import pandas as pd\n"
                "fs_py_pd = pd.DataFrame({'score': pd.Series([1.25, None, 2.5], dtype='Float64'), "
                "'flag': pd.Series([True, None, False], dtype='boolean'), "
-               "'label': pd.Series(['@NA@', None, 'é'], dtype='string')})\\n"
+               "'label': pd.Series(['@NA@', None, 'é'], dtype='string')})\n"
                "print('pandas browser ready')",
                "pandas browser ready", timeout)
     page.locator("#transferDirection").select_option("python-to-r")

@@ -10,34 +10,6 @@ concurrency:
   group: ci-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 jobs:
-  rebuild_monaco_pr89:
-    name: Rebuild shipped Monaco bundle for PR 89
-    if: github.event_name == 'pull_request' && github.event.pull_request.number == 89
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: feat/native-monaco-r-member-completion-20261026
-          persist-credentials: true
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Build and test the actual combined R and mathematical Monaco source
-        run: |
-          npm ci
-          npm run build:ui
-          node --test tests/ide_r_member_completion.test.js tests/browser_math_commands.test.js
-      - name: Commit shipped Monaco assets
-        run: |
-          git add web/ui/workbench.js web/ui/editor.worker.js web/ui/THIRD_PARTY_LICENSES.txt
-          if ! git diff --cached --quiet; then
-            git config user.name 'github-actions[bot]'
-            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git commit -m 'build(ui): combine R member and mathematical Flow completion in shipped Monaco'
-            git push origin HEAD:refs/heads/feat/native-monaco-r-member-completion-20261026
-          fi
   quality:
     name: Source and transport / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}

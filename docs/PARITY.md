@@ -8,9 +8,17 @@ expressions. It excludes non-syntactic/reserved names, custom classes and
 active bindings. The inspected names can be stale if the workspace changes;
 lazy root bindings can still be forced by the existing inspector. This does
 not change the native Flow server, native Monaco's separately bundled editor,
-or the R interpreter. **Status: partial; local V8 syntax/metadata checks
-only, GitHub Linux/macOS and real Rscript acceptance pending.** Physical
-browser acceptance and RStudio parity remain unverified.
+or the R interpreter. **Status: partial; independent Linux/macOS CI
+passed source and native jobs, including real Rscript inspector acceptance.**
+[CI #40440522826](https://github.com/godofecht/FlowStudio/actions/runs/40440522826)
+passed all four jobs on 27 October 2026. Each native job ran all four
+`tests/browser_r_dataframe_completion.test.js` cases with zero skips, including
+real Rscript verification of nested data.frames, bounded columns, custom
+classes and active-binding safety, then compiled Flow 2.0.0 and completed
+live HTTP acceptance and packaging. Source jobs ran 815 JavaScript tests
+(811 passed, four skipped, zero failures); the Rscript test was skipped only
+in source jobs without R and executed successfully in both native jobs.
+Physical-browser webR completion and RStudio parity remain unverified.
 
 ## 2026-10-27: bounded typed Python/R tabular interchange (validation pending)
 

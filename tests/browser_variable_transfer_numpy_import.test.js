@@ -74,7 +74,7 @@ test("controller rejects incompatible NumPy modes before Python destination muta
   for (const [packet,pandas,expected] of [
     [numberPacket,true,/either pandas or NumPy/],
     [{kind:"scalar",type:"number",values:[3]},false,/nonempty numeric/],
-    [{kind:"table",columns:[{name:"x",type:"number",values:[3]}]},false,/nonempty numeric/],
+    [{kind:"table",columns:[{name:"x",type:"number",values:[3]},{name:"label",type:"string",values:["mixed"]}]},false,/nonempty numeric/],
     [{kind:"vector",type:"string",values:["x",null]},false,/nonempty numeric/],
     [{kind:"vector",type:"number",values:[]},false,/nonempty numeric/],
     [{kind:"vector",type:"boolean",values:[true,null]},false,/nonempty numeric/]

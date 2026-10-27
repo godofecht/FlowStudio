@@ -88,3 +88,23 @@ R matrix identity, NumPy shape/dtype metadata, row names or integer storage.
 Real CPython/NumPy tests and Rscript acceptance when available are included
 in `tests/browser_variable_transfer_numpy_matrix.test.js`. Independent CI
 and physical-browser Pyodide/webR acceptance have not yet been verified.
+
+## 2026-10-27: opt-in homogeneous R data.frame → NumPy 2D ndarray (CI pending)
+
+The browser Copy variable operation now accepts an ordinary R data.frame as
+an explicit NumPy destination only when every column has the same wire type.
+It constructs a real two-dimensional ndarray in the persistent Pyodide worker,
+preserving row/column order and typed numeric missing cells as NaN. Boolean
+and Unicode tables require nonmissing cells; mixed-type tables, empty rows,
+malformed packets and simultaneous pandas/NumPy selection are rejected before
+Python mutation. Existing R vector → NumPy and default table → dictionary
+transfers are unchanged. R column names, integer storage, factors and custom
+row names are not preserved in the ndarray. Existing table protocol limits
+(1–16 columns, 1–128 rows, 32 KiB) apply.
+
+**Status: partial / source and real-CPython regression tests committed;
+independent Linux/macOS CI and physical Chromium Pyodide/webR execution
+pending.** Tests cover exact NumPy shape/dtype, Unicode, missing numeric
+cells, invalid tables and destination preservation on constructor failure.
+This is not general R matrix identity interchange or RStudio parity.
+

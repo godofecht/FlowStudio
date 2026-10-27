@@ -91,9 +91,15 @@ function create({direction, source, destination, button, pandas = null, numpy = 
         throw Error("Choose either pandas or NumPy destination.");
       if (asPandas && packet.kind !== "table")
         throw Error("Pandas destination requires an R data.frame.");
-      if (asNumpy && (packet.kind !== "vector" || !["number", "boolean", "string"].includes(packet.type) ||
-          packet.values.length === 0 || (packet.type !== "number" && packet.values.includes(null))))
-        throw Error("NumPy destination requires a nonempty numeric or nonmissing boolean/string R vector.");
+      if (asNumpy) {
+        const supported = packet.kind === "vector" ?
+          packet.values.length > 0 && (packet.type === "number" || !packet.values.includes(null)) :
+          packet.kind === "table" && packet.columns[0].values.length > 0 &&
+          packet.columns.every(column => column.type === packet.columns[0].type &&
+            (column.type === "number" || !column.values.includes(null)));
+        if (!supported)
+          throw Error("NumPy destination requires a nonempty numeric or nonmissing boolean/string R vector, or homogeneous R data.frame without missing boolean/string cells.");
+      }
       const target = route === "python-to-r" ? await rSession().importVariable(to, packet) :
         await python(asNumpy ? "import-numpy" : asPandas ? "import-pandas" : "import", to, packet);
       if (generation() !== epoch) throw Error("Session changed during transfer.");

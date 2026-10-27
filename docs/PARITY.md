@@ -1,3 +1,15 @@
+## 2026-10-27: inert inline emphasis in offline notebook reports (CI pending)
+
+The offline notebook HTML exporter now renders bounded strong, emphasis and
+strikethrough delimiters in Markdown cells, pipe-table cells and validated
+Jupyter `text/markdown` output. The single-pass tokenizer keeps backtick code
+spans and escaped punctuation opaque, does not turn Markdown links or raw HTML
+into active elements, and leaves unmatched marks literal. Existing HTML escaping,
+output budgets and CSP remain unchanged. This is not full CommonMark, knitr or
+Quarto compatibility. **Status: partial / local pure-JavaScript assertions passed;
+Node regression and independent CI pending.** Physical Chromium Pyodide/webR
+acceptance remains unexecuted. No Flow compiler or hosted CI changes.
+
 ## 2026-10-27: inert GFM-style pipe tables in offline notebook reports (pending CI)
 
 Notebook Markdown cells and validated Jupyter `text/markdown` output now render

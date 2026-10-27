@@ -57,11 +57,13 @@ function validateValues(type, values, allowMissing) {
     }
   }
 }
-function create({direction, source, destination, button, pandas = null, python, rSession,
+function create({direction, source, destination, button, pandas = null, numpy = null, python, rSession,
                  notice, isBusy, setBusy, generation, refresh = async () => {}}) {
   if (![direction, source, destination, button].every(Boolean) ||
       (pandas !== null && (typeof pandas !== "object" ||
         (pandas.checked !== undefined && typeof pandas.checked !== "boolean"))) ||
+      (numpy !== null && (typeof numpy !== "object" ||
+        (numpy.checked !== undefined && typeof numpy.checked !== "boolean"))) ||
       [python, rSession, notice, isBusy, setBusy, generation, refresh].some(fn => typeof fn !== "function"))
     throw TypeError("Variable transfer requires controls and runtime callbacks.");
   async function transfer() {
@@ -84,15 +86,21 @@ function create({direction, source, destination, button, pandas = null, python, 
       if (!origin || origin.ok !== true) throw Error(origin?.output || "Source variable could not be exported.");
       const packet = validate(origin.value);
       const asPandas = route === "r-to-python" && pandas?.checked === true;
+      const asNumpy = route === "r-to-python" && numpy?.checked === true;
+      if (asPandas && asNumpy)
+        throw Error("Choose either pandas or NumPy destination.");
       if (asPandas && packet.kind !== "table")
         throw Error("Pandas destination requires an R data.frame.");
+      if (asNumpy && (packet.kind !== "vector" || !["number", "boolean"].includes(packet.type) ||
+          packet.values.length === 0 || (packet.type === "boolean" && packet.values.includes(null))))
+        throw Error("NumPy destination requires a nonempty numeric or nonmissing boolean R vector.");
       const target = route === "python-to-r" ? await rSession().importVariable(to, packet) :
-        await python(asPandas ? "import-pandas" : "import", to, packet);
+        await python(asNumpy ? "import-numpy" : asPandas ? "import-pandas" : "import", to, packet);
       if (generation() !== epoch) throw Error("Session changed during transfer.");
       if (!target || target.ok !== true) throw Error(target?.output || "Destination rejected transfer.");
       await refresh(route === "python-to-r" ? "r" : "python");
       if (generation() !== epoch) throw Error("Session changed during transfer.");
-      notice("Transferred " + from + " to " + to + " (" + (packet.kind === "table" ? packet.columns.length + " table columns" : packet.type + " " + packet.kind) + (asPandas ? " as pandas DataFrame" : "") + ").");
+      notice("Transferred " + from + " to " + to + " (" + (packet.kind === "table" ? packet.columns.length + " table columns" : packet.type + " " + packet.kind) + (asPandas ? " as pandas DataFrame" : asNumpy ? " as NumPy ndarray" : "") + ").");
       return true;
     } catch (error) {
       if (generation() === epoch) notice("Variable transfer failed: " + String(error.message || error).slice(0, 300));

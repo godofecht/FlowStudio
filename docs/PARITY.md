@@ -1,3 +1,21 @@
+## 2026-10-27: opt-in R atomic vector → NumPy ndarray destination (pending independent CI)
+
+The browser R → Python Copy variable operation now supports an explicit NumPy
+destination for nonempty numeric or logical R vectors. It constructs real
+one-dimensional NumPy `float64` or `bool` arrays in the persistent Pyodide
+worker. Missing numeric R values become NumPy NaN; missing logical values are
+rejected rather than silently converted to True. Strings, scalars, tables and
+empty vectors are rejected in NumPy mode. Selecting both pandas and NumPy is
+an error. The default Python list and existing pandas DataFrame destinations
+remain unchanged. The bounded transfer packet, 256-element / 32-KiB limits,
+native Flow backend and hosted CI configuration are unchanged.
+
+**Status: partial / implementation submitted; independent CI and physical-browser
+Pyodide/webR acceptance not yet verified.** Real CPython/NumPy acceptance,
+controller dispatch, worker preflight, error handling and destination atomicity
+are covered by the new regression suite. This is not dtype-preserving R integer
+transfer, automatic session persistence or RStudio parity.
+
 ## 2026-10-27: bounded NumPy ndarray → R vector transfer (Linux/macOS CI passed)
 
 The existing browser-local Python → R Copy variable action now accepts exact

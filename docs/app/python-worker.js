@@ -145,10 +145,13 @@ async function handle(event) {
     /^[A-Za-z_][A-Za-z0-9_]{0,79}$/.test(code);
   const validExport = (op === "export" || op === "export-snapshot") &&
     typeof code === "string" && TRANSFER_NAME.test(code);
-  const validImport = (op === "import" || op === "import-pandas") &&
+  const validImport = (op === "import" || op === "import-pandas" || op === "import-numpy") &&
     typeof code === "string" && TRANSFER_NAME.test(code) &&
     validTransferPacket(transferValue) &&
-    (op !== "import-pandas" || transferValue.kind === "table");
+    (op !== "import-pandas" || transferValue.kind === "table") &&
+     (op !== "import-numpy" || (transferValue.kind === "vector" &&
+       ["number", "boolean"].includes(transferValue.type) && transferValue.values.length > 0 &&
+       (transferValue.type !== "boolean" || !transferValue.values.includes(null))));
   if (!((op === "run" && typeof code === "string" && new TextEncoder().encode(code).length <= 65536) ||
     op === "inspect" || op === "packages" || validInstall || validTable || validCheck || validHelp || validComplete || validExport || validImport)) {
     self.postMessage({id, ok:false, output:"Invalid execution request."}); return;
@@ -239,6 +242,24 @@ async function handle(event) {
         self.postMessage(origin === "pandas" ?
           {id, ok:true, value:packet, origin:"pandas"} : {id, ok:true, value:packet});
       } else self.postMessage({id, ok:true, value:packet});
+      return;
+    }
+    if (op === "import-numpy") {
+      // Explicit R vector -> ndarray conversion. Keep missing numeric values as NaN;
+      // reject missing logical values before loading NumPy to avoid silent coercion.
+      await py.loadPackage("numpy");
+      const query = [
+        "import json as _fs_transfer_json, numpy as _fs_transfer_np",
+        "_fs_transfer_packet = _fs_transfer_json.loads(" + JSON.stringify(JSON.stringify(transferValue)) + ")",
+        "_fs_transfer_dtype = _fs_transfer_np.float64 if _fs_transfer_packet['type'] == 'number' else _fs_transfer_np.bool_",
+        "_fs_transfer_array = _fs_transfer_np.asarray(_fs_transfer_packet['values'], dtype=_fs_transfer_dtype)",
+        "if type(_fs_transfer_array) is not _fs_transfer_np.ndarray or _fs_transfer_array.ndim != 1: raise ValueError('Invalid NumPy transfer result')",
+        "globals()[" + JSON.stringify(code) + "] = _fs_transfer_array",
+        "'ok'"
+      ].join("\n");
+      const acknowledgement = await py.runPythonAsync(query);
+      if (acknowledgement !== "ok") throw Error("NumPy transfer assignment did not acknowledge success.");
+      self.postMessage({id, ok:true});
       return;
     }
     if (op === "import-pandas") {

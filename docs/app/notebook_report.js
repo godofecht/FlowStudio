@@ -193,12 +193,21 @@ function renderBundle(json, format, parseCells, title = "FlowStudio notebook rep
     const result = entries.get(cell.index);
     const outputs = [];
     if (result) {
-      if (result.output) outputs.push({output_type:"stream",
-        name:result.ok ? "stdout" : "stderr", text:result.output});
-      if (result.truncated) outputs.push({output_type:"stream", name:"stderr",
-        text:"[FlowStudio output was truncated]"});
-      for (const plot of result.plots)
-        outputs.push({output_type:"display_data", metadata:{}, data:{"image/png":plot.png}});
+      // Preserve validated Jupyter display MIME types in offline reports.
+      // A portable v2 bundle cannot smuggle active HTML or modified records:
+      // decodeBundle and safeJupyterOutputs both enforce the snapshot.
+      if (result.jupyterOutputs !== undefined) {
+        const preserved = format.safeJupyterOutputs?.(result.jupyterOutputs, result);
+        if (!preserved) throw Error("Saved Jupyter output records no longer match the displayed snapshot.");
+        outputs.push(...preserved);
+      } else {
+        if (result.output) outputs.push({output_type:"stream",
+          name:result.ok ? "stdout" : "stderr", text:result.output});
+        if (result.truncated) outputs.push({output_type:"stream", name:"stderr",
+          text:"[FlowStudio output was truncated]"});
+        for (const plot of result.plots)
+          outputs.push({output_type:"display_data", metadata:{}, data:{"image/png":plot.png}});
+      }
     }
     return {cell_type:"code", metadata:{flowstudio:{language:cell.language || imported.language}},
       source:cell.code, outputs};

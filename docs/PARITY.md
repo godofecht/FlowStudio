@@ -1,3 +1,19 @@
+## 2026-10-27: restricted Quarto .qmd R/Python source interchange (CI pending)
+
+Browser notebook controls can import and export Quarto HTML source with
+literal scalar YAML, R/Python executable chunks, labels and inert Markdown.
+They reuse the strict R Markdown parser; the .qmd adapter translates only
+format: html and output: html_document in validated frontmatter.
+Unsupported Quarto #| options, shortcodes, inline engines, executable YAML,
+Flow chunks and non-HTML formats are rejected rather than silently changing
+execution semantics. The browser does not run Quarto or knitr; source
+interchange is not report rendering or full Quarto compatibility.
+
+**Status: partial / focused V8 checks passed, independent CI pending.**
+Physical Chromium Pyodide/webR and external Quarto rendering remain
+unexecuted. Flow 2.0.0 stays the primary native backend. No hosted CI changes.
+See [Quarto interchange](QUARTO_INTERCHANGE.md).
+
 ## 2026-10-27: inert inline emphasis in offline notebook reports (Linux/macOS CI passed)
 
 The offline notebook HTML exporter now renders bounded strong, emphasis and

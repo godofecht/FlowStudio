@@ -1,4 +1,4 @@
-## 2026-10-27: opt-in Python typed table / NumPy 2D ndarray → real R matrix (validation pending)
+## 2026-10-27: opt-in Python typed table / NumPy 2D ndarray → real R matrix (Linux/macOS CI passed)
 
 The browser Python → R Copy variable operation now exposes an explicit **R matrix**
 destination. It accepts only nonempty homogeneous typed tables (1–16 columns,
@@ -13,15 +13,13 @@ session generation checks remain in place. Column labels, NumPy dtype widths,
 array subclasses, and metadata are not preserved; the wire format does not
 identify whether a table originated from NumPy, pandas, or a plain dictionary.
 
-**Status: partial / source-level syntax checks passed; independent Linux/macOS
-CI, real Rscript acceptance and physical Chromium Pyodide/webR acceptance
-pending.** New automated tests cover controller routing, preflight rejection,
+**Status: partial / all four Ubuntu 24.04/macOS 14 CI jobs passed in [CI #40554621867](https://github.com/godofecht/FlowStudio/actions/runs/40554621867); physical Chromium Pyodide/webR acceptance unexecuted.** [PR #108](https://github.com/godofecht/FlowStudio/pull/108) merged as [d137d4a](https://github.com/godofecht/FlowStudio/commit/d137d4a62594ed18681a4b76040836668d3c852b). Each source platform ran 911 JavaScript tests (903 passed, eight skipped, zero failures). Both native jobs compiled Flow 2.0.0, ran real Rscript matrix acceptance (four tests, zero skips), completed native HTTP validation and packaged executables. Focused V8 execution of the actual controller and webR query construction passed. New automated tests cover controller routing, preflight rejection,
 column-major R expression generation, Unicode, NA values, real Rscript matrix
 construction and active-binding protection. Native verification explicitly
 requires the Rscript tests. No hosted CI workflow or native Flow backend
 configuration changed. This is not RStudio parity.
 
-## 2026-10-27: bounded plain R matrix → NumPy 2D ndarray (validation pending)
+## 2026-10-27: bounded plain R matrix → NumPy 2D ndarray (Linux/macOS CI passed)
 
 Browser R → Python Copy variable now exports exact unclassed, unlabelled
 two-dimensional base R numeric, integer, logical or character matrices as
@@ -34,8 +32,7 @@ unsafe numeric values and invalid strings are rejected before export. Missing
 numeric values become NaN; missing logical/character cells are rejected in
 NumPy mode. Existing 32-KiB wire limit applies.
 
-**Status: partial / new automated tests committed, independent CI pending;
-physical-browser Pyodide/webR acceptance unexecuted.** Native verification
+**Status: partial / four independent Linux/macOS CI jobs passed in [CI #40544404659](https://github.com/godofecht/FlowStudio/actions/runs/40544404659), and [PR #107](https://github.com/godofecht/FlowStudio/pull/107) merged as [f880f2d](https://github.com/godofecht/FlowStudio/commit/f880f2daf8c496383008dec164ce70d673603012); physical-browser Pyodide/webR acceptance unexecuted.** Native verification
 requires actual Rscript matrix acceptance and rejection, and source tests
 exercise real CPython/NumPy construction when installed. No native Flow route
 or hosted CI configuration changes. Flow 2.0.0 remains the primary backend.
@@ -53,7 +50,7 @@ boolean/string cells and mixed columns are rejected. R column labels and
 integer storage widths are lost. Physical-browser acceptance remains
 unexecuted; RStudio parity is not achieved.
 
-## 2026-10-27: opt-in homogeneous R data.frame → NumPy 2D ndarray (CI pending)
+## 2026-10-27: opt-in homogeneous R data.frame → NumPy 2D ndarray (Linux/macOS CI passed)
 
 The browser Copy variable operation now accepts an ordinary R data.frame as
 an explicit NumPy destination only when every column has the same wire type.
@@ -66,17 +63,15 @@ transfers are unchanged. R column names, integer storage, factors and custom
 row names are not preserved in the ndarray. Existing table protocol limits
 (1–16 columns, 1–128 rows, 32 KiB) apply.
 
-**Status: partial / source and real-CPython regression tests committed;
-independent Linux/macOS CI and physical Chromium Pyodide/webR execution
-pending.** Tests cover exact NumPy shape/dtype, Unicode, missing numeric
+**Status: partial / independent Linux/macOS CI passed in [CI #40534281335](https://github.com/godofecht/FlowStudio/actions/runs/40534281335); physical Chromium Pyodide/webR execution pending.** Tests cover exact NumPy shape/dtype, Unicode, missing numeric
 cells, invalid tables and destination preservation on constructor failure.
 This is not general R matrix identity interchange or RStudio parity.
 
-## 2026-10-27: bounded NumPy 2D matrix → R data.frame transfer (PR pending)
+## 2026-10-27: bounded NumPy 2D matrix → R data.frame transfer (Linux/macOS CI passed)
 
 Python → R Copy variable now recognizes exact two-dimensional NumPy ndarrays with approved built-in numeric, boolean or Unicode dtypes. The existing Python worker exports them as bounded typed tables, with column-major V1–V16 names and 1–128 rows; the existing webR table importer constructs an actual R data.frame. One-dimensional ndarray transfer remains a vector. Missing floating NaN values become R NA only when a column has a nonmissing value to establish its type. All-missing columns, unsafe numbers, invalid strings, unsupported dtypes, subclasses, zero dimensions, oversized matrices and packets exceeding 32 KiB are rejected. This is **not** an R matrix transfer or a dtype-preserving NumPy round trip; dimensions, integer widths and NumPy-specific metadata are not retained. No native Flow route or hosted CI configuration is modified.
 
-**Status: partial / independent CI pending; physical-browser Pyodide/webR acceptance unexecuted.** Tests cover real CPython/NumPy serialization, negative cases, browser worker validation and Rscript import when available. Flow 2.0.0 remains the primary native backend. RStudio parity is not achieved.
+**Status: partial / independent Linux/macOS CI passed in [CI #40526070277](https://github.com/godofecht/FlowStudio/actions/runs/40526070277) and [PR #105](https://github.com/godofecht/FlowStudio/pull/105) merged as [246e4ac](https://github.com/godofecht/FlowStudio/commit/246e4ac3ba6afcc303378b1c95b08227113d7697); physical-browser Pyodide/webR acceptance unexecuted.** Tests cover real CPython/NumPy serialization, negative cases, browser worker validation and Rscript import when available. Flow 2.0.0 remains the primary native backend. RStudio parity is not achieved.
 
 ## 2026-10-27: bounded bidirectional NumPy Unicode vector transfer (Linux/macOS CI passed)
 

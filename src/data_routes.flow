@@ -164,6 +164,9 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/app/mixed_languages.js" {
         return StaticAsset { path: "docs/app/mixed_languages.js", mime: "text/javascript; charset=utf-8", found: true }
     }
+    if url == "/app/notebook_quarto.js" {
+        return StaticAsset { path: "docs/app/notebook_quarto.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
     if url == "/app/notebook_rmarkdown.js" {
         return StaticAsset { path: "docs/app/notebook_rmarkdown.js", mime: "text/javascript; charset=utf-8", found: true }
     }

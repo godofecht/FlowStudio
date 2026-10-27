@@ -119,7 +119,7 @@ test("real Rscript exports numeric and logical matrices and rejects unsafe matri
     const r=spawnSync("Rscript",["--vanilla","-e",
       setup+"\nresult <- "+query+"\ncat(paste(result, collapse='\\n'))"],{encoding:"utf8"});
     assert.equal(r.status,0,r.stderr);
-    const rows=r.stdout.trimEnd().split("\n");
+    const rows=r.stdout.split("\n");
     assert.deepEqual(rows.slice(0,5),prefix);
     assert.equal(rows.length,3+Number(rows[1])*(2+Number(rows[2])));
   }

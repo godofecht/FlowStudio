@@ -62,12 +62,72 @@ function markdown(value) {
       ">" + escapeHTML(code.join("\n")) + "</code></pre>");
     fence = null; code = [];
   }
-  for (const line of value.replace(/\r\n?/g, "\n").split("\n")) {
+  // Inert pipe tables: only fixed alignment classes and escaped cell text.
+  // Pipes inside inline code spans or escaped as \| do not split cells.
+  function tableCells(line) {
+    let input = line.trim(), cell = "", codeTicks = 0, separated = false;
+    if (!input.includes("|")) return null;
+    if (input.startsWith("|")) input = input.slice(1);
+    if (input.endsWith("|") && !input.endsWith("\\|")) input = input.slice(0, -1);
+    const cells = [];
+    for (let i = 0; i < input.length; i++) {
+      if (input[i] === "\\" && input[i + 1] === "|") {
+        cell += "|"; i++; continue;
+      }
+      if (input[i] === "\`") {
+        let end = i + 1;
+        while (input[end] === "\`") end++;
+        const count = end - i;
+        if (!codeTicks) codeTicks = count;
+        else if (codeTicks === count) codeTicks = 0;
+        cell += input.slice(i, end);
+        i = end - 1;
+      } else if (input[i] === "|" && !codeTicks) {
+        cells.push(cell.trim()); cell = ""; separated = true;
+      } else cell += input[i];
+    }
+    cells.push(cell.trim());
+    return separated || line.trim().startsWith("|") ? cells : null;
+  }
+  function tableAt(lines, index) {
+    if (index + 1 >= lines.length) return null;
+    const headings = tableCells(lines[index]);
+    const rules = tableCells(lines[index + 1]);
+    if (!headings || !rules || headings.length !== rules.length ||
+        headings.length < 1 || headings.length > 16 ||
+        !rules.every(rule => /^:?-{3,}:?$/.test(rule))) return null;
+    const alignment = rules.map(rule => rule.startsWith(":") && rule.endsWith(":") ?
+      "center" : rule.endsWith(":") ? "right" : rule.startsWith(":") ? "left" : "");
+    const renderCell = (tag, value, column) => "<" + tag +
+      (alignment[column] ? ' class="align-' + alignment[column] + '"' : "") +
+      ">" + inline(value) + "</" + tag + ">";
+    const head = "<thead><tr>" + headings.map((value, column) =>
+      renderCell("th", value, column)).join("") + "</tr></thead>";
+    const rows = [];
+    let next = index + 2;
+    while (next < lines.length && rows.length < 128) {
+      const cells = tableCells(lines[next]);
+      if (!cells || cells.length > headings.length) break;
+      rows.push("<tr>" + headings.map((_, column) =>
+        renderCell("td", cells[column] || "", column)).join("") + "</tr>");
+      next++;
+    }
+    return {html:"<table>" + head + "<tbody>" + rows.join("") +
+      "</tbody></table>", next};
+  }
+  const lines = value.replace(/\r\n?/g, "\n").split("\n");
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index];
     if (fence) {
       const closing = /^ {0,3}(\`+|~+)[ \t]*$/.exec(line);
       if (closing && closing[1][0] === fence.character &&
           closing[1].length >= fence.length) flushFence();
       else code.push(line);
+      continue;
+    }
+    const table = tableAt(lines, index);
+    if (table) {
+      flush(); blocks.push(table.html); index = table.next - 1;
       continue;
     }
     const opening = /^ {0,3}(\`{3,}|~{3,})(.*)$/.exec(line);
@@ -174,6 +234,9 @@ function render(json, title = "FlowStudio notebook report") {
     "pre.stderr{background:#fff0ee;color:#912a24}img{max-width:100%;height:auto}" +
     "section{margin:1.5rem 0;border-bottom:1px solid #d7dce4;padding-bottom:1rem}" +
     "h1,h2,h3{line-height:1.25}code{font-family:ui-monospace,monospace}" +
+    "table{border-collapse:collapse;max-width:100%;display:block;overflow-x:auto}" +
+    "th,td{border:1px solid #d7dce4;padding:.35rem .65rem;text-align:left}" +
+    ".align-right{text-align:right}.align-center{text-align:center}" +
     "</style></head><body><main><h1>" + safeTitle + "</h1>" +
     sections.join("\n") + "</main></body></html>\n";
   if (encoder.encode(html).length > 7340032) throw Error("HTML report exceeds 7 MiB.");

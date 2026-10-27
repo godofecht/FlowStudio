@@ -103,8 +103,9 @@ test("Pyodide worker validates table packets before interpreter mutation", async
   h.send(1,"export","data");
   h.send(2,"import","copy",table);
   h.send(3,"import","bad",{kind:"table",columns:[{name:"x",type:"number",values:[NaN]}]});
-  await replies(h,3);
-  assert.deepEqual(h.replies.map(x=>x.ok),[true,true,false]);
+  h.send(4,"import","bad",{kind:"table",columns:[{name:null,type:"number",values:[1]}]});
+  await replies(h,4);
+  assert.deepEqual(h.replies.map(x=>x.ok),[true,true,false,false]);
   assert.equal(h.queries.length,2);
   assert.match(h.queries[0],/type\(_fs_transfer_obj\) is dict/);
   assert.match(h.queries[1],/for c in _fs_transfer_packet\['columns'\]/);

@@ -52,7 +52,7 @@ the pinned Flow 2.0.0 backend. Physical-browser Pyodide/webR table transfer
 remains unverified; no full RStudio or pandas parity is claimed.
 
 
-## NumPy Unicode vectors (27 October 2026; independent CI pending)
+## NumPy Unicode vectors (27 October 2026; Linux/macOS CI passed)
 
 The optional NumPy destination now accepts nonempty R character vectors
 without `NA_character_`, creating a real Unicode `numpy.ndarray` in the
@@ -65,4 +65,5 @@ NumPy destination mode. Default Python list transfers still support typed
 missing strings. See `tests/browser_variable_transfer_numpy.test.js` and
 `tests/browser_variable_transfer_numpy_import.test.js`. This does not
 preserve NumPy dtype width on the R side, nor verify a physical-browser
-Pyodide/webR round trip or RStudio parity.
+Pyodide/webR round trip or RStudio parity. [PR #104](https://github.com/godofecht/FlowStudio/pull/104)
+passed all four Linux/macOS jobs in [CI #40515203015](https://github.com/godofecht/FlowStudio/actions/runs/40515203015).

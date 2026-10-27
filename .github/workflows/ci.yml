@@ -41,6 +41,20 @@ jobs:
         run: |
           python3 tests/transport_smoke.py
           python3 tests/embedding_headers_smoke.py
+  flowjit:
+    name: FlowJIT real R/C native / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-14]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: 'release'
+      - name: Compile and execute native R arithmetic kernels
+        run: Rscript --vanilla tests/flowjit_smoke.R
   native:
     name: Native Flow compile and HTTP / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -74,14 +88,14 @@ jobs:
         run: |
           flow version
           python3 scripts/verify_native.py --require-r
-      - name: Real Chromium Monaco acceptance on native Flow server
+      - name: Real Chromium Quarto and Monaco acceptance on native Flow server
         if: matrix.os == 'ubuntu-24.04'
         shell: bash
         run: |
           set -euo pipefail
           npm ci
           npx playwright install --with-deps chromium
-          ./build/flowstudio > /tmp/flowstudio-monaco-ui.log 2>&1 &
+          ./build/flowstudio > /tmp/flowstudio-quarto-ui.log 2>&1 &
           server_pid=$!
           trap 'kill "$server_pid" 2>/dev/null || true' EXIT
           ready=0
@@ -92,7 +106,8 @@ jobs:
             fi
             sleep 0.2
           done
-          if [ "$ready" -ne 1 ]; then cat /tmp/flowstudio-monaco-ui.log; exit 1; fi
+          if [ "$ready" -ne 1 ]; then cat /tmp/flowstudio-quarto-ui.log; exit 1; fi
+          node tests/quarto_ui.mjs
           npm run test:ui
           node tests/native_r_member_ui.mjs
       - name: Package verified executable

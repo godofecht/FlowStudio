@@ -290,6 +290,16 @@ Open a folder, enter a literal query under **Find in project**, and select **Fin
 
 After a successful native build and acceptance test (`python3 scripts/verify_native.py`), run `sh scripts/package.sh` to create a platform-specific `.tar.gz` in `dist/`. The archive has `run.sh`, the compiled executable, web assets, docs, licence, README and VERSION. Its runtime must be run from its own extracted root; `flow` 2.x is an external runtime dependency for Flow execution. Release automation publishes Linux x86-64 and macOS arm64 archives plus a source archive and SHA256 checksums only after both CI platforms pass on `main`.
 
+## Experimental native R acceleration
+
+An opt-in, guarded **FlowJIT** arithmetic-kernel prototype is available in the
+persistent R session. `flowjit_compile(function(x) x * x + 1.0)` creates a
+hotness-triggered GNU R C-toolchain specialization for plain double vectors,
+with strict numeric inputs and a byte-compiled R fallback. Use
+`flowjit_status()` to inspect real native invocations. This is **not** an
+automatic replacement R compiler, nor does it presently emit Flow code.
+See [scope, semantics and native acceptance](docs/FLOWJIT.md).
+
 ## Architecture
 
     browser (HTML/CSS/JS)

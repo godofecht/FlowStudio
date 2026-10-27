@@ -41,6 +41,7 @@ function fixture() {
     FlowStudioData:require("../docs/app/data_viewer.js"),
     FlowStudioEnvironmentData:require("../docs/app/environment_data.js"),
     FlowStudioNotebookIO:require("../docs/app/notebook_io.js"),
+    FlowStudioQuarto:require("../docs/app/notebook_quarto.js"),
     FlowStudioNotebookFormat:require("../docs/app/notebook_format.js"),
     FlowStudioNotebookRecovery:require("../docs/app/notebook_recovery.js"),
     FlowStudioPackages:{create:()=>({clear(){}})},

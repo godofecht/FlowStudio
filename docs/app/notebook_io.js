@@ -5,7 +5,8 @@ function create(options) {
   const {openButton, fileInput, saveButton, source, language, format, parseCells,
     isBusy, canReplace, onImported, onExport, getResults, getFilename, notice,
     bundleOpenButton, bundleFileInput, bundleSaveButton,
-    rMarkdownOpenButton, rMarkdownFileInput, rMarkdown} = options;
+    rMarkdownOpenButton, rMarkdownFileInput, rMarkdown,
+    quartoOpenButton, quartoFileInput, quarto} = options;
   openButton.addEventListener("click", () => fileInput.click());
   fileInput.addEventListener("change", async event => {
     const file = event.target.files?.[0];
@@ -91,6 +92,27 @@ function create(options) {
           "Inline R remains Markdown text; no code was executed.");
       } catch (error) {
         notice("R Markdown import failed: " + String(error.message || error));
+      }
+    });
+  }
+  if (quartoOpenButton && quartoFileInput && quarto) {
+    quartoOpenButton.addEventListener("click", () => quartoFileInput.click());
+    quartoFileInput.addEventListener("change", async event => {
+      const file = event.target.files?.[0];
+      event.target.value = "";
+      if (!file) return;
+      if (isBusy()) { notice("Wait for notebook execution to finish."); return; }
+      if (file.size > 4 * 1024 * 1024) { notice("Quarto document exceeds 4 MiB."); return; }
+      try {
+        const content = await file.text();
+        if (isBusy()) { notice("Wait for notebook execution to finish."); return; }
+        const imported = quarto.decode(content, parseCells);
+        if (!canReplace()) return;
+        await onImported(imported, file.name);
+        notice("Quarto document imported as R/Python source cells; no code was executed. " +
+          "Only inert scalar YAML and HTML format are supported.");
+      } catch (error) {
+        notice("Quarto import failed: " + String(error.message || error));
       }
     });
   }

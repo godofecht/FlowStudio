@@ -93,6 +93,11 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
 .hint{font-size:12px;max-width:46ch}
 .muted{color:var(--muted)}
 .example-card{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:10px;background:var(--surface-2)}
+.example-card.saved-project{border-color:#2f5245;background:#15202b}
+.gallery-heading{margin:2px 0 8px;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:#7d8ba3;font-weight:600}
+.saved-projects{margin-bottom:14px}
+.example-forget{font-size:11px;padding:2px 8px;background:transparent;border-color:#2c3a52;color:#7d8ba3;margin-top:4px}
+.example-forget:hover{color:var(--error);border-color:#5e3434}
 .example-head{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
 .example-head h3{margin:0;font-size:13.5px;overflow-wrap:anywhere}
 .example-langs{margin-left:auto;flex:none;font-size:10.5px;color:var(--muted);border:1px solid var(--line);border-radius:9px;padding:2px 7px;white-space:nowrap}
@@ -134,10 +139,10 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
 .editor-find button{padding:4px 8px;font-size:12px}
 #editorFindCount{font-size:12px;color:var(--muted)}
 #source{flex:1;width:100%;min-height:0;resize:none;border:0;padding:12px 16px;background:#111721;color:#e9f0fb;font:14px/1.65 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;tab-size:4}
-.dock{border-top:1px solid var(--line);background:var(--surface)}
+.dock{border-top:1px solid var(--line);background:#0a0e16}
 .dock-title{display:flex;align-items:center;gap:8px}
 .dock .body{display:flex;flex-direction:column;gap:6px;padding:6px 12px 10px;overflow:hidden}
-#console{margin:0;overflow:auto;flex:1;min-height:0;padding:8px 2px;white-space:pre-wrap;overflow-wrap:anywhere;font:12.5px/1.55 var(--mono);color:#b9c9e2;background:transparent}
+#console{margin:0;overflow:auto;flex:1;min-height:0;padding:8px 2px;white-space:pre-wrap;overflow-wrap:anywhere;font:12.5px/1.55 var(--mono);color:#b9c9e2;background:#0a0e16}
 #console::-webkit-scrollbar{width:12px;height:10px}
 #console::-webkit-scrollbar-thumb{background:#ffffff22;border:3px solid #0000;background-clip:padding-box;border-radius:7px}
 #console::-webkit-scrollbar-thumb:hover{background:#ffffff38;border:3px solid #0000;background-clip:padding-box;border-radius:7px}
@@ -147,16 +152,23 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
 #console .fs-black{color:#5a647a}#console .fs-red{color:#ff9d8f}#console .fs-green{color:#8ee0b1}#console .fs-yellow{color:#f0c37b}#console .fs-blue{color:#7aa7ff}#console .fs-magenta{color:#d3a7ff}#console .fs-cyan{color:#7fc9dd}#console .fs-white{color:#e7edf8}
 #console .fs-bright-black{color:#8296b3}#console .fs-bright-red{color:#ffc4b8}#console .fs-bright-green{color:#b3efc9}#console .fs-bright-yellow{color:#f7d79b}#console .fs-bright-blue{color:#a9c4ff}#console .fs-bright-magenta{color:#e3c2ff}#console .fs-bright-cyan{color:#a5dce9}#console .fs-bright-white{color:#fff}
 #console .fs-bold{font-weight:700}#console .fs-dim{opacity:.62}
-.dock .body>label[for="consoleInput"]{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}
-#consoleInput{flex:0 0 auto!important;height:64px;min-height:44px!important;max-height:40vh;resize:vertical!important;padding:7px 10px!important;background:#0f141d!important;border:1px solid #33415a!important;border-radius:6px!important;font:12.5px/1.5 var(--mono);color:#d7e2f2}
-#consoleInput::placeholder{color:#5d7195}
-#consoleInput:focus{outline:none;border-color:var(--accent)!important;box-shadow:0 0 0 1px #5b93ff55}
-.dock .body>div{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+/* The console command strip: a runtime prompt beside a borderless input,
+ * like a real REPL — no boxed web-form textarea. */
+.dock .body>div.console-command{display:flex;align-items:flex-start;gap:0 7px;flex:0 0 auto;padding:9px 12px 5px;background:#0a0e16;border-top:1px solid var(--line);flex-wrap:nowrap}
+.dock .body>div.console-command:focus-within{background:#0d1421}
+.console-prompt{flex:none;font:700 12.5px/1.6 var(--mono);color:#5fdba7;white-space:pre;user-select:none;padding-top:1px}
+#consoleInput{flex:1;min-width:0;height:24px;min-height:24px;max-height:40vh;resize:vertical;padding:0;background:#0a0e16;border:0;outline:none;font:12.5px/1.6 var(--mono);color:#d7e2f2;caret-color:#5fdba7}
+#consoleInput::placeholder{color:#4d5a75}
+.dock .body>div.console-command textarea:focus{outline:none}
+.dock .body>div.console-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:2px 12px 8px;background:#0a0e16}
 .dock .body>div span{font-size:11px;color:var(--muted)}
 .dock .body>div button{font-size:12px;padding:4px 13px}
-#consoleExecute{background:#2f5db8;border-color:#4275d6;color:#fff}
+#consoleExecute{background:#16202f;border-color:#2c3a52;color:#8fb8ff}
+#consoleExecute:hover{border-color:#4275d6;color:#c7dcff}
 .dock .body>label:not([for="consoleInput"]){display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--muted)}
-#consoleClearHistory{font-size:11.5px;padding:3px 9px}
+.console-flag{padding-left:2px}
+.console-clear-text{background:transparent;border-color:#2c3a52;color:#7d8ba3;font-size:11px}
+#consoleClearHistory{font-size:11px;padding:3px 9px}
 .statusbar{display:flex;align-items:center;gap:16px;min-height:var(--statusbar-height);padding:2px 12px;background:#10151f;border-top:1px solid var(--line);font-size:12px;color:#8298b8;overflow:hidden;white-space:nowrap}
 #resultStatus{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
 #cursor{font-variant-numeric:tabular-nums}
@@ -171,6 +183,7 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
 svg{width:14px;height:14px;vertical-align:-2px;flex:none}
 @media(max-width:900px){.workspace{grid-template-columns:minmax(0,1fr)}.sidebar,.rightpanel,.workspace>.splitter{display:none}}
 @media(max-width:760px){.shell{grid-template-rows:auto minmax(0,1fr) var(--sash) 40vh auto}.topbar-actions{margin-left:0}}
+@media(max-width:680px){html{overflow-x:auto}.shell{min-width:680px}.ide-shell-width{width:max(100%,680px)}}
 </style>
 <link rel="stylesheet" href="/ui/workbench.css">
 </head>
@@ -315,6 +328,7 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
     </div>
     <div class="body examples-body" id="view-examples" role="tabpanel" aria-labelledby="tab-examples" hidden>
       <p class="muted hint">Curated local examples showing Flow, Python and R working in one project. Everything executes on this device.</p>
+      <p class="muted hint">Projects you open are kept as saved project files (with your edits) in the "Your projects" list at the top of this tab, and reopen from there after a reload.</p>
       <div id="examplesHost"></div>
     </div>
     <div class="body debug-body" id="view-debug" role="tabpanel" aria-labelledby="tab-debug" hidden>
@@ -1016,9 +1030,11 @@ function writeConsole(text) {
   if (globalThis.FlowStudioConsoleIO) globalThis.FlowStudioConsoleIO.write(text);
   else consolePane.textContent += text;
 }
+let editorDocId = null;
 const documents = FlowStudioDocuments.createModel();
 documents.open({ name: "untitled.flow", text: src.value,
   language: language.value || "flow", baseline: src.value });
+editorDocId = documents.active().id;
 
 
 function findOptions() {
@@ -1130,6 +1146,16 @@ function inferLanguage(name) {
 function activeDocument() {
   return documents.active();
 }
+/* The visible buffer is bound to editorDocId, which can differ from
+ * documents.active() while a freshly opened document has not been loaded
+ * into the editor yet. Implicit saves must always go to the buffer the
+ * editor actually shows, never to whatever the model currently considers
+ * active. */
+function saveEditorBuffer() {
+  const doc = editorDocId ? documents.find(editorDocId) : null;
+  if (doc) documents.setText(doc.id, src.value);
+  return doc;
+}
 function setFilename(name, label = name) {
   const doc = activeDocument();
   if (doc) documents.rename(doc.id, name, label === name ? null : label);
@@ -1191,6 +1217,7 @@ function renderTabs() {
 }
 function loadDocumentIntoEditor(doc) {
   if (!doc) return false;
+  editorDocId = doc.id;
   globalThis.FlowStudioEditor?.activate(doc);
   src.value = doc.text;
   language.value = doc.language;
@@ -1205,7 +1232,7 @@ function loadDocumentIntoEditor(doc) {
 function activateDocument(id) {
   const current = activeDocument();
   if (current && current.id === id) { renderTabs(); src.focus(); return true; }
-  if (current) documents.setText(current.id, src.value);
+  saveEditorBuffer();
   const doc = documents.activate(id);
   if (!doc) return false;
   loadDocumentIntoEditor(doc);
@@ -1213,8 +1240,7 @@ function activateDocument(id) {
   return true;
 }
 function createUntitled() {
-  const doc = activeDocument();
-  if (doc) documents.setText(doc.id, src.value);
+  saveEditorBuffer();
   try {
     const opened = documents.open({ name: "untitled." + extension(language.value), text: "",
       language: language.value, baseline: "" });
@@ -1228,8 +1254,7 @@ function createUntitled() {
   }
 }
 function closeDocument(id = null) {
-  const current = activeDocument();
-  if (current) documents.setText(current.id, src.value);
+  saveEditorBuffer();
   const target = id ? documents.find(id) : activeDocument();
   if (!target) return false;
   if (target.dirty && !confirm("Discard unsaved changes in " + FlowStudioDocuments.label(target) + "?"))
@@ -1451,8 +1476,7 @@ async function openEditorHandle(handle, path = null) {
     return activateDocument(existing.id);
   }
   const content = await FlowStudioFileSave.readSnapshot(handle);
-  const current = activeDocument();
-  if (current) documents.setText(current.id, src.value);
+  saveEditorBuffer();
   let opened;
   try {
     opened = documents.open({ name: handle.name, path, text: content,
@@ -1846,8 +1870,7 @@ el("fallbackOpen").addEventListener("change", async event => {
   const file = event.target.files[0];
   if (!file) return;
   const text = await file.text();
-  const current = activeDocument();
-  if (current) documents.setText(current.id, src.value);
+  saveEditorBuffer();
   try {
     const opened = documents.open({ name: file.name, text, baseline: text,
       language: inferLanguage(file.name) });
@@ -1999,6 +2022,7 @@ renderTabs();
 <script src="/workspace_console.js"></script>
 <script src="/packages_panel.js"></script>
 <script src="/examples_gallery.js"></script>
+<script src="/saved_projects.js"></script>
 <script src="/debug_panel.js"></script>
 <script src="/ide_shell.js"></script>
 <script src="/ide_symbols.js"></script>
@@ -2059,9 +2083,8 @@ function findReferencesAtCaret() {
       status("Place the caret on a Flow, R or Python identifier.", "error");
       return false;
     }
-    const current = activeDocument();
+    const current = saveEditorBuffer();
     if (!current) return false;
-    documents.setText(current.id, src.value);
     const result = FlowStudioSymbols.findOpenReferences(
       language.value, documents.list(), name, current.id);
     const node = el("referenceResults");

@@ -6,6 +6,12 @@
  * index.html wiring is asserted by contract tests.
  */
 (function (global) {
+const store = (function () {
+  let storage = null;
+  try { storage = global.localStorage || null; } catch (_) { storage = null; }
+  return global.FlowStudioSavedProjects
+    ? global.FlowStudioSavedProjects.createStore(storage) : null;
+})();
 const modules = [
   ["FlowStudioPackageManager", global.FlowStudioPackageManager],
   ["FlowStudioExamples", global.FlowStudioExamples],
@@ -38,7 +44,8 @@ function mountPanel(name, thing, run) {
 
 /* Examples first: a curated gallery must load even if debug wiring changes. */
 mountPanel("FlowStudioExamples", global.FlowStudioExamples, Examples => {
-  const openedProjects = new Map();
+  const openedProjects = new Map();   // saved project id -> document ids per file
+  const projectMeta = new Map();      // saved project id -> { title, files }
   function syncDoc(doc, file) {
     const documents = global.FlowStudioApp.documents;
     if (doc && !doc.dirty) documents.setText(doc.id, file.text);
@@ -49,40 +56,100 @@ mountPanel("FlowStudioExamples", global.FlowStudioExamples, Examples => {
     }
     return doc.id;
   }
-  function activateEntry(entry) {
-    global.FlowStudioApp.activateDocument(entry.id);
-    language.value = entry.language;
+  function activateEntry(docId, languageName) {
+    global.FlowStudioApp.activateDocument(docId);
+    language.value = languageName;
     language.dispatchEvent(new Event("change"));
+  }
+  /* Opens (reopens) every project file as an editor buffer, activating the
+   * entry file — or the requested file when given. */
+  function openProjectBuffers(project, files, activateFileName = null) {
+    const documents = global.FlowStudioApp.documents;
+    if (!files.length) {
+      el("resultStatus").textContent = "This example runs in the console instead.";
+      el("resultStatus").dataset.state = "ok";
+      return;
+    }
+    const known = openedProjects.get(project.id) || [];
+    const docIds = [];
+    for (const file of files) {
+      const existing = known.find(id => {
+        const doc = documents.find(id);
+        return doc && doc.name === file.name && doc.language === file.language;
+      });
+      docIds.push(syncDoc(documents.find(existing), file));
+    }
+    openedProjects.set(project.id, docIds);
+    projectMeta.set(project.id, { title: project.title || project.id, files });
+    const target = activateFileName
+      ? files.findIndex(file => file.name === activateFileName) : 0;
+    const entry = docIds[target >= 0 ? target : 0];
+    activateEntry(entry, files[target >= 0 ? target : 0].language);
+    el("resultStatus").textContent = "Opened " + (project.title || project.id) +
+      " as " + docIds.length + " editor tab(s).";
+    el("resultStatus").dataset.state = "ok";
+    if (typeof global.console !== "undefined" && global.console.log) {
+      global.console.log("FlowStudioExamples opened " + project.id +
+        " (" + docIds.length + " buffers).");
+    }
+  }
+  /* Snapshot the live document texts of a project's buffers so the saved
+   * project preserves user edits, not just the example template. */
+  function projectFilesSnapshot(projectId, files) {
+    const documents = global.FlowStudioApp.documents;
+    const known = openedProjects.get(projectId) || [];
+    return files.map((file, index) => {
+      const doc = documents.find(known[index]);
+      return { name: file.name, language: file.language,
+        text: doc ? doc.text : file.text };
+    });
+  }
+  function persistOpenProject(project, files) {
+    if (!store || !project || !Array.isArray(files) || !files.length) return;
+    try {
+      const snapshot = projectFilesSnapshot(project.id, files);
+      store.upsert({ id: project.id, title: project.title || project.id,
+        savedAt: Date.now(), files: snapshot });
+      projectMeta.set(project.id, { title: project.title || project.id, files });
+    } catch (error) {
+      // Persistence failures must never break opening an example.
+      if (global.console && global.console.warn)
+        global.console.warn("workspace_panels: could not save project: " + error.message);
+    }
+  }
+  function saveOpenProjects() {
+    if (!store) return;
+    for (const [id, meta] of projectMeta)
+      persistOpenProject({ id, title: meta.title }, meta.files);
   }
   Examples.mount(global.document, {
     host: el("examplesHost"),
+    saved: (() => ({
+      list: () => store ? store.list().filter(project =>
+        Array.isArray(project.files) && project.files.length) : []
+    }))(),
+    onReopenProject: (project, file) => {
+      try {
+        if (!project || !Array.isArray(project.files)) return false;
+        openProjectBuffers(project, project.files, file && file.name || null);
+        return true;
+      } catch (error) {
+        el("resultStatus").textContent = error.message || String(error);
+        el("resultStatus").dataset.state = "error";
+        return false;
+      }
+    },
+    onForgetProject: (id) => {
+      if (!store) return false;
+      const removed = store.remove(id);
+      openedProjects.delete(id);
+      projectMeta.delete(id);
+      return removed;
+    },
     onOpenProject: (example) => {
       try {
-        const documents = global.FlowStudioApp.documents;
-        if (!example.files.length) {
-          el("resultStatus").textContent = "This example runs in the console instead.";
-          el("resultStatus").dataset.state = "ok";
-          return;
-        }
-        const known = openedProjects.get(example.id) || [];
-        const docIds = [];
-        for (const file of example.files) {
-          const existing = known.find(id => {
-            const doc = documents.find(id);
-            return doc && doc.name === file.name && doc.language === file.language;
-          });
-          docIds.push(syncDoc(documents.find(existing), file));
-        }
-        openedProjects.set(example.id, docIds);
-        const entryId = docIds[0];
-        activateEntry({ id: entryId, language: example.files[0].language });
-        el("resultStatus").textContent = "Opened " + example.title + " as " +
-          docIds.length + " editor tab(s).";
-        el("resultStatus").dataset.state = "ok";
-        if (typeof global.console !== "undefined" && global.console.log) {
-          global.console.log("FlowStudioExamples opened " + example.id +
-            " (" + docIds.length + " buffers).");
-        }
+        openProjectBuffers(example, example.files);
+        persistOpenProject(example, example.files);
       } catch (error) {
         el("resultStatus").textContent = error.message || String(error);
         el("resultStatus").dataset.state = "error";
@@ -90,10 +157,10 @@ mountPanel("FlowStudioExamples", global.FlowStudioExamples, Examples => {
     },
     onOpen: (example, file) => {
       try {
-        const current = global.FlowStudioApp.documents.active();
-        if (current) global.FlowStudioApp.documents.setText(current.id, document.getElementById("source").value);
         const openedId = syncDoc(null, file);
-        activateEntry({ id: openedId, language: file.language });
+        openedProjects.set(example.id, [openedId]);
+        projectMeta.set(example.id, { title: example.title, files: [file] });
+        activateEntry(openedId, file.language);
         el("resultStatus").textContent = "Opened example: " + example.title;
         el("resultStatus").dataset.state = "ok";
       } catch (error) {
@@ -123,7 +190,14 @@ mountPanel("FlowStudioExamples", global.FlowStudioExamples, Examples => {
       el("resultStatus").textContent = "Interop demo finished";
       el("resultStatus").dataset.state = ok ? "ok" : "error";
     }
-  });
+  });  if (typeof global.document !== "undefined" && global.document.addEventListener) {
+    global.document.addEventListener("visibilitychange", () => {
+      if (global.document.visibilityState === "hidden") saveOpenProjects();
+    });
+    if (typeof global.addEventListener === "function")
+      global.addEventListener("beforeunload", saveOpenProjects);
+  }
+  exports.saveOpenProjects = saveOpenProjects;
 });
 
 mountPanel("FlowStudioPackageManager", global.FlowStudioPackageManager, PackageManager => {

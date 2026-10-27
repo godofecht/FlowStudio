@@ -84,6 +84,9 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/examples_gallery.js" {
         return StaticAsset { path: "web/examples_gallery.js", mime: "text/javascript; charset=utf-8", found: true }
     }
+    if url == "/saved_projects.js" {
+        return StaticAsset { path: "web/saved_projects.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
     if url == "/debug_panel.js" {
         return StaticAsset { path: "web/debug_panel.js", mime: "text/javascript; charset=utf-8", found: true }
     }

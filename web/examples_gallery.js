@@ -143,17 +143,109 @@ function validate() {
 }
 
 function mount(document, options) {
-  const { host, onOpen, onOpenProject, onDemo, notice = () => {} } = options || {};
+  const { host, onOpen, onOpenProject, onDemo, notice = () => {},
+    onReopenProject = null, onForgetProject = null } = options || {};
   if (!host) throw new TypeError("Examples gallery needs a host element.");
   const problem = validate();
   if (problem) throw new Error("Examples dataset problem: " + problem);
   if (typeof onOpen !== "function" ||
       (onOpenProject && typeof onOpenProject !== "function") ||
-      (onDemo && typeof onDemo !== "function"))
-    throw new TypeError("Examples gallery needs onOpen and optional onOpenProject and onDemo callbacks.");
+      (onDemo && typeof onDemo !== "function") ||
+      (onReopenProject && typeof onReopenProject !== "function") ||
+      (onForgetProject && typeof onForgetProject !== "function"))
+    throw new TypeError("Examples gallery needs onOpen and optional onOpenProject, onDemo, onReopenProject and onForgetProject callbacks.");
+  const savedData = options && options.saved && typeof options.saved.list === "function"
+    ? options.saved : null;
+
+  /* Saved projects come first: they act like project management for
+   * examples opened earlier, persisting as project files on this device. */
+  const savedSection = document.createElement("div");
+  savedSection.className = "saved-projects";
+  const curatedSection = document.createElement("div");
+  curatedSection.className = "curated-examples";
+  host.replaceChildren(savedSection, curatedSection);
+
+  function fileCountText(files) {
+    return files.length + (files.length === 1 ? " file" : " files");
+  }
+  function renderSaved() {
+    const list = savedData ? savedData.list() : [];
+    savedSection.replaceChildren();
+    const heading = document.createElement("h2");
+    heading.className = "gallery-heading";
+    heading.textContent = "Your projects";
+    savedSection.append(heading);
+    if (!list.length) {
+      const empty = document.createElement("p");
+      empty.className = "muted";
+      empty.textContent = "Projects you open below are saved on this device with your edits, so you can reopen them here after a reload.";
+      savedSection.append(empty);
+      return;
+    }
+    for (const project of list) {
+      const card = document.createElement("section");
+      card.className = "example-card saved-project";
+      card.dataset.projectId = project.id;
+      const head = document.createElement("div");
+      head.className = "example-head";
+      const title = document.createElement("h3");
+      title.textContent = project.title;
+      head.append(title);
+      const meta = document.createElement("span");
+      meta.className = "example-langs";
+      const when = Number.isFinite(project.savedAt) ?
+        new Date(project.savedAt).toLocaleString() : "";
+      meta.textContent = fileCountText(project.files) + (when ? " · " + when : "");
+      head.append(meta);
+      card.append(head);
+      const names = document.createElement("p");
+      names.className = "saved-project-files muted";
+      names.textContent = project.files.map(file => file.name).join(", ");
+      card.append(names);
+      if (onReopenProject) {
+        const reopen = document.createElement("button");
+        reopen.type = "button";
+        reopen.className = "primary";
+        reopen.textContent = "Reopen project (" + fileCountText(project.files) + ")";
+        reopen.addEventListener("click", () => onReopenProject(project));
+        card.append(reopen);
+        for (const file of project.files) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "example-file-btn";
+          button.textContent = file.name + " · " + file.language;
+          button.addEventListener("click", () => onReopenProject(project, file));
+          card.append(button);
+        }
+      }
+      if (onForgetProject) {
+        const forget = document.createElement("button");
+        forget.type = "button";
+        forget.className = "example-forget";
+        forget.setAttribute("aria-label", "Forget saved project " + project.title);
+        forget.textContent = "Forget project";
+        forget.addEventListener("click", () => {
+          onForgetProject(project.id);
+          renderSaved();
+        });
+        card.append(forget);
+      }
+      savedSection.append(card);
+    }
+  }
+  const handleOpenProject = onOpenProject && (example => {
+    onOpenProject(example);   // Saved list may change (upsert); refresh the section.
+    renderSaved();
+  });
+
+  const curated = document.createElement("h2");
+  curated.className = "gallery-heading";
+  curated.textContent = "Curated examples";
+  curatedSection.append(curated);
   for (const example of EXAMPLES) {
     const card = document.createElement("section");
     card.className = "example-card";
+    card.dataset.exampleId = example.id;
     const head = document.createElement("div");
     head.className = "example-head";
     const title = document.createElement("h3");
@@ -169,13 +261,13 @@ function mount(document, options) {
     description.className = "muted";
     description.textContent = example.description;
     card.append(description);
-    if (onOpenProject && !example.demoRoute) {
+    if (handleOpenProject && !example.demoRoute) {
       const primary = document.createElement("button");
       primary.type = "button";
       primary.className = "primary";
       primary.textContent = "Open project in editor (" + example.files.length + " " +
         (example.files.length === 1 ? "file" : "files") + ")";
-      primary.addEventListener("click", () => onOpenProject(example));
+      primary.addEventListener("click", () => handleOpenProject(example));
       card.append(primary);
     }
     if (example.demoRoute && onDemo) {
@@ -206,8 +298,9 @@ function mount(document, options) {
     }
     steps.append(ordered);
     card.append(steps);
-    host.append(card);
+    curatedSection.append(card);
   }
+  renderSaved();
 }
 
 const api = { examples, validate, mount };

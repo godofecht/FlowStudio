@@ -20,25 +20,33 @@ function mount(doc = document, request = fetch) {
     output.style.flex = "1";
     output.style.minHeight = "60px";
     output.style.height = "auto";
+    /* Terminal command row: a runtime prompt beside a borderless input,
+     * styled by the page — this is chrome, not a web form. */
+    const row = doc.createElement("div");
+    row.className = "console-command";
     const label = doc.createElement("label");
+    label.id = "consolePrompt";
     label.htmlFor = "consoleInput";
-    label.textContent = "Interactive command (selected runtime)";
+    label.className = "console-prompt";
+    label.setAttribute("aria-hidden", "false");
     const input = doc.createElement("textarea");
     input.id = "consoleInput";
     input.setAttribute("aria-label", "Interactive console command");
     input.spellcheck = false;
+    input.autocomplete = "off";
     input.placeholder = "Enter to execute · Shift+Enter for newline";
-    input.style.cssText = "flex:0 0 70px;min-height:70px;resize:vertical;padding:8px;border:1px solid #455a7e;border-radius:5px";
+    row.append(label, input);
     const controls = doc.createElement("div");
-    controls.style.cssText = "display:flex;align-items:center;gap:10px;flex-wrap:wrap";
+    controls.className = "console-controls";
     const button = doc.createElement("button");
     button.id = "consoleExecute";
     button.type = "button";
-    button.textContent = "Execute";
+    button.textContent = "Run ▸";
     const hint = doc.createElement("span");
-    hint.textContent = "Enter: run · Shift+Enter: newline · ↑/↓: history";
+    hint.className = "console-hint";
+    hint.textContent = "Enter run · Shift+Enter newline · ↑/↓ history";
     controls.append(button, hint);
-    panel.append(label, input, controls);
+    panel.append(row, controls);
   }
   const el = id => doc.getElementById(id);
   const input = el("consoleInput"), output = el("console");
@@ -74,10 +82,14 @@ function mount(doc = document, request = fetch) {
     paint();
   }
   function syncLanguage() {
-    if (activeLanguage === language.value) return;
-    drafts[activeLanguage] = input.value;
-    activeLanguage = language.value;
-    input.value = drafts[activeLanguage] || "";
+    if (activeLanguage !== language.value) {
+      drafts[activeLanguage] = input.value;
+      activeLanguage = language.value;
+      input.value = drafts[activeLanguage] || "";
+    }
+    const prompt = doc.getElementById("consolePrompt");
+    if (prompt) prompt.textContent =
+      (activeLanguage === "python" ? "python" : activeLanguage) + " ❯ ";
   }
   async function submit(name, code) {
     if (editorRun.disabled || editorCell.disabled) {
@@ -118,6 +130,7 @@ function mount(doc = document, request = fetch) {
     message => status(message, "error"), {storage});
   if (output.parentElement && doc.createElement) {
     const label = doc.createElement("label"), box = doc.createElement("input");
+    label.className = "console-flag";
     box.id = "consoleRememberHistory";
     box.type = "checkbox";
     box.checked = controller.isPersisting();
@@ -127,6 +140,7 @@ function mount(doc = document, request = fetch) {
     label.append(box, " Remember command history on this device");
     const clear = doc.createElement("button");
     clear.id = "consoleClearHistory";
+    clear.className = "console-clear-text";
     clear.type = "button";
     clear.textContent = "Clear selected runtime history";
     clear.addEventListener("click", () => {
@@ -154,6 +168,7 @@ function mount(doc = document, request = fetch) {
   input.addEventListener("focus", syncLanguage);
   button.addEventListener("click", () => { syncLanguage(); void controller.run(input); });
   language.addEventListener("change", syncLanguage);
+  syncLanguage();   // Paint the runtime prompt for the selected language.
   return controller;
 }
 root.FlowStudioWorkspaceConsole = Object.freeze({mount});

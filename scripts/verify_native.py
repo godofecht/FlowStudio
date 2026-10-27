@@ -143,6 +143,16 @@ def verify(root: Path, port: int = 8751, build_timeout: int = 180,
             print(inspect_result.stderr, end="", file=sys.stderr, flush=True)
         if inspect_result.returncode != 0:
             raise VerificationError("Real browser R inspector acceptance failed")
+        print("Real data.frame column completion acceptance: tests/browser_r_dataframe_completion.test.js", flush=True)
+        frame_result = _command(
+            ["node", "--test", str(root / "tests/browser_r_dataframe_completion.test.js")], root, 65
+        )
+        if frame_result.stdout:
+            print(frame_result.stdout, end="", flush=True)
+        if frame_result.stderr:
+            print(frame_result.stderr, end="", file=sys.stderr, flush=True)
+        if frame_result.returncode != 0:
+            raise VerificationError("Real R data.frame completion acceptance failed")
     _free_port(port)
     # Never accept a stale executable left by an earlier successful build.
     # Unlinking a symlink here also avoids following an unexpected target.

@@ -429,7 +429,7 @@ function create({load = () => import(CDN)} = {}) {
           "stop(\"Only bounded, unlabelled, plain atomic R matrices can be transferred\"); " +
           "v <- base::as.data.frame.matrix(v, optional=TRUE, stringsAsFactors=FALSE); " +
           "base::names(v) <- base::paste0(\"V\", base::seq_len(base::ncol(v))); " +
-          "} " +
+          "}; " +
                      "if (base::is.data.frame(v)) { " +
            "if (!base::identical(base::class(v), \"data.frame\") || base::ncol(v) < 1L || " +
            "base::ncol(v) > 16L || base::nrow(v) > 128L || " +

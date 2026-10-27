@@ -92,7 +92,7 @@ test("fixed-width pandas numeric dtypes preserve exact values and reject unsafe 
   }
   const query=await exportQuery();
   const result=runPython(query,
-    "import pandas as pd\\n" +
+    "import pandas as pd\n" +
     "data = pd.DataFrame({'half':pd.Series([1.5,2],dtype='float16')," +
     "'single':pd.Series([1.25,float('nan')],dtype='float32')," +
     "'signed':pd.Series([-2,3],dtype='int32')," +
@@ -107,7 +107,7 @@ test("fixed-width pandas numeric dtypes preserve exact values and reject unsafe 
   ]});
   assert.equal(transfer.validate(packet),packet);
   const unsafe=runPython(query,
-    "import pandas as pd\\n" +
+    "import pandas as pd\n" +
     "data = pd.DataFrame({'large':pd.Series([9007199254740992],dtype='uint64')})");
   assert.notEqual(unsafe.status,0,"uint64 above JS safe integer range must be rejected");
 });

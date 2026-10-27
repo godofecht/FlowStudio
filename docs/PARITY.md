@@ -1,3 +1,25 @@
+## 2026-10-27: explicit browser source reload after external disk edits (PR pending)
+
+The browser File System Access workspace now offers **Reload from disk** for
+an opened project file or a file attached by Save As. Reload reads the actual
+granted file handle and updates the editor's conflict baseline only after two
+bounded reads agree. For project files it verifies the current parent-directory
+entry is still the same file handle, before and after the first read. Dirty
+buffers require explicit confirmation; cancellation, read/permission errors,
+oversized files, externally replaced files, concurrent editor changes and
+mid-read disk changes preserve the editor and its previous save baseline.
+Reload is serialized against saves, renames, deletes and project switching.
+Changed source invalidates notebook output recovery through the existing
+filename callback, while a no-op reload leaves outputs alone.
+
+**Status: partial / 13 exact-source regression tests passed in local V8
+with ASCII-only Blob/Buffer shims; independent Node/Linux/macOS CI and
+physical-browser File System Access acceptance pending.** This is not an
+atomic filesystem snapshot: concurrent external writes can still race after
+the final read. It does not restore browser directory permissions after
+reload or provide multi-file project reload. No hosted CI configuration or
+native Flow backend changed. RStudio parity remains incomplete.
+
 ## 2026-10-27: explicit pandas-aware Python session snapshot (Linux/macOS CI passed)
 
 Browser-local session export/import now supports an opt-in-preserved **pandas

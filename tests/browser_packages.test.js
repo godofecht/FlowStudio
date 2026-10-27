@@ -25,7 +25,7 @@ function harness(options = {}) {
           if (options.installFailure) throw Error("Package unavailable");
           return null;
         }
-        if (code.includes("_fs_json.dumps")) return "[]";
+        if (code.includes("_fs_json.dumps")) return JSON.stringify({variables:[],truncated:false});
         if (code.includes("_fs_plot_capture.capture()")) return "[]";
         return null;
       } finally { active--; }

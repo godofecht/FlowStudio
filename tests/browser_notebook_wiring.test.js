@@ -14,6 +14,9 @@ test("notebook UI uses the real persistent browser Python and R sessions", () =>
   assert.match(html, /FlowStudioNotebook\.create\(/);
   assert.match(html, /FlowStudioSourceCells\.parseCells/);
   assert.match(html, /getRSession\(\)\.run\(code\)/);
+  assert.ok(html.includes("FlowStudioNativeFlow.run(code)"));
+  assert.ok(html.includes("allowNativeFlow: globalThis.FlowStudioNativeFlow?.available?.() === true"));
+  assert.ok(html.includes('lastLanguage === "python" || lastLanguage === "r"'));
   assert.match(html, /request\("run", code\)/);
   assert.match(html, /getRSession\(\)\.inspect\(\)/);
   assert.match(html, /request\("inspect"\)/);

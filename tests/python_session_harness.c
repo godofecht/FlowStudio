@@ -2,6 +2,7 @@
 #include <string.h>
 extern const char *fs_py_run(const char *);
 extern const char *fs_py_inspect(void);
+extern const char *fs_py_trace(const char *);
 extern int fs_py_status(void);
 extern void fs_py_reset(void);
 int main(void)
@@ -23,6 +24,13 @@ int main(void)
     if (fs_py_status() != 200 || !strstr(a, "\"name\":\"obj\"")) return 11;
     a = fs_py_run("print(inspected)");
     if (fs_py_status() != 200 || strcmp(a, "False\n") != 0) return 12;
+    a = fs_py_trace("trace_value = value + 1\nprint(trace_value)");
+    if (fs_py_status() != 200 || !strstr(a, "\"events\":") ||
+        !strstr(a, "\"line\":2") || !strstr(a, "\"output\":\"43")) return 14;
+    a = fs_py_run("print(trace_value)");
+    if (fs_py_status() != 200 || strcmp(a, "43\n") != 0) return 15;
+    a = fs_py_trace("raise ValueError('trace failure')");
+    if (fs_py_status() != 422 || !strstr(a, "ValueError: trace failure")) return 16;
     fs_py_reset();
     a = fs_py_inspect();
     if (fs_py_status() != 200 || strstr(a, "\"name\":\"value\"")) return 13;

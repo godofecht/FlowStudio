@@ -42,9 +42,11 @@ function scanLine(line, state) {
 function parseCells(source) {
   if (typeof source !== "string" || source.length > MAX_SOURCE)
     throw new Error("Cell navigation supports source buffers up to 2 MiB.");
-  const boundaries = [{ start: 0, codeStart: 0, kind: "code" }];
+  const boundaries = [{ start: 0, codeStart: 0, kind: "code", language: null }];
   const state = { mode: "normal", quote: "", triple: false };
   let currentKind = "code";
+  let currentLanguage = null;
+  let currentLabel = null;
   let offset = 0;
   while (offset < source.length) {
     // Preserve CR-only, LF-only and CRLF line endings and source offsets.
@@ -57,9 +59,16 @@ function parseCells(source) {
     const match = state.mode === "normal" || currentKind === "markdown"
       ? MARKER.exec(line) : null;
     if (match) {
-      const label = (match[1] || "").trim().toLowerCase();
+      const rawLabel = (match[1] || "").trim();
+      const label = rawLabel.toLowerCase();
       currentKind = /^\[(?:markdown|md)\](?:\s|$)/.test(label) ? "markdown" : "code";
-      const boundary = { start: offset, codeStart: offset + match[0].length, kind: currentKind };
+      const tagged = /^\[(python|r|flow)\](?:\s|$)/.exec(label);
+      currentLanguage = currentKind === "code" && tagged ? tagged[1] : null;
+      // Preserve case-sensitive knitr labels in source metadata, not user code.
+      const named = /^\[(?:r|python|flow)\]\s+label=([A-Za-z][A-Za-z0-9_.-]{0,79})$/i.exec(rawLabel);
+      currentLabel = currentLanguage && named ? named[1] : null;
+      const boundary = { start: offset, codeStart: offset + match[0].length,
+        kind: currentKind, language: currentLanguage, label: currentLabel };
       if (offset === 0) boundaries[0] = boundary;
       else boundaries.push(boundary);
       if (boundaries.length > MAX_CELLS) throw new Error("Source exceeds the 10,000-cell limit.");
@@ -72,7 +81,9 @@ function parseCells(source) {
   return boundaries.map((boundary, index) => {
     const end = index + 1 < boundaries.length ? boundaries[index + 1].start : source.length;
     return { index, count: boundaries.length, start: boundary.start, end,
-      kind: boundary.kind, code: source.slice(boundary.codeStart, end) };
+      kind: boundary.kind, language: boundary.language,
+      ...(boundary.label ? {label: boundary.label} : {}),
+      code: source.slice(boundary.codeStart, end) };
   });
 }
 

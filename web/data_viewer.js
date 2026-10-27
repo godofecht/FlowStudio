@@ -114,10 +114,61 @@ function viewRows(dataset, options = {}) {
   const pageCount = Math.max(1, Math.ceil(matching.length / PAGE_SIZE));
   const requested = Number.isInteger(options.page) ? options.page : 0;
   const page = Math.max(0, Math.min(requested, pageCount - 1));
-  return { rows: matching.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE),
-    total: matching.length, page, pageCount };
+  const rows = options.allRows === true ? matching : matching.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  return { rows, total: matching.length, page, pageCount };
 }
-const api = { delimiterForName, parseDelimited, viewRows, MAX_BYTES, PAGE_SIZE };
+/* Bounded local CSV export of all filtered/sorted preview rows, across pages.
+ * Spreadsheet formula-looking fields gain a leading apostrophe.
+ */
+function exportCSV(dataset, options = {}) {
+  if (!dataset || !Array.isArray(dataset.columns) ||
+      !dataset.columns.length || dataset.columns.length > MAX_COLUMNS ||
+      !Array.isArray(dataset.rows) || dataset.rows.length > MAX_ROWS)
+    throw new Error("Invalid CSV snapshot dataset.");
+  const view = viewRows(dataset, {...options, allRows:true});
+  const encoder = new TextEncoder();
+  let size = 0;
+  const lines = [];
+  function add(values) {
+    if (!Array.isArray(values) || values.length !== dataset.columns.length)
+      throw new Error("CSV snapshot has an inconsistent row.");
+    const row = values.map(value => {
+      if (typeof value !== "string" || value.length > MAX_FIELD || value.includes("\0"))
+        throw new Error("CSV snapshot contains an invalid field.");
+      const trimmed = value.trimStart();
+      const numeric = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(trimmed.trim()) &&
+        Number.isFinite(Number(trimmed.trim()));
+      const safe = /^[=+@-]/.test(trimmed) && !numeric ? "'" + value : value;
+      return /[",\r\n]/.test(safe) ? '"' + safe.replace(/"/g, '""') + '"' : safe;
+    }).join(",") + "\r\n";
+    size += encoder.encode(row).length;
+    if (size > MAX_BYTES) throw new Error("CSV export exceeds the 8 MiB limit.");
+    lines.push(row);
+  }
+  add(dataset.columns);
+  for (const item of view.rows) add(item.values);
+  return {csv:lines.join(""), count:view.total,
+    sampled:dataset.truncated === true ||
+      (Number.isSafeInteger(dataset.totalRows) && dataset.totalRows > dataset.rows.length)};
+}
+function downloadCSV(csv, filename, document) {
+  if (typeof csv !== "string" || new TextEncoder().encode(csv).length > MAX_BYTES)
+    throw new Error("CSV download exceeds the 8 MiB limit.");
+  if (!document || typeof document.createElement !== "function")
+    throw new TypeError("Document required for CSV download.");
+  const base = String(filename || "snapshot").replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 80)
+    .replace(/\.csv$/i, "") || "snapshot";
+  const url = URL.createObjectURL(new Blob([csv], {type:"text/csv;charset=utf-8"}));
+  try {
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = base + ".csv";
+    link.click();
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+}
+const api = { delimiterForName, parseDelimited, viewRows, exportCSV, downloadCSV, MAX_BYTES, PAGE_SIZE };
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 global.FlowStudioData = api;
 })(globalThis);

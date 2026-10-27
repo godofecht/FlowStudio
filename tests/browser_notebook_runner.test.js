@@ -41,10 +41,10 @@ test("runtime exceptions become failed cells",async()=>{
   assert.equal(result.ok,false);
   assert.match(f.entries[0].output,/kernel unavailable/);
 });
-test("rejects Flow, empty, oversized and too many cells before executing anything",async()=>{
+test("rejects Flow without native opt-in, empty, oversized and too many cells before executing anything",async()=>{
   let calls=0;
   const f=fixture(async()=>{calls++;return {ok:true};});
-  assert.match((await f.runner.run("x=1","flow")).error,/requires browser Python or R/);
+  assert.match((await f.runner.run("x=1","flow")).error,/explicitly enabled native Flow/);
   assert.match((await f.runner.run("# %% [markdown]\n# hello","r")).error,/No executable/);
   assert.match((await f.runner.run("λ".repeat(33000),"r")).error,/64 KiB/);
   const source=Array.from({length:129},(_,i)=>"# %%\nx="+i).join("\n");

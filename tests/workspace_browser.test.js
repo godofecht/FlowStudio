@@ -8,8 +8,13 @@ const path = require("node:path");
 const root = path.join(__dirname, "..");
 const html = fs.readFileSync(path.join(root, "web/index.html"), "utf8");
 const projectSource = fs.readFileSync(path.join(root, "web/project.js"), "utf8").trimEnd();
+const sourceCells = fs.readFileSync(path.join(root, "web/source_cells.js"), "utf8").trimEnd();
+/* Enhancement mounts (workspace tabs, outline) run after this harness stops;
+   their own suites cover them. Everything else is the editor itself. */
 const scripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)]
-  .map(m => m[1]).filter(source => source.trim() && !source.includes("FlowStudioWorkspaceTabs.mount();"));
+  .map(m => m[1]).filter(source => source.trim() &&
+    !source.includes("FlowStudioWorkspaceTabs.mount();") &&
+    !source.includes("FlowStudioOutline.mount("));
 
 class Element {
   constructor(tag = "div") {
@@ -34,6 +39,8 @@ class Element {
   fire(event, payload = {}) { return this.listeners[event]?.(payload); }
   click() { return this.fire("click"); }
   focus() { this.focused = true; }
+  setAttribute(name, value) { (this.attributes ||= {})[name] = String(value); }
+  getAttribute(name) { return (this.attributes || {})[name] ?? null; }
   setSelectionRange(start, end) { this.selectionStart = start; this.selectionEnd = end; }
   setRangeText(text, start, end) {
     this.value = this.value.slice(0, start) + text + this.value.slice(end);
@@ -73,9 +80,10 @@ function workspace(folder) {
     "source", "language", "console", "resultStatus", "fileLabel", "dirty",
     "cursor", "run", "runCell", "resetR", "resetPython", "refreshPythonEnvironment", "pythonEnvironment", "open", "save", "clear", "fallbackOpen", "runtimeInfo",
     "projectTree", "folder", "newFile", "refreshProject",
-    "projectSearch", "caseSensitive", "searchProject", "searchResults",
+    "projectSearch", "caseSensitive", "projectRegex", "projectWholeWord", "searchProject", "searchResults", "projectReplace", "replaceProject", "undoProjectReplace",
     "editorFind", "editorReplace", "findNext", "findPrevious",
-    "replaceOne", "replaceAll", "editorCaseSensitive", "editorFindCount"
+    "replaceOne", "replaceAll", "editorCaseSensitive", "editorRegex", "editorWholeWord", "editorFindCount",
+    "docTabs", "newDocument", "newDocumentTab", "findBar"
   ];
   for (const id of ids) elements.set(id, new Element());
   elements.get("source").value = "initial";
@@ -113,10 +121,11 @@ function workspace(folder) {
     },
     Blob, URL, setTimeout, console
   });
-  assert.equal(scripts.length, 4, "Expected project, editor-find, cells and workspace scripts");
+  assert.equal(scripts.length, 4, "Expected embedded project, editor-find, documents and workspace scripts");
   vm.runInContext(scripts[0], context, { filename: "project-embedded.js" });
   vm.runInContext(scripts[1], context, { filename: "editor-find-embedded.js" });
-  vm.runInContext(scripts[2], context, { filename: "source-cells-embedded.js" });
+  vm.runInContext(sourceCells, context, { filename: "source_cells.js" });
+  vm.runInContext(scripts[2], context, { filename: "documents-embedded.js" });
   vm.runInContext(scripts[3], context, { filename: "workspace.js" });
   return {
     el: id => elements.get(id), document, fetches, inspectionFetches,
@@ -129,7 +138,8 @@ test("embedded project module exactly mirrors tested standalone source", () => {
   assert.equal(scripts[0].trim(), projectSource);
   const findSource = fs.readFileSync(path.join(root, "web/editor_find.js"), "utf8").trimEnd();
   assert.equal(scripts[1].trim(), findSource);
-  assert.equal(scripts[2].trim(), fs.readFileSync(path.join(root, "web/source_cells.js"), "utf8").trimEnd());
+  assert.match(html, /<script src="\/source_cells\.js"><\/script>/);
+  assert.equal(scripts[2].trim(), fs.readFileSync(path.join(root, "web/ide_documents.js"), "utf8").trimEnd());
   assert.match(html, /id="projectTree"/);
   assert.match(html, /id="folder"/);
   assert.match(html, /id="newFile"/);
@@ -154,7 +164,7 @@ test("folder selection opens nested source in editor, saves to exact handle", as
   assert.equal(app.el("dirty").hidden, true);
 });
 
-test("refuses project file switch with unsaved changes", async () => {
+test("opening a second project file keeps the edited buffer in its own tab", async () => {
   const first = file("one.py", "first");
   const second = file("two.py", "second");
   const app = workspace(directory("p", [["one.py", first], ["two.py", second]]));
@@ -162,8 +172,14 @@ test("refuses project file switch with unsaved changes", async () => {
   await app.el("projectTree").children[1].fire("click");
   app.el("source").value = "unsaved";
   app.el("source").fire("input");
-  app.setDiscard(false);
   await app.el("projectTree").children[2].fire("click");
+  assert.equal(app.el("source").value, "second");
+  const tabs = app.el("docTabs").children;
+  // The starting buffer plus one tab per opened project file.
+  assert.equal(tabs.length, 3);
+  assert.match(tabs[1].className, /dirty/);
+  assert.equal(app.el("dirty").hidden, true);
+  await tabs[1].fire("click");
   assert.equal(app.el("source").value, "unsaved");
   assert.equal(app.el("dirty").hidden, false);
 });
@@ -241,7 +257,7 @@ test("project-wide search navigates to exact match with editor selection", async
   assert.equal(app.el("source").focused, true);
 });
 
-test("search navigation preserves unsaved source edits when switching is declined", async () => {
+test("search navigation opens its own tab and preserves the edited buffer", async () => {
   const folder = directory("research", [
     ["a.flow", file("a.flow", "needle")],
     ["b.flow", file("b.flow", "needle")]
@@ -253,8 +269,11 @@ test("search navigation preserves unsaved source edits when switching is decline
   app.el("source").fire("input");
   app.el("projectSearch").value = "needle";
   await app.el("searchProject").fire("click");
-  app.setDiscard(false);
   await app.el("searchResults").children[2].fire("click");
+  assert.equal(app.el("source").value, "needle");
+  const tabs = app.el("docTabs").children;
+  assert.equal(tabs.length, 3);
+  await tabs[1].fire("click");
   assert.equal(app.el("source").value, "unsaved changes");
   assert.equal(app.el("dirty").hidden, false);
 });
@@ -306,6 +325,33 @@ test("replace current and replace all edit buffer without saving or executing", 
   assert.equal(app.fetches.length, 0);
 });
 
+test("native editor regex captures and Unicode whole-word search stay local", () => {
+  const app = workspace(directory("empty"));
+  app.el("source").value = "cat1 cats cat2";
+  app.el("editorFind").value = "(cat)(\\d)";
+  app.el("editorRegex").checked = true;
+  app.el("editorRegex").fire("change");
+  assert.equal(app.el("editorFindCount").textContent, "2 matches");
+  app.el("editorReplace").value = "$2-$1";
+  app.el("findNext").fire("click");
+  app.el("replaceOne").fire("click");
+  assert.equal(app.el("source").value, "1-cat cats cat2");
+  assert.equal(app.el("dirty").hidden, false);
+  app.el("editorRegex").checked = false;
+  app.el("editorWholeWord").checked = true;
+  app.el("editorWholeWord").fire("change");
+  app.el("editorFind").value = "cat";
+  app.el("editorFind").fire("input");
+  assert.equal(app.el("editorFindCount").textContent, "1 matches");
+  app.el("editorRegex").checked = true;
+  app.el("editorRegex").fire("change");
+  app.el("editorFind").value = "(";
+  app.el("editorFind").fire("input");
+  assert.match(app.el("editorFindCount").textContent, /Invalid regular expression/);
+  assert.equal(app.el("source").value, "1-cat cats cat2");
+  assert.equal(app.fetches.length, 0);
+});
+
 test("replace-all limit prevents partial source mutation", () => {
   const app = workspace(directory("empty"));
   app.el("source").value = "x".repeat(10001);
@@ -342,6 +388,29 @@ test("Run cell sends only the active percent cell through execution API", async 
   assert.equal(app.fetches[0].url, "/api/run/python");
   assert.equal(app.fetches[0].options.body, "print('two')\n");
   assert.match(app.el("console").textContent, /\[cell 2\/2\]/);
+});
+test("Run Cell keeps Python multiline string markers inside the same execution", async () => {
+  const app = workspace(directory("empty"));
+  app.el("language").value = "python";
+  const source = 'message = """first\n# %% literal\nlast"""\nprint(message)\n# %%\nprint("next")\n';
+  app.el("source").value = source;
+  app.el("source").setSelectionRange(source.indexOf("literal"), source.indexOf("literal"));
+  await app.el("runCell").fire("click");
+  assert.equal(app.fetches.length, 1);
+  assert.equal(app.fetches[0].url, "/api/run/python");
+  assert.equal(app.fetches[0].options.body, 'message = """first\n# %% literal\nlast"""\nprint(message)\n');
+  assert.match(app.el("console").textContent, /\[cell 1\/2\]/);
+});
+test("Run Cell preserves R multiline strings and CR-only source boundaries", async () => {
+  const app = workspace(directory("empty"));
+  app.el("language").value = "r";
+  const source = 'x <- "start\r# %% literal\rend"\r# %%\rprint(x)\r';
+  app.el("source").value = source;
+  app.el("source").setSelectionRange(source.indexOf("literal"), source.indexOf("literal"));
+  await app.el("runCell").fire("click");
+  assert.equal(app.fetches.length, 1);
+  assert.equal(app.fetches[0].url, "/api/run/r");
+  assert.equal(app.fetches[0].options.body, 'x <- "start\r# %% literal\rend"\r');
 });
 test("Markdown and empty cells never execute", async () => {
   const app = workspace(directory("empty"));
@@ -429,4 +498,100 @@ test("native R execution and reset refresh bounded environment through Flow inte
   assert.equal(app.fetches[1].url, "/api/reset/r");
   assert.equal(app.inspectionFetches.length, 2);
   assert.equal(app.inspectionFetches[1].url, "/api/inspect/r");
+});
+
+test("project regex search selects real matches and rejects stale changed file text", async () => {
+  const target = file("analysis.R", "α αβ\nfoo_2 = 1\nfoo_3 = 2");
+  const app = workspace(directory("research", [["analysis.R", target]]));
+  await app.el("folder").fire("click");
+  app.el("projectSearch").value = "foo_(\\d)";
+  app.el("projectRegex").checked = true;
+  app.el("projectWholeWord").checked = true;
+  await app.el("searchProject").fire("click");
+  const results = app.el("searchResults");
+  assert.equal(results.children.length, 3);
+  assert.match(results.children[0].textContent, /2 matches in 1 files/);
+  await results.children[2].fire("click");
+  assert.equal(app.el("source").selectionStart, 15);
+  assert.equal(app.el("source").selectionEnd, 20);
+  assert.equal(app.el("source").value.slice(15, 20), "foo_3");
+  const writable = await target.createWritable();
+  await writable.write("α αβ\nfoo_2 = 1\nbar_3 = 2");
+  await writable.close();
+  await results.children[2].fire("click");
+  assert.match(app.el("resultStatus").textContent, /File changed since search/);
+});
+
+
+test("project-wide replacement writes only after confirmation and never uploads project contents", async () => {
+  const target = file("analysis.R", "x <- 1\nx <- 2\n");
+  const app = workspace(directory("work", [["analysis.R", target]]));
+  await app.el("folder").fire("click");
+  app.el("projectSearch").value = "x";
+  app.el("projectReplace").value = "count";
+  app.setDiscard(false);
+  await app.el("replaceProject").fire("click");
+  assert.equal(target.content, "x <- 1\nx <- 2\n");
+  assert.match(app.el("resultStatus").textContent, /cancelled/);
+  app.setDiscard(true);
+  await app.el("replaceProject").fire("click");
+  assert.equal(target.content, "count <- 1\ncount <- 2\n");
+  assert.match(app.el("resultStatus").textContent, /Replaced 2 matches in 1 project files/);
+  assert.equal(app.fetches.length, 0);
+});
+
+test("project-wide replacement refuses open tabs and preserves unsaved source", async () => {
+  const target = file("analysis.R", "x <- 1\n");
+  const app = workspace(directory("work", [["analysis.R", target]]));
+  await app.el("folder").fire("click");
+  await app.el("projectTree").children[1].fire("click");
+  app.el("source").value = "x <- 99\n";
+  app.el("source").fire("input");
+  app.el("projectSearch").value = "x";
+  app.el("projectReplace").value = "y";
+  await app.el("replaceProject").fire("click");
+  assert.equal(target.content, "x <- 1\n");
+  assert.equal(app.el("source").value, "x <- 99\n");
+  assert.match(app.el("resultStatus").textContent, /Close open editor tabs/);
+});
+
+test("project-wide replacement uses regex capture groups in the native workspace", async () => {
+  const target = file("analysis.R", "foo_1 <- 3\nfoo_2 <- 4");
+  const app = workspace(directory("work", [["analysis.R", target]]));
+  await app.el("folder").fire("click");
+  app.el("projectSearch").value = "foo_(\\d)";
+  app.el("projectRegex").checked = true;
+  app.el("projectReplace").value = "bar_$1";
+  await app.el("replaceProject").fire("click");
+  assert.equal(target.content, "bar_1 <- 3\nbar_2 <- 4");
+});
+
+test("native project undo restores verified disk contents and is one-shot", async () => {
+  const target = file("analysis.R", "x <- 1\nx <- 2\n");
+  const app = workspace(directory("work", [["analysis.R", target]]));
+  await app.el("folder").fire("click");
+  app.el("projectSearch").value = "x";
+  app.el("projectReplace").value = "z";
+  await app.el("replaceProject").fire("click");
+  assert.equal(target.content, "z <- 1\nz <- 2\n");
+  assert.equal(app.el("undoProjectReplace").disabled, false);
+  await app.el("undoProjectReplace").fire("click");
+  assert.equal(target.content, "x <- 1\nx <- 2\n");
+  assert.equal(app.el("undoProjectReplace").disabled, true);
+  assert.equal(app.fetches.length, 0);
+});
+test("native project undo refuses external edits without overwriting", async () => {
+  const target = file("analysis.R", "x <- 1\n");
+  const app = workspace(directory("work", [["analysis.R", target]]));
+  await app.el("folder").fire("click");
+  app.el("projectSearch").value = "x";
+  app.el("projectReplace").value = "z";
+  await app.el("replaceProject").fire("click");
+  const writer = await target.createWritable();
+  await writer.write("external");
+  await writer.close();
+  await app.el("undoProjectReplace").fire("click");
+  assert.equal(target.content, "external");
+  assert.match(app.el("resultStatus").textContent, /Project undo failed.*File changed since preview/);
+  assert.equal(app.el("undoProjectReplace").disabled, true);
 });

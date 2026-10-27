@@ -1,7 +1,7 @@
 name: CI
 on:
   push:
-    branches: [main, feat/flowjit-guarded-native-numeric]
+    branches: [main]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -25,7 +25,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      # pandas is required here: the Python→R DataFrame feature must not pass
+      # solely because its real-CPython regression cases were skipped.
+      - name: Install pandas for actual DataFrame interchange acceptance
+        run: python3 -m pip install 'pandas==2.2.3'
       - name: JavaScript module, DOM and source contract suites
+        env:
+          FLOWSTUDIO_REQUIRE_PANDAS: '1'
         run: node --test tests/*.test.js
       - name: Python syntax and verification harness
         run: |
@@ -35,7 +41,6 @@ jobs:
         run: |
           python3 tests/transport_smoke.py
           python3 tests/embedding_headers_smoke.py
-
   flowjit:
     name: FlowJIT real R/C native / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -83,6 +88,26 @@ jobs:
         run: |
           flow version
           python3 scripts/verify_native.py --require-r
+      - name: Real Chromium Quarto import/export on native Flow server
+        if: matrix.os == 'ubuntu-24.04'
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npx playwright install --with-deps chromium
+          ./build/flowstudio > /tmp/flowstudio-quarto-ui.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          ready=0
+          for i in $(seq 1 100); do
+            if curl -fsS http://127.0.0.1:8751/health >/dev/null; then
+              ready=1
+              break
+            fi
+            sleep 0.2
+          done
+          if [ "$ready" -ne 1 ]; then cat /tmp/flowstudio-quarto-ui.log; exit 1; fi
+          node tests/quarto_ui.mjs
       - name: Package verified executable
         run: sh scripts/package.sh
       - name: Archive qualified platform build

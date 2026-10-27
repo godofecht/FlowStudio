@@ -12,10 +12,13 @@ const MAX_PLOTS = 4;
 const MAX_PNG = 524288;
 const PNG = /^iVBORw0KGgo[A-Za-z0-9+/]*={0,2}$/;
 const encoder = new TextEncoder();
+// Share the import/export validator; never persist unverified Jupyter records.
+const format = global.FlowStudioNotebookFormat ||
+  (typeof require === "function" ? require("./notebook_format.js") : null);
 
 function normalise(source, language, entries) {
   if (typeof source !== "string" || encoder.encode(source).length > MAX_SOURCE_BYTES ||
-      !["python", "r"].includes(language) || !Array.isArray(entries) || entries.length > MAX_ENTRIES)
+      !["python", "r", "flow"].includes(language) || !Array.isArray(entries) || entries.length > MAX_ENTRIES)
     return null;
   let lastIndex = -1;
   const safe = [];
@@ -31,18 +34,33 @@ function normalise(source, language, entries) {
           !PNG.test(plot.png)) return null;
       plots.push({png:plot.png});
     }
-    safe.push({index:entry.index, kind:"code", ok:entry.ok,
-      output:entry.output, truncated:entry.truncated, plots});
+    const saved = {index:entry.index, kind:"code", ok:entry.ok,
+      output:entry.output, truncated:entry.truncated, plots};
+    if (entry.jupyterOutputs !== undefined) {
+      if (!format || typeof format.safeJupyterOutputs !== "function") return null;
+      const canonical = format.safeJupyterOutputs(entry.jupyterOutputs, {...entry, plots});
+      if (!canonical) return null;
+      // The validator deliberately drops unsupported metadata. Recovery must
+      // reject such records rather than silently claiming lossless persistence.
+      try {
+        if (JSON.stringify(canonical) !== JSON.stringify(entry.jupyterOutputs)) return null;
+      } catch (_) { return null; }
+      saved.jupyterOutputs = canonical;
+    }
+    safe.push(saved);
     lastIndex = entry.index;
   }
   const record = {version:1, source, language, entries:safe};
   return encoder.encode(JSON.stringify(record)).length <= MAX_RECORD_BYTES ? record : null;
 }
 function save(storage, source, language, entries) {
-  const record = normalise(source, language, entries);
-  if (!record || !storage) return false;
-  try { storage.setItem(KEY, JSON.stringify(record)); return true; }
-  catch (_) { return false; }
+  if (!storage) return false;
+  try {
+    const record = normalise(source, language, entries);
+    if (!record) return false;
+    storage.setItem(KEY, JSON.stringify(record));
+    return true;
+  } catch (_) { return false; }
 }
 function read(storage, source, language) {
   if (!storage) return null;

@@ -20,12 +20,13 @@ function mount(reply = {ok:true,status:200,text:async () => "ok"}) {
   const doc = {getElementById:id=>elements.get(id)};
   const requests = [];
   const context = vm.createContext({TextEncoder,console});
+  vm.runInContext(fs.readFileSync(path.join(root,"web/terminal_render.js"),"utf8"),context);
   vm.runInContext(fs.readFileSync(path.join(root,"web/console.js"),"utf8"),context);
   vm.runInContext(fs.readFileSync(path.join(root,"web/workspace_console.js"),"utf8"),context);
   const controller = context.FlowStudioWorkspaceConsole.mount(doc,async (url,options)=>{
     requests.push({url,options});return reply;
   });
-  return {controller,el:id=>elements.get(id),requests};
+  return {controller,el:id=>elements.get(id),requests,io:()=>context.FlowStudioConsoleIO};
 }
 test("workspace exposes console controls and loads allowlisted modules",()=>{
   assert.match(html, /id="console"/);
@@ -98,8 +99,7 @@ test("keyboard prevents editor shortcut propagation and supports multiline",asyn
   prevented=false;
   app.el("consoleInput").fire("keydown",{key:"Enter",shiftKey:true,preventDefault(){prevented=true;}});
   assert.equal(prevented,false);
-});
-test("network failures do not consume history and release locks",async()=>{
+});test("network failures do not consume history and release locks",async()=>{
   const app=mount({text:async()=>{throw Error("disconnected");}});
   app.el("consoleInput").value="retry";
   assert.equal(await app.controller.run(app.el("consoleInput")),false);
@@ -131,6 +131,7 @@ test("mount creates accessible console controls inside existing editor panel", a
   elements.get("language").value = "flow";
   const doc = {getElementById:id=>elements.get(id) || null,createElement:tag=>element("")};
   const context = vm.createContext({TextEncoder,console});
+  vm.runInContext(fs.readFileSync(path.join(root,"web/terminal_render.js"),"utf8"),context);
   vm.runInContext(fs.readFileSync(path.join(root,"web/console.js"),"utf8"),context);
   vm.runInContext(fs.readFileSync(path.join(root,"web/workspace_console.js"),"utf8"),context);
   const calls=[];
@@ -138,9 +139,42 @@ test("mount creates accessible console controls inside existing editor panel", a
     calls.push([url,opts.body]);return {ok:true,status:200,text:async()=>"ok"};
   });
   assert.equal(elements.get("consoleInput")["aria-label"],"Interactive console command");
-  assert.equal(elements.get("consoleExecute").textContent,"Execute");
-  assert.equal(panel.style.flexDirection,"column");
+  assert.equal(elements.get("consoleInput")["aria-label"], "Interactive console command");
+  assert.equal(elements.get("consoleExecute").textContent, "Run ▸");
+  assert.equal(elements.get("consoleExecute").type, "button");
+  assert.equal(panel.style.flexDirection, "column");
+  // Terminal chrome: the runtime prompt sits inline beside the input row.
+  const prompt = elements.get("consolePrompt");
+  assert.ok(prompt, "a runtime command prompt is injected");
+  assert.match(prompt.textContent, /flow/);
   elements.get("consoleInput").value="println(1)";
   assert.equal(await controller.run(elements.get("consoleInput")),true);
   assert.deepEqual(calls,[["/api/run/flow","println(1)"]]);
+});
+
+test("console renders prompt and error classes from the terminal engine",async()=>{
+  const app=mount({ok:false,status:422,text:async()=>"TypeError: bad type"});
+  app.el("consoleInput").value="bad";
+  await app.controller.run(app.el("consoleInput"));
+  const html = app.el("console").innerHTML;
+  assert.match(html,/fs-prompt-line/);
+  assert.match(html,/fs-error-line/);
+  assert.match(html,/TypeError/);
+});
+
+test("console output is never interpreted as HTML",async()=>{
+  const app=mount({ok:true,status:200,text:async()=>'<img onerror=alert(1)> done'});
+  app.el("consoleInput").value="print('<img>')";
+  await app.controller.run(app.el("consoleInput"));
+  const html = app.el("console").innerHTML;
+  assert.doesNotMatch(html,/<img\s.*onerror/);
+  assert.match(html,/&lt;img\s+onerror=alert\(1\)&gt;/);
+});
+
+test("the console I/O singleton feeds one bounded terminal buffer",async()=>{
+  const app=mount();
+  app.io().write("\n> manual entry\n\x1b[32mok\x1b[0m\n");
+  const html = app.el("console").innerHTML;
+  assert.match(html,/&gt; manual entry/);
+  assert.match(html,/fs-green/);
 });

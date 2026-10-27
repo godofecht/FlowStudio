@@ -14,6 +14,7 @@ function node() {
 }
 function file(name, content) {
   return {kind:"file", name, content,
+    async isSameEntry(other) { return this === other; },
     async getFile() {return {size:Buffer.byteLength(this.content),text:async()=>this.content};},
     async createWritable() {
       let staged = "";
@@ -31,7 +32,7 @@ function fixture() {
     async *entries(){for(const pair of this.files) yield pair;},
     async getFileHandle(name,{create}={}){
       if (!this.files.has(name) && create) this.files.set(name,file(name,""));
-      if (!this.files.has(name)) throw Error("missing file");
+      if (!this.files.has(name)) { const error = Error("missing file"); error.name = "NotFoundError"; throw error; }
       return this.files.get(name);
     }};
   const openFolderButton=node(),saveFileButton=node(),newFileButton=node();

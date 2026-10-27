@@ -13,6 +13,7 @@ import os
 import sys
 import traceback
 
+
 MAX_SOURCE = 131072
 MAX_OUTPUT = 131072
 
@@ -61,31 +62,100 @@ def read_exact(stream: io.BufferedReader, count: int) -> bytes | None:
 
 
 
+MAX_INSPECT_NODES = 256
+MAX_INSPECT_CHILDREN = 12
+MAX_INSPECT_DEPTH = 2
+
+
 def inspect_namespace(namespace: dict[str, object]) -> bytes:
-    """Bounded metadata only: never invoke repr(), properties or user methods."""
+    """Inspect exact built-in containers without running user-defined methods.
+
+    Child nodes are bounded and carry types/sizes, never repr() values. This
+    avoids executing __repr__, __iter__, __getitem__ or descriptor code on
+    arbitrary user objects. No numpy/pandas objects are traversed.
+    """
+    limits = {"nodes": 0, "truncated": False}
+
+    def describe(name: str, value: object, depth: int,
+                 ancestors: frozenset[int]) -> dict[str, object] | None:
+        if limits["nodes"] >= MAX_INSPECT_NODES:
+            limits["truncated"] = True
+            return None
+        limits["nodes"] += 1
+        exact_type = type(value)
+        kind = type.__getattribute__(exact_type, "__name__")[:100]
+        size = len(value) if exact_type in (
+            str, bytes, list, tuple, dict, set, frozenset) else None
+        node: dict[str, object] = {
+            "name": name[:160], "type": kind, "size": size
+        }
+        if depth >= MAX_INSPECT_DEPTH or exact_type not in (list, tuple, dict):
+            return node
+        if id(value) in ancestors:
+            node["cycle"] = True
+            return node
+
+        children: list[dict[str, object]] = []
+        next_ancestors = ancestors | {id(value)}
+        if exact_type in (list, tuple):
+            for index in range(min(size, MAX_INSPECT_CHILDREN)):
+                child = describe(f"[{index}]", value[index], depth + 1, next_ancestors)
+                if child is None:
+                    break
+                children.append(child)
+        else:
+            # Only exact str/int keys are named. Never call user key __str__
+            # or __repr__; dictionary iteration itself is a builtin operation.
+            for index, (key, item) in enumerate(value.items()):
+                if index >= MAX_INSPECT_CHILDREN:
+                    break
+                if type(key) is str:
+                    label = "[" + json.dumps(key[:80], ensure_ascii=True) + "]"
+                elif type(key) is int and key.bit_length() <= 512:
+                    label = "[" + str(key) + "]"
+                else:
+                    limits["truncated"] = True
+                    continue
+                child = describe(label, item, depth + 1, next_ancestors)
+                if child is None:
+                    break
+                children.append(child)
+        if children:
+            node["children"] = children
+        if size > len(children):
+            node["truncated"] = True
+            limits["truncated"] = True
+        return node
+
     variables: list[dict[str, object]] = []
-    truncated = False
     for name, value in namespace.items():
         if type(name) is not str or name.startswith("__"):
             continue
         if len(variables) >= 128:
-            truncated = True
+            limits["truncated"] = True
             break
-        kind = type.__getattribute__(type(value), "__name__")[:100]
-        size = len(value) if type(value) in (str, bytes, list, tuple, dict, set, frozenset) else None
-        variables.append({"name": name[:160], "type": kind, "size": size})
-    payload = json.dumps({"variables": variables, "truncated": truncated},
-                         ensure_ascii=True, separators=(",", ":")).encode("utf-8")
+        entry = describe(name, value, 0, frozenset())
+        if entry is None:
+            break
+        variables.append(entry)
+
+    def serialize() -> bytes:
+        return json.dumps(
+            {"variables": variables, "truncated": limits["truncated"]},
+            ensure_ascii=True, separators=(",", ":")).encode("utf-8")
+
+    payload = serialize()
     while len(payload) > 65536 and variables:
         variables.pop()
-        truncated = True
-        payload = json.dumps({"variables": variables, "truncated": truncated},
-                             ensure_ascii=True, separators=(",", ":")).encode("utf-8")
+        limits["truncated"] = True
+        payload = serialize()
     return payload
 
 
 def serve() -> None:
     namespace: dict[str, object] = {"__name__": "__main__"}
+    from python_debugger import DebugSession, encode
+    debugger = DebugSession()
     protocol = os.fdopen(3, "wb", buffering=0)
     stdin = sys.stdin.buffer
     while True:
@@ -96,14 +166,39 @@ def serve() -> None:
             length = int(header[1:], 16)
         except ValueError:
             return
-        if header[:1] not in (b"E", b"I") or length > MAX_SOURCE or (header[:1] == b"I" and length != 0):
+        if header[:1] not in (b"E", b"I", b"T", b"B", b"S", b"N", b"F", b"C", b"X", b"Q") or length > MAX_SOURCE or (header[:1] in (b"I", b"S", b"N", b"F", b"C", b"X", b"Q") and length != 0):
             return
         data = read_exact(stdin, length)
         if data is None:
             return
-        if header[:1] == b"I":
+        if header[:1] in (b"B", b"S", b"N", b"F", b"C", b"X", b"Q"):
+            if header[:1] == b"B":
+                try:
+                    ok, payload = encode(debugger.start(data.decode("utf-8", "strict"), namespace, LimitedWriter()))
+                except UnicodeDecodeError:
+                    ok, payload = encode({"state": "idle", "ok": False, "stack": [],
+                                          "output": "", "message": "Invalid UTF-8 debugger request."})
+            else:
+                actions = {b"S": "step", b"N": "next", b"F": "finish", b"C": "continue", b"X": "stop", b"Q": "status"}
+                ok, payload = encode(debugger.command(actions[header[:1]]))
+        elif debugger.busy() and header[:1] != b"I":
+            ok, payload = False, b"Python debugger is active; stop or finish it before normal execution."
+        elif debugger.busy() and debugger.snapshot()["state"] == "running":
+            ok, payload = False, b"Python debugger is executing; inspection is temporarily unavailable."
+        elif header[:1] == b"I":
             ok = True
             payload = inspect_namespace(namespace)
+        elif header[:1] == b"T":
+            try:
+                source = data.decode("utf-8", "strict")
+            except UnicodeDecodeError:
+                ok = False
+                payload = b'{"ok":false,"output":"Invalid UTF-8 source","events":[],"truncated":false}'
+            else:
+                # Loaded only for tracing: regular kernel imports and inspection
+                # remain usable when this file is imported via spec_from_file_location.
+                from python_trace import trace_source
+                ok, payload = trace_source(source, namespace, LimitedWriter())
         else:
             output = LimitedWriter()
             ok = True

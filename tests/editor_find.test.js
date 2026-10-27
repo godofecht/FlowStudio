@@ -53,3 +53,44 @@ test("refuses truncated replace-all atomically", () => {
   assert.equal(findMatches(source, "x").truncated, true);
   assert.throws(() => replaceAll(source, "x", "y"), /10,000 matches/);
 });
+
+
+test("regex search supports captures and named captures with UTF-16 offsets", () => {
+  const text = "🙂 α=12 β=34";
+  const matches = findMatches(text, "(?<key>\\p{L})=(?<value>\\d+)", {regex:true}).matches;
+  assert.deepEqual(matches.map(m => [m.index,m.end,m.groups.key,m.groups.value]),
+    [[3,7,"α","12"],[8,12,"β","34"]]);
+  assert.equal(replaceAll(text, "(?<key>\\p{L})=(?<value>\\d+)", "$<value>:$<key>", {regex:true}).value,
+    "🙂 12:α 34:β");
+});
+test("regex replacement expands captures, full match, dollar and optional groups", () => {
+  assert.equal(replaceAll("a1 b2", "([a-z])(\\d)", "$2-$1", {regex:true}).value, "1-a 2-b");
+  assert.equal(replaceSelection("a1 b2", "([a-z])(\\d)", "$2:$1", 3, 5, {regex:true}).value, "a1 2:b");
+  assert.equal(replaceAll("a", "(a)(b)?", "[$&][$1][$2][$$]", {regex:true}).value, "[a][a][][$]");
+  assert.equal(replaceAll("a1", "([a-z])(\\d)", "$1$2", {regex:false}).count, 0);
+  assert.equal(replaceAll("a1", "([a-z])(\\d)", "$1$2", {regex:true}).value, "a1");
+});
+test("whole-word matches Unicode words but not identifier substrings", () => {
+  assert.deepEqual(findMatches("cat cats cat_ cat. scatter", "cat", {wholeWord:true}).matches.map(m => m.index), [0,14]);
+  assert.deepEqual(findMatches("α αβ _α α_", "α", {wholeWord:true}).matches.map(m => m.index), [0]);
+  assert.equal(replaceAll("x xy x_", "x", "y", {wholeWord:true}).value, "y xy x_");
+});
+test("regex anchors, zero-width matches and malformed patterns remain bounded", () => {
+  assert.equal(replaceAll("a\nb", "^", ">", {regex:true}).value, ">a\n>b");
+  assert.equal(replaceAll("aa", "(?=a)", "x", {regex:true}).value, "xaxa");
+  assert.throws(() => findMatches("x", "(", {regex:true}), /Invalid regular expression/);
+  assert.throws(() => findMatches("x".repeat(131073), "x", {regex:true}), /128 KiB/);
+  assert.throws(() => replaceAll("x".repeat(10001), "x", "y", {regex:true}), /10,000 matches/);
+  assert.throws(() => replaceAll("a".repeat(1000), "a", "x".repeat(10000), {regex:true}), /2 MiB/);
+});
+test("native HTML embeds the same regex engine and wires both search toggles", () => {
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const html = fs.readFileSync(path.join(__dirname,"../web/index.html"),"utf8");
+  const engine = fs.readFileSync(path.join(__dirname,"../web/editor_find.js"),"utf8");
+  assert.ok(html.includes("<script>\n" + engine + "</script>"));
+  for (const id of ["editorRegex","editorWholeWord"])
+    assert.ok(html.includes('id="' + id + '"'));
+  assert.match(html, /regex:el\("editorRegex"\)\.checked/);
+  assert.match(html, /wholeWord:el\("editorWholeWord"\)\.checked/);
+});

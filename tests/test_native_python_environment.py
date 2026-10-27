@@ -21,7 +21,10 @@ class NativePythonEnvironmentTest(unittest.TestCase):
         }))
         entries = {item["name"]: item for item in result["variables"]}
         self.assertNotIn("__name__", entries)
-        self.assertEqual(entries["café"], {"name": "café", "type": "list", "size": 2})
+        self.assertEqual(entries["café"]["name"], "café")
+        self.assertEqual(entries["café"]["type"], "list")
+        self.assertEqual(entries["café"]["size"], 2)
+        self.assertEqual([child["name"] for child in entries["café"]["children"]], ["[0]", "[1]"])
         self.assertEqual(entries["number"]["type"], "int")
         self.assertIsNone(entries["number"]["size"])
         self.assertEqual(entries["mapping"]["size"], 1)
@@ -40,6 +43,53 @@ class NativePythonEnvironmentTest(unittest.TestCase):
         self.assertEqual(calls, [])
         self.assertEqual(result["variables"][0]["type"], "Adversarial")
         self.assertIsNone(result["variables"][0]["size"])
+
+    def test_nested_containers_and_cycles_are_bounded(self):
+        loop = []
+        loop.append(loop)
+        nested = {"items": [1, {"deep": [2]}], "cycle": loop}
+        result = json.loads(kernel.inspect_namespace({"nested": nested}))
+        root = result["variables"][0]
+        self.assertEqual(root["type"], "dict")
+        self.assertEqual(root["children"][0]["name"], '["items"]')
+        self.assertEqual(root["children"][0]["children"][0]["type"], "int")
+        self.assertEqual(root["children"][1]["children"][0]["type"], "list")
+        # Recursive descent is bounded to two child levels, even on cycles.
+        self.assertLessEqual(len(json.dumps(result)), 65536)
+
+    def test_nested_values_do_not_invoke_user_defined_methods(self):
+        called = []
+        class Dangerous:
+            def __repr__(self):
+                called.append("repr")
+                raise RuntimeError("repr")
+            def __iter__(self):
+                called.append("iter")
+                raise RuntimeError("iter")
+            def __getitem__(self, key):
+                called.append("getitem")
+                raise RuntimeError("getitem")
+            def __len__(self):
+                called.append("len")
+                raise RuntimeError("len")
+        bad = Dangerous()
+        data = {"x": [bad], bad: bad}
+        result = json.loads(kernel.inspect_namespace({"data": data}))
+        self.assertEqual(called, [])
+        children = result["variables"][0]["children"]
+        self.assertEqual(children[0]["children"][0]["type"], "Dangerous")
+        self.assertTrue(result["truncated"])
+
+    def test_child_limits_and_json_budget(self):
+        huge = [{"long": "a" * 500000} for _ in range(20)]
+        result = json.loads(kernel.inspect_namespace({"huge": huge}))
+        self.assertTrue(result["truncated"])
+        self.assertEqual(len(result["variables"][0]["children"]), 12)
+        self.assertTrue(result["variables"][0]["truncated"])
+        many = {f"v{i}": list(range(20)) for i in range(128)}
+        raw = kernel.inspect_namespace(many)
+        self.assertLessEqual(len(raw), 65536)
+        self.assertTrue(json.loads(raw)["truncated"])
 
     def test_entry_and_size_limits(self):
         result = json.loads(kernel.inspect_namespace({f"v{i}": i for i in range(200)}))

@@ -5,7 +5,7 @@
 # sandbox executed code. Python and R retain separate local interpreter sessions.
 
 import std.process { ProcCmd, ProcResult, proc_cmd, proc_arg, proc_timeout_ms, proc_run }
-import std.io { FileRead, io_read_text }
+import std.io { FileRead, io_read_text, io_read_file }
 import .data_routes { StaticAsset, data_route }
 
 extern {
@@ -19,15 +19,38 @@ extern {
     function fs_write_temp_flow(code: string) -> string
     function fs_make_temp_c() -> string
     function fs_r_run(code: string) -> string
+    function fs_r_check(code: string) -> string
+    function fs_r_debug_start(source: string) -> string
+    function fs_r_debug_step() -> string
+    function fs_r_debug_continue(line: string) -> string
+    function fs_r_debug_evaluate(source: string) -> string
+    function fs_r_debug_stop() -> string
+    function fs_r_debug_status() -> string
     function fs_r_inspect() -> string
+    function fs_r_table(name: string) -> string
+    function fs_r_plot() -> string
+    function fs_r_packages() -> string
+    function fs_r_load_package(name: string) -> string
+    function fs_r_install_package(name: string) -> string
+    function fs_r_remove_package(name: string) -> string
+    function fs_r_update_package(name: string) -> string
     function fs_r_status() -> i32
     function fs_r_reset() -> void
     function fs_py_run(code: string) -> string
+    function fs_py_trace(code: string) -> string
+    function fs_py_debug_start(code: string) -> string
+    function fs_py_debug_step() -> string
+    function fs_py_debug_next() -> string
+    function fs_py_debug_finish() -> string
+    function fs_py_debug_continue() -> string
+    function fs_py_debug_stop() -> string
+    function fs_py_debug_state() -> string
     function fs_py_inspect() -> string
     function fs_py_status() -> i32
     function fs_py_reset() -> void
     function unlink(path: string) -> i32
     function strcmp(a: string, b: string) -> i32
+    function strlen(s: string) -> i64
 }
 
 function eq(a: string, b: string) -> bool {
@@ -39,7 +62,9 @@ struct ExecutionResult {
     output: string
 }
 
-function execute(language: string, code: string, check_only: bool) -> ExecutionResult {
+# backend selects the compiler backend for Flow runs: "" uses the default
+# C backend, "mlir" passes --backend=mlir to the real flow process.
+function execute(language: string, code: string, check_only: bool, backend: string) -> ExecutionResult {
     let mut command: ptr<ProcCmd> = proc_cmd("flow")
     let mut temp_path: string = ""
     let mut output_path: string = ""
@@ -65,6 +90,9 @@ function execute(language: string, code: string, check_only: bool) -> ExecutionR
         } else {
             proc_arg(command, "run")
             proc_arg(command, temp_path)
+            if not eq(backend, "") {
+                proc_arg(command, "--backend=" + backend)
+            }
         }
     } else {
         return ExecutionResult { status: 400, output: "Unsupported language." }
@@ -124,8 +152,8 @@ function execute(language: string, code: string, check_only: bool) -> ExecutionR
     return ExecutionResult { status: 200, output: output }
 }
 
-function send_execution(language: string, code: string) -> void {
-    let result: ExecutionResult = execute(language, code, false)
+function send_execution(language: string, code: string, backend: string) -> void {
+    let result: ExecutionResult = execute(language, code, false, backend)
     fs_reply(result.status, "text/plain; charset=utf-8", result.output)
 }
 
@@ -156,6 +184,37 @@ function send_r(code: string) -> void {
     fs_reply(fs_r_status(), "text/plain; charset=utf-8", output)
 }
 
+# A bounded, cooperative R top-level-expression debugger. Flow owns the HTTP
+# intent/origin gate and the native C/R IPC; no browser() stdin interaction.
+function send_r_debug(action: string, source: string) -> void {
+    let mut output: string = ""
+    if eq(action, "start") {
+        output = fs_r_debug_start(source)
+    } elif eq(action, "step") {
+        output = fs_r_debug_step()
+    } elif eq(action, "continue") {
+        output = fs_r_debug_continue(source)
+    } elif eq(action, "evaluate") {
+        output = fs_r_debug_evaluate(source)
+    } elif eq(action, "stop") {
+        output = fs_r_debug_stop()
+    } else {
+        output = fs_r_debug_status()
+    }
+    let status: i32 = fs_r_status()
+    if status == 200 or status == 422 {
+        fs_reply(status, "application/json; charset=utf-8", output)
+    } else {
+        fs_reply(status, "text/plain; charset=utf-8", output)
+    }
+}
+
+# Parse with the actual persistent R interpreter; never evaluate user source.
+function send_r_check(code: string) -> void {
+    let output: string = fs_r_check(code)
+    fs_reply(fs_r_status(), "text/plain; charset=utf-8", output)
+}
+
 function send_python(code: string) -> void {
     let output: string = fs_py_run(code)
     fs_reply(fs_py_status(), "text/plain; charset=utf-8", output)
@@ -166,6 +225,110 @@ function send_r_environment() -> void {
     let status: i32 = fs_r_status()
     if status == 200 {
         fs_reply(200, "application/json; charset=utf-8", output)
+    } else {
+        fs_reply(status, "text/plain; charset=utf-8", output)
+    }
+}
+
+# Flow owns the package inventory route; no submitted R source is evaluated.
+function send_r_packages() -> void {
+    let output: string = fs_r_packages()
+    let status: i32 = fs_r_status()
+    if status == 200 {
+        fs_reply(200, "application/json; charset=utf-8", output)
+    } else {
+        fs_reply(status, "text/plain; charset=utf-8", output)
+    }
+}
+
+# Load an installed package in the actual persistent Rscript kernel.
+# This does not install packages or accept arbitrary R expressions.
+function send_r_package_load(name: string) -> void {
+    let output: string = fs_r_load_package(name)
+    fs_reply(fs_r_status(), "text/plain; charset=utf-8", output)
+}
+
+# Explicit CRAN installation through the persistent native R kernel.
+# Package build scripts execute with the local user's permissions.
+function send_r_package_install(name: string) -> void {
+    let output: string = fs_r_install_package(name)
+    fs_reply(fs_r_status(), "text/plain; charset=utf-8", output)
+}
+
+# Removal is restricted by R to the dedicated FlowStudio user library.
+# Loaded packages and system libraries cannot be removed.
+function send_r_package_remove(name: string) -> void {
+    let output: string = fs_r_remove_package(name)
+    fs_reply(fs_r_status(), "text/plain; charset=utf-8", output)
+}
+
+# Update only packages in FlowStudio's dedicated user library; R rejects
+# loaded namespaces, system libraries and unavailable CRAN updates.
+function send_r_package_update(name: string) -> void {
+    let output: string = fs_r_update_package(name)
+    fs_reply(fs_r_status(), "text/plain; charset=utf-8", output)
+}
+
+# Flow owns the table route. The persistent R kernel returns bounded JSON.
+function send_r_plot() -> void {
+    let output: string = fs_r_plot()
+    let status: i32 = fs_r_status()
+    if status == 200 {
+        fs_reply(200, "application/json; charset=utf-8", output)
+    } else {
+        fs_reply(status, "text/plain; charset=utf-8", output)
+    }
+}
+
+function send_r_table(name: string) -> void {
+    let output: string = fs_r_table(name)
+    let status: i32 = fs_r_status()
+    if status == 200 {
+        fs_reply(200, "application/json; charset=utf-8", output)
+    } else {
+        fs_reply(status, "text/plain; charset=utf-8", output)
+    }
+}
+
+# Flow owns the trace route and status; CPython performs bounded line tracing.
+function send_python_trace(code: string) -> void {
+    let output: string = fs_py_trace(code)
+    let status: i32 = fs_py_status()
+    if status == 200 or status == 422 {
+        fs_reply(status, "application/json; charset=utf-8", output)
+    } else {
+        fs_reply(status, "text/plain; charset=utf-8", output)
+    }
+}
+
+# Interactive CPython debugging runs inside the persistent native Python
+# kernel; Flow owns all HTTP routes and their existing origin/intent gate.
+function send_python_debug(action: string, body: string) -> void {
+    let mut output: string = ""
+    if eq(action, "start") {
+        output = fs_py_debug_start(body)
+    }
+    if eq(action, "step") {
+        output = fs_py_debug_step()
+    }
+    if eq(action, "next") {
+        output = fs_py_debug_next()
+    }
+    if eq(action, "finish") {
+        output = fs_py_debug_finish()
+    }
+    if eq(action, "continue") {
+        output = fs_py_debug_continue()
+    }
+    if eq(action, "stop") {
+        output = fs_py_debug_stop()
+    }
+    if eq(action, "status") {
+        output = fs_py_debug_state()
+    }
+    let status: i32 = fs_py_status()
+    if status == 200 or status == 422 {
+        fs_reply(status, "application/json; charset=utf-8", output)
     } else {
         fs_reply(status, "text/plain; charset=utf-8", output)
     }
@@ -182,8 +345,203 @@ function send_python_environment() -> void {
 }
 
 function send_flow_check(code: string) -> void {
-    let result: ExecutionResult = execute("flow", code, true)
+    let result: ExecutionResult = execute("flow", code, true, "")
     fs_reply(result.status, "text/plain; charset=utf-8", result.output)
+}
+
+# Fixed-argv, read-only Git inspection of the server working tree.
+# Git never receives a client-supplied path or shell expression.
+function send_git_view(kind: string) -> void {
+    let command: ptr<ProcCmd> = proc_cmd("git")
+    proc_arg(command, "-c")
+    proc_arg(command, "core.fsmonitor=false")
+    proc_arg(command, "--no-optional-locks")
+    if eq(kind, "status") {
+        proc_arg(command, "status")
+        proc_arg(command, "--short")
+        proc_arg(command, "--branch")
+        proc_arg(command, "--untracked-files=normal")
+    } else {
+        proc_arg(command, "diff")
+        if eq(kind, "staged") {
+            proc_arg(command, "--cached")
+        }
+        proc_arg(command, "--no-ext-diff")
+        proc_arg(command, "--no-textconv")
+        proc_arg(command, "--no-color")
+        proc_arg(command, "--unified=3")
+        proc_arg(command, "--")
+    }
+    proc_timeout_ms(command, 5000)
+    let result: ptr<ProcResult> = proc_run(command)
+    if result.timed_out {
+        fs_reply(504, "text/plain; charset=utf-8", "Git inspection timed out after five seconds.")
+        return
+    }
+    if not eq(result.error, "") {
+        fs_reply(503, "text/plain; charset=utf-8", "Git executable unavailable: " + result.error)
+        return
+    }
+    if result.exit_code != 0 {
+        fs_reply(422, "text/plain; charset=utf-8", "Git inspection failed: " + result.stderr)
+        return
+    }
+    if strlen(result.stdout) > 131072 {
+        fs_reply(413, "text/plain; charset=utf-8", "Git output exceeds the 128 KiB display limit.")
+        return
+    }
+    fs_reply(200, "text/plain; charset=utf-8", result.stdout)
+}
+
+# Explicit native Git writes. Only a literal pathspec or commit message is
+# supplied by the browser. No shell, arbitrary argv, repository path or hooks.
+# The server's working tree is the target, not a browser-picked folder.
+function send_git_write(kind: string, value: string) -> void {
+    if eq(value, "") or strlen(value) > 512 {
+        fs_reply(400, "text/plain; charset=utf-8", "Git input must contain 1 to 512 bytes.")
+        return
+    }
+    if (eq(kind, "stage") or eq(kind, "unstage")) and (eq(value, ".") or eq(value, "..") or eq(value, "/")) {
+        fs_reply(400, "text/plain; charset=utf-8", "Select a specific file or subdirectory, not the whole repository.")
+        return
+    }
+    let command: ptr<ProcCmd> = proc_cmd("git")
+    proc_arg(command, "-c")
+    proc_arg(command, "core.fsmonitor=false")
+    proc_arg(command, "-c")
+    proc_arg(command, "core.hooksPath=/dev/null")
+    if eq(kind, "stage") {
+        proc_arg(command, "add")
+        proc_arg(command, "--")
+        proc_arg(command, ":(literal)" + value)
+    } else {
+        if eq(kind, "unstage") {
+            # Restore only the index entry from HEAD. Leave working-tree edits intact.
+            proc_arg(command, "restore")
+            proc_arg(command, "--staged")
+            proc_arg(command, "--")
+            proc_arg(command, ":(literal)" + value)
+        } else {
+            proc_arg(command, "-c")
+            proc_arg(command, "commit.gpgsign=false")
+            proc_arg(command, "commit")
+            proc_arg(command, "--no-gpg-sign")
+            proc_arg(command, "-m")
+            proc_arg(command, value)
+        }
+    }
+    proc_timeout_ms(command, 10000)
+    let result: ptr<ProcResult> = proc_run(command)
+    if result.timed_out {
+        fs_reply(504, "text/plain; charset=utf-8", "Git operation timed out after ten seconds.")
+        return
+    }
+    if not eq(result.error, "") {
+        fs_reply(503, "text/plain; charset=utf-8", "Git executable unavailable: " + result.error)
+        return
+    }
+    let mut output: string = result.stdout + result.stderr
+    if strlen(output) > 131072 {
+        fs_reply(413, "text/plain; charset=utf-8", "Git output exceeds the 128 KiB display limit.")
+        return
+    }
+    if result.exit_code != 0 {
+        fs_reply(422, "text/plain; charset=utf-8", "Git operation failed: " + output)
+        return
+    }
+    if eq(output, "") {
+        if eq(kind, "unstage") {
+            output = "Selected path unstaged; working-tree contents preserved."
+        } else {
+            output = "Selected path staged successfully."
+        }
+    }
+    fs_reply(200, "text/plain; charset=utf-8", output)
+}
+
+# Branch operations target only the native server working tree. Git validates
+# ref names, argv is fixed, and checkout refuses dirty tracked or untracked files.
+function send_git_branch(kind: string, name: string) -> void {
+    if not eq(kind, "list") and (eq(name, "") or strlen(name) > 128) {
+        fs_reply(400, "text/plain; charset=utf-8", "Branch name must contain 1 to 128 bytes.")
+        return
+    }
+    if eq(kind, "switch") {
+        let dirty: ptr<ProcCmd> = proc_cmd("git")
+        proc_arg(dirty, "-c")
+        proc_arg(dirty, "core.fsmonitor=false")
+        proc_arg(dirty, "--no-optional-locks")
+        proc_arg(dirty, "status")
+        proc_arg(dirty, "--porcelain")
+        proc_arg(dirty, "--untracked-files=normal")
+        proc_timeout_ms(dirty, 5000)
+        let state: ptr<ProcResult> = proc_run(dirty)
+        if state.timed_out {
+            fs_reply(504, "text/plain; charset=utf-8", "Git working-tree check timed out.")
+            return
+        }
+        if not eq(state.error, "") {
+            fs_reply(503, "text/plain; charset=utf-8", "Git unavailable: " + state.error)
+            return
+        }
+        if state.exit_code != 0 {
+            fs_reply(422, "text/plain; charset=utf-8", "Git working-tree check failed: " + state.stderr)
+            return
+        }
+        if not eq(state.stdout, "") {
+            fs_reply(409, "text/plain; charset=utf-8", "Commit, stash or remove all working-tree changes and untracked files before switching branches.")
+            return
+        }
+    }
+    let command: ptr<ProcCmd> = proc_cmd("git")
+    proc_arg(command, "-c")
+    proc_arg(command, "core.fsmonitor=false")
+    proc_arg(command, "-c")
+    proc_arg(command, "core.hooksPath=/dev/null")
+    if eq(kind, "list") {
+        proc_arg(command, "branch")
+        proc_arg(command, "--list")
+        proc_arg(command, "--no-color")
+    } else {
+        if eq(kind, "create") {
+            proc_arg(command, "branch")
+            proc_arg(command, "--")
+            proc_arg(command, name)
+        } else {
+            proc_arg(command, "switch")
+            proc_arg(command, "--no-guess")
+            proc_arg(command, "--no-overwrite-ignore")
+            proc_arg(command, "--")
+            proc_arg(command, name)
+        }
+    }
+    proc_timeout_ms(command, 10000)
+    let result: ptr<ProcResult> = proc_run(command)
+    if result.timed_out {
+        fs_reply(504, "text/plain; charset=utf-8", "Git branch operation timed out.")
+        return
+    }
+    if not eq(result.error, "") {
+        fs_reply(503, "text/plain; charset=utf-8", "Git executable unavailable: " + result.error)
+        return
+    }
+    let mut output: string = result.stdout + result.stderr
+    if strlen(output) > 131072 {
+        fs_reply(413, "text/plain; charset=utf-8", "Git branch output exceeds 128 KiB.")
+        return
+    }
+    if result.exit_code != 0 {
+        fs_reply(422, "text/plain; charset=utf-8", "Git branch operation failed: " + output)
+        return
+    }
+    if eq(output, "") {
+        if eq(kind, "create") {
+            output = "Branch created: " + name
+        } else {
+            output = "Branch operation completed."
+        }
+    }
+    fs_reply(200, "text/plain; charset=utf-8", output)
 }
 
 function send_editor() -> void {
@@ -213,7 +571,9 @@ function dispatch() -> void {
     if eq(method, "GET") {
         let asset: StaticAsset = data_route(path)
         if asset.found {
-            let file: FileRead = io_read_text(asset.path)
+            # These are trusted, checked-in assets. io_read_text validates each
+            # code point with repeated length scans, which stalls large bundles.
+            let file: FileRead = io_read_file(asset.path)
             if file.ok {
                 fs_reply(200, asset.mime, file.data)
             } else {
@@ -227,16 +587,85 @@ function dispatch() -> void {
             send_flow_check(fs_body())
             return
         }
+        if eq(path, "/api/check/r") {
+            send_r_check(fs_body())
+            return
+        }
         if eq(path, "/api/demo/python-r") {
             send_mixed_demo()
             return
         }
+        if eq(path, "/api/git/status") {
+            send_git_view("status")
+            return
+        }
+        if eq(path, "/api/git/diff") {
+            send_git_view("diff")
+            return
+        }
+        if eq(path, "/api/git/diff/staged") {
+            send_git_view("staged")
+            return
+        }
+        if eq(path, "/api/git/stage") {
+            send_git_write("stage", fs_body())
+            return
+        }
+        if eq(path, "/api/git/unstage") {
+            send_git_write("unstage", fs_body())
+            return
+        }
+        if eq(path, "/api/git/commit") {
+            send_git_write("commit", fs_body())
+            return
+        }
+        if eq(path, "/api/git/branches") {
+            send_git_branch("list", "")
+            return
+        }
+        if eq(path, "/api/git/branch/create") {
+            send_git_branch("create", fs_body())
+            return
+        }
+        if eq(path, "/api/git/branch/switch") {
+            send_git_branch("switch", fs_body())
+            return
+        }
         if eq(path, "/api/run/flow") {
-            send_execution("flow", fs_body())
+            send_execution("flow", fs_body(), "")
+            return
+        }
+        # Same real flow process with the MLIR backend selected.
+        if eq(path, "/api/run/flow-mlir") {
+            send_execution("flow", fs_body(), "mlir")
             return
         }
         if eq(path, "/api/run/r") {
             send_r(fs_body())
+            return
+        }
+        if eq(path, "/api/debug/r/start") {
+            send_r_debug("start", fs_body())
+            return
+        }
+        if eq(path, "/api/debug/r/step") {
+            send_r_debug("step", "")
+            return
+        }
+        if eq(path, "/api/debug/r/continue") {
+            send_r_debug("continue", fs_body())
+            return
+        }
+        if eq(path, "/api/debug/r/evaluate") {
+            send_r_debug("evaluate", fs_body())
+            return
+        }
+        if eq(path, "/api/debug/r/stop") {
+            send_r_debug("stop", "")
+            return
+        }
+        if eq(path, "/api/debug/r/status") {
+            send_r_debug("status", "")
             return
         }
         if eq(path, "/api/run/python") {
@@ -245,6 +674,66 @@ function dispatch() -> void {
         }
         if eq(path, "/api/inspect/r") {
             send_r_environment()
+            return
+        }
+        if eq(path, "/api/table/r") {
+            send_r_table(fs_body())
+            return
+        }
+        if eq(path, "/api/plot/r") {
+            send_r_plot()
+            return
+        }
+        if eq(path, "/api/packages/r") {
+            send_r_packages()
+            return
+        }
+        if eq(path, "/api/packages/r/load") {
+            send_r_package_load(fs_body())
+            return
+        }
+        if eq(path, "/api/packages/r/install") {
+            send_r_package_install(fs_body())
+            return
+        }
+        if eq(path, "/api/packages/r/remove") {
+            send_r_package_remove(fs_body())
+            return
+        }
+        if eq(path, "/api/packages/r/update") {
+            send_r_package_update(fs_body())
+            return
+        }
+        if eq(path, "/api/debug/python/start") {
+            send_python_debug("start", fs_body())
+            return
+        }
+        if eq(path, "/api/debug/python/step") {
+            send_python_debug("step", "")
+            return
+        }
+        if eq(path, "/api/debug/python/next") {
+            send_python_debug("next", "")
+            return
+        }
+        if eq(path, "/api/debug/python/finish") {
+            send_python_debug("finish", "")
+            return
+        }
+        if eq(path, "/api/debug/python/continue") {
+            send_python_debug("continue", "")
+            return
+        }
+        if eq(path, "/api/debug/python/stop") {
+            send_python_debug("stop", "")
+            return
+        }
+        if eq(path, "/api/debug/python/status") {
+            send_python_debug("status", "")
+            return
+        }
+        if eq(path, "/api/trace/python") {
+            send_python_trace(fs_body())
             return
         }
         if eq(path, "/api/inspect/python") {

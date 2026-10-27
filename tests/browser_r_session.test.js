@@ -17,7 +17,7 @@ function mock() {
     };
     async evalRRaw(code,type) {
       calls.push({inspect:code,type});
-      return ["x\tinteger\t2%20x%203\tint%20%5B1%3A6%5D"];
+      return ["@0", "0\tx\tinteger\t2%20x%203\tint%20%5B1%3A6%5D\t0"];
     }
   }
   const load=async()=>({WebR,ChannelType:{PostMessage:"post"}});
@@ -37,8 +37,9 @@ test("reuses R state, inspects actual global environment and resets",async()=>{
   await r.run("x + 41");
   const inspection=await r.inspect();
   assert.equal(m.instances.length,1);
+  assert.equal(inspection.truncated,false);
   assert.deepEqual(inspection.variables,[{name:"x",type:"integer",shape:["2","3"],preview:"int [1:6]"}]);
-  assert.match(m.calls.at(-1).inspect,/ls\(envir=\.GlobalEnv/);
+  assert.match(m.calls.at(-1).inspect, /base::ls\(envir=base::globalenv\(\)/);
   r.reset();
   assert.equal(m.instances[0].closed,true);
   await r.run("x <- 5");

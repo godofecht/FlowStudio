@@ -16,7 +16,7 @@ function harness(execute) {
     async runPythonAsync(code) {
       if (code.includes("_fs_plot_capture.prepare()")) return undefined;
       if (code.includes("_fs_plot_capture.capture()")) return "[]";
-      if (code.includes("_fs_json.dumps")) return "[]";
+      if (code.includes("_fs_json.dumps")) return JSON.stringify({variables:[],truncated:false});
       active++; maxActive = Math.max(active, maxActive);
       try { return await execute(code, this); }
       finally {active--;}

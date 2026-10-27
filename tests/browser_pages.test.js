@@ -22,7 +22,10 @@ test("Browser workspace offers working local editor actions", () => {
 test("Python runs inside dedicated worker, not GitHub Pages server", () => {
   assert.match(app, /new Worker\("\.\/python-worker\.js"\)/);
   assert.match(worker, /importScripts\("https:\/\/cdn\.jsdelivr\.net\/pyodide\/v0\.27\.7\/full\/pyodide\.js"\)/);
-  assert.match(worker, /runPythonAsync\(op === "inspect"/);
+  assert.match(worker, /_fs_environment_capture\.capture\(globals\(\)\)/);
+  assert.match(worker, /prepareEnvironmentCapture\(py\)/);
+  assert.match(worker, /validateEnvironmentSnapshot\(JSON\.parse\(raw\)\)/);
+  assert.doesNotMatch(worker, /repr\(v\)/);
   assert.doesNotMatch(app, /fetch\("\/api\/execute/);
 });
 test("Static preview distinguishes native Flow from experimental browser R", () => {

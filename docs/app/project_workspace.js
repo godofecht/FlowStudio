@@ -2,7 +2,7 @@
 (function (global) {
 "use strict";
 function create({projectApi, fileSaveApi, source, filename, language, tree,
-                 openFolderButton, saveFileButton, saveAsButton, newFileButton, deleteFileButton, renameFileButton, status,
+                 openFolderButton, saveFileButton, reloadFileButton, saveAsButton, newFileButton, newFolderButton, deleteFileButton, renameFileButton, status,
                  setFilename, onDraft, picker, saveAsPicker, saveAsApi, projectRenameApi, confirmChange, promptName}) {
   if (!projectApi || !fileSaveApi) throw new TypeError("Project and save APIs are required.");
   let activeHandle = null;
@@ -22,6 +22,7 @@ function create({projectApi, fileSaveApi, source, filename, language, tree,
     diskBaseline = null;
     editorBaseline = source.value;
     saveFileButton.disabled = true;
+    if (reloadFileButton) reloadFileButton.disabled = true;
   }
   async function openHandle(handle, path, parent) {
     if (deleting || saving) return false;
@@ -47,6 +48,7 @@ function create({projectApi, fileSaveApi, source, filename, language, tree,
     diskBaseline = text;
     editorBaseline = text;
     saveFileButton.disabled = false;
+    if (reloadFileButton) reloadFileButton.disabled = false;
     onDraft();
     status("Opened " + path);
     return true;
@@ -60,19 +62,89 @@ function create({projectApi, fileSaveApi, source, filename, language, tree,
     if (opened) notifyExternalOpen();
     return opened;
   }
+  /* File handles can outlive the path they were opened through. Check the
+   * current directory entry before and after writing a project source file. */
+  async function verifiedProjectEntry(handle, parent, name) {
+    if (!parent) return handle; // Save As may point outside the project.
+    if (!name || typeof parent.getFileHandle !== "function")
+      throw new Error("Cannot verify the project file location.");
+    const current = await parent.getFileHandle(name);
+    const same = typeof current.isSameEntry === "function"
+      ? await current.isSameEntry(handle)
+      : typeof handle.isSameEntry === "function"
+        ? await handle.isSameEntry(current) : false;
+    if (!same) throw new Error("Project file was replaced or cannot be verified.");
+    return current;
+  }
   async function save() {
     if (saving || deleting) { status("File operation already running."); return false; }
     if (!activeHandle) { status("Open a project file before saving to disk."); return false; }
+    const handle = activeHandle, parent = activeParent, name = activeName;
+    const baseline = diskBaseline, contents = source.value;
     saving = true;
     try {
-      const saved = await fileSaveApi.writeIfUnchanged(activeHandle, diskBaseline, source.value);
+      const current = await verifiedProjectEntry(handle, parent, name);
+      const saved = await fileSaveApi.writeIfUnchanged(current, baseline, contents);
+      // Do not claim success or advance the baseline if another process
+      // replaced or modified the file while the write was in flight.
+      const after = await verifiedProjectEntry(handle, parent, name);
+      if (await fileSaveApi.readSnapshot(after) !== saved)
+        throw new Error("File changed during save; verify disk contents before retrying.");
       diskBaseline = saved;
       editorBaseline = saved;
       onDraft();
-      status("Saved " + filename.textContent + " to disk.");
+      status(source.value === saved
+        ? "Saved " + filename.textContent + " to disk."
+        : "Saved " + filename.textContent + "; newer editor changes remain unsaved.");
       return true;
     } catch (error) {
       status("Save failed: " + (error.message || String(error)));
+      return false;
+    } finally { saving = false; }
+  }
+  async function reloadFile() {
+    if (saving || deleting) { status("File operation already running."); return false; }
+    if (!activeHandle) { status("Open a project file before reloading from disk."); return false; }
+    if (dirty() && !confirmChange("Discard unsaved editor changes and reload from disk?"))
+      return false;
+    const handle = activeHandle, parent = activeParent, name = activeName;
+    const previousSource = source.value;
+    saving = true; // Serialize reload with project switching and all disk mutations.
+    try {
+      let current = handle;
+      async function checkIdentity() {
+        if (!parent || !name) return;
+        if (typeof parent.getFileHandle !== "function")
+          throw new Error("Cannot verify the project file location.");
+        const found = await parent.getFileHandle(name);
+        const same = typeof found.isSameEntry === "function"
+          ? await found.isSameEntry(handle)
+          : typeof handle.isSameEntry === "function"
+            ? await handle.isSameEntry(found) : false;
+        if (!same) throw new Error("Project file was replaced or cannot be verified.");
+        current = found;
+      }
+      await checkIdentity();
+      const disk = await fileSaveApi.readSnapshot(current);
+      await checkIdentity();
+      if (await fileSaveApi.readSnapshot(current) !== disk)
+        throw new Error("File changed during reload; retry.");
+      if (activeHandle !== handle || source.value !== previousSource)
+        throw new Error("Editor changed during reload; source retained.");
+      if (disk === diskBaseline && disk === previousSource) {
+        status("Source already matches disk.");
+        return true;
+      }
+      source.value = disk;
+      diskBaseline = disk;
+      editorBaseline = disk;
+      // The filename callback also invalidates notebook outputs from old source.
+      if (disk !== previousSource) setFilename(name || handle.name, filename.textContent);
+      onDraft();
+      status("Reloaded " + filename.textContent + " from disk.");
+      return true;
+    } catch (error) {
+      status("Reload failed: " + (error.message || String(error)));
       return false;
     } finally { saving = false; }
   }
@@ -102,6 +174,7 @@ function create({projectApi, fileSaveApi, source, filename, language, tree,
       else if (extension === "r") language.value = "r";
       setFilename(result.name, result.name);
       saveFileButton.disabled = false;
+      if (reloadFileButton) reloadFileButton.disabled = false;
       if (deleteFileButton) deleteFileButton.disabled = true;
       if (renameFileButton) renameFileButton.disabled = true;
       onDraft();
@@ -116,14 +189,30 @@ function create({projectApi, fileSaveApi, source, filename, language, tree,
   async function createFile() {
     if (deleting || saving) { status("File operation already running."); return false; }
     if (!project.hasProject()) { status("Open a project folder first."); return false; }
-    const name = promptName("New source filename (e.g. analysis.flow)");
+    const name = promptName("New source path (e.g. src/analysis.flow)");
     if (name === null) return false;
-    if (!projectApi.validFilename(name)) { status("Invalid source filename."); return false; }
+    if (!(typeof projectApi.validSourcePath === "function" ? projectApi.validSourcePath(name) : projectApi.validFilename(name))) { status("Invalid project source path."); return false; }
     if (!confirmSwitch()) return false;
     approvedCreate = true;
     try { return await project.create(name); }
     catch (error) { status("Cannot create file: " + (error.message || String(error))); return false; }
     finally { approvedCreate = false; }
+  }
+  async function createFolder() {
+    if (deleting || saving) { status("File operation already running."); return false; }
+    if (!project.hasProject()) { status("Open a project folder first."); return false; }
+    const path = promptName("New folder path (e.g. src or src/analysis)");
+    if (path === null) return false;
+    if (typeof projectApi.validFolderPath !== "function" ||
+        !projectApi.validFolderPath(path)) {
+      status("Invalid project folder path."); return false;
+    }
+    deleting = true; // Folder creation is serialized with saves and project switches.
+    try { return await project.createFolder(path); }
+    catch (error) {
+      status("Cannot create folder: " + (error.message || String(error)));
+      return false;
+    } finally { deleting = false; }
   }
   async function deleteFile() {
     if (!activeHandle || !activeParent || !activeName) {
@@ -132,22 +221,26 @@ function create({projectApi, fileSaveApi, source, filename, language, tree,
     if (saving || deleting) { status("File operation already running."); return false; }
     if (dirty()) { status("Save or discard unsaved changes before deleting."); return false; }
     const handle = activeHandle, parent = activeParent, name = activeName;
-    const baseline = diskBaseline;
+    const baseline = diskBaseline, initialSource = source.value;
     deleting = true;
     try {
       if (typeof parent.getFileHandle !== "function" || typeof parent.removeEntry !== "function")
         throw new Error("This browser does not support project file deletion.");
       async function checkCurrent() {
-        const current = await parent.getFileHandle(name);
-        if (typeof current.isSameEntry === "function" && !(await current.isSameEntry(handle)))
-          throw new Error("The file was replaced externally.");
+        // Share the same fail-closed identity gate as project saves/reloads.
+        // Matching bytes are not evidence that a replaced file is the same file.
+        const current = await verifiedProjectEntry(handle, parent, name);
         if ((await fileSaveApi.readSnapshot(current)) !== baseline)
           throw new Error("The file changed on disk. Deletion refused.");
       }
       await checkCurrent();
       if (!confirmChange('Permanently delete "' + name + '" from this project?')) return false;
-      if (activeHandle !== handle || dirty()) throw new Error("Editor changed during deletion.");
+      if (activeHandle !== handle || source.value !== initialSource || dirty())
+        throw new Error("Editor changed during deletion.");
       await checkCurrent();
+      // A user can type while the final filesystem read is pending.
+      if (activeHandle !== handle || source.value !== initialSource || dirty())
+        throw new Error("Editor changed during deletion.");
       await parent.removeEntry(name);
       activeHandle = null;
       activeParent = null;
@@ -155,6 +248,7 @@ function create({projectApi, fileSaveApi, source, filename, language, tree,
       diskBaseline = null;
       editorBaseline = "";
       saveFileButton.disabled = true;
+      if (reloadFileButton) reloadFileButton.disabled = true;
       if (deleteFileButton) deleteFileButton.disabled = true;
       if (renameFileButton) renameFileButton.disabled = true;
       const extension = name.includes(".") ? "." + name.split(".").pop() : ".txt";
@@ -210,15 +304,29 @@ function create({projectApi, fileSaveApi, source, filename, language, tree,
   }
   openFolderButton.addEventListener("click", () => { void choose(); });
   saveFileButton.addEventListener("click", () => { void save(); });
+  if (reloadFileButton) reloadFileButton.addEventListener("click", () => { void reloadFile(); });
   if (saveAsButton) saveAsButton.addEventListener("click", () => { void saveAs(); });
   newFileButton.addEventListener("click", () => { void createFile(); });
+  if (newFolderButton) newFolderButton.addEventListener("click", () => { void createFolder(); });
   if (deleteFileButton) deleteFileButton.addEventListener("click", () => { void deleteFile(); });
   if (renameFileButton) renameFileButton.addEventListener("click", () => { void renameFile(); });
   saveFileButton.disabled = true;
+  if (reloadFileButton) reloadFileButton.disabled = true;
   if (deleteFileButton) deleteFileButton.disabled = true;
   if (renameFileButton) renameFileButton.disabled = true;
-  return {project, choose, save, saveAs, createFile, deleteFile, renameFile, openHandle, notifyExternalOpen, dirty,
-    hasActiveFile: () => activeHandle !== null};
+  async function isOpenHandle(handle) {
+    if (!activeHandle) return false;
+    if (activeHandle === handle) return true;
+    if (typeof activeHandle.isSameEntry === "function")
+      return !!(await activeHandle.isSameEntry(handle));
+    if (typeof handle.isSameEntry === "function")
+      return !!(await handle.isSameEntry(activeHandle));
+    // When identity cannot be established, reject replacement rather than
+    // risk overwriting a file currently held in the editor.
+    throw new Error("Cannot verify whether the project file is open in the editor.");
+  }
+  return {project, choose, save, reloadFile, saveAs, createFile, createFolder, deleteFile, renameFile, openHandle, notifyExternalOpen, dirty,
+    isOpenHandle, hasActiveFile: () => activeHandle !== null};
 }
 const api = {create};
 if (typeof module !== "undefined" && module.exports) module.exports = api;

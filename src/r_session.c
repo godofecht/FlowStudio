@@ -19,6 +19,8 @@
 
 #define FS_R_MAX 131072
 #define FS_R_DEADLINE_MS 15000
+/* Package installation and update may compile source packages. */
+#define FS_R_INSTALL_DEADLINE_MS 180000
 static pid_t kernel_pid = -1;
 static int kernel_in = -1;
 static int kernel_out = -1;
@@ -143,7 +145,7 @@ static const char *request_r(char operation, const char *code)
         fs_r_reset();
         return "Monotonic clock unavailable.";
     }
-    int64_t deadline = now + FS_R_DEADLINE_MS;
+    int64_t deadline = now + ((operation == 'N' || operation == 'V') ? FS_R_INSTALL_DEADLINE_MS : FS_R_DEADLINE_MS);
     char header[10];
     size_t source_length = strlen(code);
     snprintf(header, sizeof(header), "%c%08x", operation, (unsigned)source_length);
@@ -166,5 +168,19 @@ failed:
 }
 
 const char *fs_r_run(const char *code) { return request_r('E', code); }
+const char *fs_r_debug_start(const char *source) { return request_r('B', source); }
+const char *fs_r_debug_step(void) { return request_r('S', ""); }
+const char *fs_r_debug_continue(const char *line) { return request_r('F', line); }
+const char *fs_r_debug_evaluate(const char *source) { return request_r('W', source); }
+const char *fs_r_debug_stop(void) { return request_r('D', ""); }
+const char *fs_r_debug_status(void) { return request_r('Q', ""); }
+const char *fs_r_check(const char *code) { return request_r('C', code); }
 const char *fs_r_inspect(void) { return request_r('I', ""); }
+const char *fs_r_table(const char *name) { return request_r('T', name); }
+const char *fs_r_plot(void) { return request_r('P', ""); }
+const char *fs_r_packages(void) { return request_r('K', ""); }
+const char *fs_r_load_package(const char *name) { return request_r('L', name); }
+const char *fs_r_install_package(const char *name) { return request_r('N', name); }
+const char *fs_r_remove_package(const char *name) { return request_r('U', name); }
+const char *fs_r_update_package(const char *name) { return request_r('V', name); }
 int fs_r_status(void) { return last_status; }

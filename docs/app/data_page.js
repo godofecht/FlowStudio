@@ -1,6 +1,6 @@
 "use strict";
 const el = id => document.getElementById(id);
-let data = null, page = 0, sort = null, descending = false;
+let data = null, page = 0, sort = null, descending = false, fileName = "dataset";
 function render() {
   if (!data) return;
   const view = FlowStudioData.viewRows(data, {filter:el("filter").value, page, sortColumn:sort, descending});
@@ -34,7 +34,9 @@ async function loadFile(file) {
     const delimiter = FlowStudioData.delimiterForName(file.name);
     if (file.size > FlowStudioData.MAX_BYTES) throw new Error("File exceeds 8 MiB");
     const parsed = FlowStudioData.parseDelimited(await file.text(), delimiter);
-    data = parsed; page = 0; sort = null; descending = false;
+    data = parsed; fileName = file.name.replace(/\.(?:csv|tsv)$/i, "") || "dataset";
+    page = 0; sort = null; descending = false;
+    el("exportCSV").disabled = false;
     el("filter").value = ""; el("filter").disabled = false;
     render();
     el("status").textContent = "Loaded " + file.name;
@@ -57,3 +59,16 @@ el("fallback").addEventListener("change", async event => {
 el("filter").addEventListener("input", () => { page = 0; render(); });
 el("previous").addEventListener("click", () => { page--; render(); });
 el("next").addEventListener("click", () => { page++; render(); });
+
+el("exportCSV").addEventListener("click", () => {
+  if (!data) return;
+  try {
+    const result = FlowStudioData.exportCSV(data, {filter:el("filter").value,
+      sortColumn:sort, descending});
+    FlowStudioData.downloadCSV(result.csv, fileName + "-filtered", document);
+    el("status").textContent = "Exported " + result.count +
+      " filtered/sorted local preview rows (CSV formula-safe).";
+  } catch (error) {
+    el("status").textContent = "CSV export failed: " + String(error.message || error);
+  }
+});

@@ -4,140 +4,390 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark">
-<title>FlowStudio — Scientific IDE</title>
+<title>FlowStudio | Scientific IDE</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23151b26'/%3E%3Ctext x='16' y='23' font-size='19' text-anchor='middle' fill='%235b93ff'%3E%E2%97%88%3C/text%3E%3C/svg%3E">
 <style>
-:root { font: 14px/1.45 system-ui, -apple-system, sans-serif; color: #e8edf5; background: #10141e; }
-* { box-sizing: border-box; }
-body { margin: 0; height: 100dvh; display: flex; flex-direction: column; }
-button,select,textarea { font: inherit; }
-button,select { background: #273044; border: 1px solid #3a4762; color: #f2f6ff; border-radius: 6px; padding: 7px 11px; cursor: pointer; }
-button:hover,select:hover { border-color: #8baaf4; }
-button:focus-visible,select:focus-visible,textarea:focus-visible { outline: 2px solid #80a5fe; outline-offset: 1px; }
-button:disabled { opacity: .5; cursor: wait; }
-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; border-bottom: 1px solid #39435b; padding: 10px 16px; background: #171e2c; }
-.brand { font-size: 17px; font-weight: 700; letter-spacing: -.02em; }
-.brand b { color: #85b3ff; }
-.toolbar { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; }
-.primary { background: #315fbf; border-color: #3f72dc; }
-.main { display: grid; flex: 1; min-height: 0; grid-template-columns: minmax(0, 2fr) minmax(255px, 1fr); grid-template-rows: minmax(180px, 58fr) minmax(130px, 42fr); gap: 5px; background: #080c14; padding: 5px; }
-.panel { display: flex; flex-direction: column; overflow: hidden; min-width: 0; min-height: 0; background: #171e2a; border: 1px solid #2c3950; border-radius: 7px; }
-.panel > h2 { font-size: 12px; color: #b9c7e2; text-transform: uppercase; letter-spacing: .08em; margin: 0; padding: 10px 13px; border-bottom: 1px solid #30394e; }
-.panel .body { flex: 1; min-height: 0; padding: 11px 13px; }
-textarea { flex: 1; resize: none; width: 100%; min-height: 0; padding: 15px 17px; background: #101520; border: 0; color: #e6eeff; font: 14px/1.65 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; tab-size: 4; }
-pre { margin: 0; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 12.5px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace; height: 100%; }
-kbd { background: #333f55; padding: 2px 4px; border-radius: 4px; font: inherit; }
-.muted { color: #a4b0c6; }
-.hint { font-size: 13px; max-width: 45ch; }
-footer { padding: 5px 14px; display: flex; justify-content: space-between; gap: 15px; font-size: 12px; background: #192337; color: #a7b8d6; }
-#resultStatus[data-state="error"] { color: #ffb8ad; }
-#resultStatus[data-state="ok"] { color: #93deb3; }
-#fileLabel { color: #b9cae5; font-size: 12px; }
-#console { color: #c8daee; }
-.project-body { overflow-y: auto; }
-#projectTree { display: flex; flex-direction: column; gap: 5px; }
-#projectTree details { padding-left: 9px; border-left: 1px solid #39465f; }
-#projectTree summary { cursor: pointer; padding: 5px 0; }
-#projectTree .project-children { display: flex; flex-direction: column; gap: 4px; margin: 4px 0 5px 8px; }
-#projectTree .project-file { display: block; text-align: left; width: 100%; overflow-wrap: anywhere; }
-#projectTree .project-file:focus-visible { outline-offset: -2px; }
-
-.project-search { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; }
-.project-search input[type="search"] { background: #101520; color: #e6eeff; border: 1px solid #3a4762; border-radius: 6px; padding: 7px; flex: 1; min-width: 110px; }
-.project-search label { color: #c2cee4; font-size: 12px; }
-#searchResults { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
-#searchResults button { text-align: left; white-space: normal; overflow-wrap: anywhere; width: 100%; font: 12px/1.5 ui-monospace, monospace; }
-@media (max-width: 790px) {
- body { min-height: 100dvh; height: auto; }
- .main { min-height: 90dvh; grid-template-columns: 1fr; grid-template-rows: 36vh 16vh 25vh 16vh; }
- footer { flex-wrap: wrap; }
-}
-.editor-find { display:flex; gap:6px; flex-wrap:wrap; align-items:center; padding:7px 10px; border-bottom:1px solid #30394e; }
-.editor-find input[type="text"] { min-width:95px; max-width:220px; flex:1; background:#101520; color:#e6eeff; border:1px solid #3a4762; border-radius:5px; padding:5px 7px; }
-.editor-find label { font-size:12px; color:#c2cee4; }
-.editor-find button { padding:5px 8px; font-size:12px; }
-#editorFindCount { font-size:12px; color:#afc4e6; }
-
-.workspace-tabs { display:flex; gap:5px; padding:6px 9px; border-bottom:1px solid #30394e; }
-.workspace-tabs button { flex:1; min-width:0; padding:5px; }
-.workspace-tabs [aria-selected="true"] { border-color:#8baaf4; background:#31518b; }
-.workspace-frame { flex:1; min-height:0; overflow:hidden; }
-.workspace-frame iframe { display:block; width:100%; height:100%; border:0; background:#10141e; }
-[hidden] { display:none !important; }
+:root{color-scheme:dark;--bg:#0d1119;--surface:#151b26;--surface-2:#1b2331;--line:#283344;--ink:#e7edf8;--muted:#9db0cb;--accent:#5b93ff;--accent-dim:#22385f;--ok:#8ee0b1;--warn:#f0c37b;--error:#ffb4a8;--mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;--titlebar-height:35px;--panel-header-height:35px;--statusbar-height:22px;--sash:5px;--sidebar-width:290px;--right-width:320px;--dock-height:190px;font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink)}
+*{box-sizing:border-box}
+body{margin:0;height:100dvh;overflow:hidden;background:var(--bg)}
+button,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+button,select{background:var(--surface-2);border:1px solid #3a4a63;border-radius:6px;padding:5px 10px}
+button:hover:not(:disabled),select:hover{border-color:#6d90cf}
+button:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.shell{height:100dvh;display:grid;grid-template-rows:auto minmax(0,1fr) var(--sash) var(--dock-height) auto}
+.topbar{display:flex;align-items:center;gap:8px;min-height:var(--titlebar-height);padding:3px 10px;background:var(--surface);border-bottom:1px solid var(--line);flex-wrap:wrap;row-gap:3px}
+.brand{display:flex;align-items:center;gap:8px;font-weight:600;font-size:13.5px;white-space:nowrap;letter-spacing:-.01em;padding-right:10px;margin-right:2px;border-right:1px solid var(--line)}
+.brand b{color:#8fb8ff}
+.brand-mark{display:grid;place-items:center;width:22px;height:22px;border-radius:5px;background:var(--accent-dim);color:#8fb8ff}
+.menubar{display:flex;gap:1px;align-items:center}
+.menu{position:relative}
+.menu-trigger{background:transparent;border:1px solid transparent;padding:3px 8px;border-radius:5px;font-size:13px}
+.menu-trigger:hover{background:#ffffff12}
+.menu-trigger[aria-expanded="true"]{background:#ffffff1c;border-color:transparent}
+.menu-popup{position:absolute;top:calc(100% + 4px);left:0;z-index:50;min-width:240px;padding:5px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;box-shadow:0 18px 34px #0009}
+.menu-popup button{display:flex;justify-content:space-between;gap:18px;width:100%;padding:7px 9px;background:transparent;border:0;border-radius:5px;text-align:left}
+.menu-popup button:hover,.menu-popup button:focus-visible{background:var(--accent-dim)}
+.menu-popup kbd{color:var(--muted);font:11px ui-monospace,monospace}
+.menu-popup hr{border:0;border-top:1px solid var(--line);margin:4px 2px}
+.topbar-actions{margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap;row-gap:3px;padding:1px 0}
+.topbar-actions label{color:var(--muted);font-size:11.5px}
+.topbar-actions button,.topbar-actions select{padding:4px 9px;font-size:12.5px;border-radius:6px;line-height:1.25}
+.primary{background:#2f5db8;border-color:#4275d6}
+.command-launcher{display:flex;align-items:center;gap:8px;min-width:200px;max-width:320px;background:#0f141d;border:1px solid #33415a;border-radius:6px;padding:4px 9px;color:var(--muted);font-size:12.5px}
+.command-launcher span{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.command-launcher kbd{margin-left:auto;color:#8fa2c0;font:11px/1 var(--mono);background:#ffffff0d;border:1px solid #33415a;border-radius:4px;padding:2px 5px}
+.command-launcher:hover{border-color:#4a5f85}
+.workspace{display:grid;grid-template-columns:var(--sidebar-width) var(--sash) minmax(0,1fr) var(--sash) var(--right-width);min-height:0}
+.splitter{position:relative;background:var(--bg);cursor:col-resize}
+.splitter::after{content:"";position:absolute;inset:0 2px;background:var(--line)}
+.splitter:hover::after,.splitter:focus-visible::after{background:var(--accent)}
+.splitter-horizontal{cursor:row-resize}
+.splitter-horizontal::after{inset:2px 0}
+.panel{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--surface)}
+.panel>h2{margin:0;min-height:var(--panel-header-height);padding:0 12px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:8px;flex:none}
+.workspace-heading{display:flex;align-items:center;justify-content:flex-start;gap:8px;min-height:var(--panel-header-height);padding:0 12px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);background:var(--surface);border-bottom:1px solid var(--line);flex:none}
+.panel>h2 button{background:transparent;border:0;color:#a8badd;padding:3px 9px;border-radius:5px;font-size:11px;text-transform:none;letter-spacing:0;flex:none}
+.panel>h2 button:hover{background:#ffffff14;color:#fff}
+.panel>h2 svg{width:13px;height:13px;color:var(--muted)}
+.local-badge,.console-label,.panel-tag{margin-left:9px;padding:2px 7px;border-radius:9px;font-size:9.5px;font-weight:500;letter-spacing:.05em;background:#ffffff0d;color:var(--muted);text-transform:uppercase}
+.workspace-heading .local-badge{margin-left:auto}
+.sidebar{border-right:1px solid var(--line)}
+.rightpanel{border-left:1px solid var(--line)}
+.panel .body{flex:1;min-height:0;overflow:auto;padding:10px 12px}
+.workspace-tabs{display:flex;flex:none;flex-wrap:wrap;overflow-x:auto;gap:4px 3px;padding:6px 8px;border-bottom:1px solid var(--line)}
+.workspace-tabs button{flex:1 1 auto;font-size:12px;background:transparent;border-color:transparent;white-space:nowrap}
+.workspace-tabs [aria-selected="true"]{background:var(--accent-dim);border-color:#3d5c95}
+.workspace-frame{flex:1;min-height:0}
+.workspace-frame iframe{display:block;width:100%;height:100%;border:0;background:#10141e}
+.outline-body{display:flex;flex-direction:column;gap:6px}
+.outline-head{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted)}
+.outline-head button{font-size:11px;padding:2px 7px}
+#outlineList{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px}
+.outline-item{display:flex;align-items:baseline;gap:6px;width:100%;text-align:left;background:transparent;border:1px solid transparent;border-radius:5px;padding:3px 6px 3px calc(6px + var(--depth,0) * 12px);font:12px/1.45 ui-monospace,SFMono-Regular,monospace;white-space:nowrap;overflow:hidden}
+.outline-item:hover,.outline-item:focus-visible{background:var(--accent-dim);border-color:#3d5c95}
+.outline-glyph{flex:0 0 12px;width:12px;text-align:center;color:var(--accent)}
+.outline-name{color:var(--ink);overflow:hidden;text-overflow:ellipsis}
+.outline-detail{color:var(--muted);overflow:hidden;text-overflow:ellipsis}
+.outline-note{padding:4px 6px;font-size:11px;color:var(--muted)}
+#referenceResults{display:flex;flex-direction:column;gap:2px;min-width:0;overflow-wrap:anywhere}
+#referenceResults .outline-item{white-space:normal;overflow-wrap:anywhere}
+#renamePanel{display:flex;flex-direction:column;gap:6px;padding:9px;border:1px solid var(--line);border-radius:6px}
+#renamePanel input[type="text"]{width:100%;background:#0f141d;color:var(--ink);border:1px solid #3a4a63;border-radius:5px;padding:5px 7px}
+#renamePanel .rename-actions{display:flex;flex-wrap:wrap;gap:5px}
+#renamePanel label,#renameSummary{font-size:12px;overflow-wrap:anywhere}
+.project-tools{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:9px}
+.project-tools button{padding:4px 9px;font-size:12px}
+.project-search{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:9px}
+.project-search input[type="search"]{flex:1;min-width:100px;background:#0f141d;border:1px solid #3a4a63;border-radius:6px;padding:5px 7px}
+.project-search label{font-size:12px;color:var(--muted)}
+#searchResults{display:flex;flex-direction:column;gap:3px;margin-bottom:9px}
+#searchResults button{width:100%;text-align:left;white-space:normal;overflow-wrap:anywhere;font:12px/1.45 ui-monospace,monospace;padding:4px 6px}
+#projectTree{display:flex;flex-direction:column;gap:3px;font-size:13px}
+#projectTree details{padding-left:8px;border-left:1px solid var(--line)}
+#projectTree summary{cursor:pointer;padding:3px 0}
+#projectTree .project-children{display:flex;flex-direction:column;gap:2px;margin:3px 0 4px 6px}
+#projectTree .project-file{display:block;width:100%;text-align:left;overflow-wrap:anywhere;padding:3px 6px;background:transparent;border-color:transparent}
+#projectTree .project-file:hover{background:var(--accent-dim)}
+.hint{font-size:12px;max-width:46ch}
+.muted{color:var(--muted)}
+.example-card{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:10px;background:var(--surface-2)}
+.example-card.saved-project{border-color:#2f5245;background:#15202b}
+.gallery-heading{margin:2px 0 8px;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:#7d8ba3;font-weight:600}
+.saved-projects{margin-bottom:14px}
+.example-forget{font-size:11px;padding:2px 8px;background:transparent;border-color:#2c3a52;color:#7d8ba3;margin-top:4px}
+.example-forget:hover{color:var(--error);border-color:#5e3434}
+.example-head{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.example-head h3{margin:0;font-size:13.5px;overflow-wrap:anywhere}
+.example-langs{margin-left:auto;flex:none;font-size:10.5px;color:var(--muted);border:1px solid var(--line);border-radius:9px;padding:2px 7px;white-space:nowrap}
+.example-card p{margin:2px 0 8px;font-size:12.5px;line-height:1.55;overflow-wrap:anywhere}
+.example-card button{display:block;width:100%;text-align:left;font-size:12.5px;margin-top:6px;white-space:normal;overflow-wrap:anywhere}
+.example-card .primary{background:#2f5db8;border-color:#4275d6;color:#fff}
+.example-card .example-file-btn{font-size:11.5px;padding:3px 8px;text-align:left;background:#151d2b;border-color:#2c3a52;color:#a9bcd8}
+.example-card .example-runbook{margin-top:8px;font-size:12px;color:var(--muted)}
+.example-card .example-runbook summary{cursor:pointer;user-select:none;font-size:11.5px}
+.example-card .example-runbook ol{margin:6px 0 2px;padding-left:20px}
+.example-card ol{margin:8px 0 2px;padding-left:20px;font-size:12px;color:var(--muted)}
+#debugSteps{max-height:200px;overflow:auto;display:flex;flex-direction:column;gap:2px;margin-bottom:8px}
+.debug-step button{width:100%;text-align:left;font:11.5px/1.4 var(--mono);padding:3px 7px;background:transparent;border:1px solid transparent;border-radius:5px}
+.debug-step button:hover{background:var(--accent-dim)}
+.debug-step button[data-step-index].debug-step-active{background:var(--accent-dim);border-color:#3d5c95}
+.debug-step-here button{color:var(--warn)}
+.debug-locals table{border-collapse:collapse;width:100%;font:12px/1.5 var(--mono)}
+.debug-locals td,.debug-locals th{border:1px solid var(--line);padding:3px 7px;text-align:left;overflow-wrap:anywhere}
+#packageTable table,#pythonEnvironment table{border-collapse:collapse;width:100%;font:12px/1.5 var(--mono)}
+#packageTable td,#packageTable th,#pythonEnvironment td,#pythonEnvironment th{border:1px solid var(--line);padding:3px 7px;text-align:left}
+.editor-area{display:flex;flex-direction:column;min-width:0;min-height:0;background:#111721}
+.editor-breadcrumb{display:flex;align-items:center;gap:6px;padding:3px 12px;font-size:11.5px;color:var(--muted);background:#111721;border-bottom:1px solid #202a3a;flex:none}
+.editor-breadcrumb svg{width:12px;height:12px}
+.editor-engine{margin-left:auto;font-size:10.5px;color:#7c92b8;background:#ffffff08;padding:1px 7px;border-radius:8px}
+.doc-tabs-row{display:flex;align-items:stretch;background:var(--surface);border-bottom:1px solid var(--line);min-height:35px}
+.doc-tabs{display:flex;flex:1;min-width:0;overflow-x:auto;gap:1px}
+.doc-tabs-empty{padding:9px 12px;font-size:12px;color:var(--muted)}
+.doc-tab{display:flex;align-items:center;gap:7px;max-width:230px;padding:0 5px 0 11px;background:#151c27;border:0;border-right:1px solid var(--line);border-radius:0;color:var(--muted);font-size:13px}
+.doc-tab.active{background:#111721;color:var(--ink);box-shadow:inset 0 2px 0 var(--accent)}
+.doc-tab-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.doc-tab-dot{color:var(--warn);font-size:9px}
+.doc-tab-close{width:19px;height:19px;padding:0;line-height:1;background:transparent;border:0;border-radius:4px;color:var(--muted)}
+.doc-tab-close:hover{background:#33415a;color:#fff}
+.doc-tab-new{padding:0 11px;background:transparent;border:0;border-left:1px solid var(--line);border-radius:0;font-size:16px;color:var(--muted)}
+.doc-tab-new:hover{color:var(--ink)}
+.editor-find{display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:6px 10px;border-bottom:1px solid var(--line);background:var(--surface)}
+.editor-find input[type="text"]{min-width:95px;max-width:210px;flex:1;background:#0f141d;border:1px solid #3a4a63;border-radius:5px;padding:4px 7px}
+.editor-find label{font-size:12px;color:var(--muted)}
+.editor-find button{padding:4px 8px;font-size:12px}
+#editorFindCount{font-size:12px;color:var(--muted)}
+#source{flex:1;width:100%;min-height:0;resize:none;border:0;padding:12px 16px;background:#111721;color:#e9f0fb;font:14px/1.65 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;tab-size:4}
+.dock{border-top:1px solid var(--line);background:#0a0e16}
+.dock-title{display:flex;align-items:center;gap:8px}
+.dock .body{display:flex;flex-direction:column;gap:6px;padding:6px 12px 10px;overflow:hidden}
+#console{margin:0;overflow:auto;flex:1;min-height:0;padding:8px 2px;white-space:pre-wrap;overflow-wrap:anywhere;font:12.5px/1.55 var(--mono);color:#b9c9e2;background:#0a0e16}
+#console::-webkit-scrollbar{width:12px;height:10px}
+#console::-webkit-scrollbar-thumb{background:#ffffff22;border:3px solid #0000;background-clip:padding-box;border-radius:7px}
+#console::-webkit-scrollbar-thumb:hover{background:#ffffff38;border:3px solid #0000;background-clip:padding-box;border-radius:7px}
+#console::-webkit-scrollbar-corner{background:transparent}
+#console .fs-prompt-line{color:#8fb8ff;font-weight:600}
+#console .fs-error-line{color:var(--error)}
+#console .fs-black{color:#5a647a}#console .fs-red{color:#ff9d8f}#console .fs-green{color:#8ee0b1}#console .fs-yellow{color:#f0c37b}#console .fs-blue{color:#7aa7ff}#console .fs-magenta{color:#d3a7ff}#console .fs-cyan{color:#7fc9dd}#console .fs-white{color:#e7edf8}
+#console .fs-bright-black{color:#8296b3}#console .fs-bright-red{color:#ffc4b8}#console .fs-bright-green{color:#b3efc9}#console .fs-bright-yellow{color:#f7d79b}#console .fs-bright-blue{color:#a9c4ff}#console .fs-bright-magenta{color:#e3c2ff}#console .fs-bright-cyan{color:#a5dce9}#console .fs-bright-white{color:#fff}
+#console .fs-bold{font-weight:700}#console .fs-dim{opacity:.62}
+/* The console command strip: a runtime prompt beside a borderless input,
+ * like a real REPL — no boxed web-form textarea. */
+.dock .body>div.console-command{display:flex;align-items:flex-start;gap:0 7px;flex:0 0 auto;padding:9px 12px 5px;background:#0a0e16;border-top:1px solid var(--line);flex-wrap:nowrap}
+.dock .body>div.console-command:focus-within{background:#0d1421}
+.console-prompt{flex:none;font:700 12.5px/1.6 var(--mono);color:#5fdba7;white-space:pre;user-select:none;padding-top:1px}
+#consoleInput{flex:1;min-width:0;height:24px;min-height:24px;max-height:40vh;resize:vertical;padding:0;background:#0a0e16;border:0;outline:none;font:12.5px/1.6 var(--mono);color:#d7e2f2;caret-color:#5fdba7}
+#consoleInput::placeholder{color:#4d5a75}
+.dock .body>div.console-command textarea:focus{outline:none}
+.dock .body>div.console-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:2px 12px 8px;background:#0a0e16}
+.dock .body>div span{font-size:11px;color:var(--muted)}
+.dock .body>div button{font-size:12px;padding:4px 13px}
+#consoleExecute{background:#16202f;border-color:#2c3a52;color:#8fb8ff}
+#consoleExecute:hover{border-color:#4275d6;color:#c7dcff}
+.dock .body>label:not([for="consoleInput"]){display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--muted)}
+.console-flag{padding-left:2px}
+.console-clear-text{background:transparent;border-color:#2c3a52;color:#7d8ba3;font-size:11px}
+#consoleClearHistory{font-size:11px;padding:3px 9px}
+.statusbar{display:flex;align-items:center;gap:16px;min-height:var(--statusbar-height);padding:2px 12px;background:#10151f;border-top:1px solid var(--line);font-size:12px;color:#8298b8;overflow:hidden;white-space:nowrap}
+#resultStatus{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+#cursor{font-variant-numeric:tabular-nums}
+.shortcut-hint{font-size:11px;color:#6d80a0}
+#resultStatus[data-state="error"]{color:var(--error)}
+#resultStatus[data-state="ok"]{color:var(--ok)}
+#fileLabel{color:#c4d3e8}
+#dirty{color:var(--warn)}
+.statusbar .spacer{margin-left:auto}
+#editorRecovery{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--warn)}
+[hidden]{display:none !important}
+svg{width:14px;height:14px;vertical-align:-2px;flex:none}
+@media(max-width:900px){.workspace{grid-template-columns:minmax(0,1fr)}.sidebar,.rightpanel,.workspace>.splitter{display:none}}
+@media(max-width:760px){.shell{grid-template-rows:auto minmax(0,1fr) var(--sash) 40vh auto}.topbar-actions{margin-left:0}}
+@media(max-width:680px){html{overflow-x:auto}.shell{min-width:680px}.ide-shell-width{width:max(100%,680px)}}
 </style>
+<link rel="stylesheet" href="/ui/workbench.css">
 </head>
 <body>
-<header>
-  <div class="brand"><b>◈</b> FlowStudio <span class="muted">/ developer preview</span></div>
-  <div class="toolbar" aria-label="Editor actions">
+<div class="shell" id="ideShell">
+<header class="topbar">
+  <div class="brand" aria-label="FlowStudio"><span class="brand-mark"><i data-lucide="blocks"></i></span><b>FlowStudio</b></div>
+  <nav class="menubar" aria-label="Main menu">
+    <div class="menu">
+      <button class="menu-trigger" id="menuFile" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="menuFilePopup">File</button>
+      <div class="menu-popup" id="menuFilePopup" role="menu" aria-labelledby="menuFile" hidden>
+        <button type="button" role="menuitem" id="newDocument">New buffer<kbd>Ctrl+Alt+N</kbd></button>
+        <button type="button" role="menuitem" id="open">Open file…<kbd>Ctrl+O</kbd></button>
+        <button type="button" role="menuitem" data-command="openFolder">Open folder…</button>
+        <hr>
+        <button type="button" role="menuitem" id="save">Save<kbd>Ctrl+S</kbd></button>
+        <button type="button" role="menuitem" data-command="saveFileAs">Save as…</button>
+        <hr>
+        <button type="button" role="menuitem" data-command="closeDocument">Close tab<kbd>Ctrl+W</kbd></button>
+      </div>
+    </div>
+    <div class="menu">
+      <button class="menu-trigger" id="menuEdit" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="menuEditPopup">Edit</button>
+      <div class="menu-popup" id="menuEditPopup" role="menu" aria-labelledby="menuEdit" hidden>
+        <button type="button" role="menuitem" data-command="focusFind">Find in buffer<kbd>Ctrl+F</kbd></button>
+        <button type="button" role="menuitem" data-command="focusReplace">Replace<kbd>Ctrl+H</kbd></button>
+        <button type="button" role="menuitem" data-command="findInProject">Find in project</button>
+        <hr>
+        <button type="button" role="menuitem" data-command="goToSymbol">Go to symbol…<kbd>Ctrl+Shift+O</kbd></button>
+        <button type="button" role="menuitem" data-command="goToDefinition">Go to definition<kbd>F12</kbd></button>
+        <button type="button" role="menuitem" data-command="findReferences">Find references<kbd>Shift+F12</kbd></button>
+        <button type="button" role="menuitem" data-command="renameSymbol">Rename identifier…<kbd>F2</kbd></button>
+      </div>
+    </div>
+    <div class="menu">
+      <button class="menu-trigger" id="menuRun" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="menuRunPopup">Run</button>
+      <div class="menu-popup" id="menuRunPopup" role="menu" aria-labelledby="menuRun" hidden>
+        <button type="button" role="menuitem" data-command="run">Run selection or file<kbd>Ctrl+Enter</kbd></button>
+        <button type="button" role="menuitem" data-command="runCell">Run cell<kbd>Ctrl+Shift+Enter</kbd></button>
+        <hr>
+        <button type="button" role="menuitem" data-command="resetR">Reset R session</button>
+        <button type="button" role="menuitem" data-command="resetPython">Reset Python session</button>
+      </div>
+    </div>
+    <div class="menu">
+      <button class="menu-trigger" id="menuView" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="menuViewPopup">View</button>
+      <div class="menu-popup" id="menuViewPopup" role="menu" aria-labelledby="menuView" hidden>
+        <button type="button" role="menuitem" data-command="showFiles">Project files</button>
+        <button type="button" role="menuitem" data-command="showPlots">Plots</button>
+        <button type="button" role="menuitem" data-command="showData">Data viewer</button>
+        <button type="button" role="menuitem" data-command="showOutline">Outline</button>
+        <hr>
+        <button type="button" role="menuitem" data-command="toggleDock">Toggle console dock</button>
+      </div>
+    </div>
+    <div class="menu">
+      <button class="menu-trigger" id="menuHelp" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="menuHelpPopup">Help</button>
+      <div class="menu-popup" id="menuHelpPopup" role="menu" aria-labelledby="menuHelp" hidden>
+        <button type="button" role="menuitem" data-command="shortcuts">Keyboard shortcuts</button>
+        <button type="button" role="menuitem" data-command="about">About FlowStudio</button>
+      </div>
+    </div>
+  </nav>
+  <div class="topbar-actions" aria-label="Editor actions">
+    <button id="commandLauncher" class="command-launcher" type="button" aria-haspopup="dialog" aria-controls="commandPalette" title="Search commands (Ctrl+K)"><i data-lucide="search"></i><span>Search commands...</span><kbd>Ctrl K</kbd></button>
     <label for="language">Runtime</label>
     <select id="language" aria-label="Execution language"><option value="flow">Flow</option><option value="r">R</option><option value="python">Python</option></select>
-    <button id="folder">Open folder</button>
-    <button id="newFile" title="Create a new source file in the opened project">New file</button>
-    <button id="refreshProject" title="Refresh project tree">Refresh</button>
-    <a href="/rproj" aria-label="Edit RStudio project settings">RStudio project</a>
-    <button id="open">Open file</button>
-    <button id="save">Save file</button>
-    <button id="run" class="primary" title="Run selection or entire buffer (Ctrl/⌘+Enter)">▶ Run</button>
+    <label for="flowBackend">Backend</label>
+    <select id="flowBackend" aria-label="Flow compiler backend" title="Compiler backend for Flow runs"><option value="" selected>C (default)</option><option value="mlir">MLIR (experimental)</option></select>
+    <button id="run" class="primary" title="Run selection or entire buffer (Ctrl/⌘+Enter)"><i data-lucide="play"></i>Run</button>
     <button id="runCell" title="Run current # %% cell (Ctrl/⌘+Shift+Enter)">Run cell</button>
     <button id="resetR" type="button" title="Discard native R variables and restart its interpreter">Reset R</button>
     <button id="resetPython" type="button" title="Discard native Python variables and restart its interpreter">Reset Python</button>
     <input id="fallbackOpen" type="file" accept=".flow,.R,.r,.py,.txt" hidden>
   </div>
 </header>
-<div class="main">
-  <section class="panel" aria-label="Source editor">
-    <h2>Source <span id="fileLabel">untitled.flow</span><span id="dirty" hidden> • modified</span></h2>
-    <div class="editor-find"><input id="editorFind" type="text" aria-label="Find text"><button id="findNext">Next</button>
-    <label for="editorReplace">Replace with</label><input id="editorReplace" type="text" aria-label="Replacement text"><button id="replaceOne">Replace</button><button id="replaceAll">Replace all</button><button id="findPrevious">Previous</button><label><input id="editorCaseSensitive" type="checkbox"> Match case</label><span id="editorFindCount" role="status" aria-live="polite"></span></div>
+<div class="workspace">
+  <aside class="panel sidebar" aria-label="Project files, outline, plots and data">
+    <div class="workspace-heading"><i data-lucide="folder-open"></i>Workspace<span class="local-badge">Local</span></div>
+    <div class="workspace-tabs" role="tablist" aria-label="Workspace views">
+      <button type="button" id="tab-files" role="tab" aria-controls="view-files" aria-selected="true" tabindex="0"><i data-lucide="files"></i>Files</button>
+      <button type="button" id="tab-outline" role="tab" aria-controls="view-outline" aria-selected="false" tabindex="-1"><i data-lucide="list-tree"></i>Outline</button>
+      <button type="button" id="tab-plots" role="tab" aria-controls="view-plots" aria-selected="false" tabindex="-1"><i data-lucide="chart-no-axes-combined"></i>Plots</button>
+      <button type="button" id="tab-data" role="tab" aria-controls="view-data" aria-selected="false" tabindex="-1"><i data-lucide="table-2"></i>Data</button>
+      <button type="button" id="tab-packages" role="tab" aria-controls="view-packages" aria-selected="false" tabindex="-1"><i data-lucide="package"></i>Packages</button>
+      <button type="button" id="tab-examples" role="tab" aria-controls="view-examples" aria-selected="false" tabindex="-1"><i data-lucide="library"></i>Examples</button>
+      <button type="button" id="tab-debug" role="tab" aria-controls="view-debug" aria-selected="false" tabindex="-1"><i data-lucide="bug"></i>Debug</button>
+    </div>
+    <div class="body project-body" id="view-files" role="tabpanel" aria-labelledby="tab-files">
+      <div class="project-tools">
+        <button id="folder" type="button"><i data-lucide="folder-open"></i>Open folder</button>
+        <button id="newFile" type="button" title="Create a new source file in the opened project"><i data-lucide="file-plus-2"></i>New file</button>
+        <button id="refreshProject" type="button" title="Refresh project tree" aria-label="Refresh project tree"><i data-lucide="rotate-cw"></i></button>
+      </div>
+      <div class="project-search" role="search" aria-label="Search project files">
+        <label for="projectSearch">Find in project</label>
+        <input id="projectSearch" type="search" maxlength="256" placeholder="Text or regex" aria-label="Find in project">
+        <label><input id="caseSensitive" type="checkbox"> Case</label>
+        <label><input id="projectRegex" type="checkbox"> Regex</label>
+        <label><input id="projectWholeWord" type="checkbox"> Word</label>
+        <button id="searchProject" type="button">Find all</button>
+        <label for="projectReplace">Replace</label><input id="projectReplace" type="text" maxlength="10000" placeholder="Replacement text" aria-label="Project-wide replacement text">
+        <button id="replaceProject" type="button" title="Preview and confirm local file changes">Replace all…</button>
+        <button id="undoProjectReplace" type="button" disabled title="Undo the last verified project-wide replacement">Undo project replace</button>
+      </div>
+      <div id="searchResults" aria-live="polite" aria-label="Project search results"></div>
+      <div id="projectTree" role="navigation" aria-label="Project files"><div class="project-empty"><i data-lucide="folder-open"></i><p><strong>Your workspace starts here</strong></p><p>Open a folder to browse and edit your source files.</p></div></div>
+      <p class="muted hint">Files stay on this device.</p>
+    </div>
+    <div class="body outline-body" id="view-outline" role="tabpanel" aria-labelledby="tab-outline" hidden>
+      <div class="outline-head"><span id="outlineLabel">Document symbols</span><button id="outlineRefresh" type="button" title="Re-read the buffer">Refresh</button></div>
+      <ul id="outlineList" aria-label="Document outline"></ul>
+      <p id="outlineEmpty" class="muted">Open a Flow, R or Python file to see its structure.</p>
+      <div id="referenceResults" role="group" aria-label="Source references" aria-live="polite"></div>
+       <div id="renamePanel" role="group" aria-label="Lexical identifier rename" hidden>
+         <label for="renameTarget">Rename <strong id="renameOriginal"></strong> to</label>
+         <input id="renameTarget" type="text" maxlength="128" autocomplete="off" spellcheck="false">
+         <label><input id="renameAllOpen" type="checkbox"> Include other open tabs of the same language</label>
+         <div class="rename-actions">
+           <button id="renamePreview" type="button">Preview</button>
+           <button id="renameApply" type="button" disabled>Apply rename</button>
+           <button id="renameCancel" type="button">Cancel</button>
+         </div>
+         <p id="renameSummary" role="status" aria-live="polite">Lexical rename only; shadowing and imports are not resolved. No files are saved.</p>
+       </div>
+      <p class="muted hint">Select a symbol to move the caret to it. The outline follows the active buffer.</p>
+    </div>
+    <div id="view-plots" class="workspace-frame" role="tabpanel" aria-labelledby="tab-plots" hidden><iframe title="Local plot history" loading="lazy"></iframe></div>
+    <div id="view-data" class="workspace-frame" role="tabpanel" aria-labelledby="tab-data" hidden><iframe title="Local CSV and TSV data viewer" loading="lazy"></iframe></div>
+    <div class="body packages-body" id="view-packages" role="tabpanel" aria-labelledby="tab-packages" hidden>
+      <p class="muted hint">Installs run on this device through the persistent local Python / R sessions (each under the 15 s execution budget). R installs use the CRAN cloud mirror.</p>
+      <div class="project-search">
+        <label for="packageSpec">Package</label>
+        <input id="packageSpec" type="text" maxlength="96" placeholder="package==version" aria-label="Package spec">
+      </div>
+      <div class="project-tools">
+        <button id="packageInstall" type="button"><i data-lucide="download"></i>Install package</button>
+        <button id="packageList" type="button"><i data-lucide="list"></i>List packages</button>
+      </div>
+      <p id="packageNotice" class="muted" role="status" aria-live="polite"></p>
+      <div id="packageTable" aria-label="Installed packages"></div>
+    </div>
+    <div class="body examples-body" id="view-examples" role="tabpanel" aria-labelledby="tab-examples" hidden>
+      <p class="muted hint">Curated local examples showing Flow, Python and R working in one project. Everything executes on this device.</p>
+      <p class="muted hint">Projects you open are kept as saved project files (with your edits) in the "Your projects" list at the top of this tab, and reopen from there after a reload.</p>
+      <div id="examplesHost"></div>
+    </div>
+    <div class="body debug-body" id="view-debug" role="tabpanel" aria-labelledby="tab-debug" hidden>
+      <p class="muted hint">Replay debugger for Python: breakpoints, the real line trace, click through recorded states.</p>
+      <div class="project-tools">
+        <button id="debugToggleBp" type="button"><i data-lucide="octagon"></i>Breakpoint at cursor</button>
+        <button id="debugClearBp" type="button">Clear</button>
+        <button id="debugRun" type="button"><i data-lucide="play"></i>Run trace</button>
+      </div>
+      <p id="debugBreakpoints" class="muted" aria-live="polite">No breakpoints yet.</p>
+      <p id="debugSummary" class="muted"></p>
+      <div id="debugSteps" class="debug-steps"></div>
+      <div id="debugLocals" class="debug-locals"></div>
+    </div>
+  </aside>
+  <div class="splitter" data-splitter data-axis="x" data-panel="sidebar" role="separator" aria-orientation="vertical" aria-label="Resize project sidebar" tabindex="0"></div>
+  <main class="editor-area" aria-label="Source editor">
+    <div class="doc-tabs-row">
+      <div class="doc-tabs" id="docTabs" role="tablist" aria-label="Open documents"></div>
+      <button id="newDocumentTab" class="doc-tab-new" type="button" title="New buffer (Ctrl+Alt+N)" aria-label="New buffer">+</button>
+    </div>
+    <div class="editor-breadcrumb"><i data-lucide="file-code-2"></i><span>Workspace</span><i data-lucide="chevron-right"></i><span>Source</span><span id="editorEngine" class="editor-engine">Text editor</span></div>
+    <div class="editor-find" id="findBar" hidden><input id="editorFind" type="text" aria-label="Find text"><button id="findNext">Next</button>
+    <label for="editorReplace">Replace with</label><input id="editorReplace" type="text" aria-label="Replacement text"><button id="replaceOne">Replace</button><button id="replaceAll">Replace all</button><button id="findPrevious">Previous</button><label><input id="editorCaseSensitive" type="checkbox"> Match case</label><label><input id="editorRegex" type="checkbox"> Regex</label><label><input id="editorWholeWord" type="checkbox"> Whole word</label><span id="editorFindCount" role="status" aria-live="polite"></span></div>
     <textarea id="source" spellcheck="false" aria-label="Source code editor">function main() -> i32 {
     println("Hello from FlowStudio")
     return 0
 }
 </textarea>
-  </section>
-  <section class="panel" aria-label="Environment">
-    <h2>Environment / History</h2>
+    <div id="monacoHost" hidden></div>
+  </main>
+  <div class="splitter" data-splitter data-axis="x" data-panel="right" role="separator" aria-orientation="vertical" aria-label="Resize environment panel" tabindex="0"></div>
+  <aside class="panel rightpanel" aria-label="Environment">
+    <h2><i data-lucide="sliders-horizontal"></i>Environment<span class="panel-tag">Native session</span></h2>
     <div class="body">
       <p id="runtimeInfo">Flow execution available when Flow is installed.</p>
-      <p class="muted hint">Native R and Python retain separate variables until their respective Reset controls. Flow runs are independent.</p>
-      <button id="refreshPythonEnvironment" type="button">Refresh selected environment</button>
-      <div id="pythonEnvironment" aria-live="polite"><p class="muted">Select Python to inspect its native session.</p></div>
-      <p class="muted hint">The IDE executes code with your local OS permissions. Only run code you trust.</p>
+      <button id="refreshPythonEnvironment" type="button"><i data-lucide="rotate-cw"></i>Refresh environment</button>
+      <div id="pythonEnvironment" aria-live="polite"><p class="muted">Select Python or R to inspect its native session.</p></div>
+      <p class="muted hint">Python and R keep their variables between runs. Reset a session from the Run menu.</p>
+      <p class="muted hint">Code runs on your computer with your OS permissions.</p>
     </div>
-  </section>
-  <section class="panel" aria-label="Console output">
-    <h2>Console <button id="clear" style="float:right;padding:1px 7px;font-size:11px">Clear</button></h2>
+  </aside>
+</div>
+<div class="splitter splitter-horizontal" id="dockSplitter" data-splitter data-axis="y" data-panel="dock" role="separator" aria-orientation="horizontal" aria-label="Resize console dock" tabindex="0"></div>
+<section class="panel dock" id="consoleDock" aria-label="Console output">
+    <h2><span class="dock-title"><i data-lucide="terminal"></i>Console<span class="console-label">Local execution</span></span><button id="clear" type="button">Clear</button></h2>
     <div class="body"><pre id="console" role="log" aria-live="polite">Ready. Press Ctrl/⌘+Enter to execute selection or buffer.
 </pre></div>
   </section>
-  <section class="panel" aria-label="Project, plots and data">
-    <h2>Project / Plots / Data</h2>
-    <div class="workspace-tabs" role="tablist" aria-label="Workspace views">
-      <button type="button" id="tab-files" role="tab" aria-controls="view-files" aria-selected="true" tabindex="0">Files</button>
-      <button type="button" id="tab-plots" role="tab" aria-controls="view-plots" aria-selected="false" tabindex="-1">Plots</button>
-      <button type="button" id="tab-data" role="tab" aria-controls="view-data" aria-selected="false" tabindex="-1">Data</button>
-    </div>
-    <div class="body project-body" id="view-files" role="tabpanel" aria-labelledby="tab-files">
-
-      <div class="project-search" role="search" aria-label="Search project files">
-        <label for="projectSearch">Find in project</label>
-        <input id="projectSearch" type="search" maxlength="256" placeholder="Literal text" aria-label="Find in project">
-        <label><input id="caseSensitive" type="checkbox"> Case</label>
-        <button id="searchProject" type="button">Find all</button>
-      </div>
-      <div id="searchResults" aria-live="polite" aria-label="Project search results"></div>
-      <div id="projectTree" role="navigation" aria-label="Project files"><p class="muted">Open a folder to browse source files.</p></div>
-      <p class="muted hint">Project files remain local to your browser. Plot and data viewers accept locally selected files.</p>
-    </div>
-    <div id="view-plots" class="workspace-frame" role="tabpanel" aria-labelledby="tab-plots" hidden>
-      <iframe title="Local plot history" loading="lazy"></iframe>
-    </div>
-    <div id="view-data" class="workspace-frame" role="tabpanel" aria-labelledby="tab-data" hidden>
-      <iframe title="Local CSV and TSV data viewer" loading="lazy"></iframe>
-    </div>
-  </section>
+<footer class="statusbar">
+  <span id="resultStatus" role="status">Idle</span>
+  <span id="fileLabel">untitled.flow</span>
+  <span id="dirty" hidden>● unsaved</span>
+  <span id="cursor">Ln 1, Col 1</span>
+  <span class="spacer"></span>
+  <span class="shortcut-hint">Ctrl+K Commands &nbsp; Ctrl+Enter Run</span>
+</footer>
 </div>
-<footer><span id="resultStatus" role="status">Idle</span><span>Local: 127.0.0.1:8751 · <span id="cursor">Ln 1, Col 1</span> · Ctrl/⌘+S Save · Ctrl/⌘+Enter Run · Ctrl/⌘+Shift+Enter Cell</span></footer>
+<dialog id="commandPalette" aria-label="Search commands"><div class="command-search"><i data-lucide="search"></i><input id="commandQuery" type="search" placeholder="Type a command..." aria-label="Search commands" autocomplete="off"><button id="closePalette" type="button" aria-label="Close commands"><i data-lucide="x"></i></button></div><div id="commandResults" aria-live="polite"></div><div class="command-footer">Arrow keys to navigate &nbsp; Enter to select &nbsp; Esc to close</div></dialog>
 <!-- BEGIN EMBEDDED PROJECT MODULE: mirrors web/project.js -->
 <script>
 /* FlowStudio project explorer. Browser File System Access API only. */
@@ -152,7 +402,7 @@ function validFilename(name) {
   return true;
 }
 
-/* Bounded, read-only literal search over browser-granted project files. */
+/* Bounded, read-only literal/regex search over browser-granted project files. */
 async function searchProject(root, query, options = {}) {
   if (!root || root.kind !== "directory") throw new Error("Open a project folder first.");
   if (typeof query !== "string" || !query.trim() || query.length > 256)
@@ -161,7 +411,16 @@ async function searchProject(root, query, options = {}) {
   const MAX_BYTES = 1024 * 1024, MAX_ENTRIES = 500;
   const metacharacters = "\\^$.*+?()[]{}|";
   const literal = [...query].map(ch => metacharacters.includes(ch) ? "\\" + ch : ch).join("");
-  const expression = new RegExp(literal, options.caseSensitive ? "g" : "gi");
+  const body = options.regex ? query : literal;
+  const pattern = options.wholeWord
+    ? "(?<![\\p{L}\\p{N}_])(?:" + body + ")(?![\\p{L}\\p{N}_])" : body;
+  let expression;
+  try {
+    expression = new RegExp(pattern, (options.caseSensitive ? "g" : "gi") +
+      (options.regex ? "m" : "") + "u");
+  } catch (error) {
+    throw new Error("Invalid regular expression: " + error.message);
+  }
   const matches = [];
   let scannedFiles = 0, skippedLarge = 0, truncated = false;
   function checkAbort() {
@@ -195,10 +454,11 @@ async function searchProject(root, query, options = {}) {
       if (handle.kind !== "file" || !editable.test(name)) continue;
       const file = await handle.getFile();
       checkAbort();
-      if (file.size > MAX_BYTES) { skippedLarge++; continue; }
+      const maxBytes = options.regex ? 128 * 1024 : MAX_BYTES;
+      if (file.size > maxBytes) { skippedLarge++; continue; }
       const source = await file.text();
       checkAbort();
-      if (source.length > MAX_BYTES) { skippedLarge++; continue; }
+      if (source.length > maxBytes) { skippedLarge++; continue; }
       scannedFiles++;
       let line = 1, lineStart = 0;
       for (const found of source.matchAll(expression)) {
@@ -213,7 +473,7 @@ async function searchProject(root, query, options = {}) {
         }
         const lineEnd = newline < 0 ? source.length : newline;
         matches.push({
-          path, handle, index, length: found[0].length,
+          path, handle, index, length: found[0].length, text: found[0],
           line, column: index - lineStart + 1,
           preview: source.slice(lineStart, Math.min(lineEnd, lineStart + 180))
         });
@@ -224,8 +484,127 @@ async function searchProject(root, query, options = {}) {
   return { matches, scannedFiles, skippedLarge, truncated };
 }
 
+
+/* Two-phase, bounded local project replacement. Preview never writes files. */
+function replacementEngine() {
+  const engine = global.FlowStudioEditorFind ||
+    (typeof require === "function" ? require("./editor_find.js") : null);
+  if (!engine || typeof engine.findMatches !== "function" ||
+      typeof engine.replaceAll !== "function")
+    throw new Error("The source replacement engine is unavailable.");
+  return engine;
+}
+function checkReplacementAbort(signal) {
+  if (signal && signal.aborted) {
+    const error = new Error("Project replacement cancelled.");
+    error.name = "AbortError";
+    throw error;
+  }
+}
+async function planProjectReplace(root, query, replacement, options = {}) {
+  if (typeof replacement !== "string" || replacement.length > 10000)
+    throw new Error("Replacement must be at most 10,000 characters.");
+  const found = await searchProject(root, query, options);
+  if (found.truncated || found.skippedLarge)
+    throw new Error("Project search was incomplete; narrow the query or remove oversized files before replacing.");
+  const engine = replacementEngine();
+  const groups = new Map();
+  for (const hit of found.matches) {
+    if (!groups.has(hit.handle))
+      groups.set(hit.handle, { handle: hit.handle, path: hit.path, hits: [] });
+    groups.get(hit.handle).hits.push(hit);
+  }
+  if (groups.size > 50)
+    throw new Error("Project replacement is limited to 50 changed files.");
+  let budget = 0;
+  const files = [];
+  for (const entry of groups.values()) {
+    checkReplacementAbort(options.signal);
+    const file = await entry.handle.getFile();
+    const limit = options.regex ? 128 * 1024 : 1024 * 1024;
+    if (file.size > limit) throw new Error("File grew since search: " + entry.path);
+    const before = await file.text();
+    checkReplacementAbort(options.signal);
+    if (before.length > limit) throw new Error("File grew since search: " + entry.path);
+    const matches = engine.findMatches(before, query, options);
+    if (matches.truncated || matches.matches.length !== entry.hits.length ||
+        matches.matches.some((hit, i) => hit.index !== entry.hits[i].index ||
+          hit.end - hit.index !== entry.hits[i].length ||
+          before.slice(hit.index, hit.end) !== entry.hits[i].text))
+      throw new Error("File changed since search; retry: " + entry.path);
+    const updated = engine.replaceAll(before, query, replacement, options);
+    if (updated.count !== entry.hits.length)
+      throw new Error("Replacement count changed; retry: " + entry.path);
+    budget += before.length + updated.value.length;
+    if (budget > 8 * 1024 * 1024)
+      throw new Error("Project replacement exceeds the 8-million-character preview budget.");
+    if (updated.value !== before)
+      files.push({ path: entry.path, handle: entry.handle, before, after: updated.value, count: updated.count });
+  }
+  return { root, matches: found.matches.length, files };
+}
+async function applyProjectReplacement(plan, options = {}) {
+  if (!plan || !Array.isArray(plan.files) || plan.files.length > 50)
+    throw new Error("Invalid project replacement preview.");
+  for (const entry of plan.files) {
+    checkReplacementAbort(options.signal);
+    if (options.isBlocked && await options.isBlocked(entry))
+      throw new Error("Close the open editor tab before replacing " + entry.path + ".");
+    if (typeof entry.handle.createWritable !== "function")
+      throw new Error("Write access is unavailable for " + entry.path + ".");
+    const current = await entry.handle.getFile();
+    if (await current.text() !== entry.before)
+      throw new Error("File changed since preview; no files replaced: " + entry.path);
+  }
+  let completed = 0, matches = 0;
+  try {
+    for (const entry of plan.files) {
+      checkReplacementAbort(options.signal);
+      if (options.isBlocked && await options.isBlocked(entry))
+        throw new Error("An editor tab was opened during replacement: " + entry.path);
+      const current = await entry.handle.getFile();
+      if (await current.text() !== entry.before)
+        throw new Error("File changed during replacement: " + entry.path);
+      const writer = await entry.handle.createWritable();
+      try {
+        await writer.write(entry.after);
+        await writer.close();
+      } catch (error) {
+        if (typeof writer.abort === "function") {
+          try { await writer.abort(); } catch (_) { /* preserve original error */ }
+        }
+        throw error;
+      }
+      const saved = await entry.handle.getFile();
+      if (await saved.text() !== entry.after)
+        throw new Error("Could not verify the written file: " + entry.path);
+      completed++;
+      matches += entry.count;
+    }
+  } catch (error) {
+    if (completed) {
+      const partial = new Error("Replacement stopped after " + completed + " files (" +
+        matches + " matches); earlier writes remain on disk: " + (error.message || String(error)));
+      partial.name = error.name || "Error";
+      throw partial;
+    }
+    throw error;
+  }
+  return { files: completed, matches };
+}
+
+/* Undo is a second, conflict-checked write, never an unconditional rollback. */
+function reverseProjectReplacement(plan) {
+  if (!plan || !Array.isArray(plan.files) || plan.files.length > 50)
+    throw new Error("Invalid project replacement history.");
+  return {root:plan.root, matches:plan.matches, files:plan.files.map(entry => ({
+    path:entry.path, handle:entry.handle, before:entry.after,
+    after:entry.before, count:entry.count
+  }))};
+}
+
 function createProjectExplorer({ tree, status, openHandle, picker }) {
-  let root = null, revision = 0;
+  let root = null, revision = 0, lastReplacement = null;
   const element = (tag, text) => {
     const node = document.createElement(tag);
     if (text !== undefined) node.textContent = text;
@@ -295,6 +674,7 @@ function createProjectExplorer({ tree, status, openHandle, picker }) {
       const handle = await picker({ mode: "read" });
       if (!handle || handle.kind !== "directory") throw new Error("Not a directory");
       root = handle;
+      lastReplacement = null;
       await refresh();
       status("Opened project " + root.name, "ok");
       return true;
@@ -308,9 +688,28 @@ function createProjectExplorer({ tree, status, openHandle, picker }) {
     await refresh();
     return opened;
   }
-  return { choose, refresh, create, search: (query, options) => searchProject(root, query, options), hasProject: () => root !== null };
+  return { choose, refresh, create, search: (query, options) => searchProject(root, query, options),
+    previewReplace: (query, replacement, options) => planProjectReplace(root, query, replacement, options),
+    applyReplace: async (plan, options) => {
+      if (!root || !plan || plan.root !== root)
+        throw new Error("Project changed since replacement preview.");
+      lastReplacement = null;
+      const result = await applyProjectReplacement(plan, options);
+      if (root === plan.root && result.files > 0)
+        lastReplacement = reverseProjectReplacement(plan);
+      return result;
+    },
+    undoReplace: async options => {
+      if (!root || !lastReplacement || lastReplacement.root !== root)
+        throw new Error("No completed project replacement to undo.");
+      const undo = lastReplacement;
+      lastReplacement = null; // A failed or partial undo must not be blindly replayed.
+      return applyProjectReplacement(undo, options);
+    },
+    hasUndoReplace: () => lastReplacement !== null && lastReplacement.root === root,
+    hasProject: () => root !== null };
 }
-const api = { createProjectExplorer, validFilename, searchProject };
+const api = { createProjectExplorer, validFilename, searchProject, planProjectReplace, applyProjectReplacement, reverseProjectReplacement };
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 global.FlowStudioProject = api;
 })(globalThis);
@@ -318,28 +717,47 @@ global.FlowStudioProject = api;
 <!-- END EMBEDDED PROJECT MODULE -->
 <!-- BEGIN EMBEDDED EDITOR FIND MODULE: mirrors web/editor_find.js -->
 <script>
-/* Literal in-buffer find and replace. Pure operations: no filesystem or network access. */
+/* Bounded in-buffer literal/regex find and replace. No filesystem or network. */
 (function (global) {
 "use strict";
 const MAX_QUERY = 256;
 const MAX_REPLACEMENT = 10000;
 const MAX_SOURCE = 2 * 1024 * 1024;
+const MAX_REGEX_SOURCE = 128 * 1024;
 const MAX_MATCHES = 10000;
-function validate(text, query) {
+function validate(text, query, options = {}) {
   if (typeof text !== "string" || text.length > MAX_SOURCE)
     throw new Error("Editor search supports buffers up to 2 MiB.");
   if (typeof query !== "string" || query.length < 1 || query.length > MAX_QUERY)
     throw new Error("Find text must be 1–256 characters.");
+  if (options.regex && text.length > MAX_REGEX_SOURCE)
+    throw new Error("Regex search is limited to 128 KiB buffers; use literal search for larger files.");
+}
+function compile(query, options = {}) {
+  const escaped = [...query].map(ch => "\\^$.*+?()[]{}|".includes(ch) ? "\\" + ch : ch).join("");
+  const body = options.regex ? query : escaped;
+  const pattern = options.wholeWord
+    ? "(?<![\\p{L}\\p{N}_])(?:" + body + ")(?![\\p{L}\\p{N}_])" : body;
+  try {
+    return new RegExp(pattern, options.regex ? (options.caseSensitive ? "gmu" : "gimu") : (options.caseSensitive ? "gu" : "giu"));
+  } catch (error) {
+    throw new Error("Invalid regular expression: " + error.message);
+  }
 }
 function findMatches(text, query, options = {}) {
   if (query === "") return { matches: [], truncated: false };
-  validate(text, query);
-  const escaped = [...query].map(ch => "\\^$.*+?()[]{}|".includes(ch) ? "\\" + ch : ch).join("");
-  const regex = new RegExp(escaped, options.caseSensitive ? "gu" : "giu");
+  validate(text, query, options);
+  const regex = compile(query, options);
   const matches = [];
   for (const hit of text.matchAll(regex)) {
     if (matches.length === MAX_MATCHES) return { matches, truncated: true };
-    matches.push({ index: hit.index, end: hit.index + hit[0].length });
+    const match = { index: hit.index, end: hit.index + hit[0].length };
+    if (options.regex) {
+      match.text = hit[0];
+      match.captures = hit.slice(1);
+      match.groups = hit.groups || null;
+    }
+    matches.push(match);
   }
   return { matches, truncated: false };
 }
@@ -347,33 +765,69 @@ function nextMatch(matches, start, end, backwards = false) {
   if (matches.length === 0) return null;
   if (backwards) {
     for (let i = matches.length - 1; i >= 0; i--)
-      if (matches[i].end <= start) return matches[i];
+      if (matches[i].end <= start && (matches[i].index !== start || matches[i].end !== start))
+        return matches[i];
     return matches[matches.length - 1];
   }
-  for (const match of matches) if (match.index >= end) return match;
+  for (const match of matches)
+    if (match.index >= end && (match.index !== end || match.end !== end || start !== end))
+      return match;
   return matches[0];
 }
-function replaceSelection(text, query, replacement, start, end, options = {}) {
-  if (typeof replacement !== "string" || replacement.length > MAX_REPLACEMENT)
-    throw new Error("Replacement must be at most 10,000 characters.");
-  const result = findMatches(text, query, options);
-  const hit = result.matches.find(match => match.index === start && match.end === end);
-  if (!hit) return { value: text, replaced: false, start, end };
-  return { value: text.slice(0, start) + replacement + text.slice(end),
-    replaced: true, start, end: start + replacement.length };
+function expand(template, hit) {
+  if (!hit.captures) return template;
+  return template.replace(/\$(\$|&|<[^>]+>|[0-9]{1,2})/g, (token, key) => {
+    if (key === "$") return "$";
+    if (key === "&") return hit.text;
+    if (key[0] === "<") {
+      if (!hit.groups) return token;
+      const name = key.slice(1, -1);
+      return Object.hasOwn(hit.groups, name) ? (hit.groups[name] ?? "") : token;
+    }
+    const number = Number(key);
+    if (number > 0 && number <= hit.captures.length)
+      return hit.captures[number - 1] ?? "";
+    if (key.length === 2 && Number(key[0]) > 0 && Number(key[0]) <= hit.captures.length)
+      return (hit.captures[Number(key[0]) - 1] ?? "") + key[1];
+    return token;
+  });
 }
-function replaceAll(text, query, replacement, options = {}) {
+function replacementText(replacement, hit, options) {
+  return options.regex ? expand(replacement, hit) : replacement;
+}
+function validateReplacement(replacement) {
   if (typeof replacement !== "string" || replacement.length > MAX_REPLACEMENT)
     throw new Error("Replacement must be at most 10,000 characters.");
+}
+function replaceSelection(text, query, replacement, start, end, options = {}) {
+  validateReplacement(replacement);
   const result = findMatches(text, query, options);
   if (result.truncated) throw new Error("More than 10,000 matches; narrow the query before replacing.");
-  let position = 0;
+  const hit = result.matches.find(match => match.index === start && match.end === end);
+  if (!hit) return { value: text, replaced: false, start, end };
+  const inserted = replacementText(replacement, hit, options);
+  if (text.length - (end - start) + inserted.length > MAX_SOURCE)
+    throw new Error("Replacement exceeds the 2 MiB editor limit.");
+  return { value: text.slice(0, start) + inserted + text.slice(end),
+    replaced: true, start, end: start + inserted.length };
+}
+function replaceAll(text, query, replacement, options = {}) {
+  validateReplacement(replacement);
+  const result = findMatches(text, query, options);
+  if (result.truncated) throw new Error("More than 10,000 matches; narrow the query before replacing.");
+  let position = 0, size = 0;
   const parts = [];
   for (const match of result.matches) {
-    parts.push(text.slice(position, match.index), replacement);
+    const before = text.slice(position, match.index);
+    const inserted = replacementText(replacement, match, options);
+    size += before.length + inserted.length;
+    if (size > MAX_SOURCE) throw new Error("Replacement exceeds the 2 MiB editor limit.");
+    parts.push(before, inserted);
     position = match.end;
   }
-  parts.push(text.slice(position));
+  const tail = text.slice(position);
+  if (size + tail.length > MAX_SOURCE) throw new Error("Replacement exceeds the 2 MiB editor limit.");
+  parts.push(tail);
   return { value: parts.join(""), count: result.matches.length,
     firstIndex: result.matches.length ? result.matches[0].index : -1 };
 }
@@ -383,46 +837,140 @@ global.FlowStudioEditorFind = api;
 })(globalThis);
 </script>
 <!-- END EMBEDDED EDITOR FIND MODULE -->
-<!-- BEGIN EMBEDDED SOURCE CELLS MODULE: mirrors web/source_cells.js -->
+<!-- Source-cell parser is served from the explicit Flow allowlist, shared with tests. -->
+<script src="/source_cells.js"></script>
+
+<!-- BEGIN EMBEDDED DOCUMENT MODEL: mirrors web/ide_documents.js -->
 <script>
-/* Percent-style source cells for Flow, R and Python. No source execution here. */
+/* FlowStudio open-document model.
+ * Pure state: no DOM, no filesystem, no network. The editor view renders it.
+ */
 (function (global) {
 "use strict";
-const MAX_SOURCE = 2 * 1024 * 1024;
-const MARKER = /^[ \t]*#[ \t]*%%(?:([ \t][^\r\n]*))?(?:\r?\n|$)/gm;
+const MAX_DOCUMENTS = 24;
+const MAX_NAME = 256;
+const LANGUAGES = Object.freeze(["flow", "r", "python"]);
 
-function parseCells(source) {
-  if (typeof source !== "string" || source.length > MAX_SOURCE)
-    throw new Error("Cell navigation supports source buffers up to 2 MiB.");
-  const boundaries = [{ start: 0, codeStart: 0, kind: "code" }];
-  for (const match of source.matchAll(MARKER)) {
-    const label = (match[1] || "").trim().toLowerCase();
-    const kind = /^\[(?:markdown|md)\](?:\s|$)/.test(label) ? "markdown" : "code";
-    const boundary = { start: match.index, codeStart: match.index + match[0].length, kind };
-    if (match.index === 0) boundaries[0] = boundary;
-    else boundaries.push(boundary);
+function label(doc) {
+  if (!doc) return "";
+  return doc.path || doc.name;
+}
+
+function createModel(options = {}) {
+  const limit = Number.isInteger(options.limit) && options.limit > 0
+    ? Math.min(options.limit, MAX_DOCUMENTS) : MAX_DOCUMENTS;
+  const items = [];
+  let activeId = null;
+  let sequence = 0;
+
+  function find(id) {
+    return items.find(item => item.id === id) || null;
   }
-  return boundaries.map((boundary, index) => {
-    const end = index + 1 < boundaries.length ? boundaries[index + 1].start : source.length;
-    return { index, count: boundaries.length, start: boundary.start, end,
-      kind: boundary.kind, code: source.slice(boundary.codeStart, end) };
+  function list() {
+    return items.slice();
+  }
+  function active() {
+    return find(activeId);
+  }
+  function count() {
+    return items.length;
+  }
+  function normalizeLanguage(value) {
+    return LANGUAGES.includes(value) ? value : "flow";
+  }
+  function sameDocument(doc, spec) {
+    if (typeof spec.path === "string" && spec.path && doc.path === spec.path) return true;
+    return Boolean(spec.handle) && doc.handle === spec.handle;
+  }
+  function open(spec) {
+    if (!spec || typeof spec.name !== "string" || !spec.name || spec.name.length > MAX_NAME)
+      throw new TypeError("A document needs a name of 1–256 characters.");
+    if (typeof spec.text !== "string")
+      throw new TypeError("A document needs string content.");
+    const existing = items.find(doc => sameDocument(doc, spec));
+    if (existing) {
+      activeId = existing.id;
+      return { document: existing, created: false };
+    }
+    if (items.length >= limit)
+      throw new RangeError("Close a document before opening more than " + limit + ".");
+    const document_ = {
+      id: "doc-" + (++sequence),
+      name: spec.name,
+      path: typeof spec.path === "string" && spec.path ? spec.path : null,
+      language: normalizeLanguage(spec.language),
+      text: spec.text,
+      saved: typeof spec.baseline === "string" ? spec.baseline : spec.text,
+      handle: spec.handle || null,
+      dirty: false
+    };
+    items.push(document_);
+    activeId = document_.id;
+    return { document: document_, created: true };
+  }
+  function activate(id) {
+    const doc = find(id);
+    if (!doc) return null;
+    activeId = doc.id;
+    return doc;
+  }
+  function setText(id, text) {
+    const doc = find(id);
+    if (!doc || typeof text !== "string") return false;
+    doc.text = text;
+    doc.dirty = text !== doc.saved;
+    return true;
+  }
+  function setDirty(id, isDirty) {
+    const doc = find(id);
+    if (!doc) return false;
+    doc.dirty = Boolean(isDirty);
+    return true;
+  }
+  function markSaved(id, text = null) {
+    const doc = find(id);
+    if (!doc) return null;
+    if (typeof text === "string") doc.text = text;
+    doc.saved = doc.text;
+    doc.dirty = false;
+    return doc;
+  }
+  function rename(id, name, path = null) {
+    const doc = find(id);
+    if (!doc) return null;
+    if (typeof name === "string" && name && name.length <= MAX_NAME) doc.name = name;
+    if (path === null || (typeof path === "string" && path)) doc.path = path;
+    return doc;
+  }
+  function setLanguage(id, language) {
+    const doc = find(id);
+    if (!doc) return null;
+    doc.language = normalizeLanguage(language);
+    return doc;
+  }
+  function close(id) {
+    const index = items.findIndex(item => item.id === id);
+    if (index < 0) return null;
+    const [closed] = items.splice(index, 1);
+    if (closed.id === activeId) {
+      const neighbour = items[index] || items[index - 1] || null;
+      activeId = neighbour ? neighbour.id : null;
+    }
+    return { document: closed, activeId };
+  }
+  return Object.freeze({
+    open, activate, active, find, list, count, close,
+    setText, setDirty, markSaved, rename, setLanguage,
+    limit: () => limit
   });
 }
 
-function cellAt(source, offset) {
-  if (!Number.isInteger(offset) || offset < 0 || offset > source.length)
-    throw new RangeError("Cursor is outside the source buffer.");
-  const cells = parseCells(source);
-  for (let index = cells.length - 1; index >= 0; index--)
-    if (offset >= cells[index].start) return cells[index];
-  return cells[0];
-}
-const api = { parseCells, cellAt };
+const api = Object.freeze({ createModel, label, MAX_DOCUMENTS, MAX_NAME, LANGUAGES });
+global.FlowStudioDocuments = api;
 if (typeof module !== "undefined" && module.exports) module.exports = api;
-global.FlowStudioSourceCells = api;
 })(globalThis);
 </script>
-<!-- END EMBEDDED SOURCE CELLS MODULE -->
+<!-- END EMBEDDED DOCUMENT MODEL -->
 <script>
 "use strict";
 /* BEGIN EMBEDDED FILE SAVE MODULE: mirrors web/file_save.js */
@@ -476,17 +1024,29 @@ const src = el("source");
 const language = el("language");
 const consolePane = el("console");
 const resultStatus = el("resultStatus");
-let fileHandle = null;
-let fileBaseline = null;
-let filename = "untitled.flow";
-let projectPath = null;
-let dirty = false;
-let creatingProjectFile = false;
+/* All console writers funnel through the bounded terminal buffer; fall back
+ * to direct text appends if the terminal module is not available. */
+function writeConsole(text) {
+  if (globalThis.FlowStudioConsoleIO) globalThis.FlowStudioConsoleIO.write(text);
+  else consolePane.textContent += text;
+}
+let editorDocId = null;
+const documents = FlowStudioDocuments.createModel();
+documents.open({ name: "untitled.flow", text: src.value,
+  language: language.value || "flow", baseline: src.value });
+editorDocId = documents.active().id;
 
 
+function findOptions() {
+  return {caseSensitive:el("editorCaseSensitive").checked,
+    regex:el("editorRegex").checked, wholeWord:el("editorWholeWord").checked};
+}
 function currentFind() {
-  return FlowStudioEditorFind.findMatches(src.value, el("editorFind").value,
-    { caseSensitive: el("editorCaseSensitive").checked });
+  return FlowStudioEditorFind.findMatches(src.value, el("editorFind").value, findOptions());
+}
+function showFindBar() {
+  const bar = el("findBar");
+  if (bar) bar.hidden = false;
 }
 function updateFindCount() {
   try {
@@ -528,11 +1088,11 @@ function replaceCurrent() {
     const replacement = el("editorReplace").value;
     const result = FlowStudioEditorFind.replaceSelection(src.value, query, replacement,
       src.selectionStart, src.selectionEnd,
-      { caseSensitive: el("editorCaseSensitive").checked });
+      findOptions());
     if (!result.replaced) { findInEditor(false); return; }
     if (result.value !== src.value) {
       if (typeof src.setRangeText === "function")
-        src.setRangeText(replacement, result.start, src.selectionEnd, "end");
+        src.setRangeText(result.value.slice(result.start, result.end), result.start, src.selectionEnd, "end");
       else src.value = result.value;
       markDirty(true);
     }
@@ -549,7 +1109,7 @@ function replaceAllInEditor() {
     const query = el("editorFind").value;
     if (!query) { status("Enter text to replace.", "error"); return; }
     const result = FlowStudioEditorFind.replaceAll(src.value, query,
-      el("editorReplace").value, { caseSensitive: el("editorCaseSensitive").checked });
+      el("editorReplace").value, findOptions());
     if (result.count === 0) {
       status("No matches in current file.", "error");
       return;
@@ -583,18 +1143,156 @@ function inferLanguage(name) {
   if (/\.flow$/i.test(name)) return "flow";
   return language.value;
 }
+function activeDocument() {
+  return documents.active();
+}
+/* The visible buffer is bound to editorDocId, which can differ from
+ * documents.active() while a freshly opened document has not been loaded
+ * into the editor yet. Implicit saves must always go to the buffer the
+ * editor actually shows, never to whatever the model currently considers
+ * active. */
+function saveEditorBuffer() {
+  const doc = editorDocId ? documents.find(editorDocId) : null;
+  if (doc) documents.setText(doc.id, src.value);
+  return doc;
+}
 function setFilename(name, label = name) {
-  filename = name;
+  const doc = activeDocument();
+  if (doc) documents.rename(doc.id, name, label === name ? null : label);
   el("fileLabel").textContent = label;
+  renderTabs();
 }
 function markDirty(isDirty) {
-  dirty = isDirty;
+  const doc = activeDocument();
+  if (doc) documents.setDirty(doc.id, Boolean(isDirty));
   el("dirty").hidden = !isDirty;
+  renderTabs();
+}
+/* Open-document tab strip: one tab per buffer, dirty marker, close control. */
+function renderTabs() {
+  const strip = el("docTabs");
+  if (!strip) return;
+  const list = documents.list();
+  const current = activeDocument();
+  if (!list.length) {
+    const empty = document.createElement("p");
+    empty.className = "doc-tabs-empty";
+    empty.textContent = "No open documents";
+    strip.replaceChildren(empty);
+    return;
+  }
+  strip.replaceChildren(...list.map(doc => {
+    const selected = Boolean(current && current.id === doc.id);
+    const tab = document.createElement("div");
+    tab.className = "doc-tab" + (selected ? " active" : "") + (doc.dirty ? " dirty" : "");
+    tab.dataset.docId = doc.id;
+    tab.tabIndex = selected ? 0 : -1;
+    tab.setAttribute("role", "tab");
+    tab.setAttribute("aria-selected", String(selected));
+    tab.title = FlowStudioDocuments.label(doc);
+    const name = document.createElement("span");
+    name.className = "doc-tab-name";
+    name.textContent = FlowStudioDocuments.label(doc);
+    tab.append(name);
+    if (doc.dirty) {
+      const dot = document.createElement("span");
+      dot.className = "doc-tab-dot";
+      dot.textContent = "●";
+      dot.title = "Unsaved changes";
+      tab.append(dot);
+    }
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "doc-tab-close";
+    close.textContent = "×";
+    close.setAttribute("aria-label", "Close " + FlowStudioDocuments.label(doc));
+    close.addEventListener("click", event => {
+      if (event && typeof event.stopPropagation === "function") event.stopPropagation();
+      closeDocument(doc.id);
+    });
+    tab.append(close);
+    tab.addEventListener("click", () => activateDocument(doc.id));
+    return tab;
+  }));
+}
+function loadDocumentIntoEditor(doc) {
+  if (!doc) return false;
+  editorDocId = doc.id;
+  globalThis.FlowStudioEditor?.activate(doc);
+  src.value = doc.text;
+  language.value = doc.language;
+  el("fileLabel").textContent = FlowStudioDocuments.label(doc);
+  el("dirty").hidden = !doc.dirty;
+  updateCursor();
+  updateFindCount();
+  renderTabs();
+  if (typeof refreshOutline === "function") refreshOutline();
+  return true;
+}
+function activateDocument(id) {
+  const current = activeDocument();
+  if (current && current.id === id) { renderTabs(); src.focus(); return true; }
+  saveEditorBuffer();
+  const doc = documents.activate(id);
+  if (!doc) return false;
+  loadDocumentIntoEditor(doc);
+  src.focus();
+  return true;
+}
+function createUntitled() {
+  saveEditorBuffer();
+  try {
+    const opened = documents.open({ name: "untitled." + extension(language.value), text: "",
+      language: language.value, baseline: "" });
+    loadDocumentIntoEditor(opened.document);
+    status("New buffer", "ok");
+    src.focus();
+    return opened.document;
+  } catch (error) {
+    status(error.message || String(error), "error");
+    return null;
+  }
+}
+function closeDocument(id = null) {
+  saveEditorBuffer();
+  const target = id ? documents.find(id) : activeDocument();
+  if (!target) return false;
+  if (target.dirty && !confirm("Discard unsaved changes in " + FlowStudioDocuments.label(target) + "?"))
+    return false;
+  documents.close(target.id);
+  if (documents.count() === 0) { createUntitled(); return true; }
+  loadDocumentIntoEditor(activeDocument());
+  src.focus();
+  return true;
+}
+function cycleDocument(step) {
+  const list = documents.list();
+  if (list.length < 2) return false;
+  const current = activeDocument();
+  const index = Math.max(0, list.findIndex(doc => current && doc.id === current.id));
+  return activateDocument(list[(index + step + list.length) % list.length].id);
 }
 function updateCursor() {
   const before = src.value.slice(0, src.selectionStart);
   const lines = before.split("\n");
   el("cursor").textContent = "Ln " + lines.length + ", Col " + (lines[lines.length - 1].length + 1);
+}
+/* Move the caret to a buffer position and scroll that line toward the middle. */
+function revealPosition(line, column = 1) {
+  const lines = src.value.split("\n");
+  const target = Math.min(Math.max(1, Math.trunc(Number(line)) || 1), lines.length);
+  let offset = 0;
+  for (let index = 0; index < target - 1; index++) offset += lines[index].length + 1;
+  const width = (lines[target - 1] || "").length + 1;
+  const column_ = Math.min(Math.max(1, Math.trunc(Number(column)) || 1), width);
+  const computed = typeof getComputedStyle === "function" ? getComputedStyle(src) : null;
+  const lineHeight = computed ? parseFloat(computed.lineHeight) || 20 : 20;
+  src.focus();
+  src.setSelectionRange(offset + column_ - 1, offset + column_ - 1);
+  if (Number.isFinite(src.clientHeight) && Number.isFinite(src.scrollTop))
+    src.scrollTop = Math.max(0, (target - 1) * lineHeight - src.clientHeight / 2);
+  updateCursor();
+  return true;
 }
 let environmentRevision = 0;
 function showPythonEnvironmentMessage(message) {
@@ -603,6 +1301,35 @@ function showPythonEnvironmentMessage(message) {
   p.className = "muted";
   p.textContent = message;
   pane.replaceChildren(p);
+}
+// Only exact built-in Python containers are supplied by the native kernel.
+// Render their bounded metadata tree as inert text; never interpret names as code.
+function renderPythonEnvironmentChild(item, depth) {
+  if (!item || typeof item.name !== "string" || typeof item.type !== "string" ||
+      depth > 2 || item.name.length > 160 || item.type.length > 100) return null;
+  const li = document.createElement("li");
+  const size = Number.isSafeInteger(item.size) && item.size >= 0 ?
+    " (" + item.size + ")" : "";
+  const label = item.name + " : " + item.type + size +
+    (item.cycle === true ? " [cycle]" : "") +
+    (item.truncated === true ? " [partial]" : "");
+  const children = Array.isArray(item.children) && item.children.length <= 12 &&
+    depth < 2 ? item.children : [];
+  if (children.length) {
+    const details = document.createElement("details");
+    const summary = document.createElement("summary");
+    summary.textContent = label;
+    const list = document.createElement("ul");
+    for (const child of children) {
+      const element = renderPythonEnvironmentChild(child, depth + 1);
+      if (element) list.append(element);
+    }
+    details.append(summary, list);
+    li.append(details);
+  } else {
+    li.textContent = label;
+  }
+  return li;
 }
 async function refreshPythonEnvironment() {
   const revision = ++environmentRevision;
@@ -656,6 +1383,22 @@ async function refreshPythonEnvironment() {
       cell.textContent = value;
       row.append(cell);
     }
+    if ((selectedLanguage === "python" || selectedLanguage === "r") && Array.isArray(variable.children) &&
+        variable.children.length > 0 && variable.children.length <= 12) {
+      const list = document.createElement("ul");
+      for (const child of variable.children) {
+        const element = renderPythonEnvironmentChild(child, 1);
+        if (element) list.append(element);
+      }
+      if (list.childNodes.length) {
+        const details = document.createElement("details");
+        const summary = document.createElement("summary");
+        summary.textContent = variable.name + " — expand children" +
+          (variable.truncated === true ? " (partial)" : "");
+        details.append(summary, list);
+        row.firstChild.replaceChildren(details);
+      }
+    }
     table.append(row);
   }
   pane.replaceChildren(table);
@@ -677,15 +1420,17 @@ async function executeCode(code, label) {
   el("run").disabled = true;
   el("runCell").disabled = true;
   status("Running " + language.value + " …");
-  consolePane.textContent += "\n> " + label + " (" + language.value + ")\n";
+  writeConsole("\n> " + label + " (" + language.value + ")\n");
   try {
-    const response = await fetch("/api/run/" + language.value, {
+    const backend = language.value === "flow" ? el("flowBackend").value : "";
+    const response = await fetch("/api/run/" + language.value +
+      (backend ? "-" + backend : ""), {
       method: "POST",
       headers: { "Content-Type": "text/plain; charset=utf-8", "X-FlowStudio-Intent": "run" },
       body: code
     });
     const output = await response.text();
-    consolePane.textContent += output + "\n";
+    writeConsole(output + "\n");
     const message = response.ok ? "Finished" :
       response.status === 422 ? "Execution failed" :
       response.status === 503 ? "Interpreter unavailable" :
@@ -693,7 +1438,7 @@ async function executeCode(code, label) {
       "HTTP error " + response.status;
     status(message, response.ok ? "ok" : "error");
   } catch (error) {
-    consolePane.textContent += String(error) + "\n";
+    writeConsole(String(error) + "\n");
     status("Execution request failed", "error");
   } finally {
     if (language.value === "python" || language.value === "r") {
@@ -723,28 +1468,33 @@ async function runCell() {
   }
 }
 
-async function openEditorHandle(handle, path = null, skipDirtyCheck = false) {
-  if (dirty && !skipDirtyCheck && !creatingProjectFile && !confirm("Discard unsaved editor changes?")) return false;
+async function openEditorHandle(handle, path = null) {
+  const existing = documents.list().find(doc => doc.handle === handle &&
+    (path === null || doc.path === path));
+  if (existing) {
+    status("Switched to " + FlowStudioDocuments.label(existing), "ok");
+    return activateDocument(existing.id);
+  }
   const content = await FlowStudioFileSave.readSnapshot(handle);
-  src.value = content;
-  fileHandle = handle;
-  fileBaseline = content;
-  projectPath = path;
-  setFilename(handle.name, path || handle.name);
-  language.value = inferLanguage(handle.name);
-  markDirty(false);
-  updateCursor();
-  updateFindCount();
+  saveEditorBuffer();
+  let opened;
+  try {
+    opened = documents.open({ name: handle.name, path, text: content,
+      language: inferLanguage(handle.name), handle, baseline: content });
+  } catch (error) {
+    status(error.message || String(error), "error");
+    return false;
+  }
+  loadDocumentIntoEditor(opened.document);
   status("Opened " + (path || handle.name), "ok");
   return true;
 }
 async function openFile() {
-  if (dirty && !confirm("Discard unsaved editor changes?")) return;
   try {
     if (typeof window.showOpenFilePicker === "function") {
       const handles = await window.showOpenFilePicker({ multiple: false });
       if (!handles.length) return;
-      await openEditorHandle(handles[0], null, true);
+      await openEditorHandle(handles[0], null);
     } else {
       el("fallbackOpen").click();
     }
@@ -753,19 +1503,22 @@ async function openFile() {
   }
 }
 async function saveFile() {
-  const name = filename.startsWith("untitled.") ? "untitled." + extension(language.value) : filename;
+  const doc = activeDocument();
+  if (!doc) return;
+  const name = doc.name.startsWith("untitled.") ? "untitled." + extension(language.value) : doc.name;
   try {
-    if (fileHandle && typeof fileHandle.createWritable === "function") {
-      fileBaseline = await FlowStudioFileSave.writeIfUnchanged(fileHandle, fileBaseline, src.value);
-      setFilename(fileHandle.name, projectPath || fileHandle.name);
+    if (doc.handle && typeof doc.handle.createWritable === "function") {
+      const fileHandle = doc.handle;
+      const saved = await FlowStudioFileSave.writeIfUnchanged(fileHandle, doc.saved, src.value);
+      documents.rename(doc.id, fileHandle.name, doc.path);
+      documents.markSaved(doc.id, saved);
     } else if (typeof window.showSaveFilePicker === "function") {
       const handle = await window.showSaveFilePicker({ suggestedName: name });
       const baseline = await FlowStudioFileSave.readSnapshot(handle);
       const saved = await FlowStudioFileSave.writeIfUnchanged(handle, baseline, src.value);
-      fileHandle = handle;
-      fileBaseline = saved;
-      projectPath = null;
-      setFilename(handle.name);
+      doc.handle = handle;
+      documents.rename(doc.id, handle.name, null);
+      documents.markSaved(doc.id, saved);
     } else {
       const blob = new Blob([src.value], {type: "text/plain; charset=utf-8"});
       const url = URL.createObjectURL(blob);
@@ -774,9 +1527,30 @@ async function saveFile() {
       link.download = name;
       link.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
+      documents.markSaved(doc.id);
     }
+    el("fileLabel").textContent = FlowStudioDocuments.label(doc);
     markDirty(false);
     status("Saved " + name, "ok");
+  } catch (error) {
+    if (error.name !== "AbortError") status(String(error), "error");
+  }
+}
+async function saveFileAs() {
+  const doc = activeDocument();
+  if (!doc) return;
+  if (typeof window.showSaveFilePicker !== "function") return saveFile();
+  const name = doc.name.startsWith("untitled.") ? "untitled." + extension(language.value) : doc.name;
+  try {
+    const handle = await window.showSaveFilePicker({ suggestedName: name });
+    const baseline = await FlowStudioFileSave.readSnapshot(handle);
+    const saved = await FlowStudioFileSave.writeIfUnchanged(handle, baseline, src.value);
+    doc.handle = handle;
+    documents.rename(doc.id, handle.name, null);
+    documents.markSaved(doc.id, saved);
+    el("fileLabel").textContent = handle.name;
+    markDirty(false);
+    status("Saved " + handle.name, "ok");
   } catch (error) {
     if (error.name !== "AbortError") status(String(error), "error");
   }
@@ -791,7 +1565,7 @@ const project = FlowStudioProject.createProjectExplorer({
 });
 el("folder").addEventListener("click", async () => {
   const chosen = await project.choose();
-  if (chosen) { ++searchRevision; el("searchResults").replaceChildren(); }
+  if (chosen) { ++searchRevision; el("searchResults").replaceChildren(); el("undoProjectReplace").disabled = true; }
 });
 el("refreshProject").addEventListener("click", () => project.refresh());
 el("newFile").addEventListener("click", async () => {
@@ -805,14 +1579,10 @@ el("newFile").addEventListener("click", async () => {
     status("Invalid or unsupported source filename.", "error");
     return;
   }
-  if (dirty && !confirm("Discard unsaved editor changes?")) return;
-  creatingProjectFile = true;
   try {
     await project.create(name);
   } catch (error) {
     status(error.message || String(error), "error");
-  } finally {
-    creatingProjectFile = false;
   }
 });
 
@@ -831,10 +1601,13 @@ async function runProjectSearch() {
     return;
   }
   el("searchProject").disabled = true;
+  el("replaceProject").disabled = true;
   status("Searching project …");
   try {
     const caseSensitive = el("caseSensitive").checked;
-    const result = await project.search(query, { caseSensitive });
+    const regex = el("projectRegex").checked;
+    const wholeWord = el("projectWholeWord").checked;
+    const result = await project.search(query, { caseSensitive, regex, wholeWord });
     if (token !== searchRevision) return;
     const summary = document.createElement("p");
     summary.className = "muted hint";
@@ -849,12 +1622,19 @@ async function runProjectSearch() {
       button.title = "Open " + hit.path + " at line " + hit.line;
       button.addEventListener("click", async () => {
         try {
+          // Re-read the granted disk file before switching tabs: an already
+          // open editor tab may still hold an older, cached buffer.
+          const current = await hit.handle.getFile();
+          const limit = regex ? 128 * 1024 : 1024 * 1024;
+          if (current.size > limit ||
+              (await current.text()).slice(hit.index, hit.index + hit.length) !== hit.text) {
+            status("File changed since search; search again.", "error");
+            return;
+          }
           const opened = await openEditorHandle(hit.handle, hit.path);
           if (!opened) return;
           const selected = src.value.slice(hit.index, hit.index + hit.length);
-          const equal = caseSensitive ? selected === query :
-            selected.toLowerCase() === query.toLowerCase();
-          if (!equal) {
+          if (selected !== hit.text) {
             status("File changed since search; search again.", "error");
             return;
           }
@@ -872,10 +1652,102 @@ async function runProjectSearch() {
     if (token === searchRevision && error.name !== "AbortError")
       status(error.message || String(error), "error");
   } finally {
-    if (token === searchRevision) el("searchProject").disabled = false;
+    if (token === searchRevision) {
+      el("searchProject").disabled = false;
+      el("replaceProject").disabled = false;
+    }
   }
 }
+
+async function runProjectReplace() {
+  const token = ++searchRevision;
+  if (!project.hasProject()) { status("Open a project folder before replacing.", "error"); return; }
+  const query = el("projectSearch").value;
+  if (!query.trim()) { status("Enter text to replace in the project.", "error"); return; }
+  el("replaceProject").disabled = true;
+  el("searchProject").disabled = true;
+  status("Previewing project replacements …");
+  try {
+    const options = { caseSensitive: el("caseSensitive").checked,
+      regex: el("projectRegex").checked, wholeWord: el("projectWholeWord").checked };
+    const plan = await project.previewReplace(query, el("projectReplace").value, options);
+    if (token !== searchRevision) return;
+    if (!plan.files.length) {
+      status(plan.matches ? "All matching text already equals the replacement." :
+        "No project matches to replace.", "ok");
+      return;
+    }
+    const blocked = async entry => {
+      for (const doc of documents.list()) {
+        if (!doc.handle) continue;
+        if (doc.handle === entry.handle) return true;
+        if (typeof entry.handle.isSameEntry === "function" &&
+            await entry.handle.isSameEntry(doc.handle)) return true;
+      }
+      return false;
+    };
+    const open = [];
+    for (const entry of plan.files) if (await blocked(entry)) open.push(entry);
+    if (open.length) throw new Error("Close open editor tabs before project replacement: " +
+      open.map(entry => entry.path).join(", "));
+    const names = plan.files.slice(0, 10).map(entry => entry.path).join("\n");
+    const summary = "Replace " + plan.matches + " matches in " + plan.files.length +
+      " local project files?\n\n" + names +
+      (plan.files.length > 10 ? "\n… and " + (plan.files.length - 10) + " more" : "") +
+      "\n\nWrites are sequential; a later filesystem failure can leave earlier files changed.";
+    if (!confirm(summary)) { status("Project replacement cancelled."); return; }
+    const applied = await project.applyReplace(plan, { isBlocked: blocked });
+    el("undoProjectReplace").disabled = !project.hasUndoReplace();
+    if (token !== searchRevision) return;
+    el("searchResults").replaceChildren();
+    status("Replaced " + applied.matches + " matches in " + applied.files +
+      " project files. One-level undo is available.", "ok");
+  } catch (error) {
+    if (token === searchRevision && error.name !== "AbortError")
+      status(error.message || String(error), "error");
+  } finally {
+    el("undoProjectReplace").disabled = !project.hasUndoReplace();
+    if (token === searchRevision) {
+      el("replaceProject").disabled = false;
+      el("searchProject").disabled = false;
+    }
+  }
+}
+
+async function runProjectUndo() {
+  if (!project.hasUndoReplace()) { el("undoProjectReplace").disabled = true; return; }
+  if (!confirm("Undo the last project-wide replacement? Files must be unchanged. Multi-file writes are not atomic.")) return;
+  el("undoProjectReplace").disabled = true;
+  el("replaceProject").disabled = true;
+  el("searchProject").disabled = true;
+  try {
+    const blocked = async entry => {
+      for (const doc of documents.list()) {
+        if (!doc.handle) continue;
+        if (doc.handle === entry.handle) return true;
+        if (typeof entry.handle.isSameEntry === "function" &&
+            await entry.handle.isSameEntry(doc.handle)) return true;
+      }
+      return false;
+    };
+    const result = await project.undoReplace({isBlocked: blocked});
+    ++searchRevision;
+    el("searchResults").replaceChildren();
+    status("Restored " + result.files + " project files (" + result.matches +
+      " replacements undone).", "ok");
+  } catch (error) {
+    status("Project undo failed: " + (error.message || String(error)) +
+      ". Review files before further changes.", "error");
+  } finally {
+    el("undoProjectReplace").disabled = !project.hasUndoReplace();
+    el("replaceProject").disabled = false;
+    el("searchProject").disabled = false;
+  }
+}
+
 el("searchProject").addEventListener("click", runProjectSearch);
+el("undoProjectReplace").addEventListener("click", runProjectUndo);
+el("replaceProject").addEventListener("click", runProjectReplace);
 el("projectSearch").addEventListener("keydown", event => {
   if (event.key === "Enter") {
     event.preventDefault();
@@ -886,6 +1758,8 @@ el("projectSearch").addEventListener("keydown", event => {
 
 el("editorFind").addEventListener("input", updateFindCount);
 el("editorCaseSensitive").addEventListener("change", updateFindCount);
+el("editorRegex").addEventListener("change", updateFindCount);
+el("editorWholeWord").addEventListener("change", updateFindCount);
 el("editorFind").addEventListener("keydown", event => {
   if (event.key === "Enter") { event.preventDefault(); findInEditor(event.shiftKey); }
 });
@@ -894,14 +1768,30 @@ el("findPrevious").addEventListener("click", () => findInEditor(true));
 el("replaceOne").addEventListener("click", replaceCurrent);
 el("replaceAll").addEventListener("click", replaceAllInEditor);
 
-src.addEventListener("input", () => { markDirty(true); updateCursor(); updateFindCount(); });
+src.addEventListener("input", () => {
+  const doc = activeDocument();
+  if (doc) {
+    documents.setText(doc.id, src.value);
+    el("dirty").hidden = !activeDocument().dirty;
+    renderTabs();
+  } else {
+    markDirty(true);
+  }
+  updateCursor();
+  updateFindCount();
+  if (typeof scheduleOutlineRefresh === "function") scheduleOutlineRefresh();
+});
 src.addEventListener("click", updateCursor);
 src.addEventListener("keyup", updateCursor);
 language.addEventListener("change", () => {
   environmentRevision++;
   showPythonEnvironmentMessage(language.value === "python" || language.value === "r" ?
     "Refresh to inspect native " + language.value + " variables." : "Select Python or R to inspect its native session.");
-  if (filename.startsWith("untitled.")) setFilename("untitled." + extension(language.value));
+  const doc = activeDocument();
+  if (doc) {
+    documents.setLanguage(doc.id, language.value);
+    if (doc.name.startsWith("untitled.")) setFilename("untitled." + extension(language.value));
+  }
   el("runtimeInfo").textContent = language.value === "python" ? "Native Python: persistent until Reset Python." :
     language.value === "r" ? "Native R: persistent until Reset R." :
     "Flow executions are independent.";
@@ -972,33 +1862,91 @@ el("resetPython").addEventListener("click", async () => {
 });
 el("open").addEventListener("click", openFile);
 el("save").addEventListener("click", saveFile);
-el("clear").addEventListener("click", () => { consolePane.textContent = ""; });
+el("clear").addEventListener("click", () => {
+  if (globalThis.FlowStudioConsoleIO) globalThis.FlowStudioConsoleIO.clear();
+  else consolePane.textContent = "";
+});
 el("fallbackOpen").addEventListener("change", async event => {
   const file = event.target.files[0];
   if (!file) return;
-  src.value = await file.text();
-  fileHandle = null;
-  fileBaseline = null;
-  projectPath = null;
-  setFilename(file.name);
-  language.value = inferLanguage(file.name);
-  markDirty(false);
-  updateFindCount();
-  status("Opened " + file.name, "ok");
-  event.target.value = "";
+  const text = await file.text();
+  saveEditorBuffer();
+  try {
+    const opened = documents.open({ name: file.name, text, baseline: text,
+      language: inferLanguage(file.name) });
+    el("fallbackOpen").value = "";
+    loadDocumentIntoEditor(opened.document);
+    status("Opened " + file.name, "ok");
+  } catch (error) {
+    status(error.message || String(error), "error");
+  }
 });
 document.addEventListener("keydown", event => {
-  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") {
+  const command = event.ctrlKey || event.metaKey;
+  // Handle IDE shortcuts before Monaco's own keybinding service.
+  if (command && ["w", "Tab", "n", "o", "f", "h", "Enter", "s"].includes(event.key.length === 1 ? event.key.toLowerCase() : event.key))
+    event.stopPropagation?.();
+  if (command && !event.altKey && event.key.toLowerCase() === "w") {
     event.preventDefault();
+    closeDocument();
+    return;
+  }
+  if (command && event.key === "Tab") {
+    event.preventDefault();
+    cycleDocument(event.shiftKey ? -1 : 1);
+    return;
+  }
+  if (command && event.altKey && event.key.toLowerCase() === "n") {
+    event.preventDefault();
+    createUntitled();
+    return;
+  }
+  if (event.key === "F2" && event.target === src &&
+      !event.ctrlKey && !event.metaKey && !event.altKey) {
+    event.preventDefault();
+    openRenamePanel();
+    return;
+  }
+  if (event.key === "F12" && event.target === src &&
+      !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) {
+    event.preventDefault();
+    goToDefinition();
+    return;
+  }
+  if (event.key === "F12" && event.target === src && event.shiftKey &&
+      !event.ctrlKey && !event.metaKey && !event.altKey) {
+    event.preventDefault();
+    findReferencesAtCaret();
+    return;
+  }
+  if (command && event.shiftKey && !event.altKey && event.key.toLowerCase() === "o") {
+    event.preventDefault();
+    goToSymbol();
+    return;
+  }
+  if (command && !event.altKey && event.key.toLowerCase() === "o") {
+    event.preventDefault();
+    void openFile();
+    return;
+  }
+  if (command && event.key.toLowerCase() === "f") {
+    event.preventDefault();
+    showFindBar();
     const selection = src.value.slice(src.selectionStart, src.selectionEnd);
     if (selection.length > 0 && selection.length <= 256) el("editorFind").value = selection;
     updateFindCount();
     el("editorFind").focus();
     return;
   }
-  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "h") {
+  if (command && event.key.toLowerCase() === "h") {
     event.preventDefault();
+    showFindBar();
     el("editorReplace").focus();
+    return;
+  }
+  if (event.key === "Escape" && el("findBar") && !el("findBar").hidden &&
+      event.target !== el("editorFind") && event.target !== el("editorReplace")) {
+    el("findBar").hidden = true;
     return;
   }
   if (event.key === "F3" && el("editorFind").value) {
@@ -1014,12 +1962,254 @@ document.addEventListener("keydown", event => {
     event.preventDefault();
     saveFile();
   }
+}, true);
+
+el("newDocument").addEventListener("click", () => createUntitled());
+el("newDocumentTab").addEventListener("click", () => createUntitled());
+
+const commands = Object.freeze({
+  newDocument: () => createUntitled(),
+  closeDocument: () => closeDocument(),
+  openFile: () => openFile(),
+  saveFile: () => saveFile(),
+  saveFileAs: () => saveFileAs(),
+  openFolder: () => el("folder").click(),
+  focusFind: () => {
+    showFindBar();
+    const selection = src.value.slice(src.selectionStart, src.selectionEnd);
+    if (selection.length > 0 && selection.length <= 256) el("editorFind").value = selection;
+    updateFindCount();
+    el("editorFind").focus();
+  },
+  focusReplace: () => { showFindBar(); el("editorReplace").focus(); },
+  findInProject: () => el("projectSearch").focus(),
+  showOutline: () => el("tab-outline").click(),
+  goToSymbol: () => goToSymbol(),
+  goToDefinition: () => goToDefinition(),
+  findReferences: () => findReferencesAtCaret(),
+  renameSymbol: () => openRenamePanel(),
+  refreshOutline: () => refreshOutline(),
+  run: () => el("run").click(),
+  runCell: () => el("runCell").click(),
+  resetR: () => el("resetR").click(),
+  resetPython: () => el("resetPython").click(),
+  showFiles: () => el("tab-files").click(),
+  showPlots: () => el("tab-plots").click(),
+  showData: () => el("tab-data").click(),
+  toggleDock: () => {
+    const dock = el("consoleDock");
+    const splitter = el("dockSplitter");
+    const hide = !dock.hidden;
+    dock.hidden = hide;
+    if (splitter) splitter.hidden = hide;
+    el("ideShell").classList.toggle("dock-hidden", hide);
+  },
+  refreshEnvironment: () => el("refreshPythonEnvironment").click(),
+  shortcuts: () => status("Ctrl+Enter run · Ctrl+Shift+Enter cell · Ctrl+S save · Ctrl+W close tab · Ctrl+Tab next tab · Ctrl+F find · Ctrl+H replace · Ctrl+Shift+O outline · F12 definition · Shift+F12 references · F2 rename", "ok"),    about: () => status("FlowStudio 0.2.0-alpha.1 · Flow-first local IDE · execution on 127.0.0.1:8751 only", "ok")
 });
+if (typeof window !== "undefined") {
+  window.FlowStudioApp = Object.freeze({
+    commands, documents, createUntitled, activateDocument, closeDocument, openEditorHandle, revealPosition
+  });
+}
+renderTabs();
 </script>
 <script src="/editor_recovery.js"></script>
 <script src="/workspace_tabs.js"></script>
 <script>FlowStudioWorkspaceTabs.mount();</script>
+<script src="/terminal_render.js"></script>
 <script src="/console.js"></script>
 <script src="/workspace_console.js"></script>
+<script src="/packages_panel.js"></script>
+<script src="/examples_gallery.js"></script>
+<script src="/saved_projects.js"></script>
+<script src="/debug_panel.js"></script>
+<script src="/ide_shell.js"></script>
+<script src="/ide_symbols.js"></script>
+<script src="/ide_outline.js"></script>
+<script>
+"use strict";
+/* Outline panel: parses the active buffer and jumps the caret to a symbol. */
+const outlinePanel = FlowStudioOutline.mount(document, { jump: revealPosition });
+let outlineTimer = 0;
+function refreshOutline() {
+  if (!outlinePanel) return 0;
+  const doc = activeDocument();
+  return outlinePanel.update({
+    language: doc ? doc.language : language.value,
+    text: src.value,
+    label: doc ? FlowStudioDocuments.label(doc) : ""
+  });
+}
+function scheduleOutlineRefresh() {
+  if (outlineTimer) clearTimeout(outlineTimer);
+  outlineTimer = setTimeout(() => { outlineTimer = 0; refreshOutline(); }, 250);
+}
+function goToDefinition() {
+  try {
+    const name = FlowStudioSymbols.identifierAt(language.value, src.value, src.selectionStart);
+    if (!name) {
+      status("Place the caret on a Flow, R or Python identifier.", "error");
+      return false;
+    }
+    const local = FlowStudioSymbols.findDefinition(
+      language.value, src.value, name, src.selectionStart);
+    if (local) {
+      revealPosition(local.line, local.column);
+      status("Definition: " + name + " (line " + local.line + ")", "ok");
+      return true;
+    }
+    const current = activeDocument();
+    const match = FlowStudioSymbols.uniqueOpenDefinition(
+      language.value, documents.list(), name, current ? current.id : null);
+    if (match.state === "unique" && activateDocument(match.documentId)) {
+      revealPosition(match.symbol.line, match.symbol.column);
+      status("Definition: " + name + " in another open tab", "ok");
+      return true;
+    }
+    status(match.state === "ambiguous"
+      ? "Multiple open files define " + name + "; select a file explicitly."
+      : "No definition of " + name + " found in open source buffers.", "error");
+  } catch (error) {
+    status("Definition navigation: " + (error.message || String(error)), "error");
+  }
+  return false;
+}
+
+function findReferencesAtCaret() {
+  try {
+    const name = FlowStudioSymbols.identifierAt(language.value, src.value, src.selectionStart);
+    if (!name) {
+      status("Place the caret on a Flow, R or Python identifier.", "error");
+      return false;
+    }
+    const current = saveEditorBuffer();
+    if (!current) return false;
+    const result = FlowStudioSymbols.findOpenReferences(
+      language.value, documents.list(), name, current.id);
+    const node = el("referenceResults");
+    const title = document.createElement("p");
+    title.className = "outline-note";
+    title.textContent = "Lexical references: " + name + " (" + result.matches.length +
+      (result.truncated ? "+, capped at 200" : "") + "). Open tabs only; not semantic resolution.";
+    const buttons = result.matches.map(match => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "outline-item";
+      button.title = match.documentLabel + ":" + match.line + ":" + match.column;
+      button.textContent = match.documentLabel + ":" + match.line + ":" + match.column +
+        "  " + match.preview;
+      button.addEventListener("click", () => {
+        if (activateDocument(match.documentId)) {
+          revealPosition(match.line, match.column);
+          status("Reference: " + name + " in " + match.documentLabel, "ok");
+        }
+      });
+      return button;
+    });
+    node.replaceChildren(title, ...buttons);
+    el("tab-outline").click();
+    status("Found " + result.matches.length + (result.truncated ? "+" : "") +
+      " lexical references to " + name + " in open tabs.", "ok");
+    return true;
+  } catch (error) {
+    status("Reference search: " + (error.message || String(error)), "error");
+    return false;
+  }
+}
+
+
+/* F2 rename: explicit lexical preview; no filesystem writes or source execution.
+ * Shadowed bindings may share spellings, so this is not semantic refactoring. */
+let renamePlan = null;
+let renameSourceId = null;
+let renameSourceName = "";
+function invalidateRenamePreview() {
+  renamePlan = null;
+  el("renameApply").disabled = true;
+  el("renameSummary").textContent =
+    "Preview required. Lexical rename only; imports and shadowing are not resolved.";
+}
+function openRenamePanel() {
+  const current = activeDocument();
+  const name = FlowStudioSymbols.identifierAt(language.value, src.value, src.selectionStart);
+  if (!current || !name) {
+    status("Place the caret on a Flow, R or Python identifier to rename.", "error");
+    return false;
+  }
+  documents.setText(current.id, src.value);
+  renameSourceId = current.id;
+  renameSourceName = name;
+  el("renameOriginal").textContent = name;
+  el("renameTarget").value = name;
+  el("renameAllOpen").checked = false;
+  el("renamePanel").hidden = false;
+  invalidateRenamePreview();
+  el("tab-outline").click();
+  el("renameTarget").focus();
+  el("renameTarget").select();
+  return true;
+}
+el("renameTarget").addEventListener("input", invalidateRenamePreview);
+el("renameAllOpen").addEventListener("change", invalidateRenamePreview);
+el("renameCancel").addEventListener("click", () => {
+  renamePlan = null;
+  el("renamePanel").hidden = true;
+  src.focus();
+});
+el("renamePreview").addEventListener("click", () => {
+  try {
+    const current = activeDocument();
+    if (!current || current.id !== renameSourceId)
+      throw new Error("Return to the original source tab before previewing.");
+    documents.setText(current.id, src.value);
+    const plan = FlowStudioSymbols.planOpenRename(
+      language.value, documents.list(), renameSourceName, el("renameTarget").value,
+      renameSourceId, el("renameAllOpen").checked);
+    renamePlan = plan;
+    el("renameSummary").textContent = "Preview: " + plan.count + " lexical occurrence(s) in " +
+      plan.entries.length + " open buffer(s): " +
+      plan.entries.map(entry => entry.label + " (" + entry.count + ")").join(", ") +
+      ". Changes remain unsaved; shadowing and imports are not resolved.";
+    el("renameApply").disabled = false;
+  } catch (error) {
+    invalidateRenamePreview();
+    el("renameSummary").textContent = error.message || String(error);
+    status("Rename preview: " + (error.message || String(error)), "error");
+  }
+});
+el("renameApply").addEventListener("click", () => {
+  try {
+    if (!renamePlan) throw new Error("Preview the rename before applying it.");
+    const current = activeDocument();
+    if (!current || current.id !== renameSourceId)
+      throw new Error("Return to the original source tab before applying.");
+    documents.setText(current.id, src.value);
+    const applied = FlowStudioSymbols.applyOpenRename(documents, renamePlan);
+    loadDocumentIntoEditor(activeDocument());
+    el("referenceResults").replaceChildren();
+    el("renamePanel").hidden = true;
+    renamePlan = null;
+    status("Renamed " + applied.references + " lexical occurrence(s) in " +
+      applied.documents + " open buffer(s). Save changed tabs explicitly.", "ok");
+  } catch (error) {
+    invalidateRenamePreview();
+    el("renameSummary").textContent = error.message || String(error);
+    status("Rename failed: " + (error.message || String(error)), "error");
+  }
+});
+
+function goToSymbol() {
+  const tab = el("tab-outline");
+  if (tab) tab.click();
+  refreshOutline();
+  if (outlinePanel) outlinePanel.focusFirst();
+}
+const outlineRefreshButton = el("outlineRefresh");
+if (outlineRefreshButton) outlineRefreshButton.addEventListener("click", refreshOutline);
+refreshOutline();
+</script>
+<script src="/workspace_panels.js"></script>
+<script type="module" src="/ui/workbench.js"></script>
 </body>
 </html>

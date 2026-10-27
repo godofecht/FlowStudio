@@ -90,17 +90,110 @@ def verify(root: Path, port: int = 8751, build_timeout: int = 180,
     if require_r:
         if not shutil.which("Rscript"):
             raise VerificationError("Rscript is required for native R acceptance")
-        print("Real R IPC and FlowJIT native acceptance", flush=True)
+        print("Real R IPC acceptance: tests/test_native_r_session.py", flush=True)
         r_result = _command(
             [sys.executable, "-m", "unittest", "discover", "-s", "tests",
-             "-p", "test_native_*.py", "-v"], root, 110
+             "-p", "test_native_r_session.py", "-v"], root, 65
         )
         if r_result.stdout:
             print(r_result.stdout, end="", flush=True)
         if r_result.stderr:
             print(r_result.stderr, end="", file=sys.stderr, flush=True)
         if r_result.returncode != 0:
-            raise VerificationError("Real R IPC or FlowJIT native acceptance failed")
+            raise VerificationError("Real R IPC acceptance failed")
+        print("Real FlowJIT C-native acceptance: tests/test_native_flowjit.py", flush=True)
+        jit_result = _command(
+            [sys.executable, "-m", "unittest", "discover", "-s", "tests",
+             "-p", "test_native_flowjit.py", "-v"], root, 110
+        )
+        if jit_result.stdout:
+            print(jit_result.stdout, end="", flush=True)
+        if jit_result.stderr:
+            print(jit_result.stderr, end="", file=sys.stderr, flush=True)
+        if jit_result.returncode != 0:
+            raise VerificationError("Real FlowJIT native acceptance failed")
+        if not shutil.which("node"):
+            raise VerificationError("Node.js is required for browser transfer Rscript acceptance")
+        print("Real Python/R transfer query acceptance: tests/browser_variable_transfer.test.js", flush=True)
+        transfer_result = _command(
+            ["node", "--test", str(root / "tests/browser_variable_transfer.test.js")], root, 65
+        )
+        if transfer_result.stdout:
+            print(transfer_result.stdout, end="", flush=True)
+        if transfer_result.stderr:
+            print(transfer_result.stderr, end="", file=sys.stderr, flush=True)
+        if transfer_result.returncode != 0:
+            raise VerificationError("Real Python/R transfer query acceptance failed")
+        print("Real typed NA/None transfer acceptance: tests/browser_variable_transfer_missing.test.js", flush=True)
+        missing_result = _command(
+            ["node", "--test", str(root / "tests/browser_variable_transfer_missing.test.js")], root, 65
+        )
+        if missing_result.stdout:
+            print(missing_result.stdout, end="", flush=True)
+        if missing_result.stderr:
+            print(missing_result.stderr, end="", file=sys.stderr, flush=True)
+        if missing_result.returncode != 0:
+            raise VerificationError("Real typed NA/None transfer acceptance failed")
+        print("Real Python/R typed table transfer acceptance: tests/browser_variable_transfer_table.test.js", flush=True)
+        table_result = _command(
+            ["node", "--test", str(root / "tests/browser_variable_transfer_table.test.js")], root, 65
+        )
+        if table_result.stdout:
+            print(table_result.stdout, end="", flush=True)
+        if table_result.stderr:
+            print(table_result.stderr, end="", file=sys.stderr, flush=True)
+        if table_result.returncode != 0:
+            raise VerificationError("Real typed table transfer acceptance failed")
+        print("Real NumPy matrix to R data.frame acceptance: tests/browser_variable_transfer_numpy_matrix.test.js", flush=True)
+        matrix_result = _command(
+            ["node", "--test", str(root / "tests/browser_variable_transfer_numpy_matrix.test.js")], root, 65
+        )
+        if matrix_result.stdout:
+            print(matrix_result.stdout, end="", flush=True)
+        if matrix_result.stderr:
+            print(matrix_result.stderr, end="", file=sys.stderr, flush=True)
+        if matrix_result.returncode != 0:
+            raise VerificationError("Real NumPy matrix to R data.frame acceptance failed")
+        print("Real R matrix to NumPy transfer acceptance: tests/browser_variable_transfer_r_matrix.test.js", flush=True)
+        r_matrix_result = _command(
+            ["node", "--test", str(root / "tests/browser_variable_transfer_r_matrix.test.js")], root, 65
+        )
+        if r_matrix_result.stdout:
+            print(r_matrix_result.stdout, end="", flush=True)
+        if r_matrix_result.stderr:
+            print(r_matrix_result.stderr, end="", file=sys.stderr, flush=True)
+        if r_matrix_result.returncode != 0:
+            raise VerificationError("Real R matrix transfer acceptance failed")
+        print("Real Python table to R matrix acceptance: tests/browser_variable_transfer_r_matrix_import.test.js", flush=True)
+        r_import_matrix_result = _command(
+            ["node", "--test", str(root / "tests/browser_variable_transfer_r_matrix_import.test.js")], root, 65
+        )
+        if r_import_matrix_result.stdout:
+            print(r_import_matrix_result.stdout, end="", flush=True)
+        if r_import_matrix_result.stderr:
+            print(r_import_matrix_result.stderr, end="", file=sys.stderr, flush=True)
+        if r_import_matrix_result.returncode != 0:
+            raise VerificationError("Real Python table to R matrix acceptance failed")
+        print("Real browser R inspector query acceptance: tests/browser_r_nested_environment.test.js", flush=True)
+        inspect_result = _command(
+            ["node", "--test", str(root / "tests/browser_r_nested_environment.test.js")], root, 65
+        )
+        if inspect_result.stdout:
+            print(inspect_result.stdout, end="", flush=True)
+        if inspect_result.stderr:
+            print(inspect_result.stderr, end="", file=sys.stderr, flush=True)
+        if inspect_result.returncode != 0:
+            raise VerificationError("Real browser R inspector acceptance failed")
+        print("Real data.frame column completion acceptance: tests/browser_r_dataframe_completion.test.js", flush=True)
+        frame_result = _command(
+            ["node", "--test", str(root / "tests/browser_r_dataframe_completion.test.js")], root, 65
+        )
+        if frame_result.stdout:
+            print(frame_result.stdout, end="", flush=True)
+        if frame_result.stderr:
+            print(frame_result.stderr, end="", file=sys.stderr, flush=True)
+        if frame_result.returncode != 0:
+            raise VerificationError("Real R data.frame completion acceptance failed")
     _free_port(port)
     # Never accept a stale executable left by an earlier successful build.
     # Unlinking a symlink here also avoids following an unexpected target.
@@ -141,6 +234,41 @@ def verify(root: Path, port: int = 8751, build_timeout: int = 180,
             raise
         finally:
             _stop_process_group(proc)
+
+    # A second live server exercises Git mutations in an isolated checkout,
+    # never the repository running CI. This is real Git and the real Flow
+    # executable, not an HTTP mock or a command-line approximation.
+    git_smoke = root / "tests/native_git_write_smoke.py"
+    if not git_smoke.is_file() or not shutil.which("git"):
+        raise VerificationError("Native Git write acceptance requires git and its fixture script")
+    with tempfile.TemporaryDirectory(prefix="flowstudio-git-") as temp:
+        fixture = Path(temp)
+        shutil.copytree(root / "web", fixture / "web")
+        shutil.copytree(root / "docs", fixture / "docs")
+        # The preceding server may leave TCP TIME_WAIT sockets. The real
+        # listener sets SO_REUSEADDR; a plain probe bind here would be flaky.
+        with tempfile.TemporaryFile(mode="w+t", encoding="utf-8") as git_log:
+            git_server = subprocess.Popen([str(binary)], cwd=fixture,
+                                          stdout=git_log, stderr=subprocess.STDOUT,
+                                          start_new_session=True)
+            try:
+                _wait_health(git_server, port, startup_timeout)
+                result = _command([sys.executable, str(git_smoke)], fixture, 65)
+                if result.stdout:
+                    print(result.stdout, end="", flush=True)
+                if result.stderr:
+                    print(result.stderr, end="", file=sys.stderr, flush=True)
+                if result.returncode != 0:
+                    raise VerificationError("Isolated live native Git write acceptance failed")
+                if git_server.poll() is not None:
+                    raise VerificationError("Git fixture server exited unexpectedly")
+            except BaseException:
+                git_log.seek(0)
+                print("Native Git fixture server log:\\n" + git_log.read()[-16000:],
+                      file=sys.stderr)
+                raise
+            finally:
+                _stop_process_group(git_server)
 
 
 def main() -> int:

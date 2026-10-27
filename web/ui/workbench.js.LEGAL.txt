@@ -1,0 +1,40 @@
+Bundled license information:
+
+dompurify/dist/purify.es.mjs:
+  /*! @license DOMPurify 3.4.17 | (c) Cure53 and other contributors | Released under the Apache license 2.0 and Mozilla Public License 2.0 | github.com/cure53/DOMPurify/blob/3.4.17/LICENSE */
+  /*! regenerator-runtime -- Copyright (c) 2014-present, Facebook, Inc. -- license (MIT): https://github.com/babel/babel/blob/main/packages/babel-helpers/LICENSE */
+
+lucide/dist/esm/createElement.js:
+lucide/dist/esm/replaceElement.js:
+lucide/dist/esm/defaultAttributes.js:
+lucide/dist/esm/icons/arrow-up-right.js:
+lucide/dist/esm/icons/blocks.js:
+lucide/dist/esm/icons/bug.js:
+lucide/dist/esm/icons/chart-no-axes-combined.js:
+lucide/dist/esm/icons/chevron-right.js:
+lucide/dist/esm/icons/circle.js:
+lucide/dist/esm/icons/command.js:
+lucide/dist/esm/icons/download.js:
+lucide/dist/esm/icons/file-code-2.js:
+lucide/dist/esm/icons/file-plus-2.js:
+lucide/dist/esm/icons/files.js:
+lucide/dist/esm/icons/folder-open.js:
+lucide/dist/esm/icons/library.js:
+lucide/dist/esm/icons/list-tree.js:
+lucide/dist/esm/icons/list.js:
+lucide/dist/esm/icons/octagon.js:
+lucide/dist/esm/icons/package.js:
+lucide/dist/esm/icons/play.js:
+lucide/dist/esm/icons/rotate-cw.js:
+lucide/dist/esm/icons/search.js:
+lucide/dist/esm/icons/sliders-horizontal.js:
+lucide/dist/esm/icons/table-2.js:
+lucide/dist/esm/icons/terminal.js:
+lucide/dist/esm/icons/x.js:
+lucide/dist/esm/lucide.js:
+  /**
+   * @license lucide v0.468.0 - ISC
+   *
+   * This source code is licensed under the ISC license.
+   * See the LICENSE file in the root directory of this source tree.
+   */

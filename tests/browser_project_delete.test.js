@@ -134,7 +134,7 @@ test("replaced file handle is not deleted even when text matches", async () => {
     f.root.files.set("main.flow", file("main.flow", original.content));
     assert.equal(await f.controller.deleteFile(), false);
     assert.equal(f.root.files.has("main.flow"), true);
-    assert.match(f.messages.join(" "), /replaced externally/);
+    assert.match(f.messages.join(" "), /replaced or cannot be verified/);
   } finally { f.cleanup(); }
 });
 test("cancelling confirmation leaves project and editor unchanged", async () => {
@@ -207,4 +207,40 @@ test("browser workspace exposes the deletion control without changing CI", () =>
   const html = fs.readFileSync(path.join(__dirname, "../docs/app/index.html"), "utf8");
   assert.match(html, /id="deleteProjectFile"/);
   assert.match(html, /deleteFileButton: \$\("deleteProjectFile"\)/);
+});
+
+test("deletion fails closed when the browser cannot verify file identity", async () => {
+  const f = fixture();
+  try {
+    await f.controller.choose(); await f.open();
+    delete f.root.files.get("main.flow").isSameEntry;
+    assert.equal(await f.controller.deleteFile(), false);
+    assert.equal(f.root.files.has("main.flow"), true);
+    assert.equal(f.controller.hasActiveFile(), true);
+    assert.match(f.messages.at(-1), /cannot be verified/);
+  } finally { f.cleanup(); }
+});
+
+test("edits typed during the final deletion read cannot be discarded", async () => {
+  const f = fixture();
+  try {
+    await f.controller.choose(); await f.open();
+    const handle = f.root.files.get("main.flow");
+    const read = handle.getFile.bind(handle);
+    let reads = 0, entered, release;
+    const enteredFinalRead = new Promise(resolve => { entered = resolve; });
+    const gate = new Promise(resolve => { release = resolve; });
+    handle.getFile = async () => {
+      if (++reads === 2) { entered(); await gate; }
+      return read();
+    };
+    const pending = f.controller.deleteFile();
+    await enteredFinalRead;
+    f.source.value += "\nnew unsaved change";
+    release();
+    assert.equal(await pending, false);
+    assert.equal(f.root.files.has("main.flow"), true);
+    assert.equal(f.controller.hasActiveFile(), true);
+    assert.match(f.messages.at(-1), /Editor changed during deletion/);
+  } finally { f.cleanup(); }
 });

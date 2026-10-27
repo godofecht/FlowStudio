@@ -1,4 +1,4 @@
-/* Browser-local Python (Pyodide) and R (webR) package controls. */
+/* Browser Python/webR and Flow-owned native R package controls. */
 (function (global) {
 "use strict";
 const SPEC = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}(?:==[0-9][A-Za-z0-9.!+_-]{0,39})?$/;
@@ -8,7 +8,11 @@ function validRName(name) {
 }
 function create(options) {
   const {document, request, notice, target, input, installButton, listButton,
-    language = () => "python", rSession = null} = options;
+    loadButton = null, removeButton = null, updateButton = null, language = () => "python", rSession = null,
+    rNative = () => false, confirmRemove = name => typeof global.confirm === "function" &&
+      global.confirm("Remove " + name + " from the FlowStudio user R library? This cannot be undone."),
+    confirmUpdate = name => typeof global.confirm === "function" &&
+      global.confirm("Update " + name + " from CRAN? Package installation executes code as your local user and cannot be automatically rolled back.")} = options;
   let busy = false, revision = 0;
   function render(packages, kind) {
     target.replaceChildren();
@@ -44,7 +48,20 @@ function create(options) {
     input.setAttribute?.("aria-label", kind === "r" ? "R package name" : "Python package name");
     installButton.textContent = kind === "r" ? "Install R package" : "Install package";
     listButton.textContent = kind === "r" ? "List R packages" : "List packages";
-    installButton.disabled = listButton.disabled = busy || kind === "flow";
+    installButton.disabled = busy || kind === "flow";
+    listButton.disabled = busy || kind === "flow";
+    if (loadButton) {
+      loadButton.hidden = kind !== "r" || !rNative();
+      loadButton.disabled = busy || loadButton.hidden;
+    }
+    if (removeButton) {
+      removeButton.hidden = kind !== "r" || !rNative();
+      removeButton.disabled = busy || removeButton.hidden;
+    }
+    if (updateButton) {
+      updateButton.hidden = kind !== "r" || !rNative();
+      updateButton.disabled = busy || updateButton.hidden;
+    }
   }
   async function perform(operation, code) {
     if (busy) return false;
@@ -54,18 +71,29 @@ function create(options) {
       notice("Browser package management supports Python and R, not Flow.");
       return false;
     }
+    if ((operation === "load" || operation === "remove" || operation === "update") && (kind !== "r" || !rNative())) return false;
     busy = true;
     installButton.disabled = listButton.disabled = true;
-    notice(operation === "install" ? "Installing into the browser " + kind + " session…" :
-      "Inspecting browser " + kind + " packages…");
+    if (loadButton) loadButton.disabled = true;
+    if (removeButton) removeButton.disabled = true;
+    if (updateButton) updateButton.disabled = true;
+    notice(operation === "update" ? "Checking for a newer CRAN version in the native R user library…" :
+      operation === "remove" ? "Removing user-installed native R package…" :
+      operation === "load" ? "Loading installed native R package…" :
+      operation === "install" ? "Installing into the selected " + kind + " session…" :
+      "Inspecting installed " + kind + " packages…");
     try {
-      let inventory;
+      let inventory, operationOutput = "";
       if (kind === "r") {
         if (typeof rSession !== "function") throw Error("R package session unavailable.");
         const session = rSession();
-        if (operation === "install") {
-          const installed = await session.installPackage(code);
-          if (!installed.ok) throw Error(installed.output || "R installation failed");
+        if (operation === "install" || operation === "load" || operation === "remove" || operation === "update") {
+          const installed = operation === "load" ? await session.loadPackage(code) :
+            operation === "remove" ? await session.removePackage(code) :
+            operation === "update" ? await session.updatePackage(code) :
+            await session.installPackage(code);
+          if (!installed.ok) throw Error(installed.output || "R package operation failed");
+          operationOutput = installed.output || "";
         }
         if (token !== revision) return false;
         inventory = await session.packages();
@@ -86,7 +114,10 @@ function create(options) {
           item.name.length > 100 || item.version.length > 100))
         throw Error("Invalid package inventory response.");
       render(inventory.packages, kind);
-      notice(operation === "install" ? "Package installed in the current " + kind + " session." :
+      notice(operation === "update" ? (operationOutput || "R package update check completed.") :
+        operation === "remove" ? "User-installed R package removed from the native library." :
+        operation === "load" ? "Installed R package loaded into the native session." :
+        operation === "install" ? "Package installation completed in the current " + kind + " session." :
         kind + " package inventory updated.");
       return true;
     } catch (error) {
@@ -95,7 +126,11 @@ function create(options) {
       return false;
     } finally {
       busy = false;
-      installButton.disabled = listButton.disabled = currentLanguage() === "flow";
+      installButton.disabled = currentLanguage() === "flow";
+      listButton.disabled = currentLanguage() === "flow";
+      if (loadButton) loadButton.disabled = currentLanguage() !== "r" || !rNative();
+      if (removeButton) removeButton.disabled = currentLanguage() !== "r" || !rNative();
+      if (updateButton) updateButton.disabled = currentLanguage() !== "r" || !rNative();
     }
   }
   listButton.addEventListener("click", () => { void perform("packages"); });
@@ -108,6 +143,40 @@ function create(options) {
       return;
     }
     void perform("install", spec);
+  });
+  if (loadButton) loadButton.addEventListener("click", () => {
+    const spec = input.value.trim();
+    if (!validRName(spec)) {
+      notice("Enter a valid R package name (no versions, URLs or paths).");
+      return;
+    }
+    void perform("load", spec);
+  });
+  if (updateButton) updateButton.addEventListener("click", () => {
+    if (currentLanguage() !== "r" || !rNative()) return;
+    const spec = input.value.trim();
+    if (!validRName(spec)) {
+      notice("Enter a valid R package name (no versions, URLs or paths).");
+      return;
+    }
+    if (!confirmUpdate(spec)) {
+      notice("R package update cancelled.");
+      return;
+    }
+    void perform("update", spec);
+  });
+  if (removeButton) removeButton.addEventListener("click", () => {
+    if (currentLanguage() !== "r" || !rNative()) return;
+    const spec = input.value.trim();
+    if (!validRName(spec)) {
+      notice("Enter a valid R package name (no versions, URLs or paths).");
+      return;
+    }
+    if (!confirmRemove(spec)) {
+      notice("R package removal cancelled.");
+      return;
+    }
+    void perform("remove", spec);
   });
   updateLanguage();
   return {list: () => perform("packages"), clear: () => { revision++; target.replaceChildren(); }, updateLanguage};

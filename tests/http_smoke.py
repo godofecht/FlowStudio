@@ -112,7 +112,7 @@ def main() -> None:
     # End-to-end Unicode mathematical Flow: actual native Flow HTTP routing,
     # Python frontend, NumPy pressure solver and numerical validation.
     math_source = (Path(__file__).resolve().parents[1] / "examples/navier_stokes_proposed.flow").read_text(encoding="utf-8")
-    math_small = math_source.replace("256 × 256", "16 × 16").replace("Evolve(until: 10s)", "Evolve(until: 0.001s)")
+    math_small = (Path(__file__).resolve().parents[1] / "examples/navier_stokes_smoke.flow").read_text(encoding="utf-8")
     assert request("POST", "/api/run/mathflow", math_small)[0] == 404
     assert request("POST", "/api/run/mathflow", math_small,
                    {"X-FlowStudio-Intent": "run", "Origin": "http://attacker.invalid"})[0] == 404

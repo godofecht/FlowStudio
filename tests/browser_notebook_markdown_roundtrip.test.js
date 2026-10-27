@@ -94,3 +94,15 @@ test("oversized Markdown snapshots are not exported as successful display record
   assert.equal(imported.ignoredOutputs, true);
   assert.equal(imported.entries.length, 0);
 });
+
+test("oversized plain fallback cannot hide behind a small Markdown representation", () => {
+  const imported = format.decode(ipynb([display({
+    "text/markdown":"# Short", "text/plain":"a".repeat(131073)
+  })]));
+  assert.equal(imported.entries[0].output, "# Short");
+  assert.equal(imported.entries[0].jupyterOutputs, undefined);
+  assert.equal(imported.ignoredOutputs, true);
+  const exported = JSON.parse(format.encode(imported.source, "python", imported.entries, parseCells));
+  assert.deepEqual(exported.cells[0].outputs,
+    [{output_type:"stream", name:"stdout", text:"# Short"}]);
+});

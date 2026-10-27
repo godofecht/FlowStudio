@@ -17,29 +17,29 @@ try {
   });
   await page.goto('http://127.0.0.1:8751/app/', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => Boolean(globalThis.FlowStudioQuarto?.decode));
-  const qmd = '---\\ntitle: Example\\nformat: html\\n---\\n\\n' +
-    fence + '{r summary}\\nprint(42)\\n' + fence + '\\n';
+  const qmd = '---\ntitle: Example\nformat: html\n---\n\n' +
+    fence + '{r summary}\nprint(42)\n' + fence + '\n';
   await page.locator('#quartoFile').setInputFiles({
     name: 'study.qmd', mimeType: 'text/markdown', buffer: Buffer.from(qmd)
   });
   await page.waitForFunction(() => document.querySelector('#source')?.value.includes('print(42)'));
-  assert.match(await page.locator('#source').inputValue(), /# %% \\[r\\]/);
+  assert.match(await page.locator('#source').inputValue(), /# %% \[r\]/);
   const downloadPromise = page.waitForEvent('download');
   await page.locator('#exportQuarto').click();
   const download = await downloadPromise;
   assert.equal(download.suggestedFilename(), 'study.qmd');
   const exported = await readFile(await download.path(), 'utf8');
   assert.match(exported, /format: html/);
-  assert.match(exported, /print\\(42\\)/);
+  assert.match(exported, /print\(42\)/);
   assert.ok(exported.includes(fence + '{r summary}'));
   const before = await page.locator('#source').inputValue();
   await page.locator('#quartoFile').setInputFiles({
     name: 'unsupported.qmd', mimeType: 'text/markdown',
-    buffer: Buffer.from('---\\nformat: pdf\\n---\\n')
+    buffer: Buffer.from('---\nformat: pdf\n---\n')
   });
   await page.waitForFunction(() => document.body.textContent.includes('Quarto import failed'));
   assert.equal(await page.locator('#source').inputValue(), before);
-  assert.deepEqual(errors, [], errors.join('\\n'));
+  assert.deepEqual(errors, [], errors.join('\n'));
   console.log('PASS: real Chromium Quarto import/export, native routes and fail-closed rejection');
 } finally {
   await browser.close();

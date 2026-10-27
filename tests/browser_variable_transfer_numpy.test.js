@@ -49,7 +49,7 @@ test("NumPy vector export retains existing typed packet and worker limits", asyn
   const query = await exportQuery();
   assert.match(query,/type\(_fs_transfer_obj\) is _fs_transfer_np.ndarray/);
   assert.match(query,/NumPy vector requires 1-256 elements/);
-  assert.match(query,/Unsupported NumPy vector/matrix dtype/);
+  assert.match(query,/Unsupported NumPy vector\/matrix dtype/);
   assert.match(query,/allow_nan=False/);
   assert.equal(transfer.validate(example),example);
 });

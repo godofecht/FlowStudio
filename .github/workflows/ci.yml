@@ -59,8 +59,10 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git show HEAD:docs/PARITY.md > /tmp/pr89-parity.md
           git fetch origin main
           git merge --no-ff -X ours origin/main -m 'merge: reconcile main into R member completion'
+          python3 -c 'from pathlib import Path; import subprocess; p=Path("/tmp/pr89-parity.md").read_text(); m=subprocess.check_output(["git","show","origin/main:docs/PARITY.md"],text=True); section=p.split("\\n## ",1)[0].rstrip()+"\\n\\n"; Path("docs/PARITY.md").write_text(section+m if section.splitlines()[0] not in m else m)'
           git diff --check
       - name: Rebuild and run complete Node acceptance on integrated tree
         run: |
@@ -69,9 +71,9 @@ jobs:
           node --test tests/*.test.js
       - name: Commit verified generated assets and integrated branch
         run: |
-          git add web/ui/workbench.js web/ui/editor.worker.js web/ui/THIRD_PARTY_LICENSES.txt
+          git add docs/PARITY.md web/ui/workbench.js web/ui/editor.worker.js web/ui/THIRD_PARTY_LICENSES.txt
           if ! git diff --cached --quiet; then
-            git commit -m 'build(ui): regenerate Monaco after integration with main'
+            git commit -m 'build(ui): regenerate Monaco and retain parity history after integration'
           fi
           git push origin HEAD:refs/heads/feat/native-monaco-r-member-completion-20261026
   quality:

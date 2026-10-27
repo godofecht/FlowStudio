@@ -75,13 +75,14 @@ const INSPECT = `base::local({
     # Do not invoke user-defined extraction or class methods for completion.
     frame <- base::identical(classes, "data.frame") && base::identical(raw_type, "list")
     columns <- if (frame) base::attr(value, "names", exact=TRUE) else NULL
+    frame_size <- if (frame) base::length(base::unclass(value)) else 0L
     frame_names <- frame && base::is.character(columns) &&
-      base::length(columns) == base::length(value) && !base::anyNA(columns)
+      base::length(columns) == frame_size && !base::anyNA(columns)
     count <- if (depth < 2L && plain && base::identical(raw_type, "list"))
       base::min(size, 12L) else if (depth < 2L && frame_names)
       base::min(base::length(columns), 12L) else 0L
-    more <- depth < 2L && ((plain && base::identical(raw_type, "list")) || frame_names) &&
-      base::length(value) > count
+    more <- depth < 2L && ((plain && base::identical(raw_type, "list") && size > count) ||
+      (frame_names && frame_size > count))
     if (!push(depth, name, kind, shape, preview, more)) base::return(FALSE)
     if (count > 0L) {
       labels <- base::attr(value, "names", exact=TRUE)

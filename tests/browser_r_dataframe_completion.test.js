@@ -71,7 +71,8 @@ test("real Rscript inspector enumerates exact data.frame names without active bi
     "custom <- structure(list(secret=1), class='custom')",
     "many <- as.data.frame(setNames(as.list(1:13), paste0('c',1:13)))",
     "tripped <- FALSE",
-    "makeActiveBinding('trap', function() { tripped <<- TRUE; stop('invoked') }, .GlobalEnv)"
+    "makeActiveBinding('trap', function() { tripped <<- TRUE; stop('invoked') }, .GlobalEnv)",
+    "length.data.frame <- function(...) stop('masked S3 length dispatched')"
   ].join("\n");
   const program = setup + "\n._rows <- " + INSPECT +
     "\ncat(base::paste(._rows,collapse='\\n'), '\\n', sep='')" +

@@ -123,6 +123,28 @@ try {
     'Monaco must fit the viewport: ' + JSON.stringify(dimensions));
   assert.equal(dimensions.document > dimensions.viewport, false,
     'The narrow workbench must not overflow: ' + JSON.stringify(dimensions));
+  // Regression: the editor must shrink to a phone-width grid track, then expand.
+  await page.setViewportSize({ width: 375, height: 740 });
+  await page.waitForFunction(() => {
+    const host = document.querySelector('#monacoHost');
+    const editor = document.querySelector('.monaco-editor');
+    return host && editor && Math.abs(editor.clientWidth - host.clientWidth) <= 2;
+  });
+  const phone = await page.evaluate(() => ({
+    viewport: innerWidth,
+    document: document.documentElement.scrollWidth,
+    host: document.querySelector('#monacoHost').clientWidth,
+    editor: document.querySelector('.monaco-editor').clientWidth
+  }));
+  assert.ok(phone.host > 0 && phone.host <= phone.viewport &&
+    phone.editor > 0 && phone.editor <= phone.host && phone.document <= phone.viewport,
+    'Monaco must fit a phone viewport: ' + JSON.stringify(phone));
+  await page.setViewportSize({ width: 1440, height: 950 });
+  await page.waitForFunction(() => {
+    const host = document.querySelector('#monacoHost');
+    const editor = document.querySelector('.monaco-editor');
+    return host && editor && host.clientWidth > 600 && Math.abs(editor.clientWidth - host.clientWidth) <= 2;
+  });
   await page.screenshot({ path: 'build/ui/workbench-narrow.png' });
   assert.deepEqual(errors, [], 'The affected flow must have clean runtime logs');
   console.log('PASS: Monaco editing, per-document undo, find/replace, native selection execution, commands, worker and narrow layout');

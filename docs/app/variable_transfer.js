@@ -9,30 +9,53 @@ function validName(name) {
   return typeof name === "string" && NAME.test(name);
 }
 function validate(packet) {
-  if (!packet || typeof packet !== "object" || Array.isArray(packet) ||
-      Object.keys(packet).sort().join(",") !== "kind,type,values" ||
-      !["scalar", "vector"].includes(packet.kind) || !TYPES.includes(packet.type) ||
-      !Array.isArray(packet.values) || packet.values.length > MAX_ITEMS ||
-      (packet.kind === "scalar" && packet.values.length !== 1))
-    throw Error("Unsupported transfer value: expected a typed scalar or vector.");
-  for (const value of packet.values) {
-    // Null is a typed missing element, never an untyped scalar.
-    if (value === null && packet.kind === "vector") continue;
-    if (packet.type === "number" &&
+  if (!packet || typeof packet !== "object" || Array.isArray(packet))
+    throw Error("Unsupported transfer packet.");
+  if (packet.kind === "table") {
+    if (Object.keys(packet).sort().join(",") !== "columns,kind" ||
+        !Array.isArray(packet.columns) || packet.columns.length < 1 ||
+        packet.columns.length > 16)
+      throw Error("Table transfer requires 1–16 typed columns.");
+    const seen = new Set();
+    let rows = null;
+    for (const column of packet.columns) {
+      if (!column || typeof column !== "object" || Array.isArray(column) ||
+          Object.keys(column).sort().join(",") !== "name,type,values" ||
+          !validName(column.name) || seen.has(column.name) ||
+          !TYPES.includes(column.type) || !Array.isArray(column.values) ||
+          column.values.length > 128 || (rows !== null && rows !== column.values.length))
+        throw Error("Invalid table column, name or row count.");
+      seen.add(column.name);
+      rows = column.values.length;
+      validateValues(column.type, column.values, true);
+    }
+  } else {
+    if (Object.keys(packet).sort().join(",") !== "kind,type,values" ||
+        !["scalar", "vector"].includes(packet.kind) || !TYPES.includes(packet.type) ||
+        !Array.isArray(packet.values) || packet.values.length > MAX_ITEMS ||
+        (packet.kind === "scalar" && packet.values.length !== 1))
+      throw Error("Unsupported transfer value: expected a typed scalar or vector.");
+    validateValues(packet.type, packet.values, packet.kind === "vector");
+  }
+  if (new TextEncoder().encode(JSON.stringify(packet)).length > MAX_BYTES)
+    throw Error("Transfer payload exceeds 32 KiB.");
+  return packet;
+}
+function validateValues(type, values, allowMissing) {
+  for (const value of values) {
+    if (value === null && allowMissing) continue;
+    if (type === "number" &&
         (typeof value !== "number" || !Number.isFinite(value) ||
          Math.abs(value) > Number.MAX_SAFE_INTEGER)) throw Error("Transfer number is not finite or safe.");
-    if (packet.type === "boolean" && typeof value !== "boolean")
+    if (type === "boolean" && typeof value !== "boolean")
       throw Error("Transfer boolean has an invalid value.");
-    if (packet.type === "string") {
+    if (type === "string") {
       if (typeof value !== "string" || value.length > 512 || value.includes("\0"))
         throw Error("Transfer string exceeds 512 characters.");
       try { encodeURIComponent(value); }
       catch (_) { throw Error("Transfer string contains invalid Unicode."); }
     }
   }
-  if (new TextEncoder().encode(JSON.stringify(packet)).length > MAX_BYTES)
-    throw Error("Transfer payload exceeds 32 KiB.");
-  return packet;
 }
 function create({direction, source, destination, button, python, rSession,
                  notice, isBusy, setBusy, generation, refresh = async () => {}}) {
@@ -64,7 +87,7 @@ function create({direction, source, destination, button, python, rSession,
       if (!target || target.ok !== true) throw Error(target?.output || "Destination rejected transfer.");
       await refresh(route === "python-to-r" ? "r" : "python");
       if (generation() !== epoch) throw Error("Session changed during transfer.");
-      notice("Transferred " + from + " to " + to + " (" + packet.type + " " + packet.kind + ").");
+      notice("Transferred " + from + " to " + to + " (" + (packet.kind === "table" ? packet.columns.length + " table columns" : packet.type + " " + packet.kind) + ").");
       return true;
     } catch (error) {
       if (generation() === epoch) notice("Variable transfer failed: " + String(error.message || error).slice(0, 300));

@@ -1,3 +1,17 @@
+## 2026-10-27: fail-closed R Markdown YAML metadata (validation pending)
+
+R Markdown import and export now refuse executable YAML tags such as `!expr`,
+anchors/aliases, block scalars, collections, embedded comments and other
+unsupported metadata values in `title`, `author` and `date`. The
+existing `output: html_document` restriction remains in force. Ordinary
+single-line literal metadata, including quoted Unicode titles, is preserved
+without execution. Regression tests cover both directions and safe round trips.
+
+**Status: implemented / local scalar-gate assertions passed; independent CI
+and real knitr rendering are not yet verified.** This closes an import/export
+safety gap but does not add knitr rendering, physical-browser acceptance,
+resumable R debugging, authenticated remote sessions or RStudio parity.
+
 ## 2026-10-27: bounded pandas DataFrame → R data.frame transfer (Linux/macOS CI passed)
 
 The existing browser Python → R Copy variable path recognizes exact pandas

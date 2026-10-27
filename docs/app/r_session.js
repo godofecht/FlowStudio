@@ -508,14 +508,21 @@ function create({load = () => import(CDN)} = {}) {
       if (generation !== epoch) return {ok:false, output:"R session reset."};
       try {
         const r = await get();
-        const atom = value => value === null
-          ? {number:"NA_real_", boolean:"NA", string:"NA_character_"}[packet.type]
-          : packet.type === "number" ? String(value) :
-          packet.type === "boolean" ? (value ? "TRUE" : "FALSE") :
+        const atom = (value, type) => value === null
+          ? {number:"NA_real_", boolean:"NA", string:"NA_character_"}[type]
+          : type === "number" ? String(value) :
+          type === "boolean" ? (value ? "TRUE" : "FALSE") :
           'utils::URLdecode(' + JSON.stringify(encodeURIComponent(value)) + ')';
         const empty = {number:"base::numeric(0L)", boolean:"base::logical(0L)", string:"base::character(0L)"};
-        const expression = packet.kind === "scalar" ? atom(packet.values[0]) :
-          packet.values.length ? "base::c(" + packet.values.map(atom).join(",") + ")" : empty[packet.type];
+        const vector = (values, type) => values.length ?
+          "base::c(" + values.map(value => atom(value, type)).join(",") + ")" : empty[type];
+        const expression = packet.kind === "table"
+          ? "base::as.data.frame(base::setNames(base::list(" +
+            packet.columns.map(col => vector(col.values, col.type)).join(",") +
+            "), base::c(" + packet.columns.map(col => JSON.stringify(col.name)).join(",") +
+            ")), optional=TRUE, stringsAsFactors=FALSE)"
+          : packet.kind === "scalar" ? atom(packet.values[0], packet.type) :
+            vector(packet.values, packet.type);
         const query = 'local({ n <- ' + JSON.stringify(name) +
           '; if (base::exists(n, envir=.GlobalEnv, inherits=FALSE) && ' +
           '(base::bindingIsActive(n, .GlobalEnv) || base::bindingIsLocked(n, .GlobalEnv))) ' +

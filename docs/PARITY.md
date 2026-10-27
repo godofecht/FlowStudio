@@ -9,6 +9,9 @@ existing 32 KiB typed-table protocol and persistent webR/native R destination.
 No pandas import or package installation is triggered by ordinary dictionary
 transfers. Nondefault indexes, duplicate/unsafe names, unsupported/custom dtypes,
 subclasses, classed values, infinities and oversized tables are rejected.
+Exact NumPy integer dtypes (8–64-bit signed/unsigned) and float16/32/64 are
+supported, with safe-integer bounds and exact float16/float32 promotion to
+double. Nullable pandas Int64/Float64, boolean and string columns are supported.
 
 **Status: partial / [draft PR #94](https://github.com/godofecht/FlowStudio/pull/94)
 awaiting independent CI.** A local CPython pandas 2.2.3 prototype exercised
@@ -16,9 +19,13 @@ nullable round-trip packet construction and rejection cases. The actual patched
 worker source passed JavaScript syntax compilation, but complete Node suites,
 physical-browser Pyodide/webR acceptance and Linux/macOS CI are **not yet
 verified**. The new tests execute real CPython+pandas when installed and
-explicitly skip that integration when pandas is absent. R → Python still
+explicitly skip that integration when pandas is absent locally. Qualified
+Linux/macOS source CI now installs pandas 2.2.3 and fails closed if its
+DataFrame or numeric-dtype acceptance tests would skip. Results from that
+stricter gate are pending. R → Python still
 imports dictionaries of typed lists rather than constructing pandas DataFrames.
-Flow 2.0.0 remains the primary native backend. No hosted CI changed. This is
+Flow 2.0.0 remains the primary native backend. Hosted CI changes are limited
+to requiring the pandas integration tests on both source platforms. This is
 not RStudio feature parity, authenticated remote sessions, knitr rendering or
 live function-level R debugging.
 

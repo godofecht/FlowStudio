@@ -17,28 +17,58 @@ function markdown(value) {
   let paragraph = [], list = [], listTag = null, quote = [];
   let fence = null, code = [];
   function inline(source) {
-    let result = "", i = 0;
-    while (i < source.length) {
-      if (source[i] === "\`") {
-        let end = i + 1;
-        while (source[end] === "\`") end++;
-        const delimiter = source.slice(i, end);
-        const close = source.indexOf(delimiter, end);
-        if (close !== -1) {
-          result += "<code>" + escapeHTML(source.slice(end, close)) + "</code>";
-          i = close + delimiter.length;
-          continue;
-        }
-        result += escapeHTML(delimiter);
-        i = end;
-      } else {
-        let end = source.indexOf("\`", i);
-        if (end === -1) end = source.length;
-        result += escapeHTML(source.slice(i, end));
-        i = end;
+    // Single-pass, inert emphasis parsing. Code spans and backslash escapes
+    // become opaque tokens before any formatting delimiters are considered.
+    const tokens = [], open = [];
+    const special = /[\\`*_~]/;
+    const word = value => !!value && /[\p{L}\p{N}_]/u.test(value);
+    const tags = {"**":"strong", "__":"strong", "*":"em", "_":"em", "~~":"del"};
+    for (let i = 0; i < source.length;) {
+      if (source[i] === "\\" && /[\\`*_~]/.test(source[i + 1] || "")) {
+        tokens.push(escapeHTML(source[i + 1])); i += 2; continue;
       }
+      if (source[i] === "`") {
+        let end = i + 1;
+        while (source[end] === "`") end++;
+        const delimiter = source.slice(i, end);
+        let close = source.indexOf(delimiter, end);
+        while (close !== -1 &&
+               (source[close - 1] === "`" || source[close + delimiter.length] === "`" ||
+                source[close - 1] === "\\")) {
+          close = source.indexOf(delimiter, close + delimiter.length);
+        }
+        if (close !== -1) {
+          tokens.push("<code>" + escapeHTML(source.slice(end, close)) + "</code>");
+          i = close + delimiter.length;
+        } else {
+          tokens.push(escapeHTML(delimiter)); i = end;
+        }
+        continue;
+      }
+      const mark = ["**", "__", "~~", "*", "_"].find(value => source.startsWith(value, i));
+      if (mark) {
+        const before = source[i - 1] || "", after = source[i + mark.length] || "";
+        const mayOpen = !!after && !/\s/.test(after) && (mark[0] !== "_" || !word(before));
+        const mayClose = !!before && !/\s/.test(before) && (mark[0] !== "_" || !word(after));
+        const top = open[open.length - 1];
+        const index = tokens.length;
+        if (mayClose && top && top.mark === mark && index > top.index + 1) {
+          tokens[top.index] = "<" + tags[mark] + ">";
+          tokens.push("</" + tags[mark] + ">");
+          open.pop();
+        } else {
+          tokens.push(escapeHTML(mark));
+          if (mayOpen) open.push({mark, index});
+        }
+        i += mark.length;
+        continue;
+      }
+      let end = i + 1;
+      while (end < source.length && !special.test(source[end])) end++;
+      tokens.push(escapeHTML(source.slice(i, end)));
+      i = end;
     }
-    return result;
+    return tokens.join("");
   }
   function flushParagraph() {
     if (paragraph.length) blocks.push("<p>" + paragraph.map(inline).join("<br>") + "</p>");

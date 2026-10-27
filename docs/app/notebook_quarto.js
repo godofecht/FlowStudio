@@ -48,7 +48,7 @@ function convertFrontmatter(input, toQuarto) {
     }
   }
   if (toQuarto && !converted)
-    throw new Error("R Markdown output metadata cannot be converted to Quarto.");
+    lines.splice(end, 0, "format: html");
   return lines.join("\n");
 }
 

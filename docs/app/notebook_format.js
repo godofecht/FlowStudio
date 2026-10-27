@@ -163,6 +163,7 @@ function importCellOutputs(cell, index, language, state) {
     delete result.used;
     const preserved = safeJupyterOutputs(cell.outputs, result);
     if (preserved) result.jupyterOutputs = preserved;
+    else state.ignored = true;
     state.entries.push(result);
   }
 }
@@ -204,6 +205,11 @@ function safeJupyterOutputs(items, result) {
           payload["text/plain"] = sourceString(item.data["text/plain"]);
         if (Object.hasOwn(item.data, "text/markdown"))
           payload["text/markdown"] = sourceString(item.data["text/markdown"]);
+        // Bound every preserved MIME representation, including fallback text
+        // that is not currently displayed when Markdown is preferred.
+        if ((payload["text/plain"] !== undefined && bytes(payload["text/plain"]) > MAX_IMPORT_TEXT) ||
+            (payload["text/markdown"] !== undefined && bytes(payload["text/markdown"]) > MAX_IMPORT_TEXT))
+          return null;
         text += payload["text/markdown"] ?? payload["text/plain"] ?? "";
         if (Object.hasOwn(item.data, "image/png")) {
           const png = sourceString(item.data["image/png"]).replace(/\s/g, "");

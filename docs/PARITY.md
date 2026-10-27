@@ -1,4 +1,4 @@
-## 2026-10-27: bounded webR data.frame column completion (validation pending)
+## 2026-10-27: bounded webR data.frame column completion (native CI passed)
 
 The browser R source editor now offers `$` completion for column names of exact
 base `data.frame` objects, including frames nested inside ordinary lists.

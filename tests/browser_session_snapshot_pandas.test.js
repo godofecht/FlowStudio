@@ -117,7 +117,7 @@ test("real worker export-snapshot reports pandas origin while normal transfers s
   const exported=await worker.send("export-snapshot");
   assert.equal(exported.reply.ok,true);
   assert.equal(exported.reply.origin,"pandas");
-  assert.deepEqual(exported.reply.value,table);
+  assert.deepEqual(JSON.parse(JSON.stringify(exported.reply.value)),table);
   assert.equal(exported.queries.length,2);
   assert.equal(exported.queries[1],"_fs_transfer_kind");
   const ordinary=await worker.send("export");

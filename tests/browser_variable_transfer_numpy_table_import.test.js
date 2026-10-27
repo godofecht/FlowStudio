@@ -74,7 +74,7 @@ test("controller sends homogeneous R tables to NumPy, retaining default dictiona
 
 test("controller rejects mixed columns, missing logical/string cells and empty rows", async () => {
   const invalid=[
-    {kind:"table",columns:[numeric.columns[0],unicode.columns[0]]},
+    {kind:"table",columns:[numeric.columns[0],{name:"label",type:"string",values:["a","b","c"]}]},
     {kind:"table",columns:[{name:"x",type:"boolean",values:[true,null]}]},
     {kind:"table",columns:[{name:"x",type:"string",values:["safe",null]}]},
     {kind:"table",columns:[{name:"x",type:"number",values:[]}]}
@@ -94,7 +94,7 @@ test("worker preflight rejects unsafe matrix packets before loading NumPy", asyn
   const h=harness();
   const cases=[
     [numeric,true],[logical,true],[unicode,true],
-    [{kind:"table",columns:[numeric.columns[0],unicode.columns[0]]},false],
+    [{kind:"table",columns:[numeric.columns[0],{name:"label",type:"string",values:["a","b","c"]}]},false],
     [{kind:"table",columns:[{name:"flag",type:"boolean",values:[true,null]}]},false],
     [{kind:"table",columns:[{name:"label",type:"string",values:[null,"ok"]}]},false],
     [{kind:"table",columns:[{name:"x",type:"number",values:[]}]},false],

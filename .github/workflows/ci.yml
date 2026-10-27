@@ -25,7 +25,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      # pandas is required here: the Python→R DataFrame feature must not pass
+      # solely because its real-CPython regression cases were skipped.
+      - name: Install pandas for actual DataFrame interchange acceptance
+        run: python3 -m pip install 'pandas==2.2.3'
       - name: JavaScript module, DOM and source contract suites
+        env:
+          FLOWSTUDIO_REQUIRE_PANDAS: '1'
         run: node --test tests/*.test.js
       - name: Python syntax and verification harness
         run: |

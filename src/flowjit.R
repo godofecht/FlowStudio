@@ -122,8 +122,8 @@ flowjit_compile <- local({
         args <- names(formals(fn))
         if (length(args) < 1L || length(args) > 4L || anyNA(args) ||
             any(!nzchar(args)) || any(args == "...") ||
-            !all(vapply(as.list(formals(fn)),
-                        function(x) missing(x), logical(1L)))) {
+            !all(vapply(seq_along(args), function(i)
+                identical(formals(fn)[[i]], quote(expr=)), logical(1L)))) {
             stop("Require 1-4 positional formals without defaults.")
         }
         if (length(hot) != 1L || is.na(hot) || !is.finite(hot) ||

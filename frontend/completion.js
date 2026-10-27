@@ -34,7 +34,7 @@ const MATH_COMMANDS = Object.freeze({
 export function mathCommandAt(model, position) {
   const line = model.getLineContent(position.lineNumber) || '';
   const before = line.slice(0, position.column - 1);
-  const match = /\\\\([A-Za-z][A-Za-z0-9]*)$/.exec(before);
+  const match = /\\([A-Za-z][A-Za-z0-9]*)$/.exec(before);
   return match ? { command: match[1], length: match[0].length } : null;
 }
 export { MATH_COMMANDS };
@@ -60,14 +60,14 @@ export function registerCompletion(monaco, app, fetchFn = (typeof fetch !== 'und
   const disposers = [];
   for (const language of ['flow', 'python', 'r']) {
     const disposable = monaco.languages.registerCompletionItemProvider(language, {
-      triggerCharacters: language === 'r' ? ['.'] : language === 'flow' ? ['\\\\'] : [],
+      triggerCharacters: language === 'r' ? ['.'] : language === 'flow' ? ['\\'] : [],
       provideCompletionItems: async (model, position) => {
         const math = language === 'flow' ? mathCommandAt(model, position) : null;
         if (math) {
           return { suggestions: Object.entries(MATH_COMMANDS)
             .filter(([command]) => command.startsWith(math.command))
             .map(([command, glyph]) => ({
-              label: '\\\\' + command + ' → ' + glyph,
+              label: '\\' + command + ' → ' + glyph,
               kind: monaco.languages.CompletionItemKind.Operator,
               insertText: glyph,
               range: { startLineNumber: position.lineNumber, endLineNumber: position.lineNumber,

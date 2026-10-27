@@ -62,7 +62,7 @@ jobs:
           git show HEAD:docs/PARITY.md > /tmp/pr89-parity.md
           git fetch origin main
           git merge --no-ff -X ours origin/main -m 'merge: reconcile main into R member completion'
-          python3 -c 'from pathlib import Path; import subprocess; p=Path("/tmp/pr89-parity.md").read_text(); m=subprocess.check_output(["git","show","origin/main:docs/PARITY.md"],text=True); section=p.split("\\n## ",1)[0].rstrip()+"\\n\\n"; Path("docs/PARITY.md").write_text(section+m if section.splitlines()[0] not in m else m)'
+          python3 -c 'from pathlib import Path; import subprocess; p=Path("/tmp/pr89-parity.md").read_text(); m=subprocess.check_output(["git","show","origin/main:docs/PARITY.md"],text=True); section=p.split("\n## ",1)[0].rstrip()+"\n\n"; Path("docs/PARITY.md").write_text(section+m if section.splitlines()[0] not in m else m)'
           git diff --check
       - name: Rebuild and run complete Node acceptance on integrated tree
         run: |

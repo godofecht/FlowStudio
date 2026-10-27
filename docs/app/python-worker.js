@@ -149,9 +149,12 @@ async function handle(event) {
     typeof code === "string" && TRANSFER_NAME.test(code) &&
     validTransferPacket(transferValue) &&
     (op !== "import-pandas" || transferValue.kind === "table") &&
-     (op !== "import-numpy" || (transferValue.kind === "vector" &&
-       ["number", "boolean", "string"].includes(transferValue.type) && transferValue.values.length > 0 &&
-       (transferValue.type === "number" || !transferValue.values.includes(null))));
+    (op !== "import-numpy" || (transferValue.kind === "vector" ?
+      transferValue.values.length > 0 &&
+        (transferValue.type === "number" || !transferValue.values.includes(null)) :
+      transferValue.kind === "table" && transferValue.columns[0].values.length > 0 &&
+        transferValue.columns.every(col => col.type === transferValue.columns[0].type &&
+          (col.type === "number" || !col.values.includes(null)))));
   if (!((op === "run" && typeof code === "string" && new TextEncoder().encode(code).length <= 65536) ||
     op === "inspect" || op === "packages" || validInstall || validTable || validCheck || validHelp || validComplete || validExport || validImport)) {
     self.postMessage({id, ok:false, output:"Invalid execution request."}); return;
@@ -257,15 +260,21 @@ async function handle(event) {
       return;
     }
     if (op === "import-numpy") {
-      // Explicit R vector -> ndarray conversion. Keep missing numeric values as NaN;
-      // reject missing logical/string values before loading NumPy to avoid silent coercion.
+      // Explicit R vector/table -> ndarray conversion. Homogeneous R tables
+      // become two-dimensional arrays in row-major order; column names are lost.
+      // Numeric NA becomes NaN; reject missing logical/string values preflight.
       await py.loadPackage("numpy");
       const query = [
         "import json as _fs_transfer_json, numpy as _fs_transfer_np",
         "_fs_transfer_packet = _fs_transfer_json.loads(" + JSON.stringify(JSON.stringify(transferValue)) + ")",
-        "_fs_transfer_dtype = {'number': _fs_transfer_np.float64, 'boolean': _fs_transfer_np.bool_, 'string': _fs_transfer_np.str_}[_fs_transfer_packet['type']]",
-        "_fs_transfer_array = _fs_transfer_np.asarray(_fs_transfer_packet['values'], dtype=_fs_transfer_dtype)",
-        "if type(_fs_transfer_array) is not _fs_transfer_np.ndarray or _fs_transfer_array.ndim != 1: raise ValueError('Invalid NumPy transfer result')",
+        "_fs_transfer_table = _fs_transfer_packet['kind'] == 'table'",
+        "_fs_transfer_type = _fs_transfer_packet['columns'][0]['type'] if _fs_transfer_table else _fs_transfer_packet['type']",
+        "_fs_transfer_dtype = {'number': _fs_transfer_np.float64, 'boolean': _fs_transfer_np.bool_, 'string': _fs_transfer_np.str_}[_fs_transfer_type]",
+        "if _fs_transfer_table:",
+        "    _fs_transfer_array = _fs_transfer_np.column_stack([_fs_transfer_np.asarray(col['values'], dtype=_fs_transfer_dtype) for col in _fs_transfer_packet['columns']])",
+        "else:",
+        "    _fs_transfer_array = _fs_transfer_np.asarray(_fs_transfer_packet['values'], dtype=_fs_transfer_dtype)",
+        "if type(_fs_transfer_array) is not _fs_transfer_np.ndarray or _fs_transfer_array.ndim != (2 if _fs_transfer_table else 1): raise ValueError('Invalid NumPy transfer result')",
         "globals()[" + JSON.stringify(code) + "] = _fs_transfer_array",
         "'ok'"
       ].join("\n");

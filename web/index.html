@@ -254,6 +254,7 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
     <label for="flowBackend">Backend</label>
     <select id="flowBackend" aria-label="Flow compiler backend" title="Compiler backend for Flow runs"><option value="" selected>C (default)</option><option value="mlir">MLIR (experimental)</option></select>
     <button id="run" class="primary" title="Run selection or entire buffer (Ctrl/⌘+Enter)"><i data-lucide="play"></i>Run</button>
+    <button id="runMathFlow" title="Run the supported Unicode mathematical Flow PDE dialect (NumPy required)">Run MathFlow</button>
     <button id="runCell" title="Run current # %% cell (Ctrl/⌘+Shift+Enter)">Run cell</button>
     <button id="resetR" type="button" title="Discard native R variables and restart its interpreter">Reset R</button>
     <button id="resetPython" type="button" title="Discard native Python variables and restart its interpreter">Reset Python</button>
@@ -1410,7 +1411,8 @@ async function refreshPythonEnvironment() {
   }
 }
 
-async function executeCode(code, label) {
+async function executeCode(code, label, languageOverride = null) {
+  const executionLanguage = languageOverride || language.value;
   if (el("run").disabled) return;
   if (!code.trim()) { status("Current cell is empty.", "error"); return; }
   if (new Blob([code]).size > 131072) {
@@ -1419,11 +1421,11 @@ async function executeCode(code, label) {
   }
   el("run").disabled = true;
   el("runCell").disabled = true;
-  status("Running " + language.value + " …");
-  writeConsole("\n> " + label + " (" + language.value + ")\n");
+  status("Running " + executionLanguage + " …");
+  writeConsole("\n> " + label + " (" + executionLanguage + ")\n");
   try {
-    const backend = language.value === "flow" ? el("flowBackend").value : "";
-    const response = await fetch("/api/run/" + language.value +
+    const backend = executionLanguage === "flow" ? el("flowBackend").value : "";
+    const response = await fetch("/api/run/" + executionLanguage +
       (backend ? "-" + backend : ""), {
       method: "POST",
       headers: { "Content-Type": "text/plain; charset=utf-8", "X-FlowStudio-Intent": "run" },
@@ -1441,7 +1443,7 @@ async function executeCode(code, label) {
     writeConsole(String(error) + "\n");
     status("Execution request failed", "error");
   } finally {
-    if (language.value === "python" || language.value === "r") {
+    if (executionLanguage === "python" || executionLanguage === "r") {
       try { await refreshPythonEnvironment(); }
       catch (error) { showPythonEnvironmentMessage(error.message || String(error)); }
     }
@@ -1797,6 +1799,7 @@ language.addEventListener("change", () => {
     "Flow executions are independent.";
 });
 el("run").addEventListener("click", run);
+el("runMathFlow").addEventListener("click", () => executeCode(src.value, "[mathematical Flow]", "mathflow"));
 el("runCell").addEventListener("click", runCell);
 el("refreshPythonEnvironment").addEventListener("click", async () => {
   try { await refreshPythonEnvironment(); }

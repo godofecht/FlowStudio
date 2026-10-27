@@ -31,7 +31,7 @@ function fixture() {
     async *entries(){for(const pair of this.files) yield pair;},
     async getFileHandle(name,{create}={}){
       if (!this.files.has(name) && create) this.files.set(name,file(name,""));
-      if (!this.files.has(name)) throw Error("missing file");
+      if (!this.files.has(name)) { const error = Error("missing file"); error.name = "NotFoundError"; throw error; }
       return this.files.get(name);
     }};
   const openFolderButton=node(),saveFileButton=node(),newFileButton=node();

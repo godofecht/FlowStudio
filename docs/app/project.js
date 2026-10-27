@@ -1,6 +1,8 @@
 /* FlowStudio project explorer. Browser File System Access API only. */
 (function (global) {
 "use strict";
+const creation = global.FlowStudioProjectCreate ||
+  (typeof require === "function" ? require("./project_create.js") : null);
 const editable = /\.(flow|r|py|txt|md|qmd|rmd|csv|tsv|json|toml|yaml|yml|rproj)$/i;
 function validFilename(name) {
   if (typeof name !== "string" || name.length === 0 || name.length > 255 ||
@@ -290,13 +292,19 @@ function createProjectExplorer({ tree, status, openHandle, picker }) {
   }
   async function create(name) {
     if (!root) throw new Error("Open a project first.");
-    if (!validFilename(name)) throw new Error("Invalid source filename.");
-    const handle = await root.getFileHandle(name, { create: true });
-    const opened = await openHandle(handle, root.name + "/" + name, root);
+    const result = await creation.createFile(root, name, validFilename);
+    const opened = await openHandle(result.handle, root.name + "/" + result.path, result.parent);
     await refresh();
     return opened;
   }
-  return { choose, refresh, create, search: (query, options) => searchProject(root, query, options),
+  async function createFolder(path) {
+    if (!root) throw new Error("Open a project first.");
+    const result = await creation.createDirectory(root, path);
+    await refresh();
+    status("Created folder " + root.name + "/" + result.path, "ok");
+    return true;
+  }
+  return { choose, refresh, create, createFolder, search: (query, options) => searchProject(root, query, options),
     previewReplace: (query, replacement, options) => planProjectReplace(root, query, replacement, options),
     applyReplace: async (plan, options) => {
       if (!root || !plan || plan.root !== root)
@@ -317,7 +325,9 @@ function createProjectExplorer({ tree, status, openHandle, picker }) {
     hasUndoReplace: () => lastReplacement !== null && lastReplacement.root === root,
     hasProject: () => root !== null };
 }
-const api = { createProjectExplorer, validFilename, searchProject, planProjectReplace, applyProjectReplacement, reverseProjectReplacement };
+const api = { createProjectExplorer, validFilename,
+  validSourcePath: path => creation.validSourcePath(path, validFilename),
+  validFolderPath: creation.validFolderPath, searchProject, planProjectReplace, applyProjectReplacement, reverseProjectReplacement };
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 global.FlowStudioProject = api;
 })(globalThis);

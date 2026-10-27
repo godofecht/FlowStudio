@@ -191,6 +191,9 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/app/plot_history.js" {
         return StaticAsset { path: "docs/app/plot_history.js", mime: "text/javascript; charset=utf-8", found: true }
     }
+    if url == "/app/project_create.js" {
+        return StaticAsset { path: "docs/app/project_create.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
     if url == "/app/project.js" {
         return StaticAsset { path: "docs/app/project.js", mime: "text/javascript; charset=utf-8", found: true }
     }

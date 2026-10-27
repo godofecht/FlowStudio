@@ -1,3 +1,20 @@
+## 2026-10-27: browser-local nested source files and project folders (local tests only)
+
+The File System Access project explorer now supports explicit creation of
+folders and source files inside existing project subdirectories, without
+creating missing ancestors. Paths are validated as relative to the
+browser-granted project root, limited to twelve segments, and reject
+traversal, invalid/reserved names and existing entries. A nonempty file
+appearing during the creation race is not attached to the editor. The
+existing Flow-owned native backend and hosted CI configuration are unchanged.
+
+**Status: partial / local Node helper tests passed; independent CI and
+physical-browser File System Access acceptance pending.** Creation is not
+atomic with the existence check, so an externally created empty file can
+still race. Folder creation does not alter the current editor buffer.
+This does not establish RStudio parity, remote-session isolation or
+physical-browser Pyodide/webR acceptance.
+
 ## 2026-10-27: opt-in R data.frame → Python pandas DataFrame (Linux/macOS CI passed)
 
 The existing browser-local R → Python Copy variable path now has an explicit

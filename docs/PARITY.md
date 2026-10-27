@@ -1,3 +1,17 @@
+## 2026-10-27: inert GFM-style pipe tables in offline notebook reports (pending CI)
+
+Notebook Markdown cells and validated Jupyter `text/markdown` output now render
+bounded pipe tables (up to 16 columns and 128 rows per table), including fixed
+left/center/right alignment classes, escaped pipes and inline code spans.
+All cell contents are HTML-escaped; no links, images or raw HTML are executed.
+Malformed delimiters and oversized column counts remain literal Markdown.
+This extends the existing offline renderer, not live knitr/Quarto execution.
+
+**Status: partial / focused V8 source execution passed; independent Linux/macOS
+CI and physical Chromium acceptance not yet verified.** Six Node regression
+tests are included. No Flow backend, dependencies or hosted CI changed.
+RStudio parity remains incomplete.
+
 ## 2026-10-27: Jupyter Markdown MIME roundtrip and portable report rendering (Linux/macOS CI passed)
 
 Jupyter `display_data` and `execute_result` records containing inert

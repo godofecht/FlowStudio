@@ -143,7 +143,8 @@ async function handle(event) {
     /^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*){0,3}$/.test(code);
   const validComplete = op === "complete" && typeof code === "string" &&
     /^[A-Za-z_][A-Za-z0-9_]{0,79}$/.test(code);
-  const validExport = op === "export" && typeof code === "string" && TRANSFER_NAME.test(code);
+  const validExport = (op === "export" || op === "export-snapshot") &&
+    typeof code === "string" && TRANSFER_NAME.test(code);
   const validImport = (op === "import" || op === "import-pandas") &&
     typeof code === "string" && TRANSFER_NAME.test(code) &&
     validTransferPacket(transferValue) &&
@@ -156,7 +157,7 @@ async function handle(event) {
   let py = null;
   try {
     py = await python();
-    if (op === "export") {
+    if (op === "export" || op === "export-snapshot") {
       // Only exact builtins or exact pandas DataFrames with approved dtypes are traversed.
       const query = [
         "import json as _fs_transfer_json, math as _fs_transfer_math, re as _fs_transfer_re",
@@ -220,7 +221,15 @@ async function handle(event) {
         throw Error("Invalid Python transfer response.");
       const packet = JSON.parse(raw);
       if (!validTransferPacket(packet)) throw Error("Invalid Python transfer payload.");
-      self.postMessage({id, ok:true, value:packet});
+      // Session export alone needs the original pandas identity. Keep the
+      // ordinary Python/R transfer packet and its response unchanged.
+      if (op === "export-snapshot") {
+        const origin = await py.runPythonAsync("_fs_transfer_kind");
+        if (origin === "pandas" && packet.kind !== "table")
+          throw Error("Invalid pandas session snapshot.");
+        self.postMessage(origin === "pandas" ?
+          {id, ok:true, value:packet, origin:"pandas"} : {id, ok:true, value:packet});
+      } else self.postMessage({id, ok:true, value:packet});
       return;
     }
     if (op === "import-pandas") {

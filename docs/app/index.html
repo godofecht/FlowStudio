@@ -558,8 +558,9 @@ FlowStudioSessionSnapshot.create({
   language:()=> $("language").value, generation:()=>sessionGeneration,
   isBusy:()=>busy || !!notebookRunner?.isRunning(), setBusy, notice,
   inspect:lang=>lang==="r" ? getRSession().inspect() : request("inspect"),
-  exportValue:(lang,name)=>lang==="r" ? getRSession().exportVariable(name) : request("export",name),
-  importValue:(lang,name,value)=>lang==="r" ? getRSession().importVariable(name,value) : request("import",name,value),
+  exportValue:(lang,name)=>lang==="r" ? getRSession().exportVariable(name) : request("export-snapshot",name),
+  importValue:(lang,name,value,restoreAs)=>lang==="r" ? getRSession().importVariable(name,value) :
+    request(restoreAs==="pandas" ? "import-pandas" : "import",name,value),
   refresh:async lang=>{
     const result=lang==="r" ? await getRSession().inspect() : await request("inspect");
     if (result.ok && $("language").value===lang) renderEnvironment(result.variables,result.truncated);

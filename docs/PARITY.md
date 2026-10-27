@@ -1,3 +1,33 @@
+## 2026-10-27: explicit pandas-aware Python session snapshot (Linux/macOS CI passed)
+
+Browser-local session export/import now supports an opt-in-preserved **pandas
+DataFrame identity** for approved typed tables. The existing Pyodide export
+path emits bounded table packets, and a dedicated snapshot export operation
+reports pandas provenance without altering normal Python/R transfer replies.
+Snapshot format v2 annotates only actual pandas table entries. On explicit
+import, the persistent Pyodide worker uses its real pandas importer; ordinary
+Python dictionaries, vectors, scalars and R tables retain v1-compatible
+behavior. V1 files remain readable. The entire file is preflight-validated
+before any interpreter assignment, and failures report partial restoration.
+
+**Status: partial / independent Linux/macOS source and native CI passed;
+physical-browser Pyodide acceptance pending.** [PR #98](https://github.com/godofecht/FlowStudio/pull/98)
+passed all four Ubuntu 24.04/macOS 14 jobs in
+[CI #40469330017](https://github.com/godofecht/FlowStudio/actions/runs/40469330017)
+on 27 October 2026. Each source job ran 848 JavaScript tests
+(843 passed, five skipped, zero failures), including eight new snapshot
+regressions and real CPython/pandas 2.2.3 provenance acceptance. Both native
+jobs compiled pinned Flow 2.0.0, passed live Rscript/HTTP acceptance and
+packaged their executables. Direct V8 execution of the actual
+snapshot/transfer/worker modules passed 14 assertions locally.
+The same 64-variable / 128 KiB snapshot limits
+and 16-column / 128-row / 32 KiB per-table transfer limits apply. This is
+manual file export/import, not automatic interpreter recovery, arbitrary object
+serialization, or exact pandas dtype/index round-tripping. Imported pandas
+numeric columns use nullable Float64, not the original integer dtype. Python
+and R runtimes remain separate; Flow remains the native application/backend.
+No hosted CI configuration or native Flow route changed.
+
 ## 2026-10-27: browser-local nested source files and project folders (Linux/macOS CI passed)
 
 The File System Access project explorer now supports explicit creation of

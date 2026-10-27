@@ -522,11 +522,20 @@ function create({load = () => import(CDN)} = {}) {
       } catch (error) { return {ok:false, output:String(error.message || error).slice(0, 300)}; }
     });
   }
-  async function importVariable(name, packet) {
+  async function importVariable(name, packet, options = {}) {
+    if (!options || typeof options !== "object" || Array.isArray(options) ||
+        Object.keys(options).some(key => key !== "asMatrix") ||
+        (options.asMatrix !== undefined && typeof options.asMatrix !== "boolean"))
+      return {ok:false, output:"Invalid R transfer destination."};
+    const asMatrix = options.asMatrix === true;
     if (!/^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(name))
       return {ok:false, output:"Invalid shared Python/R variable name."};
     try { global.FlowStudioVariableTransfer.validate(packet); }
     catch (error) { return {ok:false, output:String(error.message || error).slice(0, 300)}; }
+    if (asMatrix && (packet.kind !== "table" ||
+        packet.columns[0].values.length < 1 ||
+        !packet.columns.every(col => col.type === packet.columns[0].type)))
+      return {ok:false, output:"R matrix requires a nonempty homogeneous typed table."};
     const generation = epoch;
     return schedule(async () => {
       if (generation !== epoch) return {ok:false, output:"R session reset."};
@@ -540,7 +549,10 @@ function create({load = () => import(CDN)} = {}) {
         const empty = {number:"base::numeric(0L)", boolean:"base::logical(0L)", string:"base::character(0L)"};
         const vector = (values, type) => values.length ?
           "base::c(" + values.map(value => atom(value, type)).join(",") + ")" : empty[type];
-        const expression = packet.kind === "table"
+        const expression = asMatrix
+          ? "base::matrix(" + vector(packet.columns.flatMap(col => col.values), packet.columns[0].type) +
+            ", nrow=" + packet.columns[0].values.length + "L, ncol=" + packet.columns.length + "L)"
+          : packet.kind === "table"
           ? "base::as.data.frame(base::structure(base::list(" +
             packet.columns.map(col => vector(col.values, col.type)).join(",") +
             "), names=base::c(" + packet.columns.map(col => JSON.stringify(col.name)).join(",") +

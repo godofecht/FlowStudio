@@ -35,7 +35,7 @@ function validTransferPacket(packet) {
     for (const col of packet.columns) {
       if (!col || typeof col !== "object" || Array.isArray(col) ||
           Object.keys(col).sort().join(",") !== "name,type,values" ||
-          !TRANSFER_NAME.test(col.name) || names.has(col.name) ||
+          typeof col.name !== "string" || !TRANSFER_NAME.test(col.name) || names.has(col.name) ||
           !["number", "boolean", "string"].includes(col.type) ||
           !Array.isArray(col.values) || col.values.length > 128 ||
           (count !== null && count !== col.values.length) ||

@@ -7,9 +7,14 @@ All cell contents are HTML-escaped; no links, images or raw HTML are executed.
 Malformed delimiters and oversized column counts remain literal Markdown.
 This extends the existing offline renderer, not live knitr/Quarto execution.
 
-**Status: partial / focused V8 source execution passed; independent Linux/macOS
-CI and physical Chromium acceptance not yet verified.** Six Node regression
-tests are included. No Flow backend, dependencies or hosted CI changed.
+**Status: partial / all four Ubuntu 24.04/macOS 14 CI jobs passed in
+[CI #40580841709](https://github.com/godofecht/FlowStudio/actions/runs/40580841709).**
+Both source jobs passed the full JavaScript, Python and transport suites, including
+six new table regression tests. Both native jobs compiled pinned Flow 2.0.0,
+completed Rscript/HTTP acceptance and packaged executables. [PR #111](https://github.com/godofecht/FlowStudio/pull/111)
+merged as [f55a677](https://github.com/godofecht/FlowStudio/commit/f55a677827caf163b39e70be3d3e82479d3a720d).
+Physical Chromium acceptance remains unexecuted. No Flow backend,
+dependencies or hosted CI changed.
 RStudio parity remains incomplete.
 
 ## 2026-10-27: Jupyter Markdown MIME roundtrip and portable report rendering (Linux/macOS CI passed)

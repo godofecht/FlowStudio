@@ -48,8 +48,8 @@ function requireNumpy(t) {
 test("NumPy vector export retains existing typed packet and worker limits", async () => {
   const query = await exportQuery();
   assert.match(query,/type\(_fs_transfer_obj\) is _fs_transfer_np.ndarray/);
-  assert.match(query,/NumPy vector requires 1-256 elements and exactly one dimension/);
-  assert.match(query,/Unsupported NumPy vector dtype/);
+  assert.match(query,/NumPy vector requires 1-256 elements/);
+  assert.match(query,/Unsupported NumPy vector\/matrix dtype/);
   assert.match(query,/allow_nan=False/);
   assert.equal(transfer.validate(example),example);
 });
@@ -79,7 +79,7 @@ test("NumPy transfer rejects unsafe dimensions, types and values", async t => {
   const query = await exportQuery();
   const invalid = [
     "np.array([], dtype=np.float64)",
-    "np.ones((2,2), dtype=np.float64)",
+    "np.ones((2,2,2), dtype=np.float64)",
     "np.array(3, dtype=np.int32)",
     "np.ones(257, dtype=np.float64)",
     "np.array([9007199254740992], dtype=np.uint64)",

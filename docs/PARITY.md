@@ -1,3 +1,9 @@
+## 2026-10-27: bounded NumPy 2D matrix → R data.frame transfer (PR pending)
+
+Python → R Copy variable now recognizes exact two-dimensional NumPy ndarrays with approved built-in numeric, boolean or Unicode dtypes. The existing Python worker exports them as bounded typed tables, with column-major V1–V16 names and 1–128 rows; the existing webR table importer constructs an actual R data.frame. One-dimensional ndarray transfer remains a vector. Missing floating NaN values become R NA only when a column has a nonmissing value to establish its type. All-missing columns, unsafe numbers, invalid strings, unsupported dtypes, subclasses, zero dimensions, oversized matrices and packets exceeding 32 KiB are rejected. This is **not** an R matrix transfer or a dtype-preserving NumPy round trip; dimensions, integer widths and NumPy-specific metadata are not retained. No native Flow route or hosted CI configuration is modified.
+
+**Status: partial / independent CI pending; physical-browser Pyodide/webR acceptance unexecuted.** Tests cover real CPython/NumPy serialization, negative cases, browser worker validation and Rscript import when available. Flow 2.0.0 remains the primary native backend. RStudio parity is not achieved.
+
 ## 2026-10-27: bounded bidirectional NumPy Unicode vector transfer (Linux/macOS CI passed)
 
 Browser Python → R Copy variable now accepts exact one-dimensional NumPy Unicode

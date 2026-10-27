@@ -67,3 +67,24 @@ missing strings. See `tests/browser_variable_transfer_numpy.test.js` and
 preserve NumPy dtype width on the R side, nor verify a physical-browser
 Pyodide/webR round trip or RStudio parity. [PR #104](https://github.com/godofecht/FlowStudio/pull/104)
 passed all four Linux/macOS jobs in [CI #40515203015](https://github.com/godofecht/FlowStudio/actions/runs/40515203015).
+
+
+## NumPy 2D matrices → R data.frames (27 October 2026; acceptance pending)
+
+Python → R **Copy variable** accepts exact two-dimensional NumPy ndarrays with
+approved native numeric, boolean and Unicode dtypes. It converts each column
+to the existing bounded typed-table protocol, naming columns `V1`, `V2`,
+… `V16` in their original order. The existing webR importer constructs a
+base R `data.frame`; no new R evaluation path is added. Supported matrices
+have 1–128 rows and 1–16 columns, with the same 32-KiB payload limit.
+Floating NaN is represented as typed R `NA` only when a column has at
+least one nonmissing element. All-missing columns are rejected rather than
+assigned a guessed type. Object, complex, bytes, structured and subclassed
+arrays, unsafe integers, invalid Unicode, empty dimensions and 3D+ arrays
+are rejected. One-dimensional arrays retain their vector transfer behavior.
+
+This is a **lossy matrix-to-data.frame conversion**, not preservation of
+R matrix identity, NumPy shape/dtype metadata, row names or integer storage.
+Real CPython/NumPy tests and Rscript acceptance when available are included
+in `tests/browser_variable_transfer_numpy_matrix.test.js`. Independent CI
+and physical-browser Pyodide/webR acceptance have not yet been verified.

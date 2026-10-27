@@ -276,7 +276,7 @@ def test_r(page, timeout: int):
     # Physical-browser acceptance for real Unicode ndarray <-> webR character vectors.
     # These assertions remain unexecuted until Playwright runs against real CDNs.
     run_source(page, "python",
-               "fs_py_unicode = np.array(['café', '東京', '🙂'], dtype='U4')\\n"
+               "fs_py_unicode = np.array(['café', '東京', '🙂'], dtype='U4')\n"
                "print('numpy Unicode ready')", "numpy Unicode ready", timeout)
     page.locator("#transferDirection").select_option("python-to-r")
     page.locator("#transferSource").fill("fs_py_unicode")
@@ -301,7 +301,7 @@ def test_r(page, timeout: int):
                 "assert fs_py_unicode_back.tolist() == ['café','東京','🙂']; print('unicode NumPy accepted')",
                 "unicode NumPy accepted", timeout)
     run_source(page, "r",
-               "fs_r_unicode_missing <- c('safe', NA_character_)\\ncat('missing Unicode ready')",
+               "fs_r_unicode_missing <- c('safe', NA_character_)\ncat('missing Unicode ready')",
                "missing Unicode ready", timeout)
     page.locator("#transferSource").fill("fs_r_unicode_missing")
     page.locator("#transferDestination").fill("fs_py_unicode_missing")

@@ -75,7 +75,7 @@ test("controller rejects incompatible NumPy modes before Python destination muta
     [numberPacket,true,/either pandas or NumPy/],
     [{kind:"scalar",type:"number",values:[3]},false,/nonempty numeric/],
     [{kind:"table",columns:[{name:"x",type:"number",values:[3]}]},false,/nonempty numeric/],
-    [{kind:"vector",type:"string",values:["x"]},false,/nonempty numeric/],
+    [{kind:"vector",type:"string",values:["x",null]},false,/nonempty numeric/],
     [{kind:"vector",type:"number",values:[]},false,/nonempty numeric/],
     [{kind:"vector",type:"boolean",values:[true,null]},false,/nonempty numeric/]
   ]) {
@@ -97,7 +97,7 @@ test("worker rejects invalid NumPy requests before loading Python and serializes
   h.send(1,"import-numpy","copy",numberPacket);
   h.send(2,"import-numpy","flags",boolPacket);
   h.send(3,"import-numpy","copy",{kind:"vector",type:"boolean",values:[null,true]});
-  h.send(4,"import-numpy","copy",{kind:"vector",type:"string",values:["x"]});
+  h.send(4,"import-numpy","copy",{kind:"vector",type:"string",values:["x",null]});
   h.send(5,"import-numpy","copy",{kind:"scalar",type:"number",values:[1]});
   h.send(6,"import-numpy","bad-name",numberPacket);
   h.send(7,"import-numpy","copy",{kind:"vector",type:"number",values:[Infinity]});

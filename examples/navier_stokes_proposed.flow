@@ -1,0 +1,73 @@
+# Experimental Flow syntax — NOT executable in the current compiler.
+
+domain FluidDomain {
+    grid       = 256 × 256
+    extent     = 1m × 1m
+    boundaries = Periodic
+}
+
+model NavierStokes on FluidDomain {
+    const density            = 1kg/m³
+    const kinematicViscosity = 0.001m²/s
+
+    field velocity: Vector²<MetersPerSecond>
+    field pressure: Scalar<Pascals>
+
+    dynamics {
+        ∂ₜvelocity =
+            −(velocity · ∇)velocity
+            − ∇pressure / density
+            + kinematicViscosity ∇²velocity
+    }
+
+    constraint {
+        ∇ · velocity = 0
+    }
+
+    initial {
+        velocity = (
+            sin(2πy / 1m) * 1m/s,
+            sin(2πx / 1m) * 1m/s
+        )
+        pressure = 0Pa
+    }
+}
+
+solver FluidSolver for NavierStokes {
+    spatial {
+        method     = FiniteDifference
+        gradient   = ForwardDifference
+        divergence = BackwardDifference
+        diffusion  = CentralDifference
+    }
+
+    temporal {
+        method   = RungeKuttaSecondOrder
+        timeStep = 10⁻⁴s
+    }
+
+    pressure {
+        method    = ConjugateGradient
+        tolerance = 10⁻⁶
+        gauge     = ZeroMean
+    }
+
+    enforce ∇ · velocity = 0 via PressureProjection
+}
+
+let simulation =
+    NavierStokes
+    ▷ FluidSolver
+    ▷ Evolve(until: 10s)
+
+simulation
+    ▷ Observe {
+        vorticity     = ∇ × velocity
+        divergence    = ∇ · velocity
+        kineticEnergy = ½density ∫(velocity · velocity)
+    }
+    ▷ Visualize {
+        velocity      = VectorField
+        vorticity     = Heatmap
+        kineticEnergy = LineGraph
+    }

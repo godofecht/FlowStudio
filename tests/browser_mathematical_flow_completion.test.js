@@ -33,3 +33,16 @@ test("mathematical Flow keywords and snippets are offered without claiming execu
   }
   assert.match(core.SNIPPETS.flow.find(item => item.label === "model").insert, /∂ₜ/);
 });
+
+test("native workbench exposes explicit mathematical Flow execution without claiming Flow 2.0 grammar support", () => {
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const html = fs.readFileSync(path.join(__dirname, "../web/index.html"), "utf8");
+  assert.match(html, /id="runMathFlow"/);
+  assert.match(html, /executeCode\(src\.value, "\[mathematical Flow\]", "mathflow"\)/);
+  assert.match(html, /"\/api\/run\/" \+ executionLanguage/);
+  const native = fs.readFileSync(path.join(__dirname, "../src/main.flow"), "utf8");
+  assert.match(native, /"\/api\/run\/mathflow"/);
+  assert.match(native, /"\/api\/check\/mathflow"/);
+  assert.match(native, /proc_arg\(command, "src\/math_flow\.py"\)/);
+});

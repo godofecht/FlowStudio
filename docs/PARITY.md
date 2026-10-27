@@ -1,4 +1,4 @@
-## 2026-10-27: Jupyter Markdown MIME roundtrip and portable report rendering (CI pending)
+## 2026-10-27: Jupyter Markdown MIME roundtrip and portable report rendering (Linux/macOS CI passed)
 
 Jupyter `display_data` and `execute_result` records containing inert
 `text/markdown` now import as bounded plain-text snapshots. When both Markdown
@@ -11,13 +11,19 @@ verbatim; invalid Markdown falls back to plain text where available. Existing
 128-KiB per-cell text and 1-MiB total import limits still apply. Neither
 Markdown import nor report generation executes notebook code.
 
-**Status: partial / automated regression tests added, independent CI pending.**
+**Status: partial / all four Ubuntu 24.04/macOS 14 CI jobs passed in
+[CI #40572067064](https://github.com/godofecht/FlowStudio/actions/runs/40572067064).**
+Both source platforms ran 928 JavaScript tests (920 passed, eight skipped,
+zero failures), including eight new Markdown MIME roundtrip regression tests.
+Both native jobs compiled pinned Flow 2.0.0, passed native Rscript/HTTP
+acceptance and packaged executables. [PR #110](https://github.com/godofecht/FlowStudio/pull/110)
+merged as [fd9eb17](https://github.com/godofecht/FlowStudio/commit/fd9eb1703fcf4070678ba4303f21a6899fe1398f).
 The source editor displays imported Markdown as inert text rather than rich
 output; full Jupyter MIME compatibility, knitr/Quarto execution and physical
 Chromium Pyodide/webR acceptance remain unverified. No native Flow backend or
 hosted CI configuration changed. RStudio parity remains incomplete.
 
-## 2026-10-27: safe Markdown rendering in offline notebook reports (source-tested; CI pending)
+## 2026-10-27: safe Markdown rendering in offline notebook reports (Linux/macOS CI passed)
 
 Offline HTML notebook reports now render escaped fenced Flow/R/Python code,
 inline backtick code, ordered/unordered lists, blockquotes and thematic breaks.
@@ -29,10 +35,14 @@ bounded to 128 KiB, and the report's restrictive CSP is unchanged. This
 is **not** a general CommonMark/GFM or knitr/Quarto renderer; nested lists,
 HTML output and live R Markdown execution remain unsupported.
 
-**Status: partial / nine exact-source regression tests passed in isolated
-V8 execution, hosted Linux/macOS CI and physical Chromium acceptance pending.**
-The change does not modify Flow's native compiler/backend, native HTTP routes,
-or hosted CI configuration. Full RStudio parity remains incomplete.
+**Status: partial / all four independent Linux/macOS jobs passed in
+[CI #40564001548](https://github.com/godofecht/FlowStudio/actions/runs/40564001548);
+post-merge main CI [#40571706459](https://github.com/godofecht/FlowStudio/actions/runs/40571706459)
+also passed.** [PR #109](https://github.com/godofecht/FlowStudio/pull/109)
+merged as [2b4f9b5](https://github.com/godofecht/FlowStudio/commit/2b4f9b5387d938337748db3315f0a4b79e2c8166).
+Physical Chromium acceptance remains unexecuted. The change does not modify
+Flow's native compiler/backend, native HTTP routes, or hosted CI configuration.
+Full RStudio parity remains incomplete.
 
 ## 2026-10-27: opt-in Python typed table / NumPy 2D ndarray → real R matrix (Linux/macOS CI passed)
 

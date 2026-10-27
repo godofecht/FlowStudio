@@ -143,6 +143,16 @@ def verify(root: Path, port: int = 8751, build_timeout: int = 180,
             print(matrix_result.stderr, end="", file=sys.stderr, flush=True)
         if matrix_result.returncode != 0:
             raise VerificationError("Real NumPy matrix to R data.frame acceptance failed")
+        print("Real R matrix to NumPy transfer acceptance: tests/browser_variable_transfer_r_matrix.test.js", flush=True)
+        r_matrix_result = _command(
+            ["node", "--test", str(root / "tests/browser_variable_transfer_r_matrix.test.js")], root, 65
+        )
+        if r_matrix_result.stdout:
+            print(r_matrix_result.stdout, end="", flush=True)
+        if r_matrix_result.stderr:
+            print(r_matrix_result.stderr, end="", file=sys.stderr, flush=True)
+        if r_matrix_result.returncode != 0:
+            raise VerificationError("Real R matrix transfer acceptance failed")
         print("Real browser R inspector query acceptance: tests/browser_r_nested_environment.test.js", flush=True)
         inspect_result = _command(
             ["node", "--test", str(root / "tests/browser_r_nested_environment.test.js")], root, 65

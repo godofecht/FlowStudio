@@ -150,7 +150,7 @@ test("real Rscript round-trip preserves typed columns and rejects classed data",
   await h.session.importVariable("copy",table);
   const exportQuery=h.queries[0],importQuery=h.queries[1];
   const result=spawnSync("Rscript",["--vanilla","-e",
-    importQuery+"\nstopifnot(is.data.frame(copy), identical(names(copy), c('score','flag','label')), identical(copy$score, c(1.25, NA_real_, 2.5)), identical(copy$flag, c(TRUE, NA, FALSE)), identical(copy$label, c('@NA@', NA_character_, 'é')))\n"+
+    "invisible("+importQuery+")\nstopifnot(is.data.frame(copy), identical(names(copy), c('score','flag','label')), identical(copy$score, c(1.25, NA_real_, 2.5)), identical(copy$flag, c(TRUE, NA, FALSE)), identical(copy$label, c('@NA@', NA_character_, 'é')))\n"+
     "result <- "+exportQuery+"\ncat(paste(result, collapse='\\n'))"],{encoding:"utf8"});
   assert.equal(result.status,0,result.stderr);
   const outputRows=result.stdout.trim().split("\n");

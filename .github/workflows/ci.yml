@@ -94,6 +94,7 @@ jobs:
           done
           if [ "$ready" -ne 1 ]; then cat /tmp/flowstudio-monaco-ui.log; exit 1; fi
           npm run test:ui
+          node tests/native_r_member_ui.mjs
       - name: Package verified executable
         run: sh scripts/package.sh
       - name: Archive qualified platform build

@@ -87,6 +87,31 @@ try {
   });
   assert.equal(workerResult, 'flow');
   await page.screenshot({ path: 'build/ui/workbench-tested.png' });
+  // Examples open as real editor tabs and every buffer keeps its own content;
+  // re-opening never collapses tabs onto the untitled Flow stub.
+  await page.evaluate(() => localStorage.removeItem('flowstudio.savedProjects.v1'));
+  await page.evaluate(() => document.getElementById('commandPalette').close());
+  await page.click('#tab-examples');
+  await page.locator('.example-card button.primary').first().click();
+  await page.waitForFunction(() => document.querySelectorAll('#docTabs .doc-tab').length >= 3);
+  await page.evaluate(() => {
+    const tab = [...document.querySelectorAll('#docTabs .doc-tab')]
+      .find(t => t.textContent.includes('analyse.R'));
+    tab.click();
+  });
+  await page.waitForFunction(() =>
+    FlowStudioApp.documents.active().text.startsWith('# Step 3'));
+  assert.match(await page.evaluate(() => document.getElementById('source').value),
+    /samples <- read\.csv\("data\/samples\.csv"\)/);
+  // The open example becomes a saved project file on this device.
+  await page.evaluate(() => FlowStudioWorkspacePanels.saveOpenProjects());
+  assert.match(await page.locator('.saved-projects').innerText(), /Reopen project/);
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.click('#tab-examples');
+  assert.match(await page.locator('.saved-projects').innerText(),
+    /Python → data file → R analysis/,
+    'saved projects reopen after a page reload');
+  await page.waitForTimeout(200);
   await page.setViewportSize({ width: 600, height: 850 });
   await page.waitForFunction(() => document.querySelector('.monaco-editor').clientWidth < 600);
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);

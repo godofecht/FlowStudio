@@ -37,6 +37,18 @@ test("integrated console scripts load once, after workspace tabs", () => {
   assert.match(routes, /if url == "\/workspace_console\.js"/);
 });
 
+test("saved projects module loads before the panel glue and is routed", () => {
+  const html = read("web/index.html");
+  const tag = '<script src="/saved_projects.js"></script>';
+  assert.equal(html.split(tag).length - 1, 1, tag);
+  const index = html.indexOf(tag);
+  assert.ok(index >= 0, tag);
+  assert.ok(index < html.indexOf('<script src="/workspace_panels.js"></script>'), tag);
+  const routes = read("src/data_routes.flow");
+  assert.match(routes, /if url == "\/saved_projects\.js"/);
+  assert.match(routes, /path: "web\/saved_projects\.js"/);
+});
+
 test("native project replacement has an explicit conflict-checked undo", () => {
   const html = read("web/index.html");
   assert.match(html, /id="undoProjectReplace"[^>]*disabled/);

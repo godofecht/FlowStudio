@@ -113,6 +113,56 @@ def verify(root: Path, port: int = 8751, build_timeout: int = 180,
             print(transfer_result.stderr, end="", file=sys.stderr, flush=True)
         if transfer_result.returncode != 0:
             raise VerificationError("Real Python/R transfer query acceptance failed")
+        print("Real typed NA/None transfer acceptance: tests/browser_variable_transfer_missing.test.js", flush=True)
+        missing_result = _command(
+            ["node", "--test", str(root / "tests/browser_variable_transfer_missing.test.js")], root, 65
+        )
+        if missing_result.stdout:
+            print(missing_result.stdout, end="", flush=True)
+        if missing_result.stderr:
+            print(missing_result.stderr, end="", file=sys.stderr, flush=True)
+        if missing_result.returncode != 0:
+            raise VerificationError("Real typed NA/None transfer acceptance failed")
+        print("Real Python/R typed table transfer acceptance: tests/browser_variable_transfer_table.test.js", flush=True)
+        table_result = _command(
+            ["node", "--test", str(root / "tests/browser_variable_transfer_table.test.js")], root, 65
+        )
+        if table_result.stdout:
+            print(table_result.stdout, end="", flush=True)
+        if table_result.stderr:
+            print(table_result.stderr, end="", file=sys.stderr, flush=True)
+        if table_result.returncode != 0:
+            raise VerificationError("Real typed table transfer acceptance failed")
+        print("Real NumPy matrix to R data.frame acceptance: tests/browser_variable_transfer_numpy_matrix.test.js", flush=True)
+        matrix_result = _command(
+            ["node", "--test", str(root / "tests/browser_variable_transfer_numpy_matrix.test.js")], root, 65
+        )
+        if matrix_result.stdout:
+            print(matrix_result.stdout, end="", flush=True)
+        if matrix_result.stderr:
+            print(matrix_result.stderr, end="", file=sys.stderr, flush=True)
+        if matrix_result.returncode != 0:
+            raise VerificationError("Real NumPy matrix to R data.frame acceptance failed")
+        print("Real R matrix to NumPy transfer acceptance: tests/browser_variable_transfer_r_matrix.test.js", flush=True)
+        r_matrix_result = _command(
+            ["node", "--test", str(root / "tests/browser_variable_transfer_r_matrix.test.js")], root, 65
+        )
+        if r_matrix_result.stdout:
+            print(r_matrix_result.stdout, end="", flush=True)
+        if r_matrix_result.stderr:
+            print(r_matrix_result.stderr, end="", file=sys.stderr, flush=True)
+        if r_matrix_result.returncode != 0:
+            raise VerificationError("Real R matrix transfer acceptance failed")
+        print("Real Python table to R matrix acceptance: tests/browser_variable_transfer_r_matrix_import.test.js", flush=True)
+        r_import_matrix_result = _command(
+            ["node", "--test", str(root / "tests/browser_variable_transfer_r_matrix_import.test.js")], root, 65
+        )
+        if r_import_matrix_result.stdout:
+            print(r_import_matrix_result.stdout, end="", flush=True)
+        if r_import_matrix_result.stderr:
+            print(r_import_matrix_result.stderr, end="", file=sys.stderr, flush=True)
+        if r_import_matrix_result.returncode != 0:
+            raise VerificationError("Real Python table to R matrix acceptance failed")
         print("Real browser R inspector query acceptance: tests/browser_r_nested_environment.test.js", flush=True)
         inspect_result = _command(
             ["node", "--test", str(root / "tests/browser_r_nested_environment.test.js")], root, 65
@@ -123,6 +173,16 @@ def verify(root: Path, port: int = 8751, build_timeout: int = 180,
             print(inspect_result.stderr, end="", file=sys.stderr, flush=True)
         if inspect_result.returncode != 0:
             raise VerificationError("Real browser R inspector acceptance failed")
+        print("Real data.frame column completion acceptance: tests/browser_r_dataframe_completion.test.js", flush=True)
+        frame_result = _command(
+            ["node", "--test", str(root / "tests/browser_r_dataframe_completion.test.js")], root, 65
+        )
+        if frame_result.stdout:
+            print(frame_result.stdout, end="", flush=True)
+        if frame_result.stderr:
+            print(frame_result.stderr, end="", file=sys.stderr, flush=True)
+        if frame_result.returncode != 0:
+            raise VerificationError("Real R data.frame completion acceptance failed")
     _free_port(port)
     # Never accept a stale executable left by an earlier successful build.
     # Unlinking a symlink here also avoids following an unexpected target.

@@ -172,6 +172,147 @@ def test_r(page, timeout: int):
         "document.querySelector('#notice').textContent === 'Notebook executed 1 cells from cursor.'",
         timeout=timeout)
     assert "cursor-only-r-47" in page.locator("#notebookOutput").inner_text()
+    # Real Pyodide -> real webR and back: typed missing values must survive.
+    # This is opt-in physical-browser acceptance, never a mocked-kernel pass.
+    run_source(page, "python",
+               "fs_py_missing = [1, None, 2.5]\nprint('missing Python ready')",
+               "missing Python ready", timeout)
+    page.locator("#transferDirection").select_option("python-to-r")
+    page.locator("#transferSource").fill("fs_py_missing")
+    page.locator("#transferDestination").fill("fs_r_missing")
+    page.locator("#transferVariable").click()
+    page.wait_for_function(
+        "() => document.querySelector('#notice').textContent.includes('Transferred fs_py_missing to fs_r_missing')",
+        timeout=timeout)
+    run_console(page, "r",
+                "stopifnot(identical(fs_r_missing, c(1, NA_real_, 2.5))); cat('missing R accepted')",
+                "missing R accepted", timeout)
+    run_source(page, "r",
+               "fs_r_labels <- c('@NA@', NA_character_, 'é')\ncat('R labels ready')",
+               "R labels ready", timeout)
+    page.locator("#transferDirection").select_option("r-to-python")
+    page.locator("#transferSource").fill("fs_r_labels")
+    page.locator("#transferDestination").fill("fs_py_labels")
+    page.locator("#transferVariable").click()
+    page.wait_for_function(
+        "() => document.querySelector('#notice').textContent.includes('Transferred fs_r_labels to fs_py_labels')",
+        timeout=timeout)
+    run_console(page, "python",
+                "assert fs_py_labels == ['@NA@', None, 'é']; print('missing Python accepted')",
+                "missing Python accepted", timeout)
+    # Exact pandas DataFrame -> actual webR data.frame -> Python dictionary.
+    # Pyodide's existing loadPackagesFromImports loads pandas for this source.
+    run_source(page, "python",
+               "import pandas as pd\n"
+               "fs_py_pd = pd.DataFrame({'score': pd.Series([1.25, None, 2.5], dtype='Float64'), "
+               "'flag': pd.Series([True, None, False], dtype='boolean'), "
+               "'label': pd.Series(['@NA@', None, 'é'], dtype='string')})\n"
+               "print('pandas browser ready')",
+               "pandas browser ready", timeout)
+    page.locator("#transferDirection").select_option("python-to-r")
+    page.locator("#transferSource").fill("fs_py_pd")
+    page.locator("#transferDestination").fill("fs_r_pd")
+    page.locator("#transferVariable").click()
+    page.wait_for_function(
+        "() => document.querySelector('#notice').textContent.includes('Transferred fs_py_pd to fs_r_pd')",
+        timeout=timeout)
+    run_console(page, "r",
+                "stopifnot(is.data.frame(fs_r_pd), "
+                "identical(names(fs_r_pd), c('score','flag','label')), "
+                "identical(fs_r_pd$score, c(1.25, NA_real_, 2.5)), "
+                "identical(fs_r_pd$flag, c(TRUE, NA, FALSE)), "
+                "identical(fs_r_pd$label, c('@NA@', NA_character_, 'é'))); "
+                "cat('pandas R accepted')",
+                "pandas R accepted", timeout)
+    page.locator("#transferDirection").select_option("r-to-python")
+    page.locator("#transferSource").fill("fs_r_pd")
+    page.locator("#transferDestination").fill("fs_py_pd_roundtrip")
+    page.locator("#transferVariable").click()
+    page.wait_for_function(
+        "() => document.querySelector('#notice').textContent.includes('Transferred fs_r_pd to fs_py_pd_roundtrip')",
+        timeout=timeout)
+    run_console(page, "python",
+                "assert fs_py_pd_roundtrip == {'score':[1.25,None,2.5], "
+                "'flag':[True,None,False], 'label':['@NA@',None,'é']}; "
+                "print('pandas browser roundtrip accepted')",
+                "pandas browser roundtrip accepted", timeout)
+    # Real webR -> real Pyodide pandas, not a dictionary or mocked import.
+    run_console(page, "r",
+                "fs_r_pd$missing <- c(NA_real_, NA_real_, NA_real_); cat('typed R ready')",
+                "typed R ready", timeout)
+    page.locator("#transferAsPandas").check()
+    page.locator("#transferSource").fill("fs_r_pd")
+    page.locator("#transferDestination").fill("fs_py_pd_typed")
+    page.locator("#transferVariable").click()
+    page.wait_for_function(
+        "() => document.querySelector('#notice').textContent.includes('Transferred fs_r_pd to fs_py_pd_typed (4 table columns as pandas DataFrame)')",
+        timeout=timeout)
+    run_console(page, "python",
+                "import pandas as pd; "
+                "assert type(fs_py_pd_typed) is pd.DataFrame; "
+                "assert list(fs_py_pd_typed.columns) == ['score','flag','label','missing']; "
+                "assert list(map(str,fs_py_pd_typed.dtypes)) == ['Float64','boolean','string','Float64']; "
+                "assert fs_py_pd_typed['score'].isna().tolist() == [False,True,False]; "
+                "assert fs_py_pd_typed['label'].tolist()[0] == '@NA@'; "
+                "assert fs_py_pd_typed['missing'].isna().all(); "
+                "print('real pandas destination accepted')",
+                "real pandas destination accepted", timeout)
+    page.locator("#transferAsPandas").uncheck()
+    # Actual NumPy ndarray -> webR numeric vector, preserving a typed NA.
+    # This is a physical-browser assertion; adding it is not evidence of a pass.
+    run_source(page, "python",
+               "import numpy as np\nfs_py_np = np.array([1.25, np.nan, 2.5], dtype=np.float32)\n"
+               "print('numpy browser ready')", "numpy browser ready", timeout)
+    page.locator("#transferDirection").select_option("python-to-r")
+    page.locator("#transferSource").fill("fs_py_np")
+    page.locator("#transferDestination").fill("fs_r_np")
+    page.locator("#transferVariable").click()
+    page.wait_for_function(
+        "() => document.querySelector('#notice').textContent.includes('Transferred fs_py_np to fs_r_np')",
+        timeout=timeout)
+    run_console(page, "r",
+                "stopifnot(identical(fs_r_np, c(1.25, NA_real_, 2.5))); "
+                "cat('numpy R accepted')", "numpy R accepted", timeout)
+    # Physical-browser acceptance for real Unicode ndarray <-> webR character vectors.
+    # These assertions remain unexecuted until Playwright runs against real CDNs.
+    run_source(page, "python",
+               "fs_py_unicode = np.array(['café', '東京', '🙂'], dtype='U4')\n"
+               "print('numpy Unicode ready')", "numpy Unicode ready", timeout)
+    page.locator("#transferDirection").select_option("python-to-r")
+    page.locator("#transferSource").fill("fs_py_unicode")
+    page.locator("#transferDestination").fill("fs_r_unicode")
+    page.locator("#transferVariable").click()
+    page.wait_for_function(
+        "() => document.querySelector('#notice').textContent.includes('Transferred fs_py_unicode to fs_r_unicode')",
+        timeout=timeout)
+    run_console(page, "r",
+                "stopifnot(identical(fs_r_unicode, c('café','東京','🙂'))); cat('unicode R accepted')",
+                "unicode R accepted", timeout)
+    page.locator("#transferDirection").select_option("r-to-python")
+    page.locator("#transferAsNumpy").check()
+    page.locator("#transferSource").fill("fs_r_unicode")
+    page.locator("#transferDestination").fill("fs_py_unicode_back")
+    page.locator("#transferVariable").click()
+    page.wait_for_function(
+        "() => document.querySelector('#notice').textContent.includes('Transferred fs_r_unicode to fs_py_unicode_back')",
+        timeout=timeout)
+    run_console(page, "python",
+                "assert type(fs_py_unicode_back) is np.ndarray and fs_py_unicode_back.dtype.kind == 'U'; "
+                "assert fs_py_unicode_back.tolist() == ['café','東京','🙂']; print('unicode NumPy accepted')",
+                "unicode NumPy accepted", timeout)
+    run_source(page, "r",
+               "fs_r_unicode_missing <- c('safe', NA_character_)\ncat('missing Unicode ready')",
+               "missing Unicode ready", timeout)
+    page.locator("#transferSource").fill("fs_r_unicode_missing")
+    page.locator("#transferDestination").fill("fs_py_unicode_missing")
+    page.locator("#transferVariable").click()
+    page.wait_for_function(
+        "() => document.querySelector('#notice').textContent.includes('nonmissing boolean/string')",
+        timeout=timeout)
+    run_console(page, "python",
+                "assert 'fs_py_unicode_missing' not in globals(); print('missing Unicode rejected')",
+                "missing Unicode rejected", timeout)
+    page.locator("#transferAsNumpy").uncheck()
     page.locator("#reset").click()
     assert "R state reset" in page.locator("#notice").inner_text()
     run_source(page, "r", "print(exists('fs_browser_value', envir=.GlobalEnv))", "FALSE", timeout)

@@ -11,7 +11,7 @@ const app = fs.readFileSync(path.join(__dirname, "../docs/app/index.html"), "utf
 const routes = fs.readFileSync(path.join(__dirname, "../src/data_routes.flow"), "utf8");
 
 function fixture({python = async () => ({ok:true,items:["print"]}),
-                  r = async () => ({ok:true,items:["mean"]})} = {}) {
+                  r = async () => ({ok:true,items:["mean"]}), rMembers = null} = {}) {
   const events = {}, messages = [];
   let language = "python", generation = 0, busy = false;
   const source = {
@@ -32,7 +32,7 @@ function fixture({python = async () => ({ok:true,items:["print"]}),
     setAttribute() {},
     addEventListener(type, fn) {this.listeners[type]=fn;}
   };}};
-  const api = create({source,button,target,language:()=>language,python,r,
+  const api = create({source,button,target,language:()=>language,python,r,rMembers,
     generation:()=>generation,isBusy:()=>busy,notice:x=>messages.push(x),document});
   return {api,source,target,events,messages,
     language:x=>{language=x;},reset:()=>{generation++;},busy:x=>{busy=x;}};
@@ -49,7 +49,9 @@ test("prefix parsing refuses arbitrary expressions, selections and member access
   assert.equal(at("x.foo","python"),null);
   assert.equal(at("mean","r"),"mean");
   assert.equal(at("stats::lm","r"),null);
-  assert.equal(at("df$col","r"),null);
+  assert.equal(at("df$col","r"),"col");
+  assert.equal(at("df$","r"),"");
+  assert.equal(at("df$if$","r"),null);
   assert.equal(at("print","flow"),"print");
   assert.equal(prefixAt({value:"print",selectionStart:0,selectionEnd:5},"python"),null);
   assert.equal(validItems(["print"],"pri","python"),true);
@@ -128,6 +130,50 @@ test("both GitHub Pages and native Flow route load completion module", () => {
   assert.match(app, /id="completeSource"/);
   assert.match(app, /request\("complete", prefix\)/);
   assert.match(app, /getRSession\(\)\.complete\(prefix\)/);
+  assert.match(app, /getRSession\(\)\.inspect\(\)/);
+  assert.match(app, /FlowStudioCompletion\.rListMembers\(result\.variables, path, prefix\)/);
   assert.match(routes, /url == "\/app\/completion\.js"/);
   assert.match(routes, /path: "docs\/app\/completion\.js"/);
+});
+
+
+test("R named-list completion inserts only inspected members, not guessed names", async () => {
+  const calls = [];
+  const f = fixture({
+    r:async()=>{throw Error("R root completion must not run for $ members");},
+    rMembers:async(path,prefix)=>{
+      calls.push({path,prefix});
+      return {ok:true,items:["scale","score"]};
+    }
+  });
+  f.language("r");
+  f.source.value="analysis$model$sc";
+  f.source.selectionStart=f.source.selectionEnd=f.source.value.length;
+  assert.equal(await f.api.complete(),true);
+  assert.deepEqual(calls,[{path:["analysis","model"],prefix:"sc"}]);
+  assert.equal(f.target.children[1].children.length,2);
+  f.target.children[1].children[0].listeners.click();
+  assert.equal(f.source.value,"analysis$model$scale");
+  assert.equal(f.source.selectionStart,f.source.value.length);
+});
+
+test("R member completion refuses missing inspector and stale session results", async () => {
+  const unavailable=fixture();
+  unavailable.language("r");
+  unavailable.source.value="analysis$";
+  unavailable.source.selectionStart=unavailable.source.selectionEnd=9;
+  assert.equal(await unavailable.api.complete(),false);
+  assert.match(unavailable.messages.at(-1),/R list inspection is unavailable/);
+
+  let release;
+  const wait=new Promise(resolve=>{release=resolve;});
+  const stale=fixture({rMembers:async()=>{await wait;return {ok:true,items:["score"]};}});
+  stale.language("r");
+  stale.source.value="analysis$sc";
+  stale.source.selectionStart=stale.source.selectionEnd=11;
+  const task=stale.api.complete();
+  stale.reset();
+  release();
+  assert.equal(await task,false);
+  assert.equal(stale.target.children.length,0);
 });

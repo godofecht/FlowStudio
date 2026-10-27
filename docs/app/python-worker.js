@@ -10,23 +10,46 @@ let serial = Promise.resolve();
 const MAX_QUEUED = 32;
 const MAX_OUTPUT = 131072;
 const TRANSFER_NAME = /^[A-Za-z][A-Za-z0-9_]{0,79}$/;
-function validTransferPacket(packet) {
-  if (!packet || typeof packet !== "object" || Array.isArray(packet) ||
-      Object.keys(packet).sort().join(",") !== "kind,type,values" ||
-      !["scalar", "vector"].includes(packet.kind) ||
-      !["number", "boolean", "string"].includes(packet.type) ||
-      !Array.isArray(packet.values) || packet.values.length > 256 ||
-      (packet.kind === "scalar" && packet.values.length !== 1))
-    return false;
-  for (const value of packet.values) {
-    if (packet.type === "number" &&
+function validTransferValues(type, values, missing) {
+  for (const value of values) {
+    if (value === null && missing) continue;
+    if (type === "number" &&
         (typeof value !== "number" || !Number.isFinite(value) || Math.abs(value) > Number.MAX_SAFE_INTEGER))
       return false;
-    if (packet.type === "boolean" && typeof value !== "boolean") return false;
-    if (packet.type === "string") {
+    if (type === "boolean" && typeof value !== "boolean") return false;
+    if (type === "string") {
       if (typeof value !== "string" || value.length > 512 || value.includes("\0")) return false;
       try { encodeURIComponent(value); } catch (_) { return false; }
     }
+  }
+  return true;
+}
+function validTransferPacket(packet) {
+  if (!packet || typeof packet !== "object" || Array.isArray(packet)) return false;
+  if (packet.kind === "table") {
+    if (Object.keys(packet).sort().join(",") !== "columns,kind" ||
+        !Array.isArray(packet.columns) || packet.columns.length < 1 ||
+        packet.columns.length > 16) return false;
+    const names = new Set();
+    let count = null;
+    for (const col of packet.columns) {
+      if (!col || typeof col !== "object" || Array.isArray(col) ||
+          Object.keys(col).sort().join(",") !== "name,type,values" ||
+          typeof col.name !== "string" || !TRANSFER_NAME.test(col.name) || names.has(col.name) ||
+          !["number", "boolean", "string"].includes(col.type) ||
+          !Array.isArray(col.values) || col.values.length > 128 ||
+          (count !== null && count !== col.values.length) ||
+          !validTransferValues(col.type, col.values, true)) return false;
+      names.add(col.name);
+      count = col.values.length;
+    }
+  } else {
+    if (Object.keys(packet).sort().join(",") !== "kind,type,values" ||
+        !["scalar", "vector"].includes(packet.kind) ||
+        !["number", "boolean", "string"].includes(packet.type) ||
+        !Array.isArray(packet.values) || packet.values.length > 256 ||
+        (packet.kind === "scalar" && packet.values.length !== 1) ||
+        !validTransferValues(packet.type, packet.values, packet.kind === "vector")) return false;
   }
   return new TextEncoder().encode(JSON.stringify(packet)).length <= 32768;
 }
@@ -120,9 +143,18 @@ async function handle(event) {
     /^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*){0,3}$/.test(code);
   const validComplete = op === "complete" && typeof code === "string" &&
     /^[A-Za-z_][A-Za-z0-9_]{0,79}$/.test(code);
-  const validExport = op === "export" && typeof code === "string" && TRANSFER_NAME.test(code);
-  const validImport = op === "import" && typeof code === "string" && TRANSFER_NAME.test(code) &&
-    validTransferPacket(transferValue);
+  const validExport = (op === "export" || op === "export-snapshot") &&
+    typeof code === "string" && TRANSFER_NAME.test(code);
+  const validImport = (op === "import" || op === "import-pandas" || op === "import-numpy") &&
+    typeof code === "string" && TRANSFER_NAME.test(code) &&
+    validTransferPacket(transferValue) &&
+    (op !== "import-pandas" || transferValue.kind === "table") &&
+    (op !== "import-numpy" || (transferValue.kind === "vector" ?
+      transferValue.values.length > 0 &&
+        (transferValue.type === "number" || !transferValue.values.includes(null)) :
+      transferValue.kind === "table" && transferValue.columns[0].values.length > 0 &&
+        transferValue.columns.every(col => col.type === transferValue.columns[0].type &&
+          (col.type === "number" || !col.values.includes(null)))));
   if (!((op === "run" && typeof code === "string" && new TextEncoder().encode(code).length <= 65536) ||
     op === "inspect" || op === "packages" || validInstall || validTable || validCheck || validHelp || validComplete || validExport || validImport)) {
     self.postMessage({id, ok:false, output:"Invalid execution request."}); return;
@@ -131,30 +163,144 @@ async function handle(event) {
   let py = null;
   try {
     py = await python();
-    if (op === "export") {
-      // Only exact Python builtins are traversed; no user iterators, descriptors or repr().
+    if (op === "export" || op === "export-snapshot") {
+      // Only exact builtins, NumPy ndarrays, or pandas DataFrames with approved dtypes are traversed.
       const query = [
-        "import json as _fs_transfer_json, math as _fs_transfer_math",
+        "import json as _fs_transfer_json, math as _fs_transfer_math, re as _fs_transfer_re",
         "_fs_transfer_name = " + JSON.stringify(code),
         "if _fs_transfer_name not in globals(): raise ValueError('Unknown Python variable')",
         "_fs_transfer_obj = globals()[_fs_transfer_name]",
-        "_fs_transfer_kind = 'vector' if type(_fs_transfer_obj) in (list, tuple) else 'scalar'",
-        "_fs_transfer_values = list(_fs_transfer_obj) if _fs_transfer_kind == 'vector' else [_fs_transfer_obj]",
-        "if not _fs_transfer_values or len(_fs_transfer_values) > 256: raise ValueError('Python vector is empty or exceeds limit')",
+        "import sys as _fs_transfer_sys",
+        "_fs_transfer_pd = _fs_transfer_sys.modules.get('pandas')",
+        "_fs_transfer_is_df = _fs_transfer_pd is not None and type(_fs_transfer_obj) is _fs_transfer_pd.DataFrame",
+        "_fs_transfer_np = _fs_transfer_sys.modules.get('numpy')",
+        "_fs_transfer_is_array = _fs_transfer_np is not None and type(_fs_transfer_obj) is _fs_transfer_np.ndarray",
+        "_fs_transfer_kind = 'pandas' if _fs_transfer_is_df else 'ndarray' if _fs_transfer_is_array else 'table' if type(_fs_transfer_obj) is dict else 'vector' if type(_fs_transfer_obj) in (list, tuple) else 'scalar'",
         "def _fs_transfer_type(v):",
         "    return 'boolean' if type(v) is bool else 'number' if type(v) in (int, float) else 'string' if type(v) is str else None",
-        "_fs_transfer_type_name = _fs_transfer_type(_fs_transfer_values[0])",
-        "if _fs_transfer_type_name is None or any(_fs_transfer_type(v) != _fs_transfer_type_name for v in _fs_transfer_values): raise ValueError('Only homogeneous plain scalar/list/tuple values can be transferred')",
-        "if any(type(v) is str and (len(v) > 512 or '\\x00' in v) for v in _fs_transfer_values): raise ValueError('Python string exceeds limit or contains NUL')",
-        "if any(type(v) in (int, float) and (not _fs_transfer_math.isfinite(v) or abs(v) > 9007199254740991) for v in _fs_transfer_values): raise ValueError('Python number is not finite or safe')",
-        "_fs_transfer_json.dumps({'kind': _fs_transfer_kind, 'type': _fs_transfer_type_name, 'values': _fs_transfer_values}, allow_nan=False)"
+        "def _fs_transfer_check(_fs_transfer_values, _fs_transfer_limit):",
+        "    if not _fs_transfer_values or len(_fs_transfer_values) > _fs_transfer_limit: raise ValueError('Python vector is empty or exceeds limit')",
+        "    _fs_transfer_present = [_fs_transfer_type(v) for v in _fs_transfer_values if v is not None]",
+        "    if not _fs_transfer_present or _fs_transfer_present[0] is None or any(t != _fs_transfer_present[0] for t in _fs_transfer_present): raise ValueError('Only homogeneous plain scalar/list/tuple values can be transferred')",
+        "    if any(type(v) is str and (len(v) > 512 or '\\x00' in v) for v in _fs_transfer_values): raise ValueError('Python string exceeds limit or contains NUL')",
+        "    if any(type(v) in (int, float) and (not _fs_transfer_math.isfinite(v) or abs(v) > 9007199254740991) for v in _fs_transfer_values): raise ValueError('Python number is not finite or safe')",
+        "    return _fs_transfer_present[0]",
+        "if _fs_transfer_kind == 'pandas':",
+        "    if not 1 <= len(_fs_transfer_obj.columns) <= 16 or not 1 <= len(_fs_transfer_obj) <= 128: raise ValueError('Pandas table requires 1-16 columns and 1-128 rows')",
+        "    if type(_fs_transfer_obj.index) is not _fs_transfer_pd.RangeIndex or not _fs_transfer_obj.index.equals(_fs_transfer_pd.RangeIndex(len(_fs_transfer_obj))): raise ValueError('Pandas table requires default RangeIndex')",
+        "    _fs_transfer_columns = []",
+        "    _fs_transfer_names = set()",
+        "    _fs_transfer_np = _fs_transfer_sys.modules.get('numpy')",
+        "    for _fs_transfer_index, _fs_transfer_key in enumerate(_fs_transfer_obj.columns):",
+        "        if type(_fs_transfer_key) is not str or _fs_transfer_re.fullmatch('[A-Za-z][A-Za-z0-9_]{0,79}', _fs_transfer_key) is None or _fs_transfer_key in _fs_transfer_names: raise ValueError('Invalid or duplicate pandas column name')",
+        "        _fs_transfer_names.add(_fs_transfer_key)",
+        "        _fs_transfer_column = _fs_transfer_obj.iloc[:, _fs_transfer_index]",
+        "        if type(_fs_transfer_column) is not _fs_transfer_pd.Series: raise ValueError('Unsupported pandas column')",
+        "        _fs_transfer_dtype = _fs_transfer_column.dtype",
+        "        _fs_transfer_builtin_dtype = (_fs_transfer_np is not None and isinstance(_fs_transfer_dtype, _fs_transfer_np.dtype) and type(_fs_transfer_dtype).__module__.startswith('numpy')) or type(_fs_transfer_dtype) in (_fs_transfer_pd.Int64Dtype, _fs_transfer_pd.Float64Dtype, _fs_transfer_pd.BooleanDtype, _fs_transfer_pd.StringDtype)",
+        "        if not _fs_transfer_builtin_dtype or str(_fs_transfer_dtype) not in ('int8', 'int16', 'int32', 'int64', 'uint8', 'uint16', 'uint32', 'uint64', 'float16', 'float32', 'float64', 'bool', 'Int64', 'Float64', 'boolean', 'string', 'object'): raise ValueError('Unsupported pandas column dtype')",
+        "        _fs_transfer_values = [None if (v is None or v is _fs_transfer_pd.NA or (type(v) is float and _fs_transfer_math.isnan(v))) else v for v in _fs_transfer_column.tolist()]",
+        "        _fs_transfer_type_name = _fs_transfer_check(_fs_transfer_values, 128)",
+        "        _fs_transfer_columns.append({'name': _fs_transfer_key, 'type': _fs_transfer_type_name, 'values': _fs_transfer_values})",
+        "    _fs_transfer_packet = {'kind': 'table', 'columns': _fs_transfer_columns}",
+        "elif _fs_transfer_kind == 'ndarray':",
+        "    if _fs_transfer_obj.ndim not in (1, 2): raise ValueError('NumPy transfer requires one or two dimensions')",
+        "    if str(_fs_transfer_obj.dtype) not in ('int8', 'int16', 'int32', 'int64', 'uint8', 'uint16', 'uint32', 'uint64', 'float16', 'float32', 'float64', 'bool') and not (_fs_transfer_obj.dtype.kind == 'U' and 0 < _fs_transfer_obj.dtype.itemsize <= 2048): raise ValueError('Unsupported NumPy vector/matrix dtype')",
+        "    if _fs_transfer_obj.ndim == 1:",
+        "        if not 1 <= _fs_transfer_obj.size <= 256: raise ValueError('NumPy vector requires 1-256 elements')",
+        "        _fs_transfer_values = _fs_transfer_obj.tolist()",
+        "        _fs_transfer_values = [None if type(v) is float and _fs_transfer_math.isnan(v) else v for v in _fs_transfer_values]",
+        "        _fs_transfer_type_name = _fs_transfer_check(_fs_transfer_values, 256)",
+        "        _fs_transfer_packet = {'kind': 'vector', 'type': _fs_transfer_type_name, 'values': _fs_transfer_values}",
+        "    else:",
+        "        _fs_transfer_rows, _fs_transfer_width = _fs_transfer_obj.shape",
+        "        if not 1 <= _fs_transfer_rows <= 128 or not 1 <= _fs_transfer_width <= 16: raise ValueError('NumPy matrix requires 1-128 rows and 1-16 columns')",
+        "        _fs_transfer_columns = []",
+        "        for _fs_transfer_index in range(_fs_transfer_width):",
+        "            _fs_transfer_values = _fs_transfer_obj[:, _fs_transfer_index].tolist()",
+        "            _fs_transfer_values = [None if type(v) is float and _fs_transfer_math.isnan(v) else v for v in _fs_transfer_values]",
+        "            _fs_transfer_type_name = _fs_transfer_check(_fs_transfer_values, 128)",
+        "            _fs_transfer_columns.append({'name': 'V' + str(_fs_transfer_index + 1), 'type': _fs_transfer_type_name, 'values': _fs_transfer_values})",
+        "        _fs_transfer_packet = {'kind': 'table', 'columns': _fs_transfer_columns}",
+        "elif _fs_transfer_kind == 'table':",
+        "    if not 1 <= len(_fs_transfer_obj) <= 16: raise ValueError('Python table requires 1-16 columns')",
+        "    _fs_transfer_columns = []",
+        "    _fs_transfer_rows = None",
+        "    for _fs_transfer_key, _fs_transfer_column in _fs_transfer_obj.items():",
+        "        if type(_fs_transfer_key) is not str or _fs_transfer_re.fullmatch('[A-Za-z][A-Za-z0-9_]{0,79}', _fs_transfer_key) is None: raise ValueError('Invalid Python table column name')",
+        "        if type(_fs_transfer_column) not in (list, tuple): raise ValueError('Python table columns must be plain lists or tuples')",
+        "        if len(_fs_transfer_column) > 128: raise ValueError(\'Python table exceeds row limit\')",
+        "        _fs_transfer_values = list(_fs_transfer_column)",
+        "        if _fs_transfer_rows is not None and len(_fs_transfer_values) != _fs_transfer_rows: raise ValueError('Python table columns have unequal lengths')",
+        "        _fs_transfer_rows = len(_fs_transfer_values)",
+        "        _fs_transfer_type_name = _fs_transfer_check(_fs_transfer_values, 128)",
+        "        _fs_transfer_columns.append({'name': _fs_transfer_key, 'type': _fs_transfer_type_name, 'values': _fs_transfer_values})",
+        "    _fs_transfer_packet = {'kind': 'table', 'columns': _fs_transfer_columns}",
+        "else:",
+        "    if _fs_transfer_kind == 'vector' and len(_fs_transfer_obj) > 256: raise ValueError(\'Python vector exceeds limit\')",
+        "    _fs_transfer_values = list(_fs_transfer_obj) if _fs_transfer_kind == 'vector' else [_fs_transfer_obj]",
+        "    _fs_transfer_type_name = _fs_transfer_check(_fs_transfer_values, 256)",
+        "    _fs_transfer_packet = {'kind': _fs_transfer_kind, 'type': _fs_transfer_type_name, 'values': _fs_transfer_values}",
+        "_fs_transfer_json.dumps(_fs_transfer_packet, allow_nan=False)",
       ].join("\n");
       const raw = await py.runPythonAsync(query);
       if (typeof raw !== "string" || new TextEncoder().encode(raw).length > 32768)
         throw Error("Invalid Python transfer response.");
       const packet = JSON.parse(raw);
       if (!validTransferPacket(packet)) throw Error("Invalid Python transfer payload.");
-      self.postMessage({id, ok:true, value:packet});
+      // Session export alone needs the original pandas identity. Keep the
+      // ordinary Python/R transfer packet and its response unchanged.
+      if (op === "export-snapshot") {
+        const origin = await py.runPythonAsync("_fs_transfer_kind");
+        if (origin === "pandas" && packet.kind !== "table")
+          throw Error("Invalid pandas session snapshot.");
+        self.postMessage(origin === "pandas" ?
+          {id, ok:true, value:packet, origin:"pandas"} : {id, ok:true, value:packet});
+      } else self.postMessage({id, ok:true, value:packet});
+      return;
+    }
+    if (op === "import-numpy") {
+      // Explicit R vector/table -> ndarray conversion. Homogeneous R tables
+      // become two-dimensional arrays in row-major order; column names are lost.
+      // Numeric NA becomes NaN; reject missing logical/string values preflight.
+      await py.loadPackage("numpy");
+      const query = [
+        "import json as _fs_transfer_json, numpy as _fs_transfer_np",
+        "_fs_transfer_packet = _fs_transfer_json.loads(" + JSON.stringify(JSON.stringify(transferValue)) + ")",
+        "_fs_transfer_table = _fs_transfer_packet['kind'] == 'table'",
+        "_fs_transfer_type = _fs_transfer_packet['columns'][0]['type'] if _fs_transfer_table else _fs_transfer_packet['type']",
+        "_fs_transfer_dtype = {'number': _fs_transfer_np.float64, 'boolean': _fs_transfer_np.bool_, 'string': _fs_transfer_np.str_}[_fs_transfer_type]",
+        "if _fs_transfer_table:",
+        "    _fs_transfer_array = _fs_transfer_np.column_stack([_fs_transfer_np.asarray(col['values'], dtype=_fs_transfer_dtype) for col in _fs_transfer_packet['columns']])",
+        "else:",
+        "    _fs_transfer_array = _fs_transfer_np.asarray(_fs_transfer_packet['values'], dtype=_fs_transfer_dtype)",
+        "if type(_fs_transfer_array) is not _fs_transfer_np.ndarray or _fs_transfer_array.ndim != (2 if _fs_transfer_table else 1): raise ValueError('Invalid NumPy transfer result')",
+        "globals()[" + JSON.stringify(code) + "] = _fs_transfer_array",
+        "'ok'"
+      ].join("\n");
+      const acknowledgement = await py.runPythonAsync(query);
+      if (acknowledgement !== "ok") throw Error("NumPy transfer assignment did not acknowledge success.");
+      self.postMessage({id, ok:true});
+      return;
+    }
+    if (op === "import-pandas") {
+      // Opt-in: fetch the real Pyodide pandas package and construct typed columns
+      // before assigning the destination. Failed conversions leave it untouched.
+      await py.loadPackage("pandas");
+      const query = [
+        "import json as _fs_transfer_json, pandas as _fs_transfer_pd",
+        "_fs_transfer_packet = _fs_transfer_json.loads(" + JSON.stringify(JSON.stringify(transferValue)) + ")",
+        "_fs_transfer_columns = {}",
+        "for _fs_transfer_column in _fs_transfer_packet['columns']:",
+        "    _fs_transfer_dtype = {'number': 'Float64', 'boolean': 'boolean', 'string': 'string'}[_fs_transfer_column['type']]",
+        "    _fs_transfer_columns[_fs_transfer_column['name']] = _fs_transfer_pd.Series(_fs_transfer_column['values'], dtype=_fs_transfer_dtype)",
+        "_fs_transfer_frame = _fs_transfer_pd.DataFrame(_fs_transfer_columns)",
+        "globals()[" + JSON.stringify(code) + "] = _fs_transfer_frame",
+        "'ok'"
+      ].join("\n");
+      const acknowledgement = await py.runPythonAsync(query);
+      if (acknowledgement !== "ok") throw Error("Pandas transfer assignment did not acknowledge success.");
+      self.postMessage({id, ok:true});
       return;
     }
     if (op === "import") {
@@ -162,7 +308,7 @@ async function handle(event) {
       const query = [
         "import json as _fs_transfer_json",
         "_fs_transfer_packet = _fs_transfer_json.loads(" + JSON.stringify(JSON.stringify(transferValue)) + ")",
-        "globals()[" + JSON.stringify(code) + "] = _fs_transfer_packet['values'] if _fs_transfer_packet['kind'] == 'vector' else _fs_transfer_packet['values'][0]",
+        "globals()[" + JSON.stringify(code) + "] = {c['name']: c['values'] for c in _fs_transfer_packet['columns']} if _fs_transfer_packet['kind'] == 'table' else (_fs_transfer_packet['values'] if _fs_transfer_packet['kind'] == 'vector' else _fs_transfer_packet['values'][0])",
         "'ok'"
       ].join("\n");
       const acknowledgement = await py.runPythonAsync(query);

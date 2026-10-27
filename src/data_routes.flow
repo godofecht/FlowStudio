@@ -84,6 +84,9 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/examples_gallery.js" {
         return StaticAsset { path: "web/examples_gallery.js", mime: "text/javascript; charset=utf-8", found: true }
     }
+    if url == "/saved_projects.js" {
+        return StaticAsset { path: "web/saved_projects.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
     if url == "/debug_panel.js" {
         return StaticAsset { path: "web/debug_panel.js", mime: "text/javascript; charset=utf-8", found: true }
     }
@@ -190,6 +193,9 @@ export function data_route(url: string) -> StaticAsset {
     }
     if url == "/app/plot_history.js" {
         return StaticAsset { path: "docs/app/plot_history.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/app/project_create.js" {
+        return StaticAsset { path: "docs/app/project_create.js", mime: "text/javascript; charset=utf-8", found: true }
     }
     if url == "/app/project.js" {
         return StaticAsset { path: "docs/app/project.js", mime: "text/javascript; charset=utf-8", found: true }

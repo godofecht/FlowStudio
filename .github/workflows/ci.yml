@@ -1,7 +1,7 @@
 name: CI
 on:
   push:
-    branches: [main, feat/native-monaco-r-member-completion-20261026]
+    branches: [main]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -10,72 +10,6 @@ concurrency:
   group: ci-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 jobs:
-  rebuild_monaco_pr89:
-    name: Rebuild committed Monaco assets for PR 89
-    if: (github.event_name == 'pull_request' && github.event.pull_request.number == 89) || github.ref == 'refs/heads/feat/native-monaco-r-member-completion-20261026'
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: feat/native-monaco-r-member-completion-20261026
-          persist-credentials: true
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Rebuild shipped Monaco assets with pinned dependencies
-        run: |
-          npm ci
-          npm run build:ui
-          node --test tests/ide_r_member_completion.test.js
-      - name: Commit generated assets to source branch
-        shell: bash
-        run: |
-          git add web/ui/workbench.js web/ui/editor.worker.js web/ui/THIRD_PARTY_LICENSES.txt
-          if ! git diff --cached --quiet; then
-            git config user.name 'github-actions[bot]'
-            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git commit -m 'build(ui): regenerate shipped Monaco assets for R member completion'
-            git push origin HEAD:refs/heads/feat/native-monaco-r-member-completion-20261026
-          fi
-  sync_pr89:
-    name: Integrate main, rebuild Monaco and validate PR 89
-    needs: rebuild_monaco_pr89
-    if: github.event_name == 'push' && github.ref == 'refs/heads/feat/native-monaco-r-member-completion-20261026'
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: feat/native-monaco-r-member-completion-20261026
-          fetch-depth: 0
-          persist-credentials: true
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Merge current main with explicit PR preference on overlapping hunks
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git show HEAD:docs/PARITY.md > /tmp/pr89-parity.md
-          git fetch origin main
-          git merge --no-ff -X ours origin/main -m 'merge: reconcile main into R member completion'
-          python3 -c 'from pathlib import Path; import subprocess; p=Path("/tmp/pr89-parity.md").read_text(); m=subprocess.check_output(["git","show","origin/main:docs/PARITY.md"],text=True); section=p.split("\n## ",1)[0].rstrip()+"\n\n"; Path("docs/PARITY.md").write_text(section+m if section.splitlines()[0] not in m else m)'
-          git diff --check
-      - name: Rebuild and run complete Node acceptance on integrated tree
-        run: |
-          npm ci
-          npm run build:ui
-          node --test tests/*.test.js
-      - name: Commit verified generated assets and integrated branch
-        run: |
-          git add docs/PARITY.md web/ui/workbench.js web/ui/editor.worker.js web/ui/THIRD_PARTY_LICENSES.txt
-          if ! git diff --cached --quiet; then
-            git commit -m 'build(ui): regenerate Monaco and retain parity history after integration'
-          fi
-          git push origin HEAD:refs/heads/feat/native-monaco-r-member-completion-20261026
   quality:
     name: Source and transport / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -91,7 +25,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      # pandas is required here: the Python→R DataFrame feature must not pass
+      # solely because its real-CPython regression cases were skipped.
+      - name: Install pandas for actual DataFrame interchange acceptance
+        run: python3 -m pip install 'pandas==2.2.3'
       - name: JavaScript module, DOM and source contract suites
+        env:
+          FLOWSTUDIO_REQUIRE_PANDAS: '1'
         run: node --test tests/*.test.js
       - name: Python syntax and verification harness
         run: |

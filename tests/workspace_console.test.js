@@ -139,8 +139,14 @@ test("mount creates accessible console controls inside existing editor panel", a
     calls.push([url,opts.body]);return {ok:true,status:200,text:async()=>"ok"};
   });
   assert.equal(elements.get("consoleInput")["aria-label"],"Interactive console command");
-  assert.equal(elements.get("consoleExecute").textContent,"Execute");
-  assert.equal(panel.style.flexDirection,"column");
+  assert.equal(elements.get("consoleInput")["aria-label"], "Interactive console command");
+  assert.equal(elements.get("consoleExecute").textContent, "Run ▸");
+  assert.equal(elements.get("consoleExecute").type, "button");
+  assert.equal(panel.style.flexDirection, "column");
+  // Terminal chrome: the runtime prompt sits inline beside the input row.
+  const prompt = elements.get("consolePrompt");
+  assert.ok(prompt, "a runtime command prompt is injected");
+  assert.match(prompt.textContent, /flow/);
   elements.get("consoleInput").value="println(1)";
   assert.equal(await controller.run(elements.get("consoleInput")),true);
   assert.deepEqual(calls,[["/api/run/flow","println(1)"]]);

@@ -1,19 +1,609 @@
-## 2026-10-26: native Monaco R list completion source (draft PR #89; not shipped)
+## 2026-10-27: native Monaco R list member completion (PR #89)
 
-The native Monaco completion provider source can now derive syntactically safe
-`$` member suggestions for ordinary R lists from the existing Flow-owned
-`POST /api/inspect/r` metadata, including nested lists and correct insertion
-ranges. Four Node regression cases were added and exact-source V8 provider
-checks passed. No R source expressions are submitted for completion; the
-underlying inspector can still force lazy promises while inspecting roots.
+The native Monaco provider derives bounded, syntax-safe `$` member suggestions for ordinary R lists from existing `POST /api/inspect/r` metadata. It supports nested list members, rejects invalid identifiers and active bindings, and preserves receiver text during insertion. The shipped `web/ui/workbench.js` was rebuilt with the pinned npm toolchain. The integrated source passed 918 Node tests (26 skipped) in the real GitHub Actions Linux job.
 
-**Status: implementation partial / checked-in generated runtime bundle is
-stale.** `frontend/completion.js` must be rebuilt with `npm ci && npm run
-build:ui` and the generated `web/ui/workbench.js` committed before native
-Monaco users receive the feature. The draft PR must not merge before
-independent Node/Linux/macOS CI and physical-browser validation of that
-generated bundle. Flow 2.0.0 remains the backend; no CI or HTTP route changed.
-RStudio parity is not achieved.
+**Status: implementation tested in Node and native bundle generated; physical Chromium acceptance pending.** No R source is executed to obtain suggestions. The inspector may still force lazy root promises. RStudio feature parity is not claimed.
+
+## 2026-10-27: inert inline emphasis in offline notebook reports (Linux/macOS CI passed)
+
+The offline notebook HTML exporter now renders bounded strong, emphasis and
+strikethrough delimiters in Markdown cells, pipe-table cells and validated
+Jupyter `text/markdown` output. The single-pass tokenizer keeps backtick code
+spans and escaped punctuation opaque, does not turn Markdown links or raw HTML
+into active elements, and leaves unmatched marks literal. Existing HTML escaping,
+output budgets and CSP remain unchanged. This is not full CommonMark, knitr or
+Quarto compatibility. **Status: partial / all four Ubuntu 24.04/macOS 14 CI jobs passed** in
+[CI #40590385584](https://github.com/godofecht/FlowStudio/actions/runs/40590385584).
+Both source/transport jobs passed, including five new Node regression tests;
+both native jobs compiled Flow 2.0.0, completed Rscript/HTTP acceptance and
+packaged executables. [PR #112](https://github.com/godofecht/FlowStudio/pull/112)
+merged as [a390887](https://github.com/godofecht/FlowStudio/commit/a3908877637a9fd8e4fda7ecca7b2929125d93a5).
+Physical Chromium Pyodide/webR acceptance remains unexecuted. No Flow compiler
+or hosted CI changes.
+
+## 2026-10-27: inert GFM-style pipe tables in offline notebook reports (pending CI)
+
+Notebook Markdown cells and validated Jupyter `text/markdown` output now render
+bounded pipe tables (up to 16 columns and 128 rows per table), including fixed
+left/center/right alignment classes, escaped pipes and inline code spans.
+All cell contents are HTML-escaped; no links, images or raw HTML are executed.
+Malformed delimiters and oversized column counts remain literal Markdown.
+This extends the existing offline renderer, not live knitr/Quarto execution.
+
+**Status: partial / all four Ubuntu 24.04/macOS 14 CI jobs passed in
+[CI #40580841709](https://github.com/godofecht/FlowStudio/actions/runs/40580841709).**
+Both source jobs passed the full JavaScript, Python and transport suites, including
+six new table regression tests. Both native jobs compiled pinned Flow 2.0.0,
+completed Rscript/HTTP acceptance and packaged executables. [PR #111](https://github.com/godofecht/FlowStudio/pull/111)
+merged as [f55a677](https://github.com/godofecht/FlowStudio/commit/f55a677827caf163b39e70be3d3e82479d3a720d).
+Physical Chromium acceptance remains unexecuted. No Flow backend,
+dependencies or hosted CI changed.
+RStudio parity remains incomplete.
+
+## 2026-10-27: Jupyter Markdown MIME roundtrip and portable report rendering (Linux/macOS CI passed)
+
+Jupyter `display_data` and `execute_result` records containing inert
+`text/markdown` now import as bounded plain-text snapshots. When both Markdown
+and `text/plain` exist, Markdown is preferred for the visible snapshot, while
+the validated MIME payload is preserved for `.ipynb` and portable `.fsnb` v2
+roundtrips. Offline HTML report export from a portable bundle now renders the
+same escaped Markdown subset as direct Jupyter report export. Untrusted HTML,
+SVG, widget MIME types and malformed Markdown payloads cannot be preserved
+verbatim; invalid Markdown falls back to plain text where available. Existing
+128-KiB per-cell text and 1-MiB total import limits still apply. Neither
+Markdown import nor report generation executes notebook code.
+
+**Status: partial / all four Ubuntu 24.04/macOS 14 CI jobs passed in
+[CI #40572067064](https://github.com/godofecht/FlowStudio/actions/runs/40572067064).**
+Both source platforms ran 928 JavaScript tests (920 passed, eight skipped,
+zero failures), including eight new Markdown MIME roundtrip regression tests.
+Both native jobs compiled pinned Flow 2.0.0, passed native Rscript/HTTP
+acceptance and packaged executables. [PR #110](https://github.com/godofecht/FlowStudio/pull/110)
+merged as [fd9eb17](https://github.com/godofecht/FlowStudio/commit/fd9eb1703fcf4070678ba4303f21a6899fe1398f).
+The source editor displays imported Markdown as inert text rather than rich
+output; full Jupyter MIME compatibility, knitr/Quarto execution and physical
+Chromium Pyodide/webR acceptance remain unverified. No native Flow backend or
+hosted CI configuration changed. RStudio parity remains incomplete.
+
+## 2026-10-27: safe Markdown rendering in offline notebook reports (Linux/macOS CI passed)
+
+Offline HTML notebook reports now render escaped fenced Flow/R/Python code,
+inline backtick code, ordered/unordered lists, blockquotes and thematic breaks.
+Jupyter `display_data` / `execute_result` outputs with `text/markdown`
+are rendered through the same inert subset, preferring it to `text/plain`
+when both are present. Raw HTML, links and image URLs are never interpreted.
+Language labels are constrained to safe class tokens, output size remains
+bounded to 128 KiB, and the report's restrictive CSP is unchanged. This
+is **not** a general CommonMark/GFM or knitr/Quarto renderer; nested lists,
+HTML output and live R Markdown execution remain unsupported.
+
+**Status: partial / all four independent Linux/macOS jobs passed in
+[CI #40564001548](https://github.com/godofecht/FlowStudio/actions/runs/40564001548);
+post-merge main CI [#40571706459](https://github.com/godofecht/FlowStudio/actions/runs/40571706459)
+also passed.** [PR #109](https://github.com/godofecht/FlowStudio/pull/109)
+merged as [2b4f9b5](https://github.com/godofecht/FlowStudio/commit/2b4f9b5387d938337748db3315f0a4b79e2c8166).
+Physical Chromium acceptance remains unexecuted. The change does not modify
+Flow's native compiler/backend, native HTTP routes, or hosted CI configuration.
+Full RStudio parity remains incomplete.
+
+## 2026-10-27: opt-in Python typed table / NumPy 2D ndarray → real R matrix (Linux/macOS CI passed)
+
+The browser Python → R Copy variable operation now exposes an explicit **R matrix**
+destination. It accepts only nonempty homogeneous typed tables (1–16 columns,
+1–128 rows, existing 32-KiB bound) and constructs a real base R matrix in the
+persistent webR session, preserving row and column order through column-major
+construction. Numeric missing values become typed `NA_real_`; logical and
+character missing values remain their respective typed R NA. Unicode text is
+URL-decoded safely. Default Python → R table import still produces a data.frame.
+Mixed-type tables, empty tables, malformed packets, invalid options, and
+active/locked destination bindings fail closed before assignment. Python/R
+session generation checks remain in place. Column labels, NumPy dtype widths,
+array subclasses, and metadata are not preserved; the wire format does not
+identify whether a table originated from NumPy, pandas, or a plain dictionary.
+
+**Status: partial / all four Ubuntu 24.04/macOS 14 CI jobs passed in [CI #40554621867](https://github.com/godofecht/FlowStudio/actions/runs/40554621867); physical Chromium Pyodide/webR acceptance unexecuted.** [PR #108](https://github.com/godofecht/FlowStudio/pull/108) merged as [d137d4a](https://github.com/godofecht/FlowStudio/commit/d137d4a62594ed18681a4b76040836668d3c852b). Each source platform ran 911 JavaScript tests (903 passed, eight skipped, zero failures). Both native jobs compiled Flow 2.0.0, ran real Rscript matrix acceptance (four tests, zero skips), completed native HTTP validation and packaged executables. Focused V8 execution of the actual controller and webR query construction passed. New automated tests cover controller routing, preflight rejection,
+column-major R expression generation, Unicode, NA values, real Rscript matrix
+construction and active-binding protection. Native verification explicitly
+requires the Rscript tests. No hosted CI workflow or native Flow backend
+configuration changed. This is not RStudio parity.
+
+## 2026-10-27: bounded plain R matrix → NumPy 2D ndarray (Linux/macOS CI passed)
+
+Browser R → Python Copy variable now exports exact unclassed, unlabelled
+two-dimensional base R numeric, integer, logical or character matrices as
+bounded typed-table packets. The existing NumPy destination reconstructs a
+real two-dimensional ndarray, preserving row/column order. R matrix attributes
+and integer storage widths are not preserved; Python → R continues to import
+typed tables as data.frames, not R matrices. Invalid dimensions (including
+empty, >128 rows or >16 columns), custom attributes, classes, dimnames,
+unsafe numeric values and invalid strings are rejected before export. Missing
+numeric values become NaN; missing logical/character cells are rejected in
+NumPy mode. Existing 32-KiB wire limit applies.
+
+**Status: partial / four independent Linux/macOS CI jobs passed in [CI #40544404659](https://github.com/godofecht/FlowStudio/actions/runs/40544404659), and [PR #107](https://github.com/godofecht/FlowStudio/pull/107) merged as [f880f2d](https://github.com/godofecht/FlowStudio/commit/f880f2daf8c496383008dec164ce70d673603012); physical-browser Pyodide/webR acceptance unexecuted.** Native verification
+requires actual Rscript matrix acceptance and rejection, and source tests
+exercise real CPython/NumPy construction when installed. No native Flow route
+or hosted CI configuration changes. Flow 2.0.0 remains the primary backend.
+RStudio parity remains incomplete.
+
+## 2026-10-27: homogeneous R data.frame → NumPy 2D ndarray (Linux/macOS CI passed)
+
+[PR #106](https://github.com/godofecht/FlowStudio/pull/106) merged as
+[450d986](https://github.com/godofecht/FlowStudio/commit/450d986cf6c078546165c82fafb4dae5c46a9e5c)
+after all four independent Ubuntu/macOS CI jobs passed in
+[CI #40534281335](https://github.com/godofecht/FlowStudio/actions/runs/40534281335)
+on 27 October 2026. The opt-in browser transfer constructs real 2D NumPy
+arrays from homogeneous R data.frames; numeric NA maps to NaN, while missing
+boolean/string cells and mixed columns are rejected. R column labels and
+integer storage widths are lost. Physical-browser acceptance remains
+unexecuted; RStudio parity is not achieved.
+
+## 2026-10-27: opt-in homogeneous R data.frame → NumPy 2D ndarray (Linux/macOS CI passed)
+
+The browser Copy variable operation now accepts an ordinary R data.frame as
+an explicit NumPy destination only when every column has the same wire type.
+It constructs a real two-dimensional ndarray in the persistent Pyodide worker,
+preserving row/column order and typed numeric missing cells as NaN. Boolean
+and Unicode tables require nonmissing cells; mixed-type tables, empty rows,
+malformed packets and simultaneous pandas/NumPy selection are rejected before
+Python mutation. Existing R vector → NumPy and default table → dictionary
+transfers are unchanged. R column names, integer storage, factors and custom
+row names are not preserved in the ndarray. Existing table protocol limits
+(1–16 columns, 1–128 rows, 32 KiB) apply.
+
+**Status: partial / independent Linux/macOS CI passed in [CI #40534281335](https://github.com/godofecht/FlowStudio/actions/runs/40534281335); physical Chromium Pyodide/webR execution pending.** Tests cover exact NumPy shape/dtype, Unicode, missing numeric
+cells, invalid tables and destination preservation on constructor failure.
+This is not general R matrix identity interchange or RStudio parity.
+
+## 2026-10-27: bounded NumPy 2D matrix → R data.frame transfer (Linux/macOS CI passed)
+
+Python → R Copy variable now recognizes exact two-dimensional NumPy ndarrays with approved built-in numeric, boolean or Unicode dtypes. The existing Python worker exports them as bounded typed tables, with column-major V1–V16 names and 1–128 rows; the existing webR table importer constructs an actual R data.frame. One-dimensional ndarray transfer remains a vector. Missing floating NaN values become R NA only when a column has a nonmissing value to establish its type. All-missing columns, unsafe numbers, invalid strings, unsupported dtypes, subclasses, zero dimensions, oversized matrices and packets exceeding 32 KiB are rejected. This is **not** an R matrix transfer or a dtype-preserving NumPy round trip; dimensions, integer widths and NumPy-specific metadata are not retained. No native Flow route or hosted CI configuration is modified.
+
+**Status: partial / independent Linux/macOS CI passed in [CI #40526070277](https://github.com/godofecht/FlowStudio/actions/runs/40526070277) and [PR #105](https://github.com/godofecht/FlowStudio/pull/105) merged as [246e4ac](https://github.com/godofecht/FlowStudio/commit/246e4ac3ba6afcc303378b1c95b08227113d7697); physical-browser Pyodide/webR acceptance unexecuted.** Tests cover real CPython/NumPy serialization, negative cases, browser worker validation and Rscript import when available. Flow 2.0.0 remains the primary native backend. RStudio parity is not achieved.
+
+## 2026-10-27: bounded bidirectional NumPy Unicode vector transfer (Linux/macOS CI passed)
+
+Browser Python → R Copy variable now accepts exact one-dimensional NumPy Unicode
+ndarrays with native dtype kind `U` and storage width at most 512 code points
+per element. The existing typed string packet, 256-element / 32-KiB limits,
+512-UTF-16-code-unit string limit and NUL/invalid-Unicode rejection remain
+in force. NumPy bytes, object, structured and custom ndarray subclasses remain
+unsupported. R → Python can explicitly construct a real NumPy Unicode ndarray
+from a nonempty classless character vector without missing values. R
+`NA_character_` is rejected for this destination instead of being silently
+converted into the literal string `"None"`; the default Python-list
+destination continues to preserve missing values as `None`. Existing numeric
+NaN and logical array behavior is unchanged.
+
+**Status: partial / independent Linux/macOS source and native CI passed;
+physical-browser Pyodide/webR acceptance remains unexecuted.**
+[PR #104](https://github.com/godofecht/FlowStudio/pull/104) merged as
+[bc8ec80](https://github.com/godofecht/FlowStudio/commit/bc8ec8087ab640e6a4b9368273fc6c8084d61144)
+after all four Ubuntu 24.04/macOS 14 jobs passed in
+[CI #40515203015](https://github.com/godofecht/FlowStudio/actions/runs/40515203015)
+on 27 October 2026. Both source jobs ran 886 JavaScript tests (881 passed,
+five skipped, zero failures), including real CPython/NumPy Unicode export
+and import. Both native jobs compiled Flow 2.0.0, passed live Rscript/HTTP
+acceptance and packaged executables. Focused local V8 execution of the
+actual controller and worker passed transfer, missing-value and invalid-string
+rejection checks; local CPython/NumPy 2.3.5 constructed a Unicode ndarray.
+The physical Chromium Pyodide/webR Unicode round-trip and missing-string
+rejection scenarios were added but **not executed**. No hosted CI or native
+Flow backend configuration changed. This is not RStudio parity.
+
+
+## 2026-10-27: opt-in R atomic vector → NumPy ndarray destination (pending independent CI)
+
+The browser R → Python Copy variable operation now supports an explicit NumPy
+destination for nonempty numeric or logical R vectors. It constructs real
+one-dimensional NumPy `float64` or `bool` arrays in the persistent Pyodide
+worker. Missing numeric R values become NumPy NaN; missing logical values are
+rejected rather than silently converted to True. Strings, scalars, tables and
+empty vectors are rejected in NumPy mode. Selecting both pandas and NumPy is
+an error. The default Python list and existing pandas DataFrame destinations
+remain unchanged. The bounded transfer packet, 256-element / 32-KiB limits,
+native Flow backend and hosted CI configuration are unchanged.
+
+**Status: partial / independent Linux/macOS source and native CI passed;
+physical-browser Pyodide/webR acceptance remains unexecuted.**
+[PR #103](https://github.com/godofecht/FlowStudio/pull/103) merged as
+[28ee51f](https://github.com/godofecht/FlowStudio/commit/28ee51f7cd6a39714c09902b59748d3ff4829483)
+after all four Ubuntu 24.04/macOS 14 jobs passed in
+[CI #40506051407](https://github.com/godofecht/FlowStudio/actions/runs/40506051407)
+on 27 October 2026. Both source platforms ran 884 JavaScript tests
+(879 passed, five skipped, zero failures), including all six new
+controller/worker/real CPython-NumPy regression tests. Both native platforms
+compiled Flow 2.0.0, passed real Rscript/HTTP acceptance and packaged
+executables. A separate local CPython/NumPy 2.3.5 conversion check passed.
+This does not verify physical Chromium execution, dtype-preserving R integer
+transfer, automatic session persistence or RStudio parity.
+
+## 2026-10-27: bounded NumPy ndarray → R vector transfer (Linux/macOS CI passed)
+
+The existing browser-local Python → R Copy variable action now accepts exact
+one-dimensional NumPy ndarrays of 1–256 elements through the same typed vector
+packet as plain Python lists. Approved native dtypes are signed/unsigned
+8/16/32/64-bit integers, float16/32/64 and boolean. Numeric values must be
+finite and within JavaScript's safe-integer bound; floating NaN becomes a typed
+missing value when other values establish the numeric type. Unsupported
+dtypes, complex/object arrays, ndarray subclasses, unsafe integers, empty,
+all-missing, multidimensional and oversized arrays are rejected before
+transferring. NumPy must already be imported in the Python session; ordinary
+lists do not require it. The receiving R vector remains a double/logical
+vector; exact NumPy dtype is not preserved. No Flow route, interpreter,
+dependency, or hosted CI configuration changed.
+
+**Status: partial / independent Linux/macOS source and native CI passed.**
+[PR #102](https://github.com/godofecht/FlowStudio/pull/102)
+merged as [cf18f7e](https://github.com/godofecht/FlowStudio/commit/cf18f7ec55f3ac2e91d22ee758e8c18bdd868664)
+after [CI #40498878250](https://github.com/godofecht/FlowStudio/actions/runs/40498878250)
+passed all four Ubuntu 24.04/macOS 14 jobs on 27 October 2026. Each source
+platform ran 878 JavaScript tests (873 passed, five skipped, zero failures).
+All five new NumPy regression tests executed without skips, including real
+CPython/NumPy conversions, unsafe-value rejection and subclass safety. Both
+native jobs compiled pinned Flow 2.0.0, passed Rscript/HTTP acceptance and
+packaged executables. The physical Chromium Pyodide → webR NumPy transfer
+assertion was added but **has not been executed**. No claim of full RStudio
+feature parity, physical-browser execution or dtype-preserving transfer is made.
+
+## 2026-10-27: fail-closed identity checks for destructive browser project operations (Linux/macOS CI passed)
+
+Project-file deletion and rename now refuse destructive operations when the
+browser cannot establish that the current directory entry is the originally
+opened file. The deletion path reuses the same identity check as project
+saving, rather than accepting matching contents when `isSameEntry` is absent.
+Deletion also rechecks editor contents after its final awaited filesystem
+verification, so typing during that read cannot silently discard an unsaved
+edit. Rename checks source identity and destination distinctness before
+writing, and only cleans up a verified empty destination after failed copying.
+
+**Status: partial / independent Linux/macOS source and native CI passed;
+physical-browser File System Access acceptance pending.**
+[PR #101](https://github.com/godofecht/FlowStudio/pull/101)
+passed all four Ubuntu 24.04/macOS 14 jobs in
+[CI #40491600189](https://github.com/godofecht/FlowStudio/actions/runs/40491600189)
+on 27 October 2026. Both source platforms completed 873 JavaScript tests
+(868 passed, five skipped, zero failures), including all four new destructive
+file-operation regressions. Both native platforms compiled pinned Flow 2.0.0,
+passed live Rscript/HTTP acceptance and packaged executables. No local
+physical-browser test was executed.
+This is not an atomic filesystem transaction. The browser File System Access
+API cannot prevent an external process from replacing or modifying a file
+between the final check and `removeEntry`, nor guarantee exclusive creation
+of a rename destination. No native Flow backend or hosted CI changes.
+
+## 2026-10-27: verified project-file identity and readback during browser saves (Linux/macOS CI passed)
+
+The browser File System Access workspace now checks that a project file's
+current parent-directory entry is the same handle opened in the editor before
+writing, and checks both identity and on-disk contents again after writing.
+Same-content external replacement, unverifiable identity, and changes made
+while a write is in flight no longer count as successful saves. The editor's
+conflict baseline advances only after verified readback; edits typed during an
+awaited save remain dirty. Save As files outside the project retain their
+existing handle-only save path. The existing 2 MiB bound and conflict-aware
+writer are unchanged.
+
+**Status: partial / independent Linux/macOS source and native CI passed;
+physical-browser File System Access acceptance pending.** [PR #100](https://github.com/godofecht/FlowStudio/pull/100)
+passed all four Ubuntu 24.04/macOS 14 jobs in
+[CI #40483964486](https://github.com/godofecht/FlowStudio/actions/runs/40483964486)
+on 27 October 2026. Each source job ran 869 JavaScript tests (864 passed,
+five skipped, zero failures), including eight new save-identity tests without
+skips. Both native jobs compiled the pinned Flow 2.0.0 backend, completed
+real Rscript/HTTP acceptance and packaged executables. Eight exact-source V8
+regression scenarios also passed locally. An initial CI run exposed a
+filesystem mock without `isSameEntry`; the fixture was corrected to model
+the actual browser handle contract before successful CI. A successful underlying write followed by a
+failed readback is reported as ambiguous, not as a clean save. This is not an
+atomic filesystem transaction: external writes can still race after the last
+check. Flow 2.0.0 remains the primary native backend. No hosted CI
+configuration changed. RStudio parity remains incomplete.
+
+## 2026-10-27: explicit browser source reload after external disk edits (Linux/macOS CI passed)
+
+The browser File System Access workspace now offers **Reload from disk** for
+an opened project file or a file attached by Save As. Reload reads the actual
+granted file handle and updates the editor's conflict baseline only after two
+bounded reads agree. For project files it verifies the current parent-directory
+entry is still the same file handle, before and after the first read. Dirty
+buffers require explicit confirmation; cancellation, read/permission errors,
+oversized files, externally replaced files, concurrent editor changes and
+mid-read disk changes preserve the editor and its previous save baseline.
+Reload is serialized against saves, renames, deletes and project switching.
+Changed source invalidates notebook output recovery through the existing
+filename callback, while a no-op reload leaves outputs alone.
+
+**Status: partial / independently validated Linux/macOS source and native CI;
+physical-browser File System Access acceptance pending.** [PR #99](https://github.com/godofecht/FlowStudio/pull/99)
+passed all four Ubuntu 24.04/macOS 14 jobs in
+[CI #40475713914](https://github.com/godofecht/FlowStudio/actions/runs/40475713914)
+on 27 October 2026. Each source platform ran 861 JavaScript tests
+(856 passed, five skipped, zero failures), including all 13 new disk reload
+regressions without skips. Both native jobs compiled pinned Flow 2.0.0,
+passed real Rscript/HTTP acceptance and completed packaging. The 13
+exact-source tests also passed locally in V8 with ASCII-only Blob/Buffer shims. This is not an
+atomic filesystem snapshot: concurrent external writes can still race after
+the final read. It does not restore browser directory permissions after
+reload or provide multi-file project reload. No hosted CI configuration or
+native Flow backend changed. RStudio parity remains incomplete.
+
+## 2026-10-27: explicit pandas-aware Python session snapshot (Linux/macOS CI passed)
+
+Browser-local session export/import now supports an opt-in-preserved **pandas
+DataFrame identity** for approved typed tables. The existing Pyodide export
+path emits bounded table packets, and a dedicated snapshot export operation
+reports pandas provenance without altering normal Python/R transfer replies.
+Snapshot format v2 annotates only actual pandas table entries. On explicit
+import, the persistent Pyodide worker uses its real pandas importer; ordinary
+Python dictionaries, vectors, scalars and R tables retain v1-compatible
+behavior. V1 files remain readable. The entire file is preflight-validated
+before any interpreter assignment, and failures report partial restoration.
+
+**Status: partial / independent Linux/macOS source and native CI passed;
+physical-browser Pyodide acceptance pending.** [PR #98](https://github.com/godofecht/FlowStudio/pull/98)
+passed all four Ubuntu 24.04/macOS 14 jobs in
+[CI #40469330017](https://github.com/godofecht/FlowStudio/actions/runs/40469330017)
+on 27 October 2026. Each source job ran 848 JavaScript tests
+(843 passed, five skipped, zero failures), including eight new snapshot
+regressions and real CPython/pandas 2.2.3 provenance acceptance. Both native
+jobs compiled pinned Flow 2.0.0, passed live Rscript/HTTP acceptance and
+packaged their executables. Direct V8 execution of the actual
+snapshot/transfer/worker modules passed 14 assertions locally.
+The same 64-variable / 128 KiB snapshot limits
+and 16-column / 128-row / 32 KiB per-table transfer limits apply. This is
+manual file export/import, not automatic interpreter recovery, arbitrary object
+serialization, or exact pandas dtype/index round-tripping. Imported pandas
+numeric columns use nullable Float64, not the original integer dtype. Python
+and R runtimes remain separate; Flow remains the native application/backend.
+No hosted CI configuration or native Flow route changed.
+
+## 2026-10-27: browser-local nested source files and project folders (Linux/macOS CI passed)
+
+The File System Access project explorer now supports explicit creation of
+folders and source files inside existing project subdirectories, without
+creating missing ancestors. Paths are validated as relative to the
+browser-granted project root, limited to twelve segments, and reject
+traversal, invalid/reserved names and existing entries. A nonempty file
+appearing during the creation race is not attached to the editor. The
+existing Flow-owned native backend and hosted CI configuration are unchanged.
+
+**Status: partial / independent Linux/macOS source and native CI passed;
+physical-browser File System Access acceptance pending.** [PR #97](https://github.com/godofecht/FlowStudio/pull/97)
+passed all four Ubuntu 24.04/macOS 14 jobs in
+[CI #40463652838](https://github.com/godofecht/FlowStudio/actions/runs/40463652838)
+on 27 October 2026. Each source platform completed 839 JavaScript tests
+(834 passed, five skipped, zero failures), including eight new folder and
+nested-file tests. Both native jobs compiled pinned Flow 2.0.0, passed live
+HTTP/Rscript acceptance and completed packaging. Local Node.js 22.16.0
+executed all six isolated creation tests; direct V8 integration of the
+actual project explorer/workspace passed nine assertions. A first CI attempt
+failed ten existing VM integration tests because the helper was resolved
+eagerly; that regression was corrected before the successful run.
+
+Creation is not atomic with the existence check, so an externally created
+empty file can still race. Folder creation does not alter the current editor
+buffer. This does not establish RStudio parity, remote-session isolation or
+physical-browser Pyodide/webR acceptance.
+
+## 2026-10-27: opt-in R data.frame → Python pandas DataFrame (Linux/macOS CI passed)
+
+The existing browser-local R → Python Copy variable path now has an explicit
+**R table → pandas DataFrame** option. The native Flow-owned R export and
+bounded typed-table wire protocol remain unchanged. When enabled, the
+persistent Pyodide worker loads real pandas, constructs ordered nullable
+`Float64`, `boolean` and `string` columns (including entirely missing
+columns), and assigns the completed DataFrame to the selected Python
+workspace variable. The default destination remains a dictionary of lists;
+scalar/vector transfers with the pandas option are rejected before import.
+No generated assets or hosted CI workflow changes are required.
+
+**Status: partial / independent Linux/macOS source and native CI passed; physical-browser acceptance pending.**
+[PR #96](https://github.com/godofecht/FlowStudio/pull/96) merged as
+[ee0df29](https://github.com/godofecht/FlowStudio/commit/ee0df2927e3f2bbbf27c1a74eec9edb458f5b442)
+after [CI #40457919749](https://github.com/godofecht/FlowStudio/actions/runs/40457919749)
+passed all four Ubuntu 24.04/macOS 14 jobs on 27 October 2026. Each source
+job ran 830 JavaScript tests (825 passed, five skipped, zero failures),
+including all seven new pandas-import cases without skips. Both native jobs
+compiled pinned Flow 2.0.0, completed real Rscript/HTTP acceptance and
+packaging. The first CI attempt found a mock-DOM compatibility regression;
+this was corrected before the successful run. The new regression suite
+covers controller routing, worker preflight,
+unavailable pandas, failed acknowledgements, real CPython pandas 2.2.3
+nullable construction, zero-row tables and failure atomicity. Local CPython
+2.2.3 construction was exercised, but this is not real Pyodide/webR browser
+acceptance. The existing 16-column, 128-row and 32-KiB transfer limits
+remain. No pandas dtype round-trip back to R is promised; R integer storage
+still transfers as numeric. Real knitr rendering, live R function stepping,
+authenticated remote sessions and RStudio feature parity remain outstanding.
+
+## 2026-10-27: fail-closed R Markdown YAML metadata (Linux/macOS CI passed)
+
+R Markdown import and export now refuse executable YAML tags such as `!expr`,
+anchors/aliases, block scalars, collections, embedded comments and other
+unsupported metadata values in `title`, `author` and `date`. The
+existing `output: html_document` restriction remains in force. Ordinary
+single-line literal metadata, including quoted Unicode titles, is preserved
+without execution. Regression tests cover both directions and safe round trips.
+
+**Status: partial / independent Linux/macOS source and native CI passed.**
+[PR #95](https://github.com/godofecht/FlowStudio/pull/95) merged as
+[d6f67f5](https://github.com/godofecht/FlowStudio/commit/d6f67f5c2c738602d4128492c2cf65f31b21391e)
+after [CI #40451725324](https://github.com/godofecht/FlowStudio/actions/runs/40451725324)
+passed all four Ubuntu 24.04/macOS 14 jobs on 27 October 2026. Both source
+jobs ran 823 JavaScript tests (818 passed, five skipped, zero failures),
+including both new YAML rejection/round-trip cases. Both native jobs compiled
+Flow 2.0.0, passed real Rscript/HTTP acceptance and packaged the executable.
+The local scalar-gate assertions also passed (7 accepted, 15 rejected).
+This closes an import/export safety gap but does not add real knitr rendering,
+physical-browser acceptance, resumable R debugging, authenticated remote
+sessions or RStudio parity.
+
+## 2026-10-27: bounded pandas DataFrame → R data.frame transfer (Linux/macOS CI passed)
+
+The existing browser Python → R Copy variable path recognizes exact pandas
+DataFrame objects already loaded in Pyodide, with 1–16 safe unique columns,
+1–128 rows, default RangeIndex, and a 32 KiB typed-table packet bound. Supported
+NumPy dtypes include signed/unsigned 8–64-bit integers, float16/32/64, bool and
+object; pandas nullable Int64/Float64, boolean and string are supported.
+Float16/float32 promote exactly to double, and integer values above JavaScript's
+safe-integer range are rejected. Missing values become typed R NA values.
+Unsupported classes, indexes, names, mixed or untyped columns, infinities and
+oversized tables fail closed. Ordinary dictionary transfer does not import pandas.
+The R → Python destination still receives dictionaries of typed lists.
+
+**Status: partial / independent Linux/macOS source and native CI passed.**
+[PR #94](https://github.com/godofecht/FlowStudio/pull/94) merged as
+[c57847a](https://github.com/godofecht/FlowStudio/commit/c57847a15b35dcad4eb30a89e0eeee289a89149b)
+after [CI #40448944593](https://github.com/godofecht/FlowStudio/actions/runs/40448944593)
+passed all four Ubuntu 24.04/macOS 14 jobs on 27 October 2026. Each source
+job ran 821 JavaScript tests (816 passed, five skipped, zero failures).
+The actual CPython/pandas DataFrame, fixed-width numeric and rejection tests
+ran without skips on both source platforms, using pinned pandas 2.2.3.
+Both native jobs compiled pinned Flow 2.0.0, passed real Rscript/HTTP
+acceptance and packaged the executable. The only hosted CI change was adding
+pandas to source jobs so these tests cannot silently skip. Physical-browser
+Pyodide/webR acceptance remains **unexecuted**; the real browser import path,
+knitr rendering, function-level R debugging, authenticated remote sessions
+and RStudio feature parity are not verified.
+## 2026-10-27: bounded webR data.frame column completion (native CI passed)
+
+The browser R source editor now offers `$` completion for column names of exact
+base `data.frame` objects, including frames nested inside ordinary lists.
+The existing webR environment inspection emits up to twelve column names per
+frame without reading column values or evaluating submitted completion
+expressions. It excludes non-syntactic/reserved names, custom classes and
+active bindings. The inspected names can be stale if the workspace changes;
+lazy root bindings can still be forced by the existing inspector. This does
+not change the native Flow server, native Monaco's separately bundled editor,
+or the R interpreter. **Status: partial; independent Linux/macOS CI
+passed source and native jobs, including real Rscript inspector acceptance.**
+[CI #40440522826](https://github.com/godofecht/FlowStudio/actions/runs/40440522826)
+passed all four jobs on 27 October 2026. Each native job ran all four
+`tests/browser_r_dataframe_completion.test.js` cases with zero skips, including
+real Rscript verification of nested data.frames, bounded columns, custom
+classes and active-binding safety, then compiled Flow 2.0.0 and completed
+live HTTP acceptance and packaging. Source jobs ran 815 JavaScript tests
+(811 passed, four skipped, zero failures); the Rscript test was skipped only
+in source jobs without R and executed successfully in both native jobs.
+Physical-browser webR completion and RStudio parity remain unverified.
+
+## 2026-10-27: bounded typed Python/R tabular interchange (validation pending)
+
+The browser-local Copy variable path now accepts a **typed table packet** with
+1–16 unique ASCII column names and 0–128 rows, equal-length columns, only
+number/boolean/string types, and per-column missing values. Total encoded
+JSON remains limited to 32 KiB. Exact Python built-in dictionaries of
+homogeneous plain list/tuple columns export as R data.frames; plain base R
+data.frames with default row names and unclassed atomic columns export as
+Python dictionaries of lists. The existing scalar/vector protocol and native
+Flow-owned server routes are unchanged. No new interpreter or demo backend
+was added.
+
+**Status: partial / independently verified Linux/macOS source and native
+CI; physical-browser Pyodide/webR execution remains unverified.**
+[PR #92](https://github.com/godofecht/FlowStudio/pull/92) merged as
+[9ee78f7](https://github.com/godofecht/FlowStudio/commit/9ee78f7a56a3b6a0054db5e1d53dcc285e17c960)
+after [CI #40428898996](https://github.com/godofecht/FlowStudio/actions/runs/40428898996)
+passed all four Ubuntu 24.04/macOS 14 jobs. Each source job ran 812
+JavaScript tests (808 passed, four skipped, zero failed). Both native
+jobs compiled Flow 2.0.0, passed live Rscript/HTTP acceptance and packaged
+the executable. All six new table tests passed without skips on both native
+platforms, including actual CPython and Rscript round trips and rejection
+cases. The native verification harness requires real Rscript table acceptance
+rather than treating an optional local Rscript skip as passing evidence. Python
+empty-column dictionaries and all-None columns cannot be typed and are
+rejected; R zero-row typed data.frames can be transferred one-way to Python.
+Factors, custom row names, dates, pandas DataFrames, nested objects, nonfinite
+numbers and unsafe names remain unsupported. R integer storage is not
+preserved on import. This is not Arrow/pandas compatibility, remote-session
+isolation, knitr rendering, function-level R debugging or RStudio parity.
+
+
+## 2026-10-26: typed R NA / Python None vector transfer (Linux/macOS CI passed)
+
+The browser-local Python ↔ R transfer now preserves missing values in typed
+vectors. Homogeneous Python lists/tuples may contain `None`; R classless atomic
+vectors may contain type-specific `NA`. R integers still map to numeric wire
+values and import as R doubles. Transfers retain the 256-item / 32-KiB bounds.
+Scalar `None`, all-`None` Python lists (untyped), heterogeneous nonmissing
+values, NaN, Inf, classed R objects and tables remain rejected. The R literal
+string `"@NA@"` remains distinct from its missing-value wire sentinel.
+
+**Status: partial / independent Linux/macOS source and native CI passed.**
+[PR #91](https://github.com/godofecht/FlowStudio/pull/91) merged as
+[7612894](https://github.com/godofecht/FlowStudio/commit/761289493953cfd075e72dd304fb4e7b51eaeacd)
+after [CI #40422754617](https://github.com/godofecht/FlowStudio/actions/runs/40422754617)
+passed all four jobs. Each source job ran 806 JavaScript tests (803 passed,
+three skipped, zero failures), Python suites and C transport checks. Both
+native jobs compiled Flow 2.0.0, passed real Rscript/HTTP acceptance and
+packaging. All five new transfer tests passed without skips on both native
+platforms, including real Rscript NA/NaN/Inf and literal sentinel assertions.
+Eight direct V8 protocol assertions also passed locally. The opt-in
+Playwright runner includes real Pyodide → webR → Pyodide NA/None round-trip
+assertions, but physical-browser execution is **not yet verified**.
+No hosted CI configuration or native Flow route changed. This is not
+tabular interchange, restart-persistent interpreters, live function-level
+R debugging, authenticated remote sessions or RStudio parity.
+
+## 2026-10-26: prevent implicit knitr execution from Markdown cells (Linux/macOS CI passed)
+
+R Markdown export rejects executable fenced knitr chunks and inline R
+expressions embedded in FlowStudio **Markdown** cells. Such cells are inert in
+the editor, but knitr would otherwise execute their contents after .Rmd export.
+Literal `eval=FALSE` R/Python fenced chunks remain portable and inert;
+ordinary fenced examples and escaped inline examples remain Markdown.
+The exporter refuses unknown knitr options instead of silently changing
+execution semantics. This change affects `docs/app/` export only; it does not
+execute R, install knitr, or introduce a new backend.
+
+**Status: partial / independent Linux/macOS source and native CI passed.**
+[PR #90](https://github.com/godofecht/FlowStudio/pull/90) merged as
+[8930d49](https://github.com/godofecht/FlowStudio/commit/8930d495bde1edec62df289e8527960f830a9b81)
+after [CI #40415902244](https://github.com/godofecht/FlowStudio/actions/runs/40415902244)
+passed all four jobs on Ubuntu 24.04 and macOS 14. Each source job ran
+801 JavaScript tests (799 passed, two skipped, zero failures), 78 Python
+tests (11 skipped), and transport checks. Both native jobs compiled the
+real Flow 2.0.0 server, passed live Rscript/HTTP acceptance and packaged it.
+Four new Node regression cases and 12 direct V8 assertions passed. Physical-
+browser R Markdown export and real knitr rendering remain unverified or
+unimplemented. No hosted CI configuration changed; RStudio parity is not achieved.
+
+## 2026-10-26: real browser R named-list member completion (Linux/macOS CI passed)
+
+The `docs/app/` browser workspace now completes named members of ordinary R
+lists from **real webR or native R inspector snapshots** through the existing
+serialized `getRSession().inspect()` path. The Flow-owned native route is
+`POST /api/inspect/r`; the webR path uses its existing bounded inspection
+query. `analysis$model$sc` offers inspected `scale`/`score` children
+without replacing the receiver; `$` works with an empty prefix. Existing
+Python/R root completion and Flow lexical completion are unchanged. No new
+interpreter or simulated response was introduced.
+
+The list traversal is bounded to the first twelve children per container and
+two nested member levels. It rejects unsafe or reserved identifiers, malformed
+labels, active bindings and classed objects without child metadata; it does
+not evaluate submitted completion expressions. **The underlying native R
+inspector can still force lazy promises during root binding lookup**, so this
+is not side-effect-free for all possible R workspaces.
+
+**Status: partial / independent Linux/macOS source and native CI passed.**
+[PR #88](https://github.com/godofecht/FlowStudio/pull/88) merged as
+[5895687](https://github.com/godofecht/FlowStudio/commit/589568749c0e64b45ced52be9570852d2f470478)
+after [CI #40408659163](https://github.com/godofecht/FlowStudio/actions/runs/40408659163)
+passed all four jobs on Ubuntu 24.04 and macOS 14. Each source job ran
+797 JavaScript tests (795 passed, two skipped, zero failures) and 78 Python
+tests (11 skipped). Both native jobs compiled the real Flow 2.0.0 server,
+passed Rscript/HTTP acceptance and packaged the executable. Direct V8
+execution of the actual browser completion module, inspected-member dispatch
+and insertion also passed locally. These gates do **not** establish a physical
+browser webR/Rscript completion pass; that interaction remains unverified. The separate native Monaco provider is under
+[draft PR #89](https://github.com/godofecht/FlowStudio/pull/89);
+its checked-in `web/ui/workbench.js` bundle still needs regeneration and
+physical-browser acceptance before the native Monaco feature can ship.
+No Flow compiler, HTTP route or hosted CI configuration changed.
+This is not data.frame column completion, knitr rendering, function-level
+R debugging, authenticated remote sessions or RStudio parity.
 
 ## 2026-10-26: clear saved notebook outputs without resetting interpreters (validation pending)
 
@@ -27,8 +617,9 @@ results remain, rewritten with only those results. Subsequent .ipynb, .fsnb
 and HTML exports cannot reintroduce cleared outputs. Failed persistence is
 reported explicitly. No backend routes, Flow compiler or hosted CI changes.
 
-**Status: partial / implementation and seven automated Node regressions added;
-independent CI and physical-browser acceptance pending.** This is output
+**Status: partial / PR #87 merged as fc23e427 after all four
+Ubuntu 24.04/macOS 14 jobs in CI #40399045181 passed.** Seven Node
+regressions were added; physical-browser acceptance remains unverified. This is output
 management, not interpreter state recovery, real knitr rendering, resumable
 function-level R debugging, authenticated remote sessions or RStudio parity.
 

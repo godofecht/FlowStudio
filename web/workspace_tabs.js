@@ -1,7 +1,7 @@
 /* Accessible Files, Plots and Data workspace tabs for FlowStudio. */
 (function (root) {
   "use strict";
-  const NAMES = ["files", "outline", "plots", "data"];
+  const NAMES = ["files", "outline", "plots", "data", "packages", "examples", "debug"];
   const SOURCES = Object.freeze({plots: "/plots", data: "/data"});
 
   function mount(doc = document, storage = null) {

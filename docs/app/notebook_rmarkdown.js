@@ -16,6 +16,16 @@ function fenceFor(code) {
   }
   return TICK.repeat(Math.max(3, longest + 1));
 }
+/* Imported Markdown is inert, but YAML !expr and tags can execute in knitr.
+ * Preserve only a single-line literal scalar; reject tags, anchors, aliases,
+ * collections, block scalars, YAML comments and escape sequences. */
+function safeYamlScalar(value) {
+  const text = value.trim();
+  if (!text || text.length > 256 || /[\x00-\x1f\x7f]/.test(value)) return false;
+  if (/^'(?:[^']|'')*'$/.test(text) || /^"[^"\\]*"$/.test(text)) return true;
+  return /^[\p{L}\p{N}][\p{L}\p{N} .,_'()+/:-]*$/u.test(text) &&
+    !/:\s|(?:^|\s)#/.test(text);
+}
 function preservedFrontmatter(body) {
   if (!body.startsWith("---\n")) return null;
   const lines = body.split("\n");
@@ -31,6 +41,8 @@ function preservedFrontmatter(body) {
     if (!match || seen.has(match[1].toLowerCase()))
       throw new Error("Unsupported R Markdown YAML metadata.");
     seen.add(match[1].toLowerCase());
+    if (match[1].toLowerCase() !== "output" && !safeYamlScalar(match[2]))
+      throw new Error("Unsupported R Markdown YAML scalar; executable tags and complex values are forbidden.");
     if (match[1].toLowerCase() === "output" &&
         !/^(?:html_document|"html_document"|'html_document')$/.test(match[2].trim()))
       throw new Error("Only R Markdown html_document output is supported.");
@@ -38,6 +50,32 @@ function preservedFrontmatter(body) {
   return {header:lines.slice(0, end + 1).join("\n") + "\n\n",
     remainder:lines.slice(end + 1).join("\n").replace(/^\n/, "")};
 }
+/* Markdown cells are inert in FlowStudio; R Markdown renders executable
+ * knitr chunks and inline R. Refuse unrepresented execution on export.
+ * Only literal eval=FALSE chunks remain inert and may be preserved. */
+function rejectExecutableMarkdown(body) {
+  let fence = null;
+  for (const line of body.split("\n")) {
+    if (!fence) {
+      const opener = /^ {0,3}(\x60{3,}|~{3,})(.*)$/.exec(line);
+      if (!opener) {
+        if (/(^|[^\\\x60])\x60r[ \t]+[^\x60\r\n]+\x60(?!\x60)/.test(line))
+          throw new Error("Executable inline R in Markdown cell; use an R code cell.");
+        continue;
+      }
+      const info = opener[2].trim();
+      if (info.startsWith("{") &&
+          !/^\{(?:r|python)(?:[ \t]+[A-Za-z][A-Za-z0-9_.-]{0,79})?\s*,\s*eval\s*=\s*FALSE\}$/.test(info))
+        throw new Error("Executable or unsupported R Markdown chunk in Markdown cell; use a code cell or literal eval=FALSE.");
+      fence = {symbol:opener[1][0], length:opener[1].length};
+    } else {
+      const close = /^ {0,3}(\x60+|~+)[ \t]*$/.exec(line);
+      if (close && close[1][0] === fence.symbol && close[1].length >= fence.length)
+        fence = null;
+    }
+  }
+}
+
 function encode(source, defaultLanguage, parseCells) {
   if (defaultLanguage !== "r" && defaultLanguage !== "python")
     throw new Error("R Markdown export requires an R or Python default language; Flow chunks are unsupported.");
@@ -58,6 +96,7 @@ function encode(source, defaultLanguage, parseCells) {
     if (byteLength(body) > MAX_CELL_BYTES || body.includes("\0"))
       throw new Error("R Markdown cells must be at most 64 KiB without NUL bytes.");
     if (cell.kind === "markdown") {
+      rejectExecutableMarkdown(body);
       const metadata = index === 0 ? preservedFrontmatter(body) : null;
       if (metadata) {
         output = metadata.header;

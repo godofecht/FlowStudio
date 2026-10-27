@@ -85,7 +85,7 @@ function exportMetadata(marker) {
   return meta;
 }
 
-/* Import only inert text and PNG snapshots from untrusted Jupyter output.
+/* Import only inert plain/Markdown text and PNG snapshots from Jupyter output.
  * HTML, JavaScript, SVG, widgets, metadata and execution state are never loaded.
  */
 const MAX_IMPORT_RESULTS = 128;
@@ -134,7 +134,16 @@ function importCellOutputs(cell, index, language, state) {
         state.ignored = true;
         continue;
       }
-      if (Object.hasOwn(item.data, "text/plain"))
+      // Markdown is an inert text snapshot in the editor, and the preferred
+      // report MIME type. Keep plain text as a fallback for malformed Markdown.
+      const hasMarkdown = Object.hasOwn(item.data, "text/markdown");
+      let validMarkdown = false;
+      if (hasMarkdown) {
+        try { sourceString(item.data["text/markdown"]); validMarkdown = true; }
+        catch (_) { state.ignored = true; }
+      }
+      if (validMarkdown) importOutputText(item.data["text/markdown"], state, result);
+      else if (Object.hasOwn(item.data, "text/plain"))
         importOutputText(item.data["text/plain"], state, result);
       if (Object.hasOwn(item.data, "image/png")) {
         let png;
@@ -144,7 +153,8 @@ function importCellOutputs(cell, index, language, state) {
             result.plots.length < MAX_IMPORT_PLOTS) result.plots.push({png});
         else state.ignored = true;
       }
-      if (Object.keys(item.data).some(key => key !== "text/plain" && key !== "image/png"))
+      if (Object.keys(item.data).some(key =>
+        key !== "text/plain" && key !== "text/markdown" && key !== "image/png"))
         state.ignored = true;
     } else state.ignored = true;
   }
@@ -186,13 +196,15 @@ function safeJupyterOutputs(items, result) {
       } else if (item.output_type === "display_data" || item.output_type === "execute_result") {
         if (!item.data || typeof item.data !== "object" || Array.isArray(item.data) ||
             Object.keys(item.data).length === 0 ||
-            Object.keys(item.data).some(key => key !== "text/plain" && key !== "image/png"))
+            Object.keys(item.data).some(key =>
+              key !== "text/plain" && key !== "text/markdown" && key !== "image/png"))
           return null;
         const payload = {};
-        if (Object.hasOwn(item.data, "text/plain")) {
+        if (Object.hasOwn(item.data, "text/plain"))
           payload["text/plain"] = sourceString(item.data["text/plain"]);
-          text += payload["text/plain"];
-        }
+        if (Object.hasOwn(item.data, "text/markdown"))
+          payload["text/markdown"] = sourceString(item.data["text/markdown"]);
+        text += payload["text/markdown"] ?? payload["text/plain"] ?? "";
         if (Object.hasOwn(item.data, "image/png")) {
           const png = sourceString(item.data["image/png"]).replace(/\s/g, "");
           if (png.length > MAX_IMPORT_PNG || !PNG.test(png)) return null;

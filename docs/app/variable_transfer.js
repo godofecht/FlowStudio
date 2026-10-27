@@ -60,7 +60,8 @@ function validateValues(type, values, allowMissing) {
 function create({direction, source, destination, button, pandas = null, python, rSession,
                  notice, isBusy, setBusy, generation, refresh = async () => {}}) {
   if (![direction, source, destination, button].every(Boolean) ||
-      (pandas !== null && typeof pandas.checked !== "boolean") ||
+      (pandas !== null && (typeof pandas !== "object" ||
+        (pandas.checked !== undefined && typeof pandas.checked !== "boolean"))) ||
       [python, rSession, notice, isBusy, setBusy, generation, refresh].some(fn => typeof fn !== "function"))
     throw TypeError("Variable transfer requires controls and runtime callbacks.");
   async function transfer() {

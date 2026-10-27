@@ -62,7 +62,8 @@ test("real NumPy integer, floating, boolean arrays export as R-compatible vector
     ["np.array([4, 5], dtype=np.uint64)",{kind:"vector",type:"number",values:[4,5]}],
     ["np.array([1.25, np.nan, 2.5], dtype=np.float32)",example],
     ["np.array([1.5, 2], dtype=np.float16)",{kind:"vector",type:"number",values:[1.5,2]}],
-    ["np.array([True, False], dtype=np.bool_)",{kind:"vector",type:"boolean",values:[true,false]}]
+    ["np.array([True, False], dtype=np.bool_)",{kind:"vector",type:"boolean",values:[true,false]}],
+    ["np.array(['café', '東京', '🙂'], dtype='U4')",{kind:"vector",type:"string",values:["café","東京","🙂"]}]
   ];
   for (const [expression, expected] of examples) {
     const result = runPython(query,"import numpy as np\ndata = " + expression);
@@ -85,7 +86,9 @@ test("NumPy transfer rejects unsafe dimensions, types and values", async t => {
     "np.array([float('inf')], dtype=np.float64)",
     "np.array([float('nan')], dtype=np.float64)",
     "np.array([1+2j], dtype=np.complex128)",
-    "np.array(['x'], dtype='U1')",
+    "np.array([b'x'], dtype='S1')",
+    "np.array(['x'], dtype='U513')",
+    "np.array(['x\\x00y'], dtype='U3')",
     "np.array([None], dtype=object)",
     "np.array([(1,2)], dtype=[('a','i4'),('b','i4')])"
   ];

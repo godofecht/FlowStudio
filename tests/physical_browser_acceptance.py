@@ -200,6 +200,42 @@ def test_r(page, timeout: int):
     run_console(page, "python",
                 "assert fs_py_labels == ['@NA@', None, 'é']; print('missing Python accepted')",
                 "missing Python accepted", timeout)
+    # Exact pandas DataFrame -> actual webR data.frame -> Python dictionary.
+    # Pyodide's existing loadPackagesFromImports loads pandas for this source.
+    run_source(page, "python",
+               "import pandas as pd\\n"
+               "fs_py_pd = pd.DataFrame({'score': pd.Series([1.25, None, 2.5], dtype='Float64'), "
+               "'flag': pd.Series([True, None, False], dtype='boolean'), "
+               "'label': pd.Series(['@NA@', None, 'é'], dtype='string')})\\n"
+               "print('pandas browser ready')",
+               "pandas browser ready", timeout)
+    page.locator("#transferDirection").select_option("python-to-r")
+    page.locator("#transferSource").fill("fs_py_pd")
+    page.locator("#transferDestination").fill("fs_r_pd")
+    page.locator("#transferVariable").click()
+    page.wait_for_function(
+        "() => document.querySelector('#notice').textContent.includes('Transferred fs_py_pd to fs_r_pd')",
+        timeout=timeout)
+    run_console(page, "r",
+                "stopifnot(is.data.frame(fs_r_pd), "
+                "identical(names(fs_r_pd), c('score','flag','label')), "
+                "identical(fs_r_pd$score, c(1.25, NA_real_, 2.5)), "
+                "identical(fs_r_pd$flag, c(TRUE, NA, FALSE)), "
+                "identical(fs_r_pd$label, c('@NA@', NA_character_, 'é'))); "
+                "cat('pandas R accepted')",
+                "pandas R accepted", timeout)
+    page.locator("#transferDirection").select_option("r-to-python")
+    page.locator("#transferSource").fill("fs_r_pd")
+    page.locator("#transferDestination").fill("fs_py_pd_roundtrip")
+    page.locator("#transferVariable").click()
+    page.wait_for_function(
+        "() => document.querySelector('#notice').textContent.includes('Transferred fs_r_pd to fs_py_pd_roundtrip')",
+        timeout=timeout)
+    run_console(page, "python",
+                "assert fs_py_pd_roundtrip == {'score':[1.25,None,2.5], "
+                "'flag':[True,None,False], 'label':['@NA@',None,'é']}; "
+                "print('pandas browser roundtrip accepted')",
+                "pandas browser roundtrip accepted", timeout)
     page.locator("#reset").click()
     assert "R state reset" in page.locator("#notice").inner_text()
     run_source(page, "r", "print(exists('fs_browser_value', envir=.GlobalEnv))", "FALSE", timeout)

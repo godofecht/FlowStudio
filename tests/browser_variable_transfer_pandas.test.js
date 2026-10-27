@@ -52,14 +52,18 @@ test("plain dictionary transfers work without importing pandas", async t => {
   if (probe.error) return t.skip("python3 unavailable");
   const query=await exportQuery();
   const result=runPython(query,
-    "data = {'score': [1.25, None, 2.5], 'flag': [True, None, False], 'label': ['@NA@', None, 'é']}");
+    "data = {'score': [1.25, None, 2.5], 'flag': [True, None, False], 'label': ['@NA@', None, 'é']}\n" +
+    "assert 'pandas' not in __import__('sys').modules");
   assert.equal(result.status,0,result.stderr);
   assert.deepEqual(JSON.parse(result.stdout),expected);
 });
 
 test("actual pandas nullable data frame transfers typed values and missing cells", async t => {
   const probe=spawnSync("python3",["-c","import pandas"],{encoding:"utf8"});
-  if (probe.status!==0) return t.skip("pandas unavailable locally; not proof of pandas acceptance");
+  if (probe.status!==0) {
+    if (process.env.FLOWSTUDIO_REQUIRE_PANDAS === "1") assert.fail("pandas is required for independent CI acceptance: " + (probe.stderr || probe.error || "import failed"));
+    return t.skip("pandas unavailable locally; not proof of pandas acceptance");
+  }
   const query=await exportQuery();
   const setup = "import pandas as pd\n" +
     "data = pd.DataFrame({'score': pd.Series([1.25,None,2.5],dtype='Float64'), " +
@@ -82,7 +86,10 @@ test("actual pandas nullable data frame transfers typed values and missing cells
 
 test("pandas export rejects lossy or unsafe frames before packet creation", async t => {
   const probe=spawnSync("python3",["-c","import pandas"],{encoding:"utf8"});
-  if (probe.status!==0) return t.skip("pandas unavailable locally");
+  if (probe.status!==0) {
+    if (process.env.FLOWSTUDIO_REQUIRE_PANDAS === "1") assert.fail("pandas is required for independent CI rejection tests: " + (probe.stderr || probe.error || "import failed"));
+    return t.skip("pandas unavailable locally");
+  }
   const query=await exportQuery();
   const invalid=[
     "data = pd.DataFrame({'x':[1]},index=[5])",

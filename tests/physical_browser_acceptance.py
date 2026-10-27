@@ -273,6 +273,46 @@ def test_r(page, timeout: int):
     run_console(page, "r",
                 "stopifnot(identical(fs_r_np, c(1.25, NA_real_, 2.5))); "
                 "cat('numpy R accepted')", "numpy R accepted", timeout)
+    # Physical-browser acceptance for real Unicode ndarray <-> webR character vectors.
+    # These assertions remain unexecuted until Playwright runs against real CDNs.
+    run_source(page, "python",
+               "fs_py_unicode = np.array(['café', '東京', '🙂'], dtype='U4')\n"
+               "print('numpy Unicode ready')", "numpy Unicode ready", timeout)
+    page.locator("#transferDirection").select_option("python-to-r")
+    page.locator("#transferSource").fill("fs_py_unicode")
+    page.locator("#transferDestination").fill("fs_r_unicode")
+    page.locator("#transferVariable").click()
+    page.wait_for_function(
+        "() => document.querySelector('#notice').textContent.includes('Transferred fs_py_unicode to fs_r_unicode')",
+        timeout=timeout)
+    run_console(page, "r",
+                "stopifnot(identical(fs_r_unicode, c('café','東京','🙂'))); cat('unicode R accepted')",
+                "unicode R accepted", timeout)
+    page.locator("#transferDirection").select_option("r-to-python")
+    page.locator("#transferAsNumpy").check()
+    page.locator("#transferSource").fill("fs_r_unicode")
+    page.locator("#transferDestination").fill("fs_py_unicode_back")
+    page.locator("#transferVariable").click()
+    page.wait_for_function(
+        "() => document.querySelector('#notice').textContent.includes('Transferred fs_r_unicode to fs_py_unicode_back')",
+        timeout=timeout)
+    run_console(page, "python",
+                "assert type(fs_py_unicode_back) is np.ndarray and fs_py_unicode_back.dtype.kind == 'U'; "
+                "assert fs_py_unicode_back.tolist() == ['café','東京','🙂']; print('unicode NumPy accepted')",
+                "unicode NumPy accepted", timeout)
+    run_source(page, "r",
+               "fs_r_unicode_missing <- c('safe', NA_character_)\ncat('missing Unicode ready')",
+               "missing Unicode ready", timeout)
+    page.locator("#transferSource").fill("fs_r_unicode_missing")
+    page.locator("#transferDestination").fill("fs_py_unicode_missing")
+    page.locator("#transferVariable").click()
+    page.wait_for_function(
+        "() => document.querySelector('#notice').textContent.includes('nonmissing boolean/string')",
+        timeout=timeout)
+    run_console(page, "python",
+                "assert 'fs_py_unicode_missing' not in globals(); print('missing Unicode rejected')",
+                "missing Unicode rejected", timeout)
+    page.locator("#transferAsNumpy").uncheck()
     page.locator("#reset").click()
     assert "R state reset" in page.locator("#notice").inner_text()
     run_source(page, "r", "print(exists('fs_browser_value', envir=.GlobalEnv))", "FALSE", timeout)

@@ -50,3 +50,19 @@ Both native platforms passed six table regression tests without skips,
 including actual CPython and Rscript round trips, and compiled and packaged
 the pinned Flow 2.0.0 backend. Physical-browser Pyodide/webR table transfer
 remains unverified; no full RStudio or pandas parity is claimed.
+
+
+## NumPy Unicode vectors (27 October 2026; independent CI pending)
+
+The optional NumPy destination now accepts nonempty R character vectors
+without `NA_character_`, creating a real Unicode `numpy.ndarray` in the
+persistent Python interpreter. The reverse direction accepts exact NumPy
+Unicode arrays (dtype kind `U`) with a maximum declared width of 512 Unicode
+code points per element, subject to the existing per-string UTF-16, total
+packet and element bounds. It rejects bytes/object/structured dtypes,
+subclasses, embedded NUL, invalid Unicode and missing character elements in
+NumPy destination mode. Default Python list transfers still support typed
+missing strings. See `tests/browser_variable_transfer_numpy.test.js` and
+`tests/browser_variable_transfer_numpy_import.test.js`. This does not
+preserve NumPy dtype width on the R side, nor verify a physical-browser
+Pyodide/webR round trip or RStudio parity.

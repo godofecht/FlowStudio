@@ -1,3 +1,26 @@
+## 2026-10-27: bounded bidirectional NumPy Unicode vector transfer (validation pending)
+
+Browser Python → R Copy variable now accepts exact one-dimensional NumPy Unicode
+ndarrays with native dtype kind `U` and storage width at most 512 code points
+per element. The existing typed string packet, 256-element / 32-KiB limits,
+512-UTF-16-code-unit string limit and NUL/invalid-Unicode rejection remain
+in force. NumPy bytes, object, structured and custom ndarray subclasses remain
+unsupported. R → Python can explicitly construct a real NumPy Unicode ndarray
+from a nonempty classless character vector without missing values. R
+`NA_character_` is rejected for this destination instead of being silently
+converted into the literal string `"None"`; the default Python-list
+destination continues to preserve missing values as `None`. Existing numeric
+NaN and logical array behavior is unchanged.
+
+**Status: partial / source implementation committed; hosted Linux/macOS CI
+and physical-browser Pyodide/webR acceptance pending.** Focused local V8
+execution of the actual controller and worker passed transfer, missing-value
+and invalid-string rejection checks; local CPython/NumPy 2.3.5 constructed
+the real Unicode ndarray. These checks are not evidence of native Flow/Rscript
+compilation, physical-browser execution or RStudio parity. No hosted CI or
+native Flow backend configuration changed.
+
+
 ## 2026-10-27: opt-in R atomic vector → NumPy ndarray destination (pending independent CI)
 
 The browser R → Python Copy variable operation now supports an explicit NumPy

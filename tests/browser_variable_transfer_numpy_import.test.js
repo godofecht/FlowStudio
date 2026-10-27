@@ -75,7 +75,7 @@ test("controller rejects incompatible NumPy modes before Python destination muta
     [numberPacket,true,/either pandas or NumPy/],
     [{kind:"scalar",type:"number",values:[3]},false,/nonempty numeric/],
     [{kind:"table",columns:[{name:"x",type:"number",values:[3]}]},false,/nonempty numeric/],
-    [{kind:"vector",type:"string",values:["x"]},false,/nonempty numeric/],
+    [{kind:"vector",type:"string",values:["x",null]},false,/nonempty numeric/],
     [{kind:"vector",type:"number",values:[]},false,/nonempty numeric/],
     [{kind:"vector",type:"boolean",values:[true,null]},false,/nonempty numeric/]
   ]) {
@@ -97,7 +97,7 @@ test("worker rejects invalid NumPy requests before loading Python and serializes
   h.send(1,"import-numpy","copy",numberPacket);
   h.send(2,"import-numpy","flags",boolPacket);
   h.send(3,"import-numpy","copy",{kind:"vector",type:"boolean",values:[null,true]});
-  h.send(4,"import-numpy","copy",{kind:"vector",type:"string",values:["x"]});
+  h.send(4,"import-numpy","copy",{kind:"vector",type:"string",values:["x",null]});
   h.send(5,"import-numpy","copy",{kind:"scalar",type:"number",values:[1]});
   h.send(6,"import-numpy","bad-name",numberPacket);
   h.send(7,"import-numpy","copy",{kind:"vector",type:"number",values:[Infinity]});
@@ -147,4 +147,41 @@ test("NumPy import errors and nonacknowledgement leave destination unchanged", a
     h.queries[0].split("\n").map(line=>"    "+line).join("\n")+
     "\nexcept RuntimeError:\n    pass\nassert copy == 'unchanged'");
   assert.equal(result.status,0,result.stderr);
+});
+
+test("R Unicode vectors are transferred to real NumPy Unicode ndarrays", async t => {
+  const packet = {kind:"vector",type:"string",values:["café","東京","🙂",""]};
+  const missing = {kind:"vector",type:"string",values:["safe",null]};
+  const h = harness();
+  h.send(1,"import-numpy","words",packet);
+  h.send(2,"import-numpy","missing",missing);
+  await wait(h,2);
+  assert.equal(h.replies[0].ok,true);
+  assert.equal(h.replies[1].ok,false);
+  assert.equal(h.queries.length,1,"Missing strings must not reach Python");
+  assert.deepEqual(h.loaded,["numpy"]);
+  if (!requireNumpy(t)) return;
+  const result=python(h.queries[0]+
+    "\nimport numpy as np"+
+    "\nassert type(words) is np.ndarray and words.ndim == 1"+
+    "\nassert words.dtype.kind == 'U'"+
+    "\nassert words.tolist() == ['café','東京','🙂','']");
+  assert.equal(result.status,0,result.stderr);
+});
+
+test("controller accepts nonmissing R strings as NumPy but refuses missing strings", async () => {
+  let packet={kind:"vector",type:"string",values:["élan","東京"]};
+  const calls=[], notices=[];
+  let busy=false;
+  const controller=transfer.create({direction:control("r-to-python"),source:control("words"),
+    destination:control("copy"),button:control(""),numpy:{checked:true},pandas:{checked:false},
+    rSession:()=>({exportVariable:async()=>({ok:true,value:packet})}),
+    python:async(op,name,value)=>{calls.push([op,name,value]);return {ok:true};},
+    notice:s=>notices.push(s),isBusy:()=>busy,setBusy:v=>{busy=v;},generation:()=>0});
+  assert.equal(await controller.transfer(),true);
+  assert.deepEqual(calls,[["import-numpy","copy",packet]]);
+  packet={kind:"vector",type:"string",values:["safe",null]};
+  assert.equal(await controller.transfer(),false);
+  assert.equal(calls.length,1,"Missing strings must not mutate destination");
+  assert.ok(notices.at(-1).includes("nonmissing boolean/string"));
 });

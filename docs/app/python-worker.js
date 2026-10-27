@@ -150,8 +150,8 @@ async function handle(event) {
     validTransferPacket(transferValue) &&
     (op !== "import-pandas" || transferValue.kind === "table") &&
      (op !== "import-numpy" || (transferValue.kind === "vector" &&
-       ["number", "boolean"].includes(transferValue.type) && transferValue.values.length > 0 &&
-       (transferValue.type !== "boolean" || !transferValue.values.includes(null))));
+       ["number", "boolean", "string"].includes(transferValue.type) && transferValue.values.length > 0 &&
+       (transferValue.type === "number" || !transferValue.values.includes(null))));
   if (!((op === "run" && typeof code === "string" && new TextEncoder().encode(code).length <= 65536) ||
     op === "inspect" || op === "packages" || validInstall || validTable || validCheck || validHelp || validComplete || validExport || validImport)) {
     self.postMessage({id, ok:false, output:"Invalid execution request."}); return;
@@ -202,7 +202,7 @@ async function handle(event) {
         "    _fs_transfer_packet = {'kind': 'table', 'columns': _fs_transfer_columns}",
         "elif _fs_transfer_kind == 'ndarray':",
         "    if _fs_transfer_obj.ndim != 1 or not 1 <= _fs_transfer_obj.size <= 256: raise ValueError('NumPy vector requires 1-256 elements and exactly one dimension')",
-        "    if str(_fs_transfer_obj.dtype) not in ('int8', 'int16', 'int32', 'int64', 'uint8', 'uint16', 'uint32', 'uint64', 'float16', 'float32', 'float64', 'bool'): raise ValueError('Unsupported NumPy vector dtype')",
+        "    if str(_fs_transfer_obj.dtype) not in ('int8', 'int16', 'int32', 'int64', 'uint8', 'uint16', 'uint32', 'uint64', 'float16', 'float32', 'float64', 'bool') and not (_fs_transfer_obj.dtype.kind == 'U' and 0 < _fs_transfer_obj.dtype.itemsize <= 2048): raise ValueError('Unsupported NumPy vector dtype')",
         "    _fs_transfer_values = _fs_transfer_obj.tolist()",
         "    _fs_transfer_values = [None if type(v) is float and _fs_transfer_math.isnan(v) else v for v in _fs_transfer_values]",
         "    _fs_transfer_type_name = _fs_transfer_check(_fs_transfer_values, 256)",
@@ -246,12 +246,12 @@ async function handle(event) {
     }
     if (op === "import-numpy") {
       // Explicit R vector -> ndarray conversion. Keep missing numeric values as NaN;
-      // reject missing logical values before loading NumPy to avoid silent coercion.
+      // reject missing logical/string values before loading NumPy to avoid silent coercion.
       await py.loadPackage("numpy");
       const query = [
         "import json as _fs_transfer_json, numpy as _fs_transfer_np",
         "_fs_transfer_packet = _fs_transfer_json.loads(" + JSON.stringify(JSON.stringify(transferValue)) + ")",
-        "_fs_transfer_dtype = _fs_transfer_np.float64 if _fs_transfer_packet['type'] == 'number' else _fs_transfer_np.bool_",
+        "_fs_transfer_dtype = {'number': _fs_transfer_np.float64, 'boolean': _fs_transfer_np.bool_, 'string': _fs_transfer_np.str_}[_fs_transfer_packet['type']]",
         "_fs_transfer_array = _fs_transfer_np.asarray(_fs_transfer_packet['values'], dtype=_fs_transfer_dtype)",
         "if type(_fs_transfer_array) is not _fs_transfer_np.ndarray or _fs_transfer_array.ndim != 1: raise ValueError('Invalid NumPy transfer result')",
         "globals()[" + JSON.stringify(code) + "] = _fs_transfer_array",

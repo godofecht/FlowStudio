@@ -22,7 +22,7 @@ For the next iteration, add real-browser acceptance of transfer and interpreter 
 The new regression suite `tests/browser_variable_transfer_missing.test.js` exercises the real worker-generated Python code under CPython, both webR transfer query directions, protocol validation, and actual Rscript when installed. The native verification harness now requires this test with real Rscript on both Linux and macOS; source-only Node runs may skip it. Independent [Linux/macOS CI #40422754617](https://github.com/godofecht/FlowStudio/actions/runs/40422754617) passed all four jobs, including five new transfer tests without skips on each native platform and real Rscript NA/NaN/Inf and literal-string assertions. The extension merged in [PR #91](https://github.com/godofecht/FlowStudio/pull/91). Real webR/Pyodide physical-browser round trips are still unverified, despite an opt-in acceptance scenario. The existing Flow-owned native server and hosted CI configuration are unchanged. This is typed vector interoperability, **not** tabular/data.frame interchange or RStudio parity.
 
 
-## Bounded typed tables (27 October 2026; validation pending)
+## Bounded typed tables (27 October 2026; Linux/macOS CI verified)
 
 The same Copy variable control additionally accepts a `{kind:"table",
 columns:[{name,type,values},...]}` packet. The Python source must be an
@@ -44,5 +44,9 @@ explicit nonempty type evidence.
 worker dispatch, generated CPython source, webR query construction and real
 Rscript table round trips where installed. `scripts/verify_native.py
 --require-r` requires the Rscript test in the native build gate. This is
-**pending independent CI and physical-browser verification**; no full
-RStudio or pandas parity is claimed.
+**independently verified in Linux/macOS CI #40428898996** after
+[PR #92](https://github.com/godofecht/FlowStudio/pull/92) merged.
+Both native platforms passed six table regression tests without skips,
+including actual CPython and Rscript round trips, and compiled and packaged
+the pinned Flow 2.0.0 backend. Physical-browser Pyodide/webR table transfer
+remains unverified; no full RStudio or pandas parity is claimed.

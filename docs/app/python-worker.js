@@ -144,8 +144,10 @@ async function handle(event) {
   const validComplete = op === "complete" && typeof code === "string" &&
     /^[A-Za-z_][A-Za-z0-9_]{0,79}$/.test(code);
   const validExport = op === "export" && typeof code === "string" && TRANSFER_NAME.test(code);
-  const validImport = op === "import" && typeof code === "string" && TRANSFER_NAME.test(code) &&
-    validTransferPacket(transferValue);
+  const validImport = (op === "import" || op === "import-pandas") &&
+    typeof code === "string" && TRANSFER_NAME.test(code) &&
+    validTransferPacket(transferValue) &&
+    (op !== "import-pandas" || transferValue.kind === "table");
   if (!((op === "run" && typeof code === "string" && new TextEncoder().encode(code).length <= 65536) ||
     op === "inspect" || op === "packages" || validInstall || validTable || validCheck || validHelp || validComplete || validExport || validImport)) {
     self.postMessage({id, ok:false, output:"Invalid execution request."}); return;
@@ -219,6 +221,26 @@ async function handle(event) {
       const packet = JSON.parse(raw);
       if (!validTransferPacket(packet)) throw Error("Invalid Python transfer payload.");
       self.postMessage({id, ok:true, value:packet});
+      return;
+    }
+    if (op === "import-pandas") {
+      // Opt-in: fetch the real Pyodide pandas package and construct typed columns
+      // before assigning the destination. Failed conversions leave it untouched.
+      await py.loadPackage("pandas");
+      const query = [
+        "import json as _fs_transfer_json, pandas as _fs_transfer_pd",
+        "_fs_transfer_packet = _fs_transfer_json.loads(" + JSON.stringify(JSON.stringify(transferValue)) + ")",
+        "_fs_transfer_columns = {}",
+        "for _fs_transfer_column in _fs_transfer_packet['columns']:",
+        "    _fs_transfer_dtype = {'number': 'Float64', 'boolean': 'boolean', 'string': 'string'}[_fs_transfer_column['type']]",
+        "    _fs_transfer_columns[_fs_transfer_column['name']] = _fs_transfer_pd.Series(_fs_transfer_column['values'], dtype=_fs_transfer_dtype)",
+        "_fs_transfer_frame = _fs_transfer_pd.DataFrame(_fs_transfer_columns)",
+        "globals()[" + JSON.stringify(code) + "] = _fs_transfer_frame",
+        "'ok'"
+      ].join("\n");
+      const acknowledgement = await py.runPythonAsync(query);
+      if (acknowledgement !== "ok") throw Error("Pandas transfer assignment did not acknowledge success.");
+      self.postMessage({id, ok:true});
       return;
     }
     if (op === "import") {

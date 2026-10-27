@@ -221,22 +221,26 @@ function create({projectApi, fileSaveApi, source, filename, language, tree,
     if (saving || deleting) { status("File operation already running."); return false; }
     if (dirty()) { status("Save or discard unsaved changes before deleting."); return false; }
     const handle = activeHandle, parent = activeParent, name = activeName;
-    const baseline = diskBaseline;
+    const baseline = diskBaseline, initialSource = source.value;
     deleting = true;
     try {
       if (typeof parent.getFileHandle !== "function" || typeof parent.removeEntry !== "function")
         throw new Error("This browser does not support project file deletion.");
       async function checkCurrent() {
-        const current = await parent.getFileHandle(name);
-        if (typeof current.isSameEntry === "function" && !(await current.isSameEntry(handle)))
-          throw new Error("The file was replaced externally.");
+        // Share the same fail-closed identity gate as project saves/reloads.
+        // Matching bytes are not evidence that a replaced file is the same file.
+        const current = await verifiedProjectEntry(handle, parent, name);
         if ((await fileSaveApi.readSnapshot(current)) !== baseline)
           throw new Error("The file changed on disk. Deletion refused.");
       }
       await checkCurrent();
       if (!confirmChange('Permanently delete "' + name + '" from this project?')) return false;
-      if (activeHandle !== handle || dirty()) throw new Error("Editor changed during deletion.");
+      if (activeHandle !== handle || source.value !== initialSource || dirty())
+        throw new Error("Editor changed during deletion.");
       await checkCurrent();
+      // A user can type while the final filesystem read is pending.
+      if (activeHandle !== handle || source.value !== initialSource || dirty())
+        throw new Error("Editor changed during deletion.");
       await parent.removeEntry(name);
       activeHandle = null;
       activeParent = null;

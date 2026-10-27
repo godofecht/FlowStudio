@@ -17,8 +17,12 @@ async function rename({parent, handle, name, nextName, baseline, fileSaveApi,
 
   async function verifyOriginal() {
     const current = await parent.getFileHandle(name);
-    if (typeof current.isSameEntry === "function" && !(await current.isSameEntry(handle)))
-      throw new Error("Source file was replaced externally; rename refused.");
+    const same = typeof current.isSameEntry === "function"
+      ? await current.isSameEntry(handle)
+      : typeof handle.isSameEntry === "function"
+        ? await handle.isSameEntry(current) : false;
+    if (!same)
+      throw new Error("Source file was replaced externally or its identity cannot be verified; rename refused.");
     if (await fileSaveApi.readSnapshot(current) !== baseline)
       throw new Error("Source file changed on disk; rename refused.");
   }
@@ -44,8 +48,14 @@ async function rename({parent, handle, name, nextName, baseline, fileSaveApi,
   const destination = await parent.getFileHandle(nextName, {create:true});
   let copied = false;
   try {
-    if (typeof destination.isSameEntry === "function" && await destination.isSameEntry(handle))
-      throw new Error("Destination resolves to the original file; rename refused.");
+    const sameDestination = typeof destination.isSameEntry === "function"
+      ? await destination.isSameEntry(handle)
+      : typeof handle.isSameEntry === "function"
+        ? await handle.isSameEntry(destination) : null;
+    if (sameDestination !== false)
+      throw new Error(sameDestination
+        ? "Destination resolves to the original file; rename refused."
+        : "Cannot verify that the destination differs from the source; rename refused.");
     await fileSaveApi.writeIfUnchanged(destination, "", baseline);
     copied = true;
     if (await fileSaveApi.readSnapshot(destination) !== baseline)
@@ -64,8 +74,10 @@ async function rename({parent, handle, name, nextName, baseline, fileSaveApi,
     // Before copy succeeds, remove only the exact empty file we created.
     try {
       const current = await parent.getFileHandle(nextName);
-      const same = typeof current.isSameEntry === "function" &&
-        await current.isSameEntry(destination);
+      const same = typeof current.isSameEntry === "function"
+        ? await current.isSameEntry(destination)
+        : typeof destination.isSameEntry === "function"
+          ? await destination.isSameEntry(current) : false;
       if (same && await fileSaveApi.readSnapshot(current) === "")
         await parent.removeEntry(nextName);
     } catch (_) { /* Do not mask the original failure. */ }

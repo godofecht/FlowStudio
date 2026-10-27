@@ -1,3 +1,21 @@
+## 2026-10-27: fail-closed identity checks for destructive browser project operations (PR validation pending)
+
+Project-file deletion and rename now refuse destructive operations when the
+browser cannot establish that the current directory entry is the originally
+opened file. The deletion path reuses the same identity check as project
+saving, rather than accepting matching contents when `isSameEntry` is absent.
+Deletion also rechecks editor contents after its final awaited filesystem
+verification, so typing during that read cannot silently discard an unsaved
+edit. Rename checks source identity and destination distinctness before
+writing, and only cleans up a verified empty destination after failed copying.
+
+**Status: partial / implementation and regression tests submitted; independent
+Linux/macOS CI and physical-browser File System Access acceptance pending.**
+This is not an atomic filesystem transaction. The browser File System Access
+API cannot prevent an external process from replacing or modifying a file
+between the final check and `removeEntry`, nor guarantee exclusive creation
+of a rename destination. No native Flow backend or hosted CI changes.
+
 ## 2026-10-27: verified project-file identity and readback during browser saves (Linux/macOS CI passed)
 
 The browser File System Access workspace now checks that a project file's

@@ -123,6 +123,16 @@ def verify(root: Path, port: int = 8751, build_timeout: int = 180,
             print(missing_result.stderr, end="", file=sys.stderr, flush=True)
         if missing_result.returncode != 0:
             raise VerificationError("Real typed NA/None transfer acceptance failed")
+        print("Real Python/R typed table transfer acceptance: tests/browser_variable_transfer_table.test.js", flush=True)
+        table_result = _command(
+            ["node", "--test", str(root / "tests/browser_variable_transfer_table.test.js")], root, 65
+        )
+        if table_result.stdout:
+            print(table_result.stdout, end="", flush=True)
+        if table_result.stderr:
+            print(table_result.stderr, end="", file=sys.stderr, flush=True)
+        if table_result.returncode != 0:
+            raise VerificationError("Real typed table transfer acceptance failed")
         print("Real browser R inspector query acceptance: tests/browser_r_nested_environment.test.js", flush=True)
         inspect_result = _command(
             ["node", "--test", str(root / "tests/browser_r_nested_environment.test.js")], root, 65

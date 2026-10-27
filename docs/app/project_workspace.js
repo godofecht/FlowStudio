@@ -62,16 +62,40 @@ function create({projectApi, fileSaveApi, source, filename, language, tree,
     if (opened) notifyExternalOpen();
     return opened;
   }
+  /* File handles can outlive the path they were opened through. Check the
+   * current directory entry before and after writing a project source file. */
+  async function verifiedProjectEntry(handle, parent, name) {
+    if (!parent) return handle; // Save As may point outside the project.
+    if (!name || typeof parent.getFileHandle !== "function")
+      throw new Error("Cannot verify the project file location.");
+    const current = await parent.getFileHandle(name);
+    const same = typeof current.isSameEntry === "function"
+      ? await current.isSameEntry(handle)
+      : typeof handle.isSameEntry === "function"
+        ? await handle.isSameEntry(current) : false;
+    if (!same) throw new Error("Project file was replaced or cannot be verified.");
+    return current;
+  }
   async function save() {
     if (saving || deleting) { status("File operation already running."); return false; }
     if (!activeHandle) { status("Open a project file before saving to disk."); return false; }
+    const handle = activeHandle, parent = activeParent, name = activeName;
+    const baseline = diskBaseline, contents = source.value;
     saving = true;
     try {
-      const saved = await fileSaveApi.writeIfUnchanged(activeHandle, diskBaseline, source.value);
+      const current = await verifiedProjectEntry(handle, parent, name);
+      const saved = await fileSaveApi.writeIfUnchanged(current, baseline, contents);
+      // Do not claim success or advance the baseline if another process
+      // replaced or modified the file while the write was in flight.
+      const after = await verifiedProjectEntry(handle, parent, name);
+      if (await fileSaveApi.readSnapshot(after) !== saved)
+        throw new Error("File changed during save; verify disk contents before retrying.");
       diskBaseline = saved;
       editorBaseline = saved;
       onDraft();
-      status("Saved " + filename.textContent + " to disk.");
+      status(source.value === saved
+        ? "Saved " + filename.textContent + " to disk."
+        : "Saved " + filename.textContent + "; newer editor changes remain unsaved.");
       return true;
     } catch (error) {
       status("Save failed: " + (error.message || String(error)));

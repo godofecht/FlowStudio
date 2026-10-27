@@ -1,3 +1,31 @@
+## 2026-10-27: verified project-file identity and readback during browser saves (Linux/macOS CI passed)
+
+The browser File System Access workspace now checks that a project file's
+current parent-directory entry is the same handle opened in the editor before
+writing, and checks both identity and on-disk contents again after writing.
+Same-content external replacement, unverifiable identity, and changes made
+while a write is in flight no longer count as successful saves. The editor's
+conflict baseline advances only after verified readback; edits typed during an
+awaited save remain dirty. Save As files outside the project retain their
+existing handle-only save path. The existing 2 MiB bound and conflict-aware
+writer are unchanged.
+
+**Status: partial / independent Linux/macOS source and native CI passed;
+physical-browser File System Access acceptance pending.** [PR #100](https://github.com/godofecht/FlowStudio/pull/100)
+passed all four Ubuntu 24.04/macOS 14 jobs in
+[CI #40483964486](https://github.com/godofecht/FlowStudio/actions/runs/40483964486)
+on 27 October 2026. Each source job ran 869 JavaScript tests (864 passed,
+five skipped, zero failures), including eight new save-identity tests without
+skips. Both native jobs compiled the pinned Flow 2.0.0 backend, completed
+real Rscript/HTTP acceptance and packaged executables. Eight exact-source V8
+regression scenarios also passed locally. An initial CI run exposed a
+filesystem mock without `isSameEntry`; the fixture was corrected to model
+the actual browser handle contract before successful CI. A successful underlying write followed by a
+failed readback is reported as ambiguous, not as a clean save. This is not an
+atomic filesystem transaction: external writes can still race after the last
+check. Flow 2.0.0 remains the primary native backend. No hosted CI
+configuration changed. RStudio parity remains incomplete.
+
 ## 2026-10-27: explicit browser source reload after external disk edits (Linux/macOS CI passed)
 
 The browser File System Access workspace now offers **Reload from disk** for

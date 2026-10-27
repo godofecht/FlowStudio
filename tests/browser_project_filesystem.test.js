@@ -14,6 +14,7 @@ function node() {
 }
 function file(name, content) {
   return {kind:"file", name, content,
+    async isSameEntry(other) { return this === other; },
     async getFile() {return {size:Buffer.byteLength(this.content),text:async()=>this.content};},
     async createWritable() {
       let staged = "";

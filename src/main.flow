@@ -137,7 +137,7 @@ function execute(language: string, code: string, check_only: bool, backend: stri
         output = output + "\nProcess error: " + result.error
     }
     if result.timed_out {
-        if eq(language, "flow") {
+        if eq(language, "flow") or eq(language, "mathflow") {
             output = output + "\nFlow compilation or execution stopped after 60 seconds."
         } else {
             output = output + "\nExecution stopped after 15 seconds."

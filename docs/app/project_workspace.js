@@ -2,7 +2,7 @@
 (function (global) {
 "use strict";
 function create({projectApi, fileSaveApi, source, filename, language, tree,
-                 openFolderButton, saveFileButton, saveAsButton, newFileButton, deleteFileButton, renameFileButton, status,
+                 openFolderButton, saveFileButton, saveAsButton, newFileButton, newFolderButton, deleteFileButton, renameFileButton, status,
                  setFilename, onDraft, picker, saveAsPicker, saveAsApi, projectRenameApi, confirmChange, promptName}) {
   if (!projectApi || !fileSaveApi) throw new TypeError("Project and save APIs are required.");
   let activeHandle = null;
@@ -116,14 +116,30 @@ function create({projectApi, fileSaveApi, source, filename, language, tree,
   async function createFile() {
     if (deleting || saving) { status("File operation already running."); return false; }
     if (!project.hasProject()) { status("Open a project folder first."); return false; }
-    const name = promptName("New source filename (e.g. analysis.flow)");
+    const name = promptName("New source path (e.g. src/analysis.flow)");
     if (name === null) return false;
-    if (!projectApi.validFilename(name)) { status("Invalid source filename."); return false; }
+    if (!(typeof projectApi.validSourcePath === "function" ? projectApi.validSourcePath(name) : projectApi.validFilename(name))) { status("Invalid project source path."); return false; }
     if (!confirmSwitch()) return false;
     approvedCreate = true;
     try { return await project.create(name); }
     catch (error) { status("Cannot create file: " + (error.message || String(error))); return false; }
     finally { approvedCreate = false; }
+  }
+  async function createFolder() {
+    if (deleting || saving) { status("File operation already running."); return false; }
+    if (!project.hasProject()) { status("Open a project folder first."); return false; }
+    const path = promptName("New folder path (e.g. src or src/analysis)");
+    if (path === null) return false;
+    if (typeof projectApi.validFolderPath !== "function" ||
+        !projectApi.validFolderPath(path)) {
+      status("Invalid project folder path."); return false;
+    }
+    deleting = true; // Folder creation is serialized with saves and project switches.
+    try { return await project.createFolder(path); }
+    catch (error) {
+      status("Cannot create folder: " + (error.message || String(error)));
+      return false;
+    } finally { deleting = false; }
   }
   async function deleteFile() {
     if (!activeHandle || !activeParent || !activeName) {
@@ -212,6 +228,7 @@ function create({projectApi, fileSaveApi, source, filename, language, tree,
   saveFileButton.addEventListener("click", () => { void save(); });
   if (saveAsButton) saveAsButton.addEventListener("click", () => { void saveAs(); });
   newFileButton.addEventListener("click", () => { void createFile(); });
+  if (newFolderButton) newFolderButton.addEventListener("click", () => { void createFolder(); });
   if (deleteFileButton) deleteFileButton.addEventListener("click", () => { void deleteFile(); });
   if (renameFileButton) renameFileButton.addEventListener("click", () => { void renameFile(); });
   saveFileButton.disabled = true;
@@ -228,7 +245,7 @@ function create({projectApi, fileSaveApi, source, filename, language, tree,
     // risk overwriting a file currently held in the editor.
     throw new Error("Cannot verify whether the project file is open in the editor.");
   }
-  return {project, choose, save, saveAs, createFile, deleteFile, renameFile, openHandle, notifyExternalOpen, dirty,
+  return {project, choose, save, saveAs, createFile, createFolder, deleteFile, renameFile, openHandle, notifyExternalOpen, dirty,
     isOpenHandle, hasActiveFile: () => activeHandle !== null};
 }
 const api = {create};

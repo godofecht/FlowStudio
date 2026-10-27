@@ -56,7 +56,7 @@ flowjit_compile <- local({
             " const double *v[", n, "]; R_xlen_t lengths[", n, "], count = 0;\n",
             " for (int arg = 0; arg < ", n, "; ++arg) {\n",
             "  SEXP x = VECTOR_ELT(inputs, arg);\n",
-            "  if (TYPEOF(x) != REALSXP || ATTRIB(x) != R_NilValue) return R_NilValue;\n",
+            "  if (TYPEOF(x) != REALSXP) return R_NilValue;\n",
             "  lengths[arg] = XLENGTH(x);\n",
             "  if (lengths[arg] > count) count = lengths[arg];\n",
             "  v[arg] = REAL(x);\n",
@@ -110,6 +110,8 @@ flowjit_compile <- local({
         }, logical(1L)))
     }
 
+    # The R wrapper rejects all attributes before entering the native kernel.
+    # Do not use the unstable internal ATTRIB accessor in generated C.
     suitable <- function(values, argc, min_length) {
         if (length(values) != argc) return(FALSE)
         names <- names(values)

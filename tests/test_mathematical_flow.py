@@ -9,6 +9,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from math_flow import FlowMathError, lex, parse, simulate
 
 SOURCE = (ROOT / "examples/navier_stokes_proposed.flow").read_text(encoding="utf-8")
+SMOKE = (ROOT / "examples/navier_stokes_smoke.flow").read_text(encoding="utf-8")
 
 
 class MathematicalFlowTest(unittest.TestCase):
@@ -43,7 +44,7 @@ class MathematicalFlowTest(unittest.TestCase):
             lex("domain Ω { ∀ ☃ }")
 
     def test_navier_stokes_projection_and_energy(self):
-        result = simulate(parse(SOURCE), grid=16, until=0.001)
+        result = simulate(parse(SMOKE))
         self.assertEqual(result["steps"], 10)
         self.assertLess(result["max_divergence"], 1e-5)
         self.assertLess(abs(result["pressure_mean"]), 1e-8)

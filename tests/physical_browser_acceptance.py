@@ -236,6 +236,28 @@ def test_r(page, timeout: int):
                 "'flag':[True,None,False], 'label':['@NA@',None,'é']}; "
                 "print('pandas browser roundtrip accepted')",
                 "pandas browser roundtrip accepted", timeout)
+    # Real webR -> real Pyodide pandas, not a dictionary or mocked import.
+    run_console(page, "r",
+                "fs_r_pd$missing <- c(NA_real_, NA_real_, NA_real_); cat('typed R ready')",
+                "typed R ready", timeout)
+    page.locator("#transferAsPandas").check()
+    page.locator("#transferSource").fill("fs_r_pd")
+    page.locator("#transferDestination").fill("fs_py_pd_typed")
+    page.locator("#transferVariable").click()
+    page.wait_for_function(
+        "() => document.querySelector('#notice').textContent.includes('Transferred fs_r_pd to fs_py_pd_typed (4 table columns as pandas DataFrame)')",
+        timeout=timeout)
+    run_console(page, "python",
+                "import pandas as pd; "
+                "assert type(fs_py_pd_typed) is pd.DataFrame; "
+                "assert list(fs_py_pd_typed.columns) == ['score','flag','label','missing']; "
+                "assert list(map(str,fs_py_pd_typed.dtypes)) == ['Float64','boolean','string','Float64']; "
+                "assert fs_py_pd_typed['score'].isna().tolist() == [False,True,False]; "
+                "assert fs_py_pd_typed['label'].tolist()[0] == '@NA@'; "
+                "assert fs_py_pd_typed['missing'].isna().all(); "
+                "print('real pandas destination accepted')",
+                "real pandas destination accepted", timeout)
+    page.locator("#transferAsPandas").uncheck()
     page.locator("#reset").click()
     assert "R state reset" in page.locator("#notice").inner_text()
     run_source(page, "r", "print(exists('fs_browser_value', envir=.GlobalEnv))", "FALSE", timeout)

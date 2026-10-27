@@ -64,7 +64,7 @@ test("R Markdown import and export reject executable YAML tags and structured me
     "title: " + JSON.stringify("a".repeat(257))
   ];
   for (const field of unsafe) {
-    const input = "---\\n" + field + "\\noutput: html_document\\n---\\n\\n# Notes\\n";
+    const input = "---\n" + field + "\noutput: html_document\n---\n\n# Notes\n";
     assert.throws(() => decode(input, parseCells), /YAML scalar/,
       "Import accepted unsafe metadata: " + field);
     assert.throws(() => encode(markdown(input), "r", parseCells), /YAML scalar/,
@@ -82,7 +82,7 @@ test("R Markdown import and export preserve inert literal YAML scalars", () => {
     "title: 'Résumé'"
   ];
   for (const field of safe) {
-    const input = "---\\n" + field + "\\noutput: html_document\\n---\\n\\n# Notes\\n";
+    const input = "---\n" + field + "\noutput: html_document\n---\n\n# Notes\n";
     const imported = decode(input, parseCells);
     assert.equal(imported.metadataDiscarded, false);
     assert.ok(encode(imported.source, imported.language, parseCells).includes(field));

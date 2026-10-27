@@ -17,7 +17,10 @@ const SNIPPETS = Object.freeze({
     { label: "function", insert: "function ${name}() -> i32 {\n    return 0\n}" },
     { label: "let mut", insert: "let mut ${name}: i64 = 0" },
     { label: "if", insert: "if ${condition} {\n    \n}" },
-    { label: "for", insert: "for ${item} in ${items} {\n    \n}" }
+    { label: "for", insert: "for ${item} in ${items} {\n    \n}" },
+    { label: "model", insert: "model ${ModelName} on ${DomainName} {\n    field ${velocity}: Vector²<MetersPerSecond>\n    dynamics {\n        ∂ₜ${velocity} = ${expression}\n    }\n    constraint {\n        ∇ · ${velocity} = 0\n    }\n    initial {\n        ${velocity} = ${initialVelocity}\n    }\n}" },
+    { label: "domain", insert: "domain ${DomainName} {\n    grid = 256 × 256\n    extent = 1m × 1m\n    boundaries = Periodic\n}" },
+    { label: "solver", insert: "solver ${SolverName} for ${ModelName} {\n    spatial { method = FiniteDifference }\n    temporal { method = RungeKuttaSecondOrder }\n    pressure { method = ConjugateGradient }\n}" }
   ]),
   python: Object.freeze([
     { label: "def", insert: "def ${name}():\n    " },
@@ -32,7 +35,9 @@ const SNIPPETS = Object.freeze({
 const KEYWORDS = Object.freeze({
   flow: Object.freeze(["function", "return", "let", "mut", "const", "if", "else",
     "while", "for", "in", "import", "export", "struct", "enum", "trait", "match",
-    "true", "false", "and", "or"]),
+    "true", "false", "and", "or", "domain", "model", "solver", "field",
+    "dynamics", "constraint", "initial", "spatial", "temporal", "pressure",
+    "enforce", "via", "on"]),
   python: Object.freeze(["def", "class", "return", "import", "from", "as", "if",
     "elif", "else", "for", "while", "with", "try", "except", "finally", "lambda",
     "pass", "raise", "yield", "None", "True", "False"]),
@@ -73,7 +78,7 @@ function flowSymbols(source, cursor, prefix) {
   const masked = chars.join("");
   const names = new Set();
   const add = name => { if (FLOW_NAME.test(name) && name.startsWith(prefix)) names.add(name); };
-  for (const match of masked.matchAll(/\b(?:function|struct|enum|trait|type|const)\s+([A-Za-z_][A-Za-z0-9_]*)/g))
+  for (const match of masked.matchAll(/\b(?:function|struct|enum|trait|type|const|domain|model|solver|field)\s+([A-Za-z_][A-Za-z0-9_]*)/g))
     add(match[1]);
   for (const match of masked.matchAll(/\bimport\s+[^{}\n]{1,256}\{([^}]*)\}/g))
     for (const entry of match[1].split(",")) add(entry.trim());
@@ -123,7 +128,6 @@ function bufferIdentifiers(source, prefix, language, cursorLimit) {
   }
   return found;
 }
-
 
 /* Complete only names already present in the native R inspector's bounded,
  * inert list metadata. Never evaluate R expressions or infer S3 methods. */

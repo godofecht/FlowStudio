@@ -23,6 +23,23 @@ export function sessionSymbols(fetchFn, language, signal) {
 }
 
 const WORD_AT = /[A-Za-z0-9_.]*$/;
+const MATH_COMMANDS = Object.freeze({
+  partial: '∂', nabla: '∇', grad: '∇', laplacian: '∇²', div: '∇·', curl: '∇×',
+  cdot: '·', times: '×', otimes: '⊗', odot: '⊙', circ: '∘',
+  sum: '∑', prod: '∏', int: '∫', approx: '≈', equiv: '≡', in: '∈',
+  forall: '∀', exists: '∃', perp: '⊥', parallel: '∥', oplus: '⊕',
+  vdash: '⊢', mapsto: '↦', pipe: '▷', star: '⋆', dagger: '†',
+  alpha: 'α', beta: 'β', gamma: 'γ', delta: 'δ', Delta: 'Δ',
+  nu: 'ν', rho: 'ρ', pi: 'π', omega: 'ω', Omega: 'Ω',
+  sub0: '₀', sub1: '₁', subt: 'ₜ', squared: '²', cubed: '³'
+});
+export function mathCommandAt(model, position) {
+  const line = model.getLineContent(position.lineNumber) || '';
+  const before = line.slice(0, position.column - 1);
+  const match = /\\([A-Za-z][A-Za-z0-9]*)$/.exec(before);
+  return match ? { command: match[1], length: match[0].length } : null;
+}
+export { MATH_COMMANDS };
 const WORD_START = /^[A-Za-z0-9_.]+/;
 
 export function prefixAt(model, position, language) {
@@ -45,8 +62,20 @@ export function registerCompletion(monaco, app, fetchFn = (typeof fetch !== 'und
   const disposers = [];
   for (const language of ['flow', 'python', 'r']) {
     const disposable = monaco.languages.registerCompletionItemProvider(language, {
-      triggerCharacters: language === 'r' ? ['.', '$'] : [],
+      triggerCharacters: language === 'r' ? ['.', ' : language === 'flow' ? ['\\'] : [],] : language === 'flow' ? ['\\'] : [],
       provideCompletionItems: async (model, position) => {
+        const math = language === 'flow' ? mathCommandAt(model, position) : null;
+        if (math) {
+          return { suggestions: Object.entries(MATH_COMMANDS)
+            .filter(([command]) => command.startsWith(math.command))
+            .map(([command, glyph]) => ({
+              label: '\\' + command + ' → ' + glyph,
+              kind: monaco.languages.CompletionItemKind.Operator,
+              insertText: glyph,
+              range: { startLineNumber: position.lineNumber, endLineNumber: position.lineNumber,
+                startColumn: position.column - math.length, endColumn: position.column }
+            })) };
+        }
         const beforeCursor = (model.getLineContent(position.lineNumber) || '')
           .slice(0, position.column - 1);
         const member = language === 'r' ? core.rMemberContext(beforeCursor) : null;
@@ -81,6 +110,7 @@ export function registerCompletion(monaco, app, fetchFn = (typeof fetch !== 'und
               item.kind === 'variable' ? monaco.languages.CompletionItemKind.Variable :
               monaco.languages.CompletionItemKind.Text,
             insertText: item.insert,
+            insertTextRules: item.kind === 'snippet' ? monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet : undefined,
             range: member ? {
               startLineNumber: position.lineNumber, endLineNumber: position.lineNumber,
               startColumn: position.column - prefix.length, endColumn: position.column

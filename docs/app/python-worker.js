@@ -187,7 +187,7 @@ async function handle(event) {
         "        if type(_fs_transfer_column) is not _fs_transfer_pd.Series: raise ValueError('Unsupported pandas column')",
         "        _fs_transfer_dtype = _fs_transfer_column.dtype",
         "        _fs_transfer_builtin_dtype = (_fs_transfer_np is not None and isinstance(_fs_transfer_dtype, _fs_transfer_np.dtype) and type(_fs_transfer_dtype).__module__.startswith('numpy')) or type(_fs_transfer_dtype) in (_fs_transfer_pd.Int64Dtype, _fs_transfer_pd.Float64Dtype, _fs_transfer_pd.BooleanDtype, _fs_transfer_pd.StringDtype)",
-        "        if not _fs_transfer_builtin_dtype or str(_fs_transfer_dtype) not in ('int64', 'float64', 'bool', 'Int64', 'Float64', 'boolean', 'string', 'object'): raise ValueError('Unsupported pandas column dtype')",
+        "        if not _fs_transfer_builtin_dtype or str(_fs_transfer_dtype) not in ('int8', 'int16', 'int32', 'int64', 'uint8', 'uint16', 'uint32', 'uint64', 'float16', 'float32', 'float64', 'bool', 'Int64', 'Float64', 'boolean', 'string', 'object'): raise ValueError('Unsupported pandas column dtype')",
         "        _fs_transfer_values = [None if (v is None or v is _fs_transfer_pd.NA or (type(v) is float and _fs_transfer_math.isnan(v))) else v for v in _fs_transfer_column.tolist()]",
         "        _fs_transfer_type_name = _fs_transfer_check(_fs_transfer_values, 128)",
         "        _fs_transfer_columns.append({'name': _fs_transfer_key, 'type': _fs_transfer_type_name, 'values': _fs_transfer_values})",

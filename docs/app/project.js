@@ -1,8 +1,12 @@
 /* FlowStudio project explorer. Browser File System Access API only. */
 (function (global) {
 "use strict";
-const creation = global.FlowStudioProjectCreate ||
-  (typeof require === "function" ? require("./project_create.js") : null);
+function creationApi() {
+  const api = global.FlowStudioProjectCreate ||
+    (typeof require === "function" ? require("./project_create.js") : null);
+  if (!api) throw new Error("Project creation helper unavailable.");
+  return api;
+}
 const editable = /\.(flow|r|py|txt|md|qmd|rmd|csv|tsv|json|toml|yaml|yml|rproj)$/i;
 function validFilename(name) {
   if (typeof name !== "string" || name.length === 0 || name.length > 255 ||
@@ -292,14 +296,14 @@ function createProjectExplorer({ tree, status, openHandle, picker }) {
   }
   async function create(name) {
     if (!root) throw new Error("Open a project first.");
-    const result = await creation.createFile(root, name, validFilename);
+    const result = await creationApi().createFile(root, name, validFilename);
     const opened = await openHandle(result.handle, root.name + "/" + result.path, result.parent);
     await refresh();
     return opened;
   }
   async function createFolder(path) {
     if (!root) throw new Error("Open a project first.");
-    const result = await creation.createDirectory(root, path);
+    const result = await creationApi().createDirectory(root, path);
     await refresh();
     status("Created folder " + root.name + "/" + result.path, "ok");
     return true;
@@ -326,8 +330,8 @@ function createProjectExplorer({ tree, status, openHandle, picker }) {
     hasProject: () => root !== null };
 }
 const api = { createProjectExplorer, validFilename,
-  validSourcePath: path => creation.validSourcePath(path, validFilename),
-  validFolderPath: creation.validFolderPath, searchProject, planProjectReplace, applyProjectReplacement, reverseProjectReplacement };
+  validSourcePath: path => creationApi().validSourcePath(path, validFilename),
+  validFolderPath: path => creationApi().validFolderPath(path), searchProject, planProjectReplace, applyProjectReplacement, reverseProjectReplacement };
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 global.FlowStudioProject = api;
 })(globalThis);

@@ -1,7 +1,7 @@
 name: CI
 on:
   push:
-    branches: [main]
+    branches: [main, feat/native-monaco-r-member-completion-20261026]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -12,14 +12,14 @@ concurrency:
 jobs:
   rebuild_monaco_pr89:
     name: Rebuild committed Monaco assets for PR 89
-    if: github.event_name == 'pull_request' && github.event.pull_request.number == 89
+    if: (github.event_name == 'pull_request' && github.event.pull_request.number == 89) || github.ref == 'refs/heads/feat/native-monaco-r-member-completion-20261026'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.ref }}
+          ref: feat/native-monaco-r-member-completion-20261026
           persist-credentials: true
       - uses: actions/setup-node@v4
         with:

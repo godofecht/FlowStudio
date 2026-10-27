@@ -1,3 +1,17 @@
+## 2026-10-27: bounded webR data.frame column completion (validation pending)
+
+The browser R source editor now offers `$` completion for column names of exact
+base `data.frame` objects, including frames nested inside ordinary lists.
+The existing webR environment inspection emits up to twelve column names per
+frame without reading column values or evaluating submitted completion
+expressions. It excludes non-syntactic/reserved names, custom classes and
+active bindings. The inspected names can be stale if the workspace changes;
+lazy root bindings can still be forced by the existing inspector. This does
+not change the native Flow server, native Monaco's separately bundled editor,
+or the R interpreter. **Status: partial; local V8 syntax/metadata checks
+only, GitHub Linux/macOS and real Rscript acceptance pending.** Physical
+browser acceptance and RStudio parity remain unverified.
+
 ## 2026-10-27: bounded typed Python/R tabular interchange (validation pending)
 
 The browser-local Copy variable path now accepts a **typed table packet** with

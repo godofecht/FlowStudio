@@ -71,9 +71,17 @@ const INSPECT = `base::local({
     } else {
       base::paste0("<", raw_type, ">")
     }
+    # Exact base data.frames expose names without reading their column values.
+    # Do not invoke user-defined extraction or class methods for completion.
+    frame <- base::identical(classes, "data.frame") && base::identical(raw_type, "list")
+    columns <- if (frame) base::attr(value, "names", exact=TRUE) else NULL
+    frame_names <- frame && base::is.character(columns) &&
+      base::length(columns) == base::length(value) && !base::anyNA(columns)
     count <- if (depth < 2L && plain && base::identical(raw_type, "list"))
-      base::min(size, 12L) else 0L
-    more <- depth < 2L && plain && base::identical(raw_type, "list") && size > count
+      base::min(size, 12L) else if (depth < 2L && frame_names)
+      base::min(base::length(columns), 12L) else 0L
+    more <- depth < 2L && ((plain && base::identical(raw_type, "list")) || frame_names) &&
+      base::length(value) > count
     if (!push(depth, name, kind, shape, preview, more)) base::return(FALSE)
     if (count > 0L) {
       labels <- base::attr(value, "names", exact=TRUE)
@@ -83,7 +91,9 @@ const INSPECT = `base::local({
         if (base::is.character(labels) && base::length(labels) >= index &&
             !base::is.na(labels[index]) && base::nzchar(labels[index]))
           label <- base::paste0(label, " ", base::substr(labels[index], 1L, 80L))
-        if (!describe(label, value[[index]], depth + 1L)) break
+        if (frame) {
+          if (!push(depth + 1L, label, "column", "", "<column>")) break
+        } else if (!describe(label, value[[index]], depth + 1L)) break
       }
     }
     TRUE
@@ -128,7 +138,7 @@ function parseInspection(rows) {
       variables.push(node);
     } else {
       const parent = stack[depth - 1];
-      if (!parent || parent.type !== "list")
+      if (!parent || !["list", "data.frame"].includes(parent.type))
         throw Error("Invalid R environment nesting.");
       if (!parent.children) parent.children = [];
       if (parent.children.length >= 12) throw Error("R environment exceeds child limit.");

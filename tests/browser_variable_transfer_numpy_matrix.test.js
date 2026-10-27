@@ -102,7 +102,7 @@ test("real NumPy matrix export fails closed on shape, dtype, unsafe values and s
     "matrix = np.ones((2,2)).view(Trap)");
   assert.notEqual(subclass.status,0);
   assert.doesNotMatch(subclass.stderr,/unsafe traversal/);
-  const oversized=runPython(query,"import numpy as np\nmatrix = np.full((128,16),'x'*512,dtype='U512')");
+  const oversized=runPython(query,"import numpy as np\nmatrix = np.full((16,16),'x'*200,dtype='U200')");
   assert.equal(oversized.status,0,oversized.stderr);
   assert.throws(()=>transfer.validate(JSON.parse(oversized.stdout)),/32 KiB/);
 });

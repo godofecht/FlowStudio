@@ -1,3 +1,22 @@
+## 2026-10-27: Jupyter Markdown MIME roundtrip and portable report rendering (CI pending)
+
+Jupyter `display_data` and `execute_result` records containing inert
+`text/markdown` now import as bounded plain-text snapshots. When both Markdown
+and `text/plain` exist, Markdown is preferred for the visible snapshot, while
+the validated MIME payload is preserved for `.ipynb` and portable `.fsnb` v2
+roundtrips. Offline HTML report export from a portable bundle now renders the
+same escaped Markdown subset as direct Jupyter report export. Untrusted HTML,
+SVG, widget MIME types and malformed Markdown payloads cannot be preserved
+verbatim; invalid Markdown falls back to plain text where available. Existing
+128-KiB per-cell text and 1-MiB total import limits still apply. Neither
+Markdown import nor report generation executes notebook code.
+
+**Status: partial / automated regression tests added, independent CI pending.**
+The source editor displays imported Markdown as inert text rather than rich
+output; full Jupyter MIME compatibility, knitr/Quarto execution and physical
+Chromium Pyodide/webR acceptance remain unverified. No native Flow backend or
+hosted CI configuration changed. RStudio parity remains incomplete.
+
 ## 2026-10-27: safe Markdown rendering in offline notebook reports (source-tested; CI pending)
 
 Offline HTML notebook reports now render escaped fenced Flow/R/Python code,

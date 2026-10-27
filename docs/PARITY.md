@@ -1,4 +1,4 @@
-## 2026-10-27: bounded NumPy ndarray → R vector transfer (verification pending)
+## 2026-10-27: bounded NumPy ndarray → R vector transfer (Linux/macOS CI passed)
 
 The existing browser-local Python → R Copy variable action now accepts exact
 one-dimensional NumPy ndarrays of 1–256 elements through the same typed vector
@@ -13,11 +13,18 @@ lists do not require it. The receiving R vector remains a double/logical
 vector; exact NumPy dtype is not preserved. No Flow route, interpreter,
 dependency, or hosted CI configuration changed.
 
-**Status: partial / worker syntax and mock-response dispatch checked locally;
-real NumPy CPython acceptance and independent CI pending.** New regression
-tests execute the actual worker-generated Python query with NumPy and require
-it in source CI via the existing pinned pandas dependency. Physical-browser
-Pyodide/webR acceptance and RStudio feature parity remain unverified.
+**Status: partial / independent Linux/macOS source and native CI passed.**
+[PR #102](https://github.com/godofecht/FlowStudio/pull/102)
+merged as [cf18f7e](https://github.com/godofecht/FlowStudio/commit/cf18f7ec55f3ac2e91d22ee758e8c18bdd868664)
+after [CI #40498878250](https://github.com/godofecht/FlowStudio/actions/runs/40498878250)
+passed all four Ubuntu 24.04/macOS 14 jobs on 27 October 2026. Each source
+platform ran 878 JavaScript tests (873 passed, five skipped, zero failures).
+All five new NumPy regression tests executed without skips, including real
+CPython/NumPy conversions, unsafe-value rejection and subclass safety. Both
+native jobs compiled pinned Flow 2.0.0, passed Rscript/HTTP acceptance and
+packaged executables. The physical Chromium Pyodide → webR NumPy transfer
+assertion was added but **has not been executed**. No claim of full RStudio
+feature parity, physical-browser execution or dtype-preserving transfer is made.
 
 ## 2026-10-27: fail-closed identity checks for destructive browser project operations (Linux/macOS CI passed)
 

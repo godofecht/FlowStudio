@@ -153,7 +153,12 @@ test("real Rscript round-trip preserves typed columns and rejects classed data",
     importQuery+"\nstopifnot(is.data.frame(copy), identical(names(copy), c('score','flag','label')), identical(copy$score, c(1.25, NA_real_, 2.5)), identical(copy$flag, c(TRUE, NA, FALSE)), identical(copy$label, c('@NA@', NA_character_, 'é')))\n"+
     "result <- "+exportQuery+"\ncat(paste(result, collapse='\\n'))"],{encoding:"utf8"});
   assert.equal(result.status,0,result.stderr);
-  assert.deepEqual(result.stdout.trim().split("\n"),tableRows);
+  const outputRows=result.stdout.trim().split("\n");
+  assert.deepEqual(outputRows.slice(0,5),["@TABLE@","3","3","score","double"]);
+  assert.equal(Number(decodeURIComponent(outputRows[5])),1.25);
+  assert.equal(outputRows[6],"@NA@");
+  assert.equal(Number(decodeURIComponent(outputRows[7])),2.5);
+  assert.deepEqual(outputRows.slice(8),tableRows.slice(8));
   for (const invalid of [
     "copy <- data.frame(x=factor(c('a','b')))",
     "copy <- data.frame(x=1:2); rownames(copy) <- c('a','b')",

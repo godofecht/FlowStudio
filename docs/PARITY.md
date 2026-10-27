@@ -10,10 +10,18 @@ an error. The default Python list and existing pandas DataFrame destinations
 remain unchanged. The bounded transfer packet, 256-element / 32-KiB limits,
 native Flow backend and hosted CI configuration are unchanged.
 
-**Status: partial / implementation submitted; independent CI and physical-browser
-Pyodide/webR acceptance not yet verified.** Real CPython/NumPy acceptance,
-controller dispatch, worker preflight, error handling and destination atomicity
-are covered by the new regression suite. This is not dtype-preserving R integer
+**Status: partial / independent Linux/macOS source and native CI passed;
+physical-browser Pyodide/webR acceptance remains unexecuted.**
+[PR #103](https://github.com/godofecht/FlowStudio/pull/103) merged as
+[28ee51f](https://github.com/godofecht/FlowStudio/commit/28ee51f7cd6a39714c09902b59748d3ff4829483)
+after all four Ubuntu 24.04/macOS 14 jobs passed in
+[CI #40506051407](https://github.com/godofecht/FlowStudio/actions/runs/40506051407)
+on 27 October 2026. Both source platforms ran 884 JavaScript tests
+(879 passed, five skipped, zero failures), including all six new
+controller/worker/real CPython-NumPy regression tests. Both native platforms
+compiled Flow 2.0.0, passed real Rscript/HTTP acceptance and packaged
+executables. A separate local CPython/NumPy 2.3.5 conversion check passed.
+This does not verify physical Chromium execution, dtype-preserving R integer
 transfer, automatic session persistence or RStudio parity.
 
 ## 2026-10-27: bounded NumPy ndarray → R vector transfer (Linux/macOS CI passed)

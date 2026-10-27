@@ -158,7 +158,7 @@ async function handle(event) {
   try {
     py = await python();
     if (op === "export" || op === "export-snapshot") {
-      // Only exact builtins or exact pandas DataFrames with approved dtypes are traversed.
+      // Only exact builtins, NumPy ndarrays, or pandas DataFrames with approved dtypes are traversed.
       const query = [
         "import json as _fs_transfer_json, math as _fs_transfer_math, re as _fs_transfer_re",
         "_fs_transfer_name = " + JSON.stringify(code),

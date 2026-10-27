@@ -70,6 +70,43 @@ test("rejects Flow chunks, unsafe knitr options and oversized inputs", () => {
   assert.throws(() => quarto.decode("x".repeat(4 * 1024 * 1024 + 1), parseCells), /4 MiB/);
 });
 
+
+test("notebook file controller imports .qmd without executing or discarding unsaved edits", async () => {
+  const {create} = require("../docs/app/notebook_io.js");
+  function control() {
+    const handlers = {};
+    return {addEventListener(event, callback) { handlers[event] = callback; },
+      click() { return handlers.click?.(); },
+      change(files) { return handlers.change({target:{files, value:"old"}}); }};
+  }
+  const openButton = control(), fileInput = control(), saveButton = control();
+  const quartoOpenButton = control(), quartoFileInput = control();
+  const imported = [], notices = [];
+  let busy = false, allow = true;
+  create({openButton,fileInput,saveButton,quartoOpenButton,quartoFileInput,quarto,
+    source:{value:"keep"},language:{value:"r"},format:{MAX_JSON_BYTES:4194304},
+    parseCells,isBusy:()=>busy,canReplace:()=>allow,
+    onImported:async (value,name)=>imported.push({value,name}),
+    onExport:()=>{throw new Error("Unexpected export");},getResults:()=>[],
+    getFilename:()=>"untitled.R",notice:message=>notices.push(message)});
+  const qmd = "---\ntitle: test\nformat: html\n---\n\n" +
+    fence + "{r}\nprint(42)\n" + fence;
+  const file = {name:"study.qmd",size:new TextEncoder().encode(qmd).length,text:async()=>qmd};
+  busy = true;
+  await quartoFileInput.change([file]);
+  busy = false; allow = false;
+  await quartoFileInput.change([file]);
+  allow = true;
+  await quartoFileInput.change([file]);
+  assert.equal(imported.length, 1);
+  assert.equal(imported[0].name, "study.qmd");
+  assert.match(imported[0].value.source,/print\(42\)/);
+  assert.match(notices.join(" "),/no code was executed/);
+  assert.match(notices.join(" "),/Wait for notebook execution/);
+  await quartoFileInput.change([{...file,size:4194305}]);
+  assert.match(notices.join(" "),/exceeds 4 MiB/);
+});
+
 test("browser has wired import/export controls and syntactically valid script", () => {
   const html = fs.readFileSync(path.join(__dirname, "../docs/app/index.html"), "utf8");
   for (const id of ["openQuarto","quartoFile","exportQuarto"])

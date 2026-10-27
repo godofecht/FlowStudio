@@ -20,6 +20,8 @@ test("R kernel and transport use bounded IPC and are included in native builds",
   assert.match(transport, /FS_R_DEADLINE_MS 15000/);
   assert.match(transport, /FS_R_MAX 131072/);
   assert.match(kernel, /workspace <- new\.env/);
+  assert.match(kernel, /sys\.source\("src\/flowjit\.R", envir = flowjit_api\)/);
+  assert.match(read("scripts/package.sh"), /src\/flowjit\.R/);
   assert.match(kernel, /withVisible\(eval\(expression, envir = evaluation_env\)\)/);
   assert.match(kernel, /evaluation_env = workspace, capture_frames = FALSE/);
   assert.match(kernel, /MAX_OUTPUT <- 131072L/);

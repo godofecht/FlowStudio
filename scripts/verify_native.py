@@ -101,6 +101,17 @@ def verify(root: Path, port: int = 8751, build_timeout: int = 180,
             print(r_result.stderr, end="", file=sys.stderr, flush=True)
         if r_result.returncode != 0:
             raise VerificationError("Real R IPC acceptance failed")
+        print("Real FlowJIT C-native acceptance: tests/test_native_flowjit.py", flush=True)
+        jit_result = _command(
+            [sys.executable, "-m", "unittest", "discover", "-s", "tests",
+             "-p", "test_native_flowjit.py", "-v"], root, 110
+        )
+        if jit_result.stdout:
+            print(jit_result.stdout, end="", flush=True)
+        if jit_result.stderr:
+            print(jit_result.stderr, end="", file=sys.stderr, flush=True)
+        if jit_result.returncode != 0:
+            raise VerificationError("Real FlowJIT native acceptance failed")
         if not shutil.which("node"):
             raise VerificationError("Node.js is required for browser transfer Rscript acceptance")
         print("Real Python/R transfer query acceptance: tests/browser_variable_transfer.test.js", flush=True)

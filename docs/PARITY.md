@@ -1,4 +1,4 @@
-## 2026-10-27: browser-local nested source files and project folders (local tests only)
+## 2026-10-27: browser-local nested source files and project folders (Linux/macOS CI passed)
 
 The File System Access project explorer now supports explicit creation of
 folders and source files inside existing project subdirectories, without
@@ -8,11 +8,22 @@ traversal, invalid/reserved names and existing entries. A nonempty file
 appearing during the creation race is not attached to the editor. The
 existing Flow-owned native backend and hosted CI configuration are unchanged.
 
-**Status: partial / local Node helper tests passed; independent CI and
-physical-browser File System Access acceptance pending.** Creation is not
-atomic with the existence check, so an externally created empty file can
-still race. Folder creation does not alter the current editor buffer.
-This does not establish RStudio parity, remote-session isolation or
+**Status: partial / independent Linux/macOS source and native CI passed;
+physical-browser File System Access acceptance pending.** [PR #97](https://github.com/godofecht/FlowStudio/pull/97)
+passed all four Ubuntu 24.04/macOS 14 jobs in
+[CI #40463652838](https://github.com/godofecht/FlowStudio/actions/runs/40463652838)
+on 27 October 2026. Each source platform completed 839 JavaScript tests
+(834 passed, five skipped, zero failures), including eight new folder and
+nested-file tests. Both native jobs compiled pinned Flow 2.0.0, passed live
+HTTP/Rscript acceptance and completed packaging. Local Node.js 22.16.0
+executed all six isolated creation tests; direct V8 integration of the
+actual project explorer/workspace passed nine assertions. A first CI attempt
+failed ten existing VM integration tests because the helper was resolved
+eagerly; that regression was corrected before the successful run.
+
+Creation is not atomic with the existence check, so an externally created
+empty file can still race. Folder creation does not alter the current editor
+buffer. This does not establish RStudio parity, remote-session isolation or
 physical-browser Pyodide/webR acceptance.
 
 ## 2026-10-27: opt-in R data.frame → Python pandas DataFrame (Linux/macOS CI passed)

@@ -258,6 +258,21 @@ def test_r(page, timeout: int):
                 "print('real pandas destination accepted')",
                 "real pandas destination accepted", timeout)
     page.locator("#transferAsPandas").uncheck()
+    # Actual NumPy ndarray -> webR numeric vector, preserving a typed NA.
+    # This is a physical-browser assertion; adding it is not evidence of a pass.
+    run_source(page, "python",
+               "import numpy as np\nfs_py_np = np.array([1.25, np.nan, 2.5], dtype=np.float32)\n"
+               "print('numpy browser ready')", "numpy browser ready", timeout)
+    page.locator("#transferDirection").select_option("python-to-r")
+    page.locator("#transferSource").fill("fs_py_np")
+    page.locator("#transferDestination").fill("fs_r_np")
+    page.locator("#transferVariable").click()
+    page.wait_for_function(
+        "() => document.querySelector('#notice').textContent.includes('Transferred fs_py_np to fs_r_np')",
+        timeout=timeout)
+    run_console(page, "r",
+                "stopifnot(identical(fs_r_np, c(1.25, NA_real_, 2.5))); "
+                "cat('numpy R accepted')", "numpy R accepted", timeout)
     page.locator("#reset").click()
     assert "R state reset" in page.locator("#notice").inner_text()
     run_source(page, "r", "print(exists('fs_browser_value', envir=.GlobalEnv))", "FALSE", timeout)

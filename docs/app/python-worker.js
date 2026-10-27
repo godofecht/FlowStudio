@@ -158,7 +158,7 @@ async function handle(event) {
   try {
     py = await python();
     if (op === "export" || op === "export-snapshot") {
-      // Only exact builtins or exact pandas DataFrames with approved dtypes are traversed.
+      // Only exact builtins, NumPy ndarrays, or pandas DataFrames with approved dtypes are traversed.
       const query = [
         "import json as _fs_transfer_json, math as _fs_transfer_math, re as _fs_transfer_re",
         "_fs_transfer_name = " + JSON.stringify(code),
@@ -167,7 +167,9 @@ async function handle(event) {
         "import sys as _fs_transfer_sys",
         "_fs_transfer_pd = _fs_transfer_sys.modules.get('pandas')",
         "_fs_transfer_is_df = _fs_transfer_pd is not None and type(_fs_transfer_obj) is _fs_transfer_pd.DataFrame",
-        "_fs_transfer_kind = 'pandas' if _fs_transfer_is_df else 'table' if type(_fs_transfer_obj) is dict else 'vector' if type(_fs_transfer_obj) in (list, tuple) else 'scalar'",
+        "_fs_transfer_np = _fs_transfer_sys.modules.get('numpy')",
+        "_fs_transfer_is_array = _fs_transfer_np is not None and type(_fs_transfer_obj) is _fs_transfer_np.ndarray",
+        "_fs_transfer_kind = 'pandas' if _fs_transfer_is_df else 'ndarray' if _fs_transfer_is_array else 'table' if type(_fs_transfer_obj) is dict else 'vector' if type(_fs_transfer_obj) in (list, tuple) else 'scalar'",
         "def _fs_transfer_type(v):",
         "    return 'boolean' if type(v) is bool else 'number' if type(v) in (int, float) else 'string' if type(v) is str else None",
         "def _fs_transfer_check(_fs_transfer_values, _fs_transfer_limit):",
@@ -195,6 +197,13 @@ async function handle(event) {
         "        _fs_transfer_type_name = _fs_transfer_check(_fs_transfer_values, 128)",
         "        _fs_transfer_columns.append({'name': _fs_transfer_key, 'type': _fs_transfer_type_name, 'values': _fs_transfer_values})",
         "    _fs_transfer_packet = {'kind': 'table', 'columns': _fs_transfer_columns}",
+        "elif _fs_transfer_kind == 'ndarray':",
+        "    if _fs_transfer_obj.ndim != 1 or not 1 <= _fs_transfer_obj.size <= 256: raise ValueError('NumPy vector requires 1-256 elements and exactly one dimension')",
+        "    if str(_fs_transfer_obj.dtype) not in ('int8', 'int16', 'int32', 'int64', 'uint8', 'uint16', 'uint32', 'uint64', 'float16', 'float32', 'float64', 'bool'): raise ValueError('Unsupported NumPy vector dtype')",
+        "    _fs_transfer_values = _fs_transfer_obj.tolist()",
+        "    _fs_transfer_values = [None if type(v) is float and _fs_transfer_math.isnan(v) else v for v in _fs_transfer_values]",
+        "    _fs_transfer_type_name = _fs_transfer_check(_fs_transfer_values, 256)",
+        "    _fs_transfer_packet = {'kind': 'vector', 'type': _fs_transfer_type_name, 'values': _fs_transfer_values}",
         "elif _fs_transfer_kind == 'table':",
         "    if not 1 <= len(_fs_transfer_obj) <= 16: raise ValueError('Python table requires 1-16 columns')",
         "    _fs_transfer_columns = []",

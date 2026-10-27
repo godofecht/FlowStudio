@@ -62,7 +62,7 @@ export function registerCompletion(monaco, app, fetchFn = (typeof fetch !== 'und
   const disposers = [];
   for (const language of ['flow', 'python', 'r']) {
     const disposable = monaco.languages.registerCompletionItemProvider(language, {
-      triggerCharacters: language === 'r' ? ['.', ' : language === 'flow' ? ['\\'] : [],] : language === 'flow' ? ['\\'] : [],
+      triggerCharacters: language === 'r' ? ['.', '$'] : language === 'flow' ? ['\\'] : [],
       provideCompletionItems: async (model, position) => {
         const math = language === 'flow' ? mathCommandAt(model, position) : null;
         if (math) {

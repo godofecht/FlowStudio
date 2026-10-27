@@ -517,9 +517,9 @@ function create({load = () => import(CDN)} = {}) {
         const vector = (values, type) => values.length ?
           "base::c(" + values.map(value => atom(value, type)).join(",") + ")" : empty[type];
         const expression = packet.kind === "table"
-          ? "base::as.data.frame(base::setNames(base::list(" +
+          ? "base::as.data.frame(base::structure(base::list(" +
             packet.columns.map(col => vector(col.values, col.type)).join(",") +
-            "), base::c(" + packet.columns.map(col => JSON.stringify(col.name)).join(",") +
+            "), names=base::c(" + packet.columns.map(col => JSON.stringify(col.name)).join(",") +
             ")), optional=TRUE, stringsAsFactors=FALSE)"
           : packet.kind === "scalar" ? atom(packet.values[0], packet.type) :
             vector(packet.values, packet.type);

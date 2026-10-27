@@ -1,3 +1,22 @@
+## 2026-10-27: opt-in homogeneous R data.frame → NumPy 2D ndarray (CI pending)
+
+The browser Copy variable operation now accepts an ordinary R data.frame as
+an explicit NumPy destination only when every column has the same wire type.
+It constructs a real two-dimensional ndarray in the persistent Pyodide worker,
+preserving row/column order and typed numeric missing cells as NaN. Boolean
+and Unicode tables require nonmissing cells; mixed-type tables, empty rows,
+malformed packets and simultaneous pandas/NumPy selection are rejected before
+Python mutation. Existing R vector → NumPy and default table → dictionary
+transfers are unchanged. R column names, integer storage, factors and custom
+row names are not preserved in the ndarray. Existing table protocol limits
+(1–16 columns, 1–128 rows, 32 KiB) apply.
+
+**Status: partial / source and real-CPython regression tests committed;
+independent Linux/macOS CI and physical Chromium Pyodide/webR execution
+pending.** Tests cover exact NumPy shape/dtype, Unicode, missing numeric
+cells, invalid tables and destination preservation on constructor failure.
+This is not general R matrix identity interchange or RStudio parity.
+
 ## 2026-10-27: bounded NumPy 2D matrix → R data.frame transfer (PR pending)
 
 Python → R Copy variable now recognizes exact two-dimensional NumPy ndarrays with approved built-in numeric, boolean or Unicode dtypes. The existing Python worker exports them as bounded typed tables, with column-major V1–V16 names and 1–128 rows; the existing webR table importer constructs an actual R data.frame. One-dimensional ndarray transfer remains a vector. Missing floating NaN values become R NA only when a column has a nonmissing value to establish its type. All-missing columns, unsafe numbers, invalid strings, unsupported dtypes, subclasses, zero dimensions, oversized matrices and packets exceeding 32 KiB are rejected. This is **not** an R matrix transfer or a dtype-preserving NumPy round trip; dimensions, integer widths and NumPy-specific metadata are not retained. No native Flow route or hosted CI configuration is modified.

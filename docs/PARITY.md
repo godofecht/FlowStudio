@@ -1,4 +1,4 @@
-## 2026-10-27: opt-in R data.frame → Python pandas DataFrame (validation pending)
+## 2026-10-27: opt-in R data.frame → Python pandas DataFrame (Linux/macOS CI passed)
 
 The existing browser-local R → Python Copy variable path now has an explicit
 **R table → pandas DataFrame** option. The native Flow-owned R export and
@@ -10,8 +10,17 @@ workspace variable. The default destination remains a dictionary of lists;
 scalar/vector transfers with the pandas option are rejected before import.
 No generated assets or hosted CI workflow changes are required.
 
-**Status: partial / independent CI and physical-browser acceptance pending.**
-The new regression suite covers controller routing, worker preflight,
+**Status: partial / independent Linux/macOS source and native CI passed; physical-browser acceptance pending.**
+[PR #96](https://github.com/godofecht/FlowStudio/pull/96) merged as
+[ee0df29](https://github.com/godofecht/FlowStudio/commit/ee0df2927e3f2bbbf27c1a74eec9edb458f5b442)
+after [CI #40457919749](https://github.com/godofecht/FlowStudio/actions/runs/40457919749)
+passed all four Ubuntu 24.04/macOS 14 jobs on 27 October 2026. Each source
+job ran 830 JavaScript tests (825 passed, five skipped, zero failures),
+including all seven new pandas-import cases without skips. Both native jobs
+compiled pinned Flow 2.0.0, completed real Rscript/HTTP acceptance and
+packaging. The first CI attempt found a mock-DOM compatibility regression;
+this was corrected before the successful run. The new regression suite
+covers controller routing, worker preflight,
 unavailable pandas, failed acknowledgements, real CPython pandas 2.2.3
 nullable construction, zero-row tables and failure atomicity. Local CPython
 2.2.3 construction was exercised, but this is not real Pyodide/webR browser

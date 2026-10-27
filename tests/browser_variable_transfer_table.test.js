@@ -73,7 +73,7 @@ test("webR exports real table columns and imports a data.frame expression", asyn
   assert.match(h.queries[0],/base::is.null\(base::attributes\(col\)\)/);
   assert.match(h.queries[0],/base::rownames\(v\)/);
   assert.equal((await h.session.importVariable("copy",table)).ok,true);
-  assert.match(h.queries[1],/base::as.data.frame\(base::setNames\(base::list\(/);
+  assert.match(h.queries[1],/base::as.data.frame\(base::structure\(base::list\(/);
   assert.match(h.queries[1],/NA_real_/);
   assert.match(h.queries[1],/NA_character_/);
   assert.match(h.queries[1],/%40NA%40/);

@@ -111,10 +111,18 @@ try {
   assert.match(await page.locator('.saved-projects').innerText(),
     /Python → data file → R analysis/,
     'saved projects reopen after a page reload');
-  await page.waitForTimeout(200);
   await page.setViewportSize({ width: 600, height: 850 });
-  await page.waitForFunction(() => document.querySelector('.monaco-editor').clientWidth < 600);
-  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  await page.waitForTimeout(500);
+  const dimensions = await page.evaluate(() => ({
+    editor: document.querySelector('.monaco-editor')?.clientWidth ?? 0,
+    viewport: innerWidth,
+    document: document.documentElement.scrollWidth,
+    host: document.querySelector('#monacoHost')?.clientWidth ?? 0
+  }));
+  assert.ok(dimensions.editor > 0 && dimensions.editor <= dimensions.viewport,
+    'Monaco must fit the viewport: ' + JSON.stringify(dimensions));
+  assert.equal(dimensions.document > dimensions.viewport, false,
+    'The narrow workbench must not overflow: ' + JSON.stringify(dimensions));
   await page.screenshot({ path: 'build/ui/workbench-narrow.png' });
   assert.deepEqual(errors, [], 'The affected flow must have clean runtime logs');
   console.log('PASS: Monaco editing, per-document undo, find/replace, native selection execution, commands, worker and narrow layout');

@@ -124,3 +124,28 @@ test("permission errors on destination lookup do not create files",async()=>{
   await assert.rejects(Rename.rename(f.args),/denied/);
   assert.equal(f.parent.files.size,1);
 });
+
+test("rename fails closed when source identity cannot be verified",async()=>{
+  const f=fixture();
+  delete f.source.isSameEntry;
+  await assert.rejects(Rename.rename(f.args),/identity cannot be verified/);
+  assert.equal(f.parent.files.size,1);
+  assert.equal(f.parent.files.get("main.flow"),f.source);
+});
+
+test("rename refuses an unverifiable destination before writing any source bytes",async()=>{
+  const f=fixture();
+  const original=f.parent.getFileHandle.bind(f.parent);
+  f.parent.getFileHandle=async(name,opts)=>{
+    const handle=await original(name,opts);
+    if(name==="new.flow" && opts?.create) {
+      delete f.source.isSameEntry;
+      delete handle.isSameEntry;
+    }
+    return handle;
+  };
+  await assert.rejects(Rename.rename(f.args),/Cannot verify that the destination differs/);
+  assert.equal(f.parent.files.get("main.flow").content,f.args.baseline);
+  assert.equal(f.parent.files.get("new.flow")?.content,"",
+    "unverifiable empty destination is retained for manual inspection, not overwritten or deleted");
+});

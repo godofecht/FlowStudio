@@ -1,4 +1,4 @@
-## 2026-10-27: inert inline emphasis in offline notebook reports (CI pending)
+## 2026-10-27: inert inline emphasis in offline notebook reports (Linux/macOS CI passed)
 
 The offline notebook HTML exporter now renders bounded strong, emphasis and
 strikethrough delimiters in Markdown cells, pipe-table cells and validated
@@ -6,9 +6,14 @@ Jupyter `text/markdown` output. The single-pass tokenizer keeps backtick code
 spans and escaped punctuation opaque, does not turn Markdown links or raw HTML
 into active elements, and leaves unmatched marks literal. Existing HTML escaping,
 output budgets and CSP remain unchanged. This is not full CommonMark, knitr or
-Quarto compatibility. **Status: partial / local pure-JavaScript assertions passed;
-Node regression and independent CI pending.** Physical Chromium Pyodide/webR
-acceptance remains unexecuted. No Flow compiler or hosted CI changes.
+Quarto compatibility. **Status: partial / all four Ubuntu 24.04/macOS 14 CI jobs passed** in
+[CI #40590385584](https://github.com/godofecht/FlowStudio/actions/runs/40590385584).
+Both source/transport jobs passed, including five new Node regression tests;
+both native jobs compiled Flow 2.0.0, completed Rscript/HTTP acceptance and
+packaged executables. [PR #112](https://github.com/godofecht/FlowStudio/pull/112)
+merged as [a390887](https://github.com/godofecht/FlowStudio/commit/a3908877637a9fd8e4fda7ecca7b2929125d93a5).
+Physical Chromium Pyodide/webR acceptance remains unexecuted. No Flow compiler
+or hosted CI changes.
 
 ## 2026-10-27: inert GFM-style pipe tables in offline notebook reports (pending CI)
 

@@ -424,6 +424,31 @@ function validFilename(name) {
   return true;
 }
 
+async function readProjectText(file, limit) {
+  if (file.size > limit) throw Error("Project source exceeds size limit.");
+  let source;
+  if (typeof file.arrayBuffer === "function") {
+    const bytes = await file.arrayBuffer();
+    if (bytes.byteLength > limit) throw Error("Project source exceeds size limit.");
+    try {
+      source = new TextDecoder("utf-8", {fatal:true, ignoreBOM:true}).decode(bytes);
+    } catch (_) {
+      const error = Error("Project source is not valid UTF-8.");
+      error.name = "UnsafeProjectSourceError";
+      throw error;
+    }
+  } else {
+    source = await file.text();
+  }
+  if (source.length > limit) throw Error("Project source exceeds size limit.");
+  if (source.includes("\0")) {
+    const error = Error("Project source contains binary NUL data.");
+    error.name = "UnsafeProjectSourceError";
+    throw error;
+  }
+  return source;
+}
+
 /* Bounded, read-only literal/regex search over browser-granted project files. */
 async function searchProject(root, query, options = {}) {
   if (!root || root.kind !== "directory") throw new Error("Open a project folder first.");
@@ -444,7 +469,7 @@ async function searchProject(root, query, options = {}) {
     throw new Error("Invalid regular expression: " + error.message);
   }
   const matches = [];
-  let scannedFiles = 0, skippedLarge = 0, truncated = false;
+  let scannedFiles = 0, skippedLarge = 0, skippedUnsafe = 0, truncated = false;
   function checkAbort() {
     if (options.signal && options.signal.aborted) {
       const error = new Error("Search cancelled");
@@ -478,7 +503,12 @@ async function searchProject(root, query, options = {}) {
       checkAbort();
       const maxBytes = options.regex ? 128 * 1024 : MAX_BYTES;
       if (file.size > maxBytes) { skippedLarge++; continue; }
-      const source = await file.text();
+      let source;
+      try { source = await readProjectText(file, maxBytes); }
+      catch (error) {
+        if (error.name === "UnsafeProjectSourceError") { skippedUnsafe++; continue; }
+        throw error;
+      }
       checkAbort();
       if (source.length > maxBytes) { skippedLarge++; continue; }
       scannedFiles++;
@@ -503,7 +533,7 @@ async function searchProject(root, query, options = {}) {
     }
   }
   await walk(root, root.name, 0);
-  return { matches, scannedFiles, skippedLarge, truncated };
+  return { matches, scannedFiles, skippedLarge, skippedUnsafe, truncated };
 }
 
 
@@ -526,9 +556,11 @@ function checkReplacementAbort(signal) {
 async function planProjectReplace(root, query, replacement, options = {}) {
   if (typeof replacement !== "string" || replacement.length > 10000)
     throw new Error("Replacement must be at most 10,000 characters.");
+  try { encodeURIComponent(replacement); }
+  catch (_) { throw new Error("Replacement contains invalid Unicode."); }
   const found = await searchProject(root, query, options);
-  if (found.truncated || found.skippedLarge)
-    throw new Error("Project search was incomplete; narrow the query or remove oversized files before replacing.");
+  if (found.truncated || found.skippedLarge || found.skippedUnsafe)
+    throw new Error("Project search was incomplete; narrow the query or remove oversized/unsafe-encoding files before replacing.");
   const engine = replacementEngine();
   const groups = new Map();
   for (const hit of found.matches) {
@@ -545,7 +577,7 @@ async function planProjectReplace(root, query, replacement, options = {}) {
     const file = await entry.handle.getFile();
     const limit = options.regex ? 128 * 1024 : 1024 * 1024;
     if (file.size > limit) throw new Error("File grew since search: " + entry.path);
-    const before = await file.text();
+    const before = await readProjectText(file, limit);
     checkReplacementAbort(options.signal);
     if (before.length > limit) throw new Error("File grew since search: " + entry.path);
     const matches = engine.findMatches(before, query, options);
@@ -575,7 +607,7 @@ async function applyProjectReplacement(plan, options = {}) {
     if (typeof entry.handle.createWritable !== "function")
       throw new Error("Write access is unavailable for " + entry.path + ".");
     const current = await entry.handle.getFile();
-    if (await current.text() !== entry.before)
+    if (await readProjectText(current, 8 * 1024 * 1024) !== entry.before)
       throw new Error("File changed since preview; no files replaced: " + entry.path);
   }
   let completed = 0, matches = 0;
@@ -587,7 +619,7 @@ async function applyProjectReplacement(plan, options = {}) {
       if (options.isBlocked && await options.isBlocked(entry))
         throw new Error("An editor tab was opened during replacement: " + entry.path);
       const current = await entry.handle.getFile();
-      if (await current.text() !== entry.before)
+      if (await readProjectText(current, 8 * 1024 * 1024) !== entry.before)
         throw new Error("File changed during replacement: " + entry.path);
       attempted.push(entry);
       const writer = await entry.handle.createWritable();
@@ -601,7 +633,7 @@ async function applyProjectReplacement(plan, options = {}) {
         throw error;
       }
       const saved = await entry.handle.getFile();
-      if (await saved.text() !== entry.after)
+      if (await readProjectText(saved, 8 * 1024 * 1024) !== entry.after)
         throw new Error("Could not verify the written file: " + entry.path);
       completed++;
       matches += entry.count;
@@ -618,7 +650,7 @@ async function applyProjectReplacement(plan, options = {}) {
         if (options.isBlocked && await options.isBlocked(entry))
           throw new Error("open in the editor");
         const current = await entry.handle.getFile();
-        const contents = await current.text();
+        const contents = await readProjectText(current, 8 * 1024 * 1024);
         if (contents === entry.before) { unchanged++; continue; }
         if (contents !== entry.after)
           throw new Error("changed outside this operation");
@@ -633,7 +665,7 @@ async function applyProjectReplacement(plan, options = {}) {
           throw rollbackError;
         }
         const verified = await entry.handle.getFile();
-        if (await verified.text() !== entry.before)
+        if (await readProjectText(verified, 8 * 1024 * 1024) !== entry.before)
           throw new Error("restored bytes could not be verified");
         restored++;
       } catch (rollbackError) {
@@ -1695,6 +1727,7 @@ async function runProjectSearch() {
     summary.className = "muted hint";
     summary.textContent = result.matches.length + " matches in " + result.scannedFiles +
       " files" + (result.skippedLarge ? "; " + result.skippedLarge + " large files skipped" : "") +
+      (result.skippedUnsafe ? "; " + result.skippedUnsafe + " unsafe-encoding files skipped" : "") +
       (result.truncated ? "; result limit reached" : "");
     resultsNode.append(summary);
     for (const hit of result.matches) {

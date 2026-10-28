@@ -5,12 +5,11 @@ from initial conditions or placeholder graphics. Coordinates are x-major.
 """
 from __future__ import annotations
 
-import numpy as np
-
 MAX_SPATIAL_AXIS = 24
 
 
-def spatial_snapshot(fields: dict[str, np.ndarray], extent: tuple[float, float]) -> dict:
+def spatial_snapshot(fields: dict[str, "np.ndarray"], extent: tuple[float, float]) -> dict:
+    import numpy as np
     if not fields:
         raise ValueError("At least one spatial field is required")
     first = next(iter(fields.values()))

@@ -40,16 +40,59 @@ read_exact <- function(count) {
 last_plot_svg <- NULL
 last_plot_pdf <- NULL
 last_plot_warning <- NULL
+# Not every R build that advertises cairo actually emits SVG bytes (observed
+# on the macOS acceptance runner, where the SVG device opened but produced no
+# file). A device is only trusted after it renders a real throwaway drawing.
+probe_plot_device <- function(kind) {
+    path <- tempfile("flowstudio-r-probe-",
+                     fileext = if (kind == "svg") ".svg" else ".pdf")
+    on.exit({
+        device <- tryCatch(as.integer(grDevices::dev.cur()),
+                           error = function(error) 1L)
+        if (!is.na(device) && device > 1L)
+            try(grDevices::dev.off(which = device), silent = TRUE)
+        unlink(path)
+    }, add = TRUE)
+    completed <- tryCatch(
+        withCallingHandlers({
+            if (kind == "svg") {
+                grDevices::svg(file = path, width = 4, height = 3)
+            } else {
+                grDevices::pdf(file = path, width = 4, height = 3, onefile = TRUE)
+            }
+            graphics::plot.new()
+            grDevices::dev.off()
+            TRUE
+        }, warning = function(warning) invokeRestart("muffleWarning")),
+        error = function(error) NULL)
+    if (!isTRUE(completed)) return(FALSE)
+    if (!file.exists(path)) return(FALSE)
+    bytes <- file.info(path)$size
+    if (!is.finite(bytes) || bytes <= 0) return(FALSE)
+    if (kind == "svg") {
+        text <- tryCatch(paste(readLines(path, warn = FALSE), collapse = "\n"),
+                         error = function(error) "")
+        grepl("<svg", text) && grepl("</svg>", text)
+    } else {
+        raw <- tryCatch(readBin(path, what = "raw", n = 4L),
+                        error = function(error) raw(0))
+        length(raw) >= 4L && identical(raw[1:4], charToRaw("%PDF"))
+    }
+}
 begin_plot_capture <- function() {
     svg_path <- tempfile("flowstudio-r-plot-", fileext = ".svg")
     pdf_path <- tempfile("flowstudio-r-plot-", fileext = ".pdf")
-    use_svg <- isTRUE(capabilities("cairo"))
-    path <- if (use_svg) svg_path else pdf_path
+    use_svg <- probe_plot_device("svg")
+    use_pdf <- !use_svg && probe_plot_device("pdf")
     if (use_svg) {
-        grDevices::svg(file = path, width = 7, height = 5)
+        grDevices::svg(file = svg_path, width = 7, height = 5)
+    } else if (use_pdf) {
+        grDevices::pdf(file = pdf_path, width = 7, height = 5, onefile = TRUE)
     } else {
-        grDevices::pdf(file = path, width = 7, height = 5, onefile = TRUE)
+        last_plot_warning <<- "No native R plot device could be opened on this R build."
+        return(function() invisible(NULL))
     }
+    path <- if (use_svg) svg_path else pdf_path
     device <- as.integer(grDevices::dev.cur())
     plotted <- FALSE
     previous_hook <- getHook("plot.new")

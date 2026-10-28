@@ -95,6 +95,7 @@ function mount(document, options) {
   let busy = false;
   let revision = 0;
   let traceDocId = null;
+  let traceSource = null;
 
   function describeStep(step, node) {
     const row = document.createElement("div");
@@ -108,8 +109,8 @@ function mount(document, options) {
     label.title = "Jump to line " + step.line;
     label.dataset.stepIndex = String(step.index);
     label.addEventListener("click", () => {
-      if (getDocId() !== traceDocId) {
-        notice("This trace belongs to another editor buffer; run the trace again.", "error");
+      if (getDocId() !== traceDocId || String(getSource() || "") !== traceSource) {
+        notice("The editor buffer changed since tracing; run the trace again.", "error");
         return;
       }
       position = step.index;
@@ -207,6 +208,7 @@ function mount(document, options) {
           return null;
         }
         traceDocId = requestedDocId;
+        traceSource = source;
         steps = result.steps;
         position = steps.length ? 0 : -1;
         render(node, result);

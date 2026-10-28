@@ -3,13 +3,13 @@
  */
 (function (global) {
 "use strict";
-function create({native, statusButton, diffButton, stagedDiffButton, stageButton, unstageButton, commitButton,
+function create({native, statusButton, diffButton, historyButton, stagedDiffButton, stageButton, unstageButton, commitButton,
                  branchesButton, createBranchButton, switchBranchButton, deleteBranchButton, mergeBranchButton, branchInput,
                  pathInput, messageInput, target, notice, confirmAction}) {
   if (!native || !statusButton || !diffButton || !target)
     throw new Error("Git panel requires its native client and controls.");
   const supported = !!native.available();
-  const controls = [statusButton, diffButton, stagedDiffButton, stageButton, unstageButton, commitButton,
+  const controls = [statusButton, diffButton, historyButton, stagedDiffButton, stageButton, unstageButton, commitButton,
     branchesButton, createBranchButton, switchBranchButton, deleteBranchButton, mergeBranchButton].filter(Boolean);
   let pending = false;
   function lock(value) {
@@ -51,6 +51,7 @@ function create({native, statusButton, diffButton, stagedDiffButton, stageButton
   }
   function show(kind) {
     if (kind === "status") return perform("status", () => native.gitStatus());
+    if (kind === "history") return perform("history", () => native.gitHistory());
     if (kind === "diff") return perform("diff", () => native.gitDiff());
     if (kind === "staged") return perform("staged diff", () => native.gitStagedDiff());
     if (kind === "branches") return perform("branches", () => native.gitBranches());
@@ -116,6 +117,7 @@ function create({native, statusButton, diffButton, stagedDiffButton, stageButton
   }
   statusButton.addEventListener("click", () => { void show("status"); });
   diffButton.addEventListener("click", () => { void show("diff"); });
+  historyButton?.addEventListener("click", () => { void show("history"); });
   stagedDiffButton?.addEventListener("click", () => { void show("staged"); });
   stageButton?.addEventListener("click", () => { void stage(); });
   unstageButton?.addEventListener("click", () => { void unstage(); });

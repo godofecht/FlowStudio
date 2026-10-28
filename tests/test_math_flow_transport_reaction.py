@@ -96,6 +96,11 @@ class ComposedTransportReactionTest(unittest.TestCase):
         expected = 300 + 20 / (1 + model.reaction_rate * 20 * model.until / 300)
         self.assertAlmostEqual(result["mean_temperature"], expected, places=7)
         self.assertLess(result["temperature_variance"], 1e-20)
+        # Individually the advection and nonlinear reaction bounds pass;
+        # their combined stiffness must still be rejected at each RK2 stage.
+        with self.assertRaisesRegex(FlowMathError, "nonlinear reaction stability"):
+            simulate(replace(model, reaction_rate=134800.0,
+                             advection_velocity_x=0.3, advection_velocity_y=0.3))
 
     def test_checked_in_composed_program_executes_through_cli(self):
         run = subprocess.run(

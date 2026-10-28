@@ -86,5 +86,28 @@ class QuartoRenderTests(unittest.TestCase):
         self.assertIn("<!doctype html>", html.lower())
 
 
+    @unittest.skipUnless(shutil.which("quarto") and shutil.which("Rscript"),
+                         "real Quarto CLI and Rscript required")
+    def test_real_quarto_r_chunk_executes(self):
+        # This checks actual knitr output, not a subprocess fixture.
+        installed = subprocess.run(
+            ["Rscript", "-e", "cat(requireNamespace('knitr', quietly=TRUE))"],
+            capture_output=True, text=True, timeout=20, check=False,
+        )
+        if installed.returncode or installed.stdout.strip() != "TRUE":
+            self.skipTest("R knitr package is not installed")
+        source = SOURCE + '\n```{r}\ncat("flowstudio-real-r-87421")\n```\n'
+        html = quarto.render(source)
+        self.assertIn("flowstudio-real-r-87421", html)
+
+    @unittest.skipUnless(shutil.which("quarto") and shutil.which("jupyter"),
+                         "real Quarto CLI and Jupyter required")
+    def test_real_quarto_python_chunk_executes(self):
+        # A real Jupyter kernel must execute the Python chunk.
+        source = SOURCE + '\n```{python}\nprint("flowstudio-real-python-87421")\n```\n'
+        html = quarto.render(source)
+        self.assertIn("flowstudio-real-python-87421", html)
+
+
 if __name__ == "__main__":
     unittest.main()

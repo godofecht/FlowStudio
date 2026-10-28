@@ -1,0 +1,42 @@
+# Executable space-time Robin ambient temperature and transfer-length profiles at x-min.
+# Robin(ambient, transferLength): outward gradient = (ambient - faceTemperature)/length.
+domain ThermalDomain {
+    grid       = 16 × 16
+    extent     = 1m × 1m
+    boundaries = (Robin(300K + 2K*sin(2πy / 1m) + 1K*t / 1s, 0.2m + 0.05m*sin(2πy / 1m) + 0.01m*t / 1s), Neumann(0K/m), Periodic, Periodic)
+}
+
+model HeatEquation on ThermalDomain {
+    const diffusivity = 0.01m²/s
+    field temperature: Scalar<Kelvin>
+
+    dynamics {
+        ∂ₜtemperature = diffusivity ∇²temperature
+    }
+    initial {
+        temperature = 310K
+    }
+}
+
+solver ThermalSolver for HeatEquation {
+    spatial {
+        method    = FiniteDifference
+        diffusion = CentralDifference
+    }
+    temporal {
+        method   = RungeKuttaSecondOrder
+        timeStep = 10⁻⁴s
+    }
+}
+
+let simulation = HeatEquation ▷ ThermalSolver ▷ Evolve(until: 0.01s)
+
+simulation
+    ▷ Observe {
+        meanTemperature     = Mean(temperature)
+        temperatureVariance = Mean((temperature − meanTemperature)²)
+    }
+    ▷ Visualize {
+        temperature         = Heatmap
+        temperatureVariance = LineGraph
+    }

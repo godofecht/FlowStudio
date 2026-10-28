@@ -254,6 +254,37 @@ tests the browser-facing contract; `python3 scripts/verify_native.py`
 builds the Flow server and exercises real Git operations over localhost
 against an isolated temporary repository.
 
+## Agent tools (MCP stdio server)
+
+Agents (Claude Code, MCP-compatible clients) can drive this FlowStudio
+install through a small stdio MCP server that proxies the native loopback
+HTTP API with the same guarded `X-FlowStudio-Intent` requests. It supports
+newline-delimited and LSP-style `Content-Length` framing, and answers:
+
+- `flowstudio_run_code` compiles and runs Flow (default C path, or the
+  real FLOW to MLIR to LLVM pipeline via the `mlir` language value),
+  Python or R through the real server routes.
+- `flowstudio_check_code` runs the strict Flow-to-C emit check without
+  execution.
+- `flowstudio_read_workspace_file` and `flowstudio_write_workspace_file`
+  give bounded workspace file access.
+- `flowstudio_flow_help` serves offline Flow 2.0.0 language reference
+  entries.
+- `flowstudio_health` is a server readiness probe.
+
+Running tool calls execute unsandboxed local code, exactly as the native
+server does; do not aim the server at untrusted input. The server prints
+JSON-RPC to stdout only and binds nothing to a port.
+
+    python3 mcp/flowstudio_mcp.py
+
+Register it in an MCP client as command `python3` with arg
+`mcp/flowstudio_mcp.py` (set `FLOWSTUDIO_URL` only if the native server
+listens somewhere other than 127.0.0.1:8751). Contract tests that also
+verify against a live server:
+
+    python3 tests/mcp_server.test.py
+
 ## Build and launch
 
 Requirements: [Flow 2.x](https://github.com/flooooooooooow/flow) installed as flow, a C11 compiler available as cc, POSIX macOS/Linux and a recent browser. Python 3 and Rscript are optional **runtime executables** for their respective execution modes.

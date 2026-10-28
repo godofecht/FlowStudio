@@ -1,0 +1,14 @@
+function main() -> i32 {
+    # Compiled Flow pipeline over the Python step output. Flow 2.0.0 for
+    # loops iterate numeric ranges (`for i in a to b`); there is no Reader
+    # iterator, so the samples are baked in here or read via io.import on
+    # the C backend (see the FlowStudio examples gallery).
+    let values: array<f64, 4> = [9.488, 11.023, 9.548, 9.37]
+    print("index value scaled")
+    for i in 0 to 4 {
+        let value: f64 = values[i]
+        let scaled: f64 = value * 2.0
+        print("row", i, scaled)
+    }
+    return 0
+}

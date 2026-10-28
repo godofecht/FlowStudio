@@ -170,6 +170,20 @@ def main() -> None:
     assert abs(forced["mean_temperature"] - 300.02) < 1e-8, forced
     assert forced["temperature_variance"] < forced["initial_temperature_variance"], forced
     assert forced["spatial"]["fields"]["temperature"], forced
+    # Time-dependent forcing must use the real clock at BOTH RK2 stages.
+    temporal_source = (Path(__file__).resolve().parents[1] /
+                       "examples/heat_temporal_forcing.flow").read_text(encoding="utf-8")
+    status, body = request("POST", "/api/check/mathflow", temporal_source, accepted_headers)
+    assert status == 200 and json.loads(body)["ok"], (status, body)
+    status, body = request("POST", "/api/run/mathflow", temporal_source, accepted_headers)
+    temporal = json.loads(body)
+    expected_mean = 300 + (1 - math.cos(2 * math.pi * 0.01)) / math.pi
+    assert status == 200 and temporal["ok"] and temporal["steps"] == 100, (status, temporal)
+    assert abs(temporal["mean_temperature"] - expected_mean) < 2e-8, temporal
+    assert temporal["spatial"]["fields"]["temperature"], temporal
+    invalid_temporal = temporal_source.replace("sin(2πt / 1s)", "sin(2πt / 1m)")
+    status, body = request("POST", "/api/check/mathflow", invalid_temporal, accepted_headers)
+    assert status == 422 and not json.loads(body)["ok"], (status, body)
     # Typed reaction-diffusion: native Flow HTTP -> NumPy RK2 -> real field diagnostics.
     reaction_source = (Path(__file__).resolve().parents[1] /
                        "examples/heat_reaction_diffusion.flow").read_text(encoding="utf-8")

@@ -35,7 +35,7 @@ try {
     if (source === 'examples/heat_neumann.flow') {
       const note = page.locator('#mathFlowPlot [data-mathflow-boundary="Neumann"]');
       assert.equal(await note.count(), 1, 'Native plot must display Neumann metadata');
-      assert.match(await note.textContent(), /0 K\\/m/);
+      assert.match(await note.textContent(), /0 K\/m/);
     }
     if (source === 'examples/heat_dirichlet.flow') {
       const note = page.locator('#mathFlowPlot [data-mathflow-boundary="Dirichlet"]');

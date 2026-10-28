@@ -1,4 +1,4 @@
-## 2026-10-28: R data.frame factor columns (independent validation pending)
+## 2026-10-28: R data.frame factor columns (six independent CI jobs passed)
 
 The browser-local R session snapshot path now supports strict base R factor and
 ordered-factor columns inside bounded, otherwise plain data.frames. Snapshot-only
@@ -9,11 +9,19 @@ classed factor columns. Snapshot preflight rejects forged or inconsistent column
 metadata before any interpreter assignment. This does not preserve arbitrary
 attributes, custom classes, nondefault row names or unbounded R objects.
 
-**Status: partial / independent Linux/macOS CI and physical Chromium webR
-round-trip are pending.** Real Rscript acceptance is included in the required
-native verification gate; it must actually execute before being counted as
-verified. Flow remains the native application/backend language. RStudio parity
-is not achieved. No hosted CI configuration changes.
+**Status: partial / all six Linux/macOS jobs passed in
+[CI #40691351849](https://github.com/godofecht/FlowStudio/actions/runs/40691351849).**
+Each source platform completed 1011 JavaScript tests (1000 passed, 11 skipped,
+zero failures). Both native platforms compiled pinned Flow 2.0.0 and ran the
+seven-test factor-column suite against **real Rscript with seven passes and
+zero skips**, including an ordered-factor data.frame export/import round trip,
+unused levels, missing cells and rejection of custom factor attributes.
+Both FlowJIT jobs and native packaging/acceptance passed.
+[PR #139](https://github.com/godofecht/FlowStudio/pull/139) merged as
+[2b3ea6f](https://github.com/godofecht/FlowStudio/commit/2b3ea6f3b750b070054c847c48d97670283f1ddf).
+**Live Chromium webR factor-column snapshot export/restore remains unverified.**
+Flow remains the native application/backend language. RStudio parity is not
+achieved. No hosted CI configuration changes.
 
 ## 2026-10-28: base R factor identity in browser session snapshots (six CI jobs passed)
 

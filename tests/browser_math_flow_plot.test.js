@@ -48,3 +48,16 @@ test("reject malformed, nonmonotonic, nonfinite and unbounded plot data", () => 
   assert.throws(() => plots.prepare({...heat, time: 0.2}), /endpoints/);
   assert.throws(() => plots.prepare({...heat, ok: false}));
 });
+
+test("finite extreme values cannot overflow SVG scaling", () => {
+  const extreme = plots.prepare({
+    ...heat,
+    observations: [
+      {time: 0, meanTemperature: 300, temperatureVariance: -1e308},
+      {time: 0.05, meanTemperature: 300, temperatureVariance: 0},
+      {time: 0.1, meanTemperature: 300, temperatureVariance: 1e308}
+    ]
+  });
+  const path = plots.coordinates(extreme, "temperatureVariance").path;
+  assert.ok(!/NaN|Infinity/.test(path), path);
+});

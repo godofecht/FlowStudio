@@ -105,3 +105,41 @@ observation samples.
 python3 src/math_flow.py examples/heat_reaction_diffusion.flow
 python3 -m unittest discover -s tests -p 'test_math_flow_reaction.py' -v
 ```
+
+
+## Executable quadratic thermal relaxation (bounded nonlinear PDE)
+
+`examples/heat_nonlinear_reaction.flow` extends the typed scalar heat equation
+to one explicitly recognized nonlinear reaction term:
+
+```flow
+∂ₜtemperature = diffusivity ∇²temperature
+                − reactionRate (temperature − ambientTemperature)
+                               (temperature − ambientTemperature)
+                               / ambientTemperature
+```
+
+The full dimension-checked RHS is evaluated against **both actual RK2 stage fields**.
+This is nonlinear numerical execution, not a source-string substitution or editor
+snippet. The dimension of the sink is K/s. The implementation requires a positive
+ambient temperature and temperatures at or above ambient throughout both stages.
+A conservative, state-dependent local linearized reaction stiffness is checked at
+each stage alongside the diffusion timestep bound. These constraints deliberately
+reject unbounded or unstable cases rather than claiming arbitrary nonlinear PDE
+support.
+
+The checked-in example has a nonuniform initial field above ambient. Unit tests
+compare the compiled RHS against a discrete Fourier Laplacian and quadratic sink,
+then compare a uniform-temperature case with the analytic Riccati solution
+`T(t) = A + (T(0)-A)/(1 + reactionRate*(T(0)-A)*t/A)`, verifying temporal
+refinement. CI also executes the example via the real CLI and native Flow HTTP
+check/run routes on Linux and macOS.
+
+```sh
+python3 src/math_flow.py examples/heat_nonlinear_reaction.flow
+python3 -m unittest discover -s tests -p 'test_math_flow_nonlinear.py' -v
+```
+
+This is still a **restricted** standalone mathematical Flow frontend: general
+nonlinear kinetics, arbitrary coupled fields, non-periodic boundary conditions,
+and upstream Flow 2.0 grammar/compiler integration remain unfinished.

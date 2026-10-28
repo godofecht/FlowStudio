@@ -2,7 +2,7 @@
 
 The entire RHS is parsed and dimension-checked. Supported operators are
 typed diffusion, optional space/time-dependent field-independent forcing, optional constant
-advection, and optional linear or bounded quadratic relaxation toward a
+advection, and optional linear or bounded polynomial relaxation toward a
 declared ambient temperature. The supported terms can be composed.
 No arbitrary nonlinear or coupled equation is accepted.
 """
@@ -31,6 +31,7 @@ class Equation:
     reaction: Expression | None = None
     nonlinear: bool = False
     advection: bool = False
+    reaction_power: int = 1
 
 
 def _name(expr: Expression, value: str) -> bool:
@@ -133,6 +134,38 @@ def _quadratic_relaxation(expr: Expression) -> bool:
             or rate_times_deviation(right) and deviation(left))
 
 
+def _polynomial_relaxation(expr: Expression) -> int | None:
+    """Recognize dimensionally checked dissipative powers 2..4, not arbitrary kinetics.
+
+    -reactionRate * (temperature - ambientTemperature)^n / ambientTemperature^(n-1)
+    with strictly positive ambient temperature. Exponents are literal AST nodes.
+    """
+    if expr.operator != "div" or len(expr.operands) != 2:
+        return None
+    numerator, denominator = expr.operands
+    if numerator.operator != "mul" or len(numerator.operands) != 2:
+        return None
+    a, b = numerator.operands
+    power = b if _name(a, "reactionRate") else a if _name(b, "reactionRate") else None
+    if power is None or power.operator != "pow" or len(power.operands) != 2:
+        return None
+    deviation, exponent = power.operands
+    if (exponent.operator != "literal" or exponent.value not in (2, 3, 4)
+            or deviation.operator != "sub" or len(deviation.operands) != 2
+            or not _name(deviation.operands[0], "temperature")
+            or not _name(deviation.operands[1], "ambientTemperature")):
+        return None
+    n = int(exponent.value)
+    if n == 2 and _name(denominator, "ambientTemperature"):
+        return n
+    if (denominator.operator == "pow" and len(denominator.operands) == 2
+            and _name(denominator.operands[0], "ambientTemperature")
+            and denominator.operands[1].operator == "literal"
+            and denominator.operands[1].value == n - 1):
+        return n
+    return None
+
+
 def _advection(expr: Expression, axis: str) -> bool:
     """Match a declared constant velocity times a centered spatial derivative."""
     if expr.operator != "mul" or len(expr.operands) != 2:
@@ -190,6 +223,7 @@ def compile_heat_equation(tokens: list[str], *, reaction: bool = False,
     forcing = None
     relaxation = None
     nonlinear = False
+    reaction_power = 1
     advection_axes: set[str] = set()
     mixed_count = 0
     for term, sign in _signed_terms(rhs):
@@ -202,9 +236,12 @@ def compile_heat_equation(tokens: list[str], *, reaction: bool = False,
         elif cross_diffusion and sign == 1 and _mixed_diffusion(term):
             mixed_count += 1
         elif reaction and sign == -1 and relaxation is None and (
-                _relaxation(term) or _quadratic_relaxation(term)):
+                _relaxation(term) or _quadratic_relaxation(term)
+                or _polynomial_relaxation(term) is not None):
             relaxation = term
-            nonlinear = _quadratic_relaxation(term)
+            reaction_power = (2 if _quadratic_relaxation(term)
+                              else _polynomial_relaxation(term) or 1)
+            nonlinear = reaction_power > 1
         elif advection and sign == -1 and any(
                 _advection(term, axis) and axis not in advection_axes for axis in ("x", "y")):
             advection_axes.add("x" if _advection(term, "x") else "y")
@@ -214,10 +251,10 @@ def compile_heat_equation(tokens: list[str], *, reaction: bool = False,
         else:
             raise ExpressionError(
                 "Unsupported heat dynamics: expected diffusion, independent forcing "
-                "and optional negative linear or quadratic relaxation or constant advection")
+                "and optional negative linear or bounded polynomial relaxation or constant advection")
     if ((anisotropic and directional_axes != {"x", "y"}) or
             (not anisotropic and diffusion_count != 1) or
             (reaction and relaxation is None) or (advection and advection_axes != {"x", "y"})
             or mixed_count != int(cross_diffusion)):
         raise ExpressionError("Heat dynamics requires exactly the declared diffusion operators and relaxation")
-    return Equation("temperature", rhs, forcing, relaxation, nonlinear, advection)
+    return Equation("temperature", rhs, forcing, relaxation, nonlinear, advection, reaction_power)

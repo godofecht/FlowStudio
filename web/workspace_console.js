@@ -248,7 +248,7 @@ function mount(doc = document, request = fetch) {
   });
 
   /* ---------- rich figures: collect from the real plot routes ---------- */
-  async function inlineFigures(languageName) {
+  async function inlineFigures(languageName, session) {
     if (!PLOT_MODULE || !PLOT_MODULE.collect) return;
     try {
       const plots = await PLOT_MODULE.collect(languageName);
@@ -261,14 +261,9 @@ function mount(doc = document, request = fetch) {
         catch (_) { root[panelKey] = plotPanel; }
       }
       if (plotPanel && plots.length) plotPanel.append(plots);
-      let figIndex = 1;
-      for (const plot of plots) {
-        sessions.append(languageName, "", "fig",
-          { figIndex, language: languageName, plot });
-        figIndex++;
-      }
+      for (const plot of plots) sessions.appendFigure(session, plot);
       if (plots.length)
-        sessions.append(languageName,
+        sessions.appendTo(session,
           "Captured " + plots.length + " figure(s); copies stay in the Plots panel.",
           "meta");
     } catch (_) { /* capture is optional; the run still succeeded */ }
@@ -286,9 +281,13 @@ function mount(doc = document, request = fetch) {
       status("Wait for editor execution to finish.", "error");
       return false;
     }
-    const session = sessions.findSession(name) || sessions.createFor(name);
+    // Execute in the selected scrollback, not always the newest tab of
+    // this runtime. All tabs still share the same native interpreter.
+    const active = sessions.active();
+    const session = active.runtime === name ? active :
+      (sessions.findSession(name) || sessions.createFor(name));
     sessions.recordCommand(session, code);
-    sessions.beginRun(name);
+    sessions.beginRun(name, session);
     const startedAt = Date.now();
     if (editorRun) editorRun.disabled = true;
     if (editorCell) editorCell.disabled = true;
@@ -302,7 +301,7 @@ function mount(doc = document, request = fetch) {
         body: code
       });
       const text = await response.text();
-      sessions.append(name, text + (text.endsWith("\n") ? "" : "\n"), "out");
+      sessions.appendTo(session, text + (text.endsWith("\n") ? "" : "\n"), "out");
       status(response.ok ? "Finished" :
         response.status === 422 ? "Execution failed" :
         response.status === 503 ? "Interpreter unavailable" :
@@ -310,11 +309,14 @@ function mount(doc = document, request = fetch) {
         "HTTP error " + response.status, response.ok ? "ok" : "error");
       sessions.endRun(session, response.ok ? "ok" : "error", Date.now() - startedAt);
       if (response.ok && (name === "r" || name === "python")) {
-        try { await inlineFigures(name); } catch (_) {}
+        try { await inlineFigures(name, session); } catch (_) {}
       }
+      // A run may finish after the user opens another scrollback.
+      // Clear only the submitted session's remembered draft.
+      draftsBySession.set(session.id, "");
       return true;
     } catch (error) {
-      sessions.append(name, String(error) + "\n", "out");
+      sessions.appendTo(session, String(error) + "\n", "out");
       sessions.endRun(session, "disconnected", Date.now() - startedAt);
       status("Execution request failed", "error");
       return false;
@@ -336,7 +338,8 @@ function mount(doc = document, request = fetch) {
   let storage = null;
   try { storage = root.localStorage || null; } catch (_) {}
   const controller = root.FlowStudioConsole.create(submit,
-    () => sessions.active().runtime, message => status(message, "error"), { storage });
+    () => sessions.active().runtime, message => status(message, "error"),
+    { storage, inputScope: () => sessions.active().id });
 
   /* ---------- IO singleton (same contract as before) ---------- */
   if (!root.FlowStudioConsoleIO) {
@@ -417,7 +420,8 @@ function mount(doc = document, request = fetch) {
   }
 
   async function doReset() {
-    const name = sessions.active().runtime;
+    const session = sessions.active();
+    const name = session.runtime;
     if (name !== "python" && name !== "r") return;
     if (!resetArmed) { armToggle(); return; }
     disarmReset();
@@ -430,7 +434,7 @@ function mount(doc = document, request = fetch) {
         body: ""
       });
       if (response.ok) {
-        sessions.append(name, "\n> interpreter state reset\n", "meta");
+        sessions.appendTo(session, "\n> interpreter state reset\n", "meta");
         status("Reset " + name + " interpreter state.", "ok");
       } else {
         status("Reset failed: HTTP " + response.status, "error");

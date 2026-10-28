@@ -61,3 +61,29 @@ test("malformed session/entry metadata is rejected", () => {
   assert.throws(() => exportTranscript({ runtime: "r", ordinal: 1,
     entries: [{ kind: "out", text: null }] }), /Invalid terminal entry/);
 });
+
+test("explicit appendTo and monotonic figure IDs keep concurrent scrollbacks isolated", () => {
+  const sessions = create({ runtime: () => "python" });
+  const first = sessions.active();
+  sessions.recordCommand(first, "print(1)");
+  sessions.beginRun("python", first);
+  const second = sessions.createFor("python");
+  sessions.activateRuntime("python");
+  sessions.appendTo(first, "first only", "out");
+  sessions.endRun(first, "ok", 10);
+  assert.doesNotMatch(exportTranscript(second), /first only/);
+  assert.match(exportTranscript(first), /first only/);
+  assert.equal(sessions.appendTo({ ...first }, "forged", "out"), null);
+  assert.throws(() => sessions.beginRun("python", { ...second }),
+    /foreign terminal session/);
+  sessions.appendFigure(first, { number: 1, png: "one" });
+  sessions.appendFigure(first, { number: 1, png: "two" });
+  assert.deepEqual(first.entries.filter(entry => entry.kind === "fig")
+    .map(entry => entry.figIndex), [1, 2]);
+  sessions.clearVisible(first);
+  sessions.appendFigure(first, { number: 1, png: "three" });
+  assert.deepEqual(first.entries.filter(entry => entry.kind === "fig")
+    .map(entry => entry.figIndex), [3],
+    "figure identity must not reset when scrollback is cleared");
+  assert.doesNotMatch(exportTranscript(second), /Captured figure/);
+});

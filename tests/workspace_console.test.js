@@ -11,7 +11,8 @@ const { FakeElement, createDocument } = require("./terminal_dom.js");
 /* Mounts the workspace terminal against the fake DOM. Elements that stand for
  * server-rendered ids are pre-registered; everything else is created by the
  * module under test and reachable through its ids at the end of the run. */
-function mount(reply = { ok: true, status: 200, text: async () => "ok" }, storage = null) {
+function mount(reply = { ok: true, status: 200, text: async () => "ok" }, storage = null,
+  plotModule = null) {
   const { doc, elements } = createDocument();
   const downloads = { created: [], clicked: [], revoked: [] };
   const createElement = doc.createElement;
@@ -46,6 +47,7 @@ function mount(reply = { ok: true, status: 200, text: async () => "ok" }, storag
   vm.runInContext(fs.readFileSync(path.join(root, "web/terminal_sessions.js"), "utf8"), context);
   vm.runInContext(fs.readFileSync(path.join(root, "web/terminal_input.js"), "utf8"), context);
   vm.runInContext(fs.readFileSync(path.join(root, "web/console.js"), "utf8"), context);
+  if (plotModule) context.FlowStudioPlotFigures = plotModule;
   vm.runInContext(fs.readFileSync(path.join(root, "web/workspace_console.js"), "utf8"), context);
   const controller = context.FlowStudioWorkspaceConsole.mount(doc, async (url, options) => {
     requests.push({ url, options });
@@ -388,4 +390,72 @@ test("download exports only active terminal scrollback as sanitized UTF-8 text",
   assert.deepEqual(app.downloads.revoked, ["blob:flowstudio-test-1"]);
   assert.equal(app.panel.querySelector("#terminalMenu").hidden, true);
   assert.match(app.el("resultStatus").textContent, /download requested/);
+});
+
+test("in-flight output and failure stay in their originating session after a tab switch", async () => {
+  let resolveReply;
+  const app = mount({ ok: true, status: 200,
+    text: () => new Promise(resolve => { resolveReply = resolve; }) });
+  const field = app.el("consoleInput");
+  field.value = "print('from first')";
+  const pending = app.controller.run(field);
+  await new Promise(resolve => setImmediate(resolve));
+  app.panel.querySelector("#terminalNewSession").fire("click");
+  field.value = "print('from first')"; // deliberately identical: must not be cleared
+  resolveReply("first result");
+  assert.equal(await pending, true);
+  assert.equal(field.value, "print('from first')",
+    "completion must not clear an identical draft in another session");
+  assert.doesNotMatch(app.el("console").innerHTML, /first result/);
+  const tabs = app.panel.querySelector(".terminal-tabs").querySelectorAll(".terminal-tab");
+  const first = tabs.find(tab => tab.dataset.runtime === "python" &&
+    !/Python 2/.test(tab.textContent));
+  first.fire("click");
+  assert.match(app.el("console").innerHTML, /first result/);
+  assert.equal(field.value, "", "completed original command must not reappear as draft");
+
+  let rejectReply;
+  const failureApp = mount({ ok: true, status: 200,
+    text: () => new Promise((_, reject) => { rejectReply = reject; }) });
+  const failureField = failureApp.el("consoleInput");
+  failureField.value = "raise RuntimeError()";
+  const failed = failureApp.controller.run(failureField);
+  await new Promise(resolve => setImmediate(resolve));
+  failureApp.panel.querySelector("#terminalNewSession").fire("click");
+  rejectReply(new Error("transport lost"));
+  assert.equal(await failed, false);
+  assert.doesNotMatch(failureApp.el("console").innerHTML, /transport lost/);
+  const failureTabs = failureApp.panel.querySelector(".terminal-tabs").querySelectorAll(".terminal-tab");
+  failureTabs.find(tab => tab.dataset.runtime === "python" &&
+    !/Python 2/.test(tab.textContent)).fire("click");
+  assert.match(failureApp.el("console").innerHTML, /transport lost/);
+});
+
+test("plot captures retain their source session and get distinct IDs across runs", async () => {
+  let captured = 0;
+  let releasePlot;
+  const plots = {
+    collect: () => new Promise(resolve => { releasePlot = resolve; }),
+  };
+  const app = mount({ ok: true, status: 200, text: async () => "done" }, null, plots);
+  const field = app.el("consoleInput");
+  field.value = "plot_first()";
+  const first = app.controller.run(field);
+  await new Promise(resolve => setImmediate(resolve));
+  app.panel.querySelector("#terminalNewSession").fire("click");
+  releasePlot([{ number: ++captured, png: "first-png" }]);
+  assert.equal(await first, true);
+  assert.doesNotMatch(app.el("console").innerHTML, /figure 1|Captured 1 figure/);
+  const tabs = app.panel.querySelector(".terminal-tabs").querySelectorAll(".terminal-tab");
+  tabs.find(tab => tab.dataset.runtime === "python" &&
+    !/Python 2/.test(tab.textContent)).fire("click");
+  assert.match(app.el("console").innerHTML, /figure 1/);
+
+  field.value = "plot_second()";
+  const second = app.controller.run(field);
+  await new Promise(resolve => setImmediate(resolve));
+  releasePlot([{ number: ++captured, png: "second-png" }]);
+  assert.equal(await second, true);
+  assert.match(app.el("console").innerHTML, /figure 1/);
+  assert.match(app.el("console").innerHTML, /figure 2/);
 });

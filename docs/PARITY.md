@@ -1,3 +1,20 @@
+## 2026-10-28: native workspace Python replay navigation (verification pending)
+
+The Flow-owned native workspace's bounded Python trace explorer now exposes
+previous/next recorded step and previous/next marked breakpoint controls.
+Navigation updates the selected source line, captured locals, active-row
+highlight and accessible current-step marker together; buttons disable at
+the trace boundaries and when no matching breakpoint remains. Source or
+document changes invalidate replay and disable all navigation. The recorded
+trace still executes to completion: these are **post-execution** controls,
+not live pause/resume, and do not claim Flow or R debugging parity.
+
+**Status: partial / focused V8 module smoke validation only; full Node,
+native Flow, Linux/macOS CI and physical Chromium acceptance pending.**
+The new regression tests cover breakpoint navigation, UI state, stale-source
+invalidation and actual workspace/HTML wiring. No hosted CI workflow changed.
+RStudio parity remains incomplete.
+
 ## 2026-10-28: Python debugger stdout and stale-state invalidation (CI pending)
 
 The native Python replay panel now forwards actual trace-captured stdout and

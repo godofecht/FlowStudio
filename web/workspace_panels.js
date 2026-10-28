@@ -247,6 +247,9 @@ mountPanel("FlowStudioDebugPanel", global.FlowStudioDebugPanel, DebugPanel => {
     getSource: () => document.getElementById("source").value,
     getDocId: activeDocumentId,
     getBreakpoints: () => breakpoints.lines(activeDocumentId()),
+    previousButton: el("debugPrevious"), nextButton: el("debugNext"),
+    previousBreakpointButton: el("debugPreviousBp"),
+    nextBreakpointButton: el("debugNextBp"),
     onStep: step => global.FlowStudioApp.revealPosition(step.line, 1),
     onOutput: output => {
       const text = "\n> Python debug trace\n" + output +

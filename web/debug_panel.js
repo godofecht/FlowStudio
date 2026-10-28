@@ -84,6 +84,8 @@ function mount(document, options) {
     traceRoute = "/api/trace/python", fetchFn = null, getSource = () => "",
     getDocId = () => null, getBreakpoints = () => [], onStep = () => {},
     onOutput = () => {}, notice = () => {},
+    previousButton = null, nextButton = null,
+    previousBreakpointButton = null, nextBreakpointButton = null,
     node = null
   } = options || {};
   if (!node) throw new TypeError("Debug panel needs a panel node.");
@@ -123,6 +125,7 @@ function mount(document, options) {
   function describeStep(step, node) {
     const row = document.createElement("div");
     row.className = "debug-step" + (step.atBreakpoint ? " debug-step-here" : "");
+    row.dataset.breakpoint = step.atBreakpoint ? "true" : "false";
     const label = document.createElement("button");
     label.type = "button";
     label.textContent = "#" + (step.index + 1) + "  line " + step.line +
@@ -133,19 +136,52 @@ function mount(document, options) {
     label.dataset.stepIndex = String(step.index);
     label.addEventListener("click", () => {
       if (!traceIsCurrent()) return;
-      position = step.index;
-      onStep(step);
-      renderLocals(document, node, steps[position]);
-      markActive(node, step.index);
+      selectStep(step.index);
     });
     row.append(label);
     return row;
   }
 
+  // Selection is reflected in both the visible row and its accessibility state.
+  // The row, not the button, owns the step index.
   function markActive(node, index) {
-    for (const child of node.querySelectorAll(".debug-step"))
-      child.classList.toggle("debug-step-active",
-        Number(child.dataset.stepIndex) === index);
+    const list = node.querySelector(".debug-steps");
+    if (!list) return;
+    for (const row of list.children) {
+      const active = Number(row.dataset.stepIndex) === index;
+      row.className = "debug-step" +
+        (row.dataset.breakpoint === "true" ? " debug-step-here" : "") +
+        (active ? " debug-step-active" : "");
+      const button = row.firstElementChild || row.children[0];
+      if (button) button.setAttribute("aria-current", active ? "step" : "false");
+    }
+  }
+
+  function breakpointIndex(direction) {
+    for (let index = position + direction;
+         index >= 0 && index < steps.length; index += direction)
+      if (steps[index].atBreakpoint) return index;
+    return -1;
+  }
+
+  function syncNavigation() {
+    if (previousButton) previousButton.disabled = position <= 0;
+    if (nextButton) nextButton.disabled = position < 0 || position >= steps.length - 1;
+    if (previousBreakpointButton)
+      previousBreakpointButton.disabled = breakpointIndex(-1) < 0;
+    if (nextBreakpointButton)
+      nextBreakpointButton.disabled = breakpointIndex(1) < 0;
+  }
+
+  function selectStep(index) {
+    if (!Number.isSafeInteger(index) || index < 0 || index >= steps.length) return null;
+    position = index;
+    const step = steps[index];
+    onStep(step);
+    renderLocals(document, node, step);
+    markActive(node, index);
+    syncNavigation();
+    return step;
   }
 
   function renderLocals(document, node, step) {
@@ -196,9 +232,11 @@ function mount(document, options) {
       list.append(row);
     }
     renderLocals(document, node, steps[position]);
+    markActive(node, position);
+    syncNavigation();
   }
 
-  return Object.freeze({
+  const controller = Object.freeze({
     async run() {
       if (busy) return null;
       clearTrace();
@@ -244,24 +282,35 @@ function mount(document, options) {
     },
     current() { return traceIsCurrent() && position >= 0 ? steps[position] : null; },
     next() {
-      if (!traceIsCurrent()) return null;
-      if (position < steps.length - 1) { position++; return steps[position]; }
-      return null;
+      return traceIsCurrent() ? selectStep(position + 1) : null;
     },
     previous() {
-      if (!traceIsCurrent()) return null;
-      if (position > 0) { position--; return steps[position]; }
-      return null;
+      return traceIsCurrent() ? selectStep(position - 1) : null;
+    },
+    nextBreakpoint() {
+      return traceIsCurrent() ? selectStep(breakpointIndex(1)) : null;
+    },
+    previousBreakpoint() {
+      return traceIsCurrent() ? selectStep(breakpointIndex(-1)) : null;
     },
     total() { traceIsCurrent(); return steps.length; },
     at() { traceIsCurrent(); return position; },
     goTo(index) {
       if (!traceIsCurrent() || !Number.isSafeInteger(index) ||
           index < 0 || index >= steps.length) return null;
-      position = index;
-      return steps[index];
+      return selectStep(index);
     }
   });
+  for (const [button, action] of [
+    [previousButton, () => controller.previous()],
+    [nextButton, () => controller.next()],
+    [previousBreakpointButton, () => controller.previousBreakpoint()],
+    [nextBreakpointButton, () => controller.nextBreakpoint()]
+  ]) {
+    if (button) button.addEventListener("click", action);
+  }
+  syncNavigation();
+  return controller;
 }
 
 const api = { createBreakpointStore, stepsFromTrace, sanitizeLocals, mount, MAX_BREAKPOINTS };

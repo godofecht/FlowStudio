@@ -327,3 +327,65 @@ test("workspace sends Python debugger stdout to the runtime console", () => {
   assert.match(source, /onOutput: output =>/);
   assert.match(source, /FlowStudioConsoleIO\.write\(text, "python"\)/);
 });
+
+test("replay navigation selects real steps, jumps breakpoints, and updates the visible and accessible state", async () => {
+  const doc = fakeDocument(), node = testCoveragePanelNode(doc);
+  const button = () => ({ disabled: false, listeners: {},
+    addEventListener(event, fn) { this.listeners[event] = fn; } });
+  const previousButton = button(), nextButton = button();
+  const previousBreakpointButton = button(), nextBreakpointButton = button();
+  let source = "x = 1", visited = [];
+  const p = panel.mount(doc, {
+    node, previousButton, nextButton, previousBreakpointButton, nextBreakpointButton,
+    getSource: () => source, getDocId: () => "source-document",
+    getBreakpoints: () => [4, 7],
+    onStep: step => visited.push(step.line),
+    fetchFn: async () => ({ ok: true, text: async () => JSON.stringify(TRACE) })
+  });
+  assert.equal(previousButton.disabled, true);
+  assert.equal(nextButton.disabled, true);
+  await p.run();
+  assert.equal(previousButton.disabled, true);
+  assert.equal(nextButton.disabled, false);
+  assert.equal(previousBreakpointButton.disabled, true);
+  assert.equal(nextBreakpointButton.disabled, false);
+  const rows = node._sections[".debug-steps"].children;
+  assert.match(rows[0].className, /debug-step-active/);
+  assert.equal(rows[0].children[0].attributes["aria-current"], "step");
+  nextBreakpointButton.listeners.click();
+  assert.equal(p.at(), 1);
+  assert.equal(p.current().line, 4);
+  assert.equal(rows[0].children[0].attributes["aria-current"], "false");
+  assert.equal(rows[1].children[0].attributes["aria-current"], "step");
+  assert.match(rows[1].className, /debug-step-here debug-step-active/);
+  nextButton.listeners.click();
+  assert.equal(p.at(), 2);
+  assert.equal(nextButton.disabled, true);
+  assert.equal(nextBreakpointButton.disabled, true);
+  previousBreakpointButton.listeners.click();
+  assert.equal(p.at(), 1);
+  previousButton.listeners.click();
+  assert.equal(p.at(), 0);
+  assert.deepEqual(visited, [4, 7, 4, 1]);
+  assert.equal(p.goTo(2).line, 7);
+  assert.equal(p.next(), null);
+  source = "x = 2";
+  previousButton.listeners.click();
+  assert.equal(p.total(), 0);
+  assert.equal(previousButton.disabled, true);
+  assert.equal(nextButton.disabled, true);
+  assert.equal(previousBreakpointButton.disabled, true);
+  assert.equal(nextBreakpointButton.disabled, true);
+  assert.equal(node._sections[".debug-steps"].children.length, 0);
+});
+
+test("native replay step controls are present and wired to the real panel", () => {
+  const fs = require("node:fs");
+  const html = fs.readFileSync(require.resolve("../web/index.html"), "utf8");
+  const wiring = fs.readFileSync(require.resolve("../web/workspace_panels.js"), "utf8");
+  for (const id of ["debugPrevious", "debugNext", "debugPreviousBp", "debugNextBp"]) {
+    assert.match(html, new RegExp('id="' + id + '"'));
+    assert.match(wiring, new RegExp('el\\("' + id + '"\\)'));
+  }
+  assert.match(html, /\.debug-step\.debug-step-active button/);
+});

@@ -248,6 +248,16 @@ mountPanel("FlowStudioDebugPanel", global.FlowStudioDebugPanel, DebugPanel => {
     getDocId: activeDocumentId,
     getBreakpoints: () => breakpoints.lines(activeDocumentId()),
     onStep: step => global.FlowStudioApp.revealPosition(step.line, 1),
+    onOutput: output => {
+      const text = "\n> Python debug trace\n" + output +
+        (output.endsWith("\n") ? "" : "\n");
+      if (global.FlowStudioConsoleIO) global.FlowStudioConsoleIO.write(text, "python");
+      else {
+        const consolePane = el("console");
+        consolePane.textContent += text;
+        consolePane.scrollTop = consolePane.scrollHeight;
+      }
+    },
     notice: (message, state) => {
       el("resultStatus").textContent = message;
       el("resultStatus").dataset.state = state || "";

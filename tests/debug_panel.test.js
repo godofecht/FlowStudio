@@ -164,7 +164,8 @@ test("replay navigation refuses a trace belonging to a different editor buffer",
   await p.run();
   activeDoc = "document-b";
   node._sections[".debug-steps"].children[1].children[0].listeners.click();
-  assert.equal(p.at(), 0);
+  assert.equal(p.at(), -1);
+  assert.equal(p.total(), 0);
   assert.equal(jumps, 0);
   assert.match(warning, /editor buffer changed/);
 });
@@ -210,7 +211,119 @@ test("replay refuses navigation after editing the traced source", async () => {
   await p.run();
   source = "x = 2";
   node._sections[".debug-steps"].children[1].children[0].listeners.click();
-  assert.equal(p.at(), 0);
+  assert.equal(p.at(), -1);
+  assert.equal(p.total(), 0);
   assert.equal(jumps, 0);
   assert.match(warning, /editor buffer changed/);
+});
+
+test("trace execution writes captured stdout and failure tracebacks once", async () => {
+  for (const ok of [true, false]) {
+    const output = ok ? "42\n" : "Traceback (most recent call last):\nValueError: bad\n";
+    const writes = [];
+    const doc = fakeDocument();
+    const p = panel.mount(doc, {
+      node: testCoveragePanelNode(doc),
+      fetchFn: async () => ({
+        ok, status: ok ? 200 : 422,
+        text: async () => JSON.stringify({ ...TRACE, ok, output })
+      }),
+      getSource: () => "print(42)",
+      getDocId: () => "document-a",
+      onOutput: (text, successful) => writes.push([text, successful])
+    });
+    const result = await p.run();
+    assert.equal(result.ok, ok);
+    assert.deepEqual(writes, [[output, ok]]);
+    assert.equal(p.total(), 3);
+  }
+});
+
+test("public replay navigation invalidates stale locals and step counts", async () => {
+  for (const change of ["document", "source"]) {
+    const doc = fakeDocument(), node = testCoveragePanelNode(doc);
+    let source = "x = 1", docId = "document-a", warning = "";
+    const p = panel.mount(doc, {
+      node,
+      fetchFn: async () => ({ ok: true, text: async () => JSON.stringify(TRACE) }),
+      getSource: () => source,
+      getDocId: () => docId,
+      notice: message => { warning = message; }
+    });
+    await p.run();
+    assert.equal(p.goTo(1).line, 4);
+    if (change === "document") docId = "document-b";
+    else source = "x = 2";
+    assert.equal(p.next(), null);
+    assert.equal(p.previous(), null);
+    assert.equal(p.goTo(0), null);
+    assert.equal(p.current(), null);
+    assert.equal(p.total(), 0);
+    assert.equal(p.at(), -1);
+    assert.equal(node._sections[".debug-steps"].children.length, 0);
+    assert.match(warning, /editor buffer changed/);
+  }
+});
+
+test("rerunning a trace clears previous locals while the request is pending", async () => {
+  const doc = fakeDocument(), node = testCoveragePanelNode(doc);
+  let fetchCount = 0, finishSecond;
+  const p = panel.mount(doc, {
+    node,
+    fetchFn: () => {
+      fetchCount++;
+      if (fetchCount === 1) return Promise.resolve({
+        ok: true, text: async () => JSON.stringify(TRACE)
+      });
+      return new Promise(resolve => { finishSecond = resolve; });
+    },
+    getSource: () => "x = 1",
+    getDocId: () => "document-a"
+  });
+  await p.run();
+  assert.equal(p.total(), 3);
+  const pending = p.run();
+  assert.equal(p.total(), 0);
+  assert.equal(p.current(), null);
+  assert.equal(node._sections[".debug-steps"].children.length, 0);
+  finishSecond({ ok: true, text: async () => JSON.stringify({
+    ...TRACE, events: [TRACE.events[0]]
+  }) });
+  await pending;
+  assert.equal(p.total(), 1);
+});
+
+test("failed or stale reruns do not publish stale Python console output", async () => {
+  const doc = fakeDocument(), node = testCoveragePanelNode(doc);
+  let source = "x = 1", finishSecond;
+  const writes = [];
+  let request = 0;
+  const p = panel.mount(doc, {
+    node,
+    fetchFn: () => {
+      request++;
+      if (request === 1) return Promise.resolve({
+        ok: true, text: async () => JSON.stringify({ ...TRACE, output: "first\n" })
+      });
+      return new Promise(resolve => { finishSecond = resolve; });
+    },
+    getSource: () => source,
+    getDocId: () => "document-a",
+    onOutput: text => writes.push(text)
+  });
+  await p.run();
+  assert.deepEqual(writes, ["first\n"]);
+  const pending = p.run();
+  source = "x = 2";
+  finishSecond({ ok: true, text: async () => JSON.stringify({ ...TRACE, output: "stale\n" }) });
+  assert.equal(await pending, null);
+  assert.deepEqual(writes, ["first\n"]);
+  assert.equal(p.total(), 0);
+});
+
+test("workspace sends Python debugger stdout to the runtime console", () => {
+  const fs = require("node:fs");
+  const source = fs.readFileSync(require.resolve("../web/workspace_panels.js"), "utf8");
+  assert.match(source, /onOutput: output =>/);
+  assert.match(source, /FlowStudioConsoleIO\.write\(text, "python"\)/);
 });

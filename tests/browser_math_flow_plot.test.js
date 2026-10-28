@@ -61,3 +61,23 @@ test("finite extreme values cannot overflow SVG scaling", () => {
   const path = plots.coordinates(extreme, "temperatureVariance").path;
   assert.ok(!/NaN|Infinity/.test(path), path);
 });
+
+test("bounded real spatial grids are validated before SVG rendering", () => {
+  const sample = {
+    ...heat,
+    spatial: {
+      grid: [2, 2], source_grid: [32, 32], extent: [1, 1],
+      fields: {temperature: [[300, 301], [302, 303]]}
+    }
+  };
+  const valid = plots.prepareSpatial(sample);
+  assert.deepEqual(valid.grid, [2, 2]);
+  assert.equal(valid.fields.temperature[1][1], 303);
+  assert.throws(() => plots.prepareSpatial({...sample,
+    spatial: {...sample.spatial, grid: [25, 2]}}), /Invalid bounded/);
+  assert.throws(() => plots.prepareSpatial({...sample,
+    spatial: {...sample.spatial, fields: {temperature: [[300, NaN], [302, 303]]}}}),
+    /finite/);
+  assert.throws(() => plots.prepareSpatial({...sample,
+    spatial: {...sample.spatial, fields: {temperature: [[300, 301]]}}}), /finite/);
+});

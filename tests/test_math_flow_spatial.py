@@ -37,6 +37,16 @@ class SpatialNumericsTest(unittest.TestCase):
         self.assertGreater(float(np.max(values) - np.min(values)), 0)
         self.assertGreaterEqual(float(np.min(values)), result["temperature_min"] - 1e-12)
         self.assertLessEqual(float(np.max(values)), result["temperature_max"] + 1e-12)
+        # The sampled final field must agree with the analytic discrete Fourier
+        # eigenmode propagated by the actual RK2 stencil, not just its range.
+        n = 32
+        eigenvalue = -8.0 * np.sin(np.pi / n) ** 2 * n ** 2
+        z = 0.01 * eigenvalue * (result["time"] / result["steps"])
+        amplitude = (1.0 + z + 0.5 * z * z) ** result["steps"]
+        indices = np.linspace(0, n - 1, 24).astype(int)
+        coordinates = (indices + 0.5) / n
+        expected = 300.0 + 10.0 * amplitude * np.sin(2 * np.pi * coordinates[:, None]) * np.sin(2 * np.pi * coordinates[None, :])
+        np.testing.assert_allclose(values, expected, rtol=0, atol=1e-9)
 
     def test_navier_returns_velocity_and_vorticity_after_projection(self):
         source = (ROOT / "examples/navier_stokes_smoke.flow").read_text(encoding="utf-8")

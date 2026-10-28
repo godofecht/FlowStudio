@@ -6,6 +6,8 @@ from pathlib import Path
 import shutil
 import tempfile
 import unittest
+from unittest import mock
+import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location("quarto_render", ROOT / "scripts/quarto_render.py")
@@ -51,6 +53,31 @@ class QuartoRenderTests(unittest.TestCase):
             )
             executable.chmod(0o755)
             self.assertEqual(quarto.render(SOURCE, str(executable)), "<!doctype html><p>Rendered ✓</p>")
+
+    def test_rejects_oversized_real_subprocess_output(self):
+        with tempfile.TemporaryDirectory() as directory:
+            executable = Path(directory) / "quarto-fixture"
+            executable.write_text(
+                "#!/usr/bin/env python3\n"
+                "import pathlib\n"
+                "pathlib.Path('report.html').write_bytes(b'x' * (2 * 1024 * 1024 + 1))\n",
+                encoding="utf-8",
+            )
+            executable.chmod(0o755)
+            with self.assertRaisesRegex(quarto.RenderError, "2 MiB"):
+                quarto.render(SOURCE, str(executable))
+
+    def test_timeout_kills_render_engine_group(self):
+        process = mock.Mock()
+        process.pid = 12345
+        process.wait.side_effect = [subprocess.TimeoutExpired("quarto", 45), -9]
+        with mock.patch.object(quarto.shutil, "which", return_value="/usr/bin/quarto"), \
+             mock.patch.object(quarto.subprocess, "Popen", return_value=process), \
+             mock.patch.object(quarto.os, "killpg") as kill_group:
+            with self.assertRaises(quarto.RenderError) as failure:
+                quarto.render(SOURCE)
+        self.assertEqual(failure.exception.status, 70)
+        kill_group.assert_called_once_with(12345, quarto.signal.SIGKILL)
 
     @unittest.skipUnless(shutil.which("quarto"), "real Quarto CLI not installed")
     def test_real_quarto_markdown_render(self):

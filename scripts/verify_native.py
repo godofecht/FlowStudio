@@ -174,6 +174,16 @@ def verify(root: Path, port: int = 8751, build_timeout: int = 180,
             print(r_import_matrix_result.stderr, end="", file=sys.stderr, flush=True)
         if r_import_matrix_result.returncode != 0:
             raise VerificationError("Real Python table to R matrix acceptance failed")
+        print("Real R matrix snapshot provenance acceptance: tests/browser_session_snapshot_r_matrix.test.js", flush=True)
+        snapshot_matrix_result = _command(
+            ["node", "--test", str(root / "tests/browser_session_snapshot_r_matrix.test.js")], root, 65
+        )
+        if snapshot_matrix_result.stdout:
+            print(snapshot_matrix_result.stdout, end="", flush=True)
+        if snapshot_matrix_result.stderr:
+            print(snapshot_matrix_result.stderr, end="", file=sys.stderr, flush=True)
+        if snapshot_matrix_result.returncode != 0:
+            raise VerificationError("Real R matrix snapshot provenance acceptance failed")
         print("Real browser R inspector query acceptance: tests/browser_r_nested_environment.test.js", flush=True)
         inspect_result = _command(
             ["node", "--test", str(root / "tests/browser_r_nested_environment.test.js")], root, 65

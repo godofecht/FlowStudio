@@ -408,7 +408,12 @@ function create({load = () => import(CDN)} = {}) {
   // Matrix columns use V1..V16 in the existing typed-table protocol; source
   // dimensions and storage widths are not represented in the destination.
   // Never evaluate a variable name as source.
-  async function exportVariable(name) {
+  async function exportVariable(name, options = {}) {
+    if (!options || typeof options !== "object" || Array.isArray(options) ||
+        Object.keys(options).some(key => key !== "forSnapshot") ||
+        (options.forSnapshot !== undefined && typeof options.forSnapshot !== "boolean"))
+      return {ok:false, output:"Invalid R export options."};
+    const forSnapshot = options.forSnapshot === true;
     if (!/^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(name))
       return {ok:false, output:"Invalid shared Python/R variable name."};
     const generation = epoch;
@@ -420,7 +425,8 @@ function create({load = () => import(CDN)} = {}) {
           '; if (!base::exists(n, envir=.GlobalEnv, inherits=FALSE) || ' +
           'base::bindingIsActive(n, .GlobalEnv)) stop("Unknown or active R binding"); ' +
           'v <- base::get(n, envir=.GlobalEnv, inherits=FALSE); ' +
-          "if (base::is.matrix(v) && !base::is.object(v)) { " +
+          "matrix_origin <- base::is.matrix(v) && !base::is.object(v); " +
+          "if (matrix_origin) { " +
           "d <- base::attr(v, \"dim\", exact=TRUE); " +
           "if (!base::identical(base::names(base::attributes(v)), \"dim\") || " +
           "!base::is.integer(d) || base::length(d) != 2L || " +
@@ -455,7 +461,9 @@ function create({load = () => import(CDN)} = {}) {
            "base::vapply(base::seq_along(col), function(j) if (base::is.na(col[[j]])) \"@NA@\" else " +
            "utils::URLencode(formatted[[j]], reserved=TRUE), character(1))) " +
            "}), use.names=FALSE); " +
-           "base::c(\"@TABLE@\", base::as.character(base::ncol(v)), base::as.character(base::nrow(v)), out) " +
+           "base::c(if (matrix_origin && " + (forSnapshot ? "TRUE" : "FALSE") +
+           ") \"@MATRIX@\" else \"@TABLE@\", " +
+           "base::as.character(base::ncol(v)), base::as.character(base::nrow(v)), out) " +
            "} else { " +
            't <- base::typeof(v); ' +
           'if (!is.null(base::attributes(v)) || !(t %in% c("double","integer","logical","character"))) ' +
@@ -487,8 +495,9 @@ function create({load = () => import(CDN)} = {}) {
           }
           return decoded;
         };
-        let packet;
-        if (rows[0] === "@TABLE@") {
+        let packet, origin = null;
+        if (rows[0] === "@TABLE@" || (forSnapshot && rows[0] === "@MATRIX@")) {
+          if (rows[0] === "@MATRIX@") origin = "matrix";
           if (rows.length < 5 || !/^[1-9][0-9]?$/.test(rows[1]) ||
               !/^(?:0|[1-9][0-9]{0,2})$/.test(rows[2]))
             throw Error("Invalid R table dimensions.");
@@ -518,7 +527,7 @@ function create({load = () => import(CDN)} = {}) {
           const values = rows.slice(1).map(raw => decode(raw, type));
           packet = global.FlowStudioVariableTransfer.validate({kind:"vector", type, values});
         }
-        return {ok:true, value:packet};
+        return origin ? {ok:true, value:packet, origin} : {ok:true, value:packet};
       } catch (error) { return {ok:false, output:String(error.message || error).slice(0, 300)}; }
     });
   }

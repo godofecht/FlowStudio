@@ -28,6 +28,20 @@ CHUNK_HEADER = re.compile(
 )
 INLINE_ENGINE = re.compile(r"\x60[ \t]*\{(?:r|python)\}[ \t]+\S", re.IGNORECASE)
 INLINE_R = re.compile(r"(^|[^\\\x60])\x60r[ \t]+[^\x60\r\n]+\x60(?!\x60)")
+# Pandoc can recognize fenced chunks inside blockquotes, list items and
+# indented list continuations. These cannot be validated by the top-level
+# fence scanner, so reject executable-looking nested fences rather than
+# allowing an unvalidated engine through to Quarto.
+NESTED_CHUNK_FENCE = re.compile(
+    r"^[ \t]*(?:(?:>[ \t]*)|(?:[-+*]|[0-9]{1,9}[.)])[ \t]+)*"
+    r"(?:\x60{3,}|~{3,})[ \t]*\{"
+)
+
+
+def unsupported_inline(line: str) -> bool:
+    return ("{{<" in line or "{{%" in line
+            or INLINE_ENGINE.search(line) is not None
+            or INLINE_R.search(line) is not None)
 
 
 def validate_quarto_body(lines: list[str]) -> None:
@@ -39,10 +53,12 @@ def validate_quarto_body(lines: list[str]) -> None:
     fence: tuple[str, int, bool] | None = None
     for line in lines:
         if fence is None:
-            if "{{<" in line or "{{%" in line or INLINE_ENGINE.search(line) or INLINE_R.search(line):
+            if unsupported_inline(line):
                 raise RenderError("Quarto shortcodes and inline engines are unsupported.")
             match = FENCE_OPEN.fullmatch(line)
             if match is None:
+                if NESTED_CHUNK_FENCE.match(line):
+                    raise RenderError("Nested Quarto executable fences are unsupported.")
                 continue
             marker, info = match.groups()
             info = info.strip()
@@ -86,11 +102,18 @@ def standalone_document(source: str) -> str:
         raise RenderError("Only a single scalar format: html is renderable.")
     # Do not accept arbitrary Quarto YAML from direct API callers. The browser
     # encoder produces only these inert scalar fields and the HTML format.
+    seen_metadata: set[str] = set()
     for i in range(1, end):
         if i in formats or not lines[i].strip():
             continue
+        if unsupported_inline(lines[i]):
+            raise RenderError("Quarto metadata cannot contain shortcodes or inline engines.")
         if not re.fullmatch(r"(?:title|author|date):\s*(?:[^#{}\[\]&*!|>'\"\x60]|\"[^\"\n]*\"|'[^'\n]*')*", lines[i]):
             raise RenderError("Unsupported Quarto YAML; export a restricted .qmd first.")
+        key = lines[i].split(":", 1)[0]
+        if key in seen_metadata:
+            raise RenderError("Duplicate Quarto metadata key.")
+        seen_metadata.add(key)
     validate_quarto_body(lines[end + 1:])
     index = formats[0]
     lines[index:index + 1] = ["format:", "  html:", "    embed-resources: true"]

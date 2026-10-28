@@ -72,3 +72,36 @@ This deliberately does **not** admit arbitrary scalar equations: the heat RHS mu
 python3 src/math_flow.py examples/heat_equation_forced.flow
 python3 -m unittest discover -s tests -p 'test_math_flow_equations.py' -v
 ```
+
+## Typed linear reaction-diffusion and full-RHS RK2 lowering
+
+`examples/heat_reaction_diffusion.flow` now runs a periodic scalar parabolic PDE with
+`reactionRate = 0.5s⁻¹`, `ambientTemperature = 300K`, and the typed dynamics
+
+```flow
+∂ₜtemperature = diffusivity ∇²temperature
+                − reactionRate (temperature − ambientTemperature)
+                + 2K/s
+```
+
+The parser builds one dimension-checked equation AST for the **entire** RHS. The
+RK2 solver evaluates that AST against the actual temperature field at each
+stage; it does not treat a field-dependent reaction as a constant source.
+Only the explicitly validated negative linear relaxation term is accepted,
+and its positive rate participates in the explicit timestep stability bound.
+Arbitrary nonlinear reaction kinetics, time-dependent forcing, coupled PDEs,
+non-periodic boundaries, and upstream Flow 2.0 grammar integration remain
+unsupported. Unsupported forms fail rather than being silently simplified.
+
+The new tests compare the numerical mean with the discrete RK2 relaxation
+formula and Fourier variance against the exact amplification factor of the
+periodic finite-difference Laplacian plus reaction. They also check
+grid-refinement convergence, invalid dimensions and signs, the CLI, and
+native FlowStudio HTTP execution. The workbench's existing real heatmap and
+line-graph visualization consumes the returned temperature fields and
+observation samples.
+
+```sh
+python3 src/math_flow.py examples/heat_reaction_diffusion.flow
+python3 -m unittest discover -s tests -p 'test_math_flow_reaction.py' -v
+```

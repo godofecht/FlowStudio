@@ -197,6 +197,23 @@ def main() -> None:
         "− advectionVelocityX ∂ₓ(temperature)", "+ advectionVelocityX ∂ₓ(temperature)")
     status, body = request("POST", "/api/check/mathflow", invalid_advection, accepted_headers)
     assert status == 422 and not json.loads(body)["ok"], (status, body)
+    # Composed typed transport, linear reaction and forcing must execute through
+    # the native FlowStudio HTTP route, not merely standalone Python tests.
+    combined_source = (Path(__file__).resolve().parents[1] /
+                       "examples/heat_transport_reaction.flow").read_text(encoding="utf-8")
+    status, body = request("POST", "/api/check/mathflow", combined_source, accepted_headers)
+    assert status == 200 and json.loads(body)["ok"], (status, body)
+    status, body = request("POST", "/api/run/mathflow", combined_source, accepted_headers)
+    combined = json.loads(body)
+    assert status == 200 and combined["ok"] and combined["steps"] == 200, (status, combined)
+    assert 300 < combined["mean_temperature"] < 300.05, combined
+    assert 0 < combined["temperature_variance"] < combined["initial_temperature_variance"], combined
+    assert combined["spatial"]["grid"] == [16, 16], combined
+    invalid_combined = combined_source.replace(
+        "− reactionRate (temperature − ambientTemperature)",
+        "+ reactionRate (temperature − ambientTemperature)")
+    status, body = request("POST", "/api/check/mathflow", invalid_combined, accepted_headers)
+    assert status == 422 and not json.loads(body)["ok"], (status, body)
     # Real nonlinear reaction-diffusion via native Flow HTTP and NumPy RK2.
     nonlinear_source = (Path(__file__).resolve().parents[1] /
                         "examples/heat_nonlinear_reaction.flow").read_text(encoding="utf-8")

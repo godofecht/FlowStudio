@@ -40,7 +40,7 @@ test("v2 R factor snapshot preserves ordered and unused levels",()=>{
     {...snapshot,variables:[{name:"rating",value:packet,restoreAs:"factor",factor:{levels:["low"],ordered:true,other:1}}]},
     {...snapshot,variables:[{name:"rating",value:packet,restoreAs:"factor",factor:{levels:["low","middle","high"],ordered:true},dtype:"<U6"}]},
     {...snapshot,variables:[{name:"rating",value:{kind:"scalar",type:"string",values:["low"]},restoreAs:"factor",factor}]},
-    {...snapshot,variables:[{name:"rating",value:packet,restoreAs:"factor",factor:{levels:["low","middle","high","\\ud800"],ordered:true}}]}
+    {...snapshot,variables:[{name:"rating",value:packet,restoreAs:"factor",factor:{levels:["low","middle","high","\ud800"],ordered:true}}]}
   ];
   for (const bad of invalid) assert.throws(()=>snapshots.validate(bad));
 });

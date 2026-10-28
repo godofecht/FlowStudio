@@ -71,8 +71,9 @@ try {
     if (source === 'examples/heat_robin_profile.flow') {
       const note = page.locator('#mathFlowPlot [data-mathflow-boundary="Faces"]');
       assert.equal(await note.count(), 1, 'Native plot must display executed Robin profile');
-      assert.match(await note.textContent(), /x min Robin ambient profile 300K\\+2K\\*sin/);
-      assert.match(await note.textContent(), /1K\\*t\\/1s, transfer length 0.2 m/);
+      const description = await note.textContent();
+      assert.ok(description.includes('x min Robin ambient profile 300K+2K*sin'), description);
+      assert.ok(description.includes('1K*t/1s, transfer length 0.2 m'), description);
     }
     if (source === 'examples/heat_robin.flow') {
       const note = page.locator('#mathFlowPlot [data-mathflow-boundary="Faces"]');

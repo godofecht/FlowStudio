@@ -21,6 +21,8 @@ test("native Quarto rendering uses Flow-owned route and the real installed CLI h
   assert.match(helper, /os\.killpg\(process\.pid, signal\.SIGKILL\)/);
   assert.match(helper, /"render", "report\.qmd", "--to", "html"/);
   assert.doesNotMatch(helper, /shell=True/);
+  const packaging = fs.readFileSync(path.join(__dirname, "../scripts/package.sh"), "utf8");
+  assert.match(packaging, /cp scripts\/quarto_render\.py "\\$stage\/\\$name\/scripts\/quarto_render\.py"/);
 });
 
 test("native Quarto rendering is not exposed through GitHub Pages", () => {

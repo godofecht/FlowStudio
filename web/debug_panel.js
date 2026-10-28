@@ -82,13 +82,15 @@ function sanitizeLocals(locals) {
 function mount(document, options) {
   const {
     traceRoute = "/api/trace/python", fetchFn = null, getSource = () => "",
-    getDocId = () => null, getBreakpoints = () => [], onStep = () => {}, notice = () => {},
+    getDocId = () => null, getBreakpoints = () => [], onStep = () => {},
+    onOutput = () => {}, notice = () => {},
     node = null
   } = options || {};
   if (!node) throw new TypeError("Debug panel needs a panel node.");
   if (typeof fetchFn !== "function") throw new TypeError("Debug panel needs a fetch function.");
-  if (typeof getSource !== "function" || typeof getBreakpoints !== "function")
-    throw new TypeError("Debug panel needs getSource and getBreakpoints.");
+  if (typeof getSource !== "function" || typeof getBreakpoints !== "function" ||
+      typeof getDocId !== "function" || typeof onOutput !== "function")
+    throw new TypeError("Debug panel needs source, document, breakpoint and output callbacks.");
 
   let steps = [];
   let position = -1;
@@ -96,6 +98,27 @@ function mount(document, options) {
   let revision = 0;
   let traceDocId = null;
   let traceSource = null;
+
+  // A replay belongs to the exact source buffer that was executed. Invalidate
+  // both the model and rendered locals when the buffer changes; merely
+  // blocking click handlers would leave stale state available to other callers.
+  function clearTrace() {
+    steps = [];
+    position = -1;
+    traceDocId = null;
+    traceSource = null;
+    render(node, { ok: true, truncated: false });
+  }
+
+  function traceIsCurrent() {
+    if (traceSource !== null && getDocId() === traceDocId &&
+        String(getSource() || "") === traceSource) return true;
+    if (traceSource !== null || steps.length) {
+      clearTrace();
+      notice("The editor buffer changed since tracing; run the trace again.", "error");
+    }
+    return false;
+  }
 
   function describeStep(step, node) {
     const row = document.createElement("div");
@@ -109,10 +132,7 @@ function mount(document, options) {
     label.title = "Jump to line " + step.line;
     label.dataset.stepIndex = String(step.index);
     label.addEventListener("click", () => {
-      if (getDocId() !== traceDocId || String(getSource() || "") !== traceSource) {
-        notice("The editor buffer changed since tracing; run the trace again.", "error");
-        return;
-      }
+      if (!traceIsCurrent()) return;
       position = step.index;
       onStep(step);
       renderLocals(document, node, steps[position]);
@@ -181,6 +201,7 @@ function mount(document, options) {
   return Object.freeze({
     async run() {
       if (busy) return null;
+      clearTrace();
       const source = String(getSource() || "");
       if (!source.trim()) { notice("Debug needs a non-empty Python buffer.", "error"); return null; }
       if (source.length > MAX_SOURCE) {
@@ -212,6 +233,7 @@ function mount(document, options) {
         steps = result.steps;
         position = steps.length ? 0 : -1;
         render(node, result);
+        if (result.output) onOutput(result.output, result.ok);
         return result;
       } catch (error) {
         notice("Trace failed: " + String(error.message || error).slice(0, 300), "error");
@@ -220,13 +242,22 @@ function mount(document, options) {
         busy = false;
       }
     },
-    current() { return position >= 0 ? steps[position] : null; },
-    next() { if (position < steps.length - 1) { position++; return steps[position]; } return null; },
-    previous() { if (position > 0) { position--; return steps[position]; } return null; },
-    total() { return steps.length; },
-    at() { return position; },
+    current() { return traceIsCurrent() && position >= 0 ? steps[position] : null; },
+    next() {
+      if (!traceIsCurrent()) return null;
+      if (position < steps.length - 1) { position++; return steps[position]; }
+      return null;
+    },
+    previous() {
+      if (!traceIsCurrent()) return null;
+      if (position > 0) { position--; return steps[position]; }
+      return null;
+    },
+    total() { traceIsCurrent(); return steps.length; },
+    at() { traceIsCurrent(); return position; },
     goTo(index) {
-      if (!Number.isSafeInteger(index) || index < 0 || index >= steps.length) return null;
+      if (!traceIsCurrent() || !Number.isSafeInteger(index) ||
+          index < 0 || index >= steps.length) return null;
       position = index;
       return steps[index];
     }

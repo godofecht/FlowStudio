@@ -86,6 +86,18 @@ function validFactorColumns(factorColumns, packet) {
   }
   return true;
 }
+function validRowNames(rowNames, packet) {
+  if (!Array.isArray(rowNames) || !packet || packet.kind !== "table" ||
+      !Array.isArray(packet.columns) || !packet.columns.length ||
+      rowNames.length === 0 || rowNames.length > 128 ||
+      rowNames.length !== packet.columns[0].values.length ||
+      new Set(rowNames).size !== rowNames.length ||
+      !rowNames.every(name => typeof name === "string" && name.length > 0 &&
+        [...name].length <= 512 && !name.includes("\0"))) return false;
+  try { rowNames.forEach(name => encodeURIComponent(name)); }
+  catch (_) { return false; }
+  return true;
+}
 function validate(snapshot) {
   if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot) ||
       Object.keys(snapshot).sort().join(",") !== "format,language,omitted,truncated,variables" ||
@@ -101,11 +113,13 @@ function validate(snapshot) {
     const hasDtype = entry && Object.prototype.hasOwnProperty.call(entry, "dtype");
     const hasFactor = entry && Object.prototype.hasOwnProperty.call(entry, "factor");
     const hasFactorColumns = entry && Object.prototype.hasOwnProperty.call(entry, "factorColumns");
+    const hasRowNames = entry && Object.prototype.hasOwnProperty.call(entry, "rowNames");
     if (!entry || typeof entry !== "object" || Array.isArray(entry) ||
-        Object.keys(entry).sort().join(",") !== (restoreAs ?
-          (hasDtype ? "dtype,name,restoreAs,value" :
-            hasFactor ? "factor,name,restoreAs,value" :
-            hasFactorColumns ? "factorColumns,name,restoreAs,value" : "name,restoreAs,value") : "name,value") ||
+        Object.keys(entry).sort().join(",") !==
+          ["name", "value", ...(restoreAs ? ["restoreAs"] : []),
+            ...(hasDtype ? ["dtype"] : []), ...(hasFactor ? ["factor"] : []),
+            ...(hasFactorColumns ? ["factorColumns"] : []),
+            ...(hasRowNames ? ["rowNames"] : [])].sort().join(",") ||
         !validName(entry.name) || names.has(entry.name) ||
         (restoreAs && (snapshot.format !== FORMAT_V2 ||
           !((snapshot.language === "python" && entry.restoreAs === "pandas" &&
@@ -117,13 +131,17 @@ function validate(snapshot) {
             (snapshot.language === "r" && entry.restoreAs === "factor" &&
              hasFactor && validFactor(entry.factor, entry.value)) ||
             (snapshot.language === "r" && entry.restoreAs === "dataframe" &&
-             hasFactorColumns && validFactorColumns(entry.factorColumns, entry.value))))) ||
+             (hasFactorColumns || hasRowNames) &&
+             (!hasFactorColumns || validFactorColumns(entry.factorColumns, entry.value)) &&
+             (!hasRowNames || validRowNames(entry.rowNames, entry.value)))))) ||
         (hasDtype && (entry.restoreAs !== "numpy" ||
           !validNumpyDtype(entry.dtype, entry.value))) ||
         (hasFactor && (entry.restoreAs !== "factor" ||
           !validFactor(entry.factor, entry.value))) ||
         (hasFactorColumns && (entry.restoreAs !== "dataframe" ||
-          !validFactorColumns(entry.factorColumns, entry.value))))
+          !validFactorColumns(entry.factorColumns, entry.value))) ||
+        (hasRowNames && (entry.restoreAs !== "dataframe" ||
+          !validRowNames(entry.rowNames, entry.value))))
       throw Error("Snapshot contains an invalid or duplicate variable name.");
     names.add(entry.name);
     if (!transfer || typeof transfer.validate !== "function")
@@ -188,12 +206,21 @@ async function capture({language, inspect, exportValue, generation}) {
         entry.restoreAs = "matrix";
       }
       if (result.origin === "dataframe") {
-        if (!validFactorColumns(result.factorColumns, value))
-          throw Error("R data.frame factor columns require validated provenance.");
+        if (result.factorColumns === undefined && result.rowNames === undefined)
+          throw Error("R data.frame snapshot requires typed provenance.");
+        if (result.factorColumns !== undefined) {
+          if (!validFactorColumns(result.factorColumns, value))
+            throw Error("R data.frame factor columns require validated provenance.");
+          entry.factorColumns = result.factorColumns.map(column => ({
+            name:column.name, levels:[...column.levels], ordered:column.ordered
+          }));
+        }
+        if (result.rowNames !== undefined) {
+          if (!validRowNames(result.rowNames, value))
+            throw Error("R data.frame row names require validated provenance.");
+          entry.rowNames = [...result.rowNames];
+        }
         entry.restoreAs = "dataframe";
-        entry.factorColumns = result.factorColumns.map(column => ({
-          name:column.name, levels:[...column.levels], ordered:column.ordered
-        }));
       }
       if (result.origin === "factor") {
         if (!validFactor(result.factor, value))
@@ -226,9 +253,11 @@ async function restore({snapshot, language, importValue, generation}) {
     same(generation, epoch);
     let result;
     try {
-      result = entry.dtype || entry.factor || entry.factorColumns ?
-        await importValue(language, entry.name, entry.value, entry.restoreAs || null,
-          entry.dtype || entry.factor || entry.factorColumns) :
+      const metadata = entry.rowNames ?
+        {factorColumns:entry.factorColumns || [], rowNames:entry.rowNames} :
+        entry.dtype || entry.factor || entry.factorColumns;
+      result = metadata ?
+        await importValue(language, entry.name, entry.value, entry.restoreAs || null, metadata) :
         await importValue(language, entry.name, entry.value, entry.restoreAs || null);
     }
     catch (error) {

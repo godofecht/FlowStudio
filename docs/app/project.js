@@ -171,6 +171,8 @@ async function applyProjectReplacement(plan, options = {}) {
       throw new Error("File changed since preview; no files replaced: " + entry.path);
   }
   let completed = 0, matches = 0;
+  // A failed close may have changed its file. Include that attempted write.
+  const attempted = [];
   try {
     for (const entry of plan.files) {
       checkReplacementAbort(options.signal);
@@ -179,6 +181,7 @@ async function applyProjectReplacement(plan, options = {}) {
       const current = await entry.handle.getFile();
       if (await current.text() !== entry.before)
         throw new Error("File changed during replacement: " + entry.path);
+      attempted.push(entry);
       const writer = await entry.handle.createWritable();
       try {
         await writer.write(entry.after);
@@ -196,13 +199,46 @@ async function applyProjectReplacement(plan, options = {}) {
       matches += entry.count;
     }
   } catch (error) {
-    if (completed) {
-      const partial = new Error("Replacement stopped after " + completed + " files (" +
-        matches + " matches); earlier writes remain on disk: " + (error.message || String(error)));
-      partial.name = error.name || "Error";
-      throw partial;
+    if (!attempted.length) throw error;
+    let restored = 0, unchanged = 0;
+    const unresolved = [];
+    // Best-effort compensation, not a transaction. A crash, external edit,
+    // denied permission or newly opened editor can prevent restoration.
+    // Never overwrite contents differing from both the before/after images.
+    for (const entry of attempted.reverse()) {
+      try {
+        if (options.isBlocked && await options.isBlocked(entry))
+          throw new Error("open in the editor");
+        const current = await entry.handle.getFile();
+        const contents = await current.text();
+        if (contents === entry.before) { unchanged++; continue; }
+        if (contents !== entry.after)
+          throw new Error("changed outside this operation");
+        const writer = await entry.handle.createWritable();
+        try {
+          await writer.write(entry.before);
+          await writer.close();
+        } catch (rollbackError) {
+          if (typeof writer.abort === "function") {
+            try { await writer.abort(); } catch (_) { /* preserve rollback failure */ }
+          }
+          throw rollbackError;
+        }
+        const verified = await entry.handle.getFile();
+        if (await verified.text() !== entry.before)
+          throw new Error("restored bytes could not be verified");
+        restored++;
+      } catch (rollbackError) {
+        unresolved.push(entry.path + " (" + (rollbackError.message || String(rollbackError)) + ")");
+      }
     }
-    throw error;
+    const failure = new Error("Replacement failed after " + completed +
+      " verified files (" + matches + " matches): " + (error.message || String(error)) +
+      ". Recovery restored " + restored + " files; " + unchanged + " were unchanged." +
+      (unresolved.length ? " Manual recovery required for: " + unresolved.join("; ") + "." :
+        " All attempted files match their original preview contents."));
+    failure.name = error.name || "Error";
+    throw failure;
   }
   return { files: completed, matches };
 }

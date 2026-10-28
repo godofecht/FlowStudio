@@ -120,6 +120,10 @@ test("rejects unsupported, duplicate and late Quarto options without source muta
   assert.throws(() => quarto.decode(fence + "{r}\n1\n#| eval: false\n" + fence, parseCells), /must precede/);
   assert.throws(() => quarto.decode(fence + "{python}\n#| eval: false\nprint(1)\n" + fence, parseCells), /Python/);
   assert.match(quarto.decode(fence + "text\n#| echo: false\n" + fence, parseCells).source, /#\| echo: false/);
+  assert.throws(() => quarto.decode(fence + "{r, eval=FALSE}\n#| eval: true\n1\n" + fence, parseCells),
+    /disabled chunks/);
+  assert.throws(() => quarto.encode("# %% [markdown]\n" + fence + "{r, eval=FALSE}\n#| eval: true\n1\n" + fence, "r", parseCells),
+    /disabled chunks/);
 });
 
 test("notebook file controller imports .qmd without executing or discarding unsaved edits", async () => {

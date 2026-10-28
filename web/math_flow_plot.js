@@ -172,12 +172,19 @@
          face.value.length > 0 && face.value.length <= 4096) ||
         (face.type === "Robin" && Array.isArray(face.value) &&
          face.value.length === 2 && face.value.every(Number.isFinite) &&
+         face.value[1] > 0) ||
+        (face.type === "RobinProfile" && Array.isArray(face.value) &&
+         face.value.length === 2 && typeof face.value[0] === "string" &&
+         face.value[0].length > 0 && face.value[0].length <= 4096 &&
+         typeof face.value[1] === "number" && Number.isFinite(face.value[1]) &&
          face.value[1] > 0));
       const describeFace = face => face.type === "Periodic" ? "Periodic" :
         face.type === "DirichletProfile" ? "Dirichlet profile " + face.value :
         face.type === "NeumannProfile" ? "Neumann profile " + face.value :
         face.type === "Robin" ?
           "Robin ambient " + face.value[0] + " K, transfer length " + face.value[1] + " m" :
+        face.type === "RobinProfile" ?
+          "Robin ambient profile " + face.value[0] + ", transfer length " + face.value[1] + " m" :
           face.type + " " + face.value + (face.type === "Dirichlet" ? " K" : " K/m");
       if (boundary === "Faces") {
         const faces = result.boundary_faces;
@@ -204,7 +211,7 @@
           if (!validFace(face))
             throw new TypeError("Invalid mixed boundary condition.");
         }
-        if (boundary === "Robin" && ["x", "y"].some(axis => axes[axis].type !== "Robin"))
+        if (boundary === "Robin" && ["x", "y"].some(axis => !["Robin", "RobinProfile"].includes(axes[axis].type)))
           throw new TypeError("Uniform Robin boundary requires both axes to be Robin.");
       }
       boundaryNote = doc.createElement("p");

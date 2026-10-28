@@ -197,4 +197,6 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
             "temperature_variance": variance, "initial_temperature_variance": initial_variance,
             "temperature_min": float(np.min(field)), "temperature_max": float(np.max(field)),
             "method": "periodic centered-difference RK2 heat equation",
-            "observations": observations}
+            "observations": observations,
+            "spatial": __import__("math_flow_spatial").spatial_snapshot(
+                {"temperature": field}, (model.length_x, model.length_y))}

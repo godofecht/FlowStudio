@@ -36,7 +36,7 @@ try {
     assert.ok(path.startsWith('M') && path.includes('L'), path);
     assert.ok(!/NaN|Infinity/.test(path));
     await page.locator('#mathFlowPlot select').selectOption(other);
-    assert.match(await page.locator('#mathFlowPlot svg').getAttribute('aria-label'),
+    assert.match(await page.locator('#mathFlowPlot svg').first().getAttribute('aria-label'),
       /over simulated time/);
     assert.equal(await page.locator('#mathFlowPlot select').inputValue(), other);
   }

@@ -104,7 +104,9 @@ function create(options = {}) {
       running: false,
       lastCommandTs: null,
       lastDurationMs: null,
-      lastStatusText: ""
+      lastStatusText: "",
+      // Stable identity across runs, even when the bounded scrollback shifts.
+      nextFigureIndex: 1
     };
     sessions.set(session.id, session);
     return session;
@@ -162,6 +164,10 @@ function create(options = {}) {
     return Array.isArray(extra && extra.figures) ? extra.figures : [];
   }
 
+  function owns(session) {
+    return !!session && sessions.get(session.id) === session;
+  }
+
   function pushTo(session, text, kind, extra) {
     const figures = entriesWithFigures(extra);
     const entry = Object.assign({ kind, text: text || "", ts: nowIso(clock()) }, extra);
@@ -175,19 +181,38 @@ function create(options = {}) {
    * unattributed writer (examples panel) and goes to the active session. An
    * entry may carry only figures (empty text); those are still appended so
    * captured plots never get dropped. */
-  function append(runtime, text, kind = "out", extra = {}) {
+  function appendTo(session, text, kind = "out", extra = {}) {
+    if (!owns(session)) return null;
     const hasFigures = entriesWithFigures(extra).length > 0 ||
       (kind === "fig" && !!(extra && extra.plot));
-    if (typeof text !== "string" || !text) {
-      if (!hasFigures || runtime && !RUNTIMES.includes(runtime)) return null;
-    }
-    const session = runtime && RUNTIMES.includes(runtime) ?
-      (findSession(runtime) || createFor(runtime)) : activeSession;
-    return pushTo(session, text && typeof text === "string" ? text : "", kind, extra);
+    if ((typeof text !== "string" || !text) && !hasFigures) return null;
+    return pushTo(session, typeof text === "string" ? text : "", kind, extra);
   }
 
-  function beginRun(runtime) {
-    let session = runtime && RUNTIMES.includes(runtime) ? findSession(runtime) : null;
+  function append(runtime, text, kind = "out", extra = {}) {
+    if (runtime && !RUNTIMES.includes(runtime)) return null;
+    const session = runtime ?
+      (findSession(runtime) || createFor(runtime)) : activeSession;
+    return appendTo(session, text, kind, extra);
+  }
+
+  function appendFigure(session, plot) {
+    if (!owns(session) || (session.runtime !== "r" && session.runtime !== "python") ||
+        !plot || typeof plot !== "object" ||
+        !Number.isSafeInteger(session.nextFigureIndex) ||
+        session.nextFigureIndex >= Number.MAX_SAFE_INTEGER) return null;
+    const figIndex = session.nextFigureIndex;
+    const appended = appendTo(session, "", "fig",
+      { figIndex, language: session.runtime, plot });
+    if (appended) session.nextFigureIndex++;
+    return appended;
+  }
+
+  function beginRun(runtime, targetSession = null) {
+    if (targetSession && (!owns(targetSession) || targetSession.runtime !== runtime))
+      throw new Error("Cannot run in a foreign terminal session.");
+    let session = targetSession ||
+      (runtime && RUNTIMES.includes(runtime) ? findSession(runtime) : null);
     if (!session) session = createFor(runtime);
     session.running = true;
     session.state = "running";
@@ -243,7 +268,7 @@ function create(options = {}) {
     get: id => sessions.get(id) || null,
     active: () => activeSession,
     setActive, activateRuntime, createFor, listOf, findSession,
-    append, beginRun, endRun, recordCommand, clearCommand,
+    append, appendTo, appendFigure, beginRun, endRun, recordCommand, clearCommand,
     clearVisible, plainText, exportTranscript, nowIso, formatDuration, STATE_LABELS
   });
   return api;

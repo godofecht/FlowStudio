@@ -1,3 +1,24 @@
+## 2026-10-28: terminal asynchronous session and plot attribution (verification pending)
+
+The Flow-owned native terminal now binds command output, transport failures,
+plot captures and interpreter-reset notices to the originating scrollback
+rather than whichever tab is newest when asynchronous work completes. A
+session-owned append operation rejects foreign session objects. Plot captures
+receive monotonically increasing per-session figure IDs, so successive runs
+cannot resolve an earlier figure when the server reuses figure number 1.
+The shared prompt's successful-command clearing is guarded by the session
+identity captured before execution, preventing a late completion from
+erasing another tab's identical draft. This changes terminal presentation
+only: Python and R tabs still share their actual native interpreter.
+
+**Status: partial / focused V8 verification and hosted CI pending.**
+Regression tests cover tab switches during successful and failed requests,
+plot collection after a session switch, repeated figure numbering, bounded
+scrollback clears, foreign session rejection and prompt-draft isolation.
+No physical Chromium execution, native Flow build, or real interpreter plot
+capture has been established by this change. Flow remains the primary native
+backend. No hosted CI configuration changed. RStudio parity remains incomplete.
+
 ## 2026-10-28: native terminal transcript export and plot-only entry repair (CI pending)
 
 The Flow-owned native workspace console now offers an explicit, per-session

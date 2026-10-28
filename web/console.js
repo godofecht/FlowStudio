@@ -12,6 +12,10 @@ function create(submit, language, onError = () => {}, options = {}) {
   const drafts = Object.fromEntries(languages.map(name => [name, ""]));
   const positions = Object.fromEntries(languages.map(name => [name, 0]));
   const storage = options.storage || null;
+  // The prompt DOM node is shared by runtime tabs. Capture its scope before
+  // awaiting execution so a late response cannot erase another tab's draft.
+  const inputScope = typeof options.inputScope === "function" ?
+    options.inputScope : null;
   let busy = false, persisting = false;
   function entries(name) {
     if (!Object.hasOwn(history, name)) throw new RangeError("Unsupported runtime");
@@ -94,6 +98,7 @@ function create(submit, language, onError = () => {}, options = {}) {
   async function run(input) {
     if (busy) return false;
     const name = language(), items = entries(name), code = input.value;
+    const scopeAtSubmit = inputScope ? inputScope() : null;
     if (!code.trim()) { onError("Console input is empty."); return false; }
     if (new TextEncoder().encode(code).length > MAX_BYTES) {
       onError("Console command exceeds 64 KiB."); return false;
@@ -107,7 +112,8 @@ function create(submit, language, onError = () => {}, options = {}) {
       positions[name] = items.length;
       drafts[name] = "";
       store(name);
-      if (input.value === code) input.value = "";
+      if ((!inputScope || Object.is(scopeAtSubmit, inputScope())) &&
+          input.value === code) input.value = "";
       return true;
     } catch (error) {
       onError(String(error)); return false;

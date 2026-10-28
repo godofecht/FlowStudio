@@ -21,7 +21,7 @@ UNITS: dict[str, Dimension] = {
 SUPERSCRIPT = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁻−", "0123456789--")
 _NUMBER = r"(?:10[⁻−-][⁰¹²³⁴⁵⁶⁷⁸⁹0-9]+|(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)"
 _UNIT = r"(?:kg|Pa|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)?(?:/(?:kg|Pa|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*))?"
-_TOKEN = re.compile(rf"(?P<space>\s+)|(?P<quantity>{_NUMBER}(?:{_UNIT})?)|(?P<name>∂ₓ²|∂ᵧ²|∂ₓ|∂ᵧ|∇²|[A-Za-z_][A-Za-z_0-9]*|π)|(?P<op>[+\-−*/×·(),])")
+_TOKEN = re.compile(rf"(?P<space>\s+)|(?P<quantity>{_NUMBER}(?:{_UNIT})?)|(?P<name>∂ₓ²|∂ᵧ²|∂ₓ|∂ᵧ|∇²|[A-Za-z_][A-Za-z_0-9]*|π)|(?P<postfix>[²³])|(?P<op>[+\-−*/×·(),^])")
 _UNIT_PART = re.compile(r"(kg|Pa|m|s|K)([²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)\Z")
 
 
@@ -156,6 +156,8 @@ class _Parser:
             raise ExpressionError(f"Unknown symbol or operator {first!r}")
         while True:
             nxt = self.peek()
+            if nxt in ("^", "²", "³"):
+                operator, precedence = "pow", 40
             if nxt in ("+", "-", "−"):
                 operator, precedence = ("add" if nxt == "+" else "sub"), 10
             elif nxt in ("*", "×", "·", "/"):
@@ -166,6 +168,19 @@ class _Parser:
                 break
             if precedence < minimum:
                 break
+            if operator == "pow":
+                self.take()
+                if nxt in ("²", "³"):
+                    right = Expression("literal", value=2.0 if nxt == "²" else 3.0)
+                else:
+                    right = self.expression(precedence, depth + 1)
+                if (right.operator != "literal" or right.dimension != DIMENSIONLESS
+                        or not float(right.value).is_integer() or abs(float(right.value)) > 8):
+                    raise ExpressionError("Power requires a literal integer exponent between -8 and 8")
+                exponent = int(right.value)
+                left = Expression("pow", (left, right),
+                                  dimension=tuple(exponent * power for power in left.dimension))
+                continue
             if nxt in ("+", "-", "−", "*", "×", "·", "/"):
                 self.take()
             right = self.expression(precedence + 1, depth + 1)
@@ -394,6 +409,9 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
         if node.operator == "add": return args[0] + args[1]
         if node.operator == "sub": return args[0] - args[1]
         if node.operator == "mul": return args[0] * args[1]
+        if node.operator == "pow":
+            with np.errstate(over="ignore", divide="ignore", invalid="ignore"):
+                return np.power(args[0], int(node.operands[1].value))
         if node.operator == "div":
             with np.errstate(divide="ignore", invalid="ignore"):
                 return np.divide(args[0], args[1])

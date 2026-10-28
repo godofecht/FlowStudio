@@ -137,7 +137,44 @@ def main() -> None:
     assert post("/api/git/branch/delete", "x" * 129)[0] == 400
     assert post("/api/git/branch/delete", "feature/unmerged", "http://attacker.invalid")[0] == 404
     assert git("show-ref", "--verify", "--quiet", "refs/heads/feature/unmerged") == ""
-    print("PASS: live Flow Git stage/unstage/commit, branch list/create/switch/non-forcing delete, unmerged/current protection and origin gate")
+    # Only clean, local, fast-forward merges are allowed. A failed merge
+    # must leave HEAD and tracked files unchanged.
+    assert post("/api/git/branch/create", "feature/fast-forward")[0] == 200
+    assert post("/api/git/branch/switch", "feature/fast-forward")[0] == 200
+    (HERE / "fast-forward.flow").write_text("fast-forward feature\\n", encoding="utf-8")
+    git("add", "fast-forward.flow")
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "Fast-forward fixture")
+    feature_head = git("rev-parse", "HEAD").strip()
+    assert post("/api/git/branch/switch", "feature/native")[0] == 200
+    original_head = git("rev-parse", "HEAD").strip()
+    assert original_head != feature_head
+    assert post("/api/git/branch/merge", "does-not-exist")[0] == 422
+    assert post("/api/git/branch/merge", "-bad")[0] == 422
+    assert post("/api/git/branch/merge", "")[0] == 400
+    assert post("/api/git/branch/merge", "x" * 129)[0] == 400
+    assert post("/api/git/branch/merge", "feature/fast-forward", "http://attacker.invalid")[0] == 404
+    assert git("rev-parse", "HEAD").strip() == original_head
+    (HERE / "dirty-untracked.flow").write_text("dirty\\n", encoding="utf-8")
+    status, output = post("/api/git/branch/merge", "feature/fast-forward")
+    assert status == 409 and "working-tree" in output, (status, output)
+    assert git("rev-parse", "HEAD").strip() == original_head
+    (HERE / "dirty-untracked.flow").unlink()
+    status, output = post("/api/git/branch/merge", "feature/fast-forward")
+    assert status == 200, (status, output)
+    assert git("rev-parse", "HEAD").strip() == feature_head
+    assert (HERE / "fast-forward.flow").read_text(encoding="utf-8") == "fast-forward feature\\n"
+    assert git("rev-list", "--count", original_head + "..HEAD").strip() == "1"
+    assert git("show", "-s", "--format=%P", "HEAD").strip() == original_head
+    # Divergence must never create a merge commit or alter the current branch.
+    assert post("/api/git/branch/switch", "feature/unmerged")[0] == 200
+    diverged_head = git("rev-parse", "HEAD").strip()
+    status, output = post("/api/git/branch/merge", "feature/fast-forward")
+    assert status == 422, (status, output)
+    assert git("rev-parse", "HEAD").strip() == diverged_head
+    assert "fast-forward.flow" not in git("ls-files")
+    assert post("/api/git/branch/merge", "feature/unmerged")[0] == 200
+    print("PASS: live Flow Git fast-forward merge, dirty/divergent rejection, local refs and origin gate")
+
 
 
 if __name__ == "__main__":

@@ -30,7 +30,7 @@ class HeatModel:
     advection_velocity_y: float = 0.0
     boundary_temperature: float | None = None
     boundary_gradient: float | None = None
-    boundary_axes: tuple[tuple[str, float | None], tuple[str, float | None]] | None = None
+    boundary_axes: tuple[tuple[str, float | tuple[float, float] | None], ...] | None = None
     boundary_faces: tuple[tuple[str, float | tuple[float, float] | None], ...] | None = None
 
 

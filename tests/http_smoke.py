@@ -122,6 +122,8 @@ def main() -> None:
     result = json.loads(body)
     assert status == 200 and result["ok"] and result["steps"] == 10, (status, result)
     assert result["max_divergence"] < 1e-5, result
+    assert result["observations"][0]["time"] == 0.0, result
+    assert abs(result["observations"][-1]["kineticEnergy"] - result["kinetic_energy"]) < 1e-10, result
     assert result["kinetic_energy"] <= result["initial_kinetic_energy"] * 1.001, result
     bad_math = math_small.replace("kinematicViscosity ∇²velocity", "kinematicViscosity velocity")
     status, body = request("POST", "/api/check/mathflow", bad_math, accepted_headers)
@@ -136,6 +138,7 @@ def main() -> None:
     assert status == 200 and heat["ok"] and heat["steps"] == 100, (status, heat)
     assert abs(heat["mean_temperature"] - 300.0) < 1e-8, heat
     assert heat["temperature_variance"] < heat["initial_temperature_variance"], heat
+    assert abs(heat["observations"][-1]["temperatureVariance"] - heat["temperature_variance"]) < 1e-10, heat
     bad_heat = heat_source.replace("300K", "300m")
     status, body = request("POST", "/api/check/mathflow", bad_heat, accepted_headers)
     assert status == 422 and not json.loads(body)["ok"], (status, body)

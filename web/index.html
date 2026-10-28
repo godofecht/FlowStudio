@@ -61,6 +61,13 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
 .workspace-tabs [aria-selected="true"]{background:var(--accent-dim);border-color:#3d5c95}
 .workspace-frame{flex:1;min-height:0}
 .workspace-frame iframe{display:block;width:100%;height:100%;border:0;background:#10141e}
+#view-plots:not([hidden]){display:flex;flex-direction:column}
+#view-plots iframe{flex:1;min-height:0}
+#mathFlowPlot{flex:none;max-height:290px;overflow:auto;padding:10px;border-bottom:1px solid var(--line)}
+#mathFlowPlot h3{font-size:12px;margin:0 0 5px}
+#mathFlowPlot label{font-size:11px;color:var(--muted)}
+#mathFlowPlot select{font-size:11px;margin-left:5px}
+#mathFlowPlot svg{display:block;max-height:225px}
 .outline-body{display:flex;flex-direction:column;gap:6px}
 .outline-head{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted)}
 .outline-head button{font-size:11px;padding:2px 7px}
@@ -312,7 +319,7 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
        </div>
       <p class="muted hint">Select a symbol to move the caret to it. The outline follows the active buffer.</p>
     </div>
-    <div id="view-plots" class="workspace-frame" role="tabpanel" aria-labelledby="tab-plots" hidden><iframe title="Local plot history" loading="lazy"></iframe></div>
+    <div id="view-plots" class="workspace-frame" role="tabpanel" aria-labelledby="tab-plots" hidden><div id="mathFlowPlot" aria-live="polite" hidden></div><iframe title="Local plot history" loading="lazy"></iframe></div>
     <div id="view-data" class="workspace-frame" role="tabpanel" aria-labelledby="tab-data" hidden><iframe title="Local CSV and TSV data viewer" loading="lazy"></iframe></div>
     <div class="body packages-body" id="view-packages" role="tabpanel" aria-labelledby="tab-packages" hidden>
       <p class="muted hint">Installs run on this device through the persistent local Python / R sessions (each under the 15 s execution budget). R installs use the CRAN cloud mirror.</p>
@@ -1422,6 +1429,10 @@ async function executeCode(code, label, languageOverride = null) {
   el("run").disabled = true;
   el("runCell").disabled = true;
   status("Running " + executionLanguage + " …");
+  if (executionLanguage === "mathflow") {
+    el("mathFlowPlot").replaceChildren();
+    el("mathFlowPlot").hidden = true;
+  }
   writeConsole("\n> " + label + " (" + executionLanguage + ")\n");
   try {
     const backend = executionLanguage === "flow" ? el("flowBackend").value : "";
@@ -1433,6 +1444,14 @@ async function executeCode(code, label, languageOverride = null) {
     });
     const output = await response.text();
     writeConsole(output + "\n");
+    if (executionLanguage === "mathflow" && response.ok) {
+      try {
+        FlowStudioMathPlots.render(document, el("mathFlowPlot"), JSON.parse(output));
+        el("tab-plots").click();
+      } catch (plotError) {
+        writeConsole("Numerical plot unavailable: " + plotError.message + "\n");
+      }
+    }
     const message = response.ok ? "Finished" :
       response.status === 422 ? "Execution failed" :
       response.status === 503 ? "Interpreter unavailable" :
@@ -2018,6 +2037,7 @@ if (typeof window !== "undefined") {
 renderTabs();
 </script>
 <script src="/editor_recovery.js"></script>
+<script src="/math_flow_plot.js"></script>
 <script src="/workspace_tabs.js"></script>
 <script>FlowStudioWorkspaceTabs.mount();</script>
 <script src="/terminal_render.js"></script>

@@ -158,6 +158,24 @@ def main() -> None:
     assert len(heat["spatial"]["fields"]["temperature"]) == 24, heat
     assert heat["temperature_variance"] < heat["initial_temperature_variance"], heat
     assert abs(heat["observations"][-1]["temperatureVariance"] - heat["temperature_variance"]) < 1e-10, heat
+    # Unicode spatial derivative ASTs must survive the actual native Flow HTTP
+    # request path, not merely local Python expression unit tests.
+    for example, expected_steps, metric in (
+        ("navier_stokes_spatial_derivative.flow", 10, "kinetic_energy"),
+        ("heat_equation_spatial_derivative.flow", 100, "temperature_variance"),
+    ):
+        derivative_source = (Path(__file__).resolve().parents[1] /
+                             "examples" / example).read_text(encoding="utf-8")
+        status, body = request("POST", "/api/check/mathflow",
+                               derivative_source, accepted_headers)
+        assert status == 200 and json.loads(body)["ok"], (example, status, body)
+        status, body = request("POST", "/api/run/mathflow",
+                               derivative_source, accepted_headers)
+        derivative_result = json.loads(body)
+        assert status == 200 and derivative_result["ok"], (example, status, derivative_result)
+        assert derivative_result["steps"] == expected_steps, derivative_result
+        assert math.isfinite(derivative_result[metric]) and derivative_result[metric] > 0, derivative_result
+        assert derivative_result["spatial"]["grid"], derivative_result
     bad_heat = heat_source.replace("300K", "300m")
     status, body = request("POST", "/api/check/mathflow", bad_heat, accepted_headers)
     assert status == 422 and not json.loads(body)["ok"], (status, body)

@@ -563,7 +563,8 @@ FlowStudioSessionSnapshot.create({
   exportValue:(lang,name)=>lang==="r" ? getRSession().exportVariable(name,{forSnapshot:true}) : request("export-snapshot",name),
   importValue:(lang,name,value,restoreAs,dtype)=>lang==="r" ?
     getRSession().importVariable(name,value,restoreAs==="matrix" ? {asMatrix:true} :
-      restoreAs==="factor" ? {asFactor:dtype} : undefined) :
+      restoreAs==="factor" ? {asFactor:dtype} :
+      restoreAs==="dataframe" ? {asFactorColumns:dtype} : undefined) :
     dtype && restoreAs==="numpy" ? request("import-numpy-snapshot",name,{packet:value,dtype}) :
     request(restoreAs==="pandas" ? "import-pandas" : restoreAs==="numpy" ? "import-numpy" : "import",name,value),
   refresh:async lang=>{

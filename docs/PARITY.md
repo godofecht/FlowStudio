@@ -1,3 +1,20 @@
+## 2026-10-28: R data.frame factor columns (independent validation pending)
+
+The browser-local R session snapshot path now supports strict base R factor and
+ordered-factor columns inside bounded, otherwise plain data.frames. Snapshot-only
+export validates the actual factor classes and attributes, records each column's
+levels, ordering and missing values, and restores genuine factors through the
+existing webR R interpreter. Ordinary cross-language transfer still rejects
+classed factor columns. Snapshot preflight rejects forged or inconsistent column
+metadata before any interpreter assignment. This does not preserve arbitrary
+attributes, custom classes, nondefault row names or unbounded R objects.
+
+**Status: partial / independent Linux/macOS CI and physical Chromium webR
+round-trip are pending.** Real Rscript acceptance is included in the required
+native verification gate; it must actually execute before being counted as
+verified. Flow remains the native application/backend language. RStudio parity
+is not achieved. No hosted CI configuration changes.
+
 ## 2026-10-28: base R factor identity in browser session snapshots (six CI jobs passed)
 
 The browser-local webR session snapshot exporter now recognizes strict base R

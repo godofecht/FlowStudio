@@ -194,6 +194,16 @@ def verify(root: Path, port: int = 8751, build_timeout: int = 180,
             print(factor_result.stderr, end="", file=sys.stderr, flush=True)
         if factor_result.returncode != 0:
             raise VerificationError("Real R factor snapshot provenance acceptance failed")
+        print("Real R data.frame factor column acceptance: tests/browser_session_snapshot_r_factor_columns.test.js", flush=True)
+        factor_columns_result = _command(
+            ["node", "--test", str(root / "tests/browser_session_snapshot_r_factor_columns.test.js")], root, 65
+        )
+        if factor_columns_result.stdout:
+            print(factor_columns_result.stdout, end="", flush=True)
+        if factor_columns_result.stderr:
+            print(factor_columns_result.stderr, end="", file=sys.stderr, flush=True)
+        if factor_columns_result.returncode != 0:
+            raise VerificationError("Real R data.frame factor column acceptance failed")
         print("Real browser R inspector query acceptance: tests/browser_r_nested_environment.test.js", flush=True)
         inspect_result = _command(
             ["node", "--test", str(root / "tests/browser_r_nested_environment.test.js")], root, 65

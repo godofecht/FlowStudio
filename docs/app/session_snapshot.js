@@ -69,6 +69,23 @@ function validFactor(factor, packet) {
   catch (_) { return false; }
   return true;
 }
+function validFactorColumns(factorColumns, packet) {
+  if (!Array.isArray(factorColumns) || factorColumns.length < 1 ||
+      factorColumns.length > 16 || !packet || packet.kind !== "table" ||
+      !Array.isArray(packet.columns)) return false;
+  const seen = new Set();
+  for (const entry of factorColumns) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry) ||
+        Object.keys(entry).sort().join(",") !== "levels,name,ordered" ||
+        !validName(entry.name) || seen.has(entry.name)) return false;
+    const column = packet.columns.find(col => col.name === entry.name);
+    if (!column || column.type !== "string" ||
+        !validFactor({levels:entry.levels, ordered:entry.ordered},
+          {kind:"vector", type:"string", values:column.values})) return false;
+    seen.add(entry.name);
+  }
+  return true;
+}
 function validate(snapshot) {
   if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot) ||
       Object.keys(snapshot).sort().join(",") !== "format,language,omitted,truncated,variables" ||
@@ -83,10 +100,12 @@ function validate(snapshot) {
     const restoreAs = entry && Object.prototype.hasOwnProperty.call(entry, "restoreAs");
     const hasDtype = entry && Object.prototype.hasOwnProperty.call(entry, "dtype");
     const hasFactor = entry && Object.prototype.hasOwnProperty.call(entry, "factor");
+    const hasFactorColumns = entry && Object.prototype.hasOwnProperty.call(entry, "factorColumns");
     if (!entry || typeof entry !== "object" || Array.isArray(entry) ||
         Object.keys(entry).sort().join(",") !== (restoreAs ?
           (hasDtype ? "dtype,name,restoreAs,value" :
-            hasFactor ? "factor,name,restoreAs,value" : "name,restoreAs,value") : "name,value") ||
+            hasFactor ? "factor,name,restoreAs,value" :
+            hasFactorColumns ? "factorColumns,name,restoreAs,value" : "name,restoreAs,value") : "name,value") ||
         !validName(entry.name) || names.has(entry.name) ||
         (restoreAs && (snapshot.format !== FORMAT_V2 ||
           !((snapshot.language === "python" && entry.restoreAs === "pandas" &&
@@ -96,11 +115,15 @@ function validate(snapshot) {
             (snapshot.language === "r" && entry.restoreAs === "matrix" &&
              matrixPacket(entry.value)) ||
             (snapshot.language === "r" && entry.restoreAs === "factor" &&
-             hasFactor && validFactor(entry.factor, entry.value))))) ||
+             hasFactor && validFactor(entry.factor, entry.value)) ||
+            (snapshot.language === "r" && entry.restoreAs === "dataframe" &&
+             hasFactorColumns && validFactorColumns(entry.factorColumns, entry.value))))) ||
         (hasDtype && (entry.restoreAs !== "numpy" ||
           !validNumpyDtype(entry.dtype, entry.value))) ||
         (hasFactor && (entry.restoreAs !== "factor" ||
-          !validFactor(entry.factor, entry.value))))
+          !validFactor(entry.factor, entry.value))) ||
+        (hasFactorColumns && (entry.restoreAs !== "dataframe" ||
+          !validFactorColumns(entry.factorColumns, entry.value))))
       throw Error("Snapshot contains an invalid or duplicate variable name.");
     names.add(entry.name);
     if (!transfer || typeof transfer.validate !== "function")
@@ -143,7 +166,7 @@ async function capture({language, inspect, exportValue, generation}) {
       const value = transfer.validate(result.value);
       if (result.origin !== undefined &&
           !((language === "python" && ["pandas", "ndarray"].includes(result.origin)) ||
-            (language === "r" && ["matrix", "factor"].includes(result.origin))))
+            (language === "r" && ["matrix", "factor", "dataframe"].includes(result.origin))))
         throw Error("Unsupported session snapshot source type.");
       const entry = {name, value};
       if (result.origin === "pandas") {
@@ -163,6 +186,14 @@ async function capture({language, inspect, exportValue, generation}) {
         if (!matrixPacket(value))
           throw Error("R matrix origin requires a nonempty homogeneous typed table.");
         entry.restoreAs = "matrix";
+      }
+      if (result.origin === "dataframe") {
+        if (!validFactorColumns(result.factorColumns, value))
+          throw Error("R data.frame factor columns require validated provenance.");
+        entry.restoreAs = "dataframe";
+        entry.factorColumns = result.factorColumns.map(column => ({
+          name:column.name, levels:[...column.levels], ordered:column.ordered
+        }));
       }
       if (result.origin === "factor") {
         if (!validFactor(result.factor, value))
@@ -195,9 +226,9 @@ async function restore({snapshot, language, importValue, generation}) {
     same(generation, epoch);
     let result;
     try {
-      result = entry.dtype || entry.factor ?
+      result = entry.dtype || entry.factor || entry.factorColumns ?
         await importValue(language, entry.name, entry.value, entry.restoreAs || null,
-          entry.dtype || entry.factor) :
+          entry.dtype || entry.factor || entry.factorColumns) :
         await importValue(language, entry.name, entry.value, entry.restoreAs || null);
     }
     catch (error) {
@@ -240,7 +271,7 @@ function create({exportButton, importButton, fileInput, language, inspect, expor
       notice("Exported " + snapshot.variables.length + " " + selected + " variables" +
         (snapshot.omitted || snapshot.truncated ? " (partial: " + snapshot.omitted +
           " omitted" + (snapshot.truncated ? "; inspection truncated" : "") + ")" : "") +
-        ". Only bounded scalar, vector and typed-table values are saved; pandas, NumPy ndarray, plain R matrix and base R factor identity are retained when supported.");
+        ". Only bounded scalar, vector and typed-table values are saved; pandas, NumPy ndarray, plain R matrix, base R factor and supported data.frame factor columns are retained when supported.");
       return true;
     } catch (error) {
       if (currentGeneration() === epoch) notice("Session export failed: " + String(error.message || error).slice(0, 350));

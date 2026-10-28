@@ -188,6 +188,23 @@ function validFactorDestination(factor, packet) {
   catch (_) { return false; }
   return true;
 }
+function validFactorColumnsDestination(factorColumns, packet) {
+  if (!Array.isArray(factorColumns) || factorColumns.length < 1 ||
+      factorColumns.length > 16 || !packet || packet.kind !== "table" ||
+      !Array.isArray(packet.columns)) return false;
+  const seen = new Set();
+  for (const entry of factorColumns) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry) ||
+        Object.keys(entry).sort().join(",") !== "levels,name,ordered" ||
+        typeof entry.name !== "string" || seen.has(entry.name)) return false;
+    const column = packet.columns.find(col => col.name === entry.name);
+    if (!column || column.type !== "string" ||
+        !validFactorDestination({levels:entry.levels, ordered:entry.ordered},
+          {kind:"vector", type:"string", values:column.values})) return false;
+    seen.add(entry.name);
+  }
+  return true;
+}
 function create({load = () => import(CDN)} = {}) {
   let runtime = null, loading = null, epoch = 0;
   let serial = Promise.resolve();
@@ -475,8 +492,27 @@ function create({load = () => import(CDN)} = {}) {
            "cn <- base::names(v); " +
            "if (base::anyDuplicated(cn) || base::any(!base::grepl(\"^[A-Za-z][A-Za-z0-9_]{0,79}$\", cn))) " +
            "stop(\"Invalid R table column names\"); " +
+           "factor_columns <- base::list(); factor_indices <- base::integer(0); " +
+           "if (" + (forSnapshot ? "TRUE" : "FALSE") + ") for (i in base::seq_along(v)) { " +
+           "col <- v[[i]]; cls <- base::attr(col, \"class\", exact=TRUE); " +
+           "if (base::typeof(col) == \"integer\" && " +
+           "(base::identical(cls, \"factor\") || base::identical(cls, base::c(\"ordered\",\"factor\")))) { " +
+           "lev <- base::attr(col, \"levels\", exact=TRUE); " +
+           "if (!base::identical(base::sort(base::names(base::attributes(col))), base::c(\"class\",\"levels\")) || " +
+           "!base::is.character(lev) || base::length(lev) > 64L || " +
+           "base::anyNA(lev) || base::anyDuplicated(lev) || " +
+           "base::any(base::nchar(lev, type=\"chars\") > 512L)) " +
+           "stop(\"Unsupported R factor column metadata\"); " +
+           "factor_indices <- base::c(factor_indices, i); " +
+           "factor_columns[[base::length(factor_columns)+1L]] <- base::c(" +
+           "utils::URLencode(cn[[i]], reserved=TRUE), " +
+           "if (base::identical(cls, base::c(\"ordered\",\"factor\"))) \"1\" else \"0\", " +
+           "base::as.character(base::length(lev)), " +
+           "base::vapply(lev, function(x) utils::URLencode(x, reserved=TRUE), character(1))); " +
+           "} }; " +
            "out <- base::unlist(base::lapply(base::seq_along(v), function(i) { " +
-           "col <- v[[i]]; ct <- base::typeof(col); " +
+           "col <- v[[i]]; if (i %in% factor_indices) col <- base::as.character(col); " +
+           "ct <- base::typeof(col); " +
            "if (!base::is.null(base::attributes(col)) || " +
            "!(ct %in% c(\"double\",\"integer\",\"logical\",\"character\"))) " +
            "stop(\"Only plain atomic R table columns can be transferred\"); " +
@@ -493,8 +529,11 @@ function create({load = () => import(CDN)} = {}) {
            "utils::URLencode(formatted[[j]], reserved=TRUE), character(1))) " +
            "}), use.names=FALSE); " +
            "base::c(if (matrix_origin && " + (forSnapshot ? "TRUE" : "FALSE") +
-           ") \"@MATRIX@\" else \"@TABLE@\", " +
-           "base::as.character(base::ncol(v)), base::as.character(base::nrow(v)), out) " +
+           ") \"@MATRIX@\" else if (base::length(factor_columns)) \"@FRAME_FACTORS@\" else \"@TABLE@\", " +
+           "base::as.character(base::ncol(v)), base::as.character(base::nrow(v)), out, " +
+           "if (base::length(factor_columns)) base::c(\"@FACTOR_COLUMNS@\", " +
+           "base::as.character(base::length(factor_columns)), " +
+           "base::unlist(factor_columns, use.names=FALSE)) else base::character(0)) " +
            "} else { " +
            't <- base::typeof(v); ' +
           'if (!is.null(base::attributes(v)) || !(t %in% c("double","integer","logical","character"))) ' +
@@ -526,7 +565,7 @@ function create({load = () => import(CDN)} = {}) {
           }
           return decoded;
         };
-        let packet, origin = null, factor = null;
+        let packet, origin = null, factor = null, factorColumns = null;
         if (forSnapshot && rows[0] === "@FACTOR@") {
           if (rows.length < 3 || !["0", "1"].includes(rows[1]) ||
               !/^(?:0|[1-9][0-9]?)$/.test(rows[2]))
@@ -544,13 +583,15 @@ function create({load = () => import(CDN)} = {}) {
           if (!validFactorDestination(factor, packet))
             throw Error("Invalid R factor levels or values.");
           origin = "factor";
-        } else if (rows[0] === "@TABLE@" || (forSnapshot && rows[0] === "@MATRIX@")) {
+        } else if (rows[0] === "@TABLE@" || (forSnapshot && ["@MATRIX@", "@FRAME_FACTORS@"].includes(rows[0]))) {
           if (rows[0] === "@MATRIX@") origin = "matrix";
           if (rows.length < 5 || !/^[1-9][0-9]?$/.test(rows[1]) ||
               !/^(?:0|[1-9][0-9]{0,2})$/.test(rows[2]))
             throw Error("Invalid R table dimensions.");
           const count = Number(rows[1]), size = Number(rows[2]);
-          if (count > 16 || size > 128 || rows.length !== 3 + count * (2 + size))
+          const tableEnd = 3 + count * (2 + size);
+          if (count > 16 || size > 128 || rows.length < tableEnd ||
+              (rows[0] !== "@FRAME_FACTORS@" && rows.length !== tableEnd))
             throw Error("Invalid R table response size.");
           let offset = 3;
           const columns = [];
@@ -566,6 +607,32 @@ function create({load = () => import(CDN)} = {}) {
             columns.push({name:columnName, type, values});
           }
           packet = global.FlowStudioVariableTransfer.validate({kind:"table", columns});
+          if (rows[0] === "@FRAME_FACTORS@") {
+            if (rows[offset++] !== "@FACTOR_COLUMNS@" ||
+                !/^[1-9][0-9]?$/.test(rows[offset] || ""))
+              throw Error("Invalid R factor column header.");
+            const numberOfFactors = Number(rows[offset++]);
+            if (numberOfFactors > 16) throw Error("Too many R factor columns.");
+            factorColumns = [];
+            for (let index = 0; index < numberOfFactors; index++) {
+              const columnName = decodeURIComponent(rows[offset++] || "");
+              const orderedFlag = rows[offset++];
+              const rawLevelCount = rows[offset++];
+              if (!["0","1"].includes(orderedFlag) ||
+                  !/^(?:0|[1-9][0-9]?)$/.test(rawLevelCount || "") ||
+                  Number(rawLevelCount) > 64)
+                throw Error("Invalid R factor column metadata.");
+              const numberOfLevels = Number(rawLevelCount);
+              if (offset + numberOfLevels > rows.length)
+                throw Error("Incomplete R factor column levels.");
+              const levels = rows.slice(offset, offset + numberOfLevels).map(decodeURIComponent);
+              offset += numberOfLevels;
+              factorColumns.push({name:columnName, levels, ordered:orderedFlag === "1"});
+            }
+            if (offset !== rows.length || !validFactorColumnsDestination(factorColumns, packet))
+              throw Error("Invalid R factor column provenance.");
+            origin = "dataframe";
+          }
         } else {
           if (rows.length > 257 ||
               !["double", "integer", "logical", "character"].includes(rows[0]))
@@ -576,17 +643,19 @@ function create({load = () => import(CDN)} = {}) {
           packet = global.FlowStudioVariableTransfer.validate({kind:"vector", type, values});
         }
         return origin === "factor" ? {ok:true, value:packet, origin, factor} :
+          origin === "dataframe" ? {ok:true, value:packet, origin, factorColumns} :
           origin ? {ok:true, value:packet, origin} : {ok:true, value:packet};
       } catch (error) { return {ok:false, output:String(error.message || error).slice(0, 300)}; }
     });
   }
   async function importVariable(name, packet, options = {}) {
     if (!options || typeof options !== "object" || Array.isArray(options) ||
-        Object.keys(options).some(key => !["asMatrix", "asFactor"].includes(key)) ||
+        Object.keys(options).some(key => !["asMatrix", "asFactor", "asFactorColumns"].includes(key)) ||
         (options.asMatrix !== undefined && typeof options.asMatrix !== "boolean"))
       return {ok:false, output:"Invalid R transfer destination."};
     const asMatrix = options.asMatrix === true;
     const asFactor = options.asFactor;
+    const asFactorColumns = options.asFactorColumns;
     if (!/^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(name))
       return {ok:false, output:"Invalid shared Python/R variable name."};
     try { global.FlowStudioVariableTransfer.validate(packet); }
@@ -594,6 +663,10 @@ function create({load = () => import(CDN)} = {}) {
     if (asFactor !== undefined &&
         (asMatrix || !validFactorDestination(asFactor, packet)))
       return {ok:false, output:"R factor requires validated levels and a typed string vector."};
+    if (asFactorColumns !== undefined &&
+        (asMatrix || asFactor !== undefined ||
+          !validFactorColumnsDestination(asFactorColumns, packet)))
+      return {ok:false, output:"R data.frame factor columns require validated levels and string columns."};
     if (asMatrix && (packet.kind !== "table" ||
         packet.columns[0].values.length < 1 ||
         !packet.columns.every(col => col.type === packet.columns[0].type)))
@@ -611,6 +684,7 @@ function create({load = () => import(CDN)} = {}) {
         const empty = {number:"base::numeric(0L)", boolean:"base::logical(0L)", string:"base::character(0L)"};
         const vector = (values, type) => values.length ?
           "base::c(" + values.map(value => atom(value, type)).join(",") + ")" : empty[type];
+        const factorsByName = new Map((asFactorColumns || []).map(entry => [entry.name, entry]));
         const expression = asFactor !== undefined
           ? "base::factor(" + vector(packet.values, "string") +
             ", levels=" + vector(asFactor.levels, "string") +
@@ -620,7 +694,13 @@ function create({load = () => import(CDN)} = {}) {
             ", nrow=" + packet.columns[0].values.length + "L, ncol=" + packet.columns.length + "L)"
           : packet.kind === "table"
           ? "base::as.data.frame(base::structure(base::list(" +
-            packet.columns.map(col => vector(col.values, col.type)).join(",") +
+            packet.columns.map(col => {
+              const values = vector(col.values, col.type);
+              const metadata = factorsByName.get(col.name);
+              return metadata ? "base::factor(" + values +
+                ", levels=" + vector(metadata.levels, "string") +
+                ", ordered=" + (metadata.ordered ? "TRUE" : "FALSE") + ")" : values;
+            }).join(",") +
             "), names=base::c(" + packet.columns.map(col => JSON.stringify(col.name)).join(",") +
             ")), optional=TRUE, stringsAsFactors=FALSE)"
           : packet.kind === "scalar" ? atom(packet.values[0], packet.type) :

@@ -219,7 +219,7 @@ test("replay refuses navigation after editing the traced source", async () => {
 
 test("trace execution writes captured stdout and failure tracebacks once", async () => {
   for (const ok of [true, false]) {
-    const output = ok ? "42\\n" : "Traceback (most recent call last):\\nValueError: bad\\n";
+    const output = ok ? "42\n" : "Traceback (most recent call last):\nValueError: bad\n";
     const writes = [];
     const doc = fakeDocument();
     const p = panel.mount(doc, {
@@ -303,7 +303,7 @@ test("failed or stale reruns do not publish stale Python console output", async 
     fetchFn: () => {
       request++;
       if (request === 1) return Promise.resolve({
-        ok: true, text: async () => JSON.stringify({ ...TRACE, output: "first\\n" })
+        ok: true, text: async () => JSON.stringify({ ...TRACE, output: "first\n" })
       });
       return new Promise(resolve => { finishSecond = resolve; });
     },
@@ -312,12 +312,12 @@ test("failed or stale reruns do not publish stale Python console output", async 
     onOutput: text => writes.push(text)
   });
   await p.run();
-  assert.deepEqual(writes, ["first\\n"]);
+  assert.deepEqual(writes, ["first\n"]);
   const pending = p.run();
   source = "x = 2";
-  finishSecond({ ok: true, text: async () => JSON.stringify({ ...TRACE, output: "stale\\n" }) });
+  finishSecond({ ok: true, text: async () => JSON.stringify({ ...TRACE, output: "stale\n" }) });
   assert.equal(await pending, null);
-  assert.deepEqual(writes, ["first\\n"]);
+  assert.deepEqual(writes, ["first\n"]);
   assert.equal(p.total(), 0);
 });
 
@@ -325,5 +325,5 @@ test("workspace sends Python debugger stdout to the runtime console", () => {
   const fs = require("node:fs");
   const source = fs.readFileSync(require.resolve("../web/workspace_panels.js"), "utf8");
   assert.match(source, /onOutput: output =>/);
-  assert.match(source, /FlowStudioConsoleIO\\.write\\(text, "python"\\)/);
+  assert.match(source, /FlowStudioConsoleIO\.write\(text, "python"\)/);
 });

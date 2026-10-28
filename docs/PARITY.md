@@ -1,3 +1,23 @@
+## 2026-10-28: native Quarto server-side executable source guard (CI pending)
+
+The Flow-owned /api/render/quarto path now revalidates the executable
+Quarto body in its Python CLI adapter, independently of the browser exporter.
+Only representable R/Python fenced chunks, optional safe labels and literal
+disabled R chunks are accepted. Direct API submissions containing other
+executable engines, unsupported chunk options, #| overrides, Quarto shortcodes,
+inline R/Python expressions or unterminated fences fail before launching
+Quarto. Inert Markdown and ordinary non-executable code fences remain usable.
+Six new regression tests exercise accepted source, rejection and no-subprocess
+behavior. This narrows an actual direct-API bypass of browser source checks;
+it does not sandbox approved R/Python code or authenticate remote sessions.
+
+**Status: partial / local focused Python validation passed for the source
+guard's parsing cases; full repository CI and real Quarto execution pending.**
+The real Quarto CLI and physical-browser R/Python runtime acceptance remain
+unverified. No hosted CI or Flow compiler configuration changed.
+RStudio feature parity is incomplete.
+
+
 ## 2026-10-28: real Quarto execution acceptance and stable report snapshot (verification pending)
 
 Added opt-in real Chromium -> Flow HTTP -> installed Quarto -> R/knitr or

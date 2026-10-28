@@ -84,6 +84,10 @@ class TypedHeatEquationTest(unittest.TestCase):
         with self.assertRaises(ExpressionError):
             parse_expression("temperature")
 
+    def test_release_archive_includes_equation_compiler(self):
+        packaging = (ROOT / "scripts/package.sh").read_text(encoding="utf-8")
+        self.assertIn('cp src/math_flow_equations.py "$stage/$name/src/math_flow_equations.py"', packaging)
+
     def test_checked_in_forced_equation_executes_through_cli(self):
         run = subprocess.run(
             [sys.executable, "src/math_flow.py", "examples/heat_equation_forced.flow"],

@@ -1,3 +1,20 @@
+## 2026-10-28: lossless UTF-8 project replacement guard (independent verification pending)
+
+Browser project search now uses strict UTF-8 decoding of File System Access API
+bytes, preserving a UTF-8 BOM rather than silently dropping it through
+File.text(). Malformed UTF-8 and binary NUL-bearing source files are counted
+as unsafe skips; project-wide Replace refuses incomplete searches. Preview,
+preflight, write verification, compensation and Undo re-read bytes with the
+same strict decoder, and invalid Unicode replacement text is rejected before
+writing. Both native and Pages project modules include regression tests for
+unsafe bytes, BOM round-trips, external rewrites and invalid replacement text.
+
+**Status: partial / independent CI pending.** This does not establish physical
+Chromium File System Access API acceptance or crash-safe atomic writes.
+Legacy non-UTF-8 project encodings are deliberately unsupported for replacement.
+The native Flow router and hosted CI configuration are unchanged. RStudio
+feature parity remains incomplete.
+
 ## 2026-10-28: conflict-aware compensation for failed multi-file project replacement (verification pending)
 
 The existing browser-local project-wide Replace and one-level Undo now attempt

@@ -79,7 +79,10 @@ def render(source: str, executable: str = "quarto") -> str:
             except subprocess.TimeoutExpired as exc:
                 # Quarto may spawn Rscript, Jupyter or Pandoc children. Kill
                 # its entire session, not only the parent executable.
-                os.killpg(process.pid, signal.SIGKILL)
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass  # The child group may have exited after the timeout.
                 process.wait()
                 raise RenderError("Quarto rendering exceeded 45 seconds.", 70) from exc
         if returncode:

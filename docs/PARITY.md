@@ -9,11 +9,21 @@ files and never overwrites unexpected external edits or newly editor-open files.
 Failures report recovered and unresolved paths, rather than implying an atomic
 transaction. Both native and Pages project controllers use the same behavior.
 
-**Status: partial / focused V8 functional checks passed for both controllers;
-independent Linux/macOS Node and physical-browser acceptance pending.**
+**Status: partial / all six independent Ubuntu 24.04/macOS 14 CI jobs passed
+in [CI #40710524499](https://github.com/godofecht/FlowStudio/actions/runs/40710524499).**
+Both source platforms ran 1,024 JavaScript tests (1,012 passed, 12 skipped,
+zero failures) and 171 Python tests (13 skipped, zero failures), including the
+new recovery, failed-close, concurrent-edit and denied-compensation regressions
+against both native and Pages project modules. Both native platforms compiled
+Flow 2.0.0 and passed HTTP acceptance and packaging; both FlowJIT jobs passed.
+The initial CI failed because the native embedded project module had not been
+rebuilt; the embedded copy was synchronized and the corrected six-job run
+passed. [PR #143](https://github.com/godofecht/FlowStudio/pull/143) merged
+as [b695822](https://github.com/godofecht/FlowStudio/commit/b6958220f15932ad349ceb7297e49660d263da04).
 This is best-effort compensation, not crash-safe, atomic, multi-user or remote
-file persistence. No hosted CI configuration or Flow compiler syntax changed.
-RStudio feature parity remains incomplete.
+file persistence. Physical-browser File System Access API failure/recovery
+acceptance remains **unverified**. No hosted CI configuration or Flow compiler
+syntax changed. RStudio feature parity remains incomplete.
 
 ## 2026-10-28: bounded R data.frame row-name snapshot preservation (verification pending)
 

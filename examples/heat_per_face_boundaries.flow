@@ -1,0 +1,43 @@
+# Executable scalar heat equation with independent conditions on all four faces.
+# x-min Dirichlet, x-max Neumann, and insulated y faces.
+# The half-sine mode is an exact discrete eigenvector of this ghost-cell Laplacian.
+domain ThermalDomain {
+    grid       = 16 × 16
+    extent     = 1m × 1m
+    boundaries = (Dirichlet(300K), Neumann(0K/m), Neumann(0K/m), Neumann(0K/m))
+}
+
+model HeatEquation on ThermalDomain {
+    const diffusivity = 0.01m²/s
+    field temperature: Scalar<Kelvin>
+
+    dynamics {
+        ∂ₜtemperature = diffusivity ∇²temperature
+    }
+    initial {
+        temperature = 300K + 10K * sin(πx / 2m)
+    }
+}
+
+solver ThermalSolver for HeatEquation {
+    spatial {
+        method    = FiniteDifference
+        diffusion = CentralDifference
+    }
+    temporal {
+        method   = RungeKuttaSecondOrder
+        timeStep = 10⁻⁴s
+    }
+}
+
+let simulation = HeatEquation ▷ ThermalSolver ▷ Evolve(until: 0.01s)
+
+simulation
+    ▷ Observe {
+        meanTemperature     = Mean(temperature)
+        temperatureVariance = Mean((temperature − meanTemperature)²)
+    }
+    ▷ Visualize {
+        temperature         = Heatmap
+        temperatureVariance = LineGraph
+    }

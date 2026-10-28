@@ -17,7 +17,9 @@ subclasses, masked arrays, object arrays and arbitrary NumPy attributes are
 modules passed locally; independent Node/CPython CI and physical Chromium
 Pyodide execution are pending.** The new automated suite exercises v1/v2
 validation, capture/restore provenance, real worker dispatch and actual
-CPython/NumPy export and reconstruction when NumPy is installed. No native
+CPython/NumPy export and reconstruction when NumPy is installed. An opt-in
+physical Chromium scenario now asserts downloaded snapshot provenance and
+restoration in live Pyodide; it has not been executed. No native
 Flow backend, upstream compiler or hosted CI configuration changed. This is
 not RStudio feature parity.
 

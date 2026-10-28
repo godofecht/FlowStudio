@@ -168,13 +168,14 @@
         (face.type === "Periodic" && face.value === null) ||
         (["Dirichlet", "Neumann"].includes(face.type) &&
          typeof face.value === "number" && Number.isFinite(face.value)) ||
-        (face.type === "DirichletProfile" && typeof face.value === "string" &&
+        (["DirichletProfile", "NeumannProfile"].includes(face.type) && typeof face.value === "string" &&
          face.value.length > 0 && face.value.length <= 4096) ||
         (face.type === "Robin" && Array.isArray(face.value) &&
          face.value.length === 2 && face.value.every(Number.isFinite) &&
          face.value[1] > 0));
       const describeFace = face => face.type === "Periodic" ? "Periodic" :
         face.type === "DirichletProfile" ? "Dirichlet profile " + face.value :
+        face.type === "NeumannProfile" ? "Neumann profile " + face.value :
         face.type === "Robin" ?
           "Robin ambient " + face.value[0] + " K, transfer length " + face.value[1] + " m" :
           face.type + " " + face.value + (face.type === "Dirichlet" ? " K" : " K/m");

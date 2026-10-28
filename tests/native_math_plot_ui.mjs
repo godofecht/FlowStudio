@@ -20,6 +20,7 @@ try {
     ['examples/heat_dirichlet_profile.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_neumann_profile.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_robin.flow', 'temperatureVariance', 'meanTemperature'],
+    ['examples/heat_robin_profile.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_anisotropic.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_cross_diffusion.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_nonlinear_reaction.flow', 'temperatureVariance', 'meanTemperature'],
@@ -66,6 +67,13 @@ try {
       assert.equal(await note.count(), 1, 'Native plot must show executed Neumann profile');
       assert.match(await note.textContent(), /x min Neumann profile 2K\/m\*sin/);
       assert.match(await note.textContent(), /1K\/m\*t\/1s/);
+    }
+    if (source === 'examples/heat_robin_profile.flow') {
+      const note = page.locator('#mathFlowPlot [data-mathflow-boundary="Faces"]');
+      assert.equal(await note.count(), 1, 'Native plot must display executed Robin profile');
+      const description = await note.textContent();
+      assert.ok(description.includes('x min Robin ambient profile 300K+2K*sin'), description);
+      assert.ok(description.includes('1K*t/1s, transfer length 0.2 m'), description);
     }
     if (source === 'examples/heat_robin.flow') {
       const note = page.locator('#mathFlowPlot [data-mathflow-boundary="Faces"]');

@@ -21,7 +21,7 @@ UNITS: dict[str, Dimension] = {
 SUPERSCRIPT = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁻−", "0123456789--")
 _NUMBER = r"(?:10[⁻−-][⁰¹²³⁴⁵⁶⁷⁸⁹0-9]+|(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)"
 _UNIT = r"(?:kg|Pa|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)?(?:/(?:kg|Pa|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*))?"
-_TOKEN = re.compile(rf"(?P<space>\s+)|(?P<quantity>{_NUMBER}(?:{_UNIT})?)|(?P<name>∂ₓ|∂ᵧ|∇²|[A-Za-z_][A-Za-z_0-9]*|π)|(?P<op>[+\-−*/×·(),])")
+_TOKEN = re.compile(rf"(?P<space>\s+)|(?P<quantity>{_NUMBER}(?:{_UNIT})?)|(?P<name>∂ₓ²|∂ᵧ²|∂ₓ|∂ᵧ|∇²|[A-Za-z_][A-Za-z_0-9]*|π)|(?P<op>[+\-−*/×·(),])")
 _UNIT_PART = re.compile(r"(kg|Pa|m|s|K)([²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)\Z")
 
 
@@ -119,7 +119,7 @@ class _Parser:
             left = self.expression(0, depth + 1)
             if self.take() != ")":
                 raise ExpressionError("Expected closing parenthesis")
-        elif first in ("sin", "cos", "exp", "sqrt", "∂ₓ", "∂ᵧ", "∇²"):
+        elif first in ("sin", "cos", "exp", "sqrt", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∇²"):
             if first == "∇²" and self.peek() != "(":
                 # Prefix Unicode Laplacian, as in diffusivity ∇²temperature.
                 arg = self.expression(30, depth + 1)
@@ -137,6 +137,8 @@ class _Parser:
                 dim = tuple(x // 2 for x in arg.dimension)
             elif first in ("∂ₓ", "∂ᵧ"):
                 dim = _minus(arg.dimension, LENGTH)
+            elif first in ("∂ₓ²", "∂ᵧ²"):
+                dim = _minus(arg.dimension, (2, 0, 0, 0))
             elif first == "∇²":
                 dim = _minus(arg.dimension, (2, 0, 0, 0))
             else:
@@ -158,7 +160,7 @@ class _Parser:
                 operator, precedence = ("add" if nxt == "+" else "sub"), 10
             elif nxt in ("*", "×", "·", "/"):
                 operator, precedence = ("div" if nxt == "/" else "mul"), 20
-            elif nxt in ("(", "π", "pi", "x", "y", "sin", "cos", "exp", "sqrt", "∂ₓ", "∂ᵧ", "∇²") or nxt in self.symbols or re.fullmatch(rf"{_NUMBER}(?:{_UNIT})?", nxt):
+            elif nxt in ("(", "π", "pi", "x", "y", "sin", "cos", "exp", "sqrt", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∇²") or nxt in self.symbols or re.fullmatch(rf"{_NUMBER}(?:{_UNIT})?", nxt):
                 operator, precedence = "mul", 20
             else:
                 break
@@ -292,7 +294,7 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
         return shifted
 
     def visit(node: Expression):
-        if node.operator in ("∂ₓ", "∂ᵧ", "∇²"):
+        if node.operator in ("∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∇²"):
             shape, spacing_x, spacing_y = cartesian_grid()
             if (boundary_temperature is not None or boundary_gradient is not None
                     or (boundary_axes is not None and any(kind != "Periodic" for kind, _ in boundary_axes))
@@ -306,6 +308,10 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
                 return (neighbor(field, 0, True, spacing_x) - neighbor(field, 0, False, spacing_x)) / (2 * spacing_x)
             if node.operator == "∂ᵧ":
                 return (neighbor(field, 1, True, spacing_y) - neighbor(field, 1, False, spacing_y)) / (2 * spacing_y)
+            if node.operator == "∂ₓ²":
+                return (neighbor(field, 0, True, spacing_x) + neighbor(field, 0, False, spacing_x) - 2 * field) / spacing_x**2
+            if node.operator == "∂ᵧ²":
+                return (neighbor(field, 1, True, spacing_y) + neighbor(field, 1, False, spacing_y) - 2 * field) / spacing_y**2
             return ((neighbor(field, 0, True, spacing_x) + neighbor(field, 0, False, spacing_x) - 2 * field) / spacing_x**2
                     + (neighbor(field, 1, True, spacing_y) + neighbor(field, 1, False, spacing_y) - 2 * field) / spacing_y**2)
         if node.operator == "literal":

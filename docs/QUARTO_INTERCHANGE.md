@@ -83,3 +83,16 @@ test is **not** part of hosted CI and is not evidence of a pass until run.
 Rendering now retains the original source/language and filename while an
 asynchronous render is in progress, and reports when the editor changed
 before the report finished.
+
+### Server-side source validation
+
+The native renderer also checks the submitted Quarto body at the server
+boundary, rather than relying only on browser export restrictions. It accepts
+R/Python fenced chunks with optional safe labels, and literal disabled R
+chunks, while rejecting executable engines outside that set, unsupported
+chunk options, #| directives, shortcodes, inline R/Python execution and
+unterminated code fences. Unsupported source is rejected before the CLI
+starts, including when submitted directly to the localhost HTTP endpoint.
+This is source-format validation, **not an execution sandbox**: accepted
+chunks still run with the user's local permissions. Physical-browser and
+real-CLI acceptance are separate gates.

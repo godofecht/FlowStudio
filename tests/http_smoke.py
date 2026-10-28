@@ -122,6 +122,8 @@ def main() -> None:
     result = json.loads(body)
     assert status == 200 and result["ok"] and result["steps"] == 10, (status, result)
     assert result["max_divergence"] < 1e-5, result
+    assert result["spatial"]["grid"] == [16, 16], result
+    assert set(result["spatial"]["fields"]) == {"velocity_x", "velocity_y", "vorticity"}, result
     assert result["observations"][0]["time"] == 0.0, result
     assert abs(result["observations"][-1]["kineticEnergy"] - result["kinetic_energy"]) < 1e-10, result
     assert result["kinetic_energy"] <= result["initial_kinetic_energy"] * 1.001, result
@@ -137,6 +139,8 @@ def main() -> None:
     heat = json.loads(body)
     assert status == 200 and heat["ok"] and heat["steps"] == 100, (status, heat)
     assert abs(heat["mean_temperature"] - 300.0) < 1e-8, heat
+    assert heat["spatial"]["grid"] == [24, 24], heat
+    assert len(heat["spatial"]["fields"]["temperature"]) == 24, heat
     assert heat["temperature_variance"] < heat["initial_temperature_variance"], heat
     assert abs(heat["observations"][-1]["temperatureVariance"] - heat["temperature_variance"]) < 1e-10, heat
     bad_heat = heat_source.replace("300K", "300m")

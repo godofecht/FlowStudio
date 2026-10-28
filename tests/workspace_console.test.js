@@ -13,6 +13,22 @@ const { FakeElement, createDocument } = require("./terminal_dom.js");
  * module under test and reachable through its ids at the end of the run. */
 function mount(reply = { ok: true, status: 200, text: async () => "ok" }, storage = null) {
   const { doc, elements } = createDocument();
+  const downloads = { created: [], clicked: [], revoked: [] };
+  const createElement = doc.createElement;
+  doc.createElement = tag => {
+    const node = createElement(tag);
+    if (tag === "a") node.click = () => downloads.clicked.push({
+      href: node.href, name: node.download
+    });
+    return node;
+  };
+  const downloadUrl = {
+    createObjectURL(blob) {
+      downloads.created.push(blob);
+      return "blob:flowstudio-test-" + downloads.created.length;
+    },
+    revokeObjectURL(url) { downloads.revoked.push(url); }
+  };
   const panel = new FakeElement("div");
   for (const id of ["console", "language", "resultStatus", "run", "runCell"]) {
     const node = new FakeElement(id === "language" ? "select" : id === "console" ? "pre" : "span");
@@ -24,7 +40,8 @@ function mount(reply = { ok: true, status: 200, text: async () => "ok" }, storag
   elements.get("console").parentElement = panel;
 
   const requests = [];
-  const context = vm.createContext({ TextEncoder, localStorage: storage, console });
+  const context = vm.createContext({ TextEncoder, localStorage: storage, console,
+    Blob, URL: downloadUrl, setTimeout: callback => callback() });
   vm.runInContext(fs.readFileSync(path.join(root, "web/terminal_render.js"), "utf8"), context);
   vm.runInContext(fs.readFileSync(path.join(root, "web/terminal_sessions.js"), "utf8"), context);
   vm.runInContext(fs.readFileSync(path.join(root, "web/terminal_input.js"), "utf8"), context);
@@ -35,7 +52,7 @@ function mount(reply = { ok: true, status: 200, text: async () => "ok" }, storag
     return typeof reply === "function" ? reply(url, options) : reply;
   });
   const app = {
-    controller, requests, panel, doc,
+    controller, requests, panel, doc, downloads,
     io: () => context.FlowStudioConsoleIO,
     el: id => {
       // Descend the built tree because ids set later live on created nodes.
@@ -345,4 +362,30 @@ test("overflow menu gates destructive reset and wires history persistence", asyn
   menuButton.fire("click");
   assert.equal(reset.disabled, true,
     "Flow cannot reset an interpreter; it has none");
+});
+
+
+test("download exports only active terminal scrollback as sanitized UTF-8 text", async () => {
+  const app = mount();
+  app.io().write("python output α\x1b[31mβ\x1b[0m\n", "python", "out");
+  app.io().write("unrelated flow output\n", "flow", "out");
+  const menuButton = app.panel.querySelector("#terminalMenuToggle");
+  menuButton.fire("click");
+  const exportButton = app.panel.querySelector("#terminalMenuExport");
+  assert.ok(exportButton, "the explicit download action is available");
+  assert.match(exportButton.title, /may contain secrets/);
+  exportButton.fire("click");
+  assert.equal(app.requests.length, 0, "export must not contact execution routes");
+  assert.equal(app.downloads.created.length, 1);
+  assert.deepEqual(app.downloads.clicked, [{
+    href: "blob:flowstudio-test-1",
+    name: "flowstudio-python-session-1-transcript.txt"
+  }]);
+  const content = await app.downloads.created[0].text();
+  assert.match(content, /Runtime: python/);
+  assert.match(content, /python output αβ/);
+  assert.doesNotMatch(content, /\x1b|unrelated flow output/);
+  assert.deepEqual(app.downloads.revoked, ["blob:flowstudio-test-1"]);
+  assert.equal(app.panel.querySelector("#terminalMenu").hidden, true);
+  assert.match(app.el("resultStatus").textContent, /download requested/);
 });

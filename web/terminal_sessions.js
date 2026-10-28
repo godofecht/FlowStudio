@@ -17,6 +17,7 @@
 "use strict";
 const RUNTIMES = Object.freeze(["flow", "python", "r"]);
 const MAX_ENTRIES = 2000;        // dom+memory bound per session
+const MAX_EXPORT_BYTES = 2 * 1024 * 1024; // explicit user-initiated text export
 const STATE_LABELS = Object.freeze({
   idle: "No commands yet in this session",
   running: "Executing…",
@@ -35,6 +36,49 @@ function formatDuration(ms) {
   if (typeof ms !== "number" || ms < 0) return "?";
   return ms >= 60000 ? (ms / 60000).toFixed(1) + " min" :
     ms >= 1000 ? (ms / 1000).toFixed(1) + " s" : Math.round(ms) + " ms";
+}
+
+/* Export only the selected scrollback, never the interpreter state or hidden
+ * history. Preserve Unicode and multiline commands; strip terminal controls
+ * so a downloaded transcript cannot replay ANSI/OSC sequences on viewing. */
+function cleanExportText(value) {
+  return String(value).replace(/\r\n?/g, "\n")
+    .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, "")
+    .replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, "")
+    .replace(/\x1b[^\[\]]/g, "")
+    .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, "");
+}
+
+function exportTranscript(session) {
+  if (!session || !RUNTIMES.includes(session.runtime) ||
+      !Number.isSafeInteger(session.ordinal) || session.ordinal < 1 ||
+      !Array.isArray(session.entries))
+    throw new Error("Invalid terminal session for export.");
+  const encoder = new TextEncoder();
+  let text = "FlowStudio terminal transcript\nRuntime: " + session.runtime +
+    "\nSession: " + session.ordinal + "\nInterpreter: " +
+    (session.runtime === "flow" ? "independent compilation per command" :
+      "shared persistent " + session.runtime + " interpreter") + "\n\n";
+  let size = encoder.encode(text).byteLength;
+  for (const entry of session.entries) {
+    if (!entry || typeof entry.kind !== "string" ||
+        (entry.kind !== "fig" && typeof entry.text !== "string"))
+      throw new Error("Invalid terminal entry for export.");
+    const content = entry.kind === "fig" ?
+      "[Captured figure " + (Number.isSafeInteger(entry.figIndex) ?
+        entry.figIndex : "?") + "; image data is not included]" :
+      cleanExportText(entry.text);
+    if (!content) continue;
+    const stamp = typeof entry.ts === "string" ?
+      cleanExportText(entry.ts).slice(0, 32) : "--:--:--";
+    const chunk = "[" + stamp + "] [" + entry.kind + "] " +
+      content.replace(/\n+$/, "") + "\n";
+    size += encoder.encode(chunk).byteLength;
+    if (size > MAX_EXPORT_BYTES)
+      throw new Error("Terminal transcript exceeds the 2 MiB export limit.");
+    text += chunk;
+  }
+  return text;
 }
 
 function create(options = {}) {
@@ -132,7 +176,8 @@ function create(options = {}) {
    * entry may carry only figures (empty text); those are still appended so
    * captured plots never get dropped. */
   function append(runtime, text, kind = "out", extra = {}) {
-    const hasFigures = entriesWithFigures(extra).length > 0;
+    const hasFigures = entriesWithFigures(extra).length > 0 ||
+      (kind === "fig" && !!(extra && extra.plot));
     if (typeof text !== "string" || !text) {
       if (!hasFigures || runtime && !RUNTIMES.includes(runtime)) return null;
     }
@@ -199,13 +244,13 @@ function create(options = {}) {
     active: () => activeSession,
     setActive, activateRuntime, createFor, listOf, findSession,
     append, beginRun, endRun, recordCommand, clearCommand,
-    clearVisible, plainText, nowIso, formatDuration, STATE_LABELS
+    clearVisible, plainText, exportTranscript, nowIso, formatDuration, STATE_LABELS
   });
   return api;
 }
 
 const moduleApi = Object.freeze({ create, RUNTIMES, MAX_ENTRIES,
-  STATE_LABELS, nowIso, formatDuration });
+  MAX_EXPORT_BYTES, exportTranscript, STATE_LABELS, nowIso, formatDuration });
 root.FlowStudioTerminalSessions = moduleApi;
 if (typeof module !== "undefined" && module.exports) module.exports = moduleApi;
 })(globalThis);

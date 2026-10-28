@@ -84,7 +84,11 @@ streaming timestamps and per-command durations, and an overflow menu holding
 the opt-in device history flag, per-runtime history clearing and a two-step
 destructive Python/R interpreter reset (Flow has no interpreter to reset and
 the menu says so). Captured R/Python figures render inline as figures and
-stay in the Plots panel. Execution still goes through the Flow-owned
+stay in the Plots panel. The session menu also downloads the selected
+scrollback as a bounded, ANSI-stripped UTF-8 transcript (.txt), including
+timestamps and figure placeholders but not image bytes or other session tabs.
+This is an explicit local download, not automatic persistence; transcripts may
+contain commands, output and secrets. Execution still goes through the Flow-owned
 localhost routes with the same headers and busy-locks as before; nothing was
 fabricated on top of the real kernels. The standalone `/console` page keeps
 its simpler form-based layout for scripting and accessibility use.

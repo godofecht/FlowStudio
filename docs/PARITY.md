@@ -1,3 +1,33 @@
+## 2026-10-28: native terminal transcript export and plot-only entry repair (CI pending)
+
+The Flow-owned native workspace console now offers an explicit, per-session
+plain-text transcript download. The export records the selected runtime,
+session number, timestamps, commands, output, and figure placeholders, while
+stripping ANSI/OSC controls. It does not persist hidden interpreter state,
+embed captured image data, export other runtime tabs, contact a server, or
+automatically write to local storage. A 2 MiB UTF-8 limit rejects oversized
+exports instead of silently truncating them. Downloads are user-initiated;
+the menu warns that commands and output may contain secrets.
+
+The existing terminal session model previously discarded plot-only entries:
+the real capture path passed `{plot, figIndex}` with empty text, while the
+session append guard only accepted `figures` arrays. The guard now accepts
+these actual plot records so captured R/Python figures can enter the terminal
+scrollback. This repairs the entry path, but real browser figure rendering
+and download acceptance are **not yet independently verified**.
+
+**Status: partial / all six independent Linux/macOS jobs passed in
+[CI #40729698669](https://github.com/godofecht/FlowStudio/actions/runs/40729698669).**
+Each source platform ran 1,042 JavaScript tests (1,030 passed, 12 skipped,
+zero failures) and 181 Python tests (13 skipped, zero failures). Both native
+platforms compiled pinned Flow 2.0.0 and passed real Flow-owned HTTP acceptance
+and packaging; both FlowJIT jobs passed. Focused V8 execution of the exact
+changed terminal modules additionally verified plot-only entry retention,
+UTF-8/ANSI sanitization, oversized export rejection, and the native menu
+download path. Physical Chromium download and real interpreter figure capture
+remain **unverified**. No native Flow backend, upstream compiler or hosted CI
+configuration changed. RStudio parity remains incomplete.
+
 ## 2026-10-28: lossless UTF-8 project replacement guard (six independent CI jobs passed)
 
 Browser project search now uses strict UTF-8 decoding of File System Access API

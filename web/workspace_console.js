@@ -368,6 +368,13 @@ function mount(doc = document, request = fetch) {
   clearVisibleItem.id = "terminalMenuClearVisible";
   clearVisibleItem.textContent = "Clear visible output (Ctrl+L)";
 
+  const exportItem = h(doc, "button", "terminal-menuitem");
+  exportItem.type = "button";
+  exportItem.setAttribute("role", "menuitem");
+  exportItem.id = "terminalMenuExport";
+  exportItem.textContent = "Download this session transcript (.txt)";
+  exportItem.title = "Includes commands and output, which may contain secrets. Figures are referenced, not embedded.";
+
   const resetItem = h(doc, "button", "terminal-menuitem");
   resetItem.type = "button";
   resetItem.setAttribute("role", "menuitem");
@@ -390,8 +397,8 @@ function mount(doc = document, request = fetch) {
   clearHistoryItem.id = "consoleClearHistory";
   clearHistoryItem.textContent = "Clear stored history for this runtime";
 
-  menu.append(newSessionItem, clearVisibleItem, resetItem, rememberLabel,
-    clearHistoryItem);
+  menu.append(newSessionItem, clearVisibleItem, exportItem, resetItem,
+    rememberLabel, clearHistoryItem);
 
   function hideMenu() {
     menu.hidden = true;
@@ -443,6 +450,36 @@ function mount(doc = document, request = fetch) {
   clearVisibleItem.addEventListener("click", () => {
     sessions.clearVisible(sessions.active());
     hideMenu();
+  });
+  exportItem.addEventListener("click", () => {
+    hideMenu();
+    try {
+      const session = sessions.active();
+      const text = SESSION_MODULE.exportTranscript(session);
+      const BlobType = root.Blob;
+      const urlApi = root.URL;
+      if (typeof BlobType !== "function" || !urlApi ||
+          typeof urlApi.createObjectURL !== "function" ||
+          typeof urlApi.revokeObjectURL !== "function")
+        throw new Error("Browser downloads are unavailable.");
+      const url = urlApi.createObjectURL(new BlobType([text],
+        { type: "text/plain;charset=utf-8" }));
+      try {
+        const link = doc.createElement("a");
+        link.href = url;
+        link.download = "flowstudio-" + session.runtime + "-session-" +
+          session.ordinal + "-transcript.txt";
+        link.click();
+        status("Transcript download requested.", "ok");
+      } finally {
+        // Defer revocation until the browser has accepted the download.
+        if (typeof root.setTimeout === "function")
+          root.setTimeout(() => urlApi.revokeObjectURL(url), 1000);
+        else urlApi.revokeObjectURL(url);
+      }
+    } catch (error) {
+      status("Transcript export failed: " + String(error.message || error), "error");
+    }
   });
   resetItem.addEventListener("click", () => void doReset());
   rememberBox.addEventListener("change", () => {

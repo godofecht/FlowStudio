@@ -197,8 +197,8 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
              values: dict[str, object] | None = None,
              boundary_temperature: float | None = None,
              boundary_gradient: float | None = None,
-             boundary_axes: tuple[tuple[str, float | None], tuple[str, float | None]] | None = None,
-             boundary_faces: tuple[tuple[str, float | None], ...] | None = None):
+             boundary_axes: tuple[tuple[str, float | tuple[float, float] | None], ...] | None = None,
+             boundary_faces: tuple[tuple[str, float | tuple[float, float] | None], ...] | None = None):
     """Lower a validated expression tree to NumPy arithmetic, with no eval/exec."""
     import numpy as np
     if expected_dimension is not None and expression.dimension != expected_dimension:
@@ -209,23 +209,31 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
         raise ExpressionError("Neumann boundary gradient must be finite")
     if boundary_temperature is not None and boundary_gradient is not None:
         raise ExpressionError("Cannot combine Dirichlet and Neumann boundary conditions")
+    def validate_condition(condition):
+        if not isinstance(condition, tuple) or len(condition) != 2:
+            raise ExpressionError("Invalid boundary condition")
+        kind, value = condition
+        if kind == "Periodic":
+            if value is not None:
+                raise ExpressionError("Periodic boundary must not carry a value")
+        elif kind in ("Dirichlet", "Neumann"):
+            if type(value) not in (int, float) or not math.isfinite(value):
+                raise ExpressionError("Boundary value must be finite")
+        elif kind == "Robin":
+            if (not isinstance(value, tuple) or len(value) != 2
+                    or any(type(item) not in (int, float) or not math.isfinite(item)
+                           for item in value) or value[1] <= 0):
+                raise ExpressionError("Robin requires finite ambient temperature and positive transfer length")
+        else:
+            raise ExpressionError("Unsupported boundary condition")
+
     if boundary_faces is not None:
         if boundary_temperature is not None or boundary_gradient is not None or boundary_axes is not None:
             raise ExpressionError("Cannot combine face boundaries with other boundaries")
         if not isinstance(boundary_faces, tuple) or len(boundary_faces) != 4:
             raise ExpressionError("Face boundaries require exactly four conditions")
         for condition in boundary_faces:
-            if not isinstance(condition, tuple) or len(condition) != 2:
-                raise ExpressionError("Invalid face boundary condition")
-            kind, value = condition
-            if kind == "Periodic":
-                if value is not None:
-                    raise ExpressionError("Periodic boundary must not carry a value")
-            elif kind in ("Dirichlet", "Neumann"):
-                if type(value) not in (int, float) or not math.isfinite(value):
-                    raise ExpressionError("Face boundary value must be finite")
-            else:
-                raise ExpressionError("Unsupported face boundary condition")
+            validate_condition(condition)
         for lower, upper in ((0, 1), (2, 3)):
             if (boundary_faces[lower][0] == "Periodic") != (boundary_faces[upper][0] == "Periodic"):
                 raise ExpressionError("Periodic boundaries must occur on both faces of an axis")
@@ -235,17 +243,7 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
         if not isinstance(boundary_axes, tuple) or len(boundary_axes) != 2:
             raise ExpressionError("Axis boundaries require exactly two conditions")
         for condition in boundary_axes:
-            if not isinstance(condition, tuple) or len(condition) != 2:
-                raise ExpressionError("Invalid axis boundary condition")
-            kind, value = condition
-            if kind == "Periodic":
-                if value is not None:
-                    raise ExpressionError("Periodic boundary must not carry a value")
-            elif kind in ("Dirichlet", "Neumann"):
-                if type(value) not in (int, float) or not math.isfinite(value):
-                    raise ExpressionError("Axis boundary value must be finite")
-            else:
-                raise ExpressionError("Unsupported axis boundary condition")
+            validate_condition(condition)
 
     def cartesian_grid():
         coordinates_x = np.asarray(x, dtype=np.float64)
@@ -282,8 +280,15 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
             shifted = shifted.copy()
             face = -1 if forward else 0
             target = (face, slice(None)) if axis == 0 else (slice(None), face)
-            shifted[target] = (2 * value - field[target] if kind == "Dirichlet"
-                               else field[target] + value * spacing)
+            if kind == "Robin":
+                ambient, transfer_length = value
+                # Face temperature is the mean of interior and ghost.
+                # ∂n T = (ambient - T_face) / transfer_length.
+                shifted[target] = field[target] + spacing * (ambient - field[target]) / (
+                    transfer_length + spacing / 2)
+            else:
+                shifted[target] = (2 * value - field[target] if kind == "Dirichlet"
+                                   else field[target] + value * spacing)
         return shifted
 
     def visit(node: Expression):

@@ -196,7 +196,8 @@ def parse_expression(source: str, *, symbols: dict[str, Dimension] | None = None
 def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | None = None,
              values: dict[str, object] | None = None,
              boundary_temperature: float | None = None,
-             boundary_gradient: float | None = None):
+             boundary_gradient: float | None = None,
+             boundary_axes: tuple[tuple[str, float | None], tuple[str, float | None]] | None = None):
     """Lower a validated expression tree to NumPy arithmetic, with no eval/exec."""
     import numpy as np
     if expected_dimension is not None and expression.dimension != expected_dimension:
@@ -207,6 +208,23 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
         raise ExpressionError("Neumann boundary gradient must be finite")
     if boundary_temperature is not None and boundary_gradient is not None:
         raise ExpressionError("Cannot combine Dirichlet and Neumann boundary conditions")
+    if boundary_axes is not None:
+        if boundary_temperature is not None or boundary_gradient is not None:
+            raise ExpressionError("Cannot combine axis boundaries with uniform boundaries")
+        if not isinstance(boundary_axes, tuple) or len(boundary_axes) != 2:
+            raise ExpressionError("Axis boundaries require exactly two conditions")
+        for condition in boundary_axes:
+            if not isinstance(condition, tuple) or len(condition) != 2:
+                raise ExpressionError("Invalid axis boundary condition")
+            kind, value = condition
+            if kind == "Periodic":
+                if value is not None:
+                    raise ExpressionError("Periodic boundary must not carry a value")
+            elif kind in ("Dirichlet", "Neumann"):
+                if type(value) not in (int, float) or not math.isfinite(value):
+                    raise ExpressionError("Axis boundary value must be finite")
+            else:
+                raise ExpressionError("Unsupported axis boundary condition")
 
     def cartesian_grid():
         coordinates_x = np.asarray(x, dtype=np.float64)
@@ -227,25 +245,29 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
         return coordinates_x.shape, spacing_x, spacing_y
 
     def neighbor(field, axis: int, forward: bool, spacing: float):
-        """Cell-centered periodic, Dirichlet or outward-normal Neumann ghost cell."""
+        """Cell-centered ghost cells, independently selected for x and y."""
         shifted = np.roll(field, -1 if forward else 1, axis=axis)
-        if boundary_temperature is not None or boundary_gradient is not None:
+        if boundary_axes is not None:
+            kind, value = boundary_axes[axis]
+        elif boundary_temperature is not None:
+            kind, value = "Dirichlet", boundary_temperature
+        elif boundary_gradient is not None:
+            kind, value = "Neumann", boundary_gradient
+        else:
+            kind, value = "Periodic", None
+        if kind != "Periodic":
             shifted = shifted.copy()
             face = -1 if forward else 0
-            if axis == 0:
-                shifted[face, :] = (2 * boundary_temperature - field[face, :]
-                                    if boundary_temperature is not None
-                                    else field[face, :] + boundary_gradient * spacing)
-            else:
-                shifted[:, face] = (2 * boundary_temperature - field[:, face]
-                                    if boundary_temperature is not None
-                                    else field[:, face] + boundary_gradient * spacing)
+            target = (face, slice(None)) if axis == 0 else (slice(None), face)
+            shifted[target] = (2 * value - field[target] if kind == "Dirichlet"
+                               else field[target] + value * spacing)
         return shifted
 
     def visit(node: Expression):
         if node.operator in ("∂ₓ", "∂ᵧ", "∇²"):
             shape, spacing_x, spacing_y = cartesian_grid()
-            if (boundary_temperature is not None or boundary_gradient is not None) and not (
+            if (boundary_temperature is not None or boundary_gradient is not None
+                    or (boundary_axes is not None and any(kind != "Periodic" for kind, _ in boundary_axes))) and not (
                     node.operands[0].operator == "name"
                     and node.operands[0].value == "temperature"
                     and node.operands[0].dimension == TEMPERATURE):

@@ -1,0 +1,191 @@
+"""Checked scalar periodic heat-equation frontend and RK2 finite-difference backend.
+
+This supports one validated PDE family, not arbitrary PDEs or an upstream
+Flow 2.0 grammar extension.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass
+import math
+
+from math_flow_expr import TEMPERATURE, parse_expression, evaluate, ExpressionError
+
+
+@dataclass(frozen=True)
+class HeatModel:
+    width: int
+    height: int
+    length_x: float
+    length_y: float
+    diffusivity: float
+    initial: str
+    step: float
+    until: float
+
+
+def parse_heat(source: str, base) -> HeatModel:
+    """Parse a complete scalar heat Flow program using the shared token grammar."""
+    error = base.FlowMathError
+    p = base.Parser(base.lex(source))
+    p.pop("domain")
+    domain = p.identifier()
+    if not domain[0].isupper():
+        raise error("Domain type must start uppercase")
+    statements, sections = base.split_sections(p.block())
+    if sections:
+        raise error("Unexpected domain sections")
+    d = base.assignments_tokens(statements)
+    base.expect_keys(d, {"grid", "extent", "boundaries"}, "domain")
+    if d["boundaries"] != ["Periodic"]:
+        raise error("Heat solver requires Periodic boundaries")
+    grid = d["grid"]
+    if len(grid) != 3 or grid[1] != "×":
+        raise error("grid requires width × height")
+    width, height = base.number(grid[:1]), base.number(grid[2:])
+    if not (width.is_integer() and height.is_integer() and
+            8 <= width <= 512 and 8 <= height <= 512):
+        raise error("Heat grid dimensions must be integers between 8 and 512")
+    extent = d["extent"]
+    if len(extent) != 5 or extent[1] != "m" or extent[2] != "×" or extent[4] != "m":
+        raise error("extent requires length m × length m")
+    lx, ly = base.number(extent[:1]), base.number(extent[3:4])
+    if min(lx, ly) <= 0:
+        raise error("Domain extent must be positive")
+    p.pop("model")
+    name = p.identifier()
+    p.pop("on")
+    p.pop(domain)
+    statements, sections = base.split_sections(p.block())
+    base.expect_keys(sections, {"dynamics", "initial"}, "heat model")
+    consts, fields = {}, {}
+    for stmt in statements:
+        if len(stmt) >= 4 and stmt[0] == "const" and stmt[2] == "=":
+            if stmt[1] in consts:
+                raise error("Duplicate heat constant")
+            consts[stmt[1]] = stmt[3:]
+        elif len(stmt) >= 4 and stmt[0] == "field" and stmt[2] == ":":
+            if stmt[1] in fields:
+                raise error("Duplicate heat field")
+            fields[stmt[1]] = stmt[3:]
+        else:
+            raise error(f"Unsupported heat declaration: {' '.join(stmt)}")
+    base.expect_keys(consts, {"diffusivity"}, "heat constants")
+    base.expect_keys(fields, {"temperature"}, "heat fields")
+    if fields["temperature"] != ["Scalar", "<", "Kelvin", ">"]:
+        raise error("temperature must be Scalar<Kelvin>")
+    diffusivity = base.number(consts["diffusivity"], ["m", "²", "/", "s"])
+    if diffusivity <= 0:
+        raise error("Heat diffusivity must be positive")
+    equation = "".join(t.text for t in sections["dynamics"])
+    if equation != "∂ₜtemperature=diffusivity∇²temperature":
+        raise error("Unsupported heat dynamics: expected ∂ₜtemperature = diffusivity ∇²temperature")
+    initial = base.assignments(sections["initial"])
+    base.expect_keys(initial, {"temperature"}, "heat initial")
+    expression = "".join(initial["temperature"])
+    try:
+        typed = parse_expression(expression)
+    except ExpressionError as exc:
+        raise error(f"Invalid heat initial expression: {exc}") from exc
+    if typed.dimension != TEMPERATURE:
+        raise error(f"Heat initial condition must have Kelvin dimensions, got {typed.dimension}")
+    p.pop("solver")
+    solver = p.identifier()
+    p.pop("for")
+    p.pop(name)
+    statements, sections = base.split_sections(p.block())
+    if statements:
+        raise error("Unexpected heat solver statements")
+    base.expect_keys(sections, {"spatial", "temporal"}, "heat solver")
+    spatial = base.assignments(sections["spatial"])
+    temporal = base.assignments(sections["temporal"])
+    if spatial != {"method": ["FiniteDifference"], "diffusion": ["CentralDifference"]}:
+        raise error("Heat solver requires FiniteDifference / CentralDifference")
+    base.expect_keys(temporal, {"method", "timeStep"}, "heat temporal")
+    if temporal["method"] != ["RungeKuttaSecondOrder"]:
+        raise error("Heat solver requires RungeKuttaSecondOrder")
+    step = base.number(temporal["timeStep"], ["s"])
+    if step <= 0:
+        raise error("Heat time step must be positive")
+    p.pop("let")
+    p.pop("simulation")
+    p.pop("=")
+    p.pop(name)
+    p.pop("▷")
+    p.pop(solver)
+    p.pop("▷")
+    p.pop("Evolve")
+    p.pop("(")
+    p.pop("until")
+    p.pop(":")
+    duration = []
+    while p.peek() != ")":
+        duration.append(p.pop())
+    p.pop(")")
+    until = base.number(duration, ["s"])
+    if until <= 0:
+        raise error("Heat evolution duration must be positive")
+    p.pop("simulation")
+    p.pop("▷")
+    p.pop("Observe")
+    observed = base.assignments(p.block())
+    if {k: "".join(v) for k, v in observed.items()} != {
+        "meanTemperature": "Mean(temperature)",
+        "temperatureVariance": "Mean((temperature−meanTemperature)²)",
+    }:
+        raise error("Unsupported heat observation mapping")
+    p.pop("▷")
+    p.pop("Visualize")
+    visualized = base.assignments(p.block())
+    if visualized != {"temperature": ["Heatmap"], "temperatureVariance": ["LineGraph"]}:
+        raise error("Unsupported heat visualization mapping")
+    if p.peek() != "<EOF>":
+        raise error(f"Unexpected trailing heat token {p.peek()}")
+    return HeatModel(int(width), int(height), lx, ly, diffusivity, expression, step, until)
+
+
+def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | None = None,
+                  error_type: type[ValueError] = ValueError) -> dict:
+    """Explicit RK2, centered periodic Laplacian; no hidden numerical fallback."""
+    import numpy as np
+    nx = ny = grid if grid is not None else None
+    nx = nx or model.width
+    ny = ny or model.height
+    if not (isinstance(nx, int) and isinstance(ny, int) and 8 <= nx <= 512 and 8 <= ny <= 512):
+        raise error_type("Heat grid dimensions must be integers between 8 and 512")
+    duration = until if until is not None else model.until
+    if not math.isfinite(duration) or duration <= 0:
+        raise error_type("Heat duration must be finite and positive")
+    steps = math.ceil(duration / model.step)
+    if not 1 <= steps <= 200000:
+        raise error_type("Heat evolution must have between 1 and 200000 steps")
+    dt = duration / steps
+    dx, dy = model.length_x / nx, model.length_y / ny
+    if dt * model.diffusivity * (1 / dx**2 + 1 / dy**2) > .45:
+        raise error_type("Heat time step violates diffusion stability bound")
+    x, y = np.meshgrid((np.arange(nx) + .5) * dx,
+                       (np.arange(ny) + .5) * dy, indexing="ij")
+    try:
+        field = np.broadcast_to(evaluate(parse_expression(model.initial), x, y,
+                                         expected_dimension=TEMPERATURE), (nx, ny)).copy()
+    except ExpressionError as exc:
+        raise error_type(str(exc)) from exc
+    initial_mean = float(np.mean(field))
+    initial_variance = float(np.mean((field - initial_mean)**2))
+
+    def laplacian(a):
+        return ((np.roll(a, -1, axis=0) + np.roll(a, 1, axis=0) - 2 * a) / dx**2 +
+                (np.roll(a, -1, axis=1) + np.roll(a, 1, axis=1) - 2 * a) / dy**2)
+
+    for _ in range(steps):
+        k1 = model.diffusivity * laplacian(field)
+        k2 = model.diffusivity * laplacian(field + dt * k1)
+        field += .5 * dt * (k1 + k2)
+        if not np.all(np.isfinite(field)):
+            raise error_type("Non-finite temperature during heat integration")
+    mean = float(np.mean(field))
+    variance = float(np.mean((field - mean)**2))
+    return {"steps": steps, "grid": [nx, ny], "time": duration,
+            "mean_temperature": mean, "initial_mean_temperature": initial_mean,
+            "temperature_variance": variance, "initial_temperature_variance": initial_variance,
+            "temperature_min": float(np.min(field)), "temperature_max": float(np.max(field)),
+            "method": "periodic centered-difference RK2 heat equation"}

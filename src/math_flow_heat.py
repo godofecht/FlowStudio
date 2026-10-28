@@ -74,27 +74,26 @@ def parse_heat(source: str, base) -> HeatModel:
                 raise error("Robin transfer length must be positive")
             return ("Robin", (ambient, length))
         unit = ["K"] if kind == "Dirichlet" else ["K", "/", "m"]
-        if kind == "Dirichlet":
-            # Preserve the literal fast path; profiles are separately parsed,
-            # dimension-checked and evaluated at the physical face and RK2 time.
+        # Preserve literal values while allowing typed, field-independent
+        # face profiles. Neumann uses outward-normal K/m, not Kelvin.
+        try:
+            return (kind, base.number(tokens[2:-1], unit))
+        except error:
+            profile = "".join(tokens[2:-1])
             try:
-                return (kind, base.number(tokens[2:-1], unit))
-            except error:
-                profile = "".join(tokens[2:-1])
-                try:
-                    typed = parse_expression(profile, symbols={"t": (0, 0, 1, 0)})
-                except ExpressionError as exc:
-                    raise error(f"Invalid Dirichlet profile: {exc}") from exc
-                if typed.dimension != TEMPERATURE:
-                    raise error("Dirichlet profile must have Kelvin dimensions")
-                def check_profile(node):
-                    if node.operator in ("∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∇²"):
-                        raise error("Dirichlet profiles cannot contain spatial derivatives")
-                    for child in node.operands:
-                        check_profile(child)
-                check_profile(typed)
-                return ("DirichletProfile", profile)
-        return (kind, base.number(tokens[2:-1], unit))
+                typed = parse_expression(profile, symbols={"t": (0, 0, 1, 0)})
+            except ExpressionError as exc:
+                raise error(f"Invalid {kind} profile: {exc}") from exc
+            expected = TEMPERATURE if kind == "Dirichlet" else (-1, 0, 0, 1)
+            if typed.dimension != expected:
+                raise error(f"{kind} profile must have {'Kelvin' if kind == 'Dirichlet' else 'Kelvin/metre'} dimensions")
+            def check_profile(node):
+                if node.operator in ("∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∇²"):
+                    raise error(f"{kind} profiles cannot contain spatial derivatives")
+                for child in node.operands:
+                    check_profile(child)
+            check_profile(typed)
+            return (kind + "Profile", profile)
 
     boundary_tokens = d["boundaries"]
     if boundary_tokens and boundary_tokens[0] == "(":
@@ -125,7 +124,7 @@ def parse_heat(source: str, base) -> HeatModel:
                     raise error("Periodic boundaries must occur on both faces of an axis")
     else:
         kind, value = parse_face(boundary_tokens)
-        if kind in ("Robin", "DirichletProfile"):
+        if kind in ("Robin", "DirichletProfile", "NeumannProfile"):
             boundary_axes = ((kind, value), (kind, value))
         if kind == "Dirichlet":
             boundary_temperature = value

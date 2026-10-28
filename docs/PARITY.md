@@ -1,4 +1,4 @@
-## 2026-10-28: lossless UTF-8 project replacement guard (independent verification pending)
+## 2026-10-28: lossless UTF-8 project replacement guard (six independent CI jobs passed)
 
 Browser project search now uses strict UTF-8 decoding of File System Access API
 bytes, preserving a UTF-8 BOM rather than silently dropping it through
@@ -9,7 +9,7 @@ same strict decoder, and invalid Unicode replacement text is rejected before
 writing. Both native and Pages project modules include regression tests for
 unsafe bytes, BOM round-trips, external rewrites and invalid replacement text.
 
-**Status: partial / independent CI pending.** This does not establish physical
+**Status: partial / all six independent Linux/macOS CI jobs passed in [CI #40719983142](https://github.com/godofecht/FlowStudio/actions/runs/40719983142).** Both source platforms ran 1,032 JavaScript tests (1,020 passed, 12 skipped, zero failures), and 176 Python tests (13 skipped, zero failures). Both native platforms compiled Flow 2.0.0 and passed HTTP acceptance and packaging; both FlowJIT jobs passed. [PR #145](https://github.com/godofecht/FlowStudio/pull/145) merged as [eb17514](https://github.com/godofecht/FlowStudio/commit/eb17514b2947123b53c0ceeb9311224649bd9208). This does not establish physical
 Chromium File System Access API acceptance or crash-safe atomic writes.
 Legacy non-UTF-8 project encodings are deliberately unsupported for replacement.
 The native Flow router and hosted CI configuration are unchanged. RStudio

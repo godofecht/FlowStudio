@@ -114,7 +114,30 @@ def main() -> None:
     assert post("/api/git/branch/switch", "does-not-exist")[0] == 422
     assert post("/api/git/branch/switch", "feature/native", "http://attacker.invalid")[0] == 404
     assert git("symbolic-ref", "--short", "HEAD").strip() == "feature/native"
-    print("PASS: live Flow Git stage, unstage, commit, branch list/create/switch, dirty-tree refusal, hooks and origin gate")
+
+    # Non-forcing deletion: merged branch succeeds, current/unmerged branch
+    # survives, invalid names and cross-origin requests cannot mutate refs.
+    assert post("/api/git/branch/create", "feature/merged")[0] == 200
+    assert post("/api/git/branch/delete", "feature/merged")[0] == 200
+    assert "feature/merged" not in git("branch", "--list", "feature/merged")
+    assert post("/api/git/branch/delete", "feature/native")[0] == 422
+    assert git("symbolic-ref", "--short", "HEAD").strip() == "feature/native"
+    assert post("/api/git/branch/delete", "feature/unmerged")[0] == 422
+    assert post("/api/git/branch/create", "feature/unmerged")[0] == 200
+    assert post("/api/git/branch/switch", "feature/unmerged")[0] == 200
+    (HERE / "unmerged.flow").write_text("unique commit\\n", encoding="utf-8")
+    git("add", "unmerged.flow")
+    git("-c", "core.hooksPath=/dev/null", "commit", "-m", "Unmerged fixture")
+    assert post("/api/git/branch/switch", "feature/native")[0] == 200
+    status, output = post("/api/git/branch/delete", "feature/unmerged")
+    assert status == 422 and "merged" in output.lower(), (status, output)
+    assert git("show-ref", "--verify", "--quiet", "refs/heads/feature/unmerged") == ""
+    assert post("/api/git/branch/delete", "-D")[0] == 422
+    assert post("/api/git/branch/delete", "")[0] == 400
+    assert post("/api/git/branch/delete", "x" * 129)[0] == 400
+    assert post("/api/git/branch/delete", "feature/unmerged", "http://attacker.invalid")[0] == 404
+    assert git("show-ref", "--verify", "--quiet", "refs/heads/feature/unmerged") == ""
+    print("PASS: live Flow Git stage/unstage/commit, branch list/create/switch/non-forcing delete, unmerged/current protection and origin gate")
 
 
 if __name__ == "__main__":

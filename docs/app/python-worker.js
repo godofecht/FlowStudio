@@ -130,6 +130,41 @@ async function capturePlots(py) {
     return {plots:[], warning:String(error).slice(0, 300)};
   }
 }
+function numpyPacket(packet) {
+  if (!packet || !["vector", "table"].includes(packet.kind)) return false;
+  if (packet.kind === "vector")
+    return Array.isArray(packet.values) && packet.values.length > 0 &&
+      (packet.type === "number" || !packet.values.includes(null));
+  return Array.isArray(packet.columns) && packet.columns.length > 0 &&
+    packet.columns[0] && Array.isArray(packet.columns[0].values) &&
+    packet.columns[0].values.length > 0 &&
+    packet.columns.every(column => column && column.type === packet.columns[0].type &&
+      Array.isArray(column.values) &&
+      column.values.length === packet.columns[0].values.length &&
+      (column.type === "number" || !column.values.includes(null)));
+}
+function validNumpyDtype(dtype, packet) {
+  if (typeof dtype !== "string" ||
+      !/^(?:u?int(?:8|16|32|64)|float(?:16|32|64)|bool|<U[1-9][0-9]{0,2})$/.test(dtype) ||
+      !numpyPacket(packet)) return false;
+  const type = packet.kind === "vector" ? packet.type : packet.columns[0].type;
+  const values = packet.kind === "vector" ? packet.values :
+    packet.columns.flatMap(column => column.values);
+  if (dtype === "bool") return type === "boolean";
+  if (dtype.startsWith("<U")) {
+    const width = Number(dtype.slice(2));
+    return type === "string" && width <= 512 &&
+      values.every(value => typeof value === "string" && [...value].length <= width);
+  }
+  if (type !== "number") return false;
+  if (dtype.startsWith("float"))
+    return dtype !== "float16" || values.every(value => value === null || Math.abs(value) <= 65504);
+  const limits = {int8:[-128,127],uint8:[0,255],int16:[-32768,32767],
+    uint16:[0,65535],int32:[-2147483648,2147483647],uint32:[0,4294967295]};
+  const [low, high] = limits[dtype] || (dtype === "uint64" ?
+    [0, Number.MAX_SAFE_INTEGER] : [-Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER]);
+  return values.every(value => Number.isSafeInteger(value) && value >= low && value <= high);
+}
 async function handle(event) {
   const {id, op, code, value: transferValue} = event.data || {};
   if (!Number.isSafeInteger(id)) return;
@@ -145,16 +180,19 @@ async function handle(event) {
     /^[A-Za-z_][A-Za-z0-9_]{0,79}$/.test(code);
   const validExport = (op === "export" || op === "export-snapshot") &&
     typeof code === "string" && TRANSFER_NAME.test(code);
-  const validImport = (op === "import" || op === "import-pandas" || op === "import-numpy") &&
+  const snapshotNumpy = op === "import-numpy-snapshot" && transferValue &&
+    typeof transferValue === "object" && !Array.isArray(transferValue) &&
+    Object.keys(transferValue).sort().join(",") === "dtype,packet" &&
+    validTransferPacket(transferValue.packet) &&
+    validNumpyDtype(transferValue.dtype, transferValue.packet);
+  const importPacket = op === "import-numpy-snapshot" ? transferValue?.packet : transferValue;
+  const validImport = (op === "import" || op === "import-pandas" ||
+    op === "import-numpy" || op === "import-numpy-snapshot") &&
     typeof code === "string" && TRANSFER_NAME.test(code) &&
-    validTransferPacket(transferValue) &&
-    (op !== "import-pandas" || transferValue.kind === "table") &&
-    (op !== "import-numpy" || (transferValue.kind === "vector" ?
-      transferValue.values.length > 0 &&
-        (transferValue.type === "number" || !transferValue.values.includes(null)) :
-      transferValue.kind === "table" && transferValue.columns[0].values.length > 0 &&
-        transferValue.columns.every(col => col.type === transferValue.columns[0].type &&
-          (col.type === "number" || !col.values.includes(null)))));
+    validTransferPacket(importPacket) &&
+    (op !== "import-pandas" || importPacket.kind === "table") &&
+    (op !== "import-numpy-snapshot" || snapshotNumpy) &&
+    (!["import-numpy", "import-numpy-snapshot"].includes(op) || numpyPacket(importPacket));
   if (!((op === "run" && typeof code === "string" && new TextEncoder().encode(code).length <= 65536) ||
     op === "inspect" || op === "packages" || validInstall || validTable || validCheck || validHelp || validComplete || validExport || validImport)) {
     self.postMessage({id, ok:false, output:"Invalid execution request."}); return;
@@ -176,6 +214,7 @@ async function handle(event) {
         "_fs_transfer_np = _fs_transfer_sys.modules.get('numpy')",
         "_fs_transfer_is_array = _fs_transfer_np is not None and type(_fs_transfer_obj) is _fs_transfer_np.ndarray",
         "_fs_transfer_kind = 'pandas' if _fs_transfer_is_df else 'ndarray' if _fs_transfer_is_array else 'table' if type(_fs_transfer_obj) is dict else 'vector' if type(_fs_transfer_obj) in (list, tuple) else 'scalar'",
+        "_fs_transfer_dtype = str(_fs_transfer_obj.dtype) if _fs_transfer_is_array else None",
         "def _fs_transfer_type(v):",
         "    return 'boolean' if type(v) is bool else 'number' if type(v) in (int, float) else 'string' if type(v) is str else None",
         "def _fs_transfer_check(_fs_transfer_values, _fs_transfer_limit):",
@@ -263,27 +302,46 @@ async function handle(event) {
                 (col.type === "number" || !col.values.includes(null)));
           if (!eligible) throw Error("Invalid NumPy session snapshot.");
         }
-        self.postMessage(["pandas", "ndarray"].includes(origin) ?
+        if (origin === "ndarray") {
+          const dtype = await py.runPythonAsync("_fs_transfer_dtype");
+          if (!validNumpyDtype(dtype, packet))
+            throw Error("Unsupported or incompatible NumPy snapshot dtype.");
+          self.postMessage({id, ok:true, value:packet, origin, dtype});
+        } else self.postMessage(origin === "pandas" ?
           {id, ok:true, value:packet, origin} : {id, ok:true, value:packet});
       } else self.postMessage({id, ok:true, value:packet});
       return;
     }
-    if (op === "import-numpy") {
+    if (op === "import-numpy" || op === "import-numpy-snapshot") {
       // Explicit R vector/table -> ndarray conversion. Homogeneous R tables
       // become two-dimensional arrays in row-major order; column names are lost.
       // Numeric NA becomes NaN; reject missing logical/string values preflight.
       await py.loadPackage("numpy");
+      const dtype = op === "import-numpy-snapshot" ? transferValue.dtype : null;
       const query = [
         "import json as _fs_transfer_json, numpy as _fs_transfer_np",
-        "_fs_transfer_packet = _fs_transfer_json.loads(" + JSON.stringify(JSON.stringify(transferValue)) + ")",
+        "_fs_transfer_packet = _fs_transfer_json.loads(" + JSON.stringify(JSON.stringify(importPacket)) + ")",
         "_fs_transfer_table = _fs_transfer_packet['kind'] == 'table'",
         "_fs_transfer_type = _fs_transfer_packet['columns'][0]['type'] if _fs_transfer_table else _fs_transfer_packet['type']",
-        "_fs_transfer_dtype = {'number': _fs_transfer_np.float64, 'boolean': _fs_transfer_np.bool_, 'string': _fs_transfer_np.str_}[_fs_transfer_type]",
+        "_fs_transfer_dtype_name = " + (dtype ? JSON.stringify(dtype) : "None"),
+        "_fs_transfer_dtype = _fs_transfer_np.dtype(_fs_transfer_dtype_name) if _fs_transfer_dtype_name is not None else {'number': _fs_transfer_np.float64, 'boolean': _fs_transfer_np.bool_, 'string': _fs_transfer_np.str_}[_fs_transfer_type]",
+        "_fs_transfer_values = [v for col in _fs_transfer_packet['columns'] for v in col['values']] if _fs_transfer_table else _fs_transfer_packet['values']",
+        "if _fs_transfer_dtype_name is not None:",
+        "    if _fs_transfer_dtype.kind in ('i', 'u'):",
+        "        _fs_transfer_bounds = _fs_transfer_np.iinfo(_fs_transfer_dtype)",
+        "        if any(type(v) is not int or v < _fs_transfer_bounds.min or v > _fs_transfer_bounds.max for v in _fs_transfer_values): raise ValueError('NumPy integer dtype overflow')",
+        "    elif _fs_transfer_dtype.kind == 'f':",
+        "        if any(v is not None and abs(v) > _fs_transfer_np.finfo(_fs_transfer_dtype).max for v in _fs_transfer_values): raise ValueError('NumPy floating dtype overflow')",
+        "    elif _fs_transfer_dtype.kind == 'U':",
+        "        if any(len(v) > _fs_transfer_dtype.itemsize // 4 for v in _fs_transfer_values): raise ValueError('NumPy Unicode dtype would truncate values')",
         "if _fs_transfer_table:",
         "    _fs_transfer_array = _fs_transfer_np.column_stack([_fs_transfer_np.asarray(col['values'], dtype=_fs_transfer_dtype) for col in _fs_transfer_packet['columns']])",
         "else:",
         "    _fs_transfer_array = _fs_transfer_np.asarray(_fs_transfer_packet['values'], dtype=_fs_transfer_dtype)",
         "if type(_fs_transfer_array) is not _fs_transfer_np.ndarray or _fs_transfer_array.ndim != (2 if _fs_transfer_table else 1): raise ValueError('Invalid NumPy transfer result')",
+        "if _fs_transfer_dtype_name is not None and _fs_transfer_dtype.kind == 'f':",
+        "    _fs_transfer_flat = _fs_transfer_array.ravel(order='F') if _fs_transfer_table else _fs_transfer_array",
+        "    if any(v is not None and float(_fs_transfer_flat[i]) != float(v) for i, v in enumerate(_fs_transfer_values)): raise ValueError('NumPy dtype would change numeric values')",
         "globals()[" + JSON.stringify(code) + "] = _fs_transfer_array",
         "'ok'"
       ].join("\n");

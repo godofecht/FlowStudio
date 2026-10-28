@@ -24,11 +24,19 @@ try {
         plot.querySelector('svg path')?.getAttribute('d')?.length > 20;
     }, metric, {timeout: 30000});
     assert.equal(await page.locator('#tab-plots').getAttribute('aria-selected'), 'true');
+    const spatial = page.locator('#mathFlowPlot svg[data-mathflow-spatial="true"]');
+    assert.equal(await spatial.count(), 1, 'Real spatial SVG must render');
+    assert.ok(await spatial.locator('rect').count() >= 16 * 16, 'Actual sampled heatmap cells');
+    assert.match(await spatial.getAttribute('aria-label'), /Spatial/);
+    if (metric === 'kineticEnergy') {
+      assert.ok(await spatial.locator('line').count() > 0, 'Velocity vectors must be drawn');
+      assert.ok(await spatial.locator('polygon').count() > 0, 'Velocity arrows need direction');
+    }
     const path = await page.locator('#mathFlowPlot svg path').getAttribute('d');
     assert.ok(path.startsWith('M') && path.includes('L'), path);
     assert.ok(!/NaN|Infinity/.test(path));
     await page.locator('#mathFlowPlot select').selectOption(other);
-    assert.match(await page.locator('#mathFlowPlot svg').getAttribute('aria-label'),
+    assert.match(await page.locator('#mathFlowPlot svg').first().getAttribute('aria-label'),
       /over simulated time/);
     assert.equal(await page.locator('#mathFlowPlot select').inputValue(), other);
   }

@@ -54,6 +54,99 @@
       path: points.map(([x, y], index) => (index ? "L" : "M") +
         x.toFixed(3) + "," + y.toFixed(3)).join(" ") };
   }
+  function prepareSpatial(result) {
+    const spatial = result?.spatial;
+    if (!spatial) return null;
+    const grid = spatial.grid, sourceGrid = spatial.source_grid, extent = spatial.extent;
+    if (!Array.isArray(grid) || grid.length !== 2 ||
+        !grid.every(n => Number.isInteger(n) && n >= 2 && n <= 24) ||
+        !Array.isArray(sourceGrid) || sourceGrid.length !== 2 ||
+        !sourceGrid.every((n, i) => Number.isInteger(n) && n >= grid[i] && n <= 512) ||
+        !Array.isArray(extent) || extent.length !== 2 ||
+        !extent.every(n => typeof n === "number" && Number.isFinite(n) && n > 0))
+      throw new TypeError("Invalid bounded spatial grid or extent.");
+    const fields = spatial.fields;
+    const names = ("temperature_variance" in result) ? ["temperature"] :
+      ("kinetic_energy" in result) ? ["vorticity", "velocity_x", "velocity_y"] : null;
+    if (!names || !fields || typeof fields !== "object" ||
+        Object.keys(fields).length !== names.length ||
+        !names.every(name => Object.hasOwn(fields, name)))
+      throw new TypeError("Unexpected mathematical Flow spatial fields.");
+    for (const name of names) {
+      const rows = fields[name];
+      if (!Array.isArray(rows) || rows.length !== grid[0] ||
+          !rows.every(row => Array.isArray(row) && row.length === grid[1] &&
+            row.every(value => typeof value === "number" && Number.isFinite(value))))
+        throw new TypeError("Spatial field values must be finite and match the grid.");
+    }
+    return { grid, sourceGrid, extent, fields, names };
+  }
+  function renderSpatial(doc, result) {
+    const spatial = prepareSpatial(result);
+    if (!spatial) return null;
+    const [nx, ny] = spatial.grid;
+    const field = spatial.fields[spatial.names[0]];
+    const values = field.flat();
+    const minimum = Math.min(...values), maximum = Math.max(...values);
+    const scale = Math.max(Math.abs(minimum), Math.abs(maximum), 1);
+    const range = (maximum / scale - minimum / scale) || 1;
+    const svg = doc.createElementNS(NS, "svg");
+    svg.setAttribute("viewBox", "0 0 480 480");
+    svg.setAttribute("width", "100%");
+    svg.setAttribute("role", "img");
+    svg.setAttribute("data-mathflow-spatial", "true");
+    svg.setAttribute("aria-label", spatial.names[0] === "temperature" ?
+      "Spatial temperature heatmap" : "Spatial vorticity heatmap and velocity vector field");
+    const cellWidth = 480 / nx, cellHeight = 480 / ny;
+    for (let ix = 0; ix < nx; ix++) for (let iy = 0; iy < ny; iy++) {
+      const normalized = Math.max(0, Math.min(1, (field[ix][iy] / scale - minimum / scale) / range));
+      const cell = doc.createElementNS(NS, "rect");
+      cell.setAttribute("x", String(ix * cellWidth));
+      cell.setAttribute("y", String((ny - 1 - iy) * cellHeight));
+      cell.setAttribute("width", String(cellWidth + 0.05));
+      cell.setAttribute("height", String(cellHeight + 0.05));
+      cell.setAttribute("fill", "rgb(" + Math.round(30 + 210 * normalized) + "," +
+        Math.round(55 + 90 * (1 - Math.abs(2 * normalized - 1))) + "," +
+        Math.round(225 - 185 * normalized) + ")");
+      svg.append(cell);
+    }
+    if (spatial.names.includes("velocity_x")) {
+      const u = spatial.fields.velocity_x, v = spatial.fields.velocity_y;
+      const maxSpeed = Math.max(1e-12, ...u.flat().map((value, i) =>
+        Math.hypot(value, v.flat()[i])));
+      const stride = Math.max(1, Math.ceil(Math.max(nx, ny) / 12));
+      for (let ix = 0; ix < nx; ix += stride) for (let iy = 0; iy < ny; iy += stride) {
+        const speed = Math.hypot(u[ix][iy], v[ix][iy]);
+        if (!speed) continue;
+        const x = (ix + 0.5) * cellWidth, y = (ny - iy - 0.5) * cellHeight;
+        const length = 0.38 * Math.min(cellWidth, cellHeight) * speed / maxSpeed;
+        const arrow = doc.createElementNS(NS, "line");
+        arrow.setAttribute("x1", String(x));
+        arrow.setAttribute("y1", String(y));
+        arrow.setAttribute("x2", String(x + length * u[ix][iy] / speed));
+        arrow.setAttribute("y2", String(y - length * v[ix][iy] / speed));
+        arrow.setAttribute("stroke", "#ffffff");
+        arrow.setAttribute("stroke-width", "1.7");
+        svg.append(arrow);
+        const directionX = u[ix][iy] / speed, directionY = -v[ix][iy] / speed;
+        const tipX = x + length * directionX, tipY = y + length * directionY;
+        const head = Math.min(3.0, length * 0.4);
+        const wing = head * 0.5;
+        const points = [
+          [tipX, tipY],
+          [tipX - head * directionX - wing * directionY,
+           tipY - head * directionY + wing * directionX],
+          [tipX - head * directionX + wing * directionY,
+           tipY - head * directionY - wing * directionX]
+        ];
+        const arrowHead = doc.createElementNS(NS, "polygon");
+        arrowHead.setAttribute("points", points.map(point => point.join(",")).join(" "));
+        arrowHead.setAttribute("fill", "#ffffff");
+        svg.append(arrowHead);
+      }
+    }
+    return svg;
+  }
   function render(doc, host, result) {
     const series = prepare(result);
     const heading = doc.createElement("h3");
@@ -98,12 +191,17 @@
         curve.minimum.toPrecision(5));
     }
     select.addEventListener("change", draw);
-    host.replaceChildren(heading, label, svg);
+    const spatialSvg = renderSpatial(doc, result);
+    if (spatialSvg) {
+      const spatialHeading = doc.createElement("h3");
+      spatialHeading.textContent = "Final simulated spatial fields";
+      host.replaceChildren(heading, label, svg, spatialHeading, spatialSvg);
+    } else host.replaceChildren(heading, label, svg);
     host.hidden = false;
     draw();
     return series;
   }
-  const api = Object.freeze({ prepare, coordinates, render });
+  const api = Object.freeze({ prepare, coordinates, prepareSpatial, renderSpatial, render });
   root.FlowStudioMathPlots = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

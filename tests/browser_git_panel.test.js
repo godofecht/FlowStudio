@@ -177,3 +177,42 @@ test("Hosted Pages disables Git branch controls", async () => {
   assert.equal(createBranchButton.disabled,true);
   assert.equal(switchBranchButton.disabled,true);
 });
+
+test("merged-branch deletion is confirmed, locked and refuses failed native operations", async () => {
+  const statusButton = button(), diffButton = button(), branchesButton = button();
+  const createBranchButton = button(), switchBranchButton = button(), deleteBranchButton = button();
+  const target = {textContent:""}, calls = [], prompts = [];
+  let allow = false, finish;
+  const ui = panel.create({native:{available:()=>true,
+    gitDeleteBranch(name) { calls.push(name); return new Promise(resolve => {finish = resolve;}); }},
+    statusButton,diffButton,branchesButton,createBranchButton,switchBranchButton,deleteBranchButton,
+    branchInput:{value:"feature/merged"},target,
+    confirmAction:message=>{prompts.push(message);return allow;}
+  });
+  assert.equal(await ui.deleteBranch(), false);
+  assert.deepEqual(calls, []);
+  allow = true;
+  const pending = ui.deleteBranch();
+  assert.equal(deleteBranchButton.disabled, true);
+  assert.equal(createBranchButton.disabled, true);
+  assert.equal(await ui.deleteBranch(), false);
+  assert.equal(await ui.switchBranch(), false);
+  finish({ok:false,status:422,output:"branch is not fully merged"});
+  assert.equal(await pending, false);
+  assert.match(target.textContent, /not fully merged/);
+  assert.equal(deleteBranchButton.disabled, false);
+  assert.deepEqual(calls, ["feature/merged"]);
+  assert.match(prompts[0], /no force deletion/);
+  const again = ui.deleteBranch();
+  finish({ok:true,status:200,output:"Deleted branch feature/merged"});
+  assert.equal(await again, true);
+  assert.match(target.textContent, /Deleted branch/);
+});
+test("hosted Pages disables merged-branch deletion without confirmation", async () => {
+  const deleteBranchButton = button();
+  const ui = panel.create({native:{available:()=>false},statusButton:button(),
+    diffButton:button(),deleteBranchButton,branchInput:{value:"feature/merged"},
+    target:{textContent:""},confirmAction:()=>{throw Error("unexpected confirmation");}});
+  assert.equal(await ui.deleteBranch(), false);
+  assert.equal(deleteBranchButton.disabled, true);
+});

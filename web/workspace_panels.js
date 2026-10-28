@@ -245,6 +245,7 @@ mountPanel("FlowStudioDebugPanel", global.FlowStudioDebugPanel, DebugPanel => {
     node: el("view-debug"),
     fetchFn: (route, init) => global.fetch(route, init),
     getSource: () => document.getElementById("source").value,
+    getDocId: activeDocumentId,
     getBreakpoints: () => breakpoints.lines(activeDocumentId()),
     onStep: step => global.FlowStudioApp.revealPosition(step.line, 1),
     notice: (message, state) => {

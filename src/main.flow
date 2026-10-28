@@ -524,7 +524,8 @@ function send_git_write(kind: string, value: string) -> void {
 }
 
 # Branch operations target only the native server working tree. Git validates
-# ref names, argv is fixed, and checkout refuses dirty tracked or untracked files.
+# ref names, argv is fixed, checkout refuses dirty tracked/untracked files,
+# and deletion uses Git's non-forcing -d (never -D) merged-branch guard.
 function send_git_branch(kind: string, name: string) -> void {
     if not eq(kind, "list") and (eq(name, "") or strlen(name) > 128) {
         fs_reply(400, "text/plain; charset=utf-8", "Branch name must contain 1 to 128 bytes.")
@@ -571,6 +572,11 @@ function send_git_branch(kind: string, name: string) -> void {
             proc_arg(command, "branch")
             proc_arg(command, "--")
             proc_arg(command, name)
+        } else if eq(kind, "delete") {
+            proc_arg(command, "branch")
+            proc_arg(command, "-d")
+            proc_arg(command, "--")
+            proc_arg(command, name)
         } else {
             proc_arg(command, "switch")
             proc_arg(command, "--no-guess")
@@ -601,6 +607,8 @@ function send_git_branch(kind: string, name: string) -> void {
     if eq(output, "") {
         if eq(kind, "create") {
             output = "Branch created: " + name
+        } else if eq(kind, "delete") {
+            output = "Local branch deleted: " + name
         } else {
             output = "Branch operation completed."
         }
@@ -703,6 +711,10 @@ function dispatch() -> void {
         }
         if eq(path, "/api/git/branch/switch") {
             send_git_branch("switch", fs_body())
+            return
+        }
+        if eq(path, "/api/git/branch/delete") {
+            send_git_branch("delete", fs_body())
             return
         }
         if eq(path, "/api/render/quarto") {

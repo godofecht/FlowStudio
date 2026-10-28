@@ -76,10 +76,17 @@ def parse_heat(source: str, base) -> HeatModel:
             fields[stmt[1]] = stmt[3:]
         else:
             raise error(f"Unsupported heat declaration: {' '.join(stmt)}")
-    reaction = set(consts) == {"diffusivity", "reactionRate", "ambientTemperature"}
-    advection = set(consts) == {"diffusivity", "advectionVelocityX", "advectionVelocityY"}
-    if not reaction and not advection:
-        base.expect_keys(consts, {"diffusivity"}, "heat constants")
+    # Infer optional operator families independently; require complete declarations.
+    # This permits one equation AST to compose advection and reaction while
+    # rejecting partial, misspelled, or undeclared physical constants.
+    reaction = bool({"reactionRate", "ambientTemperature"} & consts.keys())
+    advection = bool({"advectionVelocityX", "advectionVelocityY"} & consts.keys())
+    required = {"diffusivity"}
+    if reaction:
+        required.update({"reactionRate", "ambientTemperature"})
+    if advection:
+        required.update({"advectionVelocityX", "advectionVelocityY"})
+    base.expect_keys(consts, required, "heat constants")
     base.expect_keys(fields, {"temperature"}, "heat fields")
     if fields["temperature"] != ["Scalar", "<", "Kelvin", ">"]:
         raise error("temperature must be Scalar<Kelvin>")

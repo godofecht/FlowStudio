@@ -1,3 +1,27 @@
+## 2026-10-28: exact NumPy dtype snapshot round-trip (independent CI pending)
+
+Browser-local Python session snapshots now record the **actual NumPy dtype** for
+supported exact 1D/2D ndarrays, alongside existing shape and value provenance.
+The real Pyodide worker reconstructs int8/16/32/64, uint8/16/32/64,
+float16/32/64, bool and bounded Unicode (<U1 through <U512) through an
+explicit snapshot-only import operation. Preflight checks reject incompatible
+packet types, integer overflow, invalid Unicode widths and float16 overflow;
+the real NumPy constructor rejects lossy floating-point casts before assigning
+the destination variable. Ordinary Python/R transfers, legacy v1 snapshots
+and older v2 ndarray snapshots without dtype metadata keep their previous
+behavior. This is **not** general NumPy persistence: byte order, memory
+layout, object/structured dtypes, subclasses, masked arrays, arbitrary
+attributes and integer values outside the JSON safe-integer range remain
+unsupported.
+
+**Status: partial / independent Linux/macOS CI and live Chromium acceptance
+pending.** Regression tests exercise schema rejection, snapshot capture/restore,
+worker dispatch and real CPython/NumPy dtype construction. The opt-in
+physical-browser scenario now asserts an actual float32 round-trip; merely
+committing that assertion is not evidence it passed. Flow 2.0.0 remains the
+primary native backend, with no hosted CI configuration changes. RStudio
+feature parity is not achieved.
+
 ## 2026-10-28: Python NumPy ndarray identity in browser session snapshots (Linux/macOS CI passed)
 
 The browser-local Python session exporter now records **verified exact NumPy ndarray**

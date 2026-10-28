@@ -174,6 +174,9 @@ class _Parser:
                     right = Expression("literal", value=2.0 if nxt == "²" else 3.0)
                 else:
                     right = self.expression(precedence, depth + 1)
+                if (right.operator == "neg" and len(right.operands) == 1
+                        and right.operands[0].operator == "literal"):
+                    right = Expression("literal", value=-float(right.operands[0].value))
                 if (right.operator != "literal" or right.dimension != DIMENSIONLESS
                         or not float(right.value).is_integer() or abs(float(right.value)) > 8):
                     raise ExpressionError("Power requires a literal integer exponent between -8 and 8")

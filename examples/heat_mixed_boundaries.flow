@@ -1,0 +1,42 @@
+# Executable scalar heat equation with independent x-Dirichlet and y-insulated Neumann boundaries.
+# The sine/cosine product is an exact eigenvector of the mixed ghost-cell Laplacian.
+domain ThermalDomain {
+    grid       = 16 × 16
+    extent     = 1m × 1m
+    boundaries = (Dirichlet(300K), Neumann(0K/m))
+}
+
+model HeatEquation on ThermalDomain {
+    const diffusivity = 0.01m²/s
+    field temperature: Scalar<Kelvin>
+
+    dynamics {
+        ∂ₜtemperature = diffusivity ∇²temperature
+    }
+    initial {
+        temperature = 300K + 10K * sin(πx / 1m) * cos(πy / 1m)
+    }
+}
+
+solver ThermalSolver for HeatEquation {
+    spatial {
+        method    = FiniteDifference
+        diffusion = CentralDifference
+    }
+    temporal {
+        method   = RungeKuttaSecondOrder
+        timeStep = 10⁻⁴s
+    }
+}
+
+let simulation = HeatEquation ▷ ThermalSolver ▷ Evolve(until: 0.01s)
+
+simulation
+    ▷ Observe {
+        meanTemperature     = Mean(temperature)
+        temperatureVariance = Mean((temperature − meanTemperature)²)
+    }
+    ▷ Visualize {
+        temperature         = Heatmap
+        temperatureVariance = LineGraph
+    }

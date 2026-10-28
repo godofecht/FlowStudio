@@ -154,7 +154,7 @@
     const boundary = result.boundary_condition;
     let boundaryNote = null;
     if (boundary !== undefined) {
-      if (boundary !== "Periodic" && boundary !== "Dirichlet" && boundary !== "Neumann")
+      if (boundary !== "Periodic" && boundary !== "Dirichlet" && boundary !== "Neumann" && boundary !== "Mixed")
         throw new TypeError("Unsupported mathematical Flow boundary metadata.");
       if (boundary === "Dirichlet" &&
           (typeof result.boundary_temperature !== "number" ||
@@ -164,9 +164,28 @@
           (typeof result.boundary_gradient !== "number" ||
            !Number.isFinite(result.boundary_gradient)))
         throw new TypeError("Invalid Neumann boundary gradient.");
+      if (boundary === "Mixed") {
+        const axes = result.boundary_axes;
+        if (!axes || typeof axes !== "object" || Object.keys(axes).sort().join(",") !== "x,y")
+          throw new TypeError("Invalid mixed boundary axes.");
+        for (const axis of ["x", "y"]) {
+          const face = axes[axis];
+          if (!face || !["Periodic", "Dirichlet", "Neumann"].includes(face.type) ||
+              (face.type === "Periodic" ? face.value !== null :
+                typeof face.value !== "number" || !Number.isFinite(face.value)))
+            throw new TypeError("Invalid mixed boundary condition.");
+        }
+      }
       boundaryNote = doc.createElement("p");
       boundaryNote.setAttribute("data-mathflow-boundary", boundary);
-      boundaryNote.textContent = boundary === "Dirichlet"
+      boundaryNote.textContent = boundary === "Mixed"
+        ? "Boundary: " + ["x", "y"].map(axis => {
+          const face = result.boundary_axes[axis];
+          return axis + " " + face.type +
+            (face.type === "Periodic" ? "" :
+             " " + face.value + (face.type === "Dirichlet" ? " K" : " K/m"));
+        }).join("; ")
+        : boundary === "Dirichlet"
         ? "Boundary: Dirichlet at " + result.boundary_temperature + " K (all faces)"
         : boundary === "Neumann"
           ? "Boundary: Neumann outward gradient " + result.boundary_gradient + " K/m (all faces)"

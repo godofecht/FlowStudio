@@ -30,6 +30,7 @@ class HeatModel:
     advection_velocity_y: float = 0.0
     boundary_temperature: float | None = None
     boundary_gradient: float | None = None
+    boundary_axes: tuple[tuple[str, float | None], tuple[str, float | None]] | None = None
 
 
 def parse_heat(source: str, base) -> HeatModel:
@@ -47,17 +48,44 @@ def parse_heat(source: str, base) -> HeatModel:
     base.expect_keys(d, {"grid", "extent", "boundaries"}, "domain")
     boundary_temperature = None
     boundary_gradient = None
-    if d["boundaries"] != ["Periodic"]:
-        boundary_tokens = d["boundaries"]
-        if (len(boundary_tokens) < 4 or boundary_tokens[-1] != ")"
-                or boundary_tokens[1] != "("):
+    boundary_axes = None
+
+    def parse_face(tokens):
+        if tokens == ["Periodic"]:
+            return ("Periodic", None)
+        if (len(tokens) < 4 or tokens[1] != "(" or tokens[-1] != ")"
+                or tokens[0] not in ("Dirichlet", "Neumann")):
             raise error("Heat boundaries must be Periodic, Dirichlet(temperature) or Neumann(gradient)")
-        if boundary_tokens[0] == "Dirichlet":
-            boundary_temperature = base.number(boundary_tokens[2:-1], ["K"])
-        elif boundary_tokens[0] == "Neumann":
-            boundary_gradient = base.number(boundary_tokens[2:-1], ["K", "/", "m"])
-        else:
-            raise error("Unsupported heat boundary type")
+        kind = tokens[0]
+        unit = ["K"] if kind == "Dirichlet" else ["K", "/", "m"]
+        return (kind, base.number(tokens[2:-1], unit))
+
+    boundary_tokens = d["boundaries"]
+    if boundary_tokens and boundary_tokens[0] == "(":
+        if boundary_tokens[-1] != ")":
+            raise error("Mixed heat boundaries require (xBoundary, yBoundary)")
+        parts = [[]]
+        depth = 0
+        for token in boundary_tokens[1:-1]:
+            if token == "(":
+                depth += 1
+            elif token == ")":
+                depth -= 1
+                if depth < 0:
+                    raise error("Unbalanced heat boundary declaration")
+            if token == "," and depth == 0:
+                parts.append([])
+            else:
+                parts[-1].append(token)
+        if depth != 0 or len(parts) != 2:
+            raise error("Mixed heat boundaries require exactly two axis conditions")
+        boundary_axes = (parse_face(parts[0]), parse_face(parts[1]))
+    else:
+        kind, value = parse_face(boundary_tokens)
+        if kind == "Dirichlet":
+            boundary_temperature = value
+        elif kind == "Neumann":
+            boundary_gradient = value
     grid = d["grid"]
     if len(grid) != 3 or grid[1] != "×":
         raise error("grid requires width × height")
@@ -182,7 +210,7 @@ def parse_heat(source: str, base) -> HeatModel:
         raise error(f"Unexpected trailing heat token {p.peek()}")
     return HeatModel(int(width), int(height), lx, ly, diffusivity, expression,
                      step, until, equation, reaction_rate, ambient_temperature,
-                     velocity_x, velocity_y, boundary_temperature, boundary_gradient)
+                     velocity_x, velocity_y, boundary_temperature, boundary_gradient, boundary_axes)
 
 
 def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | None = None,
@@ -226,7 +254,8 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
         field = np.broadcast_to(evaluate(parse_expression(model.initial), x, y,
                                          expected_dimension=TEMPERATURE,
                                          boundary_temperature=model.boundary_temperature,
-                                         boundary_gradient=model.boundary_gradient), (nx, ny)).copy()
+                                         boundary_gradient=model.boundary_gradient,
+                boundary_axes=model.boundary_axes), (nx, ny)).copy()
     except ExpressionError as exc:
         raise error_type(str(exc)) from exc
     initial_mean = float(np.mean(field))
@@ -261,7 +290,8 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
                         "advectionVelocityX": model.advection_velocity_x,
                         "advectionVelocityY": model.advection_velocity_y},
                 boundary_temperature=model.boundary_temperature,
-                boundary_gradient=model.boundary_gradient), (nx, ny))
+                boundary_gradient=model.boundary_gradient,
+                boundary_axes=model.boundary_axes), (nx, ny))
         except (ExpressionError, ValueError) as exc:
             raise error_type(f"Invalid heat equation evaluation: {exc}") from exc
 
@@ -286,11 +316,15 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
             "temperature_variance": variance, "initial_temperature_variance": initial_variance,
             "temperature_min": float(np.min(field)), "temperature_max": float(np.max(field)),
             "method": "centered-difference RK2 scalar reaction-diffusion equation",
-            "boundary_condition": ("Dirichlet" if model.boundary_temperature is not None
+            "boundary_condition": ("Mixed" if model.boundary_axes is not None
+                                   else "Dirichlet" if model.boundary_temperature is not None
                                    else "Neumann" if model.boundary_gradient is not None
                                    else "Periodic"),
             "boundary_temperature": model.boundary_temperature,
             "boundary_gradient": model.boundary_gradient,
+            "boundary_axes": ({"x": {"type": model.boundary_axes[0][0], "value": model.boundary_axes[0][1]},
+                               "y": {"type": model.boundary_axes[1][0], "value": model.boundary_axes[1][1]}}
+                              if model.boundary_axes is not None else None),
             "observations": observations,
             "spatial": spatial_snapshot(
                 {"temperature": field}, (model.length_x, model.length_y))}

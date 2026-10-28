@@ -246,6 +246,23 @@ def main() -> None:
     bad_neumann = neumann_source.replace("Neumann(0K/m)", "Neumann(300K)")
     status, body = request("POST", "/api/check/mathflow", bad_neumann, accepted_headers)
     assert status == 422 and not json.loads(body)["ok"], (status, body)
+    # Independently selected x-Dirichlet and y-Neumann ghost cells, executed
+    # through the native HTTP route rather than editor-only syntax.
+    mixed_source = (Path(__file__).resolve().parents[1] /
+                    "examples/heat_mixed_boundaries.flow").read_text(encoding="utf-8")
+    status, body = request("POST", "/api/check/mathflow", mixed_source, accepted_headers)
+    assert status == 200 and json.loads(body)["ok"], (status, body)
+    status, body = request("POST", "/api/run/mathflow", mixed_source, accepted_headers)
+    mixed = json.loads(body)
+    assert status == 200 and mixed["ok"] and mixed["steps"] == 100, (status, mixed)
+    assert mixed["boundary_condition"] == "Mixed", mixed
+    assert mixed["boundary_axes"]["x"] == {"type": "Dirichlet", "value": 300.0}, mixed
+    assert mixed["boundary_axes"]["y"] == {"type": "Neumann", "value": 0.0}, mixed
+    assert abs(mixed["mean_temperature"] - 300) < 1e-8, mixed
+    assert mixed["spatial"]["grid"] == [16, 16], mixed
+    bad_mixed = mixed_source.replace("Neumann(0K/m)", "Neumann(0K)")
+    status, body = request("POST", "/api/check/mathflow", bad_mixed, accepted_headers)
+    assert status == 422 and not json.loads(body)["ok"], (status, body)
     # Real nonlinear reaction-diffusion via native Flow HTTP and NumPy RK2.
     nonlinear_source = (Path(__file__).resolve().parents[1] /
                         "examples/heat_nonlinear_reaction.flow").read_text(encoding="utf-8")

@@ -25,7 +25,7 @@ def request(method: str, path: str, body: str | None = None,
         ROOT + path, data=data, method=method, headers=headers or {}
     )
     try:
-        with urllib.request.urlopen(req, timeout=80 if path in ("/api/run/flow", "/api/check/flow") else 25) as reply:
+        with urllib.request.urlopen(req, timeout=80 if path in ("/api/run/flow", "/api/check/flow", "/api/render/quarto") else 25) as reply:
             return reply.status, reply.read().decode("utf-8")
     except urllib.error.HTTPError as exc:
         return exc.code, exc.read().decode("utf-8")
@@ -118,6 +118,12 @@ def main() -> None:
                     "Origin": "http://attacker.invalid"})[0] == 404
     status, body = request("POST", "/api/render/quarto", invalid_qmd, accepted_headers)
     assert status == 422 and "format: html" in body, (status, body)
+    if shutil.which("quarto"):
+        # This is actual installed-Quarto acceptance, not a fake renderer.
+        status, body = request("POST", "/api/render/quarto",
+                               "---\ntitle: Native Quarto smoke\nformat: html\n---\n\n"
+                               "## Native Quarto smoke\n", accepted_headers)
+        assert status == 200 and "Native Quarto smoke" in body, (status, body[:500])
     # End-to-end Unicode mathematical Flow: actual native Flow HTTP routing,
     # Python frontend, NumPy pressure solver and numerical validation.
     math_source = (Path(__file__).resolve().parents[1] / "examples/navier_stokes_proposed.flow").read_text(encoding="utf-8")

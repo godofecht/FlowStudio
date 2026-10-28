@@ -230,6 +230,22 @@ def main() -> None:
     bad_dirichlet = dirichlet_source.replace("Dirichlet(300K)", "Dirichlet(300m)")
     status, body = request("POST", "/api/check/mathflow", bad_dirichlet, accepted_headers)
     assert status == 422 and not json.loads(body)["ok"], (status, body)
+    # Neumann zero-flux heat: real native HTTP, typed K/m boundary and RK2.
+    neumann_source = (Path(__file__).resolve().parents[1] /
+                      "examples/heat_neumann.flow").read_text(encoding="utf-8")
+    status, body = request("POST", "/api/check/mathflow", neumann_source, accepted_headers)
+    assert status == 200 and json.loads(body)["ok"], (status, body)
+    status, body = request("POST", "/api/run/mathflow", neumann_source, accepted_headers)
+    neumann = json.loads(body)
+    assert status == 200 and neumann["ok"] and neumann["steps"] == 100, (status, neumann)
+    assert neumann["boundary_condition"] == "Neumann", neumann
+    assert neumann["boundary_gradient"] == 0.0, neumann
+    assert abs(neumann["mean_temperature"] - 300.0) < 1e-8, neumann
+    assert neumann["temperature_variance"] < neumann["initial_temperature_variance"], neumann
+    assert neumann["spatial"]["grid"] == [16, 16], neumann
+    bad_neumann = neumann_source.replace("Neumann(0K/m)", "Neumann(300K)")
+    status, body = request("POST", "/api/check/mathflow", bad_neumann, accepted_headers)
+    assert status == 422 and not json.loads(body)["ok"], (status, body)
     # Real nonlinear reaction-diffusion via native Flow HTTP and NumPy RK2.
     nonlinear_source = (Path(__file__).resolve().parents[1] /
                         "examples/heat_nonlinear_reaction.flow").read_text(encoding="utf-8")

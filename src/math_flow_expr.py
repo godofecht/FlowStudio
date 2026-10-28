@@ -199,8 +199,8 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
              values: dict[str, object] | None = None,
              boundary_temperature: float | None = None,
              boundary_gradient: float | None = None,
-             boundary_axes: tuple[tuple[str, float | tuple[float, float] | None], ...] | None = None,
-             boundary_faces: tuple[tuple[str, float | tuple[float, float] | None], ...] | None = None):
+             boundary_axes: tuple[tuple[str, float | str | tuple[float, float] | None], ...] | None = None,
+             boundary_faces: tuple[tuple[str, float | str | tuple[float, float] | None], ...] | None = None):
     """Lower a validated expression tree to NumPy arithmetic, with no eval/exec."""
     import numpy as np
     if expected_dimension is not None and expression.dimension != expected_dimension:
@@ -221,6 +221,18 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
         elif kind in ("Dirichlet", "Neumann"):
             if type(value) not in (int, float) or not math.isfinite(value):
                 raise ExpressionError("Boundary value must be finite")
+        elif kind == "DirichletProfile":
+            if not isinstance(value, str):
+                raise ExpressionError("Dirichlet profile must be a typed expression")
+            profile = parse_expression(value, symbols={"t": (0, 0, 1, 0)})
+            if profile.dimension != TEMPERATURE:
+                raise ExpressionError("Dirichlet profile must have Kelvin dimensions")
+            def check_profile(node):
+                if node.operator in ("∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∇²"):
+                    raise ExpressionError("Dirichlet profiles cannot contain spatial derivatives")
+                for child in node.operands:
+                    check_profile(child)
+            check_profile(profile)
         elif kind == "Robin":
             if (not isinstance(value, tuple) or len(value) != 2
                     or any(type(item) not in (int, float) or not math.isfinite(item)
@@ -282,7 +294,20 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
             shifted = shifted.copy()
             face = -1 if forward else 0
             target = (face, slice(None)) if axis == 0 else (slice(None), face)
-            if kind == "Robin":
+            if kind == "DirichletProfile":
+                # Evaluate at the actual face, not at cell centers. In particular
+                # a time-dependent boundary uses the current RK2 stage time.
+                coordinate_x = np.full_like(x, float(x[0, 0] - spacing / 2) if axis == 0 and not forward
+                                            else float(x[-1, 0] + spacing / 2)) if axis == 0 else x
+                coordinate_y = np.full_like(y, float(y[0, 0] - spacing / 2) if axis == 1 and not forward
+                                            else float(y[0, -1] + spacing / 2)) if axis == 1 else y
+                profile = parse_expression(value, symbols={"t": (0, 0, 1, 0)})
+                boundary_values = np.broadcast_to(evaluate(
+                    profile, coordinate_x, coordinate_y, expected_dimension=TEMPERATURE,
+                    values={"t": values["t"]} if values is not None and "t" in values else {}),
+                    field.shape)
+                shifted[target] = 2 * boundary_values[target] - field[target]
+            elif kind == "Robin":
                 ambient, transfer_length = value
                 # Face temperature is the mean of interior and ghost.
                 # ∂n T = (ambient - T_face) / transfer_length.

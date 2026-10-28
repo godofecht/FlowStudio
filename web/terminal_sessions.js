@@ -176,7 +176,8 @@ function create(options = {}) {
    * entry may carry only figures (empty text); those are still appended so
    * captured plots never get dropped. */
   function append(runtime, text, kind = "out", extra = {}) {
-    const hasFigures = entriesWithFigures(extra).length > 0;
+    const hasFigures = entriesWithFigures(extra).length > 0 ||
+      (kind === "fig" && !!(extra && extra.plot));
     if (typeof text !== "string" || !text) {
       if (!hasFigures || runtime && !RUNTIMES.includes(runtime)) return null;
     }

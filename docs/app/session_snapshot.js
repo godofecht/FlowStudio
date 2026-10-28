@@ -167,7 +167,11 @@ async function restore({snapshot, language, importValue, generation}) {
   for (const entry of snapshot.variables) {
     same(generation, epoch);
     let result;
-    try { result = await importValue(language, entry.name, entry.value, entry.restoreAs || null, entry.dtype || null); }
+    try {
+      result = entry.dtype ?
+        await importValue(language, entry.name, entry.value, entry.restoreAs || null, entry.dtype) :
+        await importValue(language, entry.name, entry.value, entry.restoreAs || null);
+    }
     catch (error) {
       same(generation, epoch);
       throw Error("Restored " + imported + " of " + snapshot.variables.length +

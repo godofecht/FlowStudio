@@ -135,7 +135,7 @@ test("cleared snapshots are absent from real .ipynb and portable .fsnb exports",
 test("actual browser controls are wired, guarded during execution, and bootstrap parses", () => {
   for (const id of ["clearNotebookCell", "clearNotebookAll"])
     assert.match(html, new RegExp('id="' + id + '"'));
-  const busyControls = html.match(/function setBusy\\(value\\) \\{[\\s\\S]*?for \\(const id of \\[([^\\]]+)\\]\\)/);
+  const busyControls = html.match(/function setBusy\(value\) \{[\s\S]*?for \(const id of \[([^\]]+)\]\)/);
   assert.ok(busyControls, "busy-state control list must exist");
   const guardedIds = JSON.parse("[" + busyControls[1] + "]");
   for (const id of ["clearNotebookCell", "clearNotebookAll", "renderQuarto"])

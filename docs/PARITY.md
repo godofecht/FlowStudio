@@ -1,3 +1,28 @@
+## 2026-10-28: native terminal transcript export and plot-only entry repair (CI pending)
+
+The Flow-owned native workspace console now offers an explicit, per-session
+plain-text transcript download. The export records the selected runtime,
+session number, timestamps, commands, output, and figure placeholders, while
+stripping ANSI/OSC controls. It does not persist hidden interpreter state,
+embed captured image data, export other runtime tabs, contact a server, or
+automatically write to local storage. A 2 MiB UTF-8 limit rejects oversized
+exports instead of silently truncating them. Downloads are user-initiated;
+the menu warns that commands and output may contain secrets.
+
+The existing terminal session model previously discarded plot-only entries:
+the real capture path passed `{plot, figIndex}` with empty text, while the
+session append guard only accepted `figures` arrays. The guard now accepts
+these actual plot records so captured R/Python figures can enter the terminal
+scrollback. This repairs the entry path, but real browser figure rendering
+and download acceptance are **not yet independently verified**.
+
+**Status: partial / implementation and automated regression tests committed;
+independent Linux/macOS CI and physical-browser acceptance pending.**
+The tests cover session isolation, multiline Unicode, ANSI/OSC removal,
+oversized exports, figure-only retention, malformed entries and menu download
+wiring. No native Flow backend, upstream compiler or hosted CI configuration
+was changed. RStudio parity remains incomplete.
+
 ## 2026-10-28: lossless UTF-8 project replacement guard (six independent CI jobs passed)
 
 Browser project search now uses strict UTF-8 decoding of File System Access API

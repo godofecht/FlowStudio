@@ -1,6 +1,6 @@
 # Executable mathematical Flow subsets (experimental)
 
-The repository contains a **separate mathematical Flow frontend** in `src/math_flow.py`. It now dispatches two explicitly supported PDE families: incompressible periodic 2D Navier–Stokes and scalar periodic 2D heat diffusion. `src/math_flow_heat.py` implements the second family; `src/math_flow_expr.py` provides a bounded, dimension-checked scalar expression AST used by both families' initial conditions. It lexes Unicode source into positioned tokens, parses and validates the domain/model/solver and observation pipeline, and executes the supported two-dimensional incompressible Navier–Stokes equations using NumPy. This is **not** a modification of the upstream Flow 2.0 compiler, and arbitrary mathematical Flow expressions are not supported. Unsupported equations, methods, units, fields, and boundary conditions are errors rather than silently ignored.
+The repository contains a **separate mathematical Flow frontend** in `src/math_flow.py`. It now dispatches two explicitly supported PDE families: incompressible periodic 2D Navier–Stokes and scalar 2D heat diffusion with periodic or constant face-Dirichlet boundaries. `src/math_flow_heat.py` implements the second family; `src/math_flow_expr.py` provides a bounded, dimension-checked scalar expression AST used by both families' initial conditions. It lexes Unicode source into positioned tokens, parses and validates the domain/model/solver and observation pipeline, and executes the supported two-dimensional incompressible Navier–Stokes equations using NumPy. This is **not** a modification of the upstream Flow 2.0 compiler, and arbitrary mathematical Flow expressions are not supported. Unsupported equations, methods, units, fields, and boundary conditions are errors rather than silently ignored.
 
 ## Run and validate
 
@@ -211,3 +211,14 @@ This is a composable **bounded scalar parabolic PDE family**, not a general
 symbolic PDE system. Coupled fields, variable-coefficient transport, non-periodic
 boundaries, unrestricted nonlinear operators and upstream Flow 2.0 grammar
 integration remain unimplemented.
+
+## Constant face-Dirichlet boundaries for scalar heat equations
+
+The scalar heat backend now supports `boundaries = Dirichlet(300K)` in addition to `Periodic`. The value is parsed as a finite, unit-checked Kelvin temperature. On the cell-centered Cartesian grid, every outer face is held at the declared temperature using a reflected ghost value `2 * boundaryTemperature - cellTemperature`. This is applied to the actual `∂ₓ`, `∂ᵧ`, and `∇²` NumPy AST operators at every RK2 stage, rather than merely validating a boundary declaration. It is available for the existing supported scalar diffusion, advection, reaction, and forcing combinations; Navier–Stokes remains periodic-only. Only one constant temperature shared by all four faces is currently implemented. The returned JSON reports `boundary_condition` and `boundary_temperature`.
+
+```sh
+python3 src/math_flow.py examples/heat_dirichlet.flow
+python3 -m unittest discover -s tests -p 'test_math_flow_dirichlet.py' -v
+```
+
+The checked-in sine-product temperature field is an exact eigenvector of this **discrete** face-Dirichlet Laplacian. Tests compare every returned cell to the closed-form RK2 amplification factor, verify continuum convergence under refinement, reject malformed boundary declarations and units, and execute the program through the native FlowStudio HTTP route. This is not general boundary-condition inference: mixed, time-dependent, spatially varying, Robin and Neumann conditions remain unsupported. Standalone scalar derivative evaluation defaults to periodic unless a validated boundary temperature is explicitly supplied.

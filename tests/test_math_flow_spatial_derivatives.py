@@ -56,7 +56,7 @@ class SpatialDerivativeTest(unittest.TestCase):
     def test_invalid_derivative_inputs_fail_closed(self):
         import numpy as np
         derivative = parse_expression("∂ₓ(1m²/s)")
-        with self.assertRaisesRegex(ExpressionError, "two-dimensional periodic"):
+        with self.assertRaisesRegex(ExpressionError, "two-dimensional Cartesian"):
             evaluate(derivative, 1.0, 2.0)
         x, y = self.grid(16)
         with self.assertRaisesRegex(ExpressionError, "uniformly spaced"):

@@ -194,17 +194,21 @@ def parse_expression(source: str, *, symbols: dict[str, Dimension] | None = None
 
 
 def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | None = None,
-             values: dict[str, object] | None = None):
+             values: dict[str, object] | None = None,
+             boundary_temperature: float | None = None):
     """Lower a validated expression tree to NumPy arithmetic, with no eval/exec."""
     import numpy as np
     if expected_dimension is not None and expression.dimension != expected_dimension:
         raise ExpressionError(f"Expected dimension {expected_dimension}, got {expression.dimension}")
-    def periodic_grid():
+    if boundary_temperature is not None and not math.isfinite(boundary_temperature):
+        raise ExpressionError("Dirichlet boundary temperature must be finite")
+
+    def cartesian_grid():
         coordinates_x = np.asarray(x, dtype=np.float64)
         coordinates_y = np.asarray(y, dtype=np.float64)
         if (coordinates_x.ndim != 2 or coordinates_x.shape != coordinates_y.shape
                 or min(coordinates_x.shape) < 3):
-            raise ExpressionError("Spatial derivatives require a two-dimensional periodic coordinate grid")
+            raise ExpressionError("Spatial derivatives require a two-dimensional Cartesian coordinate grid")
         if not (np.all(np.isfinite(coordinates_x)) and np.all(np.isfinite(coordinates_y))):
             raise ExpressionError("Spatial derivative coordinates must be finite")
         spacing_x = float(coordinates_x[1, 0] - coordinates_x[0, 0])
@@ -217,16 +221,33 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
             raise ExpressionError("Spatial derivatives require a uniformly spaced Cartesian grid")
         return coordinates_x.shape, spacing_x, spacing_y
 
+    def neighbor(field, axis: int, forward: bool):
+        """Cell-centered periodic neighbor or constant face-Dirichlet ghost cell."""
+        shifted = np.roll(field, -1 if forward else 1, axis=axis)
+        if boundary_temperature is not None:
+            shifted = shifted.copy()
+            face = -1 if forward else 0
+            if axis == 0:
+                shifted[face, :] = 2 * boundary_temperature - field[face, :]
+            else:
+                shifted[:, face] = 2 * boundary_temperature - field[:, face]
+        return shifted
+
     def visit(node: Expression):
         if node.operator in ("∂ₓ", "∂ᵧ", "∇²"):
-            shape, spacing_x, spacing_y = periodic_grid()
+            shape, spacing_x, spacing_y = cartesian_grid()
+            if boundary_temperature is not None and not (
+                    node.operands[0].operator == "name"
+                    and node.operands[0].value == "temperature"
+                    and node.operands[0].dimension == TEMPERATURE):
+                raise ExpressionError("Dirichlet derivatives require the temperature field")
             field = np.broadcast_to(np.asarray(visit(node.operands[0]), dtype=np.float64), shape)
             if node.operator == "∂ₓ":
-                return (np.roll(field, -1, axis=0) - np.roll(field, 1, axis=0)) / (2 * spacing_x)
+                return (neighbor(field, 0, True) - neighbor(field, 0, False)) / (2 * spacing_x)
             if node.operator == "∂ᵧ":
-                return (np.roll(field, -1, axis=1) - np.roll(field, 1, axis=1)) / (2 * spacing_y)
-            return ((np.roll(field, -1, axis=0) + np.roll(field, 1, axis=0) - 2 * field) / spacing_x**2
-                    + (np.roll(field, -1, axis=1) + np.roll(field, 1, axis=1) - 2 * field) / spacing_y**2)
+                return (neighbor(field, 1, True) - neighbor(field, 1, False)) / (2 * spacing_y)
+            return ((neighbor(field, 0, True) + neighbor(field, 0, False) - 2 * field) / spacing_x**2
+                    + (neighbor(field, 1, True) + neighbor(field, 1, False) - 2 * field) / spacing_y**2)
         if node.operator == "literal":
             return float(node.value)
         if node.operator == "name":

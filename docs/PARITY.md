@@ -1,3 +1,19 @@
+## 2026-10-28: literal Quarto chunk label and R evaluation options (validation pending)
+
+The .qmd importer now translates leading `#| label:` and literal
+`#| eval: true` for R/Python into executable percent cells, while
+`#| eval: false` on R chunks remains inert `eval=FALSE` Markdown
+through export. Unsupported options, duplicate/late directives, invalid
+labels and disabled Python chunks are rejected, not discarded. This is not
+Quarto/knitr execution. **Status: partial; all six Ubuntu 24.04/macOS 14 CI jobs passed in
+[CI #40611478697](https://github.com/godofecht/FlowStudio/actions/runs/40611478697).**
+Each source platform ran 963 JavaScript tests (955 passed, eight skipped,
+zero failures). Both native jobs compiled pinned Flow 2.0.0 and passed
+Rscript/HTTP acceptance; Ubuntu also passed real Chromium Quarto import/export
+and Monaco acceptance. Live Pyodide/webR and external Quarto rendering remain
+unverified.
+The Flow backend and hosted CI configuration are unchanged.
+
 ## 2026-10-27: native Monaco R list member completion (PR #89)
 
 The native Monaco provider derives bounded, syntax-safe `$` member suggestions for ordinary R lists from existing `POST /api/inspect/r` metadata. It supports nested list members, rejects invalid identifiers and active bindings, and preserves receiver text during insertion. The shipped `web/ui/workbench.js` was rebuilt with the pinned npm toolchain. The integrated source passed 918 Node tests (26 skipped) in the real GitHub Actions Linux job.

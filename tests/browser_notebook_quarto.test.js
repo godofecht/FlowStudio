@@ -52,7 +52,7 @@ test("accepts Quarto documents without YAML using default HTML", () => {
   assert.match(quarto.encode(restored.source, "python", parseCells), /format: html/);
 });
 
-test("rejects unsupported YAML and executable Quarto options", () => {
+test("rejects unsupported YAML and unrepresented Quarto source options", () => {
   for (const yaml of [
     "---\nformat: pdf\n---\n",
     "---\nformat:\n  html: default\n---\n",
@@ -60,7 +60,7 @@ test("rejects unsupported YAML and executable Quarto options", () => {
     "---\noutput: html_document\n---\n",
     "---\nformat: html\nformat: html\n---\n"
   ]) assert.throws(() => quarto.decode(yaml + fence + "{r}\n1\n" + fence, parseCells));
-  assert.throws(() => quarto.decode(fence + "{r}\n#| eval: false\nstop('bad')\n" + fence, parseCells), /chunk options/);
+  // Literal R eval: false is now safely imported as inert Markdown; see the roundtrip regression below.
   assert.throws(() => quarto.encode("# %% [r]\n#| eval: false\n1\n", "r", parseCells), /chunk options/);
 });
 
@@ -79,6 +79,52 @@ test("rejects Flow chunks, unsafe knitr options and oversized inputs", () => {
   assert.throws(() => quarto.decode("x".repeat(4 * 1024 * 1024 + 1), parseCells), /4 MiB/);
 });
 
+
+
+test("imports literal Quarto #| label and eval: true into executable R/Python cells", () => {
+  for (const language of ["r", "python"]) {
+    const qmd = fence + "{" + language + "}\n#| label: summary\n#| eval: true\nprint(42)\n" + fence;
+    const imported = quarto.decode(qmd, parseCells);
+    const cells = parseCells(imported.source);
+    assert.equal(cells.length, 1);
+    assert.equal(cells[0].kind, "code");
+    assert.equal(cells[0].language, language);
+    assert.equal(cells[0].label, "summary");
+    assert.match(cells[0].code, /print\(42\)/);
+    assert.doesNotMatch(cells[0].code, /#\|/);
+    assert.ok(quarto.encode(imported.source, language, parseCells).includes(
+      fence + "{" + language + " summary}"));
+  }
+});
+
+test("literal Quarto R eval: false remains inert through .qmd roundtrip", () => {
+  const qmd = fence + "{r}\n#| label: disabled\n#| eval: false\nstop('must not run')\n" + fence;
+  const imported = quarto.decode(qmd, parseCells);
+  const cells = parseCells(imported.source);
+  assert.equal(cells.length, 1);
+  assert.equal(cells[0].kind, "markdown");
+  assert.match(cells[0].code, /eval=FALSE/);
+  assert.match(cells[0].code, /stop\('must not run'\)/);
+  const exported = quarto.encode(imported.source, "r", parseCells);
+  assert.ok(exported.includes(fence + "{r disabled, eval=FALSE}"));
+  assert.doesNotMatch(exported, /#\|/);
+});
+
+test("rejects unsupported, duplicate and late Quarto options without source mutation", () => {
+  for (const option of [
+    "#| echo: false", "#| eval: TRUE", "#| eval: x",
+    "#| label: unsafe name", "#| label: x\n#| label: y",
+    "#| eval: true\n#| eval: false"
+  ]) assert.throws(() => quarto.decode(fence + "{r}\n" + option + "\n1\n" + fence, parseCells), /Quarto/);
+  assert.throws(() => quarto.decode(fence + "{r existing}\n#| label: other\n1\n" + fence, parseCells), /Duplicate Quarto/);
+  assert.throws(() => quarto.decode(fence + "{r}\n1\n#| eval: false\n" + fence, parseCells), /must precede/);
+  assert.throws(() => quarto.decode(fence + "{python}\n#| eval: false\nprint(1)\n" + fence, parseCells), /Python/);
+  assert.match(quarto.decode(fence + "text\n#| echo: false\n" + fence, parseCells).source, /#\| echo: false/);
+  assert.throws(() => quarto.decode(fence + "{r, eval=FALSE}\n#| eval: true\n1\n" + fence, parseCells),
+    /disabled chunks/);
+  assert.throws(() => quarto.encode("# %% [markdown]\n" + fence + "{r, eval=FALSE}\n#| eval: true\n1\n" + fence, "r", parseCells),
+    /disabled chunks/);
+});
 
 test("notebook file controller imports .qmd without executing or discarding unsaved edits", async () => {
   const {create} = require("../docs/app/notebook_io.js");

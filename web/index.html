@@ -128,7 +128,7 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
 #debugSteps{max-height:200px;overflow:auto;display:flex;flex-direction:column;gap:2px;margin-bottom:8px}
 .debug-step button{width:100%;text-align:left;font:11.5px/1.4 var(--mono);padding:3px 7px;background:transparent;border:1px solid transparent;border-radius:5px}
 .debug-step button:hover{background:var(--accent-dim)}
-.debug-step button[data-step-index].debug-step-active{background:var(--accent-dim);border-color:#3d5c95}
+.debug-step.debug-step-active button{background:var(--accent-dim);border-color:#3d5c95}
 .debug-step-here button{color:var(--warn)}
 .debug-locals table{border-collapse:collapse;width:100%;font:12px/1.5 var(--mono)}
 .debug-locals td,.debug-locals th{border:1px solid var(--line);padding:3px 7px;text-align:left;overflow-wrap:anywhere}
@@ -417,6 +417,12 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
         <button id="debugToggleBp" type="button"><i data-lucide="octagon"></i>Breakpoint at cursor</button>
         <button id="debugClearBp" type="button">Clear</button>
         <button id="debugRun" type="button"><i data-lucide="play"></i>Run trace</button>
+      </div>
+      <div class="project-tools" role="group" aria-label="Recorded Python trace navigation">
+        <button id="debugPrevious" type="button" disabled>Previous step</button>
+        <button id="debugNext" type="button" disabled>Next step</button>
+        <button id="debugPreviousBp" type="button" disabled>Previous breakpoint</button>
+        <button id="debugNextBp" type="button" disabled>Next breakpoint</button>
       </div>
       <p id="debugBreakpoints" class="muted" aria-live="polite">No breakpoints yet.</p>
       <p id="debugSummary" class="muted"></p>

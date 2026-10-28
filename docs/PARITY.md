@@ -1,3 +1,25 @@
+## 2026-10-28: base R factor identity in browser session snapshots (verification pending)
+
+The browser-local webR session snapshot exporter now recognizes strict base R
+factors and ordered factors, including unused levels and missing values. A
+version-2 snapshot records a bounded typed string vector and explicit
+`factor: {levels, ordered}` provenance; restore reconstructs a real R
+`factor(..., levels=..., ordered=...)` in the existing webR interpreter.
+Export is opt-in for snapshots; ordinary R-to-Python transfers still reject
+classed vectors rather than silently losing factor identity. The source
+binding must be non-active and the object must have the exact base factor
+class and only the expected class/levels attributes. Import validates
+levels, membership, Unicode, counts and packet size before assigning.
+
+**Status: partial / independent CI pending.** Node tests cover snapshot
+validation, capture, import dispatch and webR query generation; a real
+Rscript round-trip test is included and explicitly skips when Rscript is
+unavailable. The full physical Chromium webR export/restore scenario has
+not yet been executed. Factors embedded as data.frame columns, custom
+attributes/classes, more than 64 levels or more than 256 observations
+remain unsupported. This is not general R object serialization or
+RStudio parity. No hosted CI or native Flow compiler changes.
+
 ## 2026-10-28: offline Flow 2.0.0 language help (six Linux/macOS CI jobs passed)
 
 The browser Help pane now accepts 28 explicit Flow syntax, built-in and CLI

@@ -1,4 +1,4 @@
-"""Checked scalar periodic heat-equation frontend and RK2 finite-difference backend.
+"""Checked scalar heat-equation frontend and RK2 finite-difference backend.
 
 This supports one validated PDE family, not arbitrary PDEs or an upstream
 Flow 2.0 grammar extension.

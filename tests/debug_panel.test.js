@@ -117,3 +117,100 @@ test("debug run refuses empty buffers and posts nothing", async () => {
   assert.equal(requests, 0);
   assert.equal(p.total(), 0);
 });
+
+test("replay steps keep dense indices after invalid trace records are filtered", async () => {
+  const malformed = { ...TRACE, events: [
+    TRACE.events[0],
+    { line: -5, function: "invalid" },
+    TRACE.events[1],
+    { line: 100001, function: "invalid" },
+    TRACE.events[2]
+  ] };
+  const parsed = panel.stepsFromTrace(malformed, [4]);
+  assert.deepEqual(parsed.steps.map(step => step.index), [0, 1, 2]);
+  assert.deepEqual(parsed.steps.map(step => step.eventIndex), [0, 2, 4]);
+  const doc = fakeDocument(), node = testCoveragePanelNode(doc);
+  let jumped = null;
+  const p = panel.mount(doc, {
+    node,
+    fetchFn: async () => ({ ok: true, text: async () => JSON.stringify(malformed) }),
+    getSource: () => "x = 1\nx += 1",
+    getDocId: () => "document-a",
+    onStep: step => { jumped = step; }
+  });
+  await p.run();
+  const rows = node._sections[".debug-steps"].children;
+  assert.equal(rows[1].children[0].textContent.startsWith("#2  line 4"), true);
+  rows[1].children[0].listeners.click();
+  assert.equal(p.at(), 1);
+  assert.equal(p.current().line, 4);
+  assert.equal(jumped.eventIndex, 2);
+  assert.equal(p.previous().line, 1);
+  assert.equal(p.next().line, 4);
+  assert.equal(p.goTo(2).line, 7);
+});
+
+test("replay navigation refuses a trace belonging to a different editor buffer", async () => {
+  const doc = fakeDocument(), node = testCoveragePanelNode(doc);
+  let activeDoc = "document-a", jumps = 0, warning = "";
+  const p = panel.mount(doc, {
+    node,
+    fetchFn: async () => ({ ok: true, text: async () => JSON.stringify(TRACE) }),
+    getSource: () => "x = 1",
+    getDocId: () => activeDoc,
+    onStep: () => { jumps++; },
+    notice: message => { warning = message; }
+  });
+  await p.run();
+  activeDoc = "document-b";
+  node._sections[".debug-steps"].children[1].children[0].listeners.click();
+  assert.equal(p.at(), 0);
+  assert.equal(jumps, 0);
+  assert.match(warning, /editor buffer changed/);
+});
+
+test("replay drops an asynchronous trace when its document or source changed", async () => {
+  for (const change of ["document", "source"]) {
+    const doc = fakeDocument(), node = testCoveragePanelNode(doc);
+    let activeDoc = "document-a", source = "x = 1", resolveFetch, warning = "";
+    const p = panel.mount(doc, {
+      node,
+      fetchFn: () => new Promise(resolve => { resolveFetch = resolve; }),
+      getSource: () => source,
+      getDocId: () => activeDoc,
+      notice: message => { warning = message; }
+    });
+    const pending = p.run();
+    if (change === "document") activeDoc = "document-b";
+    else source = "x = 2";
+    resolveFetch({ ok: true, text: async () => JSON.stringify(TRACE) });
+    assert.equal(await pending, null);
+    assert.equal(p.total(), 0);
+    assert.match(warning, /Editor buffer changed/);
+  }
+});
+
+test("workspace wires replay debugger to the actual active document", () => {
+  const fs = require("node:fs");
+  const source = fs.readFileSync(require.resolve("../web/workspace_panels.js"), "utf8");
+  assert.match(source, /getDocId: activeDocumentId/);
+});
+
+test("replay refuses navigation after editing the traced source", async () => {
+  const doc = fakeDocument(), node = testCoveragePanelNode(doc);
+  let source = "x = 1", jumps = 0, warning = "";
+  const p = panel.mount(doc, {
+    node,
+    fetchFn: async () => ({ ok: true, text: async () => JSON.stringify(TRACE) }),
+    getSource: () => source,
+    getDocId: () => "document-a",
+    onStep: () => { jumps++; },
+    notice: message => { warning = message; }
+  });
+  await p.run();
+  source = "x = 2";
+  node._sections[".debug-steps"].children[1].children[0].listeners.click();
+  assert.equal(p.at(), 0);
+  assert.equal(jumps, 0);
+  assert.match(warning, /editor buffer changed/);
+});

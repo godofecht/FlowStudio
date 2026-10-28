@@ -48,7 +48,10 @@ function stepsFromTrace(payload, breakpoints) {
     const event = payload.events[index];
     if (!event || !Number.isSafeInteger(event.line) || event.line < 1 || events_bad(event)) continue;
     steps.push({
-      index,
+      // Use a dense UI index: invalid trace records are skipped, so the
+      // original event offset is not a valid index into `steps`.
+      index: steps.length,
+      eventIndex: index,
       line: event.line,
       function: typeof event.function === "string" ? event.function.slice(0, 80) : "",
       elapsed_ms: typeof event.elapsed_ms === "number" ? event.elapsed_ms : null,
@@ -91,6 +94,8 @@ function mount(document, options) {
   let position = -1;
   let busy = false;
   let revision = 0;
+  let traceDocId = null;
+  let traceSource = null;
 
   function describeStep(step, node) {
     const row = document.createElement("div");
@@ -104,6 +109,10 @@ function mount(document, options) {
     label.title = "Jump to line " + step.line;
     label.dataset.stepIndex = String(step.index);
     label.addEventListener("click", () => {
+      if (getDocId() !== traceDocId || String(getSource() || "") !== traceSource) {
+        notice("The editor buffer changed since tracing; run the trace again.", "error");
+        return;
+      }
       position = step.index;
       onStep(step);
       renderLocals(document, node, steps[position]);
@@ -179,6 +188,7 @@ function mount(document, options) {
         return null;
       }
       const breakpoints = getBreakpoints();
+      const requestedDocId = getDocId();
       busy = true;
       const token = ++revision;
       notice("Running Python with the real line tracer…");
@@ -193,6 +203,12 @@ function mount(document, options) {
         const payload = JSON.parse(text);
         const result = stepsFromTrace(payload, breakpoints);
         if (token !== revision) return null;
+        if (getDocId() !== requestedDocId || String(getSource() || "") !== source) {
+          notice("Editor buffer changed while tracing; discard the stale trace and run again.", "error");
+          return null;
+        }
+        traceDocId = requestedDocId;
+        traceSource = source;
         steps = result.steps;
         position = steps.length ? 0 : -1;
         render(node, result);

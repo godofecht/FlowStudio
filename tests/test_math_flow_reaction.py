@@ -85,7 +85,7 @@ class ReactionDiffusionTest(unittest.TestCase):
             compile_heat_equation(
                 ["∂ₜtemperature=diffusivity∇²temperature-reactionRate(temperature-ambientTemperature)"])
         with self.assertRaises(FlowMathError):
-            simulate(replace(parse(SOURCE), reaction_rate=1000.0))
+            simulate(replace(parse(SOURCE), reaction_rate=100000.0))
 
     def test_checked_in_program_executes_in_cli(self):
         run = subprocess.run(

@@ -102,17 +102,20 @@ test("Git branch requests use fixed routes and reject invalid names", async () =
     await native.gitBranches();
     await native.gitCreateBranch("feature/clean");
     await native.gitSwitchBranch("feature/clean");
+    await native.gitDeleteBranch("feature/merged");
     assert.deepEqual(calls, [
       ["/api/git/branches","","run"],
       ["/api/git/branch/create","feature/clean","run"],
-      ["/api/git/branch/switch","feature/clean","run"]
+      ["/api/git/branch/switch","feature/clean","run"],
+      ["/api/git/branch/delete","feature/merged","run"]
     ]);
     for (const name of ["", "-bad", "a..b", "a//b", "a.lock", "a/", ".hidden",
                         "a b", "a\\nb", "x".repeat(129)]) {
       await assert.rejects(native.gitCreateBranch(name), /Git branch name/);
       await assert.rejects(native.gitSwitchBranch(name), /Git branch name/);
+      await assert.rejects(native.gitDeleteBranch(name), /Git branch name/);
     }
-    assert.equal(calls.length, 3);
+    assert.equal(calls.length, 4);
   } finally {
     if (oldLocation === undefined) delete globalThis.location;
     else globalThis.location = oldLocation;
@@ -127,6 +130,7 @@ test("Hosted Pages rejects Git branch operations without contacting localhost", 
     await assert.rejects(native.gitBranches(), /native FlowStudio server/);
     await assert.rejects(native.gitCreateBranch("feature/clean"), /native FlowStudio server/);
     await assert.rejects(native.gitSwitchBranch("feature/clean"), /native FlowStudio server/);
+    await assert.rejects(native.gitDeleteBranch("feature/merged"), /native FlowStudio server/);
   } finally {
     if (oldLocation === undefined) delete globalThis.location;
     else globalThis.location = oldLocation;

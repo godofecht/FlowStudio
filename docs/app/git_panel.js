@@ -4,13 +4,13 @@
 (function (global) {
 "use strict";
 function create({native, statusButton, diffButton, stagedDiffButton, stageButton, unstageButton, commitButton,
-                 branchesButton, createBranchButton, switchBranchButton, branchInput,
+                 branchesButton, createBranchButton, switchBranchButton, deleteBranchButton, branchInput,
                  pathInput, messageInput, target, notice, confirmAction}) {
   if (!native || !statusButton || !diffButton || !target)
     throw new Error("Git panel requires its native client and controls.");
   const supported = !!native.available();
   const controls = [statusButton, diffButton, stagedDiffButton, stageButton, unstageButton, commitButton,
-    branchesButton, createBranchButton, switchBranchButton].filter(Boolean);
+    branchesButton, createBranchButton, switchBranchButton, deleteBranchButton].filter(Boolean);
   let pending = false;
   function lock(value) {
     for (const button of controls) button.disabled = value || !supported;
@@ -96,6 +96,15 @@ function create({native, statusButton, diffButton, stagedDiffButton, stageButton
       return Promise.resolve(false);
     return perform("branch switch", () => native.gitSwitchBranch(name));
   }
+  function deleteBranch() {
+    if (!supported || pending || !branchInput) return Promise.resolve(false);
+    const name = branchInput.value;
+    if (!name || !name.trim() || !approve(
+      "Delete local Git branch \"" + name +
+      "\" from the native server repository? Git refuses the checked-out branch and unmerged commits; no force deletion is available."))
+      return Promise.resolve(false);
+    return perform("branch deletion", () => native.gitDeleteBranch(name));
+  }
   statusButton.addEventListener("click", () => { void show("status"); });
   diffButton.addEventListener("click", () => { void show("diff"); });
   stagedDiffButton?.addEventListener("click", () => { void show("staged"); });
@@ -105,7 +114,8 @@ function create({native, statusButton, diffButton, stagedDiffButton, stageButton
   branchesButton?.addEventListener("click", () => { void show("branches"); });
   createBranchButton?.addEventListener("click", () => { void createBranch(); });
   switchBranchButton?.addEventListener("click", () => { void switchBranch(); });
-  return Object.freeze({show, stage, unstage, commit, createBranch, switchBranch, supported});
+  deleteBranchButton?.addEventListener("click", () => { void deleteBranch(); });
+  return Object.freeze({show, stage, unstage, commit, createBranch, switchBranch, deleteBranch, supported});
 }
 const api = Object.freeze({create});
 if (typeof module !== "undefined" && module.exports) module.exports = api;

@@ -133,7 +133,7 @@ def test_python(page, timeout: int):
     # Real Pyodide NumPy snapshot must restore an ndarray, not a list/dict.
     # This scenario is opt-in and cannot be counted as passed without Chromium.
     run_source(page, "python",
-               "import numpy as np\\nfs_np_snapshot = np.array([[1.25,3],[np.nan,4]], dtype=np.float64)\\n"
+               "import numpy as np\nfs_np_snapshot = np.array([[1.25,3],[np.nan,4]], dtype=np.float64)\n"
                "print('numpy snapshot ready')", "numpy snapshot ready", timeout)
     with page.expect_download(timeout=timeout) as numpy_snapshot_info:
         page.locator("#exportSession").click()

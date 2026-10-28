@@ -11,11 +11,18 @@ Six new regression tests exercise accepted source, rejection and no-subprocess
 behavior. This narrows an actual direct-API bypass of browser source checks;
 it does not sandbox approved R/Python code or authenticate remote sessions.
 
-**Status: partial / local focused Python validation passed for the source
-guard's parsing cases; full repository CI and real Quarto execution pending.**
-The real Quarto CLI and physical-browser R/Python runtime acceptance remain
-unverified. No hosted CI or Flow compiler configuration changed.
-RStudio feature parity is incomplete.
+**Status: partial / all six Ubuntu 24.04/macOS 14 CI jobs passed in
+[CI #40634709591](https://github.com/godofecht/FlowStudio/actions/runs/40634709591).**
+Both source platforms ran 974 JavaScript tests (966 passed, eight skipped,
+zero failures). The Python suite ran 124 tests (13 skipped), including all
+six new native source-guard tests executed without skips. Both native platforms
+compiled Flow 2.0.0, passed existing real Rscript/HTTP acceptance and packaged
+executables; the existing Chromium Quarto *source interchange* checks also ran.
+[PR #124](https://github.com/godofecht/FlowStudio/pull/124) merged as
+[cd03f2e](https://github.com/godofecht/FlowStudio/commit/cd03f2ea1eaa72db6f37c8c9c0305380c7519b4a).
+Actual Quarto CLI execution, real R/Python Quarto rendering and live
+Pyodide/webR physical-browser acceptance remain unverified. No hosted CI or
+Flow compiler configuration changed. RStudio feature parity is incomplete.
 
 
 ## 2026-10-28: real Quarto execution acceptance and stable report snapshot (verification pending)

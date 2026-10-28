@@ -9,11 +9,18 @@ document changes invalidate replay and disable all navigation. The recorded
 trace still executes to completion: these are **post-execution** controls,
 not live pause/resume, and do not claim Flow or R debugging parity.
 
-**Status: partial / focused V8 module smoke validation only; full Node,
-native Flow, Linux/macOS CI and physical Chromium acceptance pending.**
-The new regression tests cover breakpoint navigation, UI state, stale-source
-invalidation and actual workspace/HTML wiring. No hosted CI workflow changed.
-RStudio parity remains incomplete.
+**Status: partial / all six independent Linux/macOS CI jobs passed in
+[CI #40789474911](https://github.com/godofecht/FlowStudio/actions/runs/40789474911).**
+Both source/transport jobs, both native Flow compile/HTTP jobs and both FlowJIT
+jobs succeeded. The complete checked-in 16-test debug panel suite also passed
+in a focused V8 harness with a Node API shim; this is not a substitute for the
+actual Node suite, which ran successfully in CI. The new tests cover breakpoint
+navigation, UI state, stale-source invalidation and actual workspace/HTML
+wiring. [PR #163](https://github.com/godofecht/FlowStudio/pull/163) merged as
+[8ce73c8](https://github.com/godofecht/FlowStudio/commit/8ce73c8dc922c8549b6cab79f04db5524239e772).
+Physical Chromium replay-navigation acceptance is still unverified; existing
+native Chromium Quarto/Monaco acceptance is a separate test. No hosted CI
+workflow changed. RStudio parity remains incomplete.
 
 ## 2026-10-28: Python debugger stdout and stale-state invalidation (CI pending)
 

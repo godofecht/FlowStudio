@@ -248,14 +248,23 @@ async function handle(event) {
         throw Error("Invalid Python transfer response.");
       const packet = JSON.parse(raw);
       if (!validTransferPacket(packet)) throw Error("Invalid Python transfer payload.");
-      // Session export alone needs the original pandas identity. Keep the
-      // ordinary Python/R transfer packet and its response unchanged.
+      // Snapshot-only provenance: ordinary cross-language transfers remain
+      // plain bounded packets, without pandas/NumPy reconstruction metadata.
       if (op === "export-snapshot") {
         const origin = await py.runPythonAsync("_fs_transfer_kind");
         if (origin === "pandas" && packet.kind !== "table")
           throw Error("Invalid pandas session snapshot.");
-        self.postMessage(origin === "pandas" ?
-          {id, ok:true, value:packet, origin:"pandas"} : {id, ok:true, value:packet});
+        if (origin === "ndarray") {
+          const eligible = packet.kind === "vector" ?
+            packet.values.length > 0 &&
+              (packet.type === "number" || !packet.values.includes(null)) :
+            packet.kind === "table" && packet.columns[0].values.length > 0 &&
+              packet.columns.every(col => col.type === packet.columns[0].type &&
+                (col.type === "number" || !col.values.includes(null)));
+          if (!eligible) throw Error("Invalid NumPy session snapshot.");
+        }
+        self.postMessage(["pandas", "ndarray"].includes(origin) ?
+          {id, ok:true, value:packet, origin} : {id, ok:true, value:packet});
       } else self.postMessage({id, ok:true, value:packet});
       return;
     }

@@ -28,6 +28,7 @@ class HeatModel:
     ambient_temperature: float = 0.0
     advection_velocity_x: float = 0.0
     advection_velocity_y: float = 0.0
+    boundary_temperature: float | None = None
 
 
 def parse_heat(source: str, base) -> HeatModel:
@@ -43,8 +44,13 @@ def parse_heat(source: str, base) -> HeatModel:
         raise error("Unexpected domain sections")
     d = base.assignments_tokens(statements)
     base.expect_keys(d, {"grid", "extent", "boundaries"}, "domain")
+    boundary_temperature = None
     if d["boundaries"] != ["Periodic"]:
-        raise error("Heat solver requires Periodic boundaries")
+        boundary_tokens = d["boundaries"]
+        if (len(boundary_tokens) < 4 or boundary_tokens[:2] != ["Dirichlet", "("]
+                or boundary_tokens[-1] != ")"):
+            raise error("Heat boundaries must be Periodic or Dirichlet(temperature)")
+        boundary_temperature = base.number(boundary_tokens[2:-1], ["K"])
     grid = d["grid"]
     if len(grid) != 3 or grid[1] != "×":
         raise error("grid requires width × height")
@@ -169,7 +175,7 @@ def parse_heat(source: str, base) -> HeatModel:
         raise error(f"Unexpected trailing heat token {p.peek()}")
     return HeatModel(int(width), int(height), lx, ly, diffusivity, expression,
                      step, until, equation, reaction_rate, ambient_temperature,
-                     velocity_x, velocity_y)
+                     velocity_x, velocity_y, boundary_temperature)
 
 
 def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | None = None,
@@ -211,7 +217,8 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
                        (np.arange(ny) + .5) * dy, indexing="ij")
     try:
         field = np.broadcast_to(evaluate(parse_expression(model.initial), x, y,
-                                         expected_dimension=TEMPERATURE), (nx, ny)).copy()
+                                         expected_dimension=TEMPERATURE,
+                                         boundary_temperature=model.boundary_temperature), (nx, ny)).copy()
     except ExpressionError as exc:
         raise error_type(str(exc)) from exc
     initial_mean = float(np.mean(field))
@@ -244,7 +251,8 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
                         "reactionRate": model.reaction_rate,
                         "ambientTemperature": model.ambient_temperature,
                         "advectionVelocityX": model.advection_velocity_x,
-                        "advectionVelocityY": model.advection_velocity_y}), (nx, ny))
+                        "advectionVelocityY": model.advection_velocity_y},
+                boundary_temperature=model.boundary_temperature), (nx, ny))
         except (ExpressionError, ValueError) as exc:
             raise error_type(f"Invalid heat equation evaluation: {exc}") from exc
 
@@ -268,7 +276,10 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
             "mean_temperature": mean, "initial_mean_temperature": initial_mean,
             "temperature_variance": variance, "initial_temperature_variance": initial_variance,
             "temperature_min": float(np.min(field)), "temperature_max": float(np.max(field)),
-            "method": "periodic centered-difference RK2 scalar reaction-diffusion equation",
+            "method": "centered-difference RK2 scalar reaction-diffusion equation",
+            "boundary_condition": ("Periodic" if model.boundary_temperature is None
+                                   else "Dirichlet"),
+            "boundary_temperature": model.boundary_temperature,
             "observations": observations,
             "spatial": spatial_snapshot(
                 {"temperature": field}, (model.length_x, model.length_y))}

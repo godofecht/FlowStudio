@@ -170,7 +170,44 @@ FlowStudio server on Linux and macOS.
 
 This is **not** an unrestricted advection operator: only constant declared
 velocities and a single scalar temperature field with periodic boundaries
-are supported; advection and reaction are not yet composable in one model.
+are supported; the supported advection, reaction and forcing operators can now be composed in one model.
 Centered advection with explicit RK2 is not generally energy-stable in the
 zero-diffusion limit; this subset requires positive diffusion, a bounded
 timestep, and finite states. It is not an upstream Flow 2.0 grammar extension.
+
+## Composed scalar transport, reaction and forcing
+
+`examples/heat_transport_reaction.flow` executes a single dimension-checked
+equation AST containing periodic diffusion, both constant-velocity advection
+operators, linear ambient-temperature relaxation, and an independent heat source:
+
+```flow
+∂ₜtemperature = diffusivity ∇²temperature
+                − advectionVelocityX ∂ₓ(temperature)
+                − advectionVelocityY ∂ᵧ(temperature)
+                − reactionRate (temperature − ambientTemperature)
+                + 2K/s
+```
+
+The parser requires complete declarations for each optional operator family;
+partial constants, incorrect signs, duplicated reaction terms, and invalid
+dimensions are rejected. The existing NumPy RK2 runtime evaluates the full
+typed equation AST against both actual stage fields, including nonlinear
+quadratic relaxation combined with transport when its bounded positivity and
+stability requirements hold.
+
+The checked-in test compares the final field against exact discrete Fourier
+amplification factors for two independently advected modes, plus the forced
+uniform-mode recurrence. It also checks continuum grid refinement, nonlinear
+uniform Riccati relaxation, CLI execution, native FlowStudio HTTP execution on
+Linux/macOS and rendered SVG plots in Linux Chromium acceptance.
+
+```sh
+python3 src/math_flow.py examples/heat_transport_reaction.flow
+python3 -m unittest discover -s tests -p 'test_math_flow_transport_reaction.py' -v
+```
+
+This is a composable **bounded scalar parabolic PDE family**, not a general
+symbolic PDE system. Coupled fields, variable-coefficient transport, non-periodic
+boundaries, unrestricted nonlinear operators and upstream Flow 2.0 grammar
+integration remain unimplemented.

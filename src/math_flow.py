@@ -463,7 +463,10 @@ def simulate(model: Model, *, grid: int | None = None, until: float | None = Non
 
     u, v, pressure = project(u, v, dt)
     initial_energy = .5 * model.density * dx * dy * np.sum(u*u + v*v)
-    for _ in range(steps):
+    observations = [{"time": 0.0, "kineticEnergy": float(initial_energy),
+                     "maximumDivergence": float(np.max(np.abs(divergence(u, v))))}]
+    sample_stride = max(1, math.ceil(steps / 128))
+    for step_index in range(steps):
         du, dv = rhs(u, v)
         stage_u, stage_v, _ = project(u + dt * du, v + dt * dv, dt)
         du2, dv2 = rhs(stage_u, stage_v)
@@ -471,6 +474,10 @@ def simulate(model: Model, *, grid: int | None = None, until: float | None = Non
                                  v + .5 * dt * (dv + dv2), dt)
         if not (np.all(np.isfinite(u)) and np.all(np.isfinite(v))):
             raise FlowMathError("Non-finite velocity during integration")
+        if (step_index + 1) % sample_stride == 0 or step_index + 1 == steps:
+            observations.append({"time": float((step_index + 1) * dt),
+                                 "kineticEnergy": float(.5 * model.density * dx * dy * np.sum(u*u + v*v)),
+                                 "maximumDivergence": float(np.max(np.abs(divergence(u, v))))})
     final_divergence = float(np.max(np.abs(divergence(u, v))))
     energy = float(.5 * model.density * dx * dy * np.sum(u*u + v*v))
     vorticity = center(v, 0, dx) - center(u, 1, dy)
@@ -480,7 +487,8 @@ def simulate(model: Model, *, grid: int | None = None, until: float | None = Non
             "kinetic_energy": energy,
             "vorticity_rms": float(np.sqrt(np.mean(vorticity*vorticity))),
             "pressure_mean": float(np.mean(pressure)),
-            "pressure_solver": "conjugate gradient of periodic -D_backward G_forward"}
+            "pressure_solver": "conjugate gradient of periodic -D_backward G_forward",
+            "observations": observations}
 
 
 def main() -> int:

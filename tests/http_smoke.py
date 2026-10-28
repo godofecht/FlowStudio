@@ -8,6 +8,7 @@ No external Python dependencies.
 from __future__ import annotations
 
 import json
+import math
 import socket
 import shutil
 from pathlib import Path

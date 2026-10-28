@@ -10,12 +10,18 @@ steps across **all** navigation methods (not only step-button clicks). Stale
 asynchronous results cannot publish output to the terminal. No code execution
 is simulated, and the debugger remains a bounded post-execution replay.
 
-**Status: partial / automated Node regressions committed, independent CI pending.**
-The added tests cover real trace-response stdout, HTTP 422 traceback output,
-re-run clearing, programmatic stale navigation and output suppression. Live
-Chromium UI/terminal acceptance and live pause/resume remain unverified.
-No Flow compiler, backend or hosted CI configuration changed. RStudio parity
-is incomplete.
+**Status: partial / all six independent Linux/macOS CI jobs passed in
+[CI #40783343839](https://github.com/godofecht/FlowStudio/actions/runs/40783343839).**
+Each source platform passed 1,055 of 1,067 Node tests (12 skipped, zero
+failures), and 209 Python tests (13 skipped, zero failures). Both native
+Flow compile/HTTP jobs and both FlowJIT jobs passed. The added tests cover
+real trace-response stdout, HTTP 422 traceback output, re-run clearing,
+programmatic stale navigation and output suppression.
+[PR #161](https://github.com/godofecht/FlowStudio/pull/161) merged as
+[d6ec646](https://github.com/godofecht/FlowStudio/commit/d6ec646523c5d162ee6ce60068fa1e0c7b91b96d).
+Live Chromium debugger-console interaction and live pause/resume remain
+unverified. No Flow compiler, backend or hosted CI configuration changed.
+RStudio parity is incomplete.
 
 ## 2026-10-28: Python replay debugger trace identity and navigation (PR verification pending)
 

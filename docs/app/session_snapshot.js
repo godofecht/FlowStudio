@@ -32,6 +32,28 @@ function numpyPacket(packet) {
     (packet.columns[0].type === "number" ||
       packet.columns.every(column => !column.values.includes(null)));
 }
+function validNumpyDtype(dtype, packet) {
+  if (typeof dtype !== "string" ||
+      !/^(?:u?int(?:8|16|32|64)|float(?:16|32|64)|bool|<U[1-9][0-9]{0,2})$/.test(dtype) ||
+      !numpyPacket(packet)) return false;
+  const type = packet.kind === "vector" ? packet.type : packet.columns[0].type;
+  const values = packet.kind === "vector" ? packet.values :
+    packet.columns.flatMap(column => column.values);
+  if (dtype === "bool") return type === "boolean";
+  if (dtype.startsWith("<U")) {
+    const width = Number(dtype.slice(2));
+    return type === "string" && width <= 512 &&
+      values.every(value => typeof value === "string" && [...value].length <= width);
+  }
+  if (type !== "number") return false;
+  if (dtype.startsWith("float"))
+    return dtype !== "float16" || values.every(value => value === null || Math.abs(value) <= 65504);
+  const limits = {int8:[-128,127],uint8:[0,255],int16:[-32768,32767],
+    uint16:[0,65535],int32:[-2147483648,2147483647],uint32:[0,4294967295]};
+  const [low, high] = limits[dtype] || (dtype === "uint64" ?
+    [0, Number.MAX_SAFE_INTEGER] : [-Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER]);
+  return values.every(value => Number.isSafeInteger(value) && value >= low && value <= high);
+}
 function validate(snapshot) {
   if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot) ||
       Object.keys(snapshot).sort().join(",") !== "format,language,omitted,truncated,variables" ||
@@ -44,8 +66,10 @@ function validate(snapshot) {
   const names = new Set();
   for (const entry of snapshot.variables) {
     const restoreAs = entry && Object.prototype.hasOwnProperty.call(entry, "restoreAs");
+    const hasDtype = entry && Object.prototype.hasOwnProperty.call(entry, "dtype");
     if (!entry || typeof entry !== "object" || Array.isArray(entry) ||
-        Object.keys(entry).sort().join(",") !== (restoreAs ? "name,restoreAs,value" : "name,value") ||
+        Object.keys(entry).sort().join(",") !== (restoreAs ?
+          (hasDtype ? "dtype,name,restoreAs,value" : "name,restoreAs,value") : "name,value") ||
         !validName(entry.name) || names.has(entry.name) ||
         (restoreAs && (snapshot.format !== FORMAT_V2 ||
           !((snapshot.language === "python" && entry.restoreAs === "pandas" &&
@@ -53,7 +77,9 @@ function validate(snapshot) {
             (snapshot.language === "python" && entry.restoreAs === "numpy" &&
              numpyPacket(entry.value)) ||
             (snapshot.language === "r" && entry.restoreAs === "matrix" &&
-             matrixPacket(entry.value))))))
+             matrixPacket(entry.value))))) ||
+        (hasDtype && (entry.restoreAs !== "numpy" ||
+          !validNumpyDtype(entry.dtype, entry.value))))
       throw Error("Snapshot contains an invalid or duplicate variable name.");
     names.add(entry.name);
     if (!transfer || typeof transfer.validate !== "function")
@@ -107,6 +133,11 @@ async function capture({language, inspect, exportValue, generation}) {
         if (!numpyPacket(value))
           throw Error("NumPy origin requires a nonempty homogeneous vector or matrix packet.");
         entry.restoreAs = "numpy";
+        if (result.dtype !== undefined) {
+          if (!validNumpyDtype(result.dtype, value))
+            throw Error("Unsupported or incompatible NumPy snapshot dtype.");
+          entry.dtype = result.dtype;
+        }
       } else if (result.origin === "matrix") {
         if (!matrixPacket(value))
           throw Error("R matrix origin requires a nonempty homogeneous typed table.");
@@ -136,7 +167,7 @@ async function restore({snapshot, language, importValue, generation}) {
   for (const entry of snapshot.variables) {
     same(generation, epoch);
     let result;
-    try { result = await importValue(language, entry.name, entry.value, entry.restoreAs || null); }
+    try { result = await importValue(language, entry.name, entry.value, entry.restoreAs || null, entry.dtype || null); }
     catch (error) {
       same(generation, epoch);
       throw Error("Restored " + imported + " of " + snapshot.variables.length +
@@ -239,7 +270,7 @@ function create({exportButton, importButton, fileInput, language, inspect, expor
   });
   return Object.freeze({exportCurrent, importFile});
 }
-const api = Object.freeze({FORMAT, FORMAT_V2, MAX_BYTES, MAX_VARIABLES, validate, capture, restore, create});
+const api = Object.freeze({FORMAT, FORMAT_V2, MAX_BYTES, MAX_VARIABLES, validNumpyDtype, validate, capture, restore, create});
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 global.FlowStudioSessionSnapshot = api;
 })(globalThis);

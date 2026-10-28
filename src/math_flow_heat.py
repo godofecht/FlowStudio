@@ -234,7 +234,7 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
             maximum_excess = float(np.max(np.maximum(state - model.ambient_temperature, 0.0)))
             # Local linearized reaction eigenvalue is -2*k*(T-A)/A.
             # Check both RK2 stages, not just the initial field.
-            if dt * (diffusion_stiffness +
+            if dt * (diffusion_stiffness + advective_stiffness +
                      model.reaction_rate * maximum_excess / (2 * model.ambient_temperature)) > .45:
                 raise error_type("Heat time step violates nonlinear reaction stability bound")
         try:

@@ -572,7 +572,7 @@ function send_git_branch(kind: string, name: string) -> void {
             proc_arg(command, "branch")
             proc_arg(command, "--")
             proc_arg(command, name)
-        } else if eq(kind, "delete") {
+        } elif eq(kind, "delete") {
             proc_arg(command, "branch")
             proc_arg(command, "-d")
             proc_arg(command, "--")
@@ -607,7 +607,7 @@ function send_git_branch(kind: string, name: string) -> void {
     if eq(output, "") {
         if eq(kind, "create") {
             output = "Branch created: " + name
-        } else if eq(kind, "delete") {
+        } elif eq(kind, "delete") {
             output = "Local branch deleted: " + name
         } else {
             output = "Branch operation completed."

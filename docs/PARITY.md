@@ -6,8 +6,9 @@ available separately as `eventIndex`, so clicking a displayed step and
 scrubbing backward/forward select the correct captured locals rather than
 an unrelated event or undefined state. The browser workspace supplies its
 actual active editor document ID to the replay panel. A completed trace
-cannot navigate another document, and asynchronous responses are discarded
-if the document or source text changes during execution.
+cannot navigate another document or a subsequently edited source buffer,
+and asynchronous responses are discarded if the document or source text
+changes during execution.
 
 **Status: partial / local V8 checks passed** for filtered trace selection,
 cross-document navigation refusal, and stale-response refusal. New automated

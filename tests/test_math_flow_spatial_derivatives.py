@@ -1,6 +1,8 @@
 """Execute typed Unicode spatial operators through the real PDE frontends."""
 from pathlib import Path
 import math
+import json
+import subprocess
 import sys
 import unittest
 
@@ -65,8 +67,7 @@ class SpatialDerivativeTest(unittest.TestCase):
             parse_expression("∂ₓ(x).__class__")
 
     def test_unicode_derivative_executes_in_navier_stokes(self):
-        source = NAVIER.replace("sin(2πy / 1m) * 1m/s",
-            "∂ᵧ(-cos(2πy / 1m) * 1m²/s / (2π))")
+        source = (ROOT / "examples/navier_stokes_spatial_derivative.flow").read_text(encoding="utf-8")
         model = parse(source)
         result = simulate(model)
         self.assertEqual(result["steps"], 10)
@@ -75,14 +76,27 @@ class SpatialDerivativeTest(unittest.TestCase):
         self.assertTrue(math.isfinite(result["kinetic_energy"]))
 
     def test_unicode_derivative_executes_in_heat(self):
-        source = HEAT.replace(
-            "10K * sin(2πx / 1m) * sin(2πy / 1m)",
-            "∂ₓ(-cos(2πx / 1m) * 1m * 10K / (2π)) * sin(2πy / 1m)")
+        source = (ROOT / "examples/heat_equation_spatial_derivative.flow").read_text(encoding="utf-8")
         model = parse(source)
         result = simulate(model)
         self.assertAlmostEqual(result["mean_temperature"], 300.0, places=10)
         self.assertLess(result["temperature_variance"], result["initial_temperature_variance"])
         self.assertGreater(result["temperature_variance"], 0)
+
+    def test_checked_in_derivative_examples_run_through_cli(self):
+        for name in ("navier_stokes_spatial_derivative.flow",
+                     "heat_equation_spatial_derivative.flow"):
+            with self.subTest(name=name):
+                completed = subprocess.run(
+                    [sys.executable, str(ROOT / "src/math_flow.py"),
+                     str(ROOT / "examples" / name)],
+                    cwd=ROOT, text=True, capture_output=True, timeout=45, check=False)
+                self.assertEqual(completed.returncode, 0, completed.stderr)
+                output = json.loads(completed.stdout)
+                self.assertTrue(output["ok"])
+                self.assertGreater(output["steps"], 0)
+                self.assertGreater(len(output["observations"]), 1)
+
 
 
 if __name__ == "__main__":

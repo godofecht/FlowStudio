@@ -1,4 +1,4 @@
-## 2026-10-28: explicit R matrix identity in browser session snapshots (CI pending)
+## 2026-10-28: explicit R matrix identity in browser session snapshots (Linux/macOS CI passed)
 
 The existing browser-local Python/R session export/import now preserves **plain,
 unlabelled, homogeneous R matrix** identity in the version-2 snapshot format.
@@ -12,13 +12,20 @@ preserved within the existing 128-row/16-column and 128-KiB snapshot bounds;
 R integer storage widths, dimnames, attributes, S3/S4 classes and arbitrary
 objects are **not** preserved.
 
-**Status: partial / independent Linux/macOS CI pending.** The modified
-source compiled as JavaScript, and focused V8 checks exercised actual
-capture, validation, restore dispatch and the webR query protocol. New Node
-regressions include opt-in Rscript execution of the generated R export query,
-which must not be counted as passing until a runner with Rscript executes it.
-No hosted CI, Flow compiler or native backend changes. Physical Chromium
-webR snapshot export/import remains unverified. This is not RStudio parity.
+**Status: partial / all six Ubuntu 24.04/macOS 14 jobs passed in
+[CI #40646575065](https://github.com/godofecht/FlowStudio/actions/runs/40646575065).**
+Each source platform ran 981 JavaScript tests (972 passed, nine skipped,
+zero failures). The native verification gate ran the new seven-test
+matrix-snapshot suite on both platforms with **real Rscript** (seven passes,
+zero skips), including actual matrix-vs-data.frame provenance classification;
+both native platforms also compiled pinned Flow 2.0.0, passed live HTTP/R
+acceptance and packaged binaries. Both FlowJIT jobs passed. Focused V8
+execution of the exact changed modules and committed tests also passed locally.
+[PR #128](https://github.com/godofecht/FlowStudio/pull/128) merged as
+[d5f86d5](https://github.com/godofecht/FlowStudio/commit/d5f86d5766b88d1bfbb0e50931813e4de87c2e54).
+No hosted CI configuration, Flow compiler or native backend changes.
+Physical Chromium webR snapshot export/import remains **unverified**.
+This is not RStudio parity.
 
 ## 2026-10-28: Quarto nested execution and YAML metadata guard (Linux/macOS CI passed)
 

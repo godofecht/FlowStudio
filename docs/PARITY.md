@@ -1,4 +1,4 @@
-## 2026-10-28: opt-in installed Quarto CLI HTML rendering (independent validation pending)
+## 2026-10-28: opt-in installed Quarto CLI HTML rendering (six CI jobs passed; real CLI unverified)
 
 The native Flow-owned localhost server now exposes POST /api/render/quarto
 behind its existing explicit intent/origin gate. The browser renders only after
@@ -12,13 +12,21 @@ report is standalone, bounded to 2 MiB and downloaded as HTML. A missing
 Quarto executable is an explicit 503; invalid source/render errors are 422;
 timeouts are 504. No hosted CI changes and no replacement of the Flow router.
 
-**Status: partial / native Flow compile, live Quarto, R/Python knitr, and
-physical Chromium execution unverified until CI.** Focused Python unit tests
-cover header validation, missing CLI and actual fixed-argv subprocess
-orchestration; a real-Quarto smoke test runs only when installed. The native
-HTTP smoke suite now checks the intent/origin gate and invalid-format
-rejection. This is not general Quarto project support, arbitrary YAML
-compatibility, an execution sandbox, or RStudio feature parity.
+**Status: partial / all six Ubuntu 24.04/macOS 14 CI jobs passed in
+[CI #40623214506](https://github.com/godofecht/FlowStudio/actions/runs/40623214506).**
+Both source platforms ran 974 JavaScript tests (966 passed, eight skipped,
+zero failures). Both native platforms compiled pinned Flow 2.0.0, completed
+native Rscript/HTTP acceptance and packaging; Ubuntu Chromium verified .qmd
+import/export and rejection against the actual native server. The helper's
+fixed-argv subprocess, source validation, output bounds, missing-CLI and
+timeout paths have automated tests. [PR #119](https://github.com/godofecht/FlowStudio/pull/119)
+merged as [a1afd9b](https://github.com/godofecht/FlowStudio/commit/a1afd9b1573056db34d7570f71dba9c61958acf1).
+
+**Not yet verified:** the actual Quarto CLI was not installed in CI, so its
+real-render integration test was explicitly skipped; R/Python Quarto chunk
+execution and the browser render/download action were not physically exercised.
+This is not general Quarto project support, arbitrary YAML compatibility, an
+execution sandbox, or RStudio feature parity.
 
 ## 2026-10-28: literal Quarto chunk label and R evaluation options (validation pending)
 

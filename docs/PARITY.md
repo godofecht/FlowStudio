@@ -1,4 +1,4 @@
-## 2026-10-28: base R factor identity in browser session snapshots (verification pending)
+## 2026-10-28: base R factor identity in browser session snapshots (six CI jobs passed)
 
 The browser-local webR session snapshot exporter now recognizes strict base R
 factors and ordered factors, including unused levels and missing values. A
@@ -11,14 +11,21 @@ binding must be non-active and the object must have the exact base factor
 class and only the expected class/levels attributes. Import validates
 levels, membership, Unicode, counts and packet size before assigning.
 
-**Status: partial / independent CI pending.** Node tests cover snapshot
-validation, capture, import dispatch and webR query generation; a real
-Rscript round-trip test is included and explicitly skips when Rscript is
-unavailable. The full physical Chromium webR export/restore scenario has
-not yet been executed. Factors embedded as data.frame columns, custom
+**Status: partial / all six Ubuntu 24.04/macOS 14 jobs passed in
+[CI #40682737491](https://github.com/godofecht/FlowStudio/actions/runs/40682737491).**
+Each source platform ran 1004 JavaScript tests (994 passed, ten skipped,
+zero failures) and 158 Python tests (13 skipped, zero failures). Both
+native platforms compiled pinned Flow 2.0.0, completed their existing
+HTTP/Rscript/Chromium Quarto-Monaco acceptance and packaging, and
+**executed all seven factor snapshot tests with real Rscript and zero
+skips** through the required native verification gate. Both FlowJIT jobs
+passed. [PR #137](https://github.com/godofecht/FlowStudio/pull/137)
+merged as [aeeda61](https://github.com/godofecht/FlowStudio/commit/aeeda61b799b2ac241b0801febb37039ca47bd07).
+The new opt-in physical Chromium **live webR factor export/restore** scenario
+has not yet been executed. Factors embedded as data.frame columns, custom
 attributes/classes, more than 64 levels or more than 256 observations
 remain unsupported. This is not general R object serialization or
-RStudio parity. No hosted CI or native Flow compiler changes.
+RStudio parity. No hosted CI configuration or native Flow compiler changes.
 
 ## 2026-10-28: offline Flow 2.0.0 language help (six Linux/macOS CI jobs passed)
 

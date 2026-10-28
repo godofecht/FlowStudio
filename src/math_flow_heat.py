@@ -33,6 +33,7 @@ class HeatModel:
     boundary_axes: tuple[tuple[str, float | tuple[float, float] | None], ...] | None = None
     boundary_faces: tuple[tuple[str, float | tuple[float, float] | None], ...] | None = None
     diffusivity_y: float | None = None
+    cross_diffusivity: float = 0.0
 
 
 def parse_heat(source: str, base) -> HeatModel:
@@ -147,9 +148,17 @@ def parse_heat(source: str, base) -> HeatModel:
     reaction = bool({"reactionRate", "ambientTemperature"} & consts.keys())
     advection = bool({"advectionVelocityX", "advectionVelocityY"} & consts.keys())
     anisotropic = bool({"diffusivityX", "diffusivityY"} & consts.keys())
+    cross_diffusion = "crossDiffusivity" in consts
+    if cross_diffusion and not anisotropic:
+        raise error("Cross diffusion requires both directional diffusivities")
+    if cross_diffusion and (boundary_temperature is not None or boundary_gradient is not None
+                            or boundary_axes is not None or boundary_faces is not None):
+        raise error("Cross diffusion currently requires periodic boundaries")
     if anisotropic and "diffusivity" in consts:
         raise error("Declare isotropic diffusivity or both directional diffusivities, not both")
     required = {"diffusivityX", "diffusivityY"} if anisotropic else {"diffusivity"}
+    if cross_diffusion:
+        required.add("crossDiffusivity")
     if reaction:
         required.update({"reactionRate", "ambientTemperature"})
     if advection:
@@ -160,8 +169,11 @@ def parse_heat(source: str, base) -> HeatModel:
         raise error("temperature must be Scalar<Kelvin>")
     diffusivity = base.number(consts["diffusivityX" if anisotropic else "diffusivity"], ["m", "²", "/", "s"])
     diffusivity_y = base.number(consts["diffusivityY"], ["m", "²", "/", "s"]) if anisotropic else None
+    cross_diffusivity = base.number(consts["crossDiffusivity"], ["m", "²", "/", "s"]) if cross_diffusion else 0.0
     if diffusivity <= 0 or (diffusivity_y is not None and diffusivity_y <= 0):
         raise error("Heat diffusivities must be positive")
+    if cross_diffusion and abs(cross_diffusivity) >= 2 * math.sqrt(diffusivity * diffusivity_y):
+        raise error("Cross diffusion tensor must be strictly positive definite")
     reaction_rate = base.number(consts["reactionRate"], ["s", "⁻", "¹"]) if reaction else 0.0
     ambient_temperature = base.number(consts["ambientTemperature"], ["K"]) if reaction else 0.0
     if reaction and reaction_rate <= 0:
@@ -170,7 +182,8 @@ def parse_heat(source: str, base) -> HeatModel:
     velocity_y = base.number(consts["advectionVelocityY"], ["m", "/", "s"]) if advection else 0.0
     try:
         equation = compile_heat_equation([token.text for token in sections["dynamics"]],
-                                         reaction=reaction, advection=advection, anisotropic=anisotropic)
+                                         reaction=reaction, advection=advection, anisotropic=anisotropic,
+                                         cross_diffusion=cross_diffusion)
     except ExpressionError as exc:
         raise error(f"Unsupported heat dynamics: {exc}") from exc
     if equation.nonlinear and ambient_temperature <= 0:
@@ -239,7 +252,7 @@ def parse_heat(source: str, base) -> HeatModel:
     return HeatModel(int(width), int(height), lx, ly, diffusivity, expression,
                      step, until, equation, reaction_rate, ambient_temperature,
                      velocity_x, velocity_y, boundary_temperature, boundary_gradient, boundary_axes, boundary_faces,
-                     diffusivity_y)
+                     diffusivity_y, cross_diffusivity)
 
 
 def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | None = None,
@@ -260,7 +273,8 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
     dt = duration / steps
     dx, dy = model.length_x / nx, model.length_y / ny
     diffusivity_y = model.diffusivity if model.diffusivity_y is None else model.diffusivity_y
-    diffusion_stiffness = model.diffusivity / dx**2 + diffusivity_y / dy**2
+    diffusion_stiffness = (model.diffusivity / dx**2 + diffusivity_y / dy**2
+                           + abs(model.cross_diffusivity) / (4 * dx * dy))
     linear_reaction_rate = (0.0 if model.equation is not None and model.equation.nonlinear
                             else model.reaction_rate)
     # A conservative combined advective/diffusive CFL guard. Centered
@@ -317,6 +331,7 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
                 model.equation.rhs, x, y, expected_dimension=TEMPERATURE_RATE,
                 values={"temperature": state, "diffusivity": model.diffusivity,
                         "diffusivityX": model.diffusivity, "diffusivityY": diffusivity_y,
+                        "crossDiffusivity": model.cross_diffusivity,
                         "reactionRate": model.reaction_rate,
                         "ambientTemperature": model.ambient_temperature,
                         "advectionVelocityX": model.advection_velocity_x,

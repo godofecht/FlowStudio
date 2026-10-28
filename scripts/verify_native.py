@@ -184,6 +184,16 @@ def verify(root: Path, port: int = 8751, build_timeout: int = 180,
             print(snapshot_matrix_result.stderr, end="", file=sys.stderr, flush=True)
         if snapshot_matrix_result.returncode != 0:
             raise VerificationError("Real R matrix snapshot provenance acceptance failed")
+        print("Real base R factor snapshot acceptance: tests/browser_session_snapshot_r_factor.test.js", flush=True)
+        factor_result = _command(
+            ["node", "--test", str(root / "tests/browser_session_snapshot_r_factor.test.js")], root, 65
+        )
+        if factor_result.stdout:
+            print(factor_result.stdout, end="", flush=True)
+        if factor_result.stderr:
+            print(factor_result.stderr, end="", file=sys.stderr, flush=True)
+        if factor_result.returncode != 0:
+            raise VerificationError("Real R factor snapshot provenance acceptance failed")
         print("Real browser R inspector query acceptance: tests/browser_r_nested_environment.test.js", flush=True)
         inspect_result = _command(
             ["node", "--test", str(root / "tests/browser_r_nested_environment.test.js")], root, 65

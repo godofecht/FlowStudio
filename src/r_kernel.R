@@ -33,14 +33,23 @@ read_exact <- function(count) {
 }
 
 
-# R's built-in PDF device works without X11, Cairo, or third-party packages.
-# Open it before evaluating source; close it before exposing a bounded snapshot.
+# Capturing R plots without X11 or third-party packages: use the cairo SVG
+# device when available (directly renderable as a browser image), and fall
+# back to the PDF device otherwise. Open the device before evaluating source;
+# close it before exposing a bounded snapshot.
 last_plot_svg <- NULL
 last_plot_pdf <- NULL
 last_plot_warning <- NULL
 begin_plot_capture <- function() {
-    path <- tempfile("flowstudio-r-plot-", fileext = ".pdf")
-    grDevices::pdf(file = path, width = 7, height = 5, onefile = TRUE)
+    svg_path <- tempfile("flowstudio-r-plot-", fileext = ".svg")
+    pdf_path <- tempfile("flowstudio-r-plot-", fileext = ".pdf")
+    use_svg <- isTRUE(capabilities("cairo"))
+    path <- if (use_svg) svg_path else pdf_path
+    if (use_svg) {
+        grDevices::svg(file = path, width = 7, height = 5)
+    } else {
+        grDevices::pdf(file = path, width = 7, height = 5, onefile = TRUE)
+    }
     device <- as.integer(grDevices::dev.cur())
     plotted <- FALSE
     previous_hook <- getHook("plot.new")
@@ -54,26 +63,40 @@ begin_plot_capture <- function() {
         on.exit(unlink(path), add = TRUE)
         if (!plotted) return(invisible(NULL))
         if (!file.exists(path)) {
-            last_plot_warning <<- "Native R PDF file was not produced."
+            last_plot_warning <<- "Native R plot file was not produced."
             return(invisible(NULL))
         }
         bytes <- file.info(path)$size
         if (!is.finite(bytes) || bytes <= 0) {
-            last_plot_warning <<- "Native R PDF file was empty."
+            last_plot_warning <<- "Native R plot file was empty."
             return(invisible(NULL))
         }
         if (bytes > 60000L) {
-            last_plot_warning <<- "Native R PDF exceeds the 60 KiB capture limit."
+            last_plot_warning <<- (if (use_svg)
+                "Native R SVG exceeds the 60 KiB capture limit." else
+                "Native R PDF exceeds the 60 KiB capture limit.")
             return(invisible(NULL))
         }
-        reader <- file(path, open = "rb")
-        raw <- readBin(reader, what = "raw", n = as.integer(bytes))
-        close(reader)
-        if (length(raw) < 4L || !identical(raw[1:4], charToRaw("%PDF"))) {
-            last_plot_warning <<- "Native R PDF capture was invalid."
-            return(invisible(NULL))
+        if (use_svg) {
+            reader <- file(path, open = "rt")
+            lines <- readLines(reader, warn = FALSE)
+            close(reader)
+            text <- paste(lines, collapse = "\n")
+            if (grepl("<svg", text) && grepl("</svg>", text)) {
+                last_plot_svg <<- enc2utf8(text)
+            } else {
+                last_plot_warning <<- "Native R SVG capture was invalid."
+            }
+        } else {
+            reader <- file(path, open = "rb")
+            raw <- readBin(reader, what = "raw", n = as.integer(bytes))
+            close(reader)
+            if (length(raw) < 4L || !identical(raw[1:4], charToRaw("%PDF"))) {
+                last_plot_warning <<- "Native R PDF capture was invalid."
+                return(invisible(NULL))
+            }
+            last_plot_pdf <<- paste(sprintf("%02x", as.integer(raw)), collapse = "")
         }
-        last_plot_pdf <<- paste(sprintf("%02x", as.integer(raw)), collapse = "")
         invisible(NULL)
     }
 }

@@ -44,6 +44,12 @@ test("collect fetches and normalizes the server capture", async () => {
   assert.deepEqual(await figures.collect("python", fetcher).then(
     list => list.length), 2);
   assert.deepEqual(await figures.collect("flow", fetcher), []);
+  // Legacy R envelope: a single {svg, pdf, warning} snapshot without numbers.
+  const enveloped = await figures.collect("r", async () =>
+    response(200, JSON.stringify({svg: null, pdf: PDF, warning: null})));
+  assert.deepEqual(enveloped, [{number: 1, pdf: PDF}]);
+  assert.deepEqual(await figures.collect("r", async () =>
+    response(200, JSON.stringify({}))), []);
   assert.deepEqual(await figures.collect("r", async () => response(503, "unavailable")), []);
   assert.deepEqual(await figures.collect("r", async () => { throw new Error("down"); }), []);
   assert.deepEqual(await figures.collect("r", async () => response(200, "not json")), []);

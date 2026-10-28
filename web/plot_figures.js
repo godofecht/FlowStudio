@@ -40,14 +40,31 @@ async function collect(language, fetcher) {
     if (!response.ok) return [];
     const text = await response.text();
     const data = JSON.parse(text);
-    if (!data || !Array.isArray(data.plots)) return [];
-    return data.plots.map(validEntry).filter(Boolean);
+    if (!data) return [];
+    if (Array.isArray(data.plots))
+      return data.plots.map(validEntry).filter(Boolean);
+    // The R kernel still answers with one snapshot: {svg, pdf, warning}.
+    if (typeof data.svg === "string" || typeof data.pdf === "string")
+      return [validEntry({number: 1, svg: data.svg, pdf: data.pdf})].filter(Boolean);
+    return [];
   } catch (_) {
     return [];
   }
 }
 
-function figureElement(doc, item) {
+function pdfBytes(urlTarget, hex) {
+  let binary = "";
+  for (let offset = 0; offset < hex.length; offset += 2)
+    binary += String.fromCharCode(parseInt(hex.slice(offset, offset + 2), 16));
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
+  if (urlTarget && typeof urlTarget.createObjectURL === "function" &&
+      typeof Blob === "function")
+    return urlTarget.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+  return "data:application/pdf;base64," + btoa(binary);
+}
+
+function figureElement(doc, item, urlTarget) {
   const figure = doc.createElement("figure");
   figure.className = "captured-figure";
   let image;
@@ -56,12 +73,10 @@ function figureElement(doc, item) {
     image.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(item.svg);
     image.alt = "R plot " + item.number + " (SVG)";
   } else if (item.pdf) {
-    let binary = "";
-    for (let offset = 0; offset < item.pdf.length; offset += 2)
-      binary += String.fromCharCode(parseInt(item.pdf.slice(offset, offset + 2), 16));
     image = doc.createElement("embed");
     image.type = "application/pdf";
-    image.src = "data:application/pdf;base64," + btoa(binary);
+    // Chrome refuses data: PDFs inside embed; use blob URLs when available.
+    image.src = pdfBytes(urlTarget, item.pdf);
     image.title = "R plot " + item.number + " (PDF)";
     image.setAttribute("style", "width:100%;height:30rem");
   } else {
@@ -85,10 +100,26 @@ function figureElement(doc, item) {
 
 function create(doc, host) {
   const items = [];
+  let renderedBlobs = [];
+  function release() {
+    const urlTarget = typeof URL !== "undefined" ? URL : null;
+    if (urlTarget && typeof urlTarget.revokeObjectURL === "function")
+      for (const url of renderedBlobs) urlTarget.revokeObjectURL(url);
+    renderedBlobs = [];
+  }
   function render() {
     if (!doc || !host) return;
+    release();
+    const urlTarget = typeof URL !== "undefined" ? URL : null;
     host.replaceChildren();
-    for (const item of items.slice(-LIMIT)) host.append(figureElement(doc, item));
+    for (const item of items.slice(-LIMIT)) {
+      const figure = figureElement(doc, item, urlTarget);
+      host.append(figure);
+      if (item.pdf && urlTarget && typeof urlTarget.createObjectURL === "function" &&
+          figure.children[0] &&
+          String(figure.children[0].src || "").startsWith("blob:"))
+        renderedBlobs.push(figure.children[0].src);
+    }
   }
   return Object.freeze({
     append(plots) {
@@ -106,6 +137,7 @@ function create(doc, host) {
     },
     clear() {
       items.length = 0;
+      release();
       if (host) host.replaceChildren();
     },
     size: () => items.length

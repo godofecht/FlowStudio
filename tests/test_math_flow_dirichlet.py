@@ -60,6 +60,23 @@ class DirichletHeatTest(unittest.TestCase):
         self.assertIsNone(parse(PERIODIC).boundary_temperature)
         self.assertEqual(simulate(parse(PERIODIC))["boundary_condition"], "Periodic")
 
+    def test_dirichlet_transport_reaction_preserves_constant_equilibrium(self):
+        import numpy as np
+        transport = (ROOT / "examples/heat_transport_reaction.flow").read_text(encoding="utf-8")
+        transport = transport.replace("boundaries = Periodic",
+                                      "boundaries = Dirichlet(300K)")
+        transport = transport.replace(
+            "temperature = 300K + 10K * sin(2πx / 1m) + 5K * cos(2πy / 1m)",
+            "temperature = 300K").replace("+ 2K/s", "")
+        model = parse(transport)
+        self.assertTrue(model.equation.advection)
+        self.assertIsNotNone(model.equation.reaction)
+        result = simulate(model)
+        self.assertAlmostEqual(result["mean_temperature"], 300.0, places=10)
+        self.assertAlmostEqual(result["temperature_variance"], 0.0, places=15)
+        np.testing.assert_allclose(result["spatial"]["fields"]["temperature"],
+                                   300.0, atol=1e-10)
+
     def test_invalid_boundary_declarations_fail_closed(self):
         for boundary in ("Neumann(300K)", "Dirichlet(300m)", "Dirichlet()",
                          "Dirichlet(300K, 301K)", "Dirichlet(300K) + Periodic"):

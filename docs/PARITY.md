@@ -1,3 +1,26 @@
+## 2026-10-28: Python NumPy ndarray identity in browser session snapshots (verification pending)
+
+The browser-local Python session exporter now records **verified exact NumPy ndarray**
+provenance in the existing version-2 snapshot format. A bounded homogeneous
+1D vector or nonempty 2D matrix is restored through the existing real Pyodide
+NumPy constructor instead of silently becoming a list or dictionary. This
+retains dimensionality, row/column order, boolean/Unicode values and numeric
+missing cells (as NaN). Ordinary Python/R variable transfers and legacy v1
+snapshots are unchanged. The existing 256-element vector, 128-row/16-column
+table, 32-KiB packet and 128-KiB snapshot limits still apply. Invalid
+heterogeneous or missing boolean/string arrays are rejected rather than
+restored with guessed types. Dtype widths, memory order, structured dtypes,
+subclasses, masked arrays, object arrays and arbitrary NumPy attributes are
+**not preserved**.
+
+**Status: partial / focused V8 execution of the actual snapshot and worker
+modules passed locally; independent Node/CPython CI and physical Chromium
+Pyodide execution are pending.** The new automated suite exercises v1/v2
+validation, capture/restore provenance, real worker dispatch and actual
+CPython/NumPy export and reconstruction when NumPy is installed. No native
+Flow backend, upstream compiler or hosted CI configuration changed. This is
+not RStudio feature parity.
+
 ## 2026-10-28: explicit R matrix identity in browser session snapshots (Linux/macOS CI passed)
 
 The existing browser-local Python/R session export/import now preserves **plain,

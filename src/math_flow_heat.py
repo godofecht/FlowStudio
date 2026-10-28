@@ -24,6 +24,8 @@ class HeatModel:
     step: float
     until: float
     equation: Equation | None = None
+    reaction_rate: float = 0.0
+    ambient_temperature: float = 0.0
 
 
 def parse_heat(source: str, base) -> HeatModel:
@@ -72,15 +74,22 @@ def parse_heat(source: str, base) -> HeatModel:
             fields[stmt[1]] = stmt[3:]
         else:
             raise error(f"Unsupported heat declaration: {' '.join(stmt)}")
-    base.expect_keys(consts, {"diffusivity"}, "heat constants")
+    reaction = set(consts) == {"diffusivity", "reactionRate", "ambientTemperature"}
+    if not reaction:
+        base.expect_keys(consts, {"diffusivity"}, "heat constants")
     base.expect_keys(fields, {"temperature"}, "heat fields")
     if fields["temperature"] != ["Scalar", "<", "Kelvin", ">"]:
         raise error("temperature must be Scalar<Kelvin>")
     diffusivity = base.number(consts["diffusivity"], ["m", "²", "/", "s"])
     if diffusivity <= 0:
         raise error("Heat diffusivity must be positive")
+    reaction_rate = base.number(consts["reactionRate"], ["s", "⁻", "¹"]) if reaction else 0.0
+    ambient_temperature = base.number(consts["ambientTemperature"], ["K"]) if reaction else 0.0
+    if reaction and reaction_rate <= 0:
+        raise error("Reaction rate must be positive")
     try:
-        equation = compile_heat_equation([token.text for token in sections["dynamics"]])
+        equation = compile_heat_equation([token.text for token in sections["dynamics"]],
+                                         reaction=reaction)
     except ExpressionError as exc:
         raise error(f"Unsupported heat dynamics: {exc}") from exc
     initial = base.assignments(sections["initial"])
@@ -144,7 +153,8 @@ def parse_heat(source: str, base) -> HeatModel:
         raise error("Unsupported heat visualization mapping")
     if p.peek() != "<EOF>":
         raise error(f"Unexpected trailing heat token {p.peek()}")
-    return HeatModel(int(width), int(height), lx, ly, diffusivity, expression, step, until, equation)
+    return HeatModel(int(width), int(height), lx, ly, diffusivity, expression,
+                     step, until, equation, reaction_rate, ambient_temperature)
 
 
 def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | None = None,
@@ -164,17 +174,14 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
         raise error_type("Heat evolution must have between 1 and 200000 steps")
     dt = duration / steps
     dx, dy = model.length_x / nx, model.length_y / ny
-    if dt * model.diffusivity * (1 / dx**2 + 1 / dy**2) > .45:
-        raise error_type("Heat time step violates diffusion stability bound")
+    if dt * (model.diffusivity * (1 / dx**2 + 1 / dy**2)
+             + model.reaction_rate / 4) > .45:
+        raise error_type("Heat time step violates diffusion/reaction stability bound")
     x, y = np.meshgrid((np.arange(nx) + .5) * dx,
                        (np.arange(ny) + .5) * dy, indexing="ij")
     try:
         field = np.broadcast_to(evaluate(parse_expression(model.initial), x, y,
                                          expected_dimension=TEMPERATURE), (nx, ny)).copy()
-        forcing = (np.broadcast_to(evaluate(model.equation.forcing, x, y,
-                                           expected_dimension=TEMPERATURE_RATE), (nx, ny))
-                   if model.equation is not None and model.equation.forcing is not None
-                   else 0.0)
     except ExpressionError as exc:
         raise error_type(str(exc)) from exc
     initial_mean = float(np.mean(field))
@@ -184,12 +191,24 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
         return ((np.roll(a, -1, axis=0) + np.roll(a, 1, axis=0) - 2 * a) / dx**2 +
                 (np.roll(a, -1, axis=1) + np.roll(a, 1, axis=1) - 2 * a) / dy**2)
 
+    def rhs(state):
+        if model.equation is None:
+            return model.diffusivity * laplacian(state)
+        try:
+            return np.broadcast_to(evaluate(
+                model.equation.rhs, x, y, expected_dimension=TEMPERATURE_RATE,
+                values={"temperature": state, "diffusivity": model.diffusivity,
+                        "reactionRate": model.reaction_rate,
+                        "ambientTemperature": model.ambient_temperature}), (nx, ny))
+        except (ExpressionError, ValueError) as exc:
+            raise error_type(f"Invalid heat equation evaluation: {exc}") from exc
+
     observations = [{"time": 0.0, "meanTemperature": initial_mean,
                      "temperatureVariance": initial_variance}]
     sample_stride = max(1, math.ceil(steps / 128))
     for step_index in range(steps):
-        k1 = model.diffusivity * laplacian(field) + forcing
-        k2 = model.diffusivity * laplacian(field + dt * k1) + forcing
+        k1 = rhs(field)
+        k2 = rhs(field + dt * k1)
         field += .5 * dt * (k1 + k2)
         if not np.all(np.isfinite(field)):
             raise error_type("Non-finite temperature during heat integration")
@@ -204,7 +223,7 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
             "mean_temperature": mean, "initial_mean_temperature": initial_mean,
             "temperature_variance": variance, "initial_temperature_variance": initial_variance,
             "temperature_min": float(np.min(field)), "temperature_max": float(np.max(field)),
-            "method": "periodic centered-difference RK2 heat equation",
+            "method": "periodic centered-difference RK2 scalar reaction-diffusion equation",
             "observations": observations,
             "spatial": spatial_snapshot(
                 {"temperature": field}, (model.length_x, model.length_y))}

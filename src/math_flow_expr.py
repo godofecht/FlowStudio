@@ -21,7 +21,7 @@ UNITS: dict[str, Dimension] = {
 SUPERSCRIPT = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁻−", "0123456789--")
 _NUMBER = r"(?:10[⁻−-][⁰¹²³⁴⁵⁶⁷⁸⁹0-9]+|(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)"
 _UNIT = r"(?:kg|Pa|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)?(?:/(?:kg|Pa|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*))?"
-_TOKEN = re.compile(rf"(?P<space>\s+)|(?P<quantity>{_NUMBER}(?:{_UNIT})?)|(?P<name>∂ₓ²|∂ᵧ²|∂ₓ|∂ᵧ|∇²|[A-Za-z_][A-Za-z_0-9]*|π)|(?P<postfix>[²³])|(?P<op>[+\-−*/×·(),^])")
+_TOKEN = re.compile(rf"(?P<space>\s+)|(?P<quantity>{_NUMBER}(?:{_UNIT})?)|(?P<name>∂ₓ²|∂ᵧ²|∂ₓ|∂ᵧ|∇²|[A-Za-z_][A-Za-z_0-9]*|π)|(?P<postfix>[²³⁴⁵⁶⁷⁸])|(?P<op>[+\-−*/×·(),^])")
 _UNIT_PART = re.compile(r"(kg|Pa|m|s|K)([²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)\Z")
 
 
@@ -156,7 +156,7 @@ class _Parser:
             raise ExpressionError(f"Unknown symbol or operator {first!r}")
         while True:
             nxt = self.peek()
-            if nxt in ("^", "²", "³"):
+            if nxt in ("^", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸"):
                 operator, precedence = "pow", 40
             elif nxt in ("+", "-", "−"):
                 operator, precedence = ("add" if nxt == "+" else "sub"), 10
@@ -170,8 +170,8 @@ class _Parser:
                 break
             if operator == "pow":
                 self.take()
-                if nxt in ("²", "³"):
-                    right = Expression("literal", value=2.0 if nxt == "²" else 3.0)
+                if nxt in ("²", "³", "⁴", "⁵", "⁶", "⁷", "⁸"):
+                    right = Expression("literal", value=float("²³⁴⁵⁶⁷⁸".index(nxt) + 2))
                 else:
                     right = self.expression(precedence, depth + 1)
                 if (right.operator == "neg" and len(right.operands) == 1

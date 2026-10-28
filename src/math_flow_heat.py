@@ -228,7 +228,7 @@ def parse_heat(source: str, base) -> HeatModel:
     except ExpressionError as exc:
         raise error(f"Unsupported heat dynamics: {exc}") from exc
     if equation.nonlinear and ambient_temperature <= 0:
-        raise error("Quadratic thermal relaxation requires positive ambientTemperature")
+        raise error("Polynomial thermal relaxation requires positive ambientTemperature")
     initial = base.assignments(sections["initial"])
     base.expect_keys(initial, {"temperature"}, "heat initial")
     expression = "".join(initial["temperature"])
@@ -358,14 +358,18 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
             return model.diffusivity * laplacian(state)
         if model.equation.nonlinear:
             if model.ambient_temperature <= 0:
-                raise error_type("Quadratic thermal relaxation requires positive ambientTemperature")
+                raise error_type("Polynomial thermal relaxation requires positive ambientTemperature")
             if np.any(state < model.ambient_temperature - 1e-10):
-                raise error_type("Quadratic thermal relaxation requires temperature >= ambientTemperature")
+                raise error_type("Polynomial thermal relaxation requires temperature >= ambientTemperature")
             maximum_excess = float(np.max(np.maximum(state - model.ambient_temperature, 0.0)))
-            # Local linearized reaction eigenvalue is -2*k*(T-A)/A.
+            # Jacobian of -k*(T-A)^n/A^(n-1) is -n*k*((T-A)/A)^(n-1).
             # Check both RK2 stages, not just the initial field.
+            reaction_power = model.equation.reaction_power
+            reaction_stiffness = (reaction_power * model.reaction_rate
+                                  * (maximum_excess / model.ambient_temperature)
+                                  ** (reaction_power - 1))
             if dt * (diffusion_stiffness + advective_stiffness +
-                     model.reaction_rate * maximum_excess / (2 * model.ambient_temperature)) > .45:
+                     reaction_stiffness / 4) > .45:
                 raise error_type("Heat time step violates nonlinear reaction stability bound")
         try:
             return np.broadcast_to(evaluate(

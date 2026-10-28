@@ -122,7 +122,7 @@ test("webR import builds actual factor columns and rejects malformed options",as
 
 test("browser workspace dispatches factor columns to the existing R interpreter",()=>{
   const html=fs.readFileSync(path.join(__dirname,"../docs/app/index.html"),"utf8");
-  assert.match(html,/restoreAs==="dataframe" \? \{asFactorColumns:dtype\}/);
+  assert.match(html,/restoreAs==="dataframe" \? \(Array\.isArray\(dtype\) \? \{asFactorColumns:dtype\}/);
 });
 
 test("real Rscript round-trips ordered factor data.frame columns",async t=>{

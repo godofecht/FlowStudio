@@ -1,3 +1,23 @@
+## 2026-10-28: bounded R data.frame row-name snapshot preservation (verification pending)
+
+The browser-local webR snapshot transport now exports nondefault, unique
+R data.frame row names as explicit typed provenance, optionally alongside
+existing factor/ordered-factor column metadata. It reconstructs row names
+through the actual R replacement setter when importing the snapshot.
+Ordinary R-to-Python variable transfer continues rejecting custom row names
+instead of silently dropping identity. Preflight validates Unicode, uniqueness,
+row count, length and the entire snapshot before assignment. Legacy plain
+tables, factor-column snapshots, matrices and Python snapshots retain their
+existing formats. The new test suite covers malformed metadata, the browser
+dispatch and real Rscript round trips, and is required by the native
+verification script when Rscript is installed.
+
+**Status: partial / independent CI pending.** Local native execution and
+physical Chromium/webR restoration have not been verified in this iteration.
+No Flow compiler, hosted CI configuration or remote execution model changed.
+This is bounded row-name persistence, not general R object serialization.
+RStudio parity remains incomplete.
+
 ## 2026-10-28: R data.frame factor columns (six independent CI jobs passed)
 
 The browser-local R session snapshot path now supports strict base R factor and

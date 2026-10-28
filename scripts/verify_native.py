@@ -204,6 +204,16 @@ def verify(root: Path, port: int = 8751, build_timeout: int = 180,
             print(factor_columns_result.stderr, end="", file=sys.stderr, flush=True)
         if factor_columns_result.returncode != 0:
             raise VerificationError("Real R data.frame factor column acceptance failed")
+        print("Real R data.frame row-name snapshot acceptance: tests/browser_session_snapshot_r_rownames.test.js", flush=True)
+        row_names_result = _command(
+            ["node", "--test", str(root / "tests/browser_session_snapshot_r_rownames.test.js")], root, 65
+        )
+        if row_names_result.stdout:
+            print(row_names_result.stdout, end="", flush=True)
+        if row_names_result.stderr:
+            print(row_names_result.stderr, end="", file=sys.stderr, flush=True)
+        if row_names_result.returncode != 0:
+            raise VerificationError("Real R data.frame row-name snapshot acceptance failed")
         print("Real browser R inspector query acceptance: tests/browser_r_nested_environment.test.js", flush=True)
         inspect_result = _command(
             ["node", "--test", str(root / "tests/browser_r_nested_environment.test.js")], root, 65

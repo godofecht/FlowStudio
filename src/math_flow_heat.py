@@ -30,8 +30,8 @@ class HeatModel:
     advection_velocity_y: float = 0.0
     boundary_temperature: float | None = None
     boundary_gradient: float | None = None
-    boundary_axes: tuple[tuple[str, float | tuple[float, float] | None], ...] | None = None
-    boundary_faces: tuple[tuple[str, float | tuple[float, float] | None], ...] | None = None
+    boundary_axes: tuple[tuple[str, float | str | tuple[float, float] | None], ...] | None = None
+    boundary_faces: tuple[tuple[str, float | str | tuple[float, float] | None], ...] | None = None
     diffusivity_y: float | None = None
     cross_diffusivity: float = 0.0
 
@@ -74,6 +74,26 @@ def parse_heat(source: str, base) -> HeatModel:
                 raise error("Robin transfer length must be positive")
             return ("Robin", (ambient, length))
         unit = ["K"] if kind == "Dirichlet" else ["K", "/", "m"]
+        if kind == "Dirichlet":
+            # Preserve the literal fast path; profiles are separately parsed,
+            # dimension-checked and evaluated at the physical face and RK2 time.
+            try:
+                return (kind, base.number(tokens[2:-1], unit))
+            except error:
+                profile = "".join(tokens[2:-1])
+                try:
+                    typed = parse_expression(profile, symbols={"t": (0, 0, 1, 0)})
+                except ExpressionError as exc:
+                    raise error(f"Invalid Dirichlet profile: {exc}") from exc
+                if typed.dimension != TEMPERATURE:
+                    raise error("Dirichlet profile must have Kelvin dimensions")
+                def check_profile(node):
+                    if node.operator in ("∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∇²"):
+                        raise error("Dirichlet profiles cannot contain spatial derivatives")
+                    for child in node.operands:
+                        check_profile(child)
+                check_profile(typed)
+                return ("DirichletProfile", profile)
         return (kind, base.number(tokens[2:-1], unit))
 
     boundary_tokens = d["boundaries"]
@@ -105,7 +125,7 @@ def parse_heat(source: str, base) -> HeatModel:
                     raise error("Periodic boundaries must occur on both faces of an axis")
     else:
         kind, value = parse_face(boundary_tokens)
-        if kind == "Robin":
+        if kind in ("Robin", "DirichletProfile"):
             boundary_axes = ((kind, value), (kind, value))
         if kind == "Dirichlet":
             boundary_temperature = value

@@ -310,6 +310,21 @@ def main() -> None:
     bad_robin = robin_source.replace("Robin(300K, 0.2m)", "Robin(300K, 0m)")
     status, body = request("POST", "/api/check/mathflow", bad_robin, accepted_headers)
     assert status == 422 and not json.loads(body)["ok"], (status, body)
+    # Directional Unicode second derivatives execute through the native HTTP router.
+    anisotropic_source = (Path(__file__).resolve().parents[1] /
+                          "examples/heat_anisotropic.flow").read_text(encoding="utf-8")
+    status, body = request("POST", "/api/check/mathflow", anisotropic_source, accepted_headers)
+    assert status == 200 and json.loads(body)["ok"], (status, body)
+    status, body = request("POST", "/api/run/mathflow", anisotropic_source, accepted_headers)
+    anisotropic = json.loads(body)
+    assert status == 200 and anisotropic["ok"] and anisotropic["steps"] == 100, (status, anisotropic)
+    assert anisotropic["boundary_condition"] == "Periodic", anisotropic
+    assert anisotropic["temperature_variance"] < anisotropic["initial_temperature_variance"], anisotropic
+    assert abs(anisotropic["mean_temperature"] - 300) < 1e-9, anisotropic
+    assert "temperature" in anisotropic["spatial"]["fields"], anisotropic
+    bad_anisotropic = anisotropic_source.replace("0.02m²/s", "0.02m/s")
+    status, body = request("POST", "/api/check/mathflow", bad_anisotropic, accepted_headers)
+    assert status == 422 and not json.loads(body)["ok"], (status, body)
     # Real nonlinear reaction-diffusion via native Flow HTTP and NumPy RK2.
     nonlinear_source = (Path(__file__).resolve().parents[1] /
                         "examples/heat_nonlinear_reaction.flow").read_text(encoding="utf-8")

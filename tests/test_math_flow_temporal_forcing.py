@@ -63,8 +63,8 @@ class TemporalForcingTest(unittest.TestCase):
         self.assertEqual(run.returncode, 0, run.stderr)
         result = json.loads(run.stdout)
         self.assertTrue(result["ok"])
-        self.assertLess(abs(result["mean_temperature"] -
-                            (300 + (1 - math.cos(2 * math.pi * .01)) / math.pi), 2e-8)
+        expected_mean = 300 + (1 - math.cos(2 * math.pi * .01)) / math.pi
+        self.assertLess(abs(result["mean_temperature"] - expected_mean), 2e-8)
         self.assertIn("temperature", result["spatial"]["fields"])
 
 

@@ -154,17 +154,23 @@
     const boundary = result.boundary_condition;
     let boundaryNote = null;
     if (boundary !== undefined) {
-      if (boundary !== "Periodic" && boundary !== "Dirichlet")
+      if (boundary !== "Periodic" && boundary !== "Dirichlet" && boundary !== "Neumann")
         throw new TypeError("Unsupported mathematical Flow boundary metadata.");
       if (boundary === "Dirichlet" &&
           (typeof result.boundary_temperature !== "number" ||
            !Number.isFinite(result.boundary_temperature)))
         throw new TypeError("Invalid Dirichlet boundary temperature.");
+      if (boundary === "Neumann" &&
+          (typeof result.boundary_gradient !== "number" ||
+           !Number.isFinite(result.boundary_gradient)))
+        throw new TypeError("Invalid Neumann boundary gradient.");
       boundaryNote = doc.createElement("p");
       boundaryNote.setAttribute("data-mathflow-boundary", boundary);
       boundaryNote.textContent = boundary === "Dirichlet"
         ? "Boundary: Dirichlet at " + result.boundary_temperature + " K (all faces)"
-        : "Boundary: periodic";
+        : boundary === "Neumann"
+          ? "Boundary: Neumann outward gradient " + result.boundary_gradient + " K/m (all faces)"
+          : "Boundary: periodic";
     }
     const label = doc.createElement("label");
     label.textContent = "Quantity ";

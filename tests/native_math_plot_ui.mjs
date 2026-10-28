@@ -14,6 +14,7 @@ try {
   for (const [source, metric, other] of [
     ['examples/heat_equation_smoke.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_dirichlet.flow', 'temperatureVariance', 'meanTemperature'],
+    ['examples/heat_neumann.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_nonlinear_reaction.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_transport_reaction.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/navier_stokes_smoke.flow', 'kineticEnergy', 'maximumDivergence']
@@ -31,6 +32,11 @@ try {
     assert.equal(await spatial.count(), 1, 'Real spatial SVG must render');
     assert.ok(await spatial.locator('rect').count() >= 16 * 16, 'Actual sampled heatmap cells');
     assert.match(await spatial.getAttribute('aria-label'), /Spatial/);
+    if (source === 'examples/heat_neumann.flow') {
+      const note = page.locator('#mathFlowPlot [data-mathflow-boundary="Neumann"]');
+      assert.equal(await note.count(), 1, 'Native plot must display Neumann metadata');
+      assert.match(await note.textContent(), /0 K\/m/);
+    }
     if (source === 'examples/heat_dirichlet.flow') {
       const note = page.locator('#mathFlowPlot [data-mathflow-boundary="Dirichlet"]');
       assert.equal(await note.count(), 1, 'Native plot must display actual boundary metadata');

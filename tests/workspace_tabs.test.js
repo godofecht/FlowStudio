@@ -33,22 +33,26 @@ test("starts on files without loading plot or data frames", () => {
   assert.equal(tabs.current(), "files");
   assert.equal(f.nodes.get("view-files").hidden, false);
   assert.equal(f.nodes.get("view-plots").hidden, true);
+  assert.equal(f.nodes.get("view-plots").frame.getAttribute("src"), null);
   assert.equal(f.nodes.get("view-data").frame.getAttribute("src"), null);
   assert.equal(f.nodes.get("tab-files").attributes["aria-selected"], "true");
 });
 
-test("switches tabs and lazy-loads allowlisted Flow routes exactly once", () => {
+test("switches tabs and lazy-loads the data frame exactly once", () => {
   const f = fixture();
   const tabs = mount(f.doc, f.storage);
   f.nodes.get("tab-plots").listeners.click();
   assert.equal(tabs.current(), "plots");
-  assert.equal(f.nodes.get("view-plots").frame.getAttribute("src"), "/plots");
+  // Plots render inline from captured figures; no iframe route is needed.
+  assert.equal(f.nodes.get("view-plots").hidden, false);
+  assert.equal(f.nodes.get("view-plots").frame.getAttribute("src"), null);
   assert.equal(f.nodes.get("view-files").hidden, true);
   assert.equal(f.storage.saved, "plots");
   f.nodes.get("tab-data").listeners.click();
   assert.equal(f.nodes.get("view-data").frame.getAttribute("src"), "/data");
   tabs.select("plots");
-  assert.equal(f.nodes.get("view-plots").frame.getAttribute("src"), "/plots");
+  assert.equal(f.nodes.get("view-plots").frame.getAttribute("src"), null);
+  assert.equal(f.nodes.get("view-data").frame.getAttribute("src"), "/data");
   assert.equal(tabs.select("unknown"), false);
 });
 

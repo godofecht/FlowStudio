@@ -78,6 +78,9 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/editor_recovery.js" {
         return StaticAsset { path: "web/editor_recovery.js", mime: "text/javascript; charset=utf-8", found: true }
     }
+    if url == "/plot_figures.js" {
+        return StaticAsset { path: "web/plot_figures.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
     if url == "/workspace_console.js" {
         return StaticAsset { path: "web/workspace_console.js", mime: "text/javascript; charset=utf-8", found: true }
     }

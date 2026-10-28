@@ -23,6 +23,7 @@ test("both editor routes share the same source HTML", () => {
 test("integrated console scripts load once, after workspace tabs", () => {
   const html = read("web/index.html");
   const tags = ['<script src="/console.js"></script>',
+    '<script src="/plot_figures.js"></script>',
     '<script src="/workspace_console.js"></script>'];
   const tabs = html.indexOf("FlowStudioWorkspaceTabs.mount();");
   assert.ok(tabs >= 0);
@@ -34,6 +35,7 @@ test("integrated console scripts load once, after workspace tabs", () => {
   assert.ok(html.indexOf(tags[0]) < html.indexOf(tags[1]));
   const routes = read("src/data_routes.flow");
   assert.match(routes, /if url == "\/console\.js"/);
+  assert.match(routes, /if url == "\/plot_figures\.js"/);
   assert.match(routes, /if url == "\/workspace_console\.js"/);
 });
 

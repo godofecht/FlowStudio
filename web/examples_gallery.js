@@ -112,9 +112,10 @@ const EXAMPLES = [
 'plot(res$index, res$residual, type = "b", main = "Residuals of a Python fit")\n' +
 'abline(h = 0, col = "red")\n' }
     ],
+    visual: "Plots residuals with base R. The Plots tab opens with the figure after Run.",
     steps: [
-      "Run fit.py with Python selected.",
-      "Run plot.R with R selected and open the Plots tab to see the captured figure."
+      "Run fit.py with Python selected (writes data/fit_residuals.csv).",
+      "Run plot.R with R selected. The Plots tab opens automatically with the figure."
     ]
   }
 ];
@@ -131,6 +132,7 @@ function validate() {
     if (typeof example.title !== "string" || !example.title) return "bad title";
     if (typeof example.description !== "string") return "bad description";
     if (!Array.isArray(example.steps)) return "bad steps";
+    if (example.visual !== undefined && typeof example.visual !== "string") return "bad visual";
     if (!Array.isArray(example.files)) return "bad files";
     for (const file of example.files) {
       if (!file || typeof file.name !== "string" || typeof file.language !== "string" ||
@@ -261,11 +263,17 @@ function mount(document, options) {
     description.className = "muted";
     description.textContent = example.description;
     card.append(description);
+    if (example.visual) {
+      const hint = document.createElement("p");
+      hint.className = "example-visual";
+      hint.textContent = "Visual: " + example.visual;
+      card.append(hint);
+    }
     if (handleOpenProject && !example.demoRoute) {
       const primary = document.createElement("button");
       primary.type = "button";
       primary.className = "primary";
-      primary.textContent = "Open project in editor (" + example.files.length + " " +
+      primary.textContent = "Open and run (" + example.files.length + " " +
         (example.files.length === 1 ? "file" : "files") + ")";
       primary.addEventListener("click", () => handleOpenProject(example));
       card.append(primary);

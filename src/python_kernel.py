@@ -1,11 +1,12 @@
 """Length-framed, persistent native Python kernel for FlowStudio's loopback server.
 
-Not a sandbox. Code executes with the FlowStudio user's local permissions.
-Protocol: stdin E/I opcode + 8 ASCII hex bytes + UTF-8 source; fd 3: status (0/1) +
+Not a sandbox: code executes with the FlowStudio user's local permissions.
+Protocol: stdin E/I/P opcode + 8 ASCII hex bytes + UTF-8 source; fd 3: status (0/1) +
 8 ASCII hex bytes + UTF-8 captured output. One process per local server.
 """
 from __future__ import annotations
 
+import base64
 import contextlib
 import io
 import json
@@ -16,6 +17,12 @@ import traceback
 
 MAX_SOURCE = 131072
 MAX_OUTPUT = 131072
+# Bounded matplotlib capture. The JSON must fit the C result buffer
+# (128 KiB) together with its length frame; snapshots of the most recent
+# run replace the previous capture, like the R kernel's plot snapshot.
+MAX_FIGURES = 3
+MAX_PLOT_JSON = 96 * 1024
+plots: list[dict[str, object]] = []
 
 
 class LimitedWriter(io.TextIOBase):
@@ -60,6 +67,60 @@ def read_exact(stream: io.BufferedReader, count: int) -> bytes | None:
         chunks.extend(part)
     return bytes(chunks)
 
+
+def prepare_matplotlib() -> None:
+    """Select the non-DOM Agg renderer before pyplot is first imported."""
+    try:
+        import matplotlib
+    except ImportError:
+        return
+    if "matplotlib.pyplot" not in sys.modules:
+        matplotlib.use("Agg")
+
+
+def close_previous_figures() -> None:
+    """Discard figures rendered for an earlier run so snapshots stay fresh."""
+    pyplot = sys.modules.get("matplotlib.pyplot")
+    if pyplot is None:
+        return
+    for number in list(pyplot.get_fignums()):
+        try:
+            pyplot.close(number)
+        except Exception:
+            continue
+
+
+def capture_plots() -> None:
+    """Snapshot the run's open figures as bounded PNG base64 entries.
+
+    One broken or oversized figure must not hide the rest; the total JSON
+    stays under MAX_PLOT_JSON so the transport frame never overflows.
+    """
+    global plots
+    plots = []
+    pyplot = sys.modules.get("matplotlib.pyplot")
+    if pyplot is None:
+        return
+    used = 0
+    for number in list(pyplot.get_fignums())[-MAX_FIGURES:]:
+        buffer = io.BytesIO()
+        try:
+            pyplot.figure(number).savefig(buffer, format="png", dpi=85)
+        except Exception:
+            continue
+        png = base64.b64encode(buffer.getvalue()).decode("ascii")
+        if used + len(png) > MAX_PLOT_JSON:
+            break
+        used += len(png)
+        plots.append({"number": number, "png": png})
+
+
+def plot_snapshot() -> bytes:
+    """Return the latest run's captured figures as bounded JSON."""
+    payload = json.dumps({"plots": plots}, separators=(",", ":")).encode("ascii")
+    if len(payload) > MAX_PLOT_JSON:
+        return b'{"plots":[]}'
+    return payload
 
 
 MAX_INSPECT_NODES = 256
@@ -166,7 +227,7 @@ def serve() -> None:
             length = int(header[1:], 16)
         except ValueError:
             return
-        if header[:1] not in (b"E", b"I", b"T", b"B", b"S", b"N", b"F", b"C", b"X", b"Q") or length > MAX_SOURCE or (header[:1] in (b"I", b"S", b"N", b"F", b"C", b"X", b"Q") and length != 0):
+        if header[:1] not in (b"E", b"I", b"P", b"T", b"B", b"S", b"N", b"F", b"C", b"X", b"Q") or length > MAX_SOURCE or (header[:1] in (b"I", b"P", b"S", b"N", b"F", b"C", b"X", b"Q") and length != 0):
             return
         data = read_exact(stdin, length)
         if data is None:
@@ -188,6 +249,11 @@ def serve() -> None:
         elif header[:1] == b"I":
             ok = True
             payload = inspect_namespace(namespace)
+        elif header[:1] == b"P":
+            # Read-only: returns the bounded snapshot of the latest run's
+            # captured figures without evaluating source.
+            ok = True
+            payload = plot_snapshot()
         elif header[:1] == b"T":
             try:
                 source = data.decode("utf-8", "strict")
@@ -202,6 +268,8 @@ def serve() -> None:
         else:
             output = LimitedWriter()
             ok = True
+            prepare_matplotlib()
+            close_previous_figures()
             with contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
                 try:
                     source = data.decode("utf-8", "strict")
@@ -210,6 +278,7 @@ def serve() -> None:
                 except BaseException:
                     ok = False
                     traceback.print_exc()
+            capture_plots()
             payload = output.result()
             if not payload:
                 payload = b"(No output)" if ok else b"Execution failed."

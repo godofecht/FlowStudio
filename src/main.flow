@@ -46,6 +46,7 @@ extern {
     function fs_py_debug_stop() -> string
     function fs_py_debug_state() -> string
     function fs_py_inspect() -> string
+    function fs_py_plot() -> string
     function fs_py_status() -> i32
     function fs_py_reset() -> void
     function unlink(path: string) -> i32
@@ -286,6 +287,18 @@ function send_r_package_update(name: string) -> void {
 function send_r_plot() -> void {
     let output: string = fs_r_plot()
     let status: i32 = fs_r_status()
+    if status == 200 {
+        fs_reply(200, "application/json; charset=utf-8", output)
+    } else {
+        fs_reply(status, "text/plain; charset=utf-8", output)
+    }
+}
+
+# Read-only figure snapshot: the persistent Python kernel returns the
+# bounded PNG capture of the latest run; no source is evaluated here.
+function send_python_plot() -> void {
+    let output: string = fs_py_plot()
+    let status: i32 = fs_py_status()
     if status == 200 {
         fs_reply(200, "application/json; charset=utf-8", output)
     } else {
@@ -705,6 +718,10 @@ function dispatch() -> void {
         }
         if eq(path, "/api/plot/r") {
             send_r_plot()
+            return
+        }
+        if eq(path, "/api/plot/python") {
+            send_python_plot()
             return
         }
         if eq(path, "/api/packages/r") {

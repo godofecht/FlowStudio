@@ -25,6 +25,7 @@ static pid_t kernel_pid = -1;
 static int kernel_in = -1;
 static int kernel_out = -1;
 static int last_status = 503;
+static int kernel_ever_responded = 0;
 static char result[FS_R_MAX + 1];
 
 static int64_t milliseconds(void)
@@ -52,6 +53,7 @@ void fs_r_reset(void)
         while (waitpid(kernel_pid, NULL, 0) < 0 && errno == EINTR) {}
     }
     kernel_pid = -1;
+    kernel_ever_responded = 0;
 }
 
 static int start_kernel(void)
@@ -153,6 +155,7 @@ static const char *request_r(char operation, const char *code)
         !io_exact(kernel_in, (char *)code, source_length, 1, deadline)) goto failed;
     char response_header[9];
     if (!io_exact(kernel_out, response_header, 9, 0, deadline)) goto failed;
+    kernel_ever_responded = 1;
     size_t size = 0;
     if ((response_header[0] != '0' && response_header[0] != '1') ||
         !decode_hex(response_header + 1, &size) || size > FS_R_MAX) goto failed;
@@ -163,8 +166,12 @@ static const char *request_r(char operation, const char *code)
 failed:
     last_status = milliseconds() >= deadline ? 504 : 503;
     fs_r_reset();
-    return last_status == 504 ? "R session timed out and was reset." :
-                                "R session disconnected and was reset.";
+    if (last_status == 504)
+        return "R session timed out and was reset.";
+    if (!kernel_ever_responded)
+        return "The R interpreter (Rscript) was not found or failed to start. "
+               "Install R and restart FlowStudio.";
+    return "R session disconnected and was reset.";
 }
 
 const char *fs_r_run(const char *code) { return request_r('E', code); }

@@ -61,6 +61,17 @@ mountPanel("FlowStudioExamples", global.FlowStudioExamples, Examples => {
     language.value = languageName;
     language.dispatchEvent(new Event("change"));
   }
+  /* Opening a project also runs its entry file, so plot-producing examples
+   * put a figure on the Plots tab without an extra click. Execution failures
+   * surface through the normal editor/console status, never as thrown errors. */
+  function runExampleEntry(project) {
+    const commands = global.FlowStudioApp && global.FlowStudioApp.commands;
+    if (!commands || typeof commands.runDocument !== "function") return false;
+    const docIds = openedProjects.get(project.id) || [];
+    if (!docIds.length) return false;
+    try { return commands.runDocument(docIds[0]); }
+    catch (_) { return false; }
+  }
   /* Opens (reopens) every project file as an editor buffer, activating the
    * entry file — or the requested file when given. */
   function openProjectBuffers(project, files, activateFileName = null) {
@@ -150,6 +161,11 @@ mountPanel("FlowStudioExamples", global.FlowStudioExamples, Examples => {
       try {
         openProjectBuffers(example, example.files);
         persistOpenProject(example, example.files);
+        if (runExampleEntry(example)) {
+          el("resultStatus").textContent = "Opened " + (example.title || example.id) +
+            ", running the entry file now.";
+          el("resultStatus").dataset.state = "ok";
+        }
       } catch (error) {
         el("resultStatus").textContent = error.message || String(error);
         el("resultStatus").dataset.state = "error";
@@ -161,7 +177,12 @@ mountPanel("FlowStudioExamples", global.FlowStudioExamples, Examples => {
         openedProjects.set(example.id, [openedId]);
         projectMeta.set(example.id, { title: example.title, files: [file] });
         activateEntry(openedId, file.language);
-        el("resultStatus").textContent = "Opened example: " + example.title;
+        if (runExampleEntry(example)) {
+          el("resultStatus").textContent = "Opened " + file.name +
+            " and running it now.";
+        } else {
+          el("resultStatus").textContent = "Opened example: " + example.title;
+        }
         el("resultStatus").dataset.state = "ok";
       } catch (error) {
         el("resultStatus").textContent = error.message || String(error);

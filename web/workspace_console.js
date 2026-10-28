@@ -113,6 +113,14 @@ function mount(doc = document, request = fetch) {
         response.status === 503 ? "Interpreter unavailable" :
         response.status === 504 ? "Execution timed out" :
         "HTTP error " + response.status, response.ok ? "ok" : "error");
+      if (response.ok && (name === "r" || name === "python") &&
+          root.FlowStudioPlotFigures && root.FlowStudioPlotFigures.show) {
+        try {
+          const shown = await root.FlowStudioPlotFigures.show(root, doc, name,
+            (message, kind) => status(message, kind));
+          if (shown) return true;
+        } catch (_) { /* Figure capture is optional; the run still succeeded. */ }
+      }
       return true;
     } catch (error) {
       append(String(error) + "\n");

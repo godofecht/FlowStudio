@@ -23,6 +23,7 @@ static pid_t kernel_pid = -1;
 static int kernel_in = -1;
 static int kernel_out = -1;
 static int last_status = 503;
+static int kernel_ever_responded = 0;
 static char result[FS_PY_MAX + 1];
 
 static int64_t milliseconds(void)
@@ -50,6 +51,7 @@ void fs_py_reset(void)
         while (waitpid(kernel_pid, NULL, 0) < 0 && errno == EINTR) {}
     }
     kernel_pid = -1;
+    kernel_ever_responded = 0;
 }
 
 static int start_kernel(void)
@@ -151,6 +153,7 @@ static const char *request_python(char operation, const char *code)
         !io_exact(kernel_in, (char *)code, source_length, 1, deadline)) goto failed;
     char response_header[9];
     if (!io_exact(kernel_out, response_header, 9, 0, deadline)) goto failed;
+    kernel_ever_responded = 1;
     size_t size = 0;
     if ((response_header[0] != '0' && response_header[0] != '1') ||
         !decode_hex(response_header + 1, &size) || size > FS_PY_MAX) goto failed;
@@ -161,12 +164,17 @@ static const char *request_python(char operation, const char *code)
 failed:
     last_status = milliseconds() >= deadline ? 504 : 503;
     fs_py_reset();
-    return last_status == 504 ? "Python session timed out and was reset." :
-                                "Python session disconnected and was reset.";
+    if (last_status == 504)
+        return "Python session timed out and was reset.";
+    if (!kernel_ever_responded)
+        return "The Python interpreter (python3) was not found or failed to start. "
+               "Install Python 3 and restart FlowStudio.";
+    return "Python session disconnected and was reset.";
 }
 
 const char *fs_py_run(const char *code) { return request_python('E', code); }
 const char *fs_py_inspect(void) { return request_python('I', ""); }
+const char *fs_py_plot(void) { return request_python('P', ""); }
 const char *fs_py_trace(const char *code) { return request_python('T', code); }
 const char *fs_py_debug_start(const char *request) { return request_python('B', request); }
 const char *fs_py_debug_step(void) { return request_python('S', ""); }

@@ -1,3 +1,22 @@
+## 2026-10-28: Python debugger stdout and stale-state invalidation (CI pending)
+
+The native Python replay panel now forwards actual trace-captured stdout and
+failure tracebacks to the Python terminal session, rather than only exposing
+captured locals while telling the user to inspect an empty console. The
+existing Flow-owned trace route and persistent CPython interpreter are unchanged.
+A new trace clears the previous replay before asynchronous execution begins.
+Switching documents or modifying source invalidates the recorded locals and
+steps across **all** navigation methods (not only step-button clicks). Stale
+asynchronous results cannot publish output to the terminal. No code execution
+is simulated, and the debugger remains a bounded post-execution replay.
+
+**Status: partial / automated Node regressions committed, independent CI pending.**
+The added tests cover real trace-response stdout, HTTP 422 traceback output,
+re-run clearing, programmatic stale navigation and output suppression. Live
+Chromium UI/terminal acceptance and live pause/resume remain unverified.
+No Flow compiler, backend or hosted CI configuration changed. RStudio parity
+is incomplete.
+
 ## 2026-10-28: Python replay debugger trace identity and navigation (PR verification pending)
 
 The existing Python replay tracer now assigns **dense displayed step indices**
@@ -10,13 +29,14 @@ cannot navigate another document or a subsequently edited source buffer,
 and asynchronous responses are discarded if the document or source text
 changes during execution.
 
-**Status: partial / local V8 checks passed** for filtered trace selection,
-cross-document navigation refusal, and stale-response refusal. New automated
-Node regressions are committed, but full repository tests and independent
-Linux/macOS CI are **not yet verified** for this change. This is bounded
-post-execution Python replay, **not** live pause/resume, a Flow debugger, or
-RStudio debugging parity. No hosted CI configuration or Flow compiler was
-modified.
+**Status: partial / all six independent Ubuntu/macOS CI jobs passed in
+[CI #40775317139](https://github.com/godofecht/FlowStudio/actions/runs/40775317139).**
+Automated Node regressions cover filtered trace selection, cross-document
+navigation refusal and stale-response refusal. [PR #159](https://github.com/godofecht/FlowStudio/pull/159)
+merged as [6ad8d11](https://github.com/godofecht/FlowStudio/commit/6ad8d114bf75a41f356b8a31b036ff0d0adb8a6b).
+This is bounded post-execution Python replay, **not** live pause/resume, a
+Flow debugger, or RStudio debugging parity. Physical Chromium interaction
+remains unverified. No hosted CI configuration or Flow compiler was modified.
 
 ## 2026-10-28: bounded native Git commit history (six independent CI jobs passed)
 

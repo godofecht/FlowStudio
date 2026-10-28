@@ -6,10 +6,17 @@ The server checks for a clean working tree including untracked files, verifies
 the local `refs/heads/` target, and invokes `git merge --ff-only -- <branch>`
 with fixed argv and disabled hooks. Divergent histories cannot create a merge
 commit. The UI shares the existing Git operation lock; hosted Pages refuses
-all native Git operations. Live Flow HTTP acceptance now covers fast-forward
+all native Git operations. Live Flow HTTP acceptance covers fast-forward
 success, dirty/untracked rejection, divergence, invalid refs and origin
-protection. **Status: implementation committed for CI; native build and live
-HTTP acceptance not yet independently verified.** Remote fetch/push, merge
+protection. **Status: six independent Linux/macOS CI jobs passed in
+[CI #40758128437](https://github.com/godofecht/FlowStudio/actions/runs/40758128437).**
+Each source platform passed 1,052 JavaScript tests (1,040 passed, 12 skipped,
+zero failures) and 195 Python tests (13 skipped, zero failures). Both native
+platforms compiled the actual Flow 2.0.0 backend and executed the real Git/HTTP
+fast-forward acceptance in isolated repositories. Both FlowJIT jobs passed.
+[PR #155](https://github.com/godofecht/FlowStudio/pull/155) merged as
+[cdede48](https://github.com/godofecht/FlowStudio/commit/cdede485a44c21a94bc6eaad2dd1639979c42172).
+Physical Chromium Git-panel interaction remains unverified. Remote fetch/push, merge
 conflict resolution, rebasing and authenticated remote sessions are not
 implemented. RStudio parity remains incomplete; no CI workflow changed.
 

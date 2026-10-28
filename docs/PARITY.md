@@ -1,4 +1,4 @@
-## 2026-10-28: Quarto nested execution and YAML metadata guard (CI pending)
+## 2026-10-28: Quarto nested execution and YAML metadata guard (Linux/macOS CI passed)
 
 The native Flow-owned Quarto adapter now rejects executable-looking fenced
 chunks nested in Markdown blockquotes, list items or indented containers,
@@ -8,14 +8,20 @@ metadata keys. These checks run before the Quarto subprocess is launched,
 including for direct localhost HTTP clients. Valid top-level R/Python chunks
 and inert quoted examples remain accepted.
 
-**Status: partial / focused local Python tests passed (10/10 including six
-pre-existing source-guard cases); independent Linux/macOS CI pending.**
+**Status: partial / all six Ubuntu 24.04/macOS 14 CI jobs passed in
+[CI #40640120105](https://github.com/godofecht/FlowStudio/actions/runs/40640120105).**
+Both source platforms ran 974 JavaScript tests (966 passed, eight skipped,
+zero failures) and 132 Python tests (13 skipped). Both native platforms
+compiled pinned Flow 2.0.0, completed native acceptance and packaging;
+both FlowJIT jobs also passed.
+[PR #126](https://github.com/godofecht/FlowStudio/pull/126)
+merged as [0beeb64](https://github.com/godofecht/FlowStudio/commit/0beeb64eecc9083bd4e9ae80f7838bf2ea7515c3).
 Actual Quarto rendering and live Chromium Pyodide/webR execution remain
 unverified. This is a fail-closed source-format restriction, not a sandbox,
 and it does not establish RStudio feature parity. No hosted CI or upstream
 Flow compiler configuration changed.
 
-## 2026-10-28: native Quarto server-side executable source guard (CI pending)
+## 2026-10-28: native Quarto server-side executable source guard (Linux/macOS CI passed)
 
 The Flow-owned /api/render/quarto path now revalidates the executable
 Quarto body in its Python CLI adapter, independently of the browser exporter.

@@ -82,6 +82,7 @@ function worker(packet=numeric,origin="ndarray") {
     async runPythonAsync(query){
       queries.push(query);
       if(query==="_fs_transfer_kind") return origin;
+      if(query==="_fs_transfer_dtype") return "float64";
       if(query.startsWith("import json as _fs_transfer_json, numpy as _fs_transfer_np")) return "ok";
       return JSON.stringify(packet);
     }};
@@ -102,7 +103,9 @@ test("worker marks real ndarray only in snapshot export and rejects malformed pr
   const snapshot=await w.send("export-snapshot");
   assert.equal(snapshot.reply.ok,true);
   assert.equal(snapshot.reply.origin,"ndarray");
+  assert.equal(snapshot.reply.dtype,"float64");
   assert.equal(snapshot.queries[1],"_fs_transfer_kind");
+  assert.equal(snapshot.queries[2],"_fs_transfer_dtype");
   const ordinary=await w.send("export");
   assert.equal(ordinary.reply.ok,true);
   assert.equal(Object.hasOwn(ordinary.reply,"origin"),false);
@@ -116,6 +119,7 @@ test("browser dispatch restores annotated NumPy through existing real importer",
   const html=fs.readFileSync(path.join(__dirname,"../docs/app/index.html"),"utf8");
   assert.match(html,/request\(restoreAs==="pandas" \? "import-pandas" : restoreAs==="numpy" \? "import-numpy" : "import",name,value\)/);
   assert.match(html,/request\("export-snapshot",name\)/);
+  assert.match(html,/request\("import-numpy-snapshot",name,\{packet:value,dtype\}\)/);
 });
 
 function requireNumpy(t){
@@ -164,5 +168,124 @@ test("real NumPy importer reconstructs matrix and vector identity, missing value
     const run=spawnSync("python3",["-c",code],{encoding:"utf8"});
     assert.equal(run.status,0,run.stderr);
     assert.match(run.stdout,/numpy restored/);
+  }
+});
+
+test("v2 snapshot dtype metadata is validated before interpreter mutation",async()=>{
+  const typed={...source,variables:[{name:"array",value:numeric,
+    restoreAs:"numpy",dtype:"float32"}]};
+  assert.deepEqual(snapshots.validate(typed),typed);
+  const cases=[
+    {dtype:"object",value:numeric},{dtype:"float128",value:numeric},
+    {dtype:"int8",value:numeric},{dtype:"int8",value:{kind:"vector",type:"number",values:[128]}},
+    {dtype:"uint8",value:{kind:"vector",type:"number",values:[-1]}},
+    {dtype:"float16",value:{kind:"vector",type:"number",values:[70000]}},
+    {dtype:"<U1",value:vector},{dtype:"<U513",value:vector},
+    {dtype:"bool",value:numeric},{dtype:"float32",value:boolean},
+    {dtype:"float64",value:{kind:"vector",type:"number",values:[1.5]}}
+  ];
+  for(const entry of cases.slice(0,-1)){
+    const invalid={...source,variables:[{name:"array",value:entry.value,
+      restoreAs:"numpy",dtype:entry.dtype}]};
+    assert.throws(()=>snapshots.validate(invalid),entry.dtype);
+  }
+  assert.deepEqual(snapshots.validate({...source,variables:[
+    {name:"array",value:cases.at(-1).value,restoreAs:"numpy",dtype:"float64"}]}).variables[0].dtype,"float64");
+  for(const entry of [
+    {name:"array",value:numeric,dtype:"float32"},
+    {name:"array",value:numeric,restoreAs:"pandas",dtype:"float32"}
+  ]) assert.throws(()=>snapshots.validate({...source,variables:[entry]}));
+  let touched=0;
+  await assert.rejects(snapshots.restore({snapshot:{...source,variables:[
+    {name:"a",value:vector},{name:"array",value:numeric,restoreAs:"numpy",dtype:"int8"}]},
+    language:"python",generation:()=>0,importValue:async()=>{touched++;return {ok:true};}}));
+  assert.equal(touched,0);
+});
+
+test("snapshot capture and restore retain NumPy dtype only for verified ndarray provenance",async()=>{
+  const captured=await snapshots.capture({language:"python",generation:()=>0,
+    inspect:async()=>({ok:true,variables:[{name:"a"},{name:"b"}]}),
+    exportValue:async(_,name)=>name==="a"?
+      {ok:true,value:numeric,origin:"ndarray",dtype:"float32"} :
+      {ok:true,value:vector}});
+  assert.equal(captured.format,snapshots.FORMAT_V2);
+  assert.equal(captured.variables[0].dtype,"float32");
+  assert.equal(captured.variables[1].dtype,undefined);
+  const calls=[];
+  assert.equal(await snapshots.restore({snapshot:captured,language:"python",
+    generation:()=>0,importValue:async(...args)=>{calls.push(args);return {ok:true};}}),2);
+  assert.deepEqual(calls.map(call=>[call[1],call[3],call[4] || null]),
+    [["a","numpy","float32"],["b",null,null]]);
+  const invalid=await snapshots.capture({language:"python",generation:()=>0,
+    inspect:async()=>({ok:true,variables:[{name:"bad"}]}),
+    exportValue:async()=>({ok:true,value:numeric,origin:"ndarray",dtype:"int8"})});
+  assert.equal(invalid.variables.length,0);
+  assert.equal(invalid.omitted,1);
+});
+
+test("worker reconstructs exact NumPy dtypes using real CPython and refuses lossy casts",async t=>{
+  if(!requireNumpy(t)) return;
+  const cases=[
+    [{kind:"vector",type:"number",values:[-12,27]},"int8","[-12,27]"],
+    [{kind:"vector",type:"number",values:[65535,0]},"uint16","[65535,0]"],
+    [{kind:"vector",type:"number",values:[1.25,2.5]},"float16","[1.25,2.5]"],
+    [numeric,"float32","[[1.25,3.0],[float('nan'),4.0]]"],
+    [boolean,"bool","[[True,False],[False,True]]"],
+    [{kind:"vector",type:"string",values:["café","東京","🙂"]},"<U4","['café','東京','🙂']"]
+  ];
+  for(const [packet,dtype] of cases){
+    const {reply,queries,packages}=await worker(packet).send("import-numpy-snapshot",{packet,dtype});
+    assert.equal(reply.ok,true,dtype+":"+reply.output);
+    assert.deepEqual(packages,["numpy"]);
+    assert.equal(queries.length,1);
+    const run=spawnSync("python3",["-c",queries[0]+
+      "\nimport numpy as np\nassert type(array) is np.ndarray"+
+      "\nassert str(array.dtype) == "+JSON.stringify(dtype)+
+      "\nprint(array.shape)"],{encoding:"utf8"});
+    assert.equal(run.status,0,dtype+": "+run.stderr);
+  }
+  for(const [packet,dtype] of [
+    [{kind:"vector",type:"number",values:[128]},"int8"],
+    [{kind:"vector",type:"number",values:[-1]},"uint8"],
+    [{kind:"vector",type:"number",values:[70000]},"float16"],
+    [{kind:"vector",type:"string",values:["Tokyo"]},"<U2"],
+    [numeric,"object"]
+  ]){
+    const result=await worker(packet).send("import-numpy-snapshot",{packet,dtype});
+    assert.equal(result.reply.ok,false,dtype);
+    assert.equal(result.queries.length,0);
+  }
+  // A valid float32 metadata type with an unrepresentable value is rejected
+  // by the real NumPy constructor path before overwriting the destination.
+  const lossy={kind:"vector",type:"number",values:[0.1]};
+  const result=await worker(lossy).send("import-numpy-snapshot",{packet:lossy,dtype:"float32"});
+  assert.equal(result.reply.ok,true);
+  const code="array = 'original'\ntry:\n"+
+    result.queries[0].split("\n").map(line=>"    "+line).join("\n")+
+    "\nexcept ValueError:\n    pass\nassert array == 'original'";
+  const run=spawnSync("python3",["-c",code],{encoding:"utf8"});
+  assert.equal(run.status,0,run.stderr);
+});
+
+test("real CPython NumPy export reports original dtype without changing transfer packet",async t=>{
+  if(!requireNumpy(t)) return;
+  const w=worker();
+  const exported=await w.send("export-snapshot");
+  const lines=exported.queries[0].split("\n");
+  lines[lines.length-1]="print("+lines.at(-1)+")";
+  lines.push("print(_fs_transfer_kind)");
+  lines.push("print(_fs_transfer_dtype)");
+  for(const [expression,dtype] of [
+    ["np.array([1,2],dtype=np.int16)","int16"],
+    ["np.array([[1.25,2.5]],dtype=np.float32)","float32"],
+    ["np.array(['東京','🙂'],dtype='<U3')","<U3"]
+  ]){
+    const run=spawnSync("python3",["-c","import numpy as np\narray="+expression+
+      "\n"+lines.join("\n")],{encoding:"utf8"});
+    assert.equal(run.status,0,run.stderr);
+    const rows=run.stdout.trim().split("\n");
+    assert.equal(rows[1],"ndarray");
+    assert.equal(rows[2],dtype);
+    assert.ok(JSON.parse(rows[0]));
   }
 });

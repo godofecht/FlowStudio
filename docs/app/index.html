@@ -560,8 +560,9 @@ FlowStudioSessionSnapshot.create({
   isBusy:()=>busy || !!notebookRunner?.isRunning(), setBusy, notice,
   inspect:lang=>lang==="r" ? getRSession().inspect() : request("inspect"),
   exportValue:(lang,name)=>lang==="r" ? getRSession().exportVariable(name,{forSnapshot:true}) : request("export-snapshot",name),
-  importValue:(lang,name,value,restoreAs)=>lang==="r" ?
+  importValue:(lang,name,value,restoreAs,dtype)=>lang==="r" ?
     getRSession().importVariable(name,value,restoreAs==="matrix" ? {asMatrix:true} : undefined) :
+    dtype && restoreAs==="numpy" ? request("import-numpy-snapshot",name,{packet:value,dtype}) :
     request(restoreAs==="pandas" ? "import-pandas" : restoreAs==="numpy" ? "import-numpy" : "import",name,value),
   refresh:async lang=>{
     const result=lang==="r" ? await getRSession().inspect() : await request("inspect");

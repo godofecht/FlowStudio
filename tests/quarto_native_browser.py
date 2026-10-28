@@ -35,7 +35,9 @@ def main() -> None:
         raise AssertionError from exc
 
     marker = "flowstudio-quarto-executed-87421"
-    code = (f'cat("{marker}")' if args.language == "r" else f'print("{marker}")')
+    # The marker must not appear literally in echoed source: only executed output can produce it.
+    code = ('cat(paste0("flowstudio-quarto-", "executed-87421"))' if args.language == "r"
+            else 'print("flowstudio-quarto-" + "executed-87421")')
     source = f"# %% [{args.language}]\n{code}\n"
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(headless=True)

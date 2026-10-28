@@ -17,6 +17,7 @@ try {
     ['examples/heat_neumann.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_mixed_boundaries.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_per_face_boundaries.flow', 'temperatureVariance', 'meanTemperature'],
+    ['examples/heat_dirichlet_profile.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_robin.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_anisotropic.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_cross_diffusion.flow', 'temperatureVariance', 'meanTemperature'],
@@ -52,6 +53,12 @@ try {
       assert.equal(await note.count(), 1, 'Native plot must display four-face metadata');
       assert.match(await note.textContent(),
         /x min Dirichlet 300 K; x max Neumann 0 K\/m; y min Neumann 0 K\/m; y max Neumann 0 K\/m/);
+    }
+    if (source === 'examples/heat_dirichlet_profile.flow') {
+      const note = page.locator('#mathFlowPlot [data-mathflow-boundary="Faces"]');
+      assert.equal(await note.count(), 1, 'Native plot must show executed face profile');
+      assert.match(await note.textContent(), /x min Dirichlet profile 300K\+2K\*sin/);
+      assert.match(await note.textContent(), /1K\*t\/1s/);
     }
     if (source === 'examples/heat_robin.flow') {
       const note = page.locator('#mathFlowPlot [data-mathflow-boundary="Faces"]');

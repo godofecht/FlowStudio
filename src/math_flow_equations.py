@@ -15,6 +15,8 @@ REACTION_RATE = (0, 0, -1, 0)
 TEMPERATURE_RATE = (0, 0, -1, 1)
 SYMBOLS = {"temperature": TEMPERATURE, "diffusivity": DIFFUSIVITY}
 REACTION_SYMBOLS = {"reactionRate": REACTION_RATE, "ambientTemperature": TEMPERATURE}
+ADVECTION_SYMBOLS = {"advectionVelocityX": (1, 0, -1, 0),
+                     "advectionVelocityY": (1, 0, -1, 0)}
 
 
 @dataclass(frozen=True)
@@ -24,6 +26,7 @@ class Equation:
     forcing: Expression | None
     reaction: Expression | None = None
     nonlinear: bool = False
+    advection: bool = False
 
 
 def _name(expr: Expression, value: str) -> bool:
@@ -85,6 +88,20 @@ def _quadratic_relaxation(expr: Expression) -> bool:
             or rate_times_deviation(right) and deviation(left))
 
 
+def _advection(expr: Expression, axis: str) -> bool:
+    """Match a declared constant velocity times a centered spatial derivative."""
+    if expr.operator != "mul" or len(expr.operands) != 2:
+        return False
+    a, b = expr.operands
+    velocity = "advectionVelocityX" if axis == "x" else "advectionVelocityY"
+    derivative = "∂ₓ" if axis == "x" else "∂ᵧ"
+    def derivative_of_temperature(node: Expression) -> bool:
+        return (node.operator == derivative and len(node.operands) == 1
+                and _name(node.operands[0], "temperature"))
+    return ((_name(a, velocity) and derivative_of_temperature(b))
+            or (_name(b, velocity) and derivative_of_temperature(a)))
+
+
 def _independent(expr: Expression) -> bool:
     if expr.operator == "name" and expr.value in ("temperature", "diffusivity"):
         return False
@@ -107,14 +124,18 @@ def _signed_terms(expr: Expression, sign: int = 1):
         yield expr, sign
 
 
-def compile_heat_equation(tokens: list[str], *, reaction: bool = False) -> Equation:
+def compile_heat_equation(tokens: list[str], *, reaction: bool = False,
+                          advection: bool = False) -> Equation:
     source = "".join(tokens)
     if source.count("=") != 1:
         raise ExpressionError("Heat dynamics requires exactly one equality")
     lhs, rhs_source = source.split("=", 1)
     if lhs != "∂ₜtemperature":
         raise ExpressionError("Heat dynamics must evolve ∂ₜtemperature")
-    symbols = {**SYMBOLS, **(REACTION_SYMBOLS if reaction else {})}
+    if reaction and advection:
+        raise ExpressionError("Combined reaction and advection equations are not yet supported")
+    symbols = {**SYMBOLS, **(REACTION_SYMBOLS if reaction else {}),
+               **(ADVECTION_SYMBOLS if advection else {})}
     rhs = parse_expression(rhs_source, symbols=symbols)
     if rhs.dimension != TEMPERATURE_RATE:
         raise ExpressionError("Heat equation RHS must have dimensions K/s")
@@ -122,6 +143,7 @@ def compile_heat_equation(tokens: list[str], *, reaction: bool = False) -> Equat
     forcing = None
     relaxation = None
     nonlinear = False
+    advection_axes: set[str] = set()
     for term, sign in _signed_terms(rhs):
         if sign == 1 and _diffusion(term):
             diffusion_count += 1
@@ -129,13 +151,16 @@ def compile_heat_equation(tokens: list[str], *, reaction: bool = False) -> Equat
                 _relaxation(term) or _quadratic_relaxation(term)):
             relaxation = term
             nonlinear = _quadratic_relaxation(term)
+        elif advection and sign == -1 and any(
+                _advection(term, axis) and axis not in advection_axes for axis in ("x", "y")):
+            advection_axes.add("x" if _advection(term, "x") else "y")
         elif _independent(term) and forcing is None and term.dimension == TEMPERATURE_RATE:
             forcing = term if sign == 1 else Expression(
                 "neg", (term,), dimension=TEMPERATURE_RATE)
         else:
             raise ExpressionError(
                 "Unsupported heat dynamics: expected diffusion, independent forcing "
-                "and optional negative linear or quadratic relaxation")
-    if diffusion_count != 1 or (reaction and relaxation is None):
+                "and optional negative linear or quadratic relaxation or constant advection")
+    if diffusion_count != 1 or (reaction and relaxation is None) or (advection and advection_axes != {"x", "y"}):
         raise ExpressionError("Heat dynamics requires one diffusion operator and declared relaxation")
-    return Equation("temperature", rhs, forcing, relaxation, nonlinear)
+    return Equation("temperature", rhs, forcing, relaxation, nonlinear, advection)

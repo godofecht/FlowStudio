@@ -26,6 +26,8 @@ class HeatModel:
     equation: Equation | None = None
     reaction_rate: float = 0.0
     ambient_temperature: float = 0.0
+    advection_velocity_x: float = 0.0
+    advection_velocity_y: float = 0.0
 
 
 def parse_heat(source: str, base) -> HeatModel:
@@ -75,7 +77,8 @@ def parse_heat(source: str, base) -> HeatModel:
         else:
             raise error(f"Unsupported heat declaration: {' '.join(stmt)}")
     reaction = set(consts) == {"diffusivity", "reactionRate", "ambientTemperature"}
-    if not reaction:
+    advection = set(consts) == {"diffusivity", "advectionVelocityX", "advectionVelocityY"}
+    if not reaction and not advection:
         base.expect_keys(consts, {"diffusivity"}, "heat constants")
     base.expect_keys(fields, {"temperature"}, "heat fields")
     if fields["temperature"] != ["Scalar", "<", "Kelvin", ">"]:
@@ -87,9 +90,11 @@ def parse_heat(source: str, base) -> HeatModel:
     ambient_temperature = base.number(consts["ambientTemperature"], ["K"]) if reaction else 0.0
     if reaction and reaction_rate <= 0:
         raise error("Reaction rate must be positive")
+    velocity_x = base.number(consts["advectionVelocityX"], ["m", "/", "s"]) if advection else 0.0
+    velocity_y = base.number(consts["advectionVelocityY"], ["m", "/", "s"]) if advection else 0.0
     try:
         equation = compile_heat_equation([token.text for token in sections["dynamics"]],
-                                         reaction=reaction)
+                                         reaction=reaction, advection=advection)
     except ExpressionError as exc:
         raise error(f"Unsupported heat dynamics: {exc}") from exc
     if equation.nonlinear and ambient_temperature <= 0:
@@ -156,7 +161,8 @@ def parse_heat(source: str, base) -> HeatModel:
     if p.peek() != "<EOF>":
         raise error(f"Unexpected trailing heat token {p.peek()}")
     return HeatModel(int(width), int(height), lx, ly, diffusivity, expression,
-                     step, until, equation, reaction_rate, ambient_temperature)
+                     step, until, equation, reaction_rate, ambient_temperature,
+                     velocity_x, velocity_y)
 
 
 def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | None = None,
@@ -179,7 +185,20 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
     diffusion_stiffness = model.diffusivity * (1 / dx**2 + 1 / dy**2)
     linear_reaction_rate = (0.0 if model.equation is not None and model.equation.nonlinear
                             else model.reaction_rate)
-    if dt * (diffusion_stiffness + linear_reaction_rate / 4) > .45:
+    # A conservative combined advective/diffusive CFL guard. Centered
+    # advection with explicit RK2 is not stable in the zero-diffusion limit;
+    # this bounded dialect requires strictly positive diffusivity.
+    # Central differences require cell Peclet <= 2 for a monotone
+    # semi-discrete advection-diffusion operator. A small timestep alone
+    # cannot repair an advection-dominated centered spatial stencil.
+    if (model.equation is not None and model.equation.advection
+            and (abs(model.advection_velocity_x) * dx > 2 * model.diffusivity
+                 or abs(model.advection_velocity_y) * dy > 2 * model.diffusivity)):
+        raise error_type("Advection stability requires cell Peclet number <= 2")
+    advective_stiffness = (abs(model.advection_velocity_x) / dx
+                           + abs(model.advection_velocity_y) / dy)
+    if dt * (diffusion_stiffness + linear_reaction_rate / 4
+             + advective_stiffness) > .45:
         raise error_type("Heat time step violates diffusion/reaction stability bound")
     x, y = np.meshgrid((np.arange(nx) + .5) * dx,
                        (np.arange(ny) + .5) * dy, indexing="ij")
@@ -216,7 +235,9 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
                 model.equation.rhs, x, y, expected_dimension=TEMPERATURE_RATE,
                 values={"temperature": state, "diffusivity": model.diffusivity,
                         "reactionRate": model.reaction_rate,
-                        "ambientTemperature": model.ambient_temperature}), (nx, ny))
+                        "ambientTemperature": model.ambient_temperature,
+                        "advectionVelocityX": model.advection_velocity_x,
+                        "advectionVelocityY": model.advection_velocity_y}), (nx, ny))
         except (ExpressionError, ValueError) as exc:
             raise error_type(f"Invalid heat equation evaluation: {exc}") from exc
 

@@ -143,3 +143,34 @@ python3 -m unittest discover -s tests -p 'test_math_flow_nonlinear.py' -v
 This is still a **restricted** standalone mathematical Flow frontend: general
 nonlinear kinetics, arbitrary coupled fields, non-periodic boundary conditions,
 and upstream Flow 2.0 grammar/compiler integration remain unfinished.
+
+## Constant-velocity scalar advection–diffusion
+
+`examples/heat_advection_diffusion.flow` executes a typed, periodic scalar
+advection–diffusion equation with explicit `advectionVelocityX` and
+`advectionVelocityY` constants in metres per second:
+
+```flow
+∂ₜtemperature = diffusivity ∇²temperature
+                − advectionVelocityX ∂ₓ(temperature)
+                − advectionVelocityY ∂ᵧ(temperature)
+```
+
+The equation compiler checks the dimensions of the entire right-hand-side AST,
+requires exactly one positive diffusion term and both negative advection terms,
+and rejects duplicated, missing, or incorrectly signed operators. The
+NumPy RK2 runtime lowers both derivatives to centered periodic finite
+differences on the live temperature state at each stage; it applies a
+conservative combined advection/diffusion timestep guard and rejects cell Péclet numbers above 2 for the centered spatial stencil. The checked-in
+example and tests compare its final 2D field with the exact **discrete**
+Fourier-mode RK2 amplification (including advective phase), validate both
+coordinate directions, and check convergence of the variance under grid
+refinement. Native HTTP acceptance executes the example through the actual
+FlowStudio server on Linux and macOS.
+
+This is **not** an unrestricted advection operator: only constant declared
+velocities and a single scalar temperature field with periodic boundaries
+are supported; advection and reaction are not yet composable in one model.
+Centered advection with explicit RK2 is not generally energy-stable in the
+zero-diffusion limit; this subset requires positive diffusion, a bounded
+timestep, and finite states. It is not an upstream Flow 2.0 grammar extension.

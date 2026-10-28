@@ -181,6 +181,22 @@ def main() -> None:
     assert 300.0 < reaction["mean_temperature"] < 300.02, reaction
     assert reaction["temperature_variance"] < reaction["initial_temperature_variance"], reaction
     assert reaction["spatial"]["fields"]["temperature"], reaction
+    # Executable typed advection-diffusion: native Flow HTTP -> Unicode AST ->
+    # centered periodic derivatives -> actual RK2 state and spatial samples.
+    advection_source = (Path(__file__).resolve().parents[1] /
+                        "examples/heat_advection_diffusion.flow").read_text(encoding="utf-8")
+    status, body = request("POST", "/api/check/mathflow", advection_source, accepted_headers)
+    assert status == 200 and json.loads(body)["ok"], (status, body)
+    status, body = request("POST", "/api/run/mathflow", advection_source, accepted_headers)
+    advection = json.loads(body)
+    assert status == 200 and advection["ok"] and advection["steps"] == 200, (status, advection)
+    assert abs(advection["mean_temperature"] - 300.0) < 1e-8, advection
+    assert 0 < advection["temperature_variance"] < advection["initial_temperature_variance"], advection
+    assert advection["spatial"]["grid"] == [16, 16], advection
+    invalid_advection = advection_source.replace(
+        "− advectionVelocityX ∂ₓ(temperature)", "+ advectionVelocityX ∂ₓ(temperature)")
+    status, body = request("POST", "/api/check/mathflow", invalid_advection, accepted_headers)
+    assert status == 422 and not json.loads(body)["ok"], (status, body)
     # Real nonlinear reaction-diffusion via native Flow HTTP and NumPy RK2.
     nonlinear_source = (Path(__file__).resolve().parents[1] /
                         "examples/heat_nonlinear_reaction.flow").read_text(encoding="utf-8")

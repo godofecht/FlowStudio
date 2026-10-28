@@ -177,12 +177,7 @@ test("real Rscript exports and reconstructs custom row names and factor columns"
     "identical(rownames(frame),c('alpha','βeta')))"],
     {encoding:"utf8",timeout:20000});
   assert.equal(factorRestored.status,0,factorRestored.stderr);
-  const ordinary=spawnSync("Rscript",["--vanilla","-e",
-    setup+"\nwriteLines(eval(parse(text="+JSON.stringify(
-      (await session(encoded).r.exportVariable("frame")).output || query)+")))"],
-    {encoding:"utf8",timeout:20000});
-  // Ordinary transfer is intentionally not allowed to discard row-name identity.
-  // The same query with forSnapshot=FALSE must reject the nondefault labels.
+  // Ordinary transfers must reject nondefault row names instead of dropping them.
   const ordinarySource=session(encoded);
   await ordinarySource.r.exportVariable("frame");
   const rejected=spawnSync("Rscript",["--vanilla","-e",

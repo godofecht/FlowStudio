@@ -29,6 +29,7 @@ class HeatModel:
     advection_velocity_x: float = 0.0
     advection_velocity_y: float = 0.0
     boundary_temperature: float | None = None
+    boundary_gradient: float | None = None
 
 
 def parse_heat(source: str, base) -> HeatModel:
@@ -45,12 +46,18 @@ def parse_heat(source: str, base) -> HeatModel:
     d = base.assignments_tokens(statements)
     base.expect_keys(d, {"grid", "extent", "boundaries"}, "domain")
     boundary_temperature = None
+    boundary_gradient = None
     if d["boundaries"] != ["Periodic"]:
         boundary_tokens = d["boundaries"]
-        if (len(boundary_tokens) < 4 or boundary_tokens[:2] != ["Dirichlet", "("]
-                or boundary_tokens[-1] != ")"):
-            raise error("Heat boundaries must be Periodic or Dirichlet(temperature)")
-        boundary_temperature = base.number(boundary_tokens[2:-1], ["K"])
+        if (len(boundary_tokens) < 4 or boundary_tokens[-1] != ")"
+                or boundary_tokens[1] != "("):
+            raise error("Heat boundaries must be Periodic, Dirichlet(temperature) or Neumann(gradient)")
+        if boundary_tokens[0] == "Dirichlet":
+            boundary_temperature = base.number(boundary_tokens[2:-1], ["K"])
+        elif boundary_tokens[0] == "Neumann":
+            boundary_gradient = base.number(boundary_tokens[2:-1], ["K", "/", "m"])
+        else:
+            raise error("Unsupported heat boundary type")
     grid = d["grid"]
     if len(grid) != 3 or grid[1] != "×":
         raise error("grid requires width × height")
@@ -175,7 +182,7 @@ def parse_heat(source: str, base) -> HeatModel:
         raise error(f"Unexpected trailing heat token {p.peek()}")
     return HeatModel(int(width), int(height), lx, ly, diffusivity, expression,
                      step, until, equation, reaction_rate, ambient_temperature,
-                     velocity_x, velocity_y, boundary_temperature)
+                     velocity_x, velocity_y, boundary_temperature, boundary_gradient)
 
 
 def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | None = None,
@@ -218,7 +225,8 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
     try:
         field = np.broadcast_to(evaluate(parse_expression(model.initial), x, y,
                                          expected_dimension=TEMPERATURE,
-                                         boundary_temperature=model.boundary_temperature), (nx, ny)).copy()
+                                         boundary_temperature=model.boundary_temperature,
+                                         boundary_gradient=model.boundary_gradient), (nx, ny)).copy()
     except ExpressionError as exc:
         raise error_type(str(exc)) from exc
     initial_mean = float(np.mean(field))
@@ -252,7 +260,8 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
                         "ambientTemperature": model.ambient_temperature,
                         "advectionVelocityX": model.advection_velocity_x,
                         "advectionVelocityY": model.advection_velocity_y},
-                boundary_temperature=model.boundary_temperature), (nx, ny))
+                boundary_temperature=model.boundary_temperature,
+                boundary_gradient=model.boundary_gradient), (nx, ny))
         except (ExpressionError, ValueError) as exc:
             raise error_type(f"Invalid heat equation evaluation: {exc}") from exc
 
@@ -277,9 +286,11 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
             "temperature_variance": variance, "initial_temperature_variance": initial_variance,
             "temperature_min": float(np.min(field)), "temperature_max": float(np.max(field)),
             "method": "centered-difference RK2 scalar reaction-diffusion equation",
-            "boundary_condition": ("Periodic" if model.boundary_temperature is None
-                                   else "Dirichlet"),
+            "boundary_condition": ("Dirichlet" if model.boundary_temperature is not None
+                                   else "Neumann" if model.boundary_gradient is not None
+                                   else "Periodic"),
             "boundary_temperature": model.boundary_temperature,
+            "boundary_gradient": model.boundary_gradient,
             "observations": observations,
             "spatial": spatial_snapshot(
                 {"temperature": field}, (model.length_x, model.length_y))}

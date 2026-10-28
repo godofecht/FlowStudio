@@ -52,7 +52,7 @@ class RobinTransferProfileTest(unittest.TestCase):
     def test_constant_ambient_variable_length_and_axis_syntax(self):
         source = SOURCE.replace(AMBIENT, "300K")
         model = parse(source)
-        self.assertEqual(model.boundary_faces[0], ("RobinProfile", (300., LENGTH)))
+        self.assertEqual(model.boundary_faces[0], ("RobinProfile", (300., LENGTH.replace(" ", ""))))
         self.assertGreater(simulate(model)["temperature_variance"], 0)
         face = "("+ "Robin("+AMBIENT+", "+LENGTH+"), Neumann(0K/m), Periodic, Periodic)"
         uniform = parse(SOURCE.replace(face, "Robin("+AMBIENT+", "+LENGTH+")"))
@@ -82,7 +82,7 @@ class RobinTransferProfileTest(unittest.TestCase):
         self.assertEqual(completed.returncode, 0, completed.stderr)
         payload = json.loads(completed.stdout)
         self.assertTrue(payload["ok"])
-        self.assertEqual(payload["boundary_faces"]["x_min"]["value"][1], LENGTH)
+        self.assertEqual(payload["boundary_faces"]["x_min"]["value"][1], LENGTH.replace(" ", ""))
         self.assertGreater(payload["temperature_variance"], 0)
 
 

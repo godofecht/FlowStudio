@@ -17,7 +17,8 @@ test("native Quarto rendering uses Flow-owned route and the real installed CLI h
   assert.match(html, /FlowStudioQuarto\.encode\(\$\("source"\)\.value/);
   assert.match(html, /fetch\("\/api\/render\/quarto"/);
   assert.match(html, /"X-FlowStudio-Intent": "run"/);
-  assert.match(helper, /subprocess\.run\(/);
+  assert.match(helper, /subprocess\.Popen\(/);
+  assert.match(helper, /os\.killpg\(process\.pid, signal\.SIGKILL\)/);
   assert.match(helper, /"render", "report\.qmd", "--to", "html"/);
   assert.doesNotMatch(helper, /shell=True/);
 });

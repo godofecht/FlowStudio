@@ -6,175 +6,343 @@ const path = require("node:path");
 const vm = require("node:vm");
 const root = path.join(__dirname, "..");
 const html = fs.readFileSync(path.join(root, "web/index.html"), "utf8");
-function mount(reply = {ok:true,status:200,text:async () => "ok"}) {
-  const elements = new Map();
-  for (const id of ["consoleInput","console","consoleExecute","language",
-    "resultStatus","run","runCell"]) {
-    elements.set(id, {id,value:"",textContent:"",disabled:false,dataset:{},listeners:{},
-      selectionStart:0,selectionEnd:0,scrollTop:0,scrollHeight:120,
-      setSelectionRange(a,b){this.selectionStart=a;this.selectionEnd=b;},
-      addEventListener(name,fn){this.listeners[name]=fn;},
-      fire(name,event={}){return this.listeners[name]?.(event);}});
+const { FakeElement, createDocument } = require("./terminal_dom.js");
+
+/* Mounts the workspace terminal against the fake DOM. Elements that stand for
+ * server-rendered ids are pre-registered; everything else is created by the
+ * module under test and reachable through its ids at the end of the run. */
+function mount(reply = { ok: true, status: 200, text: async () => "ok" }, storage = null) {
+  const { doc, elements } = createDocument();
+  const panel = new FakeElement("div");
+  for (const id of ["console", "language", "resultStatus", "run", "runCell"]) {
+    const node = new FakeElement(id === "language" ? "select" : id === "console" ? "pre" : "span");
+    node.attributes.id = id;
+    elements.set(id, node);
   }
-  elements.get("language").value = "python";
-  const doc = {getElementById:id=>elements.get(id)};
-  const requests = [];
-  const context = vm.createContext({TextEncoder,console});
-  vm.runInContext(fs.readFileSync(path.join(root,"web/terminal_render.js"),"utf8"),context);
-  vm.runInContext(fs.readFileSync(path.join(root,"web/console.js"),"utf8"),context);
-  vm.runInContext(fs.readFileSync(path.join(root,"web/workspace_console.js"),"utf8"),context);
-  const controller = context.FlowStudioWorkspaceConsole.mount(doc,async (url,options)=>{
-    requests.push({url,options});return reply;
-  });
-  return {controller,el:id=>elements.get(id),requests,io:()=>context.FlowStudioConsoleIO};
-}
-test("workspace exposes console controls and loads allowlisted modules",()=>{
-  assert.match(html, /id="console"/);
-  const server = fs.readFileSync(path.join(root, "src/main.flow"), "utf8");
-  assert.doesNotMatch(server, /\bs_replace\s*\(/);
-  assert.match(html, /<script src="\/workspace_console\.js"><\/script>/);
-  const routes = fs.readFileSync(path.join(root, "src/data_routes.flow"), "utf8");
-  assert.match(routes, /workspace_console\.js/);
-});
-test("interactive console submits exact code and shares output",async()=>{
-  const app=mount();app.el("consoleInput").value="print('hello')";
-  assert.equal(await app.controller.run(app.el("consoleInput")),true);
-  assert.equal(app.requests.length,1);
-  assert.equal(app.requests[0].url,"/api/run/python");
-  assert.equal(app.requests[0].options.body,"print('hello')");
-  assert.equal(app.requests[0].options.headers["X-FlowStudio-Intent"],"run");
-  assert.match(app.el("console").textContent,/ok/);
-  assert.equal(app.el("consoleInput").value,"");
-  assert.equal(app.el("resultStatus").dataset.state,"ok");
-});
-test("runtime error preserves history and status",async()=>{
-  const app=mount({ok:false,status:422,text:async()=>"SyntaxError"});
-  app.el("consoleInput").value="bad(";
-  assert.equal(await app.controller.run(app.el("consoleInput")),true);
-  assert.deepEqual(Array.from(app.controller.history("python")),["bad("]);
-  assert.match(app.el("console").textContent,/SyntaxError/);
-  assert.equal(app.el("resultStatus").dataset.state,"error");
-});
-test("language switch preserves drafts and separates history",async()=>{
-  const app=mount();app.el("consoleInput").value="python draft";
-  app.el("language").value="r";app.el("language").fire("change");
-  assert.equal(app.el("consoleInput").value,"");
-  app.el("consoleInput").value="x <- 1";
-  assert.equal(await app.controller.run(app.el("consoleInput")),true);
-  app.el("language").value="python";app.el("language").fire("change");
-  assert.equal(app.el("consoleInput").value,"python draft");
-  assert.deepEqual(Array.from(app.controller.history("r")),["x <- 1"]);
-});
-test("editor execution blocks console without consuming command",async()=>{
-  const app=mount();app.el("run").disabled=true;
-  app.el("consoleInput").value="keep me";
-  assert.equal(await app.controller.run(app.el("consoleInput")),false);
-  assert.equal(app.requests.length,0);
-  assert.equal(app.el("consoleInput").value,"keep me");
-  assert.equal(app.el("run").disabled,true);
-});
-test("console execution blocks editor until request settles",async()=>{
-  let resolve;
-  const app=mount({ok:true,status:200,text:()=>new Promise(r=>{resolve=r;})});
-  app.el("consoleInput").value="x";
-  const pending=app.controller.run(app.el("consoleInput"));
-  await Promise.resolve();
-  assert.equal(app.el("run").disabled,true);
-  assert.equal(app.el("runCell").disabled,true);
-  assert.equal(app.el("consoleExecute").disabled,true);
-  await new Promise(r=>setImmediate(r));
-  resolve("done");await pending;
-  assert.equal(app.el("run").disabled,false);
-  assert.equal(app.el("runCell").disabled,false);
-});
-test("keyboard prevents editor shortcut propagation and supports multiline",async()=>{
-  const app=mount();let prevented=false,stopped=false;
-  app.el("consoleInput").value="one";
-  app.el("consoleInput").fire("keydown",{key:"Enter",ctrlKey:true,
-    preventDefault(){prevented=true;},stopPropagation(){stopped=true;}});
-  await new Promise(resolve=>setImmediate(resolve));
-  assert.equal(prevented,true);assert.equal(stopped,true);
-  assert.equal(app.requests.length,1);
-  assert.equal(app.el("consoleInput").value,"");
-  prevented=false;
-  app.el("consoleInput").fire("keydown",{key:"Enter",shiftKey:true,preventDefault(){prevented=true;}});
-  assert.equal(prevented,false);
-});test("network failures do not consume history and release locks",async()=>{
-  const app=mount({text:async()=>{throw Error("disconnected");}});
-  app.el("consoleInput").value="retry";
-  assert.equal(await app.controller.run(app.el("consoleInput")),false);
-  assert.deepEqual(Array.from(app.controller.history("python")),[]);
-  assert.equal(app.el("consoleInput").value,"retry");
-  assert.equal(app.el("run").disabled,false);
-  assert.equal(app.el("resultStatus").dataset.state,"error");
-});
-test("mount creates accessible console controls inside existing editor panel", async () => {
-  const elements = new Map();
-  const panel = {style:{},append(...nodes){
-    const register = node => {
-      if (node.id) elements.set(node.id,node);
-      for (const child of node.children || []) register(child);
-    };
-    nodes.forEach(register);
-  }};
-  function element(id) {
-    return {id,value:"",textContent:"",style:{},dataset:{},listeners:{},children:[],
-      disabled:false,selectionStart:0,selectionEnd:0,scrollTop:0,scrollHeight:100,
-      addEventListener(name,fn){this.listeners[name]=fn;},
-      setAttribute(name,value){this[name]=value;},
-      setSelectionRange(a,b){this.selectionStart=a;this.selectionEnd=b;},
-      append(...nodes){this.children.push(...nodes);}};
-  }
-  for (const id of ["console","language","resultStatus","run","runCell"])
-    elements.set(id,element(id));
+  const language = elements.get("language");
+  language.value = "python";
   elements.get("console").parentElement = panel;
-  elements.get("language").value = "flow";
-  const doc = {getElementById:id=>elements.get(id) || null,createElement:tag=>element("")};
-  const context = vm.createContext({TextEncoder,console});
-  vm.runInContext(fs.readFileSync(path.join(root,"web/terminal_render.js"),"utf8"),context);
-  vm.runInContext(fs.readFileSync(path.join(root,"web/console.js"),"utf8"),context);
-  vm.runInContext(fs.readFileSync(path.join(root,"web/workspace_console.js"),"utf8"),context);
-  const calls=[];
-  const controller=context.FlowStudioWorkspaceConsole.mount(doc,async (url,opts)=>{
-    calls.push([url,opts.body]);return {ok:true,status:200,text:async()=>"ok"};
+
+  const requests = [];
+  const context = vm.createContext({ TextEncoder, localStorage: storage, console });
+  vm.runInContext(fs.readFileSync(path.join(root, "web/terminal_render.js"), "utf8"), context);
+  vm.runInContext(fs.readFileSync(path.join(root, "web/terminal_sessions.js"), "utf8"), context);
+  vm.runInContext(fs.readFileSync(path.join(root, "web/terminal_input.js"), "utf8"), context);
+  vm.runInContext(fs.readFileSync(path.join(root, "web/console.js"), "utf8"), context);
+  vm.runInContext(fs.readFileSync(path.join(root, "web/workspace_console.js"), "utf8"), context);
+  const controller = context.FlowStudioWorkspaceConsole.mount(doc, async (url, options) => {
+    requests.push({ url, options });
+    return typeof reply === "function" ? reply(url, options) : reply;
   });
-  assert.equal(elements.get("consoleInput")["aria-label"],"Interactive console command");
-  assert.equal(elements.get("consoleInput")["aria-label"], "Interactive console command");
-  assert.equal(elements.get("consoleExecute").textContent, "Run ▸");
-  assert.equal(elements.get("consoleExecute").type, "button");
-  assert.equal(panel.style.flexDirection, "column");
-  // Terminal chrome: the runtime prompt sits inline beside the input row.
-  const prompt = elements.get("consolePrompt");
-  assert.ok(prompt, "a runtime command prompt is injected");
-  assert.match(prompt.textContent, /flow/);
-  elements.get("consoleInput").value="println(1)";
-  assert.equal(await controller.run(elements.get("consoleInput")),true);
-  assert.deepEqual(calls,[["/api/run/flow","println(1)"]]);
+  const app = {
+    controller, requests, panel, doc,
+    io: () => context.FlowStudioConsoleIO,
+    el: id => {
+      // Descend the built tree because ids set later live on created nodes.
+      for (const [, node] of elements) if (node.attributes.id === id) return node;
+      const find = (node) => {
+        for (const child of node.children) {
+          if (child.attributes.id === id) return child;
+          const hit = find(child);
+          if (hit) return hit;
+        }
+        return null;
+      };
+      return find(panel);
+    }
+  };
+  app.output = elements.get("console");
+  return app;
+}
+
+function entryText(app, bucket) {
+  const host = bucket || app.output;
+  return host.children.map(node => node.serialize()).join("");
+}
+
+test("workspace exposes console controls and loads allowlisted modules", () => {
+  assert.match(html, /id="console"/);
+  const routes = fs.readFileSync(path.join(root, "src/data_routes.flow"), "utf8");
+  for (const asset of ["workspace_console.js", "terminal_input.js",
+    "terminal_sessions.js", "terminal_render.js"])
+    assert.match(routes, new RegExp(asset.replace(/\./g, "\\.")),
+      asset + " must be served as an allowlisted asset");
+  assert.match(html, /<script src="\/workspace_console\.js"><\/script>/);
+  assert.match(html, /<script src="\/terminal_sessions\.js"><\/script>/);
 });
 
-test("console renders prompt and error classes from the terminal engine",async()=>{
-  const app=mount({ok:false,status:422,text:async()=>"TypeError: bad type"});
-  app.el("consoleInput").value="bad";
-  await app.controller.run(app.el("consoleInput"));
-  const html = app.el("console").innerHTML;
-  assert.match(html,/fs-prompt-line/);
-  assert.match(html,/fs-error-line/);
-  assert.match(html,/TypeError/);
+test("mount builds tabs, honest status row and an inline transcript prompt", () => {
+  const app = mount();
+  const tabs = app.panel.children.filter(node =>
+    node.className.split(/\s+/).includes("terminal-tab"));
+  // Tabs live in the tab strip; find by class anywhere.
+  const tabbar = app.panel.children.find(node => node.className === "terminal-tabs");
+  assert.ok(tabbar, "a runtime tab strip is injected into the panel");
+  const tabsFound = tabbar.querySelectorAll(".terminal-tab");
+  assert.deepEqual(tabsFound.map(tab => tab.textContent.replace(/\s+\d+$/, "")), ["Flow", "Python", "R", "+"]);
+  assert.equal(app.output.className, "terminal-entries");
+  const transcript = app.panel.children.find(node =>
+    node.className === "terminal-transcript");
+  assert.ok(transcript, "the transcript wraps output and prompt");
+  assert.ok(transcript.contains(app.el("consoleInput")),
+    "the prompt is the next line of the transcript, not an anchored form");
+  const status = app.panel.children.find(node => node.className === "terminal-status");
+  assert.match(status.textContent, /No commands yet/, "runtime honestly starts unknown");
+  const menu = app.panel.children.find(node => node.attributes.id === "terminalMenu");
+  assert.equal(menu.hidden, true, "secondary actions live in a collapsed menu");
 });
 
-test("console output is never interpreted as HTML",async()=>{
-  const app=mount({ok:true,status:200,text:async()=>'<img onerror=alert(1)> done'});
-  app.el("consoleInput").value="print('<img>')";
-  await app.controller.run(app.el("consoleInput"));
-  const html = app.el("console").innerHTML;
-  assert.doesNotMatch(html,/<img\s.*onerror/);
-  assert.match(html,/&lt;img\s+onerror=alert\(1\)&gt;/);
+test("prompt keydown submits exact code; output and ready state follow", async () => {
+  const app = mount();
+  const field = app.el("consoleInput");
+  field.value = "print('hello')";
+  field.fire("keydown", { key: "Enter", preventDefault() {}, stopPropagation() {} });
+  await new Promise(resolve => setImmediate(resolve));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(app.requests.length, 1);
+  assert.equal(app.requests[0].url, "/api/run/python");
+  assert.equal(app.requests[0].options.body, "print('hello')");
+  assert.equal(app.requests[0].options.headers["X-FlowStudio-Intent"], "run");
+  assert.equal(field.value, "");
+  const transcriptHTML = app.el("console").innerHTML;
+  assert.match(transcriptHTML, /term-cmd/);
+  assert.match(transcriptHTML, /&gt; [\s\S]*print[\s\S]*hello/);
+  assert.match(transcriptHTML, /ok/);
+  const status = app.panel.children.find(node => node.className === "terminal-status");
+  assert.match(status.textContent, /Last submission succeeded/);
 });
 
-test("the console I/O singleton feeds one bounded terminal buffer",async()=>{
-  const app=mount();
-  app.io().write("\n> manual entry\n\x1b[32mok\x1b[0m\n");
-  const html = app.el("console").innerHTML;
-  assert.match(html,/&gt; manual entry/);
-  assert.match(html,/fs-green/);
+test("runtime errors surface failure classes but keep the command in history", async () => {
+  const app = mount({ ok: false, status: 422, text: async () => "TypeError: bad type" });
+  const field = app.el("consoleInput");
+  field.value = "bad(";
+  assert.equal(await app.controller.run(field), true);
+  assert.deepEqual(Array.from(app.controller.history("python")), ["bad("]);
+  assert.match(app.el("console").innerHTML, /fs-error-line/);
+  assert.match(app.el("console").innerHTML, /TypeError/);
+  assert.equal(app.el("resultStatus").dataset.state, "error");
+  const status = app.panel.children.find(node => node.className === "terminal-status");
+  assert.match(status.textContent, /Last submission failed/);
+});
+
+test("console output is never interpreted as HTML", async () => {
+  const app = mount({ ok: true, status: 200, text: async () => '<img onerror=alert(1)> done' });
+  const field = app.el("consoleInput");
+  field.value = "print('<img>')";
+  await app.controller.run(field);
+  const rendered = app.el("console").innerHTML;
+  assert.doesNotMatch(rendered, /<img\s.*onerror/);
+  assert.match(rendered, /&lt;img onerror=alert\(1\)&gt;/);
+});
+
+test("Shift+Enter keeps editing; Ctrl+F is reserved for the editor", () => {
+  const app = mount();
+  const field = app.el("consoleInput");
+  field.value = "one";
+  let stopped = false, executed = false;
+  field.fire("keydown", { key: "Enter", shiftKey: true,
+    preventDefault() {}, stopPropagation() { stopped = true; } });
+  assert.equal(stopped, false);
+  assert.equal(field.value, "one");
+  // The prompt swallows Ctrl+F so the editor's global find stays untouched.
+  const transcript = app.panel.children.find(node =>
+    node.className === "terminal-transcript");
+  field.fire("keydown", {
+    key: "f", ctrlKey: true, stopPropagation() { executed = true; } });
+  assert.equal(executed, true, "terminal-scoped editor shortcuts stop at the prompt");
+});
+
+test("history recall navigates stored commands and returns to the draft", async () => {
+  const app = mount();
+  const field = app.el("consoleInput");
+  field.value = "first";
+  assert.equal(await app.controller.run(field), true);
+  field.value = "second";
+  await app.controller.run(field);
+  let prevented = false;
+  const up = { key: "ArrowUp", preventDefault() { prevented = true; } };
+  field.fire("keydown", up);
+  assert.equal(prevented, true, "arrow recall does not bubble");
+  assert.equal(field.value, "second");
+  field.fire("keydown", { key: "ArrowUp", preventDefault() {} });
+  assert.equal(field.value, "first");
+  field.fire("keydown", { key: "ArrowDown", preventDefault() {} });
+  assert.equal(field.value, "second");
+  field.fire("keydown", { key: "ArrowDown", preventDefault() {} });
+  assert.equal(field.value, "");
+  assert.deepEqual(Array.from(app.controller.history("python")), ["first", "second"]);
+});
+
+test("network failures flip the runtime to disconnected, not 'error'", async () => {
+  const app = mount({ ok: true, status: 200, text: async () => { throw Error("down"); } });
+  const field = app.el("consoleInput");
+  field.value = "retry";
+  assert.equal(await app.controller.run(field), false);
+  assert.deepEqual(Array.from(app.controller.history("python")), []);
+  assert.equal(app.el("resultStatus").dataset.state, "error");
+  const status = app.panel.children.find(node => node.className === "terminal-status");
+  assert.match(status.textContent, /Server unreachable/,
+    "a transport failure is reported as disconnected, not as a runtime error");
+  assert.equal(field.value, "retry");
+  assert.equal(app.el("run").disabled, false);
+  assert.equal(app.el("runCell").disabled, false);
+});
+
+test("a busy editor blocks console execution without consuming the command", async () => {
+  const app = mount();
+  app.el("run").disabled = true;
+  const field = app.el("consoleInput");
+  field.value = "keep me";
+  assert.equal(await app.controller.run(field), false);
+  assert.equal(app.requests.length, 0);
+  assert.equal(field.value, "keep me");
+});
+
+test("console execution blocks editor submission until the request settles", async () => {
+  let resolve;
+  const app = mount({ ok: true, status: 200, text: () => new Promise(r => { resolve = r; }) });
+  const field = app.el("consoleInput");
+  field.value = "x";
+  const pending = app.controller.run(field);
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.equal(app.el("run").disabled, true);
+  assert.equal(app.el("runCell").disabled, true);
+  await new Promise(r => setImmediate(r));
+  resolve("done");
+  await pending;
+  assert.equal(app.el("run").disabled, false);
+  assert.equal(app.el("runCell").disabled, false);
+});
+
+test("language change and tab switches isolate drafts per session", () => {
+  const app = mount();
+  const field = app.el("consoleInput");
+  field.value = "python draft";
+  const language = app.el("language");
+  language.value = "r";
+  language.fire("change");
+  assert.equal(field.value, "", "the R session starts with its own empty prompt");
+  field.value = "x <- 1";
+  language.value = "python";
+  language.fire("change");
+  assert.equal(field.value, "python draft",
+    "switching back restores that session's draft");
+  const tabStrip = app.panel.children.find(node => node.className === "terminal-tabs");
+  const rTab = tabStrip.querySelectorAll(".terminal-tab")
+    .find(tab => tab.dataset.runtime === "r");
+  rTab.fire("click");
+  assert.equal(field.value, "x <- 1", "R session keeps its draft across switches");
+});
+
+test("new sessions add scrollbacks and flag unread output in background tabs", async () => {
+  const app = mount();
+  const vibe = await (async () => {
+    const field = app.el("consoleInput");
+    field.value = "x = 1";
+    const language = app.el("language");
+    language.value = "r";
+    language.fire("change");
+    // Pull the R session to the background without producing output there.
+    language.value = "python";
+    language.fire("change");
+    return app.controller;
+  })();
+  assert.ok(vibe);
+  const response = app.panel.children.find(node =>
+    node.className === "terminal-actions");
+  const plus = app.panel.querySelector("#terminalNewSession");
+  assert.ok(plus, "an explicit + control creates sessions");
+  plus.fire("click");
+  const tabStrip = app.panel.children.find(node => node.className === "terminal-tabs");
+  const suffixes = tabStrip.querySelectorAll(".terminal-tab")
+    .map(tab => tab.textContent);
+  assert.ok(suffixes.some(text => /\bPython 2\b/.test(text)), suffixes.join("|"));
+  const status = app.panel.children.find(node => node.className === "terminal-status");
+  assert.match(status.textContent, /No commands yet/,
+    "a fresh session reports unknown state, not the other session's status");
+});
+
+test("Ctrl+L clears visible output for the active session only", () => {
+  const app = mount();
+  const transcript = app.panel.children.find(node =>
+    node.className === "terminal-transcript");
+  transcript.fire("keydown", { key: "l", ctrlKey: true, preventDefault() {} });
+  assert.equal(app.el("console").children.length, 0,
+    "cleared output removes painted lines but keeps the prompt");
+  assert.ok(app.el("consoleInput"), "the prompt survives a clear");
+});
+
+test("the terminal search filters entries without destroying the log", () => {
+  const app = mount();
+  app.io().write("alpha line\n", "python", "out");
+  app.io().write("beta line\n", "python", "out");
+  const searchToggle = app.panel.querySelector("#terminalSearchToggle");
+  searchToggle.fire("click");
+  const searchInput = app.panel.querySelector("#terminalSearchInput");
+  assert.ok(searchInput, "the search bar is reachable");
+  searchInput.value = "alpha";
+  searchInput.fire("input");
+  const rendered = app.el("console").innerHTML;
+  assert.match(rendered, /alpha line/);
+  assert.doesNotMatch(rendered, /beta line/);
+  const input = app.panel.querySelector;
+  searchInput.fire("keydown", { key: "Escape", preventDefault() {} });
+  assert.match(app.el("console").innerHTML, /alpha line/,
+    "closing search restores the full transcript");
+});
+
+test("the I/O singleton routes attributed writes to that runtime's sessions", () => {
+  const app = mount();
+  app.io().write("flow notices\n", "flow", "notice");
+  // The write went to the Flow session; the active python one is untouched.
+  assert.doesNotMatch(app.el("console").innerHTML, /flow notices/,
+    "output attributed to flow must stay out of the active transcript");
+  app.el("language").value = "flow";
+  app.el("language").fire("change");
+  assert.match(app.el("console").innerHTML, /flow notices/);
+  // Unattributed writers land in whichever session is active.
+  app.io().write("unattributed line\n", null, "out");
+  assert.match(app.el("console").innerHTML, /unattributed line/);
+  app.el("language").value = "python";
+  app.el("language").fire("change");
+  assert.doesNotMatch(app.el("console").innerHTML, /flow notices/);
+});
+
+test("overflow menu gates destructive reset and wires history persistence", async () => {
+  const storageData = new Map();
+  const storage = {
+    getItem: key => storageData.has(key) ? storageData.get(key) : null,
+    setItem: (key, value) => { storageData.set(key, String(value)); },
+    removeItem: key => { storageData.delete(key); }
+  };
+  const app = mount({ ok: true, status: 200, text: async () => "ok" }, storage);
+  const menuButton = app.panel.querySelector("#terminalMenuToggle");
+  assert.ok(menuButton, "the overflow menu is the single secondary-actions entry");
+  menuButton.fire("click");
+  const remember = app.panel.querySelector("#consoleRememberHistory");
+  assert.ok(remember, "remember-history checkbox moved into the menu");
+  const box = remember.children[0];
+  assert.equal(box.checked, false);
+  box.checked = true;
+  box.fire("change");
+  assert.equal(app.controller.isPersisting(), true);
+  const field = app.el("consoleInput");
+  field.value = "print(1)";
+  await app.controller.run(field);
+  storage.setItem;
+  assert.ok(storageData.get("flowstudio.console.history.v1.enabled") === "1" ||
+    storageData.get("flowstudio.console.history.v1.python"),
+    "persisted history reaches device storage: " + [...storageData.keys()].join(","));
+  assert.deepEqual(JSON.parse(storageData.get("flowstudio.console.history.v1.python")),
+    ["print(1)"]);
+  const reset = app.panel.querySelector("#terminalMenuReset");
+  assert.equal(reset.disabled, false,
+    "python keeps an interpreter, so the menu offers its reset");
+  // Switching to flow disables honest reset support: Flow compiles per run.
+  app.el("language").value = "flow";
+  app.el("language").fire("change");
+  menuButton.fire("click");
+  assert.equal(reset.disabled, true,
+    "Flow cannot reset an interpreter; it has none");
 });

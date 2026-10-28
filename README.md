@@ -72,9 +72,22 @@ Run the additional pure-module tests with:
 
 ## Terminal console, packages, examples, debugger (native workspace)
 
-The native workspace console renders as a terminal: ANSI-colored output,
-'classed error and prompt lines and a bounded keeper buffer, so real and
-fake browser environments stay honest (tests still read the plain buffer).
+The native workspace console is a full terminal, not a form: runtime tabs
+(Flow, Python, R, plus explicit `+` sessions), a compact status row that only
+reports states the server actually produced (unknown at start, running,
+ready, failed, disconnected; Python/R say "shared interpreter" because they
+really do share the persistent kernel), an integrated syntax-highlighted
+prompt (`flow ❯` / `python ❯` / `r ❯`) that sits inline as the next line of
+the transcript, history up/down recall bound to per-session drafts,
+Transcript search (Ctrl+F inside the panel), clear visible output (Ctrl+L),
+streaming timestamps and per-command durations, and an overflow menu holding
+the opt-in device history flag, per-runtime history clearing and a two-step
+destructive Python/R interpreter reset (Flow has no interpreter to reset and
+the menu says so). Captured R/Python figures render inline as figures and
+stay in the Plots panel. Execution still goes through the Flow-owned
+localhost routes with the same headers and busy-locks as before; nothing was
+fabricated on top of the real kernels. The standalone `/console` page keeps
+its simpler form-based layout for scripting and accessibility use.
 
 **Flow MLIR backend.** The topbar has a **Backend** selector (next to
 Runtime). Running a Flow buffer with Backend set to MLIR sends the source

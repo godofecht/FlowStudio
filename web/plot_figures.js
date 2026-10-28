@@ -165,7 +165,7 @@ async function show(root, doc, language, status) {
   return true;
 }
 
-const api = Object.freeze({ ROUTES, LIMIT, validEntry, collect, create, show });
+const api = Object.freeze({ ROUTES, LIMIT, validEntry, collect, create, show, figureElement });
 global.FlowStudioPlotFigures = api;
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(globalThis);

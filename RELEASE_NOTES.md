@@ -2,6 +2,21 @@
 
 An experimental Flow-native localhost scientific IDE with an HTML workspace.
 
+Unreleased working-set addition: the native workspace console was rebuilt as
+an integrated developer terminal. It has runtime tabs with explicit per-runtime
+sessions, an honest status row (unknown/running/ready/failed/disconnected,
+with "shared interpreter" labeling for Python and R), a syntax-highlighted
+prompt that lives inline as the next transcript line, history recall,
+in-panel transcript search (Ctrl+F), Ctrl+L clear, per-command timestamps and
+durations, an overflow menu holding opt-in device history, per-runtime
+history clearing and a two-step Python/R interpreter reset, and inline
+rendering of captured R/Python figures. Execution still uses the same
+Flow-owned localhost routes, headers and busy-locks; no execution behavior
+was simulated. Verification so far: the Node suite (1022 tests) passes,
+assets are served by the rebuilt native binary, and a live Chromium session
+exercised real Python execution, the failure path, tab isolation and the
+editor round-trip on macOS arm64 with screenshots.
+
 The preview adds, since v0.2.0-alpha.1: an examples gallery whose curated projects open and run in one click, automatically landing captured figures in the Plots tab; native R plot capture that prefers the cairo SVG device (rendered directly as a browser image) with a PDF fallback and a per-build device probe; a consent-gated native Quarto render through the installed `quarto` CLI producing bounded standalone HTML reports; mathematical Flow compilation of typed boundary conditions (constant Dirichlet, Neumann flux and Robin heat-transfer cases) with unicode spatial derivatives and combined reaction and diffusion forcing, plotting heatmaps and velocity fields; browser session snapshots that round-trip NumPy ndarray dtypes, plain R matrices and R data.frame factor columns through the real Pyodide/webR workers; R factor-column persistence parity through the live webR session and real Rscript acceptance; and an offline Flow language help reference served through the native asset allowlist without interpreter execution. This release also fixes an R kernel startup crash where the plot capture probe referenced `grDevices::capabilities` (which is not exported from that namespace) that halted every R request on R 4.6.1.
 
 Each feature landed through its own CI qualification and parity documentation; integration and verification levels vary feature by feature, see docs/PARITY.md. Verified live on macOS arm64 during this release cycle: real R 4.6.1 execution produces captured SVG figures that render in the Plots tab over the native HTTP server, and the native R IPC harness (`tests/test_native_r_session.py`) exercises real persistent `Rscript` sessions including plot capture.

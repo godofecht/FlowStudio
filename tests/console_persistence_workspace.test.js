@@ -15,6 +15,7 @@ function memoryStorage() {
     values
   };
 }
+const { FakeElement, createDocument } = require("./terminal_dom.js");
 function field(value) {
   return {value, selectionStart: 0, setSelectionRange() {}};
 }
@@ -40,41 +41,64 @@ test("network rejection is not saved to device history", async () => {
   assert.deepEqual(JSON.parse(storage.getItem(STORAGE_PREFIX + "r")), []);
 });
 test("workspace mounts opt-in checkbox and clear-history controls", async () => {
-  const elements = new Map(), storage = memoryStorage();
-  const panel = {style:{}, append(...nodes) { for (const node of nodes) register(node); }};
-  function register(node) {
-    if (node.id) elements.set(node.id, node);
-    for (const child of node.children || []) register(child);
+  const storage = memoryStorage();
+  const { doc, elements } = createDocument();
+  const panel = new FakeElement("div");
+  for (const id of ["console", "language", "resultStatus", "run", "runCell"]) {
+    const node = new FakeElement("span");
+    node.attributes.id = id;
+    elements.set(id, node);
   }
-  function element(id = "") {
-    return {id, value:"", textContent:"", style:{}, dataset:{}, children:[],
-      listeners:{}, disabled:false, selectionStart:0, selectionEnd:0,
-      addEventListener(name,fn){this.listeners[name]=fn;},
-      setAttribute(name,value){this[name]=value;},
-      setSelectionRange(){},
-      append(...nodes){this.children.push(...nodes); for(const node of nodes) register(node);},
-      fire(name){this.listeners[name]?.();}};
-  }
-  for (const id of ["console","language","resultStatus","run","runCell"])
-    elements.set(id, element(id));
-  elements.get("console").parentElement = panel;
   elements.get("language").value = "python";
-  const doc = {getElementById:id=>elements.get(id) || null, createElement:()=>element()};
-  const context = vm.createContext({TextEncoder, localStorage:storage, console});
-  const root = path.join(__dirname,"..","web");
-  vm.runInContext(fs.readFileSync(path.join(root,"console.js"),"utf8"),context);
-  vm.runInContext(fs.readFileSync(path.join(root,"workspace_console.js"),"utf8"),context);
-  const c = context.FlowStudioWorkspaceConsole.mount(doc,async()=>({ok:true,status:200,text:async()=>"ok"}));
-  assert.equal(elements.get("consoleRememberHistory").checked,false);
-  elements.get("consoleRememberHistory").checked = true;
-  elements.get("consoleRememberHistory").fire("change");
-  assert.equal(c.isPersisting(),true);
-  elements.get("consoleInput").value = "print(1)";
-  await c.run(elements.get("consoleInput"));
-  assert.deepEqual(JSON.parse(storage.getItem(STORAGE_PREFIX+"python")),["print(1)"]);
-  elements.get("consoleClearHistory").fire("click");
-  assert.deepEqual(Array.from(c.history("python")),[]);
-  elements.get("consoleRememberHistory").checked = false;
-  elements.get("consoleRememberHistory").fire("change");
-  assert.equal(storage.values.size,0);
+  elements.get("console").parentElement = panel;
+  const root = path.join(__dirname, "..", "web");
+  const context = vm.createContext({ TextEncoder, localStorage: storage, console });
+  for (const file of ["terminal_render", "terminal_sessions", "terminal_input",
+    "console", "workspace_console"])
+    vm.runInContext(fs.readFileSync(path.join(root, file + ".js"), "utf8"), context);
+  const c = context.FlowStudioWorkspaceConsole.mount(doc, async () =>
+    ({ ok: true, status: 200, text: async () => "ok" }));
+  const find = node => {
+    for (const child of node.children) {
+      if (child.attributes.id === "consoleRememberHistory") return child;
+      const hit = find(child);
+      if (hit) return hit;
+    }
+    return null;
+  };
+  const remember = find(panel);
+  assert.ok(remember, "the menu carries the opt-in persistence control");
+  const box = remember.children[0];
+  assert.equal(box.checked, false);
+  box.checked = true;
+  box.fire("change");
+  assert.equal(c.isPersisting(), true);
+  const inputFind = node => {
+    for (const child of node.children) {
+      if (child.attributes.id === "consoleInput") return child;
+      const hit = inputFind(child);
+      if (hit) return hit;
+    }
+    return null;
+  };
+  const input = inputFind(panel);
+  input.value = "print(1)";
+  await c.run(input);
+  assert.deepEqual(JSON.parse(storage.getItem(STORAGE_PREFIX + "python")), ["print(1)"]);
+  const clear = (() => {
+    const walk = node => {
+      for (const child of node.children) {
+        if (child.attributes.id === "consoleClearHistory") return child;
+        const hit = walk(child);
+        if (hit) return hit;
+      }
+      return null;
+    };
+    return walk(panel);
+  })();
+  clear.fire("click");
+  assert.deepEqual(Array.from(c.history("python")), []);
+  box.checked = false;
+  box.fire("change");
+  assert.equal(storage.values.size, 0);
 });

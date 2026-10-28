@@ -1,3 +1,25 @@
+## 2026-10-28: explicit R matrix identity in browser session snapshots (CI pending)
+
+The existing browser-local Python/R session export/import now preserves **plain,
+unlabelled, homogeneous R matrix** identity in the version-2 snapshot format.
+Snapshot-only webR exports mark matrices after inspecting the actual R object;
+ordinary R-to-Python transfers still return the same typed table without
+provenance. Import preflights the entire snapshot, then explicitly requests the
+existing real webR matrix constructor instead of silently restoring a
+data.frame. The older version-1 snapshots and Python pandas version-2
+snapshots remain accepted. Matrix dimensions and column-major values are
+preserved within the existing 128-row/16-column and 128-KiB snapshot bounds;
+R integer storage widths, dimnames, attributes, S3/S4 classes and arbitrary
+objects are **not** preserved.
+
+**Status: partial / independent Linux/macOS CI pending.** The modified
+source compiled as JavaScript, and focused V8 checks exercised actual
+capture, validation, restore dispatch and the webR query protocol. New Node
+regressions include opt-in Rscript execution of the generated R export query,
+which must not be counted as passing until a runner with Rscript executes it.
+No hosted CI, Flow compiler or native backend changes. Physical Chromium
+webR snapshot export/import remains unverified. This is not RStudio parity.
+
 ## 2026-10-28: Quarto nested execution and YAML metadata guard (Linux/macOS CI passed)
 
 The native Flow-owned Quarto adapter now rejects executable-looking fenced

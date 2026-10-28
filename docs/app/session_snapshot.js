@@ -23,6 +23,15 @@ function matrixPacket(packet) {
       Array.isArray(column.values) &&
       column.values.length === packet.columns[0].values.length);
 }
+function numpyPacket(packet) {
+  if (!packet) return false;
+  if (packet.kind === "vector")
+    return Array.isArray(packet.values) && packet.values.length > 0 &&
+      (packet.type === "number" || !packet.values.includes(null));
+  return matrixPacket(packet) &&
+    (packet.columns[0].type === "number" ||
+      packet.columns.every(column => !column.values.includes(null)));
+}
 function validate(snapshot) {
   if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot) ||
       Object.keys(snapshot).sort().join(",") !== "format,language,omitted,truncated,variables" ||
@@ -41,6 +50,8 @@ function validate(snapshot) {
         (restoreAs && (snapshot.format !== FORMAT_V2 ||
           !((snapshot.language === "python" && entry.restoreAs === "pandas" &&
              entry.value?.kind === "table") ||
+            (snapshot.language === "python" && entry.restoreAs === "numpy" &&
+             numpyPacket(entry.value)) ||
             (snapshot.language === "r" && entry.restoreAs === "matrix" &&
              matrixPacket(entry.value))))))
       throw Error("Snapshot contains an invalid or duplicate variable name.");
@@ -84,7 +95,7 @@ async function capture({language, inspect, exportValue, generation}) {
       if (!result || result.ok !== true) { snapshot.omitted++; continue; }
       const value = transfer.validate(result.value);
       if (result.origin !== undefined &&
-          !((language === "python" && result.origin === "pandas") ||
+          !((language === "python" && ["pandas", "ndarray"].includes(result.origin)) ||
             (language === "r" && result.origin === "matrix")))
         throw Error("Unsupported session snapshot source type.");
       const entry = {name, value};
@@ -92,6 +103,10 @@ async function capture({language, inspect, exportValue, generation}) {
         if (value.kind !== "table")
           throw Error("Pandas origin requires a Python typed table.");
         entry.restoreAs = "pandas";
+      } else if (result.origin === "ndarray") {
+        if (!numpyPacket(value))
+          throw Error("NumPy origin requires a nonempty homogeneous vector or matrix packet.");
+        entry.restoreAs = "numpy";
       } else if (result.origin === "matrix") {
         if (!matrixPacket(value))
           throw Error("R matrix origin requires a nonempty homogeneous typed table.");
@@ -162,7 +177,7 @@ function create({exportButton, importButton, fileInput, language, inspect, expor
       notice("Exported " + snapshot.variables.length + " " + selected + " variables" +
         (snapshot.omitted || snapshot.truncated ? " (partial: " + snapshot.omitted +
           " omitted" + (snapshot.truncated ? "; inspection truncated" : "") + ")" : "") +
-        ". Only bounded scalar, vector and typed-table values are saved; pandas and plain R matrix identity are retained when supported.");
+        ". Only bounded scalar, vector and typed-table values are saved; pandas, NumPy ndarray and plain R matrix identity are retained when supported.");
       return true;
     } catch (error) {
       if (currentGeneration() === epoch) notice("Session export failed: " + String(error.message || error).slice(0, 350));

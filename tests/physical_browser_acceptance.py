@@ -130,6 +130,38 @@ def test_python(page, timeout: int):
                                timeout=timeout)
         run_console(page, "python", "print(fs_browser_value + 5)", "44", timeout)
 
+    # Real Pyodide NumPy snapshot must restore an ndarray, not a list/dict.
+    # This scenario is opt-in and cannot be counted as passed without Chromium.
+    run_source(page, "python",
+               "import numpy as np\nfs_np_snapshot = np.array([[1.25,3],[np.nan,4]], dtype=np.float64)\n"
+               "print('numpy snapshot ready')", "numpy snapshot ready", timeout)
+    with page.expect_download(timeout=timeout) as numpy_snapshot_info:
+        page.locator("#exportSession").click()
+    with tempfile.TemporaryDirectory() as folder:
+        destination = Path(folder) / "numpy-session.json"
+        numpy_snapshot_info.value.save_as(destination)
+        import json
+        payload = json.loads(destination.read_text(encoding="utf-8"))
+        assert payload["format"] == "flowstudio-session-v2", payload
+        entry = next(item for item in payload["variables"] if item["name"] == "fs_np_snapshot")
+        assert entry["restoreAs"] == "numpy", entry
+        assert entry["value"]["kind"] == "table", entry
+        page.locator("#reset").click()
+        page.once("dialog", lambda dialog: dialog.accept())
+        page.locator("#sessionFile").set_input_files(str(destination))
+        page.wait_for_function(
+            "document.querySelector('#notice').textContent.startsWith('Imported ')",
+            timeout=timeout)
+        run_console(page, "python",
+                    "import numpy as np; "
+                    "assert type(fs_np_snapshot) is np.ndarray; "
+                    "assert fs_np_snapshot.shape == (2,2); "
+                    "assert fs_np_snapshot[0,1] == 3; "
+                    "assert np.isnan(fs_np_snapshot[1,0]); "
+                    "print('numpy snapshot restored')",
+                    "numpy snapshot restored", timeout)
+    print("PASS: physical Chromium real NumPy ndarray session snapshot restoration")
+
     # Execute actual notebook cells in order in the same interpreter.
     page.locator("#source").fill("# %% [python]\nfs_nb = 11\n# %% [python]\nprint(fs_nb * 4)\n")
     page.locator("#runNotebook").click()

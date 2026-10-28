@@ -119,7 +119,7 @@ test("browser snapshot controller opts in to R provenance and restores matrices 
   const html=fs.readFileSync(path.join(__dirname,"../docs/app/index.html"),"utf8");
   assert.match(html,/exportVariable\(name,\{forSnapshot:true\}\)/);
   assert.match(html,/restoreAs==="matrix" \? \{asMatrix:true\} : undefined/);
-  assert.match(html,/request\(restoreAs==="pandas" \? "import-pandas" : "import"/);
+  assert.match(html,/request\(restoreAs==="pandas" \? "import-pandas" : restoreAs==="numpy" \? "import-numpy" : "import"/);
 });
 
 test("real Rscript identifies plain matrices without mislabelling data.frames",async t=>{

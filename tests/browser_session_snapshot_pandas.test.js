@@ -156,6 +156,6 @@ test("real CPython distinguishes pandas and plain dictionary provenance",async t
 test("browser snapshot wiring selects the pandas import only for annotated v2 entries",()=>{
   const html=fs.readFileSync(path.join(__dirname,"../docs/app/index.html"),"utf8");
   assert.match(html,/request\("export-snapshot",name\)/);
-  assert.match(html,/request\(restoreAs==="pandas" \? "import-pandas" : "import",name,value\)/);
+  assert.match(html,/request\(restoreAs==="pandas" \? "import-pandas" : restoreAs==="numpy" \? "import-numpy" : "import",name,value\)/);
   assert.match(html,/FlowStudioSessionSnapshot\.create/);
 });

@@ -18,6 +18,7 @@ try {
     ['examples/heat_mixed_boundaries.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_per_face_boundaries.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_robin.flow', 'temperatureVariance', 'meanTemperature'],
+    ['examples/heat_anisotropic.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_nonlinear_reaction.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_transport_reaction.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/navier_stokes_smoke.flow', 'kineticEnergy', 'maximumDivergence']

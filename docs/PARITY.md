@@ -1,3 +1,18 @@
+## 2026-10-28: native Git fast-forward merge (verification pending)
+
+The native Flow-owned Git pane can request an explicitly confirmed fast-forward
+merge from an existing **local branch** into the currently checked-out branch.
+The server checks for a clean working tree including untracked files, verifies
+the local `refs/heads/` target, and invokes `git merge --ff-only -- <branch>`
+with fixed argv and disabled hooks. Divergent histories cannot create a merge
+commit. The UI shares the existing Git operation lock; hosted Pages refuses
+all native Git operations. Live Flow HTTP acceptance now covers fast-forward
+success, dirty/untracked rejection, divergence, invalid refs and origin
+protection. **Status: implementation committed for CI; native build and live
+HTTP acceptance not yet independently verified.** Remote fetch/push, merge
+conflict resolution, rebasing and authenticated remote sessions are not
+implemented. RStudio parity remains incomplete; no CI workflow changed.
+
 ## 2026-10-28: non-forcing native Git branch deletion (six Linux/macOS CI jobs passed)
 
 The Flow-owned native Git pane now offers explicitly confirmed deletion of a

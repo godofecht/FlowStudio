@@ -223,6 +223,9 @@ async function gitSwitchBranch(name) {
 async function gitDeleteBranch(name) {
   return request("/api/git/branch/delete", checkedBranchName(name));
 }
+async function gitMergeBranch(name) {
+  return request("/api/git/branch/merge", checkedBranchName(name));
+}
 
 // The native R adapter shares Flow-owned localhost transport but never shares
 // interpreter state with webR. Its unsupported features fail explicitly.
@@ -455,7 +458,7 @@ function createRSession() {
     exportVariable:unsupported, importVariable:unsupported});
 }
 
-const api = Object.freeze({available, run, createRSession, checkSyntax, checkRSyntax, tracePython, debugRStart, debugRCommand, debugPythonStart, debugPythonCommand, gitStatus, gitDiff, gitStagedDiff, gitStage, gitUnstage, gitCommit, gitBranches, gitCreateBranch, gitSwitchBranch, gitDeleteBranch});
+const api = Object.freeze({available, run, createRSession, checkSyntax, checkRSyntax, tracePython, debugRStart, debugRCommand, debugPythonStart, debugPythonCommand, gitStatus, gitDiff, gitStagedDiff, gitStage, gitUnstage, gitCommit, gitBranches, gitCreateBranch, gitSwitchBranch, gitDeleteBranch, gitMergeBranch});
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 global.FlowStudioNativeFlow = api;
 })(globalThis);

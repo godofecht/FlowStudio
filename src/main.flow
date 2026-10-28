@@ -525,13 +525,13 @@ function send_git_write(kind: string, value: string) -> void {
 
 # Branch operations target only the native server working tree. Git validates
 # ref names, argv is fixed, checkout refuses dirty tracked/untracked files,
-# and deletion uses Git's non-forcing -d (never -D) merged-branch guard.
+# deletion uses non-forcing -d, and merge uses --ff-only without merge commits.
 function send_git_branch(kind: string, name: string) -> void {
     if not eq(kind, "list") and (eq(name, "") or strlen(name) > 128) {
         fs_reply(400, "text/plain; charset=utf-8", "Branch name must contain 1 to 128 bytes.")
         return
     }
-    if eq(kind, "switch") {
+    if eq(kind, "switch") or eq(kind, "merge") {
         let dirty: ptr<ProcCmd> = proc_cmd("git")
         proc_arg(dirty, "-c")
         proc_arg(dirty, "core.fsmonitor=false")
@@ -554,7 +554,29 @@ function send_git_branch(kind: string, name: string) -> void {
             return
         }
         if not eq(state.stdout, "") {
-            fs_reply(409, "text/plain; charset=utf-8", "Commit, stash or remove all working-tree changes and untracked files before switching branches.")
+            fs_reply(409, "text/plain; charset=utf-8", "Commit, stash or remove all working-tree changes and untracked files before switching or merging branches.")
+            return
+        }
+    }
+    # Only local branches may be merged: never accept remote refs, tags or SHAs.
+    if eq(kind, "merge") {
+        let verify: ptr<ProcCmd> = proc_cmd("git")
+        proc_arg(verify, "show-ref")
+        proc_arg(verify, "--verify")
+        proc_arg(verify, "--quiet")
+        proc_arg(verify, "refs/heads/" + name)
+        proc_timeout_ms(verify, 5000)
+        let checked: ptr<ProcResult> = proc_run(verify)
+        if checked.timed_out {
+            fs_reply(504, "text/plain; charset=utf-8", "Git local branch check timed out.")
+            return
+        }
+        if not eq(checked.error, "") {
+            fs_reply(503, "text/plain; charset=utf-8", "Git executable unavailable: " + checked.error)
+            return
+        }
+        if checked.exit_code != 0 {
+            fs_reply(422, "text/plain; charset=utf-8", "Git merge requires an existing local branch.")
             return
         }
     }
@@ -575,6 +597,11 @@ function send_git_branch(kind: string, name: string) -> void {
         } elif eq(kind, "delete") {
             proc_arg(command, "branch")
             proc_arg(command, "-d")
+            proc_arg(command, "--")
+            proc_arg(command, name)
+        } elif eq(kind, "merge") {
+            proc_arg(command, "merge")
+            proc_arg(command, "--ff-only")
             proc_arg(command, "--")
             proc_arg(command, name)
         } else {
@@ -715,6 +742,10 @@ function dispatch() -> void {
         }
         if eq(path, "/api/git/branch/delete") {
             send_git_branch("delete", fs_body())
+            return
+        }
+        if eq(path, "/api/git/branch/merge") {
+            send_git_branch("merge", fs_body())
             return
         }
         if eq(path, "/api/render/quarto") {

@@ -245,9 +245,14 @@ def compile_heat_equation(tokens: list[str], *, reaction: bool = False,
         elif advection and sign == -1 and any(
                 _advection(term, axis) and axis not in advection_axes for axis in ("x", "y")):
             advection_axes.add("x" if _advection(term, "x") else "y")
-        elif _independent(term) and forcing is None and term.dimension == TEMPERATURE_RATE:
-            forcing = term if sign == 1 else Expression(
+        elif _independent(term) and term.dimension == TEMPERATURE_RATE:
+            # Keep every independently typed source. The complete RHS is
+            # evaluated at each RK2 stage; this AST records the same signed
+            # sum rather than rejecting a second source term.
+            signed = term if sign == 1 else Expression(
                 "neg", (term,), dimension=TEMPERATURE_RATE)
+            forcing = (signed if forcing is None else Expression(
+                "add", (forcing, signed), dimension=TEMPERATURE_RATE))
         else:
             raise ExpressionError(
                 "Unsupported heat dynamics: expected diffusion, independent forcing "

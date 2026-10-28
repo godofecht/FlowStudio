@@ -184,6 +184,23 @@ def main() -> None:
     invalid_temporal = temporal_source.replace("sin(2πt / 1s)", "sin(2πt / 1m)")
     status, body = request("POST", "/api/check/mathflow", invalid_temporal, accepted_headers)
     assert status == 422 and not json.loads(body)["ok"], (status, body)
+    # Multiple independent space/time sources must execute through native HTTP,
+    # including negative terms and the actual second RK2 stage clock.
+    composed_source = (Path(__file__).resolve().parents[1] /
+                       "examples/heat_composed_forcing.flow").read_text(encoding="utf-8")
+    status, body = request("POST", "/api/check/mathflow", composed_source, accepted_headers)
+    assert status == 200 and json.loads(body)["ok"], (status, body)
+    status, body = request("POST", "/api/run/mathflow", composed_source, accepted_headers)
+    composed = json.loads(body)
+    expected_composed = (300 + (1 - math.cos(2 * math.pi * 0.01)) / math.pi
+                         + 3 * math.sin(2 * math.pi * 0.01) / (2 * math.pi) - 0.01)
+    assert status == 200 and composed["ok"] and composed["steps"] == 100, (status, composed)
+    assert abs(composed["mean_temperature"] - expected_composed) < 3e-8, composed
+    assert composed["spatial"]["fields"]["temperature"], composed
+    invalid_composed = composed_source.replace("+ 2K/s * sin(2πy / 1m)",
+                                               "+ temperature / 1s")
+    status, body = request("POST", "/api/check/mathflow", invalid_composed, accepted_headers)
+    assert status == 422 and not json.loads(body)["ok"], (status, body)
     # Typed reaction-diffusion: native Flow HTTP -> NumPy RK2 -> real field diagnostics.
     reaction_source = (Path(__file__).resolve().parents[1] /
                        "examples/heat_reaction_diffusion.flow").read_text(encoding="utf-8")

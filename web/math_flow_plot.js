@@ -128,6 +128,21 @@
         arrow.setAttribute("stroke", "#ffffff");
         arrow.setAttribute("stroke-width", "1.7");
         svg.append(arrow);
+        const directionX = u[ix][iy] / speed, directionY = -v[ix][iy] / speed;
+        const tipX = x + length * directionX, tipY = y + length * directionY;
+        const head = Math.min(3.0, length * 0.4);
+        const wing = head * 0.5;
+        const points = [
+          [tipX, tipY],
+          [tipX - head * directionX - wing * directionY,
+           tipY - head * directionY + wing * directionX],
+          [tipX - head * directionX + wing * directionY,
+           tipY - head * directionY - wing * directionX]
+        ];
+        const arrowHead = doc.createElementNS(NS, "polygon");
+        arrowHead.setAttribute("points", points.map(point => point.join(",")).join(" "));
+        arrowHead.setAttribute("fill", "#ffffff");
+        svg.append(arrowHead);
       }
     }
     return svg;

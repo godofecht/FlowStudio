@@ -189,7 +189,7 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
         if node.operator == "mul": return args[0] * args[1]
         if node.operator == "div":
             with np.errstate(divide="ignore", invalid="ignore"):
-                return args[0] / args[1]
+                return np.divide(args[0], args[1])
         if node.operator == "neg": return -args[0]
         if node.operator == "pos": return args[0]
         if node.operator in ("sin", "cos", "exp", "sqrt"):

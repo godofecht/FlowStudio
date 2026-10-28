@@ -205,6 +205,18 @@ function validFactorColumnsDestination(factorColumns, packet) {
   }
   return true;
 }
+function validRowNamesDestination(rowNames, packet) {
+  if (!Array.isArray(rowNames) || !packet || packet.kind !== "table" ||
+      !Array.isArray(packet.columns) || !packet.columns.length ||
+      rowNames.length === 0 || rowNames.length > 128 ||
+      rowNames.length !== packet.columns[0].values.length ||
+      new Set(rowNames).size !== rowNames.length ||
+      !rowNames.every(name => typeof name === "string" && name.length > 0 &&
+        [...name].length <= 512 && !name.includes("\0"))) return false;
+  try { rowNames.forEach(name => encodeURIComponent(name)); }
+  catch (_) { return false; }
+  return true;
+}
 function create({load = () => import(CDN)} = {}) {
   let runtime = null, loading = null, epoch = 0;
   let serial = Promise.resolve();
@@ -487,8 +499,14 @@ function create({load = () => import(CDN)} = {}) {
                      "if (base::is.data.frame(v)) { " +
            "if (!base::identical(base::class(v), \"data.frame\") || base::ncol(v) < 1L || " +
            "base::ncol(v) > 16L || base::nrow(v) > 128L || " +
-           "!base::identical(base::rownames(v), base::as.character(base::seq_len(base::nrow(v))))) " +
-           "stop(\"Only bounded plain R data.frames with default row names can be transferred\"); " +
+           "!base::identical(base::sort(base::names(base::attributes(v))), base::c(\"class\",\"names\",\"row.names\"))) " +
+           "stop(\"Only bounded plain R data.frames can be transferred\"); " +
+           "row_names <- base::rownames(v); " +
+           "custom_rows <- !base::identical(row_names, base::as.character(base::seq_len(base::nrow(v)))); " +
+           "if (custom_rows && (!" + (forSnapshot ? "TRUE" : "FALSE") + " || " +
+           "base::anyNA(row_names) || base::anyDuplicated(row_names) || " +
+           "base::any(base::nchar(row_names, type=\"chars\") > 512L))) " +
+           "stop(\"Custom row names require a bounded session snapshot\"); " +
            "cn <- base::names(v); " +
            "if (base::anyDuplicated(cn) || base::any(!base::grepl(\"^[A-Za-z][A-Za-z0-9_]{0,79}$\", cn))) " +
            "stop(\"Invalid R table column names\"); " +
@@ -529,11 +547,16 @@ function create({load = () => import(CDN)} = {}) {
            "utils::URLencode(formatted[[j]], reserved=TRUE), character(1))) " +
            "}), use.names=FALSE); " +
            "base::c(if (matrix_origin && " + (forSnapshot ? "TRUE" : "FALSE") +
-           ") \"@MATRIX@\" else if (base::length(factor_columns)) \"@FRAME_FACTORS@\" else \"@TABLE@\", " +
+           ") \"@MATRIX@\" else if (custom_rows && base::length(factor_columns)) \"@FRAME_FACTORS_ROWS@\" " +
+           "else if (custom_rows) \"@FRAME_ROWS@\" " +
+           "else if (base::length(factor_columns)) \"@FRAME_FACTORS@\" else \"@TABLE@\", " +
            "base::as.character(base::ncol(v)), base::as.character(base::nrow(v)), out, " +
            "if (base::length(factor_columns)) base::c(\"@FACTOR_COLUMNS@\", " +
            "base::as.character(base::length(factor_columns)), " +
-           "base::unlist(factor_columns, use.names=FALSE)) else base::character(0)) " +
+           "base::unlist(factor_columns, use.names=FALSE)) else base::character(0), " +
+           "if (custom_rows) base::c(\"@ROW_NAMES@\", base::as.character(base::length(row_names)), " +
+           "base::vapply(row_names, function(x) utils::URLencode(x, reserved=TRUE), character(1))) " +
+           "else base::character(0)) " +
            "} else { " +
            't <- base::typeof(v); ' +
           'if (!is.null(base::attributes(v)) || !(t %in% c("double","integer","logical","character"))) ' +
@@ -565,7 +588,7 @@ function create({load = () => import(CDN)} = {}) {
           }
           return decoded;
         };
-        let packet, origin = null, factor = null, factorColumns = null;
+        let packet, origin = null, factor = null, factorColumns = null, rowNames = null;
         if (forSnapshot && rows[0] === "@FACTOR@") {
           if (rows.length < 3 || !["0", "1"].includes(rows[1]) ||
               !/^(?:0|[1-9][0-9]?)$/.test(rows[2]))
@@ -583,15 +606,17 @@ function create({load = () => import(CDN)} = {}) {
           if (!validFactorDestination(factor, packet))
             throw Error("Invalid R factor levels or values.");
           origin = "factor";
-        } else if (rows[0] === "@TABLE@" || (forSnapshot && ["@MATRIX@", "@FRAME_FACTORS@"].includes(rows[0]))) {
+        } else if (rows[0] === "@TABLE@" || (forSnapshot && ["@MATRIX@", "@FRAME_FACTORS@", "@FRAME_ROWS@", "@FRAME_FACTORS_ROWS@"].includes(rows[0]))) {
           if (rows[0] === "@MATRIX@") origin = "matrix";
           if (rows.length < 5 || !/^[1-9][0-9]?$/.test(rows[1]) ||
               !/^(?:0|[1-9][0-9]{0,2})$/.test(rows[2]))
             throw Error("Invalid R table dimensions.");
           const count = Number(rows[1]), size = Number(rows[2]);
           const tableEnd = 3 + count * (2 + size);
+          const hasFactors = ["@FRAME_FACTORS@", "@FRAME_FACTORS_ROWS@"].includes(rows[0]);
+          const hasRowNames = ["@FRAME_ROWS@", "@FRAME_FACTORS_ROWS@"].includes(rows[0]);
           if (count > 16 || size > 128 || rows.length < tableEnd ||
-              (rows[0] !== "@FRAME_FACTORS@" && rows.length !== tableEnd))
+              (!hasFactors && !hasRowNames && rows.length !== tableEnd))
             throw Error("Invalid R table response size.");
           let offset = 3;
           const columns = [];
@@ -607,7 +632,7 @@ function create({load = () => import(CDN)} = {}) {
             columns.push({name:columnName, type, values});
           }
           packet = global.FlowStudioVariableTransfer.validate({kind:"table", columns});
-          if (rows[0] === "@FRAME_FACTORS@") {
+          if (hasFactors) {
             if (rows[offset++] !== "@FACTOR_COLUMNS@" ||
                 !/^[1-9][0-9]?$/.test(rows[offset] || ""))
               throw Error("Invalid R factor column header.");
@@ -629,10 +654,20 @@ function create({load = () => import(CDN)} = {}) {
               offset += numberOfLevels;
               factorColumns.push({name:columnName, levels, ordered:orderedFlag === "1"});
             }
-            if (offset !== rows.length || !validFactorColumnsDestination(factorColumns, packet))
+            if (!validFactorColumnsDestination(factorColumns, packet))
               throw Error("Invalid R factor column provenance.");
-            origin = "dataframe";
           }
+          if (hasRowNames) {
+            if (rows[offset++] !== "@ROW_NAMES@" || rows[offset++] !== String(size) ||
+                offset + size > rows.length)
+              throw Error("Invalid R row-name header.");
+            rowNames = rows.slice(offset, offset + size).map(decodeURIComponent);
+            offset += size;
+            if (!validRowNamesDestination(rowNames, packet))
+              throw Error("Invalid R row-name provenance.");
+          }
+          if (offset !== rows.length) throw Error("Unexpected R table metadata.");
+          if (hasFactors || hasRowNames) origin = "dataframe";
         } else {
           if (rows.length > 257 ||
               !["double", "integer", "logical", "character"].includes(rows[0]))
@@ -643,19 +678,21 @@ function create({load = () => import(CDN)} = {}) {
           packet = global.FlowStudioVariableTransfer.validate({kind:"vector", type, values});
         }
         return origin === "factor" ? {ok:true, value:packet, origin, factor} :
-          origin === "dataframe" ? {ok:true, value:packet, origin, factorColumns} :
+          origin === "dataframe" ? {ok:true, value:packet, origin,
+            ...(factorColumns ? {factorColumns} : {}), ...(rowNames ? {rowNames} : {})} :
           origin ? {ok:true, value:packet, origin} : {ok:true, value:packet};
       } catch (error) { return {ok:false, output:String(error.message || error).slice(0, 300)}; }
     });
   }
   async function importVariable(name, packet, options = {}) {
     if (!options || typeof options !== "object" || Array.isArray(options) ||
-        Object.keys(options).some(key => !["asMatrix", "asFactor", "asFactorColumns"].includes(key)) ||
+        Object.keys(options).some(key => !["asMatrix", "asFactor", "asFactorColumns", "asRowNames"].includes(key)) ||
         (options.asMatrix !== undefined && typeof options.asMatrix !== "boolean"))
       return {ok:false, output:"Invalid R transfer destination."};
     const asMatrix = options.asMatrix === true;
     const asFactor = options.asFactor;
     const asFactorColumns = options.asFactorColumns;
+    const asRowNames = options.asRowNames;
     if (!/^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(name))
       return {ok:false, output:"Invalid shared Python/R variable name."};
     try { global.FlowStudioVariableTransfer.validate(packet); }
@@ -665,8 +702,12 @@ function create({load = () => import(CDN)} = {}) {
       return {ok:false, output:"R factor requires validated levels and a typed string vector."};
     if (asFactorColumns !== undefined &&
         (asMatrix || asFactor !== undefined ||
+          !(asRowNames !== undefined && Array.isArray(asFactorColumns) && asFactorColumns.length === 0) &&
           !validFactorColumnsDestination(asFactorColumns, packet)))
       return {ok:false, output:"R data.frame factor columns require validated levels and string columns."};
+    if (asRowNames !== undefined &&
+        (asMatrix || asFactor !== undefined || !validRowNamesDestination(asRowNames, packet)))
+      return {ok:false, output:"R data.frame row names require unique bounded strings."};
     if (asMatrix && (packet.kind !== "table" ||
         packet.columns[0].values.length < 1 ||
         !packet.columns.every(col => col.type === packet.columns[0].type)))
@@ -709,7 +750,9 @@ function create({load = () => import(CDN)} = {}) {
           '; if (base::exists(n, envir=.GlobalEnv, inherits=FALSE) && ' +
           '(base::bindingIsActive(n, .GlobalEnv) || base::bindingIsLocked(n, .GlobalEnv))) ' +
           'stop("Cannot replace active or locked R binding"); ' +
-          'base::assign(n, ' + expression + ', envir=.GlobalEnv); c("ok") })';
+          'base::assign(n, ' + (asRowNames === undefined ? expression :
+            "base::\`row.names<-\`(" + expression + ", value=" + vector(asRowNames, "string") + ")") +
+          ', envir=.GlobalEnv); c("ok") })';
         const rows = await r.evalRRaw(query, "string[]");
         if (generation !== epoch) return {ok:false, output:"R session reset."};
         if (!Array.isArray(rows) || rows.length !== 1 || rows[0] !== "ok")

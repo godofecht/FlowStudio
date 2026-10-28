@@ -72,9 +72,6 @@ def parse_heat(source: str, base) -> HeatModel:
             def robin_argument(argument, unit, dimension, description):
                 try:
                     literal = base.number(argument, unit)
-                    if description == "transfer length" and literal <= 0:
-                        raise error("Robin transfer length must be positive")
-                    return literal
                 except error:
                     profile = "".join(argument)
                     try:
@@ -90,6 +87,9 @@ def parse_heat(source: str, base) -> HeatModel:
                             check_profile(child)
                     check_profile(typed)
                     return profile
+                if description == "transfer length" and literal <= 0:
+                    raise error("Robin transfer length must be positive")
+                return literal
 
             ambient = robin_argument(inner[:comma], ["K"], TEMPERATURE, "ambient temperature")
             length = robin_argument(inner[comma + 1:], ["m"], (1, 0, 0, 0), "transfer length")

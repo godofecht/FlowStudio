@@ -93,9 +93,10 @@ def tokenize(source: str) -> tuple[str, ...]:
 
 
 class _Parser:
-    def __init__(self, tokens: tuple[str, ...]):
+    def __init__(self, tokens: tuple[str, ...], symbols: dict[str, Dimension] | None = None):
         self.tokens = tokens
         self.pos = 0
+        self.symbols = symbols or {}
 
     def peek(self) -> str:
         return self.tokens[self.pos] if self.pos < len(self.tokens) else "<EOF>"
@@ -119,11 +120,15 @@ class _Parser:
             if self.take() != ")":
                 raise ExpressionError("Expected closing parenthesis")
         elif first in ("sin", "cos", "exp", "sqrt", "∂ₓ", "∂ᵧ", "∇²"):
-            if self.take() != "(":
-                raise ExpressionError(f"Expected '(' after {first}")
-            arg = self.expression(0, depth + 1)
-            if self.take() != ")":
-                raise ExpressionError("Expected closing parenthesis")
+            if first == "∇²" and self.peek() != "(":
+                # Prefix Unicode Laplacian, as in diffusivity ∇²temperature.
+                arg = self.expression(30, depth + 1)
+            else:
+                if self.take() != "(":
+                    raise ExpressionError(f"Expected '(' after {first}")
+                arg = self.expression(0, depth + 1)
+                if self.take() != ")":
+                    raise ExpressionError("Expected closing parenthesis")
             if first in ("sin", "cos", "exp") and arg.dimension != DIMENSIONLESS:
                 raise ExpressionError(f"{first} requires a dimensionless argument")
             if first == "sqrt" and any(x % 2 for x in arg.dimension):
@@ -140,6 +145,8 @@ class _Parser:
         elif first in ("x", "y", "π", "pi"):
             left = Expression("name", value="pi" if first in ("π", "pi") else first,
                               dimension=LENGTH if first in ("x", "y") else DIMENSIONLESS)
+        elif first in self.symbols:
+            left = Expression("name", value=first, dimension=self.symbols[first])
         elif re.fullmatch(rf"{_NUMBER}(?:{_UNIT})?", first):
             value, dim = _quantity(first)
             left = Expression("literal", value=value, dimension=dim)
@@ -151,7 +158,7 @@ class _Parser:
                 operator, precedence = ("add" if nxt == "+" else "sub"), 10
             elif nxt in ("*", "×", "·", "/"):
                 operator, precedence = ("div" if nxt == "/" else "mul"), 20
-            elif nxt in ("(", "π", "pi", "x", "y", "sin", "cos", "exp", "sqrt", "∂ₓ", "∂ᵧ", "∇²") or re.fullmatch(rf"{_NUMBER}(?:{_UNIT})?", nxt):
+            elif nxt in ("(", "π", "pi", "x", "y", "sin", "cos", "exp", "sqrt", "∂ₓ", "∂ᵧ", "∇²") or nxt in self.symbols or re.fullmatch(rf"{_NUMBER}(?:{_UNIT})?", nxt):
                 operator, precedence = "mul", 20
             else:
                 break
@@ -172,15 +179,22 @@ class _Parser:
         return left
 
 
-def parse_expression(source: str) -> Expression:
-    parser = _Parser(tokenize(source))
+def parse_expression(source: str, *, symbols: dict[str, Dimension] | None = None) -> Expression:
+    if symbols:
+        for name, dimension in symbols.items():
+            if (not re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", name)
+                    or name in ("x", "y", "pi", "sin", "cos", "exp", "sqrt")
+                    or len(dimension) != 4 or any(type(power) is not int for power in dimension)):
+                raise ExpressionError(f"Invalid typed symbol {name!r}")
+    parser = _Parser(tokenize(source), symbols)
     expression = parser.expression()
     if parser.peek() != "<EOF>":
         raise ExpressionError(f"Unexpected trailing token {parser.peek()!r}")
     return expression
 
 
-def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | None = None):
+def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | None = None,
+             values: dict[str, object] | None = None):
     """Lower a validated expression tree to NumPy arithmetic, with no eval/exec."""
     import numpy as np
     if expected_dimension is not None and expression.dimension != expected_dimension:
@@ -216,7 +230,11 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
         if node.operator == "literal":
             return float(node.value)
         if node.operator == "name":
-            return {"x": x, "y": y, "pi": math.pi}[node.value]
+            if node.value in ("x", "y", "pi"):
+                return {"x": x, "y": y, "pi": math.pi}[node.value]
+            if values is None or node.value not in values:
+                raise ExpressionError(f"Missing numerical value for {node.value!r}")
+            return values[node.value]
         args = tuple(visit(arg) for arg in node.operands)
         if node.operator == "add": return args[0] + args[1]
         if node.operator == "sub": return args[0] - args[1]

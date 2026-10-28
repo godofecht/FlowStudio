@@ -199,8 +199,8 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
              values: dict[str, object] | None = None,
              boundary_temperature: float | None = None,
              boundary_gradient: float | None = None,
-             boundary_axes: tuple[tuple[str, float | str | tuple[float, float] | None], ...] | None = None,
-             boundary_faces: tuple[tuple[str, float | str | tuple[float, float] | None], ...] | None = None):
+             boundary_axes: tuple[tuple[str, float | str | tuple[float | str, float | str] | None], ...] | None = None,
+             boundary_faces: tuple[tuple[str, float | str | tuple[float | str, float | str] | None], ...] | None = None):
     """Lower a validated expression tree to NumPy arithmetic, with no eval/exec."""
     import numpy as np
     if expected_dimension is not None and expression.dimension != expected_dimension:
@@ -235,22 +235,24 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
                     check_profile(child)
             check_profile(profile)
         elif kind in ("Robin", "RobinProfile"):
-            if (not isinstance(value, tuple) or len(value) != 2
-                    or type(value[1]) not in (int, float)
-                    or not math.isfinite(value[1]) or value[1] <= 0):
-                raise ExpressionError("Robin requires a positive finite transfer length")
-            if kind == "Robin":
-                if type(value[0]) not in (int, float) or not math.isfinite(value[0]):
-                    raise ExpressionError("Robin ambient temperature must be finite")
-            else:
-                if not isinstance(value[0], str):
-                    raise ExpressionError("Robin ambient profile must be a typed expression")
-                profile = parse_expression(value[0], symbols={"t": (0, 0, 1, 0)})
-                if profile.dimension != TEMPERATURE:
-                    raise ExpressionError("Robin ambient profile must have Kelvin dimensions")
+            if not isinstance(value, tuple) or len(value) != 2:
+                raise ExpressionError("Robin requires ambient temperature and transfer length")
+            for argument, expected, description in (
+                (value[0], TEMPERATURE, "ambient temperature"),
+                (value[1], LENGTH, "transfer length"),
+            ):
+                if type(argument) in (int, float):
+                    if not math.isfinite(argument) or (description == "transfer length" and argument <= 0):
+                        raise ExpressionError(f"Robin {description} must be finite and positive where required")
+                    continue
+                if kind != "RobinProfile" or not isinstance(argument, str):
+                    raise ExpressionError(f"Robin {description} must be a typed expression")
+                profile = parse_expression(argument, symbols={"t": (0, 0, 1, 0)})
+                if profile.dimension != expected:
+                    raise ExpressionError(f"Robin {description} has incorrect physical dimensions")
                 def check_robin_profile(node):
                     if node.operator in ("∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∇²"):
-                        raise ExpressionError("Robin ambient profile cannot contain spatial derivatives")
+                        raise ExpressionError(f"Robin {description} cannot contain spatial derivatives")
                     for child in node.operands:
                         check_robin_profile(child)
                 check_robin_profile(profile)
@@ -329,17 +331,27 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
             elif kind in ("Robin", "RobinProfile"):
                 ambient, transfer_length = value
                 if kind == "RobinProfile":
-                    # Evaluate the ambient temperature on the physical face at
-                    # the current RK2 stage time, not at cell centers.
+                    # Evaluate both independently typed profiles at the physical
+                    # face and current RK2 stage, never at interior cell centers.
                     coordinate_x = np.full_like(x, float(x[0, 0] - spacing / 2) if axis == 0 and not forward
                                                 else float(x[-1, 0] + spacing / 2)) if axis == 0 else x
                     coordinate_y = np.full_like(y, float(y[0, 0] - spacing / 2) if axis == 1 and not forward
                                                 else float(y[0, -1] + spacing / 2)) if axis == 1 else y
-                    ambient = np.broadcast_to(evaluate(
-                        parse_expression(ambient, symbols={"t": (0, 0, 1, 0)}),
-                        coordinate_x, coordinate_y, expected_dimension=TEMPERATURE,
-                        values={"t": values["t"]} if values is not None and "t" in values else {}),
-                        field.shape)[target]
+                    stage_values = {"t": values["t"]} if values is not None and "t" in values else {}
+                    def face_argument(argument, dimension):
+                        if not isinstance(argument, str):
+                            return argument
+                        result = evaluate(
+                            parse_expression(argument, symbols={"t": (0, 0, 1, 0)}),
+                            coordinate_x, coordinate_y, expected_dimension=dimension,
+                            values=stage_values)
+                        return np.broadcast_to(result, field.shape)[target]
+                    ambient = face_argument(ambient, TEMPERATURE)
+                    transfer_length = face_argument(transfer_length, LENGTH)
+                if not np.all(np.isfinite(transfer_length)) or np.any(np.asarray(transfer_length) <= 0):
+                    raise ExpressionError("Robin transfer length must be positive and finite at every face point")
+                if not np.all(np.isfinite(ambient)):
+                    raise ExpressionError("Robin ambient temperature must be finite at every face point")
                 # Face temperature is the mean of interior and ghost.
                 # ∂n T = (ambient - T_face) / transfer_length.
                 shifted[target] = field[target] + spacing * (ambient - field[target]) / (

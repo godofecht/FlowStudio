@@ -106,7 +106,7 @@ test("webR factor import constructs a real ordered factor without evaluating lev
 
 test("browser snapshot UI explicitly dispatches factor metadata to R",()=>{
   const html=fs.readFileSync(path.join(__dirname,"../docs/app/index.html"),"utf8");
-  assert.match(html,/restoreAs==="factor" \? \{asFactor:dtype\} : undefined/);
+  assert.match(html,/restoreAs==="factor" \\? \\{asFactor:dtype\\} :/);
 });
 
 test("real Rscript round-trips ordered factors, missing values and unused levels",async t=>{

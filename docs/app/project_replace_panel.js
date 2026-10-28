@@ -74,7 +74,7 @@ function create({project, isOpenHandle, query, replacement, caseSensitive, regex
     const candidate = plan, token = revision;
     const message = "Replace " + candidate.matches + " matches in " +
       candidate.files.length + " project files? Writes are not atomic; earlier files " +
-      "may remain changed if a later write fails.";
+      "may remain changed if a later write or recovery fails.";
     if (!confirmChange(message)) return false;
     if (token !== revision || candidate !== plan) return false;
     working = true;
@@ -97,7 +97,7 @@ function create({project, isOpenHandle, query, replacement, caseSensitive, regex
     } catch (error) {
       plan = null;
       const message = "Replacement failed: " + (error.message || String(error)) +
-        " Review project files before retrying; earlier writes may remain.";
+        " Review the recovery report and project files before retrying.";
       output.textContent = message;
       notice(message);
       return false;

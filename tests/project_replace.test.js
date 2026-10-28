@@ -98,12 +98,58 @@ for (const [name, api] of [["native", native], ["Pages", pages]]) {
     };
     await assert.rejects(api.planProjectReplace(root, "x", "z"), /File changed since search/);
   });
-  test(name + " reports partial writes without claiming atomic multi-file replacement", async () => {
+  test(name + " compensates completed writes when a later file denies writing", async () => {
     const a = file("a.R", "x <- 1");
     const b = file("b.R", "x <- 2", {failWrite:true});
     const plan = await api.planProjectReplace(directory("work", [["a.R", a], ["b.R", b]]),
       "x", "z");
-    await assert.rejects(api.applyProjectReplacement(plan), /stopped after 1 files.*earlier writes remain/);
+    await assert.rejects(api.applyProjectReplacement(plan),
+      /Recovery restored 1 files; 1 were unchanged.*All attempted files match/);
+    assert.equal(a.contents, "x <- 1");
+    assert.equal(b.contents, "x <- 2");
+  });
+  test(name + " compensates a close that changed bytes before reporting failure", async () => {
+    const a = file("a.R", "x <- 1");
+    const original = a.createWritable.bind(a);
+    let first = true;
+    a.createWritable = async () => {
+      const writer = await original();
+      return {...writer, async close() {
+        await writer.close();
+        if (first) { first = false; throw Error("close reported failure"); }
+      }};
+    };
+    const plan = await api.planProjectReplace(directory("work", [["a.R", a]]), "x", "z");
+    await assert.rejects(api.applyProjectReplacement(plan), /Recovery restored 1 files/);
+    assert.equal(a.contents, "x <- 1");
+  });
+  test(name + " never overwrites external edits during recovery", async () => {
+    const a = file("a.R", "x <- 1");
+    const b = file("b.R", "x <- 2");
+    b.createWritable = async () => {
+      a.contents = "external edit";
+      throw Error("write denied");
+    };
+    const plan = await api.planProjectReplace(directory("work", [["a.R", a], ["b.R", b]]),
+      "x", "z");
+    await assert.rejects(api.applyProjectReplacement(plan),
+      /Manual recovery required for: work\/a\.R \(changed outside this operation\)/);
+    assert.equal(a.contents, "external edit");
+    assert.equal(b.contents, "x <- 2");
+  });
+  test(name + " reports failed compensation instead of claiming a clean rollback", async () => {
+    const a = file("a.R", "x <- 1");
+    const b = file("b.R", "x <- 2", {failWrite:true});
+    const original = a.createWritable.bind(a);
+    let writes = 0;
+    a.createWritable = async () => {
+      if (++writes === 2) throw Error("recovery permission denied");
+      return original();
+    };
+    const plan = await api.planProjectReplace(directory("work", [["a.R", a], ["b.R", b]]),
+      "x", "z");
+    await assert.rejects(api.applyProjectReplacement(plan),
+      /Manual recovery required for: work\/a\.R \(recovery permission denied\)/);
     assert.equal(a.contents, "z <- 1");
     assert.equal(b.contents, "x <- 2");
   });
@@ -189,7 +235,7 @@ for (const [name, api] of [["native", native], ["Pages", pages]]) {
     try {
       await explorer.choose();
       await assert.rejects(explorer.applyReplace(await explorer.previewReplace("x","z")),
-        /earlier writes remain/);
+        /Recovery restored 1 files/);
       assert.equal(explorer.hasUndoReplace(),false);
     } finally {cleanup();}
   });

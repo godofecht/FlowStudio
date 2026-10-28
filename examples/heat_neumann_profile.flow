@@ -1,0 +1,42 @@
+# Executable spatially and temporally varying Neumann gradient at x-min.
+# The outward-normal gradient is evaluated at x=0 and at each RK2 stage time.
+domain ThermalDomain {
+    grid       = 16 × 16
+    extent     = 1m × 1m
+    boundaries = (Neumann(2K/m*sin(2πy / 1m) + 1K/m*t / 1s), Neumann(0K/m), Neumann(0K/m), Neumann(0K/m))
+}
+
+model HeatEquation on ThermalDomain {
+    const diffusivity = 0.01m²/s
+    field temperature: Scalar<Kelvin>
+
+    dynamics {
+        ∂ₜtemperature = diffusivity ∇²temperature
+    }
+    initial {
+        temperature = 300K
+    }
+}
+
+solver ThermalSolver for HeatEquation {
+    spatial {
+        method    = FiniteDifference
+        diffusion = CentralDifference
+    }
+    temporal {
+        method   = RungeKuttaSecondOrder
+        timeStep = 10⁻⁴s
+    }
+}
+
+let simulation = HeatEquation ▷ ThermalSolver ▷ Evolve(until: 0.01s)
+
+simulation
+    ▷ Observe {
+        meanTemperature     = Mean(temperature)
+        temperatureVariance = Mean((temperature − meanTemperature)²)
+    }
+    ▷ Visualize {
+        temperature         = Heatmap
+        temperatureVariance = LineGraph
+    }

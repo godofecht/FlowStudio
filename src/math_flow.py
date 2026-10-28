@@ -14,6 +14,7 @@ import math
 from pathlib import Path
 import re
 import sys
+from math_flow_expr import parse_expression, evaluate, ExpressionError, VELOCITY
 
 TOKEN = re.compile(
     r"\s+|#[^\n]*|10[⁻−-][⁰¹²³⁴⁵⁶⁷⁸⁹0-9]+|"
@@ -210,7 +211,13 @@ class Model:
 
 
 def parse(source: str) -> Model:
-    p = Parser(lex(source))
+    tokens = lex(source)
+    # Dispatch on an actual field declaration, never a comment or editor snippet.
+    if any(tokens[i].text == "field" and tokens[i + 1].text == "temperature"
+           for i in range(len(tokens) - 1)):
+        from math_flow_heat import parse_heat
+        return parse_heat(source, sys.modules[__name__])
+    p = Parser(tokens)
     p.pop("domain")
     domain_name = p.identifier()
     if not domain_name[0].isupper():
@@ -284,6 +291,13 @@ def parse(source: str) -> Model:
             parts[-1].append(token)
     if len(parts) != 2:
         raise FlowMathError("Initial velocity requires exactly two components")
+    for component in parts:
+        try:
+            expression = parse_expression("".join(component))
+        except ExpressionError as exc:
+            raise FlowMathError(f"Invalid initial velocity expression: {exc}") from exc
+        if expression.dimension != VELOCITY:
+            raise FlowMathError(f"Initial velocity dimension must be {VELOCITY}, got {expression.dimension}")
     p.pop("solver")
     solver_name = p.identifier()
     p.pop("for")
@@ -360,47 +374,18 @@ def assignments_tokens(statements: list[list[str]]) -> dict[str, list[str]]:
 
 
 def initial_component(tokens: list[str], x, y):
-    """Evaluate a small, checked expression tree; never evaluate arbitrary Python."""
-    import ast
-    import numpy as np
-    source = "".join(tokens)
-    source = source.replace("π", "*pi*").replace("−", "-")
-    source = source.replace("m/s", "").replace("m", "")
-    source = re.sub(r"(?<=\d)(?=[A-Za-z_(])", "*", source)
+    """Compile a typed Unicode expression AST and lower it to NumPy."""
     try:
-        tree = ast.parse(source, mode="eval")
-    except SyntaxError as exc:
-        raise FlowMathError(f"Invalid initial velocity expression: {source}") from exc
-
-    def visit(node):
-        if isinstance(node, ast.Expression):
-            return visit(node.body)
-        if isinstance(node, ast.Constant) and type(node.value) in (int, float):
-            return float(node.value)
-        if isinstance(node, ast.Name) and node.id in ("x", "y", "pi"):
-            return {"x": x, "y": y, "pi": math.pi}[node.id]
-        if isinstance(node, ast.BinOp) and isinstance(node.op, (ast.Add, ast.Sub, ast.Mult, ast.Div)):
-            a, b = visit(node.left), visit(node.right)
-            if isinstance(node.op, ast.Add):
-                return a + b
-            if isinstance(node.op, ast.Sub):
-                return a - b
-            if isinstance(node.op, ast.Mult):
-                return a * b
-            return a / b
-        if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.USub, ast.UAdd)):
-            return -visit(node.operand) if isinstance(node.op, ast.USub) else visit(node.operand)
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in ("sin", "cos") and len(node.args) == 1 and not node.keywords:
-            return getattr(np, node.func.id)(visit(node.args[0]))
-        raise FlowMathError(f"Unsupported initial velocity expression: {source}")
-
-    result = np.asarray(visit(tree), dtype=np.float64)
-    if not np.all(np.isfinite(result)):
-        raise FlowMathError("Initial velocity must be finite")
-    return result
+        return evaluate(parse_expression("".join(tokens)), x, y,
+                        expected_dimension=VELOCITY)
+    except ExpressionError as exc:
+        raise FlowMathError(f"Invalid initial velocity expression: {exc}") from exc
 
 
 def simulate(model: Model, *, grid: int | None = None, until: float | None = None) -> dict:
+    from math_flow_heat import HeatModel, simulate_heat
+    if isinstance(model, HeatModel):
+        return simulate_heat(model, grid=grid, until=until, error_type=FlowMathError)
     import numpy as np
     nx = ny = grid if grid is not None else None
     nx = nx or model.width

@@ -255,16 +255,19 @@ supported. See [docs/PARITY.md](docs/PARITY.md) for verification status.
 ## Native Git branches
 
 The Git pane on the Flow-owned localhost server lists local branches, creates
-a named branch at `HEAD`, and switches to an existing local branch after
-explicit confirmation. Branch switching refuses tracked changes and
-non-ignored untracked files; it never automatically stashes, commits,
-discards or overwrites user work. Native Git commands use fixed argv,
-bounded timeouts and disabled hooks. GitHub Pages has no access to the
-server working tree, and a browser-picked project directory is not the
-Git target. Branch deletion, remote tracking, merges and rebases are not
-implemented. Native Flow/HTTP acceptance passed on Ubuntu and macOS in
+a named branch at `HEAD`, switches to an existing local branch and offers
+explicitly confirmed, non-forcing deletion of merged local branches. Git's
+`branch -d` protects checked-out and unmerged branches; force deletion is
+not exposed. Branch switching refuses tracked changes and non-ignored
+untracked files; it never automatically stashes, commits, discards or
+overwrites user work. Native Git commands use fixed argv, bounded timeouts
+and disabled hooks. GitHub Pages has no access to the server working tree,
+and a browser-picked project directory is not the Git target. Remote
+tracking, merges and rebases are not implemented. Existing native Flow/HTTP
+branch list/create/switch acceptance passed on Ubuntu and macOS in
 [CI #40117614745](https://github.com/godofecht/FlowStudio/actions/runs/40117614745);
-real-browser acceptance remains pending. See [parity matrix](docs/PARITY.md).
+new deletion acceptance and physical-browser interaction require independent
+verification. See [parity matrix](docs/PARITY.md).
 
 `node --test tests/browser_git_native.test.js tests/browser_git_panel.test.js`
 tests the browser-facing contract; `python3 scripts/verify_native.py`

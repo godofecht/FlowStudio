@@ -31,7 +31,7 @@ class HeatModel:
     boundary_temperature: float | None = None
     boundary_gradient: float | None = None
     boundary_axes: tuple[tuple[str, float | None], tuple[str, float | None]] | None = None
-    boundary_faces: tuple[tuple[str, float | None], ...] | None = None
+    boundary_faces: tuple[tuple[str, float | tuple[float, float] | None], ...] | None = None
 
 
 def parse_heat(source: str, base) -> HeatModel:
@@ -56,9 +56,21 @@ def parse_heat(source: str, base) -> HeatModel:
         if tokens == ["Periodic"]:
             return ("Periodic", None)
         if (len(tokens) < 4 or tokens[1] != "(" or tokens[-1] != ")"
-                or tokens[0] not in ("Dirichlet", "Neumann")):
-            raise error("Heat boundaries must be Periodic, Dirichlet(temperature) or Neumann(gradient)")
+                or tokens[0] not in ("Dirichlet", "Neumann", "Robin")):
+            raise error("Heat boundaries must be Periodic, Dirichlet, Neumann or Robin")
         kind = tokens[0]
+        if kind == "Robin":
+            # Outward heat transfer: ∂n T = (ambient - T_face) / transferLength.
+            # Both arguments have explicit, checked physical dimensions.
+            inner = tokens[2:-1]
+            if inner.count(",") != 1:
+                raise error("Robin requires ambient temperature and transfer length")
+            comma = inner.index(",")
+            ambient = base.number(inner[:comma], ["K"])
+            length = base.number(inner[comma + 1:], ["m"])
+            if length <= 0:
+                raise error("Robin transfer length must be positive")
+            return ("Robin", (ambient, length))
         unit = ["K"] if kind == "Dirichlet" else ["K", "/", "m"]
         return (kind, base.number(tokens[2:-1], unit))
 
@@ -91,6 +103,8 @@ def parse_heat(source: str, base) -> HeatModel:
                     raise error("Periodic boundaries must occur on both faces of an axis")
     else:
         kind, value = parse_face(boundary_tokens)
+        if kind == "Robin":
+            boundary_axes = ((kind, value), (kind, value))
         if kind == "Dirichlet":
             boundary_temperature = value
         elif kind == "Neumann":
@@ -328,7 +342,9 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
             "temperature_min": float(np.min(field)), "temperature_max": float(np.max(field)),
             "method": "centered-difference RK2 scalar reaction-diffusion equation",
             "boundary_condition": ("Faces" if model.boundary_faces is not None
-                                   else "Mixed" if model.boundary_axes is not None
+                                   else "Robin" if model.boundary_axes is not None and all(
+                                        kind == "Robin" for kind, _ in model.boundary_axes)
+                                    else "Mixed" if model.boundary_axes is not None
                                    else "Dirichlet" if model.boundary_temperature is not None
                                    else "Neumann" if model.boundary_gradient is not None
                                    else "Periodic"),

@@ -234,11 +234,26 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
                 for child in node.operands:
                     check_profile(child)
             check_profile(profile)
-        elif kind == "Robin":
+        elif kind in ("Robin", "RobinProfile"):
             if (not isinstance(value, tuple) or len(value) != 2
-                    or any(type(item) not in (int, float) or not math.isfinite(item)
-                           for item in value) or value[1] <= 0):
-                raise ExpressionError("Robin requires finite ambient temperature and positive transfer length")
+                    or type(value[1]) not in (int, float)
+                    or not math.isfinite(value[1]) or value[1] <= 0):
+                raise ExpressionError("Robin requires a positive finite transfer length")
+            if kind == "Robin":
+                if type(value[0]) not in (int, float) or not math.isfinite(value[0]):
+                    raise ExpressionError("Robin ambient temperature must be finite")
+            else:
+                if not isinstance(value[0], str):
+                    raise ExpressionError("Robin ambient profile must be a typed expression")
+                profile = parse_expression(value[0], symbols={"t": (0, 0, 1, 0)})
+                if profile.dimension != TEMPERATURE:
+                    raise ExpressionError("Robin ambient profile must have Kelvin dimensions")
+                def check_robin_profile(node):
+                    if node.operator in ("∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∇²"):
+                        raise ExpressionError("Robin ambient profile cannot contain spatial derivatives")
+                    for child in node.operands:
+                        check_robin_profile(child)
+                check_robin_profile(profile)
         else:
             raise ExpressionError("Unsupported boundary condition")
 
@@ -311,8 +326,20 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
                 shifted[target] = (2 * boundary_values[target] - field[target]
                                    if kind == "DirichletProfile"
                                    else field[target] + spacing * boundary_values[target])
-            elif kind == "Robin":
+            elif kind in ("Robin", "RobinProfile"):
                 ambient, transfer_length = value
+                if kind == "RobinProfile":
+                    # Evaluate the ambient temperature on the physical face at
+                    # the current RK2 stage time, not at cell centers.
+                    coordinate_x = np.full_like(x, float(x[0, 0] - spacing / 2) if axis == 0 and not forward
+                                                else float(x[-1, 0] + spacing / 2)) if axis == 0 else x
+                    coordinate_y = np.full_like(y, float(y[0, 0] - spacing / 2) if axis == 1 and not forward
+                                                else float(y[0, -1] + spacing / 2)) if axis == 1 else y
+                    ambient = np.broadcast_to(evaluate(
+                        parse_expression(ambient, symbols={"t": (0, 0, 1, 0)}),
+                        coordinate_x, coordinate_y, expected_dimension=TEMPERATURE,
+                        values={"t": values["t"]} if values is not None and "t" in values else {}),
+                        field.shape)[target]
                 # Face temperature is the mean of interior and ghost.
                 # ∂n T = (ambient - T_face) / transfer_length.
                 shifted[target] = field[target] + spacing * (ambient - field[target]) / (

@@ -1,7 +1,7 @@
 """Typed, bounded scalar parabolic equation AST and operator validation.
 
 The entire RHS is parsed and dimension-checked. Supported operators are
-typed diffusion, optional field-independent forcing, optional constant
+typed diffusion, optional space/time-dependent field-independent forcing, optional constant
 advection, and optional linear or bounded quadratic relaxation toward a
 declared ambient temperature. The supported terms can be composed.
 No arbitrary nonlinear or coupled equation is accepted.
@@ -14,7 +14,8 @@ from math_flow_expr import Expression, ExpressionError, TEMPERATURE, parse_expre
 DIFFUSIVITY = (2, 0, -1, 0)
 REACTION_RATE = (0, 0, -1, 0)
 TEMPERATURE_RATE = (0, 0, -1, 1)
-SYMBOLS = {"temperature": TEMPERATURE, "diffusivity": DIFFUSIVITY}
+SYMBOLS = {"temperature": TEMPERATURE, "diffusivity": DIFFUSIVITY,
+           "t": (0, 0, 1, 0)}
 REACTION_SYMBOLS = {"reactionRate": REACTION_RATE, "ambientTemperature": TEMPERATURE}
 ADVECTION_SYMBOLS = {"advectionVelocityX": (1, 0, -1, 0),
                      "advectionVelocityY": (1, 0, -1, 0)}

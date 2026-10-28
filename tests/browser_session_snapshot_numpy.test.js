@@ -214,7 +214,7 @@ test("snapshot capture and restore retain NumPy dtype only for verified ndarray 
   const calls=[];
   assert.equal(await snapshots.restore({snapshot:captured,language:"python",
     generation:()=>0,importValue:async(...args)=>{calls.push(args);return {ok:true};}}),2);
-  assert.deepEqual(calls.map(call=>[call[1],call[3],call[4]]),
+  assert.deepEqual(calls.map(call=>[call[1],call[3],call[4] || null]),
     [["a","numpy","float32"],["b",null,null]]);
   const invalid=await snapshots.capture({language:"python",generation:()=>0,
     inspect:async()=>({ok:true,variables:[{name:"bad"}]}),

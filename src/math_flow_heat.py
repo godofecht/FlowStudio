@@ -32,6 +32,7 @@ class HeatModel:
     boundary_gradient: float | None = None
     boundary_axes: tuple[tuple[str, float | tuple[float, float] | None], ...] | None = None
     boundary_faces: tuple[tuple[str, float | tuple[float, float] | None], ...] | None = None
+    diffusivity_y: float | None = None
 
 
 def parse_heat(source: str, base) -> HeatModel:
@@ -145,7 +146,10 @@ def parse_heat(source: str, base) -> HeatModel:
     # rejecting partial, misspelled, or undeclared physical constants.
     reaction = bool({"reactionRate", "ambientTemperature"} & consts.keys())
     advection = bool({"advectionVelocityX", "advectionVelocityY"} & consts.keys())
-    required = {"diffusivity"}
+    anisotropic = bool({"diffusivityX", "diffusivityY"} & consts.keys())
+    if anisotropic and "diffusivity" in consts:
+        raise error("Declare isotropic diffusivity or both directional diffusivities, not both")
+    required = {"diffusivityX", "diffusivityY"} if anisotropic else {"diffusivity"}
     if reaction:
         required.update({"reactionRate", "ambientTemperature"})
     if advection:
@@ -154,9 +158,10 @@ def parse_heat(source: str, base) -> HeatModel:
     base.expect_keys(fields, {"temperature"}, "heat fields")
     if fields["temperature"] != ["Scalar", "<", "Kelvin", ">"]:
         raise error("temperature must be Scalar<Kelvin>")
-    diffusivity = base.number(consts["diffusivity"], ["m", "²", "/", "s"])
-    if diffusivity <= 0:
-        raise error("Heat diffusivity must be positive")
+    diffusivity = base.number(consts["diffusivityX" if anisotropic else "diffusivity"], ["m", "²", "/", "s"])
+    diffusivity_y = base.number(consts["diffusivityY"], ["m", "²", "/", "s"]) if anisotropic else None
+    if diffusivity <= 0 or (diffusivity_y is not None and diffusivity_y <= 0):
+        raise error("Heat diffusivities must be positive")
     reaction_rate = base.number(consts["reactionRate"], ["s", "⁻", "¹"]) if reaction else 0.0
     ambient_temperature = base.number(consts["ambientTemperature"], ["K"]) if reaction else 0.0
     if reaction and reaction_rate <= 0:
@@ -165,7 +170,7 @@ def parse_heat(source: str, base) -> HeatModel:
     velocity_y = base.number(consts["advectionVelocityY"], ["m", "/", "s"]) if advection else 0.0
     try:
         equation = compile_heat_equation([token.text for token in sections["dynamics"]],
-                                         reaction=reaction, advection=advection)
+                                         reaction=reaction, advection=advection, anisotropic=anisotropic)
     except ExpressionError as exc:
         raise error(f"Unsupported heat dynamics: {exc}") from exc
     if equation.nonlinear and ambient_temperature <= 0:
@@ -233,7 +238,8 @@ def parse_heat(source: str, base) -> HeatModel:
         raise error(f"Unexpected trailing heat token {p.peek()}")
     return HeatModel(int(width), int(height), lx, ly, diffusivity, expression,
                      step, until, equation, reaction_rate, ambient_temperature,
-                     velocity_x, velocity_y, boundary_temperature, boundary_gradient, boundary_axes, boundary_faces)
+                     velocity_x, velocity_y, boundary_temperature, boundary_gradient, boundary_axes, boundary_faces,
+                     diffusivity_y)
 
 
 def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | None = None,
@@ -253,7 +259,8 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
         raise error_type("Heat evolution must have between 1 and 200000 steps")
     dt = duration / steps
     dx, dy = model.length_x / nx, model.length_y / ny
-    diffusion_stiffness = model.diffusivity * (1 / dx**2 + 1 / dy**2)
+    diffusivity_y = model.diffusivity if model.diffusivity_y is None else model.diffusivity_y
+    diffusion_stiffness = model.diffusivity / dx**2 + diffusivity_y / dy**2
     linear_reaction_rate = (0.0 if model.equation is not None and model.equation.nonlinear
                             else model.reaction_rate)
     # A conservative combined advective/diffusive CFL guard. Centered
@@ -264,7 +271,7 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
     # cannot repair an advection-dominated centered spatial stencil.
     if (model.equation is not None and model.equation.advection
             and (abs(model.advection_velocity_x) * dx > 2 * model.diffusivity
-                 or abs(model.advection_velocity_y) * dy > 2 * model.diffusivity)):
+                 or abs(model.advection_velocity_y) * dy > 2 * diffusivity_y)):
         raise error_type("Advection stability requires cell Peclet number <= 2")
     advective_stiffness = (abs(model.advection_velocity_x) / dx
                            + abs(model.advection_velocity_y) / dy)
@@ -309,6 +316,7 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
             return np.broadcast_to(evaluate(
                 model.equation.rhs, x, y, expected_dimension=TEMPERATURE_RATE,
                 values={"temperature": state, "diffusivity": model.diffusivity,
+                        "diffusivityX": model.diffusivity, "diffusivityY": diffusivity_y,
                         "reactionRate": model.reaction_rate,
                         "ambientTemperature": model.ambient_temperature,
                         "advectionVelocityX": model.advection_velocity_x,

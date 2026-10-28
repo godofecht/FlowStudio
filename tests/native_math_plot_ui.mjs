@@ -16,6 +16,7 @@ try {
     ['examples/heat_dirichlet.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_neumann.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_mixed_boundaries.flow', 'temperatureVariance', 'meanTemperature'],
+    ['examples/heat_per_face_boundaries.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_nonlinear_reaction.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_transport_reaction.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/navier_stokes_smoke.flow', 'kineticEnergy', 'maximumDivergence']
@@ -42,6 +43,12 @@ try {
       const note = page.locator('#mathFlowPlot [data-mathflow-boundary="Mixed"]');
       assert.equal(await note.count(), 1, 'Native plot must display mixed-axis metadata');
       assert.match(await note.textContent(), /x Dirichlet 300 K; y Neumann 0 K\/m/);
+    }
+    if (source === 'examples/heat_per_face_boundaries.flow') {
+      const note = page.locator('#mathFlowPlot [data-mathflow-boundary="Faces"]');
+      assert.equal(await note.count(), 1, 'Native plot must display four-face metadata');
+      assert.match(await note.textContent(),
+        /x min Dirichlet 300 K; x max Neumann 0 K\/m; y min Neumann 0 K\/m; y max Neumann 0 K\/m/);
     }
     if (source === 'examples/heat_dirichlet.flow') {
       const note = page.locator('#mathFlowPlot [data-mathflow-boundary="Dirichlet"]');

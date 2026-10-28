@@ -31,6 +31,7 @@ class HeatModel:
     boundary_temperature: float | None = None
     boundary_gradient: float | None = None
     boundary_axes: tuple[tuple[str, float | None], tuple[str, float | None]] | None = None
+    boundary_faces: tuple[tuple[str, float | None], ...] | None = None
 
 
 def parse_heat(source: str, base) -> HeatModel:
@@ -49,6 +50,7 @@ def parse_heat(source: str, base) -> HeatModel:
     boundary_temperature = None
     boundary_gradient = None
     boundary_axes = None
+    boundary_faces = None
 
     def parse_face(tokens):
         if tokens == ["Periodic"]:
@@ -77,9 +79,16 @@ def parse_heat(source: str, base) -> HeatModel:
                 parts.append([])
             else:
                 parts[-1].append(token)
-        if depth != 0 or len(parts) != 2:
-            raise error("Mixed heat boundaries require exactly two axis conditions")
-        boundary_axes = (parse_face(parts[0]), parse_face(parts[1]))
+        if depth != 0 or len(parts) not in (2, 4):
+            raise error("Heat boundaries require two axis or four face conditions")
+        if len(parts) == 2:
+            boundary_axes = (parse_face(parts[0]), parse_face(parts[1]))
+        else:
+            boundary_faces = tuple(parse_face(part) for part in parts)
+            # A periodic axis must be periodic on both opposing faces.
+            for lower, upper in ((0, 1), (2, 3)):
+                if (boundary_faces[lower][0] == "Periodic") != (boundary_faces[upper][0] == "Periodic"):
+                    raise error("Periodic boundaries must occur on both faces of an axis")
     else:
         kind, value = parse_face(boundary_tokens)
         if kind == "Dirichlet":
@@ -210,7 +219,7 @@ def parse_heat(source: str, base) -> HeatModel:
         raise error(f"Unexpected trailing heat token {p.peek()}")
     return HeatModel(int(width), int(height), lx, ly, diffusivity, expression,
                      step, until, equation, reaction_rate, ambient_temperature,
-                     velocity_x, velocity_y, boundary_temperature, boundary_gradient, boundary_axes)
+                     velocity_x, velocity_y, boundary_temperature, boundary_gradient, boundary_axes, boundary_faces)
 
 
 def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | None = None,
@@ -255,7 +264,8 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
                                          expected_dimension=TEMPERATURE,
                                          boundary_temperature=model.boundary_temperature,
                                          boundary_gradient=model.boundary_gradient,
-                boundary_axes=model.boundary_axes), (nx, ny)).copy()
+                boundary_axes=model.boundary_axes,
+                boundary_faces=model.boundary_faces), (nx, ny)).copy()
     except ExpressionError as exc:
         raise error_type(str(exc)) from exc
     initial_mean = float(np.mean(field))
@@ -291,7 +301,8 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
                         "advectionVelocityY": model.advection_velocity_y},
                 boundary_temperature=model.boundary_temperature,
                 boundary_gradient=model.boundary_gradient,
-                boundary_axes=model.boundary_axes), (nx, ny))
+                boundary_axes=model.boundary_axes,
+                boundary_faces=model.boundary_faces), (nx, ny))
         except (ExpressionError, ValueError) as exc:
             raise error_type(f"Invalid heat equation evaluation: {exc}") from exc
 
@@ -316,7 +327,8 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
             "temperature_variance": variance, "initial_temperature_variance": initial_variance,
             "temperature_min": float(np.min(field)), "temperature_max": float(np.max(field)),
             "method": "centered-difference RK2 scalar reaction-diffusion equation",
-            "boundary_condition": ("Mixed" if model.boundary_axes is not None
+            "boundary_condition": ("Faces" if model.boundary_faces is not None
+                                   else "Mixed" if model.boundary_axes is not None
                                    else "Dirichlet" if model.boundary_temperature is not None
                                    else "Neumann" if model.boundary_gradient is not None
                                    else "Periodic"),
@@ -325,6 +337,10 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
             "boundary_axes": ({"x": {"type": model.boundary_axes[0][0], "value": model.boundary_axes[0][1]},
                                "y": {"type": model.boundary_axes[1][0], "value": model.boundary_axes[1][1]}}
                               if model.boundary_axes is not None else None),
+            "boundary_faces": ({name: {"type": condition[0], "value": condition[1]}
+                                for name, condition in zip(("x_min", "x_max", "y_min", "y_max"),
+                                                           model.boundary_faces)}
+                               if model.boundary_faces is not None else None),
             "observations": observations,
             "spatial": spatial_snapshot(
                 {"temperature": field}, (model.length_x, model.length_y))}

@@ -197,7 +197,8 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
              values: dict[str, object] | None = None,
              boundary_temperature: float | None = None,
              boundary_gradient: float | None = None,
-             boundary_axes: tuple[tuple[str, float | None], tuple[str, float | None]] | None = None):
+             boundary_axes: tuple[tuple[str, float | None], tuple[str, float | None]] | None = None,
+             boundary_faces: tuple[tuple[str, float | None], ...] | None = None):
     """Lower a validated expression tree to NumPy arithmetic, with no eval/exec."""
     import numpy as np
     if expected_dimension is not None and expression.dimension != expected_dimension:
@@ -208,6 +209,26 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
         raise ExpressionError("Neumann boundary gradient must be finite")
     if boundary_temperature is not None and boundary_gradient is not None:
         raise ExpressionError("Cannot combine Dirichlet and Neumann boundary conditions")
+    if boundary_faces is not None:
+        if boundary_temperature is not None or boundary_gradient is not None or boundary_axes is not None:
+            raise ExpressionError("Cannot combine face boundaries with other boundaries")
+        if not isinstance(boundary_faces, tuple) or len(boundary_faces) != 4:
+            raise ExpressionError("Face boundaries require exactly four conditions")
+        for condition in boundary_faces:
+            if not isinstance(condition, tuple) or len(condition) != 2:
+                raise ExpressionError("Invalid face boundary condition")
+            kind, value = condition
+            if kind == "Periodic":
+                if value is not None:
+                    raise ExpressionError("Periodic boundary must not carry a value")
+            elif kind in ("Dirichlet", "Neumann"):
+                if type(value) not in (int, float) or not math.isfinite(value):
+                    raise ExpressionError("Face boundary value must be finite")
+            else:
+                raise ExpressionError("Unsupported face boundary condition")
+        for lower, upper in ((0, 1), (2, 3)):
+            if (boundary_faces[lower][0] == "Periodic") != (boundary_faces[upper][0] == "Periodic"):
+                raise ExpressionError("Periodic boundaries must occur on both faces of an axis")
     if boundary_axes is not None:
         if boundary_temperature is not None or boundary_gradient is not None:
             raise ExpressionError("Cannot combine axis boundaries with uniform boundaries")
@@ -247,7 +268,9 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
     def neighbor(field, axis: int, forward: bool, spacing: float):
         """Cell-centered ghost cells, independently selected for x and y."""
         shifted = np.roll(field, -1 if forward else 1, axis=axis)
-        if boundary_axes is not None:
+        if boundary_faces is not None:
+            kind, value = boundary_faces[2 * axis + (1 if forward else 0)]
+        elif boundary_axes is not None:
             kind, value = boundary_axes[axis]
         elif boundary_temperature is not None:
             kind, value = "Dirichlet", boundary_temperature
@@ -267,7 +290,8 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
         if node.operator in ("∂ₓ", "∂ᵧ", "∇²"):
             shape, spacing_x, spacing_y = cartesian_grid()
             if (boundary_temperature is not None or boundary_gradient is not None
-                    or (boundary_axes is not None and any(kind != "Periodic" for kind, _ in boundary_axes))) and not (
+                    or (boundary_axes is not None and any(kind != "Periodic" for kind, _ in boundary_axes))
+                    or (boundary_faces is not None and any(kind != "Periodic" for kind, _ in boundary_faces))) and not (
                     node.operands[0].operator == "name"
                     and node.operands[0].value == "temperature"
                     and node.operands[0].dimension == TEMPERATURE):

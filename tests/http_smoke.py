@@ -263,6 +263,24 @@ def main() -> None:
     bad_mixed = mixed_source.replace("Neumann(0K/m)", "Neumann(0K)")
     status, body = request("POST", "/api/check/mathflow", bad_mixed, accepted_headers)
     assert status == 422 and not json.loads(body)["ok"], (status, body)
+    # Four independently typed thermal faces: real native Flow HTTP, parser,
+    # NumPy ghost-cell RK2, and checked-in analytic half-sine eigenmode.
+    face_source = (Path(__file__).resolve().parents[1] /
+                   "examples/heat_per_face_boundaries.flow").read_text(encoding="utf-8")
+    status, body = request("POST", "/api/check/mathflow", face_source, accepted_headers)
+    assert status == 200 and json.loads(body)["ok"], (status, body)
+    status, body = request("POST", "/api/run/mathflow", face_source, accepted_headers)
+    faces = json.loads(body)
+    assert status == 200 and faces["ok"] and faces["steps"] == 100, (status, faces)
+    assert faces["boundary_condition"] == "Faces", faces
+    assert faces["boundary_faces"]["x_min"] == {"type": "Dirichlet", "value": 300.0}, faces
+    assert faces["boundary_faces"]["x_max"] == {"type": "Neumann", "value": 0.0}, faces
+    assert faces["spatial"]["grid"] == [16, 16], faces
+    assert 300 < faces["mean_temperature"] < 310, faces
+    bad_faces = face_source.replace("Dirichlet(300K), Neumann(0K/m)",
+                                    "Periodic, Neumann(0K/m)")
+    status, body = request("POST", "/api/check/mathflow", bad_faces, accepted_headers)
+    assert status == 422 and not json.loads(body)["ok"], (status, body)
     # Real nonlinear reaction-diffusion via native Flow HTTP and NumPy RK2.
     nonlinear_source = (Path(__file__).resolve().parents[1] /
                         "examples/heat_nonlinear_reaction.flow").read_text(encoding="utf-8")

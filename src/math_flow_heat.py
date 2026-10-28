@@ -63,32 +63,38 @@ def parse_heat(source: str, base) -> HeatModel:
         kind = tokens[0]
         if kind == "Robin":
             # Outward heat transfer: ∂n T = (ambient - T_face) / transferLength.
-            # Both arguments have explicit, checked physical dimensions.
+            # Either argument may be a typed, field-independent face profile.
             inner = tokens[2:-1]
             if inner.count(",") != 1:
                 raise error("Robin requires ambient temperature and transfer length")
             comma = inner.index(",")
-            length = base.number(inner[comma + 1:], ["m"])
-            if length <= 0:
-                raise error("Robin transfer length must be positive")
-            try:
-                ambient = base.number(inner[:comma], ["K"])
-                return ("Robin", (ambient, length))
-            except error:
-                profile = "".join(inner[:comma])
+
+            def robin_argument(argument, unit, dimension, description):
                 try:
-                    typed = parse_expression(profile, symbols={"t": (0, 0, 1, 0)})
-                except ExpressionError as exc:
-                    raise error(f"Invalid Robin ambient profile: {exc}") from exc
-                if typed.dimension != TEMPERATURE:
-                    raise error("Robin ambient profile must have Kelvin dimensions")
-                def check_profile(node):
-                    if node.operator in ("∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∇²"):
-                        raise error("Robin ambient profiles cannot contain spatial derivatives")
-                    for child in node.operands:
-                        check_profile(child)
-                check_profile(typed)
-                return ("RobinProfile", (profile, length))
+                    literal = base.number(argument, unit)
+                    if description == "transfer length" and literal <= 0:
+                        raise error("Robin transfer length must be positive")
+                    return literal
+                except error:
+                    profile = "".join(argument)
+                    try:
+                        typed = parse_expression(profile, symbols={"t": (0, 0, 1, 0)})
+                    except ExpressionError as exc:
+                        raise error(f"Invalid Robin {description} profile: {exc}") from exc
+                    if typed.dimension != dimension:
+                        raise error(f"Robin {description} profile has incorrect physical dimensions")
+                    def check_profile(node):
+                        if node.operator in ("∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∇²"):
+                            raise error(f"Robin {description} cannot contain spatial derivatives")
+                        for child in node.operands:
+                            check_profile(child)
+                    check_profile(typed)
+                    return profile
+
+            ambient = robin_argument(inner[:comma], ["K"], TEMPERATURE, "ambient temperature")
+            length = robin_argument(inner[comma + 1:], ["m"], (1, 0, 0, 0), "transfer length")
+            return ("RobinProfile" if isinstance(ambient, str) or isinstance(length, str)
+                    else "Robin", (ambient, length))
         unit = ["K"] if kind == "Dirichlet" else ["K", "/", "m"]
         # Preserve literal values while allowing typed, field-independent
         # face profiles. Neumann uses outward-normal K/m, not Kelvin.

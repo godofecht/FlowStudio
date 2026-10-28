@@ -562,7 +562,7 @@ FlowStudioSessionSnapshot.create({
   exportValue:(lang,name)=>lang==="r" ? getRSession().exportVariable(name,{forSnapshot:true}) : request("export-snapshot",name),
   importValue:(lang,name,value,restoreAs)=>lang==="r" ?
     getRSession().importVariable(name,value,restoreAs==="matrix" ? {asMatrix:true} : undefined) :
-    request(restoreAs==="pandas" ? "import-pandas" : "import",name,value),
+    request(restoreAs==="pandas" ? "import-pandas" : restoreAs==="numpy" ? "import-numpy" : "import",name,value),
   refresh:async lang=>{
     const result=lang==="r" ? await getRSession().inspect() : await request("inspect");
     if (result.ok && $("language").value===lang) renderEnvironment(result.variables,result.truncated);

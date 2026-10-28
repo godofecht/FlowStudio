@@ -281,6 +281,21 @@ def main() -> None:
                                     "Periodic, Neumann(0K/m)")
     status, body = request("POST", "/api/check/mathflow", bad_faces, accepted_headers)
     assert status == 422 and not json.loads(body)["ok"], (status, body)
+    # Real Robin heat transfer: native Flow HTTP -> typed compiler -> NumPy RK2.
+    robin_source = (Path(__file__).resolve().parents[1] /
+                    "examples/heat_robin.flow").read_text(encoding="utf-8")
+    status, body = request("POST", "/api/check/mathflow", robin_source, accepted_headers)
+    assert status == 200 and json.loads(body)["ok"], (status, body)
+    status, body = request("POST", "/api/run/mathflow", robin_source, accepted_headers)
+    robin = json.loads(body)
+    assert status == 200 and robin["ok"] and robin["steps"] == 100, (status, robin)
+    assert robin["boundary_faces"]["x_min"] == {
+        "type": "Robin", "value": [300.0, 0.2]}, robin
+    assert 300 < robin["mean_temperature"] < 310, robin
+    assert robin["spatial"]["grid"] == [16, 16], robin
+    bad_robin = robin_source.replace("Robin(300K, 0.2m)", "Robin(300K, 0m)")
+    status, body = request("POST", "/api/check/mathflow", bad_robin, accepted_headers)
+    assert status == 422 and not json.loads(body)["ok"], (status, body)
     # Real nonlinear reaction-diffusion via native Flow HTTP and NumPy RK2.
     nonlinear_source = (Path(__file__).resolve().parents[1] /
                         "examples/heat_nonlinear_reaction.flow").read_text(encoding="utf-8")

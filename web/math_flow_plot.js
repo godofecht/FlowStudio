@@ -154,7 +154,7 @@
     const boundary = result.boundary_condition;
     let boundaryNote = null;
     if (boundary !== undefined) {
-      if (boundary !== "Periodic" && boundary !== "Dirichlet" && boundary !== "Neumann" && boundary !== "Mixed" && boundary !== "Faces")
+      if (boundary !== "Periodic" && boundary !== "Dirichlet" && boundary !== "Neumann" && boundary !== "Robin" && boundary !== "Mixed" && boundary !== "Faces")
         throw new TypeError("Unsupported mathematical Flow boundary metadata.");
       if (boundary === "Dirichlet" &&
           (typeof result.boundary_temperature !== "number" ||
@@ -164,6 +164,17 @@
           (typeof result.boundary_gradient !== "number" ||
            !Number.isFinite(result.boundary_gradient)))
         throw new TypeError("Invalid Neumann boundary gradient.");
+      const validFace = face => !!face && (
+        (face.type === "Periodic" && face.value === null) ||
+        (["Dirichlet", "Neumann"].includes(face.type) &&
+         typeof face.value === "number" && Number.isFinite(face.value)) ||
+        (face.type === "Robin" && Array.isArray(face.value) &&
+         face.value.length === 2 && face.value.every(Number.isFinite) &&
+         face.value[1] > 0));
+      const describeFace = face => face.type === "Periodic" ? "Periodic" :
+        face.type === "Robin" ?
+          "Robin ambient " + face.value[0] + " K, transfer length " + face.value[1] + " m" :
+          face.type + " " + face.value + (face.type === "Dirichlet" ? " K" : " K/m");
       if (boundary === "Faces") {
         const faces = result.boundary_faces;
         const names = ["x_min", "x_max", "y_min", "y_max"];
@@ -172,9 +183,7 @@
           throw new TypeError("Invalid four-face boundary metadata.");
         for (const name of names) {
           const face = faces[name];
-          if (!face || !["Periodic", "Dirichlet", "Neumann"].includes(face.type) ||
-              (face.type === "Periodic" ? face.value !== null :
-                typeof face.value !== "number" || !Number.isFinite(face.value)))
+          if (!validFace(face))
             throw new TypeError("Invalid thermal face boundary.");
         }
         for (const [lower, upper] of [["x_min", "x_max"], ["y_min", "y_max"]]) {
@@ -182,33 +191,29 @@
             throw new TypeError("Periodic face boundary must be paired.");
         }
       }
-      if (boundary === "Mixed") {
+      if (boundary === "Mixed" || boundary === "Robin") {
         const axes = result.boundary_axes;
         if (!axes || typeof axes !== "object" || Object.keys(axes).sort().join(",") !== "x,y")
           throw new TypeError("Invalid mixed boundary axes.");
         for (const axis of ["x", "y"]) {
           const face = axes[axis];
-          if (!face || !["Periodic", "Dirichlet", "Neumann"].includes(face.type) ||
-              (face.type === "Periodic" ? face.value !== null :
-                typeof face.value !== "number" || !Number.isFinite(face.value)))
+          if (!validFace(face))
             throw new TypeError("Invalid mixed boundary condition.");
         }
+        if (boundary === "Robin" && ["x", "y"].some(axis => axes[axis].type !== "Robin"))
+          throw new TypeError("Uniform Robin boundary requires both axes to be Robin.");
       }
       boundaryNote = doc.createElement("p");
       boundaryNote.setAttribute("data-mathflow-boundary", boundary);
       boundaryNote.textContent = boundary === "Faces"
         ? "Boundary: " + ["x_min", "x_max", "y_min", "y_max"].map(name => {
           const face = result.boundary_faces[name];
-          return name.replace("_", " ") + " " + face.type +
-            (face.type === "Periodic" ? "" :
-             " " + face.value + (face.type === "Dirichlet" ? " K" : " K/m"));
+          return name.replace("_", " ") + " " + describeFace(face);
         }).join("; ")
-        : boundary === "Mixed"
+        : boundary === "Mixed" || boundary === "Robin"
         ? "Boundary: " + ["x", "y"].map(axis => {
           const face = result.boundary_axes[axis];
-          return axis + " " + face.type +
-            (face.type === "Periodic" ? "" :
-             " " + face.value + (face.type === "Dirichlet" ? " K" : " K/m"));
+          return axis + " " + describeFace(face);
         }).join("; ")
         : boundary === "Dirichlet"
         ? "Boundary: Dirichlet at " + result.boundary_temperature + " K (all faces)"

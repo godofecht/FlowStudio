@@ -34,5 +34,7 @@ with suitable R/Python engines and packages.
 
 Validation: `node --test tests/browser_notebook_quarto.test.js` and, with
 the native server running, `node tests/quarto_ui.mjs` in real Chromium.
+The native Chromium Quarto import/export check and all six Linux/macOS
+CI jobs passed in [CI #40611478697](https://github.com/godofecht/FlowStudio/actions/runs/40611478697).
 These tests do not invoke Quarto. External Quarto rendering and live
 Pyodide/webR physical-browser acceptance remain separate milestones.

@@ -1,3 +1,24 @@
+## 2026-10-28: bounded native Git commit history (validation pending)
+
+The Flow-owned localhost Git pane now exposes the checked-out branch's most
+recent 30 commits through a fixed-argument `git --no-pager log` invocation.
+Each row includes abbreviated hash, short author date and subject. No client
+revision range, repository path, format string, shell command or arbitrary
+argument is accepted. The native route uses the existing 5-second timeout and
+128 KiB output limit; an unborn HEAD returns an explicit error. The browser
+renders history as text, shares the Git operation lock, and disables the
+control on hosted Pages. This is read-only local history, **not** remote
+tracking, graph visualization, checkout by commit, authenticated Git hosting
+or complete RStudio Git parity.
+
+**Status: implementation committed on a focused branch; CI and native Flow
+compilation not yet independently verified.** Automated Node tests exercise
+native transport, Pages refusal, locking, failure recovery, text-only
+rendering and wiring. The native HTTP acceptance suite now checks an unborn
+HEAD, origin rejection, a real commit, a 32-commit fixture and the 30-entry
+bound. Physical Chromium UI acceptance remains unverified. No hosted CI
+configuration changed; RStudio feature parity remains incomplete.
+
 ## 2026-10-28: native Git fast-forward merge (verification pending)
 
 The native Flow-owned Git pane can request an explicitly confirmed fast-forward

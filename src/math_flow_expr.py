@@ -158,7 +158,7 @@ class _Parser:
             nxt = self.peek()
             if nxt in ("^", "²", "³"):
                 operator, precedence = "pow", 40
-            if nxt in ("+", "-", "−"):
+            elif nxt in ("+", "-", "−"):
                 operator, precedence = ("add" if nxt == "+" else "sub"), 10
             elif nxt in ("*", "×", "·", "/"):
                 operator, precedence = ("div" if nxt == "/" else "mul"), 20

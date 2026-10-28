@@ -20,6 +20,48 @@ MAX_HTML = 2 * 1024 * 1024
 MAX_LOG = 4096
 
 
+FENCE_OPEN = re.compile(r"^ {0,3}(\x60{3,}|~{3,})(.*)$")
+FENCE_CLOSE = re.compile(r"^ {0,3}(\x60{3,}|~{3,})[ \t]*$")
+CHUNK_HEADER = re.compile(
+    r"^\{(r|python)(?:[ \t]+([A-Za-z][A-Za-z0-9_.-]{0,79}))?"
+    r"(?:[ \t]*,[ \t]*(eval)[ \t]*=[ \t]*FALSE)?\}$"
+)
+INLINE_ENGINE = re.compile(r"\x60[ \t]*\{(?:r|python)\}[ \t]+\S", re.IGNORECASE)
+INLINE_R = re.compile(r"(^|[^\\\x60])\x60r[ \t]+[^\x60\r\n]+\x60(?!\x60)")
+
+
+def validate_quarto_body(lines: list[str]) -> None:
+    """Enforce the browser notebook's representable Quarto execution surface.
+
+    This is not a sandbox: approved R/Python chunks still run as the user.
+    A direct HTTP client must not bypass the browser's source restrictions.
+    """
+    fence: tuple[str, int, bool] | None = None
+    for line in lines:
+        if fence is None:
+            if "{{<" in line or "{{%" in line or INLINE_ENGINE.search(line) or INLINE_R.search(line):
+                raise RenderError("Quarto shortcodes and inline engines are unsupported.")
+            match = FENCE_OPEN.fullmatch(line)
+            if match is None:
+                continue
+            marker, info = match.groups()
+            info = info.strip()
+            executable = info.startswith("{")
+            if executable:
+                header = CHUNK_HEADER.fullmatch(info)
+                if header is None or (header.group(1) == "python" and header.group(3)):
+                    raise RenderError("Only restricted R/Python Quarto chunks are supported.")
+            fence = (marker[0], len(marker), executable)
+        else:
+            close = FENCE_CLOSE.fullmatch(line)
+            if close is not None and close.group(1)[0] == fence[0] and len(close.group(1)) >= fence[1]:
+                fence = None
+            elif fence[2] and re.match(r"^[ \t]*#\|", line):
+                raise RenderError("Quarto #| executable chunk options are unsupported.")
+    if fence is not None:
+        raise RenderError("Unterminated Quarto fenced code block.")
+
+
 class RenderError(Exception):
     def __init__(self, message: str, status: int = 65):
         super().__init__(message)
@@ -49,6 +91,7 @@ def standalone_document(source: str) -> str:
             continue
         if not re.fullmatch(r"(?:title|author|date):\s*(?:[^#{}\[\]&*!|>'\"\x60]|\"[^\"\n]*\"|'[^'\n]*')*", lines[i]):
             raise RenderError("Unsupported Quarto YAML; export a restricted .qmd first.")
+    validate_quarto_body(lines[end + 1:])
     index = formats[0]
     lines[index:index + 1] = ["format:", "  html:", "    embed-resources: true"]
     return "\n".join(lines)

@@ -1,4 +1,4 @@
-## 2026-10-28: Python NumPy ndarray identity in browser session snapshots (verification pending)
+## 2026-10-28: Python NumPy ndarray identity in browser session snapshots (Linux/macOS CI passed)
 
 The browser-local Python session exporter now records **verified exact NumPy ndarray**
 provenance in the existing version-2 snapshot format. A bounded homogeneous
@@ -13,15 +13,21 @@ restored with guessed types. Dtype widths, memory order, structured dtypes,
 subclasses, masked arrays, object arrays and arbitrary NumPy attributes are
 **not preserved**.
 
-**Status: partial / focused V8 execution of the actual snapshot and worker
-modules passed locally; independent Node/CPython CI and physical Chromium
-Pyodide execution are pending.** The new automated suite exercises v1/v2
-validation, capture/restore provenance, real worker dispatch and actual
-CPython/NumPy export and reconstruction when NumPy is installed. An opt-in
-physical Chromium scenario now asserts downloaded snapshot provenance and
-restoration in live Pyodide; it has not been executed. No native
-Flow backend, upstream compiler or hosted CI configuration changed. This is
-not RStudio feature parity.
+**Status: partial / all six Ubuntu 24.04/macOS 14 CI jobs passed in
+[CI #40658893614](https://github.com/godofecht/FlowStudio/actions/runs/40658893614).**
+Each source platform ran 988 JavaScript tests (979 passed, nine skipped,
+zero failures). The Python suite ran 145 tests (13 skipped, zero failures),
+including actual CPython/NumPy export and reconstruction on CI. Both native
+platforms compiled the real Flow 2.0.0 server and passed existing HTTP,
+Rscript, Chromium Quarto/Monaco acceptance and packaging; both FlowJIT jobs
+passed. An initial CI run failed on two stale source-wiring assertions,
+which were updated to assert the expanded pandas/NumPy/plain routing;
+the corrected six-job run passed. [PR #130](https://github.com/godofecht/FlowStudio/pull/130)
+merged as [161f6c7](https://github.com/godofecht/FlowStudio/commit/161f6c7b44fe10e24dcb4e29300257ab78eb76db).
+The opt-in physical Chromium **live Pyodide ndarray restore** scenario was
+added but was not executed in this CI; real browser interpreter restoration
+remains **unverified**. No native Flow backend, upstream compiler or hosted
+CI configuration changed. This is not RStudio feature parity.
 
 ## 2026-10-28: explicit R matrix identity in browser session snapshots (Linux/macOS CI passed)
 

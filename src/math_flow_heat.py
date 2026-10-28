@@ -8,6 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import math
 
+from math_flow_spatial import spatial_snapshot
 from math_flow_expr import TEMPERATURE, parse_expression, evaluate, ExpressionError
 
 
@@ -198,5 +199,5 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
             "temperature_min": float(np.min(field)), "temperature_max": float(np.max(field)),
             "method": "periodic centered-difference RK2 heat equation",
             "observations": observations,
-            "spatial": __import__("math_flow_spatial").spatial_snapshot(
+            "spatial": spatial_snapshot(
                 {"temperature": field}, (model.length_x, model.length_y))}

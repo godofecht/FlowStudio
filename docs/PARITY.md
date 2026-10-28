@@ -1,3 +1,20 @@
+## 2026-10-28: conflict-aware compensation for failed multi-file project replacement (verification pending)
+
+The existing browser-local project-wide Replace and one-level Undo now attempt
+reverse-order, conflict-checked recovery when a later write, close or verification
+fails. The failing write is included because a File System Access API close may
+change bytes before reporting an error. Recovery restores a file only when its
+current contents exactly equal the proposed after-image; it skips untouched
+files and never overwrites unexpected external edits or newly editor-open files.
+Failures report recovered and unresolved paths, rather than implying an atomic
+transaction. Both native and Pages project controllers use the same behavior.
+
+**Status: partial / focused V8 functional checks passed for both controllers;
+independent Linux/macOS Node and physical-browser acceptance pending.**
+This is best-effort compensation, not crash-safe, atomic, multi-user or remote
+file persistence. No hosted CI configuration or Flow compiler syntax changed.
+RStudio feature parity remains incomplete.
+
 ## 2026-10-28: bounded R data.frame row-name snapshot preservation (verification pending)
 
 The browser-local webR snapshot transport now exports nondefault, unique

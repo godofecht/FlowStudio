@@ -12,9 +12,18 @@ existing formats. The new test suite covers malformed metadata, the browser
 dispatch and real Rscript round trips, and is required by the native
 verification script when Rscript is installed.
 
-**Status: partial / independent CI pending.** Local native execution and
-physical Chromium/webR restoration have not been verified in this iteration.
-No Flow compiler, hosted CI configuration or remote execution model changed.
+**Status: partial / all six Linux/macOS CI jobs passed in
+[CI #40699367619](https://github.com/godofecht/FlowStudio/actions/runs/40699367619).**
+Both source platforms completed 1,018 JavaScript tests (1,006 passed,
+12 skipped, zero failures) and 167 Python tests (13 skipped, zero failures).
+Both native platforms compiled pinned Flow 2.0.0, completed HTTP/Rscript and
+packaging acceptance, and executed the seven new row-name tests against
+**real Rscript: seven passes, zero skips** on each platform. Both FlowJIT
+jobs passed. [PR #141](https://github.com/godofecht/FlowStudio/pull/141)
+merged as [57f3797](https://github.com/godofecht/FlowStudio/commit/57f379742f8dd18321f082ad3a47839fe99e8ed1).
+Physical Chromium/webR row-name snapshot restoration remains **unverified**;
+the opt-in acceptance assertions were added but not executed. No Flow compiler,
+hosted CI configuration or remote execution model changed.
 This is bounded row-name persistence, not general R object serialization.
 RStudio parity remains incomplete.
 

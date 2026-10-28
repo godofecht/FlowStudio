@@ -174,6 +174,20 @@ function tableQuery(name) {
     c(paste(nr, nc, sep="\\t"), paste(vapply(cols, encode, character(1)), collapse="\\t"), lines)
   })`;
 }
+function validFactorDestination(factor, packet) {
+  if (!factor || typeof factor !== "object" || Array.isArray(factor) ||
+      Object.keys(factor).sort().join(",") !== "levels,ordered" ||
+      typeof factor.ordered !== "boolean" || !Array.isArray(factor.levels) ||
+      factor.levels.length > 64 || new Set(factor.levels).size !== factor.levels.length ||
+      !factor.levels.every(level => typeof level === "string" &&
+        [...level].length <= 512 && !level.includes("\0")) ||
+      packet.kind !== "vector" || packet.type !== "string" ||
+      !packet.values.every(value => value === null || factor.levels.includes(value)))
+    return false;
+  try { factor.levels.forEach(level => encodeURIComponent(level)); }
+  catch (_) { return false; }
+  return true;
+}
 function create({load = () => import(CDN)} = {}) {
   let runtime = null, loading = null, epoch = 0;
   let serial = Promise.resolve();
@@ -425,6 +439,23 @@ function create({load = () => import(CDN)} = {}) {
           '; if (!base::exists(n, envir=.GlobalEnv, inherits=FALSE) || ' +
           'base::bindingIsActive(n, .GlobalEnv)) stop("Unknown or active R binding"); ' +
           'v <- base::get(n, envir=.GlobalEnv, inherits=FALSE); ' +
+          "factor_origin <- " + (forSnapshot ? "TRUE" : "FALSE") + " && " +
+          "base::typeof(v) == \"integer\" && " +
+          "(base::identical(base::attr(v, \"class\", exact=TRUE), \"factor\") || " +
+          "base::identical(base::attr(v, \"class\", exact=TRUE), base::c(\"ordered\", \"factor\"))) && " +
+          "base::identical(base::sort(base::names(base::attributes(v))), base::c(\"class\", \"levels\")); " +
+          "if (factor_origin) { " +
+          "lev <- base::attr(v, \"levels\", exact=TRUE); " +
+          "if (!base::is.character(lev) || base::length(lev) > 64L || " +
+          "base::anyNA(lev) || base::anyDuplicated(lev) || " +
+          "base::any(base::nchar(lev, type=\"chars\") > 512L) || base::length(v) > 256L) " +
+          "stop(\"Unsupported R factor levels or length\"); " +
+          "base::c(\"@FACTOR@\", " +
+          "if (base::identical(base::attr(v, \"class\", exact=TRUE), base::c(\"ordered\", \"factor\"))) \"1\" else \"0\", " +
+          "base::as.character(base::length(lev)), " +
+          "base::vapply(lev, function(x) utils::URLencode(x, reserved=TRUE), character(1)), " +
+          "base::vapply(base::as.character(v), function(x) if (base::is.na(x)) \"@NA@\" else utils::URLencode(x, reserved=TRUE), character(1))) " +
+          "} else { " +
           "matrix_origin <- base::is.matrix(v) && !base::is.object(v); " +
           "if (matrix_origin) { " +
           "d <- base::attr(v, \"dim\", exact=TRUE); " +
@@ -475,7 +506,7 @@ function create({load = () => import(CDN)} = {}) {
           'if (t == "character" && any(nchar(v[!is.na(v)], type="chars") > 512L)) stop("R string exceeds limit"); ' +
           's <- if (t == "double") format(v, digits=17L, scientific=TRUE, trim=TRUE, decimal.mark=".") else as.character(v); ' +
           'c(t, vapply(seq_along(v), function(i) if (is.na(v[[i]])) "@NA@" else ' +
-          'utils::URLencode(s[[i]], reserved=TRUE), character(1))) } })';
+          'utils::URLencode(s[[i]], reserved=TRUE), character(1))) } } })';
         const rows = await r.evalRRaw(query, "string[]");
         if (generation !== epoch) return {ok:false, output:"R session reset."};
         if (!Array.isArray(rows) || !rows.length ||
@@ -495,8 +526,25 @@ function create({load = () => import(CDN)} = {}) {
           }
           return decoded;
         };
-        let packet, origin = null;
-        if (rows[0] === "@TABLE@" || (forSnapshot && rows[0] === "@MATRIX@")) {
+        let packet, origin = null, factor = null;
+        if (forSnapshot && rows[0] === "@FACTOR@") {
+          if (rows.length < 3 || !["0", "1"].includes(rows[1]) ||
+              !/^(?:0|[1-9][0-9]?)$/.test(rows[2]))
+            throw Error("Invalid R factor header.");
+          const count = Number(rows[2]);
+          if (count > 64 || rows.length > 3 + count + 256)
+            throw Error("R factor exceeds snapshot limits.");
+          const levels = rows.slice(3, 3 + count).map(decodeURIComponent);
+          const values = rows.slice(3 + count).map(raw =>
+            raw === "@NA@" ? null : decodeURIComponent(raw));
+          packet = global.FlowStudioVariableTransfer.validate({
+            kind:"vector", type:"string", values
+          });
+          factor = {levels, ordered:rows[1] === "1"};
+          if (!validFactorDestination(factor, packet))
+            throw Error("Invalid R factor levels or values.");
+          origin = "factor";
+        } else if (rows[0] === "@TABLE@" || (forSnapshot && rows[0] === "@MATRIX@")) {
           if (rows[0] === "@MATRIX@") origin = "matrix";
           if (rows.length < 5 || !/^[1-9][0-9]?$/.test(rows[1]) ||
               !/^(?:0|[1-9][0-9]{0,2})$/.test(rows[2]))
@@ -527,20 +575,25 @@ function create({load = () => import(CDN)} = {}) {
           const values = rows.slice(1).map(raw => decode(raw, type));
           packet = global.FlowStudioVariableTransfer.validate({kind:"vector", type, values});
         }
-        return origin ? {ok:true, value:packet, origin} : {ok:true, value:packet};
+        return origin === "factor" ? {ok:true, value:packet, origin, factor} :
+          origin ? {ok:true, value:packet, origin} : {ok:true, value:packet};
       } catch (error) { return {ok:false, output:String(error.message || error).slice(0, 300)}; }
     });
   }
   async function importVariable(name, packet, options = {}) {
     if (!options || typeof options !== "object" || Array.isArray(options) ||
-        Object.keys(options).some(key => key !== "asMatrix") ||
+        Object.keys(options).some(key => !["asMatrix", "asFactor"].includes(key)) ||
         (options.asMatrix !== undefined && typeof options.asMatrix !== "boolean"))
       return {ok:false, output:"Invalid R transfer destination."};
     const asMatrix = options.asMatrix === true;
+    const asFactor = options.asFactor;
     if (!/^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(name))
       return {ok:false, output:"Invalid shared Python/R variable name."};
     try { global.FlowStudioVariableTransfer.validate(packet); }
     catch (error) { return {ok:false, output:String(error.message || error).slice(0, 300)}; }
+    if (asFactor !== undefined &&
+        (asMatrix || !validFactorDestination(asFactor, packet)))
+      return {ok:false, output:"R factor requires validated levels and a typed string vector."};
     if (asMatrix && (packet.kind !== "table" ||
         packet.columns[0].values.length < 1 ||
         !packet.columns.every(col => col.type === packet.columns[0].type)))
@@ -558,7 +611,11 @@ function create({load = () => import(CDN)} = {}) {
         const empty = {number:"base::numeric(0L)", boolean:"base::logical(0L)", string:"base::character(0L)"};
         const vector = (values, type) => values.length ?
           "base::c(" + values.map(value => atom(value, type)).join(",") + ")" : empty[type];
-        const expression = asMatrix
+        const expression = asFactor !== undefined
+          ? "base::factor(" + vector(packet.values, "string") +
+            ", levels=" + vector(asFactor.levels, "string") +
+            ", ordered=" + (asFactor.ordered ? "TRUE" : "FALSE") + ")"
+          : asMatrix
           ? "base::matrix(" + vector(packet.columns.flatMap(col => col.values), packet.columns[0].type) +
             ", nrow=" + packet.columns[0].values.length + "L, ncol=" + packet.columns.length + "L)"
           : packet.kind === "table"

@@ -12,7 +12,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 from math_flow import FlowMathError, parse, simulate
-from math_flow_expr import evaluate
+from math_flow_expr import evaluate, parse_expression
 from math_flow_equations import TEMPERATURE_RATE
 
 SOURCE = (ROOT / "examples/heat_cubic_reaction.flow").read_text(encoding="utf-8")
@@ -26,6 +26,14 @@ def quartic(source):
 
 
 class PolynomialKineticsTest(unittest.TestCase):
+    def test_unicode_powers_four_through_eight_lower_to_numpy(self):
+        x = np.zeros((3, 3))
+        for exponent, glyph in ((4, "⁴"), (5, "⁵"), (6, "⁶"), (7, "⁷"), (8, "⁸")):
+            with self.subTest(exponent=exponent):
+                tree = parse_expression("(2m)" + glyph)
+                self.assertEqual(tree.dimension, (exponent, 0, 0, 0))
+                np.testing.assert_allclose(evaluate(tree, x, x), 2**exponent)
+
     def test_typed_cubic_ast_and_discrete_fourier_rhs(self):
         model = parse(SOURCE)
         self.assertEqual(model.equation.reaction_power, 3)

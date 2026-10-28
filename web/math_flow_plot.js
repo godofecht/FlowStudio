@@ -181,7 +181,7 @@
          (typeof face.value[1] === "string"
            ? face.value[1].length > 0 && face.value[1].length <= 4096
            : typeof face.value[1] === "number" && Number.isFinite(face.value[1]) &&
-             face.value[1] > 0));
+             face.value[1] > 0)));
       const describeFace = face => face.type === "Periodic" ? "Periodic" :
         face.type === "DirichletProfile" ? "Dirichlet profile " + face.value :
         face.type === "NeumannProfile" ? "Neumann profile " + face.value :

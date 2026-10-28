@@ -68,11 +68,27 @@ def parse_heat(source: str, base) -> HeatModel:
             if inner.count(",") != 1:
                 raise error("Robin requires ambient temperature and transfer length")
             comma = inner.index(",")
-            ambient = base.number(inner[:comma], ["K"])
             length = base.number(inner[comma + 1:], ["m"])
             if length <= 0:
                 raise error("Robin transfer length must be positive")
-            return ("Robin", (ambient, length))
+            try:
+                ambient = base.number(inner[:comma], ["K"])
+                return ("Robin", (ambient, length))
+            except error:
+                profile = "".join(inner[:comma])
+                try:
+                    typed = parse_expression(profile, symbols={"t": (0, 0, 1, 0)})
+                except ExpressionError as exc:
+                    raise error(f"Invalid Robin ambient profile: {exc}") from exc
+                if typed.dimension != TEMPERATURE:
+                    raise error("Robin ambient profile must have Kelvin dimensions")
+                def check_profile(node):
+                    if node.operator in ("∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∇²"):
+                        raise error("Robin ambient profiles cannot contain spatial derivatives")
+                    for child in node.operands:
+                        check_profile(child)
+                check_profile(typed)
+                return ("RobinProfile", (profile, length))
         unit = ["K"] if kind == "Dirichlet" else ["K", "/", "m"]
         # Preserve literal values while allowing typed, field-independent
         # face profiles. Neumann uses outward-normal K/m, not Kelvin.
@@ -124,7 +140,7 @@ def parse_heat(source: str, base) -> HeatModel:
                     raise error("Periodic boundaries must occur on both faces of an axis")
     else:
         kind, value = parse_face(boundary_tokens)
-        if kind in ("Robin", "DirichletProfile", "NeumannProfile"):
+        if kind in ("Robin", "RobinProfile", "DirichletProfile", "NeumannProfile"):
             boundary_axes = ((kind, value), (kind, value))
         if kind == "Dirichlet":
             boundary_temperature = value
@@ -387,7 +403,7 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
             "method": "centered-difference RK2 scalar reaction-diffusion equation",
             "boundary_condition": ("Faces" if model.boundary_faces is not None
                                    else "Robin" if model.boundary_axes is not None and all(
-                                        kind == "Robin" for kind, _ in model.boundary_axes)
+                                        kind in ("Robin", "RobinProfile") for kind, _ in model.boundary_axes)
                                     else "Mixed" if model.boundary_axes is not None
                                    else "Dirichlet" if model.boundary_temperature is not None
                                    else "Neumann" if model.boundary_gradient is not None

@@ -97,6 +97,7 @@ class QuartoRenderTests(unittest.TestCase):
         if installed.returncode or installed.stdout.strip() != "TRUE":
             self.skipTest("R knitr package is not installed")
         source = SOURCE + '\n```{r}\ncat(paste0("flowstudio-real-", "r-87421"))\n```\n'
+        self.assertNotIn("flowstudio-real-r-87421", source)  # Echoed code is not execution evidence.
         html = quarto.render(source)
         self.assertIn("flowstudio-real-r-87421", html)
 
@@ -105,6 +106,7 @@ class QuartoRenderTests(unittest.TestCase):
     def test_real_quarto_python_chunk_executes(self):
         # A real Jupyter kernel must execute the Python chunk.
         source = SOURCE + '\n```{python}\nprint("flowstudio-real-" + "python-87421")\n```\n'
+        self.assertNotIn("flowstudio-real-python-87421", source)  # Echoed code is not execution evidence.
         html = quarto.render(source)
         self.assertIn("flowstudio-real-python-87421", html)
 

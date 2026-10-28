@@ -38,6 +38,9 @@ def main() -> None:
     git("init", "-q")
     git("config", "user.name", "FlowStudio Acceptance")
     git("config", "user.email", "flowstudio-test@example.invalid")
+    # The Flow-owned history route is read-only and reports unborn HEADs.
+    assert post("/api/git/history", "")[0] == 422
+    assert post("/api/git/history", "", "http://attacker.invalid")[0] == 404
     (HERE / "a [1].flow").write_text("function main() -> i32 { return 0 }\n", encoding="utf-8")
     (HERE / "other.flow").write_text("not staged\n", encoding="utf-8")
 
@@ -60,6 +63,22 @@ def main() -> None:
     assert status == 200, (status, output)
     assert git("log", "-1", "--format=%s").strip() == "Native Git HTTP acceptance"
     assert git("show", "--pretty=format:", "--name-only", "HEAD").strip() == "a [1].flow"
+    assert "other.flow" in git("status", "--short")
+    status, history = post("/api/git/history", "")
+    assert status == 200 and "Native Git HTTP acceptance" in history, (status, history)
+    assert "not staged" not in history
+    # Ensure the endpoint is genuinely bounded by Git rather than truncating
+    # arbitrary bytes or accepting a caller-provided revision range.
+    for index in range(32):
+        git("-c", "core.hooksPath=/dev/null", "commit", "--allow-empty",
+            "-m", f"History fixture {index:02d}")
+    status, history = post("/api/git/history", "HEAD~100..HEAD")
+    assert status == 200, (status, history)
+    entries = history.splitlines()
+    assert len(entries) == 30, len(entries)
+    assert "History fixture 31" in entries[0]
+    assert "History fixture 02" in entries[-1]
+    assert "Native Git HTTP acceptance" not in history
     assert "other.flow" in git("status", "--short")
 
     # Unstage a tracked modification without discarding the edited file, while

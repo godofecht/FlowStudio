@@ -14,6 +14,7 @@ import math
 from pathlib import Path
 import re
 import sys
+from math_flow_spatial import spatial_snapshot
 from math_flow_expr import parse_expression, evaluate, ExpressionError, VELOCITY
 
 TOKEN = re.compile(
@@ -489,7 +490,7 @@ def simulate(model: Model, *, grid: int | None = None, until: float | None = Non
             "pressure_mean": float(np.mean(pressure)),
             "pressure_solver": "conjugate gradient of periodic -D_backward G_forward",
             "observations": observations,
-            "spatial": __import__("math_flow_spatial").spatial_snapshot(
+            "spatial": spatial_snapshot(
                 {"velocity_x": u, "velocity_y": v, "vorticity": vorticity},
                 (model.length_x, model.length_y))}
 

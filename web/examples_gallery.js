@@ -5,18 +5,59 @@
 "use strict";
 
 const FLOW_INTEROP =
+'# Flow step of the project: the Python step writes data/samples.csv,\n' +
+'# this program re-reads it, scales each value and prints a summary\n' +
+'# table. Compile it with the C backend or the MLIR backend.\n' +
+'import std.io { FileRead, io_read_text }\n' +
+'import std.string { ParseF64, str_line_next, str_parse_f64_at }\n' +
+'\n' +
 'function main() -> i32 {\n' +
-'    # Reads the Python step output from data/samples.csv,\n' +
-'    # applies the compiled pipeline and prints a summary table.\n' +
-'    print("Flow pipeline starting (select MLIR backend to compile this via LLVM)")\n' +
-'    for row in Reader { path: "data/samples.csv" } {\n' +
-'        let value: f64 = row.value\n' +
-'        let scaled: f64 = value * 2.0\n' +
-'        print("scaled", scaled)\n' +
+'    let r: FileRead = io_read_text("data/samples.csv")\n' +
+'    if r.ok == false {\n' +
+'        print("data/samples.csv missing - run the Python step first")\n' +
+'        return 1\n' +
 '    }\n' +
+'    let text: string = r.data\n' +
+'    let n: i32 = r.len as i32\n' +
+'    let p: ptr<u8> = text as ptr<u8>\n' +
+'    let mut count: i32 = 0\n' +
+'    let mut total: f64 = 0.0\n' +
+'    let mut worst: f64 = 0.0\n' +
+'    # Skip the "index,value" header row: find its end, then step past it.\n' +
+'    let head_end: i32 = str_line_end(text, 0)\n' +
+'    let mut pos: i32 = str_line_next(text, head_end)\n' +
+'    while pos >= 0 and pos < n {\n' +
+'        let end: i32 = str_line_end(text, pos)\n' +
+'        let mut cut: i32 = end\n' +
+'        let mut i: i32 = pos\n' +
+'        while i < end {\n' +
+'            if p[i] == 44 {\n' +
+'                cut = i\n' +
+'                i = end\n' +
+'            }\n' +
+'            i = i + 1\n' +
+'        }\n' +
+'        let f: ParseF64 = str_parse_f64_at(text, cut + 1)\n' +
+'        if f.ok == true {\n' +
+'            let scaled: f64 = f.value * 2.0\n' +
+'            total = total + scaled\n' +
+'            if scaled > worst {\n' +
+'                worst = scaled\n' +
+'            }\n' +
+'            count = count + 1\n' +
+'            print("scaled", scaled)\n' +
+'        }\n' +
+'        pos = str_line_next(text, end)\n' +
+'    }\n' +
+'    if count == 0 {\n' +
+'        print("no sample rows found in data/samples.csv")\n' +
+'        return 1\n' +
+'    }\n' +
+'    print("rows", count)\n' +
+'    print("total scaled", total)\n' +
+'    print("max scaled", worst)\n' +
 '    return 0\n' +
 '}\n';
-
 const PY_GENERATE =
 '# Step 1 - generate deterministic sample data for the whole project.\n' +
 'def samples(rows=12, seed=7):\n' +

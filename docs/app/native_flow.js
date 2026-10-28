@@ -179,6 +179,9 @@ async function checkSyntax(code) {
 async function gitStatus() {
   return request("/api/git/status", "");
 }
+async function gitHistory() {
+  return request("/api/git/history", "");
+}
 async function gitDiff() {
   return request("/api/git/diff", "");
 }
@@ -458,7 +461,7 @@ function createRSession() {
     exportVariable:unsupported, importVariable:unsupported});
 }
 
-const api = Object.freeze({available, run, createRSession, checkSyntax, checkRSyntax, tracePython, debugRStart, debugRCommand, debugPythonStart, debugPythonCommand, gitStatus, gitDiff, gitStagedDiff, gitStage, gitUnstage, gitCommit, gitBranches, gitCreateBranch, gitSwitchBranch, gitDeleteBranch, gitMergeBranch});
+const api = Object.freeze({available, run, createRSession, checkSyntax, checkRSyntax, tracePython, debugRStart, debugRCommand, debugPythonStart, debugPythonCommand, gitStatus, gitHistory, gitDiff, gitStagedDiff, gitStage, gitUnstage, gitCommit, gitBranches, gitCreateBranch, gitSwitchBranch, gitDeleteBranch, gitMergeBranch});
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 global.FlowStudioNativeFlow = api;
 })(globalThis);

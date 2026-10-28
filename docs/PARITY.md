@@ -1,3 +1,25 @@
+## 2026-10-28: opt-in installed Quarto CLI HTML rendering (independent validation pending)
+
+The native Flow-owned localhost server now exposes POST /api/render/quarto
+behind its existing explicit intent/origin gate. The browser renders only after
+a confirmation explaining that R/Python chunks execute with the local user's
+permissions. The strict .qmd source encoder supplies the document; a bounded
+Python subprocess helper invokes the **installed real Quarto CLI** with fixed
+argv, a temporary isolated working directory, --execute, --no-cache and a
+45-second child deadline (60-second Flow process-group deadline). The
+HTML-only metadata is rewritten to embed-resources: true so the returned
+report is standalone, bounded to 2 MiB and downloaded as HTML. A missing
+Quarto executable is an explicit 503; invalid source/render errors are 422;
+timeouts are 504. No hosted CI changes and no replacement of the Flow router.
+
+**Status: partial / native Flow compile, live Quarto, R/Python knitr, and
+physical Chromium execution unverified until CI.** Focused Python unit tests
+cover header validation, missing CLI and actual fixed-argv subprocess
+orchestration; a real-Quarto smoke test runs only when installed. The native
+HTTP smoke suite now checks the intent/origin gate and invalid-format
+rejection. This is not general Quarto project support, arbitrary YAML
+compatibility, an execution sandbox, or RStudio feature parity.
+
 ## 2026-10-28: literal Quarto chunk label and R evaluation options (validation pending)
 
 The .qmd importer now translates leading `#| label:` and literal

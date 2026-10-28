@@ -32,6 +32,8 @@ cp src/python_trace.py "$stage/$name/src/python_trace.py"
 cp src/python_debugger.py "$stage/$name/src/python_debugger.py"
 cp src/r_kernel.R "$stage/$name/src/r_kernel.R"
 cp src/flowjit.R "$stage/$name/src/flowjit.R"
+mkdir -p "$stage/$name/scripts"
+cp scripts/quarto_render.py "$stage/$name/scripts/quarto_render.py"
 cp VERSION README.md "$stage/$name/"
 if test -f LICENSE; then cp LICENSE "$stage/$name/"; fi
 cat > "$stage/$name/run.sh" <<'EOS'

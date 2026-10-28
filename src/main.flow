@@ -306,6 +306,44 @@ function send_python_plot() -> void {
     }
 }
 
+# Real Quarto/knitr execution is opt-in. The Flow server owns the route,
+# localhost intent gate and bounded process lifetime. The Python helper only
+# orchestrates the installed Quarto CLI; it is not a substitute renderer.
+function send_quarto_render(source: string) -> void {
+    if eq(source, "") {
+        fs_reply(400, "text/plain; charset=utf-8", "Quarto source is empty.")
+        return
+    }
+    let temp_path: string = fs_write_temp_flow(source)
+    if eq(temp_path, "") {
+        fs_reply(500, "text/plain; charset=utf-8", "Unable to create temporary Quarto source.")
+        return
+    }
+    let command: ptr<ProcCmd> = proc_cmd("python3")
+    proc_arg(command, "scripts/quarto_render.py")
+    proc_arg(command, temp_path)
+    proc_timeout_ms(command, 60000)
+    let result: ptr<ProcResult> = proc_run(command)
+    let _removed: i32 = unlink(temp_path)
+    if result.timed_out or result.exit_code == 70 {
+        fs_reply(504, "text/plain; charset=utf-8", "Quarto rendering timed out.")
+        return
+    }
+    if not eq(result.error, "") or result.exit_code == 69 {
+        fs_reply(503, "text/plain; charset=utf-8", "Quarto unavailable: " + result.stderr + result.error)
+        return
+    }
+    if result.exit_code != 0 {
+        fs_reply(422, "text/plain; charset=utf-8", "Quarto rendering failed: " + result.stderr)
+        return
+    }
+    if eq(result.stdout, "") {
+        fs_reply(422, "text/plain; charset=utf-8", "Quarto returned no HTML.")
+        return
+    }
+    fs_reply(200, "text/html; charset=utf-8", result.stdout)
+}
+
 function send_r_table(name: string) -> void {
     let output: string = fs_r_table(name)
     let status: i32 = fs_r_status()
@@ -665,6 +703,10 @@ function dispatch() -> void {
         }
         if eq(path, "/api/git/branch/switch") {
             send_git_branch("switch", fs_body())
+            return
+        }
+        if eq(path, "/api/render/quarto") {
+            send_quarto_render(fs_body())
             return
         }
         if eq(path, "/api/run/flow") {

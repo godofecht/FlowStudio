@@ -42,11 +42,13 @@
     if (!series.metrics.includes(metric)) throw new TypeError("Unknown metric.");
     const values = series.values[metric], times = series.times;
     const minimum = Math.min(...values), maximum = Math.max(...values);
-    const range = maximum - minimum || Math.max(Math.abs(maximum), 1) * 0.1;
+    const scale = Math.max(Math.abs(minimum), Math.abs(maximum), 1);
+    const scaledMinimum = minimum / scale;
+    const range = (maximum / scale - scaledMinimum) || 0.1;
     const start = times[0], duration = times[times.length - 1] - start;
     const points = values.map((value, index) => [
       54 + 548 * (times[index] - start) / duration,
-      200 - 172 * (value - minimum) / range
+      200 - 172 * (value / scale - scaledMinimum) / range
     ]);
     return { points, minimum, maximum,
       path: points.map(([x, y], index) => (index ? "L" : "M") +

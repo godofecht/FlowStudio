@@ -176,16 +176,25 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
         return ((np.roll(a, -1, axis=0) + np.roll(a, 1, axis=0) - 2 * a) / dx**2 +
                 (np.roll(a, -1, axis=1) + np.roll(a, 1, axis=1) - 2 * a) / dy**2)
 
-    for _ in range(steps):
+    observations = [{"time": 0.0, "meanTemperature": initial_mean,
+                     "temperatureVariance": initial_variance}]
+    sample_stride = max(1, math.ceil(steps / 128))
+    for step_index in range(steps):
         k1 = model.diffusivity * laplacian(field)
         k2 = model.diffusivity * laplacian(field + dt * k1)
         field += .5 * dt * (k1 + k2)
         if not np.all(np.isfinite(field)):
             raise error_type("Non-finite temperature during heat integration")
+        if (step_index + 1) % sample_stride == 0 or step_index + 1 == steps:
+            sampled_mean = float(np.mean(field))
+            observations.append({"time": float((step_index + 1) * dt),
+                                 "meanTemperature": sampled_mean,
+                                 "temperatureVariance": float(np.mean((field - sampled_mean)**2))})
     mean = float(np.mean(field))
     variance = float(np.mean((field - mean)**2))
     return {"steps": steps, "grid": [nx, ny], "time": duration,
             "mean_temperature": mean, "initial_mean_temperature": initial_mean,
             "temperature_variance": variance, "initial_temperature_variance": initial_variance,
             "temperature_min": float(np.min(field)), "temperature_max": float(np.max(field)),
-            "method": "periodic centered-difference RK2 heat equation"}
+            "method": "periodic centered-difference RK2 heat equation",
+            "observations": observations}

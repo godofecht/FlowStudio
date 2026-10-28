@@ -52,7 +52,7 @@ test("accepts Quarto documents without YAML using default HTML", () => {
   assert.match(quarto.encode(restored.source, "python", parseCells), /format: html/);
 });
 
-test("rejects unsupported YAML and executable Quarto options", () => {
+test("rejects unsupported YAML and unrepresented Quarto source options", () => {
   for (const yaml of [
     "---\nformat: pdf\n---\n",
     "---\nformat:\n  html: default\n---\n",
@@ -60,7 +60,7 @@ test("rejects unsupported YAML and executable Quarto options", () => {
     "---\noutput: html_document\n---\n",
     "---\nformat: html\nformat: html\n---\n"
   ]) assert.throws(() => quarto.decode(yaml + fence + "{r}\n1\n" + fence, parseCells));
-  assert.throws(() => quarto.decode(fence + "{r}\n#| eval: false\nstop('bad')\n" + fence, parseCells), /chunk options/);
+  // Literal R eval: false is now safely imported as inert Markdown; see the roundtrip regression below.
   assert.throws(() => quarto.encode("# %% [r]\n#| eval: false\n1\n", "r", parseCells), /chunk options/);
 });
 

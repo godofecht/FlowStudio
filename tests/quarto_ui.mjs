@@ -18,7 +18,7 @@ try {
   await page.goto('http://127.0.0.1:8751/app/', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => Boolean(globalThis.FlowStudioQuarto?.decode));
   const qmd = '---\ntitle: Example\nformat: html\n---\n\n' +
-    fence + '{r summary}\nprint(42)\n' + fence + '\n';
+    fence + '{r}\n#| label: summary\nprint(42)\n' + fence + '\n';
   await page.locator('#quartoFile').setInputFiles({
     name: 'study.qmd', mimeType: 'text/markdown', buffer: Buffer.from(qmd)
   });
@@ -32,6 +32,12 @@ try {
   assert.match(exported, /format: html/);
   assert.match(exported, /print\(42\)/);
   assert.ok(exported.includes(fence + '{r summary}'));
+  const disabled = fence + '{r}\n#| eval: false\nstop("must not run")\n' + fence + '\n';
+  await page.locator('#quartoFile').setInputFiles({
+    name: 'disabled.qmd', mimeType: 'text/markdown', buffer: Buffer.from(disabled)
+  });
+  await page.waitForFunction(() => document.querySelector('#source')?.value.includes('eval=FALSE'));
+  assert.ok((await page.locator('#source').inputValue()).includes('# %% [markdown]'));
   const before = await page.locator('#source').inputValue();
   await page.locator('#quartoFile').setInputFiles({
     name: 'unsupported.qmd', mimeType: 'text/markdown',

@@ -14,6 +14,7 @@ try {
   for (const [source, metric, other] of [
     ['examples/heat_equation_smoke.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_nonlinear_reaction.flow', 'temperatureVariance', 'meanTemperature'],
+    ['examples/heat_transport_reaction.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/navier_stokes_smoke.flow', 'kineticEnergy', 'maximumDivergence']
   ]) {
     await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),

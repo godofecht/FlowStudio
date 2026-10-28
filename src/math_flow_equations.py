@@ -1,7 +1,7 @@
 """Typed, bounded scalar parabolic equation AST and operator validation.
 
 The entire RHS is parsed and dimension-checked. Supported operators are
-periodic diffusion, optional field-independent forcing, optional constant
+typed diffusion, optional field-independent forcing, optional constant
 advection, and optional linear or bounded quadratic relaxation toward a
 declared ambient temperature. The supported terms can be composed.
 No arbitrary nonlinear or coupled equation is accepted.

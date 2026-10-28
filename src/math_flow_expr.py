@@ -21,7 +21,7 @@ UNITS: dict[str, Dimension] = {
 SUPERSCRIPT = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁻−", "0123456789--")
 _NUMBER = r"(?:10[⁻−-][⁰¹²³⁴⁵⁶⁷⁸⁹0-9]+|(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)"
 _UNIT = r"(?:kg|Pa|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)?(?:/(?:kg|Pa|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*))?"
-_TOKEN = re.compile(rf"(?P<space>\s+)|(?P<quantity>{_NUMBER}(?:{_UNIT})?)|(?P<name>[A-Za-z_][A-Za-z_0-9]*|π)|(?P<op>[+\-−*/×·(),])")
+_TOKEN = re.compile(rf"(?P<space>\s+)|(?P<quantity>{_NUMBER}(?:{_UNIT})?)|(?P<name>∂ₓ|∂ᵧ|∇²|[A-Za-z_][A-Za-z_0-9]*|π)|(?P<op>[+\-−*/×·(),])")
 _UNIT_PART = re.compile(r"(kg|Pa|m|s|K)([²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)\Z")
 
 
@@ -118,7 +118,7 @@ class _Parser:
             left = self.expression(0, depth + 1)
             if self.take() != ")":
                 raise ExpressionError("Expected closing parenthesis")
-        elif first in ("sin", "cos", "exp", "sqrt"):
+        elif first in ("sin", "cos", "exp", "sqrt", "∂ₓ", "∂ᵧ", "∇²"):
             if self.take() != "(":
                 raise ExpressionError(f"Expected '(' after {first}")
             arg = self.expression(0, depth + 1)
@@ -128,7 +128,14 @@ class _Parser:
                 raise ExpressionError(f"{first} requires a dimensionless argument")
             if first == "sqrt" and any(x % 2 for x in arg.dimension):
                 raise ExpressionError("sqrt requires even physical dimension exponents")
-            dim = tuple(x // 2 for x in arg.dimension) if first == "sqrt" else DIMENSIONLESS
+            if first == "sqrt":
+                dim = tuple(x // 2 for x in arg.dimension)
+            elif first in ("∂ₓ", "∂ᵧ"):
+                dim = _minus(arg.dimension, LENGTH)
+            elif first == "∇²":
+                dim = _minus(arg.dimension, (2, 0, 0, 0))
+            else:
+                dim = DIMENSIONLESS
             left = Expression(first, (arg,), dimension=dim)
         elif first in ("x", "y", "π", "pi"):
             left = Expression("name", value="pi" if first in ("π", "pi") else first,
@@ -144,7 +151,7 @@ class _Parser:
                 operator, precedence = ("add" if nxt == "+" else "sub"), 10
             elif nxt in ("*", "×", "·", "/"):
                 operator, precedence = ("div" if nxt == "/" else "mul"), 20
-            elif nxt in ("(", "π", "pi", "x", "y", "sin", "cos", "exp", "sqrt") or re.fullmatch(rf"{_NUMBER}(?:{_UNIT})?", nxt):
+            elif nxt in ("(", "π", "pi", "x", "y", "sin", "cos", "exp", "sqrt", "∂ₓ", "∂ᵧ", "∇²") or re.fullmatch(rf"{_NUMBER}(?:{_UNIT})?", nxt):
                 operator, precedence = "mul", 20
             else:
                 break
@@ -178,7 +185,34 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
     import numpy as np
     if expected_dimension is not None and expression.dimension != expected_dimension:
         raise ExpressionError(f"Expected dimension {expected_dimension}, got {expression.dimension}")
+    def periodic_grid():
+        coordinates_x = np.asarray(x, dtype=np.float64)
+        coordinates_y = np.asarray(y, dtype=np.float64)
+        if (coordinates_x.ndim != 2 or coordinates_x.shape != coordinates_y.shape
+                or min(coordinates_x.shape) < 3):
+            raise ExpressionError("Spatial derivatives require a two-dimensional periodic coordinate grid")
+        if not (np.all(np.isfinite(coordinates_x)) and np.all(np.isfinite(coordinates_y))):
+            raise ExpressionError("Spatial derivative coordinates must be finite")
+        spacing_x = float(coordinates_x[1, 0] - coordinates_x[0, 0])
+        spacing_y = float(coordinates_y[0, 1] - coordinates_y[0, 0])
+        if (spacing_x <= 0 or spacing_y <= 0
+                or not np.allclose(coordinates_x, coordinates_x[:, :1], rtol=1e-12, atol=1e-12)
+                or not np.allclose(coordinates_y, coordinates_y[:1, :], rtol=1e-12, atol=1e-12)
+                or not np.allclose(np.diff(coordinates_x[:, 0]), spacing_x, rtol=1e-12, atol=1e-12)
+                or not np.allclose(np.diff(coordinates_y[0, :]), spacing_y, rtol=1e-12, atol=1e-12)):
+            raise ExpressionError("Spatial derivatives require a uniformly spaced Cartesian grid")
+        return coordinates_x.shape, spacing_x, spacing_y
+
     def visit(node: Expression):
+        if node.operator in ("∂ₓ", "∂ᵧ", "∇²"):
+            shape, spacing_x, spacing_y = periodic_grid()
+            field = np.broadcast_to(np.asarray(visit(node.operands[0]), dtype=np.float64), shape)
+            if node.operator == "∂ₓ":
+                return (np.roll(field, -1, axis=0) - np.roll(field, 1, axis=0)) / (2 * spacing_x)
+            if node.operator == "∂ᵧ":
+                return (np.roll(field, -1, axis=1) - np.roll(field, 1, axis=1)) / (2 * spacing_y)
+            return ((np.roll(field, -1, axis=0) + np.roll(field, 1, axis=0) - 2 * field) / spacing_x**2
+                    + (np.roll(field, -1, axis=1) + np.roll(field, 1, axis=1) - 2 * field) / spacing_y**2)
         if node.operator == "literal":
             return float(node.value)
         if node.operator == "name":

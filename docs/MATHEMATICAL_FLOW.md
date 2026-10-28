@@ -228,3 +228,24 @@ The checked-in sine-product temperature field is an exact eigenvector of this **
 The scalar heat frontend also accepts `boundaries = Neumann(0K/m)` or a finite signed constant outward-normal gradient in K/m on **all four faces**. The parser checks physical units and rejects unsupported mixed boundary specifications. At each RK2 stage, the spatial operator uses cell-centered ghost values `T_ghost = T_edge + g Δx` (or `g Δy`) at the corresponding outward face; `g = 0` is insulated, conserving the discrete spatial mean for diffusion-only models. A nonzero `g` produces the integrated boundary flux `d mean(T)/dt = 2 diffusivity g (1/Lx + 1/Ly)` for a rectangular grid. This is a specified outward **temperature gradient**, not a heat flux in watts or a Robin boundary.
 
 `examples/heat_neumann.flow` is a checked-in executable insulated cosine eigenmode. `tests/test_math_flow_neumann.py` verifies the exact discrete RK2 amplification factor, refinement toward the continuum solution, nonzero outward-gradient integrated flux, malformed unit rejection, and actual CLI execution. Native HTTP and Chromium workbench tests exercise this program and display the validated boundary gradient alongside real spatial and time-series SVG plots. Arbitrary per-face, mixed, time-varying, and nonlinear boundary conditions remain unsupported. Navier–Stokes still requires periodic boundaries.
+
+## Independent x/y boundary conditions (mixed thermal faces)
+
+`examples/heat_mixed_boundaries.flow` is an executable scalar heat program with
+`boundaries = (Dirichlet(300K), Neumann(0K/m))`. The ordered tuple specifies
+the two x-normal faces, then the two y-normal faces; each pair shares a
+constant value. `Periodic` may be used for either axis. The compiler checks
+the boundary units (`K` for Dirichlet, outward-normal `K/m` for Neumann)
+and rejects malformed or unsupported combinations. Each axis uses its own
+ghost-cell stencil during both RK2 stages. The native HTTP result exposes
+`boundary_condition: "Mixed"` and typed `boundary_axes` metadata, rendered
+by the workbench alongside real temperature plots.
+
+Analytic tests compare the final field with exact discrete sine/cosine
+eigenmodes for Dirichlet-x/Neumann-y and periodic-x/Dirichlet-y,
+including continuum refinement. The committed example is executed through
+the CLI, native Flow HTTP integration and Chromium acceptance on CI.
+
+This is not per-face or spatially varying boundary data: each axis has one
+boundary type and constant value shared by its opposing faces. General
+coupled PDEs and upstream Flow 2.0 grammar integration remain unimplemented.

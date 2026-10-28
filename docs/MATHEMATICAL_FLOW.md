@@ -61,3 +61,14 @@ The native Plots tab renders actual SVG spatial heatmap cells, and for Navier–
 The checked scalar expression compiler now supports `∂ₓ(expression)`, `∂ᵧ(expression)`, and `∇²(expression)` as typed AST nodes. The first two subtract one length exponent from their argument's inferred dimension; the Laplacian subtracts two. Their NumPy lowering computes centered periodic finite differences from the actual two-dimensional, uniformly spaced Cartesian coordinate grid. Unsupported or malformed grids are rejected, not evaluated using Python code execution.
 
 For example, `∂ᵧ(-cos(2πy / 1m) * 1m²/s / (2π))` is a dimensionally valid velocity field. The same operators are available inside the existing heat and Navier–Stokes initial conditions. Fourier-mode refinement tests check second-order convergence, and PDE integration tests execute both solvers using derivative-defined initial fields. This is not yet a general symbolic differentiation engine or arbitrary PDE equation compiler; the domain is periodic and the stencil is finite difference.
+
+## Typed scalar equation AST and additive source terms
+
+The heat frontend now compiles the complete Unicode right-hand side into a typed `Equation` AST (`src/math_flow_equations.py`). For example, `∂ₜtemperature = diffusivity ∇²temperature + 2K/s` is executable via `examples/heat_equation_forced.flow`. The scalar expression compiler accepts declared typed symbols, including `temperature` (K) and `diffusivity` (m²/s), and recognizes prefix `∇²temperature` as well as `∇²(temperature)`. The full RHS is dimension-checked as K/s, and can be evaluated directly against real NumPy field arrays. The solver lowers the recognized periodic diffusion operator and independent additive forcing to its existing RK2 finite-difference kernel, computing forcing from the typed AST once per run.
+
+This deliberately does **not** admit arbitrary scalar equations: the heat RHS must contain precisely the positive `diffusivity ∇²temperature` term, optionally plus an expression that does not depend on the evolving field or diffusivity. Nonlinear reactions, alternative spatial operators, coupled fields and invalid dimensions fail compilation. The runtime retains its periodic-grid, time-step, finite-value and workload guards; the added source term does not constitute an unrestricted PDE engine. Analytic tests check the forced mean and the spatial Fourier-mode response, while the native HTTP acceptance executes the checked-in forced program and rejects an invalid field-dependent source.
+
+```sh
+python3 src/math_flow.py examples/heat_equation_forced.flow
+python3 -m unittest discover -s tests -p 'test_math_flow_equations.py' -v
+```

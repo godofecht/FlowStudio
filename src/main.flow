@@ -425,6 +425,15 @@ function send_git_view(kind: string) -> void {
         proc_arg(command, "--short")
         proc_arg(command, "--branch")
         proc_arg(command, "--untracked-files=normal")
+    } elif eq(kind, "history") {
+        # Fixed-size, read-only history of the checked-out branch. Never
+        # interpolate a ref, revision range, format string or path from HTTP.
+        proc_arg(command, "--no-pager")
+        proc_arg(command, "log")
+        proc_arg(command, "--max-count=30")
+        proc_arg(command, "--date=short")
+        proc_arg(command, "--format=%h %ad %s")
+        proc_arg(command, "--no-color")
     } else {
         proc_arg(command, "diff")
         if eq(kind, "staged") {
@@ -714,6 +723,10 @@ function dispatch() -> void {
         }
         if eq(path, "/api/git/diff/staged") {
             send_git_view("staged")
+            return
+        }
+        if eq(path, "/api/git/history") {
+            send_git_view("history")
             return
         }
         if eq(path, "/api/git/stage") {

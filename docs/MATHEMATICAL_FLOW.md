@@ -161,7 +161,7 @@ requires exactly one positive diffusion term and both negative advection terms,
 and rejects duplicated, missing, or incorrectly signed operators. The
 NumPy RK2 runtime lowers both derivatives to centered periodic finite
 differences on the live temperature state at each stage; it applies a
-conservative combined advection/diffusion timestep guard. The checked-in
+conservative combined advection/diffusion timestep guard and rejects cell Péclet numbers above 2 for the centered spatial stencil. The checked-in
 example and tests compare its final 2D field with the exact **discrete**
 Fourier-mode RK2 amplification (including advective phase), validate both
 coordinate directions, and check convergence of the variance under grid

@@ -249,3 +249,38 @@ the CLI, native Flow HTTP integration and Chromium acceptance on CI.
 This is not per-face or spatially varying boundary data: each axis has one
 boundary type and constant value shared by its opposing faces. General
 coupled PDEs and upstream Flow 2.0 grammar integration remain unimplemented.
+
+## Independently specified four-face thermal boundaries
+
+`examples/heat_per_face_boundaries.flow` is an executable mathematical Flow
+program with four independently typed, constant face conditions:
+
+```flow
+boundaries = (Dirichlet(300K), Neumann(0K/m), Neumann(0K/m), Neumann(0K/m))
+```
+
+The ordered entries are **x-min, x-max, y-min, y-max**. A periodic axis
+requires `Periodic` at **both** opposing faces; an unmatched periodic face
+is rejected by the parser and runtime. Non-periodic faces may mix Dirichlet
+temperature (K) and outward-normal Neumann gradient (K/m), including different
+values on opposite faces. The finite-difference evaluator selects the
+appropriate cell-centered ghost value at each face at both actual RK2 stages,
+rather than treating the syntax as editor-only.
+
+The checked-in example is a mixed Dirichlet/Neumann half-sine eigenmode.
+`tests/test_math_flow_per_face.py` compares the returned field with the
+exact discrete RK2 eigenmode, verifies continuum refinement, and checks the
+exact integrated heat flux for unequal outward gradients. Native Flow HTTP
+acceptance and Chromium visualization tests execute and display this program.
+Results report `boundary_condition: "Faces"` and the typed
+`boundary_faces` object. The existing one-condition and two-axis forms remain
+backward compatible.
+
+```sh
+python3 src/math_flow.py examples/heat_per_face_boundaries.flow
+python3 -m unittest discover -s tests -p 'test_math_flow_per_face.py' -v
+```
+
+These are constant per-face conditions, not spatially or temporally varying
+boundary functions. General coupled PDE systems and upstream Flow 2.0 grammar
+integration remain outstanding.

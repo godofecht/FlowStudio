@@ -38,3 +38,26 @@ The native Chromium Quarto import/export check and all six Linux/macOS
 CI jobs passed in [CI #40611478697](https://github.com/godofecht/FlowStudio/actions/runs/40611478697).
 These tests do not invoke Quarto. External Quarto rendering and live
 Pyodide/webR physical-browser acceptance remain separate milestones.
+
+
+## Native render (opt-in, not Pages)
+
+When FlowStudio is served by the native Flow backend on localhost:8751, the
+**Render .qmd (native)…** control exports the current restricted R/Python
+notebook to Quarto source, asks for explicit code-execution consent, invokes
+the installed Quarto CLI and downloads a standalone HTML report. This is
+**real Quarto execution**, not the inert offline Markdown report. The native
+server's POST /api/render/quarto endpoint is origin/intent gated; Pages cannot
+call it. Quarto, R/knitr and/or Python/Jupyter engines must be installed
+separately. The helper uses a temporary working directory, fixed arguments,
+--execute, --no-cache, a 45-second CLI deadline, and a 2 MiB output cap.
+It supports only restricted HTML .qmd interchange; local files outside the
+temporary directory are not copied in. Relative image/file dependencies
+may fail. Code chunks run with the local user's permissions; **do not render
+untrusted notebooks**. Downloaded HTML may contain active content.
+
+Verification: python3 -m unittest discover -s tests -p test_quarto_render.py,
+node --test tests/browser_quarto_render_wiring.test.js, and the real native
+HTTP smoke suite. The real-Quarto test is skipped if Quarto is not installed.
+Physical browser, R/Python chunk execution, and cross-platform CI must be
+confirmed separately before claiming tested runtime parity.

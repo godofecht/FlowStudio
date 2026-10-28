@@ -66,7 +66,7 @@ class DirichletHeatTest(unittest.TestCase):
             with self.subTest(boundary=boundary), self.assertRaises(FlowMathError):
                 parse(SOURCE.replace("Dirichlet(300K)", boundary))
         with self.assertRaisesRegex(FlowMathError, "stability"):
-            simulate(replace(parse(SOURCE), step=10.0))
+            simulate(replace(parse(SOURCE), diffusivity=100.0))
 
     def test_checked_in_dirichlet_program_executes_via_cli(self):
         run = subprocess.run(

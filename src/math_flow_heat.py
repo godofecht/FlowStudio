@@ -188,6 +188,13 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
     # A conservative combined advective/diffusive CFL guard. Centered
     # advection with explicit RK2 is not stable in the zero-diffusion limit;
     # this bounded dialect requires strictly positive diffusivity.
+    # Central differences require cell Peclet <= 2 for a monotone
+    # semi-discrete advection-diffusion operator. A small timestep alone
+    # cannot repair an advection-dominated centered spatial stencil.
+    if (model.equation is not None and model.equation.advection
+            and (abs(model.advection_velocity_x) * dx > 2 * model.diffusivity
+                 or abs(model.advection_velocity_y) * dy > 2 * model.diffusivity)):
+        raise error_type("Advection stability requires cell Peclet number <= 2")
     advective_stiffness = (abs(model.advection_velocity_x) / dx
                            + abs(model.advection_velocity_y) / dy)
     if dt * (diffusion_stiffness + linear_reaction_rate / 4

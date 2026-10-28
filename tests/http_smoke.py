@@ -336,6 +336,20 @@ def main() -> None:
     assert 300 < nonlinear["mean_temperature"] < 330, nonlinear
     assert nonlinear["temperature_variance"] < nonlinear["initial_temperature_variance"], nonlinear
     assert nonlinear["spatial"]["fields"]["temperature"], nonlinear
+    # Exercise Unicode exponent lowering through the actual native HTTP router.
+    power_source = (Path(__file__).resolve().parents[1] /
+                    "examples/heat_power_reaction.flow").read_text(encoding="utf-8")
+    status, body = request("POST", "/api/check/mathflow", power_source, accepted_headers)
+    assert status == 200 and json.loads(body)["ok"], (status, body)
+    status, body = request("POST", "/api/run/mathflow", power_source, accepted_headers)
+    power = json.loads(body)
+    assert status == 200 and power["ok"] and power["steps"] == 100, (status, power)
+    assert 300 < power["mean_temperature"] < 330, power
+    assert power["temperature_variance"] < power["initial_temperature_variance"], power
+    invalid_power = power_source.replace("(temperature − ambientTemperature)²",
+                                         "(temperature − ambientTemperature)^9")
+    status, body = request("POST", "/api/check/mathflow", invalid_power, accepted_headers)
+    assert status == 422 and not json.loads(body)["ok"], (status, body)
     invalid_nonlinear = nonlinear_source.replace("/ ambientTemperature", "/ temperature")
     status, body = request("POST", "/api/check/mathflow", invalid_nonlinear, accepted_headers)
     assert status == 422 and not json.loads(body)["ok"], (status, body)

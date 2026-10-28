@@ -126,6 +126,19 @@ def main() -> None:
     bad_math = math_small.replace("kinematicViscosity ∇²velocity", "kinematicViscosity velocity")
     status, body = request("POST", "/api/check/mathflow", bad_math, accepted_headers)
     assert status == 422 and not json.loads(body)["ok"], (status, body)
+    # Second PDE family: actual native Flow HTTP -> Python typed parser -> NumPy RK2.
+    heat_source = (Path(__file__).resolve().parents[1] /
+                   "examples/heat_equation_smoke.flow").read_text(encoding="utf-8")
+    status, body = request("POST", "/api/check/mathflow", heat_source, accepted_headers)
+    assert status == 200 and json.loads(body)["ok"], (status, body)
+    status, body = request("POST", "/api/run/mathflow", heat_source, accepted_headers)
+    heat = json.loads(body)
+    assert status == 200 and heat["ok"] and heat["steps"] == 100, (status, heat)
+    assert abs(heat["mean_temperature"] - 300.0) < 1e-8, heat
+    assert heat["temperature_variance"] < heat["initial_temperature_variance"], heat
+    bad_heat = heat_source.replace("300K", "300m")
+    status, body = request("POST", "/api/check/mathflow", bad_heat, accepted_headers)
+    assert status == 422 and not json.loads(body)["ok"], (status, body)
     # Real Flow HTTP -> C IPC -> persistent Rscript top-level stepping.
     # No interpreter mocks: the native acceptance job installs actual R.
     for route in ("/api/debug/r/start", "/api/debug/r/step",

@@ -13,10 +13,16 @@ UTF-8 content. Disabled eval=FALSE R Markdown chunks remain inert Markdown.
 Flow cells cannot be represented as executable Quarto chunks and are rejected;
 use .fsnb or the offline HTML report for Flow/mixed-language notebooks.
 
-Quarto-specific #| chunk options, executable inline engine expressions,
-shortcodes, unsupported engines, arbitrary knitr options, executable YAML,
-other output formats and unsupported metadata are **rejected**, not silently
-discarded. The same source, cell and output-size limits as R Markdown apply.
+Leading Quarto `#| label: safe-name` and literal `#| eval: true` options
+are imported as executable labeled R/Python cells. Literal `#| eval: false`
+is accepted for R chunks only: it becomes inert Markdown containing a
+knitr `eval=FALSE` chunk and remains disabled on export. Labels are emitted
+in the chunk fence rather than as `#|` directives.
+
+Other `#|` options, late/duplicate directives, disabled Python chunks,
+inline engine expressions, shortcodes, unsupported engines, arbitrary knitr
+options, executable YAML, other output formats and unsupported metadata are
+**rejected**, not silently discarded. The same source, cell and output-size limits as R Markdown apply.
 The imported YAML is stored as inert Markdown with the equivalent R Markdown
 output: html_document key so that both .Rmd and .qmd export can use the
 same safe internal representation.
@@ -26,6 +32,7 @@ kernel-state restoration, full Quarto syntax support, or RStudio feature
 parity. Quarto must be installed separately to render exported documents,
 with suitable R/Python engines and packages.
 
-Validation: node --test tests/browser_notebook_quarto.test.js. Physical
-Chromium acceptance with live webR/Pyodide and external Quarto rendering
-has not been established.
+Validation: `node --test tests/browser_notebook_quarto.test.js` and, with
+the native server running, `node tests/quarto_ui.mjs` in real Chromium.
+These tests do not invoke Quarto. External Quarto rendering and live
+Pyodide/webR physical-browser acceptance remain separate milestones.

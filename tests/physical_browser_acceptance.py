@@ -347,6 +347,37 @@ def test_r(page, timeout: int):
                 "assert 'fs_py_unicode_missing' not in globals(); print('missing Unicode rejected')",
                 "missing Unicode rejected", timeout)
     page.locator("#transferAsNumpy").uncheck()
+    # Real webR factor provenance must survive a downloaded session snapshot.
+    # This is opt-in physical acceptance, not a mocked interpreter pass.
+    run_source(page, "r",
+               "fs_r_factor <- factor(c('low',NA_character_,'high','low'), "
+               "levels=c('low','middle','high'), ordered=TRUE)\\n"
+               "cat('R factor ready')", "R factor ready", timeout)
+    with page.expect_download(timeout=timeout) as factor_snapshot_info:
+        page.locator("#exportSession").click()
+    with tempfile.TemporaryDirectory() as folder:
+        destination = Path(folder) / "r-factor-session.json"
+        factor_snapshot_info.value.save_as(destination)
+        import json
+        payload = json.loads(destination.read_text(encoding="utf-8"))
+        assert payload["format"] == "flowstudio-session-v2", payload
+        entry = next(item for item in payload["variables"] if item["name"] == "fs_r_factor")
+        assert entry["restoreAs"] == "factor", entry
+        assert entry["factor"] == {"levels":["low","middle","high"],"ordered":True}, entry
+        assert entry["value"]["values"] == ["low",None,"high","low"], entry
+        page.locator("#reset").click()
+        page.once("dialog", lambda dialog: dialog.accept())
+        page.locator("#sessionFile").set_input_files(str(destination))
+        page.wait_for_function(
+            "document.querySelector('#notice').textContent.startsWith('Imported ')",
+            timeout=timeout)
+        run_console(page, "r",
+                    "stopifnot(is.ordered(fs_r_factor), "
+                    "identical(levels(fs_r_factor), c('low','middle','high')), "
+                    "identical(as.character(fs_r_factor), "
+                    "c('low',NA_character_,'high','low'))); cat('R factor restored')",
+                    "R factor restored", timeout)
+    print("PASS: physical Chromium real webR ordered factor snapshot restoration")
     page.locator("#reset").click()
     assert "R state reset" in page.locator("#notice").inner_text()
     run_source(page, "r", "print(exists('fs_browser_value', envir=.GlobalEnv))", "FALSE", timeout)

@@ -170,6 +170,22 @@ def main() -> None:
     assert abs(forced["mean_temperature"] - 300.02) < 1e-8, forced
     assert forced["temperature_variance"] < forced["initial_temperature_variance"], forced
     assert forced["spatial"]["fields"]["temperature"], forced
+    # Typed reaction-diffusion: native Flow HTTP -> NumPy RK2 -> real field diagnostics.
+    reaction_source = (Path(__file__).resolve().parents[1] /
+                       "examples/heat_reaction_diffusion.flow").read_text(encoding="utf-8")
+    status, body = request("POST", "/api/check/mathflow", reaction_source, accepted_headers)
+    assert status == 200 and json.loads(body)["ok"], (status, body)
+    status, body = request("POST", "/api/run/mathflow", reaction_source, accepted_headers)
+    reaction = json.loads(body)
+    assert status == 200 and reaction["ok"] and reaction["steps"] == 100, (status, reaction)
+    assert 300.0 < reaction["mean_temperature"] < 300.02, reaction
+    assert reaction["temperature_variance"] < reaction["initial_temperature_variance"], reaction
+    assert reaction["spatial"]["fields"]["temperature"], reaction
+    invalid_reaction = reaction_source.replace(
+        "− reactionRate (temperature − ambientTemperature)",
+        "+ reactionRate (temperature − ambientTemperature)")
+    status, body = request("POST", "/api/check/mathflow", invalid_reaction, accepted_headers)
+    assert status == 422 and not json.loads(body)["ok"], (status, body)
     invalid_forcing = forced_source.replace("+ 2K/s", "+ temperature / 1s")
     status, body = request("POST", "/api/check/mathflow", invalid_forcing, accepted_headers)
     assert status == 422 and not json.loads(body)["ok"], (status, body)

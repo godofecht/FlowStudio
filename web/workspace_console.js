@@ -281,7 +281,11 @@ function mount(doc = document, request = fetch) {
       status("Wait for editor execution to finish.", "error");
       return false;
     }
-    const session = sessions.findSession(name) || sessions.createFor(name);
+    // Execute in the selected scrollback, not always the newest tab of
+    // this runtime. All tabs still share the same native interpreter.
+    const active = sessions.active();
+    const session = active.runtime === name ? active :
+      (sessions.findSession(name) || sessions.createFor(name));
     sessions.recordCommand(session, code);
     sessions.beginRun(name, session);
     const startedAt = Date.now();

@@ -10,8 +10,8 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 from math_flow import FlowMathError, parse, simulate
-from math_flow_equations import compile_heat_equation
-from math_flow_expr import ExpressionError, TEMPERATURE_RATE, evaluate
+from math_flow_equations import compile_heat_equation, TEMPERATURE_RATE
+from math_flow_expr import ExpressionError, evaluate
 
 SOURCE = (ROOT / "examples/heat_reaction_diffusion.flow").read_text(encoding="utf-8")
 

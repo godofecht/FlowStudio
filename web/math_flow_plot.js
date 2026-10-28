@@ -154,7 +154,7 @@
     const boundary = result.boundary_condition;
     let boundaryNote = null;
     if (boundary !== undefined) {
-      if (boundary !== "Periodic" && boundary !== "Dirichlet" && boundary !== "Neumann" && boundary !== "Mixed")
+      if (boundary !== "Periodic" && boundary !== "Dirichlet" && boundary !== "Neumann" && boundary !== "Mixed" && boundary !== "Faces")
         throw new TypeError("Unsupported mathematical Flow boundary metadata.");
       if (boundary === "Dirichlet" &&
           (typeof result.boundary_temperature !== "number" ||
@@ -164,6 +164,24 @@
           (typeof result.boundary_gradient !== "number" ||
            !Number.isFinite(result.boundary_gradient)))
         throw new TypeError("Invalid Neumann boundary gradient.");
+      if (boundary === "Faces") {
+        const faces = result.boundary_faces;
+        const names = ["x_min", "x_max", "y_min", "y_max"];
+        if (!faces || typeof faces !== "object" ||
+            Object.keys(faces).sort().join(",") !== [...names].sort().join(","))
+          throw new TypeError("Invalid four-face boundary metadata.");
+        for (const name of names) {
+          const face = faces[name];
+          if (!face || !["Periodic", "Dirichlet", "Neumann"].includes(face.type) ||
+              (face.type === "Periodic" ? face.value !== null :
+                typeof face.value !== "number" || !Number.isFinite(face.value)))
+            throw new TypeError("Invalid thermal face boundary.");
+        }
+        for (const [lower, upper] of [["x_min", "x_max"], ["y_min", "y_max"]]) {
+          if ((faces[lower].type === "Periodic") !== (faces[upper].type === "Periodic"))
+            throw new TypeError("Periodic face boundary must be paired.");
+        }
+      }
       if (boundary === "Mixed") {
         const axes = result.boundary_axes;
         if (!axes || typeof axes !== "object" || Object.keys(axes).sort().join(",") !== "x,y")
@@ -178,7 +196,14 @@
       }
       boundaryNote = doc.createElement("p");
       boundaryNote.setAttribute("data-mathflow-boundary", boundary);
-      boundaryNote.textContent = boundary === "Mixed"
+      boundaryNote.textContent = boundary === "Faces"
+        ? "Boundary: " + ["x_min", "x_max", "y_min", "y_max"].map(name => {
+          const face = result.boundary_faces[name];
+          return name.replace("_", " ") + " " + face.type +
+            (face.type === "Periodic" ? "" :
+             " " + face.value + (face.type === "Dirichlet" ? " K" : " K/m"));
+        }).join("; ")
+        : boundary === "Mixed"
         ? "Boundary: " + ["x", "y"].map(axis => {
           const face = result.boundary_axes[axis];
           return axis + " " + face.type +

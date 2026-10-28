@@ -195,13 +195,18 @@ def parse_expression(source: str, *, symbols: dict[str, Dimension] | None = None
 
 def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | None = None,
              values: dict[str, object] | None = None,
-             boundary_temperature: float | None = None):
+             boundary_temperature: float | None = None,
+             boundary_gradient: float | None = None):
     """Lower a validated expression tree to NumPy arithmetic, with no eval/exec."""
     import numpy as np
     if expected_dimension is not None and expression.dimension != expected_dimension:
         raise ExpressionError(f"Expected dimension {expected_dimension}, got {expression.dimension}")
     if boundary_temperature is not None and not math.isfinite(boundary_temperature):
         raise ExpressionError("Dirichlet boundary temperature must be finite")
+    if boundary_gradient is not None and not math.isfinite(boundary_gradient):
+        raise ExpressionError("Neumann boundary gradient must be finite")
+    if boundary_temperature is not None and boundary_gradient is not None:
+        raise ExpressionError("Cannot combine Dirichlet and Neumann boundary conditions")
 
     def cartesian_grid():
         coordinates_x = np.asarray(x, dtype=np.float64)
@@ -221,33 +226,37 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
             raise ExpressionError("Spatial derivatives require a uniformly spaced Cartesian grid")
         return coordinates_x.shape, spacing_x, spacing_y
 
-    def neighbor(field, axis: int, forward: bool):
-        """Cell-centered periodic neighbor or constant face-Dirichlet ghost cell."""
+    def neighbor(field, axis: int, forward: bool, spacing: float):
+        """Cell-centered periodic, Dirichlet or outward-normal Neumann ghost cell."""
         shifted = np.roll(field, -1 if forward else 1, axis=axis)
-        if boundary_temperature is not None:
+        if boundary_temperature is not None or boundary_gradient is not None:
             shifted = shifted.copy()
             face = -1 if forward else 0
             if axis == 0:
-                shifted[face, :] = 2 * boundary_temperature - field[face, :]
+                shifted[face, :] = (2 * boundary_temperature - field[face, :]
+                                    if boundary_temperature is not None
+                                    else field[face, :] + boundary_gradient * spacing)
             else:
-                shifted[:, face] = 2 * boundary_temperature - field[:, face]
+                shifted[:, face] = (2 * boundary_temperature - field[:, face]
+                                    if boundary_temperature is not None
+                                    else field[:, face] + boundary_gradient * spacing)
         return shifted
 
     def visit(node: Expression):
         if node.operator in ("∂ₓ", "∂ᵧ", "∇²"):
             shape, spacing_x, spacing_y = cartesian_grid()
-            if boundary_temperature is not None and not (
+            if (boundary_temperature is not None or boundary_gradient is not None) and not (
                     node.operands[0].operator == "name"
                     and node.operands[0].value == "temperature"
                     and node.operands[0].dimension == TEMPERATURE):
-                raise ExpressionError("Dirichlet derivatives require the temperature field")
+                raise ExpressionError("Non-periodic derivatives require the temperature field")
             field = np.broadcast_to(np.asarray(visit(node.operands[0]), dtype=np.float64), shape)
             if node.operator == "∂ₓ":
-                return (neighbor(field, 0, True) - neighbor(field, 0, False)) / (2 * spacing_x)
+                return (neighbor(field, 0, True, spacing_x) - neighbor(field, 0, False, spacing_x)) / (2 * spacing_x)
             if node.operator == "∂ᵧ":
-                return (neighbor(field, 1, True) - neighbor(field, 1, False)) / (2 * spacing_y)
-            return ((neighbor(field, 0, True) + neighbor(field, 0, False) - 2 * field) / spacing_x**2
-                    + (neighbor(field, 1, True) + neighbor(field, 1, False) - 2 * field) / spacing_y**2)
+                return (neighbor(field, 1, True, spacing_y) - neighbor(field, 1, False, spacing_y)) / (2 * spacing_y)
+            return ((neighbor(field, 0, True, spacing_x) + neighbor(field, 0, False, spacing_x) - 2 * field) / spacing_x**2
+                    + (neighbor(field, 1, True, spacing_y) + neighbor(field, 1, False, spacing_y) - 2 * field) / spacing_y**2)
         if node.operator == "literal":
             return float(node.value)
         if node.operator == "name":

@@ -1,4 +1,4 @@
-## 2026-10-28: exact NumPy dtype snapshot round-trip (independent CI pending)
+## 2026-10-28: NumPy dtype snapshot round-trip (six Linux/macOS CI jobs passed)
 
 Browser-local Python session snapshots now record the **actual NumPy dtype** for
 supported exact 1D/2D ndarrays, alongside existing shape and value provenance.
@@ -14,13 +14,20 @@ layout, object/structured dtypes, subclasses, masked arrays, arbitrary
 attributes and integer values outside the JSON safe-integer range remain
 unsupported.
 
-**Status: partial / independent Linux/macOS CI and live Chromium acceptance
-pending.** Regression tests exercise schema rejection, snapshot capture/restore,
-worker dispatch and real CPython/NumPy dtype construction. The opt-in
-physical-browser scenario now asserts an actual float32 round-trip; merely
-committing that assertion is not evidence it passed. Flow 2.0.0 remains the
-primary native backend, with no hosted CI configuration changes. RStudio
-feature parity is not achieved.
+**Status: partial / all six Ubuntu 24.04/macOS 14 jobs passed in
+[CI #40667095384](https://github.com/godofecht/FlowStudio/actions/runs/40667095384).**
+Each source platform ran 992 JavaScript tests (983 passed, nine skipped, zero
+failures) and 150 Python tests (13 skipped, zero failures), including actual
+CPython/NumPy dtype round-trips and lossy-cast rejection. Both native platforms
+compiled pinned Flow 2.0.0, passed their existing HTTP/Rscript/Chromium
+Quarto-Monaco acceptance and packaged binaries; both FlowJIT jobs passed.
+An earlier CI run failed on a stale four-argument R matrix import assertion;
+the implementation now retains legacy callback arity, and the corrected
+six-job run passed. [PR #133](https://github.com/godofecht/FlowStudio/pull/133)
+merged as [26fb2b4](https://github.com/godofecht/FlowStudio/commit/26fb2b4a8d112511e42ea62dbe955a9087120bb1).
+The opt-in **live Chromium Pyodide float32 snapshot restore** scenario was
+updated but **not run** in CI. No hosted CI configuration changed, and
+RStudio feature parity is not achieved.
 
 ## 2026-10-28: Python NumPy ndarray identity in browser session snapshots (Linux/macOS CI passed)
 

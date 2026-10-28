@@ -96,3 +96,11 @@ starts, including when submitted directly to the localhost HTTP endpoint.
 This is source-format validation, **not an execution sandbox**: accepted
 chunks still run with the user's local permissions. Physical-browser and
 real-CLI acceptance are separate gates.
+
+The server-side guard additionally rejects executable-looking fenced chunks
+inside Markdown blockquotes, list items and indented containers, rather than
+letting nested executable engines bypass top-level fence checks. Quoted YAML
+metadata cannot contain Quarto shortcodes or inline engines, and duplicate
+metadata keys are rejected. These restrictions apply before subprocess launch,
+including to direct API requests. They are deliberately conservative and do
+not make Quarto execution safe for untrusted source.

@@ -49,7 +49,8 @@ class ComposedForcingTest(unittest.TestCase):
         amplitude = -math.expm1(-decay * model.until) / decay
         expected_variance = (1 + 4) * amplitude**2 / 2
         self.assertLess(abs(result["temperature_variance"] - expected_variance), 1e-8)
-        self.assertEqual(result["spatial"]["grid"], [n, n])
+        # The spatial transport intentionally samples the full 32x32 solver grid at 24x24.
+        self.assertEqual(result["spatial"]["grid"], [24, 24])
 
     def test_rejects_field_dependent_sources_and_bad_dimensions(self):
         for original, replacement in (

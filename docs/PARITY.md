@@ -11,13 +11,21 @@ identity captured before execution, preventing a late completion from
 erasing another tab's identical draft. This changes terminal presentation
 only: Python and R tabs still share their actual native interpreter.
 
-**Status: partial / focused V8 verification and hosted CI pending.**
-Regression tests cover tab switches during successful and failed requests,
-plot collection after a session switch, repeated figure numbering, bounded
-scrollback clears, foreign session rejection and prompt-draft isolation.
-No physical Chromium execution, native Flow build, or real interpreter plot
-capture has been established by this change. Flow remains the primary native
-backend. No hosted CI configuration changed. RStudio parity remains incomplete.
+**Status: partial / six independent Linux/macOS CI jobs passed in
+[CI #40739447774](https://github.com/godofecht/FlowStudio/actions/runs/40739447774).**
+Each source platform ran 1,045 JavaScript tests (1,033 passed, 12 skipped,
+zero failures) and 185 Python tests (13 skipped, zero failures). Both native
+platforms compiled pinned Flow 2.0.0, passed their real Flow-owned HTTP
+acceptance and packaging; both FlowJIT jobs passed. The existing native
+Chromium Quarto/Monaco acceptance also passed. Direct V8 execution of the
+exact changed terminal modules additionally passed asynchronous tab-switch,
+draft-isolation, figure-attribution and repeated-figure-ID checks.
+[PR #150](https://github.com/godofecht/FlowStudio/pull/150) merged as
+[a8f41b4](https://github.com/godofecht/FlowStudio/commit/a8f41b437edf2a449a5cce0c6b0fcae0c0b9ead6).
+Physical Chromium acceptance of real Pyodide/webR figure capture and
+asynchronous terminal tab-switch scenarios remains **unverified**.
+Flow remains the primary native backend. No hosted CI configuration changed.
+RStudio parity remains incomplete.
 
 ## 2026-10-28: native terminal transcript export and plot-only entry repair (CI pending)
 

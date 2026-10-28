@@ -112,6 +112,7 @@ jobs:
           node tests/quarto_ui.mjs
           npm run test:ui
           node tests/native_r_member_ui.mjs
+          node tests/native_math_plot_ui.mjs
       - name: Package verified executable
         run: sh scripts/package.sh
       - name: Archive qualified platform build

@@ -10,6 +10,7 @@ import math
 
 from math_flow_spatial import spatial_snapshot
 from math_flow_expr import TEMPERATURE, parse_expression, evaluate, ExpressionError
+from math_flow_equations import Equation, compile_heat_equation, TEMPERATURE_RATE
 
 
 @dataclass(frozen=True)
@@ -22,6 +23,7 @@ class HeatModel:
     initial: str
     step: float
     until: float
+    equation: Equation | None = None
 
 
 def parse_heat(source: str, base) -> HeatModel:
@@ -77,9 +79,10 @@ def parse_heat(source: str, base) -> HeatModel:
     diffusivity = base.number(consts["diffusivity"], ["m", "²", "/", "s"])
     if diffusivity <= 0:
         raise error("Heat diffusivity must be positive")
-    equation = "".join(t.text for t in sections["dynamics"])
-    if equation != "∂ₜtemperature=diffusivity∇²temperature":
-        raise error("Unsupported heat dynamics: expected ∂ₜtemperature = diffusivity ∇²temperature")
+    try:
+        equation = compile_heat_equation([token.text for token in sections["dynamics"]])
+    except ExpressionError as exc:
+        raise error(f"Unsupported heat dynamics: {exc}") from exc
     initial = base.assignments(sections["initial"])
     base.expect_keys(initial, {"temperature"}, "heat initial")
     expression = "".join(initial["temperature"])
@@ -141,7 +144,7 @@ def parse_heat(source: str, base) -> HeatModel:
         raise error("Unsupported heat visualization mapping")
     if p.peek() != "<EOF>":
         raise error(f"Unexpected trailing heat token {p.peek()}")
-    return HeatModel(int(width), int(height), lx, ly, diffusivity, expression, step, until)
+    return HeatModel(int(width), int(height), lx, ly, diffusivity, expression, step, until, equation)
 
 
 def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | None = None,
@@ -168,6 +171,10 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
     try:
         field = np.broadcast_to(evaluate(parse_expression(model.initial), x, y,
                                          expected_dimension=TEMPERATURE), (nx, ny)).copy()
+        forcing = (np.broadcast_to(evaluate(model.equation.forcing, x, y,
+                                           expected_dimension=TEMPERATURE_RATE), (nx, ny))
+                   if model.equation is not None and model.equation.forcing is not None
+                   else 0.0)
     except ExpressionError as exc:
         raise error_type(str(exc)) from exc
     initial_mean = float(np.mean(field))
@@ -181,8 +188,8 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
                      "temperatureVariance": initial_variance}]
     sample_stride = max(1, math.ceil(steps / 128))
     for step_index in range(steps):
-        k1 = model.diffusivity * laplacian(field)
-        k2 = model.diffusivity * laplacian(field + dt * k1)
+        k1 = model.diffusivity * laplacian(field) + forcing
+        k2 = model.diffusivity * laplacian(field + dt * k1) + forcing
         field += .5 * dt * (k1 + k2)
         if not np.all(np.isfinite(field)):
             raise error_type("Non-finite temperature during heat integration")

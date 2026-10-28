@@ -159,6 +159,20 @@ def main() -> None:
     assert len(heat["spatial"]["fields"]["temperature"]) == 24, heat
     assert heat["temperature_variance"] < heat["initial_temperature_variance"], heat
     assert abs(heat["observations"][-1]["temperatureVariance"] - heat["temperature_variance"]) < 1e-10, heat
+    # Execute a genuinely parsed typed equation with a nonzero physical source.
+    forced_source = (Path(__file__).resolve().parents[1] /
+                     "examples/heat_equation_forced.flow").read_text(encoding="utf-8")
+    status, body = request("POST", "/api/check/mathflow", forced_source, accepted_headers)
+    assert status == 200 and json.loads(body)["ok"], (status, body)
+    status, body = request("POST", "/api/run/mathflow", forced_source, accepted_headers)
+    forced = json.loads(body)
+    assert status == 200 and forced["ok"] and forced["steps"] == 100, (status, forced)
+    assert abs(forced["mean_temperature"] - 300.02) < 1e-8, forced
+    assert forced["temperature_variance"] < forced["initial_temperature_variance"], forced
+    assert forced["spatial"]["fields"]["temperature"], forced
+    invalid_forcing = forced_source.replace("+ 2K/s", "+ temperature / 1s")
+    status, body = request("POST", "/api/check/mathflow", invalid_forcing, accepted_headers)
+    assert status == 422 and not json.loads(body)["ok"], (status, body)
     # Unicode spatial derivative ASTs must survive the actual native Flow HTTP
     # request path, not merely local Python expression unit tests.
     for example, expected_steps, metric in (

@@ -6,8 +6,10 @@ Quarto CLI and its R/Python engines with the local user's permissions.
 """
 from __future__ import annotations
 
+import os
 import pathlib
 import re
+import signal
 import shutil
 import subprocess
 import sys
@@ -64,17 +66,23 @@ def render(source: str, executable: str = "quarto") -> str:
         # directory. --execute is intentional; the UI requires consent.
         with log.open("wb") as output:
             try:
-                result = subprocess.run(
+                process = subprocess.Popen(
                     [executable, "render", "report.qmd", "--to", "html",
                      "--output", "report.html", "--execute", "--no-cache"],
                     cwd=root, stdout=output, stderr=subprocess.STDOUT,
-                    timeout=45, check=False,
+                    start_new_session=True,
                 )
-            except subprocess.TimeoutExpired as exc:
-                raise RenderError("Quarto rendering exceeded 45 seconds.", 70) from exc
             except OSError as exc:
                 raise RenderError("Could not start Quarto: " + str(exc), 69) from exc
-        if result.returncode:
+            try:
+                returncode = process.wait(timeout=45)
+            except subprocess.TimeoutExpired as exc:
+                # Quarto may spawn Rscript, Jupyter or Pandoc children. Kill
+                # its entire session, not only the parent executable.
+                os.killpg(process.pid, signal.SIGKILL)
+                process.wait()
+                raise RenderError("Quarto rendering exceeded 45 seconds.", 70) from exc
+        if returncode:
             detail = log.read_bytes()[-MAX_LOG:].decode("utf-8", errors="replace")
             raise RenderError("Quarto render failed: " + detail.strip())
         report = root / "report.html"

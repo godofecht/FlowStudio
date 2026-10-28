@@ -1,0 +1,50 @@
+# Executable periodic scalar advection-diffusion with linear relaxation and forcing.
+# Two independent Fourier modes test transport, decay, and the evolving mean.
+domain ThermalDomain {
+    grid       = 16 × 16
+    extent     = 1m × 1m
+    boundaries = Periodic
+}
+
+model HeatEquation on ThermalDomain {
+    const diffusivity       = 0.01m²/s
+    const reactionRate      = 0.5s⁻¹
+    const ambientTemperature = 300K
+    const advectionVelocityX = 0.2m/s
+    const advectionVelocityY = 0.1m/s
+    field temperature: Scalar<Kelvin>
+
+    dynamics {
+        ∂ₜtemperature = diffusivity ∇²temperature
+                        − advectionVelocityX ∂ₓ(temperature)
+                        − advectionVelocityY ∂ᵧ(temperature)
+                        − reactionRate (temperature − ambientTemperature)
+                        + 2K/s
+    }
+    initial {
+        temperature = 300K + 10K * sin(2πx / 1m) + 5K * cos(2πy / 1m)
+    }
+}
+
+solver ThermalSolver for HeatEquation {
+    spatial {
+        method    = FiniteDifference
+        diffusion = CentralDifference
+    }
+    temporal {
+        method   = RungeKuttaSecondOrder
+        timeStep = 10⁻⁴s
+    }
+}
+
+let simulation = HeatEquation ▷ ThermalSolver ▷ Evolve(until: 0.02s)
+
+simulation
+    ▷ Observe {
+        meanTemperature     = Mean(temperature)
+        temperatureVariance = Mean((temperature − meanTemperature)²)
+    }
+    ▷ Visualize {
+        temperature         = Heatmap
+        temperatureVariance = LineGraph
+    }

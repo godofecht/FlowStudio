@@ -1,8 +1,9 @@
 """Typed, bounded scalar parabolic equation AST and operator validation.
 
 The entire RHS is parsed and dimension-checked. Supported operators are
-periodic diffusion, optional field-independent forcing, and optional
-linear or bounded quadratic relaxation toward a declared ambient temperature.
+periodic diffusion, optional field-independent forcing, optional constant
+advection, and optional linear or bounded quadratic relaxation toward a
+declared ambient temperature. The supported terms can be composed.
 No arbitrary nonlinear or coupled equation is accepted.
 """
 from __future__ import annotations
@@ -132,8 +133,6 @@ def compile_heat_equation(tokens: list[str], *, reaction: bool = False,
     lhs, rhs_source = source.split("=", 1)
     if lhs != "∂ₜtemperature":
         raise ExpressionError("Heat dynamics must evolve ∂ₜtemperature")
-    if reaction and advection:
-        raise ExpressionError("Combined reaction and advection equations are not yet supported")
     symbols = {**SYMBOLS, **(REACTION_SYMBOLS if reaction else {}),
                **(ADVECTION_SYMBOLS if advection else {})}
     rhs = parse_expression(rhs_source, symbols=symbols)

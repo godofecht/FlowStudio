@@ -289,7 +289,7 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
         return ((np.roll(a, -1, axis=0) + np.roll(a, 1, axis=0) - 2 * a) / dx**2 +
                 (np.roll(a, -1, axis=1) + np.roll(a, 1, axis=1) - 2 * a) / dy**2)
 
-    def rhs(state):
+    def rhs(state, time):
         if not np.all(np.isfinite(state)):
             raise error_type("Non-finite temperature during heat integration")
         if model.equation is None:
@@ -312,7 +312,8 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
                         "reactionRate": model.reaction_rate,
                         "ambientTemperature": model.ambient_temperature,
                         "advectionVelocityX": model.advection_velocity_x,
-                        "advectionVelocityY": model.advection_velocity_y},
+                        "advectionVelocityY": model.advection_velocity_y,
+                        "t": time},
                 boundary_temperature=model.boundary_temperature,
                 boundary_gradient=model.boundary_gradient,
                 boundary_axes=model.boundary_axes,
@@ -324,8 +325,9 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
                      "temperatureVariance": initial_variance}]
     sample_stride = max(1, math.ceil(steps / 128))
     for step_index in range(steps):
-        k1 = rhs(field)
-        k2 = rhs(field + dt * k1)
+        stage_time = step_index * dt
+        k1 = rhs(field, stage_time)
+        k2 = rhs(field + dt * k1, stage_time + dt)
         field += .5 * dt * (k1 + k2)
         if not np.all(np.isfinite(field)):
             raise error_type("Non-finite temperature during heat integration")

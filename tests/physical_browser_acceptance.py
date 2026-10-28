@@ -133,7 +133,7 @@ def test_python(page, timeout: int):
     # Real Pyodide NumPy snapshot must restore an ndarray, not a list/dict.
     # This scenario is opt-in and cannot be counted as passed without Chromium.
     run_source(page, "python",
-               "import numpy as np\nfs_np_snapshot = np.array([[1.25,3],[np.nan,4]], dtype=np.float64)\n"
+               "import numpy as np\nfs_np_snapshot = np.array([[1.25,3],[np.nan,4]], dtype=np.float32)\n"
                "print('numpy snapshot ready')", "numpy snapshot ready", timeout)
     with page.expect_download(timeout=timeout) as numpy_snapshot_info:
         page.locator("#exportSession").click()
@@ -145,6 +145,7 @@ def test_python(page, timeout: int):
         assert payload["format"] == "flowstudio-session-v2", payload
         entry = next(item for item in payload["variables"] if item["name"] == "fs_np_snapshot")
         assert entry["restoreAs"] == "numpy", entry
+        assert entry["dtype"] == "float32", entry
         assert entry["value"]["kind"] == "table", entry
         page.locator("#reset").click()
         page.once("dialog", lambda dialog: dialog.accept())
@@ -155,6 +156,7 @@ def test_python(page, timeout: int):
         run_console(page, "python",
                     "import numpy as np; "
                     "assert type(fs_np_snapshot) is np.ndarray; "
+                    "assert fs_np_snapshot.dtype == np.dtype('float32'); "
                     "assert fs_np_snapshot.shape == (2,2); "
                     "assert fs_np_snapshot[0,1] == 3; "
                     "assert np.isnan(fs_np_snapshot[1,0]); "

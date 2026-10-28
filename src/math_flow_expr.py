@@ -199,8 +199,8 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
              values: dict[str, object] | None = None,
              boundary_temperature: float | None = None,
              boundary_gradient: float | None = None,
-             boundary_axes: tuple[tuple[str, float | str | tuple[float, float] | None], ...] | None = None,
-             boundary_faces: tuple[tuple[str, float | str | tuple[float, float] | None], ...] | None = None):
+             boundary_axes: tuple[tuple[str, float | str | tuple[float | str, float | str] | None], ...] | None = None,
+             boundary_faces: tuple[tuple[str, float | str | tuple[float | str, float | str] | None], ...] | None = None):
     """Lower a validated expression tree to NumPy arithmetic, with no eval/exec."""
     import numpy as np
     if expected_dimension is not None and expression.dimension != expected_dimension:

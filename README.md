@@ -266,8 +266,9 @@ and a browser-picked project directory is not the Git target. Remote
 tracking, merges and rebases are not implemented. Existing native Flow/HTTP
 branch list/create/switch acceptance passed on Ubuntu and macOS in
 [CI #40117614745](https://github.com/godofecht/FlowStudio/actions/runs/40117614745);
-new deletion acceptance and physical-browser interaction require independent
-verification. See [parity matrix](docs/PARITY.md).
+new deletion acceptance passed real Git/HTTP tests on Ubuntu and macOS in
+[CI #40748505934](https://github.com/godofecht/FlowStudio/actions/runs/40748505934);
+physical-browser interaction remains unverified. See [parity matrix](docs/PARITY.md).
 
 `node --test tests/browser_git_native.test.js tests/browser_git_panel.test.js`
 tests the browser-facing contract; `python3 scripts/verify_native.py`

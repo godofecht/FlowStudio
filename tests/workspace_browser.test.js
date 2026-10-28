@@ -78,7 +78,7 @@ function workspace(folder) {
   const elements = new Map();
   const ids = [
     "source", "language", "console", "resultStatus", "fileLabel", "dirty",
-    "cursor", "run", "runMathFlow", "mathFlowPlot", "tab-plots", "runCell", "resetR", "resetPython", "refreshPythonEnvironment", "pythonEnvironment", "open", "save", "clear", "fallbackOpen", "runtimeInfo",
+    "cursor", "run", "runProject", "runMathFlow", "mathFlowPlot", "tab-plots", "runCell", "resetR", "resetPython", "refreshPythonEnvironment", "pythonEnvironment", "open", "save", "clear", "fallbackOpen", "runtimeInfo",
     "projectTree", "folder", "newFile", "refreshProject",
     "projectSearch", "caseSensitive", "projectRegex", "projectWholeWord", "searchProject", "searchResults", "projectReplace", "replaceProject", "undoProjectReplace",
     "editorFind", "editorReplace", "findNext", "findPrevious",

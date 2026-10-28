@@ -56,6 +56,23 @@ mountPanel("FlowStudioExamples", global.FlowStudioExamples, Examples => {
     }
     return doc.id;
   }
+  /* A dirty buffer keeps its own text on reopen, so a buffer still holding
+   * the pre-Reader-removal pipeline source gets upgraded explicitly here.
+   * files must already be the upgraded set. */
+  const LEGACY_READER_MARKER = "for row in Reader";
+  function upgradeOpenBuffers(docIds, files) {
+    const documents = global.FlowStudioApp.documents;
+    let touched = false;
+    for (const id of docIds) {
+      const doc = documents.find(id);
+      if (!doc || !doc.text.includes(LEGACY_READER_MARKER)) continue;
+      const file = files.find(candidate => candidate.name === doc.name);
+      if (!file) continue;
+      documents.setText(id, file.text);
+      touched = true;
+    }
+    return touched;
+  }
   function activateEntry(docId, languageName) {
     global.FlowStudioApp.activateDocument(docId);
     language.value = languageName;
@@ -92,12 +109,14 @@ mountPanel("FlowStudioExamples", global.FlowStudioExamples, Examples => {
     }
     openedProjects.set(project.id, docIds);
     projectMeta.set(project.id, { title: project.title || project.id, files });
+    const upgraded = upgradeOpenBuffers(docIds, files);
     const target = activateFileName
       ? files.findIndex(file => file.name === activateFileName) : 0;
     const entry = docIds[target >= 0 ? target : 0];
     activateEntry(entry, files[target >= 0 ? target : 0].language);
     el("resultStatus").textContent = "Opened " + (project.title || project.id) +
-      " as " + docIds.length + " editor tab(s).";
+      " as " + docIds.length + " editor tab(s)." +
+      (upgraded ? " Legacy Flow source upgraded to the current pipeline." : "");
     el("resultStatus").dataset.state = "ok";
     if (typeof global.console !== "undefined" && global.console.log) {
       global.console.log("FlowStudioExamples opened " + project.id +
@@ -142,7 +161,12 @@ mountPanel("FlowStudioExamples", global.FlowStudioExamples, Examples => {
     onReopenProject: (project, file) => {
       try {
         if (!project || !Array.isArray(project.files)) return false;
+        // Saved projects keep the file text as last seen; projects saved
+        // before the Reader removal carry Flow source that no longer parses.
+        const fixed = Examples.upgradeFiles ? Examples.upgradeFiles(project.files) : null;
+        if (fixed) project = { ...project, files: fixed };
         openProjectBuffers(project, project.files, file && file.name || null);
+        if (fixed) saveOpenProjects();
         return true;
       } catch (error) {
         el("resultStatus").textContent = error.message || String(error);
@@ -219,6 +243,31 @@ mountPanel("FlowStudioExamples", global.FlowStudioExamples, Examples => {
       global.addEventListener("beforeunload", saveOpenProjects);
   }
   exports.saveOpenProjects = saveOpenProjects;
+
+  /* Ordered run plan for the active buffer's project: steps follow the
+   * project's declared file order (the gallery authors that order as the
+   * data dependency order, e.g. generate.py before analyse.R). Returns
+   * null when the active buffer does not belong to an open project. */
+  exports.projectRunPlan = () => {
+    const app = global.FlowStudioApp;
+    if (!app || !app.documents) return null;
+    const active = app.documents.active();
+    if (!active) return null;
+    for (const [projectId, docIds] of openedProjects) {
+      if (!docIds.includes(active.id)) continue;
+      const meta = projectMeta.get(projectId);
+      if (!meta || !Array.isArray(meta.files)) continue;
+      const steps = [];
+      for (let index = 0; index < docIds.length; index++) {
+        const doc = app.documents.find(docIds[index]);
+        const file = meta.files[index];
+        if (doc && file) steps.push({ id: doc.id, name: file.name, language: doc.language });
+      }
+      if (steps.length) return { id: projectId, title: meta.title || projectId, steps };
+      return null;
+    }
+    return null;
+  };
 });
 
 mountPanel("FlowStudioPackageManager", global.FlowStudioPackageManager, PackageManager => {

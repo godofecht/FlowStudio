@@ -340,6 +340,7 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
     <label for="flowBackend">Backend</label>
     <select id="flowBackend" aria-label="Flow compiler backend" title="Compiler backend for Flow runs"><option value="" selected>C (default)</option><option value="mlir">MLIR (experimental)</option></select>
     <button id="run" class="primary" title="Run selection or entire buffer (Ctrl/⌘+Enter)"><i data-lucide="play"></i>Run</button>
+    <button id="runProject" title="Run every file of the active example project in its declared order, stopping at the first failure">Run Project</button>
     <button id="checkFlow" type="button" title="Compile-check the current Flow buffer without running it">Check Flow</button>
     <button id="runMathFlow" title="Run the supported Unicode mathematical Flow PDE dialect (NumPy required)">Run MathFlow</button>
     <button id="runCell" title="Run current # %% cell (Ctrl/⌘+Shift+Enter)">Run cell</button>
@@ -1604,13 +1605,13 @@ async function refreshPythonEnvironment() {
   }
 }
 
-async function executeCode(code, label, languageOverride = null) {
+async function executeCode(code, label, languageOverride = null, options = {}) {
   const executionLanguage = languageOverride || language.value;
-  if (el("run").disabled) return;
-  if (!code.trim()) { status("Current cell is empty.", "error"); return; }
+  if (el("run").disabled && !options.forceRunGate) return false;
+  if (!code.trim()) { status("Current cell is empty.", "error"); return false; }
   if (new Blob([code]).size > 131072) {
     status("Execution exceeds the server's 128 KiB request limit.", "error");
-    return;
+    return false;
   }
   el("run").disabled = true;
   el("runCell").disabled = true;
@@ -1621,6 +1622,7 @@ async function executeCode(code, label, languageOverride = null) {
   }
   writeConsole("\n> " + label + " (" + executionLanguage + ")\n", executionLanguage, "cmd");
   const startedAt = Date.now();
+  let ok = false;
   try {
     const backend = executionLanguage === "flow" ? el("flowBackend").value : "";
     const response = await fetch("/api/run/" + executionLanguage +
@@ -1630,6 +1632,7 @@ async function executeCode(code, label, languageOverride = null) {
       body: code
     });
     const output = await response.text();
+    ok = response.ok;
     writeConsole(output + "\n", executionLanguage);
     if (executionLanguage === "mathflow" && response.ok) {
       try {
@@ -1653,6 +1656,7 @@ async function executeCode(code, label, languageOverride = null) {
   } catch (error) {
     writeConsole(String(error) + "\n", executionLanguage);
     status("Execution request failed", "error");
+    return false;
   } finally {
     if (executionLanguage === "python" || executionLanguage === "r") {
       try { await refreshPythonEnvironment(); }
@@ -1663,6 +1667,7 @@ async function executeCode(code, label, languageOverride = null) {
     writeConsole("↳ " + ((Date.now() - startedAt) / 1000).toFixed(1) + " s\n",
       executionLanguage, "meta");
   }
+  return ok;
 }
 async function run() {
   const selection = src.value.substring(src.selectionStart, src.selectionEnd);
@@ -1682,6 +1687,46 @@ async function runCell() {
   }
 }
 
+/* Run Project: executes every buffer of the example project that owns the
+ * active tab, in the project's declared file order (the gallery authors
+ * that order as the data dependency order). Stops at the first failing
+ * file; each step posts through the same executeCode path as a manual run,
+ * so output headers, timings and plots behave identically. */
+async function runProject() {
+  const panels = globalThis.FlowStudioWorkspacePanels;
+  const plan = panels && panels.projectRunPlan ? panels.projectRunPlan() : null;
+  if (!plan || !plan.steps.length) {
+    status("No project buffers to run. Open an example project first.", "error");
+    return false;
+  }
+  if (el("runProject").disabled) return false;
+  el("runProject").disabled = true;
+  el("run").disabled = true;
+  el("runCell").disabled = true;
+  let ok = true;
+  try {
+    for (const step of plan.steps) {
+      if (!activateDocument(step.id)) { ok = false; break; }
+      const ran = await executeCode(src.value, plan.title + " / " + step.name,
+        step.language, { forceRunGate: true });
+      if (!ran) {
+        status(plan.title + " stopped at " + step.name + ".", "error");
+        ok = false;
+        break;
+      }
+      // executeCode re-enables the run buttons in its own finally block;
+      // keep them locked while the project sequence is still going.
+      el("run").disabled = true;
+      el("runCell").disabled = true;
+    }
+  } finally {
+    el("runProject").disabled = false;
+    el("run").disabled = false;
+    el("runCell").disabled = false;
+  }
+  if (ok) status(plan.title + " ran all " + plan.steps.length + " file(s).", "ok");
+  return ok;
+}
 async function openEditorHandle(handle, path = null) {
   const existing = documents.list().find(doc => doc.handle === handle &&
     (path === null || doc.path === path));
@@ -2012,6 +2057,7 @@ language.addEventListener("change", () => {
     "Flow executions are independent.";
 });
 el("run").addEventListener("click", run);
+el("runProject").addEventListener("click", () => void runProject());
 el("runMathFlow").addEventListener("click", () => executeCode(src.value, "[mathematical Flow]", "mathflow"));
 el("runCell").addEventListener("click", runCell);
 el("refreshPythonEnvironment").addEventListener("click", async () => {
@@ -2206,6 +2252,7 @@ const commands = Object.freeze({
   renameSymbol: () => openRenamePanel(),
   refreshOutline: () => refreshOutline(),
   run: () => el("run").click(),
+  runProject: () => runProject(),
   runCell: () => el("runCell").click(),
   checkFlow: () => el("checkFlow").click(),
   resetR: () => el("resetR").click(),

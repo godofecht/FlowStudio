@@ -90,12 +90,21 @@
     }
     restore.addEventListener("click", () => {
       if (!pending || !dirty.hidden || !eligible) return;
-      const draft = pending;
+      let draft = pending;
       pending = null;
+      // Auto-upgrade: a draft saved before the Reader removal holds Flow
+      // source that no longer parses; refresh it from the curated gallery.
+      const gallery = root.FlowStudioExamples;
+      if (draft.language === "flow" && gallery &&
+          typeof gallery.upgradeFiles === "function") {
+        const fixed = gallery.upgradeFiles([{ name: draft.label || "buffer.flow",
+          language: draft.language, text: draft.code }]);
+        if (fixed) draft = { ...draft, code: fixed[0].text };
+      }
       source.value = draft.code;
       language.value = draft.language;
       // No FileSystemFileHandle is restored: a subsequent Save As is required.
-      label.textContent = "Recovered draft — save as new file";
+      label.textContent = "Recovered draft. Save as a new file.";
       source.dispatchEvent(new Event("input", {bubbles: true}));
       show();
       source.focus();

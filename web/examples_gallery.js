@@ -352,7 +352,26 @@ function mount(document, options) {
   renderSaved();
 }
 
-const api = { examples, validate, mount };
+/* Legacy-source upgrade: buffers and saved projects written before the
+ * Reader removal still hold Flow source that cannot parse today (the old
+ * `for row in Reader` pipeline). When the exact legacy marker is present the
+ * text is replaced wholesale with the current curated pipeline; anything
+ * else comes back untouched so user edits are never consciously rewritten. */
+const LEGACY_READER_MARKER = "for row in Reader";
+function upgradeFiles(files) {
+  if (!Array.isArray(files)) return null;
+  let upgraded = false;
+  const next = files.map(file => {
+    if (file && typeof file.text === "string" && file.text.includes(LEGACY_READER_MARKER)) {
+      upgraded = true;
+      return Object.assign({}, file, { text: FLOW_INTEROP });
+    }
+    return file;
+  });
+  return upgraded ? next : null;
+}
+
+const api = { examples, validate, mount, upgradeFiles };
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 global.FlowStudioExamples = api;
 })(globalThis);

@@ -214,6 +214,22 @@ def main() -> None:
         "+ reactionRate (temperature − ambientTemperature)")
     status, body = request("POST", "/api/check/mathflow", invalid_combined, accepted_headers)
     assert status == 422 and not json.loads(body)["ok"], (status, body)
+    # Non-periodic face-Dirichlet heat: actual native HTTP -> typed parser ->
+    # ghost-cell NumPy RK2 -> measured final spatial temperature field.
+    dirichlet_source = (Path(__file__).resolve().parents[1] /
+                        "examples/heat_dirichlet.flow").read_text(encoding="utf-8")
+    status, body = request("POST", "/api/check/mathflow", dirichlet_source, accepted_headers)
+    assert status == 200 and json.loads(body)["ok"], (status, body)
+    status, body = request("POST", "/api/run/mathflow", dirichlet_source, accepted_headers)
+    dirichlet = json.loads(body)
+    assert status == 200 and dirichlet["ok"] and dirichlet["steps"] == 100, (status, dirichlet)
+    assert dirichlet["boundary_condition"] == "Dirichlet", dirichlet
+    assert dirichlet["boundary_temperature"] == 300.0, dirichlet
+    assert dirichlet["spatial"]["grid"] == [16, 16], dirichlet
+    assert 300.0 < dirichlet["mean_temperature"] < 310.0, dirichlet
+    bad_dirichlet = dirichlet_source.replace("Dirichlet(300K)", "Dirichlet(300m)")
+    status, body = request("POST", "/api/check/mathflow", bad_dirichlet, accepted_headers)
+    assert status == 422 and not json.loads(body)["ok"], (status, body)
     # Real nonlinear reaction-diffusion via native Flow HTTP and NumPy RK2.
     nonlinear_source = (Path(__file__).resolve().parents[1] /
                         "examples/heat_nonlinear_reaction.flow").read_text(encoding="utf-8")

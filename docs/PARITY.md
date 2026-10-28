@@ -1,4 +1,4 @@
-## 2026-10-28: non-forcing native Git branch deletion (verification pending)
+## 2026-10-28: non-forcing native Git branch deletion (six Linux/macOS CI jobs passed)
 
 The Flow-owned native Git pane now offers explicitly confirmed deletion of a
 named local branch using Git's `branch -d -- <name>` semantics. No force-delete
@@ -9,11 +9,18 @@ existing write lock with stage/commit/create/switch. The native HTTP
 acceptance suite now exercises real merged deletion, checked-out/unmerged
 refusal, invalid names and origin protection in an isolated temporary repo.
 Node contract tests cover client routing, confirmation, concurrency and
-hosted Pages refusal. **Status: implementation committed for CI;
-native Flow compilation, end-to-end HTTP and physical-browser acceptance
-remain unverified until the new PR checks complete.** This does not implement
-remote tracking, merges, rebases or RStudio parity. No hosted CI configuration
-was changed.
+hosted Pages refusal. **Status: all six independent Linux/macOS CI jobs
+passed in [CI #40748505934](https://github.com/godofecht/FlowStudio/actions/runs/40748505934).**
+Both native platforms compiled pinned Flow 2.0.0 and ran real Git/HTTP
+acceptance in temporary repositories, including deletion of merged branches
+and refusal of checked-out/unmerged branches. Each source platform ran
+1,047 JavaScript tests (1,035 passed, 12 skipped, zero failures) and
+190 Python tests (13 skipped, zero failures). Both FlowJIT jobs passed.
+[PR #153](https://github.com/godofecht/FlowStudio/pull/153) merged as
+[d0b1e94](https://github.com/godofecht/FlowStudio/commit/d0b1e94a6130c749d60dc9420866f2d34439efd1).
+Physical Chromium Git panel interaction remains **unverified**.
+This does not implement remote tracking, merges, rebases or RStudio parity.
+No hosted CI configuration was changed.
 
 ## 2026-10-28: terminal asynchronous session and plot attribution (verification pending)
 
@@ -2139,7 +2146,7 @@ No hosted CI configuration was changed.
 | Data viewer | partial / CSV/TSV and browser Python/webR table snapshots; native Rscript data.frame/matrix bounded preview accepted by Ubuntu/macOS native Flow/HTTP CI #40163391932 (physical-browser pending); no remote data browsing | Interactive sortable/filterable tabular datasets including missing values |
 | Completion / language server | partial / browser Python/R runtime prefix completion cross-platform CI accepted; Flow lexical completion accepted by Ubuntu/macOS CI; explicit-type Flow struct and evolution-state member completion cross-platform CI accepted (#40095770668, 473 JS passes, 2 skips per platform, native Flow/HTTP accepted); physical-browser verification pending; full semantic/LSP completion missing | R, Flow and Python completion/diagnostics |
 | Packages pane | partial / browser Python and webR inventory/install; native Rscript installed-library inventory accepted by Ubuntu/macOS native Flow/R HTTP CI #40168902761; native installed-package loading accepted by Linux/macOS real Flow/R HTTP CI #40170771561 (physical-browser acceptance pending); native CRAN installation through persistent Flow/R kernel and real offline source-package install/restart accepted on Ubuntu/macOS CI #40174758087 (PR #50 merged); public CRAN download and physical-browser acceptance unverified; native user-library update passed real offline Linux/macOS Rscript/Flow HTTP CI #40182126305 (physical-browser pending); user-library removal passed real Linux/macOS Flow/R CI #40178422509 (physical-browser pending) | List, install, update with environment-aware package sources |
-| Git pane | partial / native Flow status, diff, stage, unstage and commit previously accepted cross-platform; branch list/create/switch accepted by CI #40117614745 on Ubuntu/macOS (PR #37 merged); non-forcing merged local branch deletion implemented with tests pending CI; physical-browser verification missing; remote tracking and merge missing | Status, diff, stage, unstage, commit and branch operations |
+| Git pane | partial / native Flow status, diff, stage, unstage and commit previously accepted cross-platform; branch list/create/switch accepted by CI #40117614745 on Ubuntu/macOS (PR #37 merged); non-forcing merged local branch deletion accepted by six Linux/macOS CI jobs #40748505934; physical-browser interaction pending; physical-browser verification missing; remote tracking and merge missing | Status, diff, stage, unstage, commit and branch operations |
 | Help pane | partial / browser Python live-global/builtin docstrings and installed R Rd help wired; Node/V8 contract tests, live Pyodide/webR and physical browser unverified; Flow 2.0.0 bundled reference for 28 topics (six Linux/macOS CI jobs passed; full physical-browser and live stdlib inspection pending) | Context-aware language/function docs |
 | Find / replace / cross-file search | partial / Node + V8-tested | Literal in-buffer find next/previous, single/all replacement and project-wide search implemented; incremental indexing and physical-browser verification missing; opt-in bounded regex and Unicode whole-word matching passed Linux/macOS Node CI #40186276335 |
 | Percent-delimited source cells | partial / lexical scanner unified across native editor and Pages, Node/HTTP acceptance pending; physical-browser execution unverified | Run only the active `# %%` code cell in Flow/R/Python; markdown and empty cells do not execute |

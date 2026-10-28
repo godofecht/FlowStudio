@@ -84,6 +84,12 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/workspace_console.js" {
         return StaticAsset { path: "web/workspace_console.js", mime: "text/javascript; charset=utf-8", found: true }
     }
+    if url == "/terminal_input.js" {
+        return StaticAsset { path: "web/terminal_input.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/terminal_sessions.js" {
+        return StaticAsset { path: "web/terminal_sessions.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
     if url == "/packages_panel.js" {
         return StaticAsset { path: "web/packages_panel.js", mime: "text/javascript; charset=utf-8", found: true }
     }

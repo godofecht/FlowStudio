@@ -351,7 +351,7 @@ def test_r(page, timeout: int):
     # This is opt-in physical acceptance, not a mocked interpreter pass.
     run_source(page, "r",
                "fs_r_factor <- factor(c('low',NA_character_,'high','low'), "
-               "levels=c('low','middle','high'), ordered=TRUE)\\n"
+               "levels=c('low','middle','high'), ordered=TRUE)\n"
                "cat('R factor ready')", "R factor ready", timeout)
     with page.expect_download(timeout=timeout) as factor_snapshot_info:
         page.locator("#exportSession").click()

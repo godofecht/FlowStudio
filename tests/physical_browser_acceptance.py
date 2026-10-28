@@ -383,7 +383,7 @@ def test_r(page, timeout: int):
     run_source(page, "r",
                "fs_r_named <- data.frame(rating=factor(c('low','high'), "
                "levels=c('low','middle','high'), ordered=TRUE), "
-               "score=c(1.25,2.5), row.names=c('alpha','βeta'))\\n"
+               "score=c(1.25,2.5), row.names=c('alpha','βeta'))\n"
                "cat('R named frame ready')", "R named frame ready", timeout)
     with page.expect_download(timeout=timeout) as named_snapshot_info:
         page.locator("#exportSession").click()

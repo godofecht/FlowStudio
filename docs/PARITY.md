@@ -7,10 +7,19 @@ execution when those engines are installed. The browser retains the source,
 language and report filename from render initiation and warns when the editor
 changes before completion. No hosted CI configuration changed.
 
-**Status: partial / local browser acceptance script Python syntax and CLI
-argument parsing checked; independent CI and actual Quarto/Chromium execution
-not yet verified.** Missing Quarto, knitr/Jupyter or Playwright must not be
-counted as a passing integration run. See [Quarto interchange](QUARTO_INTERCHANGE.md).
+**Status: partial / all six Linux/macOS CI jobs passed in
+[CI #40629147903](https://github.com/godofecht/FlowStudio/actions/runs/40629147903).**
+Both source platforms passed 974 JavaScript tests (966 passed, eight skipped)
+and the Python suite, including the new real-engine tests explicitly
+**skipped** because Quarto/Jupyter or Rscript was unavailable. Native jobs
+compiled Flow 2.0.0 and passed existing Chromium Quarto source interchange,
+Flow HTTP acceptance and packaging. The new optional real Quarto
+R/Python execution and browser render/download acceptance remain **unrun**.
+The physical-browser acceptance script passed local Python syntax and CLI
+argument validation only. Missing engines must not be counted as a passing
+integration run. [PR #122](https://github.com/godofecht/FlowStudio/pull/122)
+merged as [f90bac1](https://github.com/godofecht/FlowStudio/commit/f90bac1c4679b8ed12b878b403a4a959ed091e57).
+See [Quarto interchange](QUARTO_INTERCHANGE.md).
 
 ## 2026-10-28: opt-in installed Quarto CLI HTML rendering (six CI jobs passed; real CLI unverified)
 

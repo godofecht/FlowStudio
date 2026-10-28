@@ -54,6 +54,21 @@ function validNumpyDtype(dtype, packet) {
     [0, Number.MAX_SAFE_INTEGER] : [-Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER]);
   return values.every(value => Number.isSafeInteger(value) && value >= low && value <= high);
 }
+function validFactor(factor, packet) {
+  if (!factor || typeof factor !== "object" || Array.isArray(factor) ||
+      Object.keys(factor).sort().join(",") !== "levels,ordered" ||
+      typeof factor.ordered !== "boolean" || !Array.isArray(factor.levels) ||
+      factor.levels.length > 64 || new Set(factor.levels).size !== factor.levels.length ||
+      !factor.levels.every(level => typeof level === "string" &&
+        [...level].length <= 512 && !level.includes("\0")) ||
+      !packet || packet.kind !== "vector" || packet.type !== "string" ||
+      !Array.isArray(packet.values) ||
+      !packet.values.every(value => value === null || factor.levels.includes(value)))
+    return false;
+  try { factor.levels.forEach(level => encodeURIComponent(level)); }
+  catch (_) { return false; }
+  return true;
+}
 function validate(snapshot) {
   if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot) ||
       Object.keys(snapshot).sort().join(",") !== "format,language,omitted,truncated,variables" ||
@@ -67,9 +82,11 @@ function validate(snapshot) {
   for (const entry of snapshot.variables) {
     const restoreAs = entry && Object.prototype.hasOwnProperty.call(entry, "restoreAs");
     const hasDtype = entry && Object.prototype.hasOwnProperty.call(entry, "dtype");
+    const hasFactor = entry && Object.prototype.hasOwnProperty.call(entry, "factor");
     if (!entry || typeof entry !== "object" || Array.isArray(entry) ||
         Object.keys(entry).sort().join(",") !== (restoreAs ?
-          (hasDtype ? "dtype,name,restoreAs,value" : "name,restoreAs,value") : "name,value") ||
+          (hasDtype ? "dtype,name,restoreAs,value" :
+            hasFactor ? "factor,name,restoreAs,value" : "name,restoreAs,value") : "name,value") ||
         !validName(entry.name) || names.has(entry.name) ||
         (restoreAs && (snapshot.format !== FORMAT_V2 ||
           !((snapshot.language === "python" && entry.restoreAs === "pandas" &&
@@ -77,9 +94,13 @@ function validate(snapshot) {
             (snapshot.language === "python" && entry.restoreAs === "numpy" &&
              numpyPacket(entry.value)) ||
             (snapshot.language === "r" && entry.restoreAs === "matrix" &&
-             matrixPacket(entry.value))))) ||
+             matrixPacket(entry.value)) ||
+            (snapshot.language === "r" && entry.restoreAs === "factor" &&
+             hasFactor && validFactor(entry.factor, entry.value))))) ||
         (hasDtype && (entry.restoreAs !== "numpy" ||
-          !validNumpyDtype(entry.dtype, entry.value))))
+          !validNumpyDtype(entry.dtype, entry.value))) ||
+        (hasFactor && (entry.restoreAs !== "factor" ||
+          !validFactor(entry.factor, entry.value))))
       throw Error("Snapshot contains an invalid or duplicate variable name.");
     names.add(entry.name);
     if (!transfer || typeof transfer.validate !== "function")
@@ -122,7 +143,7 @@ async function capture({language, inspect, exportValue, generation}) {
       const value = transfer.validate(result.value);
       if (result.origin !== undefined &&
           !((language === "python" && ["pandas", "ndarray"].includes(result.origin)) ||
-            (language === "r" && result.origin === "matrix")))
+            (language === "r" && ["matrix", "factor"].includes(result.origin))))
         throw Error("Unsupported session snapshot source type.");
       const entry = {name, value};
       if (result.origin === "pandas") {
@@ -142,6 +163,12 @@ async function capture({language, inspect, exportValue, generation}) {
         if (!matrixPacket(value))
           throw Error("R matrix origin requires a nonempty homogeneous typed table.");
         entry.restoreAs = "matrix";
+      }
+      if (result.origin === "factor") {
+        if (!validFactor(result.factor, value))
+          throw Error("R factor origin requires valid ordered levels and a typed string vector.");
+        entry.restoreAs = "factor";
+        entry.factor = {levels:[...result.factor.levels], ordered:result.factor.ordered};
       }
       const nextFormat = entry.restoreAs ? FORMAT_V2 : snapshot.format;
       const candidate = {...snapshot, format:nextFormat, variables:[...snapshot.variables, entry]};
@@ -168,8 +195,9 @@ async function restore({snapshot, language, importValue, generation}) {
     same(generation, epoch);
     let result;
     try {
-      result = entry.dtype ?
-        await importValue(language, entry.name, entry.value, entry.restoreAs || null, entry.dtype) :
+      result = entry.dtype || entry.factor ?
+        await importValue(language, entry.name, entry.value, entry.restoreAs || null,
+          entry.dtype || entry.factor) :
         await importValue(language, entry.name, entry.value, entry.restoreAs || null);
     }
     catch (error) {
@@ -212,7 +240,7 @@ function create({exportButton, importButton, fileInput, language, inspect, expor
       notice("Exported " + snapshot.variables.length + " " + selected + " variables" +
         (snapshot.omitted || snapshot.truncated ? " (partial: " + snapshot.omitted +
           " omitted" + (snapshot.truncated ? "; inspection truncated" : "") + ")" : "") +
-        ". Only bounded scalar, vector and typed-table values are saved; pandas, NumPy ndarray and plain R matrix identity are retained when supported.");
+        ". Only bounded scalar, vector and typed-table values are saved; pandas, NumPy ndarray, plain R matrix and base R factor identity are retained when supported.");
       return true;
     } catch (error) {
       if (currentGeneration() === epoch) notice("Session export failed: " + String(error.message || error).slice(0, 350));

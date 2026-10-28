@@ -155,6 +155,9 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/app/file_save.js" {
         return StaticAsset { path: "docs/app/file_save.js", mime: "text/javascript; charset=utf-8", found: true }
     }
+    if url == "/app/flow_help.js" {
+        return StaticAsset { path: "docs/app/flow_help.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
     if url == "/app/help_panel.js" {
         return StaticAsset { path: "docs/app/help_panel.js", mime: "text/javascript; charset=utf-8", found: true }
     }

@@ -1,26 +1,32 @@
-/* Browser-local Python/R help viewer. Never evaluates a user-supplied expression. */
+/* Browser-local Python/R/Flow help viewer. Never evaluates a user-supplied expression. */
 (function (global) {
 "use strict";
 const PYTHON_TOPIC = /^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*){0,3}$/;
 const R_TOPIC = /^[A-Za-z][A-Za-z0-9._]{0,79}(?:::[A-Za-z][A-Za-z0-9._]{0,79})?$/;
+const flowHelp = global.FlowStudioFlowHelp ||
+  (typeof module !== "undefined" && module.exports ? require("./flow_help.js") : null);
 function validTopic(language, topic) {
   return typeof topic === "string" && topic.length <= 120 &&
     (language === "python" ? PYTHON_TOPIC.test(topic) :
-      language === "r" ? R_TOPIC.test(topic) : false);
+      language === "r" ? R_TOPIC.test(topic) :
+      language === "flow" ? !!flowHelp?.hasTopic(topic) : false);
 }
 function create({input, button, target, document, notice, language, python, r, isBusy, setBusy, generation}) {
   async function lookup() {
     if (isBusy()) { notice("Wait for execution to finish."); return false; }
     const selected = language(), topic = input.value.trim();
     if (!validTopic(selected, topic)) {
-      notice("Enter a Python identifier or an R topic (optionally package::topic).");
+      notice(selected === "flow" && flowHelp ? "Flow topics: " + flowHelp.topics().join(", ") :
+        "Enter a Python identifier or an R topic (optionally package::topic).");
       return false;
     }
     const started = generation();
     setBusy(true);
-    notice("Looking up installed " + selected + " documentation for " + topic + ".");
+    notice(selected === "flow" ? "Opening bundled Flow language reference for " + topic + "." :
+      "Looking up installed " + selected + " documentation for " + topic + ".");
     try {
-      const result = selected === "python" ? await python(topic) : await r(topic);
+      const result = selected === "python" ? await python(topic) :
+        selected === "r" ? await r(topic) : flowHelp.lookup(topic);
       if (started !== generation() || language() !== selected) return false;
       if (!result || !result.ok) {
         notice("Help unavailable: " + String(result?.output || "No documentation found.").slice(0, 300));
@@ -37,8 +43,17 @@ function create({input, button, target, document, notice, language, python, r, i
       body.textContent = result.doc || "(No documentation text available.)";
       body.setAttribute("aria-label", "Documentation for " + result.name);
       holder.append(title, body);
+      if (selected === "flow") {
+        const source = document.createElement("a");
+        source.textContent = "Upstream Flow 2.0.0 language specification";
+        source.setAttribute("href", result.url);
+        source.setAttribute("target", "_blank");
+        source.setAttribute("rel", "noopener noreferrer");
+        holder.append(source);
+      }
       target.replaceChildren(holder);
-      notice("Showing installed " + selected + " documentation for " + result.name + ".");
+      notice(selected === "flow" ? "Showing bundled Flow language reference for " + result.name + "." :
+        "Showing installed " + selected + " documentation for " + result.name + ".");
       return true;
     } catch (error) {
       if (started === generation()) notice("Help lookup failed: " + String(error).slice(0, 300));

@@ -1,3 +1,22 @@
+## 2026-10-28: offline Flow 2.0.0 language help (focused tests passed; independent CI pending)
+
+The browser Help pane now accepts 28 explicit Flow syntax, built-in and CLI
+reference topics (including functions, effects, modules, units, evolution/PDE
+surfaces and the declarative ordering operators), using the actual
+[flooooooooooow/flow language specification](https://github.com/flooooooooooow/flow/blob/main/docs/LANGUAGE_SPEC.md)
+as the source of syntax and implementation-status caveats. Lookup is local,
+does not execute code, never requests Python or R interpreters, and renders
+escaped text with a fixed upstream documentation link. The Flow-owned native
+asset router explicitly serves the reference module; GitHub Pages serves the
+same module as a static asset.
+
+**Status: partial / four focused Node tests passed locally with no skips;**
+native Flow compilation, full repository CI and real-browser integration
+remain unverified until the new PR's independent checks complete. This is
+a bundled reference for a fixed set of topics, **not** a Flow LSP, dynamic
+stdlib API documentation, a runtime inspector or RStudio feature parity.
+No hosted CI configuration was changed.
+
 ## 2026-10-28: NumPy dtype snapshot round-trip (six Linux/macOS CI jobs passed)
 
 Browser-local Python session snapshots now record the **actual NumPy dtype** for
@@ -1909,7 +1928,7 @@ No hosted CI configuration was changed.
 | Completion / language server | partial / browser Python/R runtime prefix completion cross-platform CI accepted; Flow lexical completion accepted by Ubuntu/macOS CI; explicit-type Flow struct and evolution-state member completion cross-platform CI accepted (#40095770668, 473 JS passes, 2 skips per platform, native Flow/HTTP accepted); physical-browser verification pending; full semantic/LSP completion missing | R, Flow and Python completion/diagnostics |
 | Packages pane | partial / browser Python and webR inventory/install; native Rscript installed-library inventory accepted by Ubuntu/macOS native Flow/R HTTP CI #40168902761; native installed-package loading accepted by Linux/macOS real Flow/R HTTP CI #40170771561 (physical-browser acceptance pending); native CRAN installation through persistent Flow/R kernel and real offline source-package install/restart accepted on Ubuntu/macOS CI #40174758087 (PR #50 merged); public CRAN download and physical-browser acceptance unverified; native user-library update passed real offline Linux/macOS Rscript/Flow HTTP CI #40182126305 (physical-browser pending); user-library removal passed real Linux/macOS Flow/R CI #40178422509 (physical-browser pending) | List, install, update with environment-aware package sources |
 | Git pane | partial / native Flow status, diff, stage, unstage and commit previously accepted cross-platform; branch list/create/switch accepted by CI #40117614745 on Ubuntu/macOS (PR #37 merged); physical-browser verification missing; branch deletion, remote tracking and merge missing | Status, diff, stage, unstage, commit and branch operations |
-| Help pane | partial / browser Python live-global/builtin docstrings and installed R Rd help wired; Node/V8 contract tests, live Pyodide/webR and physical browser unverified; Flow help missing | Context-aware language/function docs |
+| Help pane | partial / browser Python live-global/builtin docstrings and installed R Rd help wired; Node/V8 contract tests, live Pyodide/webR and physical browser unverified; Flow 2.0.0 bundled reference for 28 topics (focused Node tests passed; independent CI pending), not live stdlib inspection | Context-aware language/function docs |
 | Find / replace / cross-file search | partial / Node + V8-tested | Literal in-buffer find next/previous, single/all replacement and project-wide search implemented; incremental indexing and physical-browser verification missing; opt-in bounded regex and Unicode whole-word matching passed Linux/macOS Node CI #40186276335 |
 | Percent-delimited source cells | partial / lexical scanner unified across native editor and Pages, Node/HTTP acceptance pending; physical-browser execution unverified | Run only the active `# %%` code cell in Flow/R/Python; markdown and empty cells do not execute |
 | Portable mixed-language FlowStudio notebooks (`.fsnb`) | partial / source and display-only outputs round-trip in Node tests; cross-platform CI accepted in PR #33; physical-browser file interaction unverified | Import/export exact Flow/R/Python tagged source and bounded saved text/PNG results, verify physical-browser round-trip, no interpreter-state restoration claims |

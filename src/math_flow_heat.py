@@ -92,6 +92,8 @@ def parse_heat(source: str, base) -> HeatModel:
                                          reaction=reaction)
     except ExpressionError as exc:
         raise error(f"Unsupported heat dynamics: {exc}") from exc
+    if equation.nonlinear and ambient_temperature <= 0:
+        raise error("Quadratic thermal relaxation requires positive ambientTemperature")
     initial = base.assignments(sections["initial"])
     base.expect_keys(initial, {"temperature"}, "heat initial")
     expression = "".join(initial["temperature"])
@@ -174,8 +176,10 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
         raise error_type("Heat evolution must have between 1 and 200000 steps")
     dt = duration / steps
     dx, dy = model.length_x / nx, model.length_y / ny
-    if dt * (model.diffusivity * (1 / dx**2 + 1 / dy**2)
-             + model.reaction_rate / 4) > .45:
+    diffusion_stiffness = model.diffusivity * (1 / dx**2 + 1 / dy**2)
+    linear_reaction_rate = (0.0 if model.equation is not None and model.equation.nonlinear
+                            else model.reaction_rate)
+    if dt * (diffusion_stiffness + linear_reaction_rate / 4) > .45:
         raise error_type("Heat time step violates diffusion/reaction stability bound")
     x, y = np.meshgrid((np.arange(nx) + .5) * dx,
                        (np.arange(ny) + .5) * dy, indexing="ij")
@@ -192,8 +196,21 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
                 (np.roll(a, -1, axis=1) + np.roll(a, 1, axis=1) - 2 * a) / dy**2)
 
     def rhs(state):
+        if not np.all(np.isfinite(state)):
+            raise error_type("Non-finite temperature during heat integration")
         if model.equation is None:
             return model.diffusivity * laplacian(state)
+        if model.equation.nonlinear:
+            if model.ambient_temperature <= 0:
+                raise error_type("Quadratic thermal relaxation requires positive ambientTemperature")
+            if np.any(state < model.ambient_temperature - 1e-10):
+                raise error_type("Quadratic thermal relaxation requires temperature >= ambientTemperature")
+            maximum_excess = float(np.max(np.maximum(state - model.ambient_temperature, 0.0)))
+            # Local linearized reaction eigenvalue is -2*k*(T-A)/A.
+            # Check both RK2 stages, not just the initial field.
+            if dt * (diffusion_stiffness +
+                     model.reaction_rate * maximum_excess / (2 * model.ambient_temperature)) > .45:
+                raise error_type("Heat time step violates nonlinear reaction stability bound")
         try:
             return np.broadcast_to(evaluate(
                 model.equation.rhs, x, y, expected_dimension=TEMPERATURE_RATE,

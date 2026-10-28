@@ -151,6 +151,21 @@
     const series = prepare(result);
     const heading = doc.createElement("h3");
     heading.textContent = "Mathematical Flow · numerical observations";
+    const boundary = result.boundary_condition;
+    let boundaryNote = null;
+    if (boundary !== undefined) {
+      if (boundary !== "Periodic" && boundary !== "Dirichlet")
+        throw new TypeError("Unsupported mathematical Flow boundary metadata.");
+      if (boundary === "Dirichlet" &&
+          (typeof result.boundary_temperature !== "number" ||
+           !Number.isFinite(result.boundary_temperature)))
+        throw new TypeError("Invalid Dirichlet boundary temperature.");
+      boundaryNote = doc.createElement("p");
+      boundaryNote.setAttribute("data-mathflow-boundary", boundary);
+      boundaryNote.textContent = boundary === "Dirichlet"
+        ? "Boundary: Dirichlet at " + result.boundary_temperature + " K (all faces)"
+        : "Boundary: periodic";
+    }
     const label = doc.createElement("label");
     label.textContent = "Quantity ";
     const select = doc.createElement("select");
@@ -195,8 +210,8 @@
     if (spatialSvg) {
       const spatialHeading = doc.createElement("h3");
       spatialHeading.textContent = "Final simulated spatial fields";
-      host.replaceChildren(heading, label, svg, spatialHeading, spatialSvg);
-    } else host.replaceChildren(heading, label, svg);
+      host.replaceChildren(heading, ...(boundaryNote ? [boundaryNote] : []), label, svg, spatialHeading, spatialSvg);
+    } else host.replaceChildren(heading, ...(boundaryNote ? [boundaryNote] : []), label, svg);
     host.hidden = false;
     draw();
     return series;

@@ -38,7 +38,7 @@ The executable `examples/heat_equation_smoke.flow` declares `Scalar<Kelvin>`, po
 
 Initial scalar expressions are no longer rewritten into Python syntax. The compiler now builds a bounded AST with explicit operator nodes for addition, subtraction, multiplication, division, unary signs and `sin`, `cos`, `exp`, `sqrt`. It supports implicit multiplication such as `2πx`, `×`, `·`, superscript powers of ten and unit-bearing literals. Dimensions are inferred as integer exponents of length, mass, time and temperature; incompatible additions and non-dimensionless trigonometric arguments are rejected at compile time. Supported coordinate variables `x` and `y` have length dimensions. NumPy lowering is restricted to checked AST nodes; no Python `eval` or `exec` is used.
 
-This remains a restricted, explicit PDE frontend. In particular, the full dynamics and observation equations are still recognized by checked patterns rather than a general equation AST; arbitrary PDEs, coupled systems, boundary types, symbolic differentiation, complete unit inference, upstream Flow 2.0 grammar integration and actual graphical rendering are **not** implemented. The `Visualize` clauses remain validated declarations; the heat route returns numerical observations, not rendered heatmaps.
+This remains a restricted, explicit PDE frontend. In particular, Navier–Stokes dynamics and observation clauses are still recognized by checked patterns, while heat dynamics uses a typed RHS AST restricted to validated forms; arbitrary PDEs, coupled systems, boundary types, symbolic differentiation, complete unit inference, upstream Flow 2.0 grammar integration and actual graphical rendering are **not** implemented. The `Visualize` clauses remain validated declarations; the heat route returns numerical observations, not rendered heatmaps.
 
 ## Sampled observation trajectories
 
@@ -64,9 +64,9 @@ For example, `∂ᵧ(-cos(2πy / 1m) * 1m²/s / (2π))` is a dimensionally valid
 
 ## Typed scalar equation AST and additive source terms
 
-The heat frontend now compiles the complete Unicode right-hand side into a typed `Equation` AST (`src/math_flow_equations.py`). For example, `∂ₜtemperature = diffusivity ∇²temperature + 2K/s` is executable via `examples/heat_equation_forced.flow`. The scalar expression compiler accepts declared typed symbols, including `temperature` (K) and `diffusivity` (m²/s), and recognizes prefix `∇²temperature` as well as `∇²(temperature)`. The full RHS is dimension-checked as K/s, and can be evaluated directly against real NumPy field arrays. The solver lowers the recognized periodic diffusion operator and independent additive forcing to its existing RK2 finite-difference kernel, computing forcing from the typed AST once per run.
+The heat frontend now compiles the complete Unicode right-hand side into a typed `Equation` AST (`src/math_flow_equations.py`). For example, `∂ₜtemperature = diffusivity ∇²temperature + 2K/s` is executable via `examples/heat_equation_forced.flow`. The scalar expression compiler accepts declared typed symbols, including `temperature` (K) and `diffusivity` (m²/s), and recognizes prefix `∇²temperature` as well as `∇²(temperature)`. The full RHS is dimension-checked as K/s, and can be evaluated directly against real NumPy field arrays. The solver evaluates the full validated RHS AST at both RK2 stages using the actual evolving NumPy field arrays.
 
-This deliberately does **not** admit arbitrary scalar equations: the heat RHS must contain precisely the positive `diffusivity ∇²temperature` term, optionally plus an expression that does not depend on the evolving field or diffusivity. Nonlinear reactions, alternative spatial operators, coupled fields and invalid dimensions fail compilation. The runtime retains its periodic-grid, time-step, finite-value and workload guards; the added source term does not constitute an unrestricted PDE engine. Analytic tests check the forced mean and the spatial Fourier-mode response, while the native HTTP acceptance executes the checked-in forced program and rejects an invalid field-dependent source.
+This deliberately does **not** admit arbitrary scalar equations: the heat RHS must contain precisely the positive `diffusivity ∇²temperature` term, optionally plus an expression that does not depend on the evolving field or diffusivity. Unrecognized nonlinear reactions, alternative spatial operators, coupled fields and invalid dimensions fail compilation. The runtime retains its periodic-grid, time-step, finite-value and workload guards; the added source term does not constitute an unrestricted PDE engine. Analytic tests check the forced mean and the spatial Fourier-mode response, while the native HTTP acceptance executes the checked-in forced program and rejects an invalid field-dependent source.
 
 ```sh
 python3 src/math_flow.py examples/heat_equation_forced.flow
@@ -105,3 +105,41 @@ observation samples.
 python3 src/math_flow.py examples/heat_reaction_diffusion.flow
 python3 -m unittest discover -s tests -p 'test_math_flow_reaction.py' -v
 ```
+
+
+## Executable quadratic thermal relaxation (bounded nonlinear PDE)
+
+`examples/heat_nonlinear_reaction.flow` extends the typed scalar heat equation
+to one explicitly recognized nonlinear reaction term:
+
+```flow
+∂ₜtemperature = diffusivity ∇²temperature
+                − reactionRate (temperature − ambientTemperature)
+                               (temperature − ambientTemperature)
+                               / ambientTemperature
+```
+
+The full dimension-checked RHS is evaluated against **both actual RK2 stage fields**.
+This is nonlinear numerical execution, not a source-string substitution or editor
+snippet. The dimension of the sink is K/s. The implementation requires a positive
+ambient temperature and temperatures at or above ambient throughout both stages.
+A conservative, state-dependent local linearized reaction stiffness is checked at
+each stage alongside the diffusion timestep bound. These constraints deliberately
+reject unbounded or unstable cases rather than claiming arbitrary nonlinear PDE
+support.
+
+The checked-in example has a nonuniform initial field above ambient. Unit tests
+compare the compiled RHS against a discrete Fourier Laplacian and quadratic sink,
+then compare a uniform-temperature case with the analytic Riccati solution
+`T(t) = A + (T(0)-A)/(1 + reactionRate*(T(0)-A)*t/A)`, verifying temporal
+refinement. CI also executes the example via the real CLI and native Flow HTTP
+check/run routes on Linux and macOS.
+
+```sh
+python3 src/math_flow.py examples/heat_nonlinear_reaction.flow
+python3 -m unittest discover -s tests -p 'test_math_flow_nonlinear.py' -v
+```
+
+This is still a **restricted** standalone mathematical Flow frontend: general
+nonlinear kinetics, arbitrary coupled fields, non-periodic boundary conditions,
+and upstream Flow 2.0 grammar/compiler integration remain unfinished.

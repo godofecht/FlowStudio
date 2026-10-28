@@ -2,8 +2,8 @@
 
 The entire RHS is parsed and dimension-checked. Supported operators are
 periodic diffusion, optional field-independent forcing, and optional
-linear relaxation toward a declared ambient temperature. No arbitrary
-nonlinear or coupled equation is accepted.
+linear or bounded quadratic relaxation toward a declared ambient temperature.
+No arbitrary nonlinear or coupled equation is accepted.
 """
 from __future__ import annotations
 
@@ -23,6 +23,7 @@ class Equation:
     rhs: Expression
     forcing: Expression | None
     reaction: Expression | None = None
+    nonlinear: bool = False
 
 
 def _name(expr: Expression, value: str) -> bool:
@@ -51,6 +52,37 @@ def _relaxation(expr: Expression) -> bool:
                 and _name(node.operands[1], "ambientTemperature"))
     return (_name(a, "reactionRate") and difference(b)
             or _name(b, "reactionRate") and difference(a))
+
+
+def _quadratic_relaxation(expr: Expression) -> bool:
+    """Match reactionRate * (temperature - ambient)^2 / ambient, using explicit products.
+
+    The squared deviation is deliberately parsed as a typed AST product,
+    not rewritten into Python or accepted as arbitrary polynomial kinetics.
+    """
+    if expr.operator != "div" or len(expr.operands) != 2:
+        return False
+    numerator, denominator = expr.operands
+    if not _name(denominator, "ambientTemperature"):
+        return False
+    if numerator.operator != "mul" or len(numerator.operands) != 2:
+        return False
+    left, right = numerator.operands
+
+    def deviation(node: Expression) -> bool:
+        return (node.operator == "sub" and len(node.operands) == 2
+                and _name(node.operands[0], "temperature")
+                and _name(node.operands[1], "ambientTemperature"))
+
+    def rate_times_deviation(node: Expression) -> bool:
+        return (node.operator == "mul" and len(node.operands) == 2
+                and ((_name(node.operands[0], "reactionRate")
+                      and deviation(node.operands[1]))
+                     or (_name(node.operands[1], "reactionRate")
+                         and deviation(node.operands[0]))))
+
+    return (rate_times_deviation(left) and deviation(right)
+            or rate_times_deviation(right) and deviation(left))
 
 
 def _independent(expr: Expression) -> bool:
@@ -89,18 +121,21 @@ def compile_heat_equation(tokens: list[str], *, reaction: bool = False) -> Equat
     diffusion_count = 0
     forcing = None
     relaxation = None
+    nonlinear = False
     for term, sign in _signed_terms(rhs):
         if sign == 1 and _diffusion(term):
             diffusion_count += 1
-        elif reaction and sign == -1 and _relaxation(term) and relaxation is None:
+        elif reaction and sign == -1 and relaxation is None and (
+                _relaxation(term) or _quadratic_relaxation(term)):
             relaxation = term
+            nonlinear = _quadratic_relaxation(term)
         elif _independent(term) and forcing is None and term.dimension == TEMPERATURE_RATE:
             forcing = term if sign == 1 else Expression(
                 "neg", (term,), dimension=TEMPERATURE_RATE)
         else:
             raise ExpressionError(
                 "Unsupported heat dynamics: expected diffusion, independent forcing "
-                "and optional negative linear relaxation")
+                "and optional negative linear or quadratic relaxation")
     if diffusion_count != 1 or (reaction and relaxation is None):
         raise ExpressionError("Heat dynamics requires one diffusion operator and declared relaxation")
-    return Equation("temperature", rhs, forcing, relaxation)
+    return Equation("temperature", rhs, forcing, relaxation, nonlinear)

@@ -181,6 +181,20 @@ def main() -> None:
     assert 300.0 < reaction["mean_temperature"] < 300.02, reaction
     assert reaction["temperature_variance"] < reaction["initial_temperature_variance"], reaction
     assert reaction["spatial"]["fields"]["temperature"], reaction
+    # Real nonlinear reaction-diffusion via native Flow HTTP and NumPy RK2.
+    nonlinear_source = (Path(__file__).resolve().parents[1] /
+                        "examples/heat_nonlinear_reaction.flow").read_text(encoding="utf-8")
+    status, body = request("POST", "/api/check/mathflow", nonlinear_source, accepted_headers)
+    assert status == 200 and json.loads(body)["ok"], (status, body)
+    status, body = request("POST", "/api/run/mathflow", nonlinear_source, accepted_headers)
+    nonlinear = json.loads(body)
+    assert status == 200 and nonlinear["ok"] and nonlinear["steps"] == 100, (status, nonlinear)
+    assert 300 < nonlinear["mean_temperature"] < 330, nonlinear
+    assert nonlinear["temperature_variance"] < nonlinear["initial_temperature_variance"], nonlinear
+    assert nonlinear["spatial"]["fields"]["temperature"], nonlinear
+    invalid_nonlinear = nonlinear_source.replace("/ ambientTemperature", "/ temperature")
+    status, body = request("POST", "/api/check/mathflow", invalid_nonlinear, accepted_headers)
+    assert status == 422 and not json.loads(body)["ok"], (status, body)
     invalid_reaction = reaction_source.replace(
         "− reactionRate (temperature − ambientTemperature)",
         "+ reactionRate (temperature − ambientTemperature)")

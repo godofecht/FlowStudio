@@ -65,9 +65,9 @@ class RobinTransferProfileTest(unittest.TestCase):
                     "temperature", "∂ₓ(0.2m)", "0.2m + 1m*t"):
             with self.subTest(bad=bad), self.assertRaises(FlowMathError):
                 parse(SOURCE.replace(LENGTH, bad))
-        model = parse(SOURCE.replace(LENGTH, "0.2m - 1m*t / 1s"))
+        model = parse(SOURCE.replace(LENGTH, "0.2m - 100m*t / 1s"))
         with self.assertRaises((ExpressionError, ValueError)):
-            simulate(model, until=.3)
+            simulate(model, until=.01)
         x, y = np.meshgrid((np.arange(8)+.5)/8, (np.arange(8)+.5)/8, indexing="ij")
         laplacian = parse_expression("∇²temperature", symbols={"temperature": TEMPERATURE})
         with self.assertRaises(ExpressionError):

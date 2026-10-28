@@ -13,6 +13,7 @@ try {
     globalThis.FlowStudioMathPlots?.render));
   for (const [source, metric, other] of [
     ['examples/heat_equation_smoke.flow', 'temperatureVariance', 'meanTemperature'],
+    ['examples/heat_nonlinear_reaction.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/navier_stokes_smoke.flow', 'kineticEnergy', 'maximumDivergence']
   ]) {
     await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
@@ -41,7 +42,7 @@ try {
     assert.equal(await page.locator('#mathFlowPlot select').inputValue(), other);
   }
   assert.deepEqual(errors, [], errors.join('\n'));
-  console.log('PASS: native mathematical Flow HTTP, both NumPy PDEs and actual SVG plots in Chromium');
+  console.log('PASS: native mathematical Flow HTTP, linear/nonlinear NumPy PDEs and actual SVG plots in Chromium');
 } finally {
   await browser.close();
 }

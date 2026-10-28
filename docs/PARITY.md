@@ -1,4 +1,4 @@
-## 2026-10-28: bounded native Git commit history (validation pending)
+## 2026-10-28: bounded native Git commit history (six independent CI jobs passed)
 
 The Flow-owned localhost Git pane now exposes the checked-out branch's most
 recent 30 commits through a fixed-argument `git --no-pager log` invocation.
@@ -11,13 +11,18 @@ control on hosted Pages. This is read-only local history, **not** remote
 tracking, graph visualization, checkout by commit, authenticated Git hosting
 or complete RStudio Git parity.
 
-**Status: implementation committed on a focused branch; CI and native Flow
-compilation not yet independently verified.** Automated Node tests exercise
-native transport, Pages refusal, locking, failure recovery, text-only
-rendering and wiring. The native HTTP acceptance suite now checks an unborn
-HEAD, origin rejection, a real commit, a 32-commit fixture and the 30-entry
-bound. Physical Chromium UI acceptance remains unverified. No hosted CI
-configuration changed; RStudio feature parity remains incomplete.
+**Status: partial / all six independent Ubuntu 24.04/macOS 14 jobs
+passed in [CI #40766588115](https://github.com/godofecht/FlowStudio/actions/runs/40766588115).**
+Both source platforms passed 1,057 JavaScript tests (1,045 passed, 12 skipped,
+zero failures) and 200 Python tests (13 skipped, zero failures). Both native
+platforms compiled the actual Flow 2.0.0 server and passed real isolated
+Git/HTTP acceptance for an unborn HEAD, origin rejection, a real commit,
+32 additional commits and the exact 30-entry bound. Both FlowJIT jobs passed.
+Automated Node tests exercise native transport, Pages refusal, locking,
+failure recovery, text-only rendering and wiring. A local independent Git
+argv smoke check also reproduced the 30-entry bound. Physical Chromium Git
+history UI acceptance remains unverified. No hosted CI configuration changed;
+RStudio feature parity remains incomplete.
 
 ## 2026-10-28: native Git fast-forward merge (verification pending)
 

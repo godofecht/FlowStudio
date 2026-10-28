@@ -61,3 +61,25 @@ node --test tests/browser_quarto_render_wiring.test.js, and the real native
 HTTP smoke suite. The real-Quarto test is skipped if Quarto is not installed.
 Physical browser, R/Python chunk execution, and cross-platform CI must be
 confirmed separately before claiming tested runtime parity.
+
+### Independent real-CLI and physical-browser acceptance
+
+The optional tests use **actual installed** Quarto, R/knitr and Jupyter
+engines, and a real Chromium download from the native Flow-owned server.
+They do not substitute a renderer or kernel fixture. First start FlowStudio
+on loopback, then run:
+
+```sh
+python3 -m unittest discover -s tests -p test_quarto_render.py
+python3 tests/quarto_native_browser.py --url http://127.0.0.1:8751/app/ --language r
+python3 tests/quarto_native_browser.py --url http://127.0.0.1:8751/app/ --language python
+```
+
+The unittest module skips real-CLI or engine-specific tests when dependencies
+are absent. The browser acceptance program instead exits with a clear error
+when Quarto or a required runtime is missing, and asserts that downloaded
+HTML contains output actually produced by the selected language. The browser
+test is **not** part of hosted CI and is not evidence of a pass until run.
+Rendering now retains the original source/language and filename while an
+asynchronous render is in progress, and reports when the editor changed
+before the report finished.

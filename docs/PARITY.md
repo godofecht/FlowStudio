@@ -1,3 +1,17 @@
+## 2026-10-28: real Quarto execution acceptance and stable report snapshot (verification pending)
+
+Added opt-in real Chromium -> Flow HTTP -> installed Quarto -> R/knitr or
+Python/Jupyter -> downloaded HTML acceptance, with explicit executed-output
+assertions. The real-CLI unittest suite now covers R and Python chunk
+execution when those engines are installed. The browser retains the source,
+language and report filename from render initiation and warns when the editor
+changes before completion. No hosted CI configuration changed.
+
+**Status: partial / local browser acceptance script Python syntax and CLI
+argument parsing checked; independent CI and actual Quarto/Chromium execution
+not yet verified.** Missing Quarto, knitr/Jupyter or Playwright must not be
+counted as a passing integration run. See [Quarto interchange](QUARTO_INTERCHANGE.md).
+
 ## 2026-10-28: opt-in installed Quarto CLI HTML rendering (six CI jobs passed; real CLI unverified)
 
 The native Flow-owned localhost server now exposes POST /api/render/quarto

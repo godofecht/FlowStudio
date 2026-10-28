@@ -14,7 +14,10 @@ test("native Quarto rendering uses Flow-owned route and the real installed CLI h
   assert.match(flow, /proc_timeout_ms\(command, 60000\)/);
   assert.match(html, /id="renderQuarto"/);
   assert.match(html, /window\.confirm\("Render with the installed Quarto CLI\?/);
-  assert.match(html, /FlowStudioQuarto\.encode\(\$\("source"\)\.value/);
+  assert.match(html, /FlowStudioQuarto\.encode\(renderedSource, renderedLanguage/);
+  assert.match(html, /const renderedSource = \$\("source"\)\.value/);
+  assert.match(html, /anchor\.download = renderReportName \+ "\.html"/);
+  assert.match(html, /the editor changed during rendering/);
   assert.match(html, /fetch\("\/api\/render\/quarto"/);
   assert.match(html, /"X-FlowStudio-Intent": "run"/);
   assert.match(helper, /subprocess\.Popen\(/);

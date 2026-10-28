@@ -820,9 +820,12 @@ $("exportQuarto").addEventListener("click", () => {
 $("renderQuarto").addEventListener("click", async () => {
   if (busy || notebookRunner?.isRunning()) { notice("Wait for notebook execution to finish."); return; }
   if (!nativeAvailable) { notice("Quarto rendering requires the native localhost FlowStudio server."); return; }
+  const renderedSource = $("source").value;
+  const renderedLanguage = $("language").value;
+  const renderReportName = fileName.replace(/\.(?:py|r|flow|ipynb|fsnb|rmd|qmd)$/i, "") || "notebook";
   let qmd;
   try {
-    qmd = FlowStudioQuarto.encode($("source").value, $("language").value,
+    qmd = FlowStudioQuarto.encode(renderedSource, renderedLanguage,
       FlowStudioSourceCells.parseCells);
     if (new TextEncoder().encode(qmd).length > 131072)
       throw new Error("Quarto source exceeds the native 128 KiB request limit.");
@@ -841,14 +844,15 @@ $("renderQuarto").addEventListener("click", async () => {
     });
     const html = await response.text();
     if (!response.ok) throw new Error(html.slice(0, 4096) || "HTTP " + response.status);
-    const reportName = fileName.replace(/\.(?:py|r|flow|ipynb|fsnb|rmd|qmd)$/i, "") || "notebook";
     const url = URL.createObjectURL(new Blob([html], {type: "text/html;charset=utf-8"}));
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = reportName + ".html";
+    anchor.download = renderReportName + ".html";
     anchor.click();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
-    notice("Quarto rendered an HTML report using the installed native CLI.");
+    const changed = $("source").value !== renderedSource || $("language").value !== renderedLanguage;
+    notice(changed ? "Quarto rendered an HTML report from the earlier source snapshot; the editor changed during rendering." :
+      "Quarto rendered an HTML report using the installed native CLI.");
   } catch (error) {
     notice("Quarto render failed: " + (error?.message || error));
   } finally {

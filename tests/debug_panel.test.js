@@ -166,7 +166,7 @@ test("replay navigation refuses a trace belonging to a different editor buffer",
   node._sections[".debug-steps"].children[1].children[0].listeners.click();
   assert.equal(p.at(), 0);
   assert.equal(jumps, 0);
-  assert.match(warning, /another editor buffer/);
+  assert.match(warning, /editor buffer changed/);
 });
 
 test("replay drops an asynchronous trace when its document or source changed", async () => {
@@ -194,4 +194,23 @@ test("workspace wires replay debugger to the actual active document", () => {
   const fs = require("node:fs");
   const source = fs.readFileSync(require.resolve("../web/workspace_panels.js"), "utf8");
   assert.match(source, /getDocId: activeDocumentId/);
+});
+
+test("replay refuses navigation after editing the traced source", async () => {
+  const doc = fakeDocument(), node = testCoveragePanelNode(doc);
+  let source = "x = 1", jumps = 0, warning = "";
+  const p = panel.mount(doc, {
+    node,
+    fetchFn: async () => ({ ok: true, text: async () => JSON.stringify(TRACE) }),
+    getSource: () => source,
+    getDocId: () => "document-a",
+    onStep: () => { jumps++; },
+    notice: message => { warning = message; }
+  });
+  await p.run();
+  source = "x = 2";
+  node._sections[".debug-steps"].children[1].children[0].listeners.click();
+  assert.equal(p.at(), 0);
+  assert.equal(jumps, 0);
+  assert.match(warning, /editor buffer changed/);
 });

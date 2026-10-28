@@ -1,0 +1,46 @@
+# Executable signed composition of independent space/time forcing with real RK2 stages.
+domain ThermalDomain {
+    grid       = 32 × 32
+    extent     = 1m × 1m
+    boundaries = Periodic
+}
+
+model HeatEquation on ThermalDomain {
+    const diffusivity = 0.01m²/s
+    field temperature: Scalar<Kelvin>
+
+    dynamics {
+        ∂ₜtemperature = diffusivity ∇²temperature
+                        + 2K/s * sin(2πt / 1s)
+                        + 3K/s * cos(2πt / 1s)
+                        − 1K/s
+                        + 1K/s * sin(2πx / 1m)
+                        + 2K/s * sin(2πy / 1m)
+    }
+    initial {
+        temperature = 300K + 10K * sin(2πx / 1m) * sin(2πy / 1m)
+    }
+}
+
+solver ThermalSolver for HeatEquation {
+    spatial {
+        method    = FiniteDifference
+        diffusion = CentralDifference
+    }
+    temporal {
+        method   = RungeKuttaSecondOrder
+        timeStep = 10⁻⁴s
+    }
+}
+
+let simulation = HeatEquation ▷ ThermalSolver ▷ Evolve(until: 0.01s)
+
+simulation
+    ▷ Observe {
+        meanTemperature     = Mean(temperature)
+        temperatureVariance = Mean((temperature − meanTemperature)²)
+    }
+    ▷ Visualize {
+        temperature         = Heatmap
+        temperatureVariance = LineGraph
+    }

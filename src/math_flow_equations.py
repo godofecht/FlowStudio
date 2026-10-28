@@ -104,6 +104,19 @@ def _quadratic_relaxation(expr: Expression) -> bool:
         return False
     left, right = numerator.operands
 
+    def squared_deviation(node: Expression) -> bool:
+        return (node.operator == "pow" and len(node.operands) == 2
+                and node.operands[1].operator == "literal"
+                and node.operands[1].value == 2
+                and node.operands[0].operator == "sub"
+                and len(node.operands[0].operands) == 2
+                and _name(node.operands[0].operands[0], "temperature")
+                and _name(node.operands[0].operands[1], "ambientTemperature"))
+
+    if ((_name(left, "reactionRate") and squared_deviation(right))
+            or (_name(right, "reactionRate") and squared_deviation(left))):
+        return True
+
     def deviation(node: Expression) -> bool:
         return (node.operator == "sub" and len(node.operands) == 2
                 and _name(node.operands[0], "temperature")

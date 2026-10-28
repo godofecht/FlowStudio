@@ -21,7 +21,7 @@ TOKEN = re.compile(
     r"\s+|#[^\n]*|10[⁻−-][⁰¹²³⁴⁵⁶⁷⁸⁹0-9]+|"
     r"\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|"
     r"[A-Za-z_][A-Za-z_0-9]*|[∂∇∫ₜₓᵧπ²³⁻⁰¹⁴⁵⁶⁷⁸⁹×·▷−½]|"
-    r"[{}()<>=:,/+*.\-]"
+    r"[{}()<>=:,/+*.\-^]"
 )
 SUPERSCRIPTS = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁻", "0123456789-")
 MAX_SOURCE = 262144
@@ -124,7 +124,7 @@ def lines(tokens: list[Token]) -> list[list[str]]:
     current: list[str] = []
     previous_line = tokens[0].line
     depth = 0
-    continuations = {"=", "+", "-", "−", "*", "/", "·", "∇", "▷"}
+    continuations = {"=", "+", "-", "−", "*", "/", "^", "·", "∇", "▷"}
     for token in tokens:
         if token.line > previous_line and depth == 0 and current and current[-1] not in continuations:
             result.append(current)

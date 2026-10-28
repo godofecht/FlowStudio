@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/godofecht/FlowStudio/actions/workflows/ci.yml/badge.svg)](https://github.com/godofecht/FlowStudio/actions/workflows/ci.yml)
 
-**Version:** `0.1.0-alpha.1` (developer preview; canonical value in [`VERSION`](VERSION)). See [release notes](RELEASE_NOTES.md), [release packages](https://github.com/godofecht/FlowStudio/releases), and the [hosted documentation site](https://godofecht.github.io/FlowStudio/). A preview package is published only after Linux and macOS CI gates qualify the same commit. The static site is published from `docs/` by `.github/workflows/pages.yml` only after CI passes on `main`.
+**Version:** `0.2.0-alpha.2` (developer preview; canonical value in [`VERSION`](VERSION)). See [release notes](RELEASE_NOTES.md), [release packages](https://github.com/godofecht/FlowStudio/releases), and the [hosted documentation site](https://godofecht.github.io/FlowStudio/). A preview package is published only after Linux and macOS CI gates qualify the same commit. The static site is published from `docs/` by `.github/workflows/pages.yml` only after CI passes on `main`.
 
 A **Flow-first scientific IDE** intended to become a capable successor to RStudio. Flow is the application/session language; R and Python are supported as external language runtimes.
 
@@ -149,7 +149,8 @@ and native Flow execution remains unverified.
 In the `docs/app/` editor, select browser webR or native R and type a named
 ordinary-list member access such as `analysis$model$sc`, then press
 **Ctrl/⌘+Space**. Suggestions come from the selected **real R session's
-existing environment inspection**, not from executing the completion text.
+existing environment inspection**, which is only inspected and never
+executed.
 Selecting `score` inserts only that member. A trailing `$` lists the
 inspected names, including nested lists to the inspector's two-level limit.
 

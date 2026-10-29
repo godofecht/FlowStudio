@@ -164,6 +164,8 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
 .editor-find button{padding:4px 8px;font-size:12px}
 #editorFindCount{font-size:12px;color:var(--muted)}
 #source{flex:1;width:100%;min-height:0;resize:none;border:0;padding:12px 16px;background:#111721;color:#e9f0fb;font:14px/1.65 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;tab-size:4}
+#flowDiagnostics{flex:none;max-height:145px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;margin:0;padding:9px 13px;border-top:1px solid var(--line);background:#1a151a;color:#ffb4a8;font:12px/1.5 var(--mono)}
+.monaco-editor .flowstudio-flow-error{text-decoration:underline wavy #e78179;text-underline-offset:3px}
 .dock{border-top:1px solid var(--line);background:#0a0e16}
 .dock-title{display:flex;align-items:center;gap:8px}
 .dock .body{display:flex;flex-direction:column;gap:0;padding:0;overflow:hidden}
@@ -306,6 +308,7 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
       <div class="menu-popup" id="menuRunPopup" role="menu" aria-labelledby="menuRun" hidden>
         <button type="button" role="menuitem" data-command="run">Run selection or file<kbd>Ctrl+Enter</kbd></button>
         <button type="button" role="menuitem" data-command="runCell">Run cell<kbd>Ctrl+Shift+Enter</kbd></button>
+        <button type="button" role="menuitem" data-command="checkFlow">Check Flow syntax (no execution)</button>
         <hr>
         <button type="button" role="menuitem" data-command="resetR">Reset R session</button>
         <button type="button" role="menuitem" data-command="resetPython">Reset Python session</button>
@@ -337,6 +340,7 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
     <label for="flowBackend">Backend</label>
     <select id="flowBackend" aria-label="Flow compiler backend" title="Compiler backend for Flow runs"><option value="" selected>C (default)</option><option value="mlir">MLIR (experimental)</option></select>
     <button id="run" class="primary" title="Run selection or entire buffer (Ctrl/⌘+Enter)"><i data-lucide="play"></i>Run</button>
+    <button id="checkFlow" type="button" title="Compile-check the current Flow buffer without running it">Check Flow</button>
     <button id="runMathFlow" title="Run the supported Unicode mathematical Flow PDE dialect (NumPy required)">Run MathFlow</button>
     <button id="runCell" title="Run current # %% cell (Ctrl/⌘+Shift+Enter)">Run cell</button>
     <button id="resetR" type="button" title="Discard native R variables and restart its interpreter">Reset R</button>
@@ -473,6 +477,7 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
 }
 </textarea>
     <div id="monacoHost" hidden></div>
+    <pre id="flowDiagnostics" role="status" aria-live="polite" hidden></pre>
   </main>
   <div class="splitter" data-splitter data-axis="x" data-panel="right" role="separator" aria-orientation="vertical" aria-label="Resize environment panel" tabindex="0"></div>
   <aside class="panel rightpanel" aria-label="Environment">
@@ -2202,6 +2207,7 @@ const commands = Object.freeze({
   refreshOutline: () => refreshOutline(),
   run: () => el("run").click(),
   runCell: () => el("runCell").click(),
+  checkFlow: () => el("checkFlow").click(),
   resetR: () => el("resetR").click(),
   resetPython: () => el("resetPython").click(),
   showFiles: () => el("tab-files").click(),
@@ -2436,6 +2442,7 @@ if (outlineRefreshButton) outlineRefreshButton.addEventListener("click", refresh
 refreshOutline();
 </script>
 <script src="/workspace_panels.js"></script>
+<script src="/flow_diagnostics.js"></script>
 <script type="module" src="/ui/workbench.js"></script>
 </body>
 </html>

@@ -1,0 +1,291 @@
+# Native Flow 2.0 compiler-generated RK4: two interacting species on a
+# 2x2 periodic anisotropic reaction-diffusion grid (eight coupled states).
+# Each species has independent Dx/Dy and exchanges locally at rate k.
+# A 2x2 Walsh/Fourier transform reduces the exact semidiscrete solution to
+# four independent 2x2 matrix exponentials (including a noncommuting
+# diffusion/exchange pair when the two species have unequal diffusivities).
+# The reference values are independently verified in
+# tests/test_native_flow_coupled_oracle.py. No Python runtime is used here.
+# Run: flow run examples/native_coupled_evolution2d.flow
+
+flow CoupledEvolution2D {
+    state uNorthwest: f64 = 3.6
+    state uNortheast: f64 = 1.6
+    state uSouthwest: f64 = 4.0
+    state uSoutheast: f64 = 2.8
+    state vNorthwest: f64 = 1.4
+    state vNortheast: f64 = 2.6
+    state vSouthwest: f64 = 1.8
+    state vSoutheast: f64 = 3.0
+
+    param diffusivity_ux: f64 = 0.02
+    param diffusivity_uy: f64 = 0.04
+    param diffusivity_vx: f64 = 0.05
+    param diffusivity_vy: f64 = 0.01
+    param exchange_rate: f64 = 0.15
+    param spacing_x: f64 = 0.5
+    param spacing_y: f64 = 0.5
+
+    solver { dt 1 ms method rk4 }
+
+    uNorthwest evolves as 2.0 * diffusivity_ux * (uNortheast - uNorthwest) / (spacing_x * spacing_x) + 2.0 * diffusivity_uy * (uSouthwest - uNorthwest) / (spacing_y * spacing_y) + exchange_rate * (vNorthwest - uNorthwest)
+    uNortheast evolves as 2.0 * diffusivity_ux * (uNorthwest - uNortheast) / (spacing_x * spacing_x) + 2.0 * diffusivity_uy * (uSoutheast - uNortheast) / (spacing_y * spacing_y) + exchange_rate * (vNortheast - uNortheast)
+    uSouthwest evolves as 2.0 * diffusivity_ux * (uSoutheast - uSouthwest) / (spacing_x * spacing_x) + 2.0 * diffusivity_uy * (uNorthwest - uSouthwest) / (spacing_y * spacing_y) + exchange_rate * (vSouthwest - uSouthwest)
+    uSoutheast evolves as 2.0 * diffusivity_ux * (uSouthwest - uSoutheast) / (spacing_x * spacing_x) + 2.0 * diffusivity_uy * (uNortheast - uSoutheast) / (spacing_y * spacing_y) + exchange_rate * (vSoutheast - uSoutheast)
+    vNorthwest evolves as 2.0 * diffusivity_vx * (vNortheast - vNorthwest) / (spacing_x * spacing_x) + 2.0 * diffusivity_vy * (vSouthwest - vNorthwest) / (spacing_y * spacing_y) + exchange_rate * (uNorthwest - vNorthwest)
+    vNortheast evolves as 2.0 * diffusivity_vx * (vNorthwest - vNortheast) / (spacing_x * spacing_x) + 2.0 * diffusivity_vy * (vSoutheast - vNortheast) / (spacing_y * spacing_y) + exchange_rate * (uNortheast - vNortheast)
+    vSouthwest evolves as 2.0 * diffusivity_vx * (vSoutheast - vSouthwest) / (spacing_x * spacing_x) + 2.0 * diffusivity_vy * (vNorthwest - vSouthwest) / (spacing_y * spacing_y) + exchange_rate * (uSouthwest - vSouthwest)
+    vSoutheast evolves as 2.0 * diffusivity_vx * (vSouthwest - vSoutheast) / (spacing_x * spacing_x) + 2.0 * diffusivity_vy * (vNortheast - vSoutheast) / (spacing_y * spacing_y) + exchange_rate * (uSoutheast - vSoutheast)
+}
+
+struct CoupledRun {
+    valid: bool,
+    state: CoupledEvolution2D
+}
+
+function absolute(value: f64) -> f64 {
+    if value < 0.0 { return -value }
+    return value
+}
+
+function maximum(first: f64, second: f64) -> f64 {
+    if first > second { return first }
+    return second
+}
+
+function minimum(first: f64, second: f64) -> f64 {
+    if first < second { return first }
+    return second
+}
+
+function maxDifference(first: CoupledEvolution2D, second: CoupledEvolution2D) -> f64 {
+    let mut error: f64 = absolute(first.uNorthwest - second.uNorthwest)
+    error = maximum(error, absolute(first.uNortheast - second.uNortheast))
+    error = maximum(error, absolute(first.uSouthwest - second.uSouthwest))
+    error = maximum(error, absolute(first.uSoutheast - second.uSoutheast))
+    error = maximum(error, absolute(first.vNorthwest - second.vNorthwest))
+    error = maximum(error, absolute(first.vNortheast - second.vNortheast))
+    error = maximum(error, absolute(first.vSouthwest - second.vSouthwest))
+    error = maximum(error, absolute(first.vSoutheast - second.vSoutheast))
+    return error
+}
+
+function totalMass(state: CoupledEvolution2D) -> f64 {
+    return state.uNorthwest + state.uNortheast + state.uSouthwest + state.uSoutheast + state.vNorthwest + state.vNortheast + state.vSouthwest + state.vSoutheast
+}
+
+function speciesUMass(state: CoupledEvolution2D) -> f64 {
+    return state.uNorthwest + state.uNortheast + state.uSouthwest + state.uSoutheast
+}
+
+function boundedPositive(state: CoupledEvolution2D) -> bool {
+    let mut low: f64 = state.uNorthwest
+    let mut high: f64 = state.uNorthwest
+    low = minimum(low, state.uNorthwest)
+    high = maximum(high, state.uNorthwest)
+    low = minimum(low, state.uNortheast)
+    high = maximum(high, state.uNortheast)
+    low = minimum(low, state.uSouthwest)
+    high = maximum(high, state.uSouthwest)
+    low = minimum(low, state.uSoutheast)
+    high = maximum(high, state.uSoutheast)
+    low = minimum(low, state.vNorthwest)
+    high = maximum(high, state.vNorthwest)
+    low = minimum(low, state.vNortheast)
+    high = maximum(high, state.vNortheast)
+    low = minimum(low, state.vSouthwest)
+    high = maximum(high, state.vSouthwest)
+    low = minimum(low, state.vSoutheast)
+    high = maximum(high, state.vSoutheast)
+    return low >= 1.4 and high <= 4.0
+}
+
+function validRun(state: CoupledEvolution2D, duration: f64, steps: i32) -> bool {
+    if steps <= 0 or steps > 100000 { return false }
+    if not (duration >= 0.0 and duration <= 100.0) { return false }
+    if not (state.spacing_x > 0.0 and state.spacing_x <= 100.0) { return false }
+    if not (state.spacing_y > 0.0 and state.spacing_y <= 100.0) { return false }
+    if not (state.diffusivity_ux >= 0.0 and state.diffusivity_ux <= 100.0) { return false }
+    if not (state.diffusivity_uy >= 0.0 and state.diffusivity_uy <= 100.0) { return false }
+    if not (state.diffusivity_vx >= 0.0 and state.diffusivity_vx <= 100.0) { return false }
+    if not (state.diffusivity_vy >= 0.0 and state.diffusivity_vy <= 100.0) { return false }
+    if not (state.exchange_rate >= 0.0 and state.exchange_rate <= 100.0) { return false }
+    let dx: f64 = maximum(state.diffusivity_ux, state.diffusivity_vx)
+    let dy: f64 = maximum(state.diffusivity_uy, state.diffusivity_vy)
+    let rate: f64 = 4.0 * (dx / (state.spacing_x * state.spacing_x) +
+        dy / (state.spacing_y * state.spacing_y)) + 2.0 * state.exchange_rate
+    # Conservative RK4 step restriction; also rejects huge finite parameters.
+    return duration * rate / (steps as f64) <= 1.0
+}
+
+function runFrom(initial: CoupledEvolution2D, duration: f64, steps: i32) -> CoupledRun {
+    if not validRun(initial, duration, steps) {
+        return CoupledRun { valid: false, state: initial }
+    }
+    let mut state: CoupledEvolution2D = initial
+    let dt: f64 = duration / (steps as f64)
+    for index in 0 to steps {
+        CoupledEvolution2D_step(&state, dt)
+    }
+    return CoupledRun { valid: true, state: state }
+}
+
+function integrate(duration: f64, steps: i32) -> CoupledRun {
+    return runFrom(CoupledEvolution2D_new(), duration, steps)
+}
+
+function analyticReference() -> CoupledEvolution2D {
+    # Closed-form Walsh-mode matrix exponential at t=1; all eight cells.
+    let mut expected: CoupledEvolution2D = CoupledEvolution2D_new()
+    expected.uNorthwest = 3.2214794690416775
+    expected.uNortheast = 2.1681842224129855
+    expected.uSouthwest = 3.4911609716374126
+    expected.uSoutheast = 2.7044844899986740
+    expected.vNorthwest = 1.9550625464474538
+    expected.vNortheast = 2.2859068293425939
+    expected.vSouthwest = 2.3015908222169643
+    expected.vSoutheast = 2.6721306489022409
+    return expected
+}
+
+function main() -> i32 {
+    let initial: CoupledEvolution2D = CoupledEvolution2D_new()
+    let expected: CoupledEvolution2D = analyticReference()
+    let coarse: CoupledRun = integrate(1.0, 8)
+    let medium: CoupledRun = integrate(1.0, 16)
+    let fine: CoupledRun = integrate(1.0, 32)
+    let finest: CoupledRun = integrate(1.0, 64)
+    if not coarse.valid or not medium.valid or not fine.valid or not finest.valid { return 1 }
+    let error8: f64 = maxDifference(coarse.state, expected)
+    let error16: f64 = maxDifference(medium.state, expected)
+    let error32: f64 = maxDifference(fine.state, expected)
+    let error64: f64 = maxDifference(finest.state, expected)
+    if error8 < 0.0000001 { return 2 }
+    if error64 > 0.000000001 { return 3 }
+    if error16 >= 0.09 * error8 { return 4 }
+    if error32 >= 0.09 * error16 { return 5 }
+    if error64 >= 0.09 * error32 { return 6 }
+    if absolute(totalMass(finest.state) - 20.8) > 0.000000000001 { return 7 }
+    if absolute(speciesUMass(finest.state) * 0.25 - 2.8963272882726874) > 0.000000001 { return 8 }
+    if not boundedPositive(finest.state) { return 9 }
+
+    let replay: CoupledRun = integrate(1.0, 64)
+    if not replay.valid or maxDifference(replay.state, finest.state) > 0.000000000001 { return 10 }
+    let half: CoupledRun = integrate(0.5, 32)
+    if not half.valid { return 11 }
+    let secondHalf: CoupledRun = runFrom(half.state, 0.5, 32)
+    if not secondHalf.valid or maxDifference(secondHalf.state, finest.state) > 0.000000000001 { return 12 }
+
+    # Multiplying all rates by 1/2 and time by 2 preserves the same path.
+    let mut scaled: CoupledEvolution2D = initial
+    scaled.diffusivity_ux = 0.01
+    scaled.diffusivity_uy = 0.02
+    scaled.diffusivity_vx = 0.025
+    scaled.diffusivity_vy = 0.005
+    scaled.exchange_rate = 0.075
+    let scaledRun: CoupledRun = runFrom(scaled, 2.0, 64)
+    if not scaledRun.valid or maxDifference(scaledRun.state, finest.state) > 0.000000000001 { return 13 }
+
+    # Species exchange equivariance even with different diffusion tensors.
+    let mut swapped: CoupledEvolution2D = initial
+    swapped.uNorthwest = initial.vNorthwest
+    swapped.uNortheast = initial.vNortheast
+    swapped.uSouthwest = initial.vSouthwest
+    swapped.uSoutheast = initial.vSoutheast
+    swapped.vNorthwest = initial.uNorthwest
+    swapped.vNortheast = initial.uNortheast
+    swapped.vSouthwest = initial.uSouthwest
+    swapped.vSoutheast = initial.uSoutheast
+    swapped.diffusivity_ux = initial.diffusivity_vx
+    swapped.diffusivity_vx = initial.diffusivity_ux
+    swapped.diffusivity_uy = initial.diffusivity_vy
+    swapped.diffusivity_vy = initial.diffusivity_uy
+    let swappedRun: CoupledRun = runFrom(swapped, 1.0, 64)
+    let mut swappedExpected: CoupledEvolution2D = finest.state
+    swappedExpected.uNorthwest = finest.state.vNorthwest
+    swappedExpected.uNortheast = finest.state.vNortheast
+    swappedExpected.uSouthwest = finest.state.vSouthwest
+    swappedExpected.uSoutheast = finest.state.vSoutheast
+    swappedExpected.vNorthwest = finest.state.uNorthwest
+    swappedExpected.vNortheast = finest.state.uNortheast
+    swappedExpected.vSouthwest = finest.state.uSouthwest
+    swappedExpected.vSoutheast = finest.state.uSoutheast
+    if not swappedRun.valid or maxDifference(swappedRun.state, swappedExpected) > 0.000000000001 { return 14 }
+
+    # Transpose grid and swap x/y diffusivities for BOTH species.
+    let mut transposed: CoupledEvolution2D = initial
+    transposed.uNortheast = initial.uSouthwest
+    transposed.uSouthwest = initial.uNortheast
+    transposed.diffusivity_ux = initial.diffusivity_uy
+    transposed.diffusivity_uy = initial.diffusivity_ux
+    transposed.vNortheast = initial.vSouthwest
+    transposed.vSouthwest = initial.vNortheast
+    transposed.diffusivity_vx = initial.diffusivity_vy
+    transposed.diffusivity_vy = initial.diffusivity_vx
+    let transposedRun: CoupledRun = runFrom(transposed, 1.0, 64)
+    let mut transposeExpected: CoupledEvolution2D = finest.state
+    transposeExpected.uNortheast = finest.state.uSouthwest
+    transposeExpected.uSouthwest = finest.state.uNortheast
+    transposeExpected.vNortheast = finest.state.vSouthwest
+    transposeExpected.vSouthwest = finest.state.vNortheast
+    if not transposedRun.valid or maxDifference(transposedRun.state, transposeExpected) > 0.000000000001 { return 15 }
+
+    # Uniform equal-species equilibrium.
+    let mut uniform: CoupledEvolution2D = initial
+    uniform.uNorthwest = 2.6
+    uniform.uNortheast = 2.6
+    uniform.uSouthwest = 2.6
+    uniform.uSoutheast = 2.6
+    uniform.vNorthwest = 2.6
+    uniform.vNortheast = 2.6
+    uniform.vSouthwest = 2.6
+    uniform.vSoutheast = 2.6
+    let equilibrium: CoupledRun = runFrom(uniform, 1.0, 64)
+    if not equilibrium.valid or maxDifference(equilibrium.state, uniform) > 0.000000000001 { return 16 }
+
+    # Zero rates and zero duration preserve the initial state exactly.
+    let mut frozen: CoupledEvolution2D = initial
+    frozen.diffusivity_ux = 0.0
+    frozen.diffusivity_uy = 0.0
+    frozen.diffusivity_vx = 0.0
+    frozen.diffusivity_vy = 0.0
+    frozen.exchange_rate = 0.0
+    let frozenRun: CoupledRun = runFrom(frozen, 1.0, 8)
+    if not frozenRun.valid or maxDifference(frozenRun.state, frozen) > 0.000000000001 { return 17 }
+    let zeroTime: CoupledRun = integrate(0.0, 8)
+    if not zeroTime.valid or maxDifference(zeroTime.state, initial) > 0.000000000001 { return 18 }
+
+    # No exchange conserves the mass of EACH species, not just total mass.
+    let mut uncoupled: CoupledEvolution2D = initial
+    uncoupled.exchange_rate = 0.0
+    let uncoupledRun: CoupledRun = runFrom(uncoupled, 1.0, 64)
+    if not uncoupledRun.valid or absolute(speciesUMass(uncoupledRun.state) - 12.0) > 0.000000000001 { return 19 }
+    if absolute(speciesUMass(finest.state) - 12.0) < 0.1 { return 20 }
+
+    # Reject invalid inputs before invoking the compiler-generated step.
+    if integrate(1.0, 0).valid { return 21 }
+    if integrate(1.0, 100001).valid { return 22 }
+    if integrate(-1.0, 64).valid { return 23 }
+    if integrate(100.1, 64).valid { return 24 }
+    let mut invalid: CoupledEvolution2D = initial
+    invalid.spacing_x = 0.0
+    if runFrom(invalid, 1.0, 64).valid { return 25 }
+    invalid = initial
+    invalid.spacing_y = -0.5
+    if runFrom(invalid, 1.0, 64).valid { return 26 }
+    invalid = initial
+    invalid.diffusivity_vx = -0.01
+    if runFrom(invalid, 1.0, 64).valid { return 27 }
+    invalid = initial
+    invalid.exchange_rate = -0.1
+    if runFrom(invalid, 1.0, 64).valid { return 28 }
+    invalid = initial
+    invalid.exchange_rate = 100.1
+    if runFrom(invalid, 1.0, 64).valid { return 29 }
+    invalid = initial
+    invalid.diffusivity_uy = 1.0
+    if runFrom(invalid, 1.0, 1).valid { return 30 }
+
+    println("native-coupled-evolution2d-ok")
+    return 0
+}

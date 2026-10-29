@@ -1,3 +1,50 @@
+## 2026-10-29: native eight-state coupled anisotropic evolution (CI pending)
+
+`examples/native_coupled_evolution2d.flow` defines **eight real upstream
+Flow 2.0 `flow` states** for two interacting species on a periodic 2x2 grid,
+with independent x/y diffusion coefficients for each species and local
+reaction exchange. The compiler-generated `CoupledEvolution2D_step` uses
+RK4; no hand-written numerical integrator or separate Python mathematical
+frontend executes the Flow example. The unequal species diffusion tensors
+make the reaction and diffusion operators noncommuting. The exact reference
+uses four 2x2 Walsh/Fourier-mode matrix exponentials, not a scalar decay
+shortcut. The Flow program asserts all eight reference values, fourth-order
+convergence at 8/16/32/64 steps, total conservation, species exchange,
+positivity, deterministic replay, semigroup composition, rate/time scaling,
+species swap, grid transpose, uniform equilibrium, zero-rate/time limits,
+uncoupled species conservation and 10 invalid-input cases. A nonzero
+`main()` result fails real HTTP execution.
+
+`tests/test_native_flow_coupled_oracle.py` independently verifies the
+eight constants, an 8x8 direct finite-difference RK4 implementation,
+convergence thresholds, exchange/transposition symmetries, equilibrium and
+mutation sensitivity. **Five independent Python oracle tests passed locally**
+on 29 October 2026; they do not compile or execute Flow. The production
+`tests/http_smoke.py` checks and runs the exact Flow source through the
+real `/api/check/flow` and `/api/run/flow` endpoints and checks that the
+native compiler rejects malformed evolution syntax with HTTP 422.
+`tests/native_math_plot_ui.mjs`, already run by the existing Ubuntu native
+Chromium CI gate, also loads the exact source into the real Monaco editor,
+selects Flow and clicks the primary Run button, requiring the real compiler's
+success marker in the terminal. This browser interaction is pending CI.
+
+**Status: tested for this bounded eight-state native evolution model;
+partial overall.** All six Linux/macOS CI jobs passed in
+[CI #40969162424](https://github.com/godofecht/FlowStudio/actions/runs/40969162424).
+Both source/transport platforms passed 1,143 Node tests (12 skipped, zero
+failed) and 324 Python tests (13 skipped, zero failed), including all five
+new independent oracle tests. Both native Flow 2.0 build/HTTP jobs checked
+and executed the exact coupled model through the production Flow-owned
+server, including real malformed-source rejection with HTTP 422. Both
+FlowJIT jobs passed. Ubuntu Chromium acceptance also loaded the exact
+model into Monaco, selected Flow and executed it through the actual Run
+button, asserting the real compiler's success marker in the terminal.
+The local Python oracle passed all five tests; local native Flow/R/HTTP
+and macOS physical-browser execution were unavailable. Post-merge
+`main` CI is not yet independently verified. This does not establish
+general native PDE grammar, scalable grids, live Flow debugging,
+multi-user isolation or RStudio parity. Hosted CI configuration is unchanged.
+
 ## 2026-10-29: compiler-generated four-state Flow evolution numerical gate (CI pending)
 
 `examples/native_evolution_ring.flow` uses the **actual upstream Flow 2.0

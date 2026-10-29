@@ -174,6 +174,19 @@ try {
       /over simulated time/);
     assert.equal(await page.locator('#mathFlowPlot select[aria-label="Mathematical Flow plotted quantity"]').inputValue(), other);
   }
+  // Real Monaco Run button -> native Flow-owned HTTP -> upstream Flow 2.0
+  // compiler-generated RK4 for eight coupled reaction/diffusion states.
+  // This deliberately exercises the actual browser interaction, not only
+  // fetch() from the Playwright page or the separate mathematical frontend.
+  await page.locator('#language').selectOption('flow');
+  await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
+    readFileSync('examples/native_coupled_evolution2d.flow', 'utf8'));
+  await page.locator('#run').click();
+  await page.waitForFunction(() =>
+    document.querySelector('#console')?.textContent?.includes('native-coupled-evolution2d-ok'),
+    null, { timeout: 80000 });
+  assert.match(await page.locator('#console').textContent(), /native-coupled-evolution2d-ok/);
+
   assert.deepEqual(errors, [], errors.join('\n'));
   console.log('PASS: native mathematical Flow HTTP, linear/nonlinear NumPy PDEs and actual SVG plots in Chromium');
 } finally {

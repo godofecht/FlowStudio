@@ -79,6 +79,32 @@ try {
     document.getElementById('liveDebugOutput').textContent.includes('Python debugger: done'));
   assert.match(await page.locator('#liveDebugOutput').innerText(), /Output:\n42/);
 
+  // Actual native Chromium caret -> Flow HTTP -> persistent CPython one-shot
+  // run-to-line. The target is executed, not emulated by editor navigation.
+  await page.evaluate(() => {
+    const source = document.getElementById('source');
+    source.value = 'caret_a = 1\ncaret_b = caret_a + 1\ncaret_result = caret_b + 1\nprint(caret_result)\n';
+    source.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.locator('#liveDebugBreakpoints').fill('2');
+  await page.locator('#liveDebugStart').click();
+  await page.waitForFunction(() =>
+    document.getElementById('liveDebugOutput').textContent.includes('Line 2 in'));
+  await page.evaluate(() => {
+    const source = document.getElementById('source');
+    const at = source.value.indexOf('print(caret_result)');
+    source.setSelectionRange(at, at);
+    source.dispatchEvent(new Event('select', { bubbles: true }));
+  });
+  assert.equal(await page.locator('#liveDebugRunToCursor').isDisabled(), false);
+  await page.locator('#liveDebugRunToCursor').click();
+  await page.waitForFunction(() =>
+    document.getElementById('liveDebugOutput').textContent.includes('Line 4 in'));
+  assert.match(await page.locator('#liveDebugOutput').innerText(), /caret_result: int = 3/);
+  await page.locator('#liveDebugContinue').click();
+  await page.waitForFunction(() =>
+    document.getElementById('liveDebugOutput').textContent.includes('Python debugger: done'));
+
   // Actual native Chromium/Flow/CPython stack-frame navigation: select a
   // caller frame, then ensure switching editor documents cannot jump into
   // unrelated source while the native kernel remains paused.

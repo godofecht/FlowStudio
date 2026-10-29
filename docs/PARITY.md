@@ -1,3 +1,22 @@
+## 2026-10-29: native CPython one-shot run-to-caret (PR verification pending)
+
+The Flow-owned persistent CPython trace debugger now accepts an explicit,
+bounded 1-based source line over a new intent/origin-gated HTTP route and
+length-framed IPC opcode. Running to the caret executes the real paused source,
+honours existing breakpoints and exception pauses, and clears the temporary
+target after any intervening pause, stop or completion. Invalid/out-of-range
+targets do not resume the worker. Both the primary workspace and the secondary
+browser workspace expose Run to caret; source revision and document identity
+guards still prohibit resuming edited or unrelated buffers. Python kernel
+execution is real and retains local user permissions, not sandboxed.
+
+**Status: partial / PR CI pending.** Native Python unit tests, real HTTP
+acceptance, browser controller and workspace wiring tests were added; no
+passing CI or physical-browser acceptance is claimed until independently
+observed. This does not implement live function-level R stepping, Flow source
+debugging, authenticated remote sessions or complete RStudio parity. No hosted
+CI configuration changed.
+
 ## 2026-10-29: native R debugger run-to-caret (verification pending)
 
 The native workspace now offers **Run R to caret**, using the actual editor

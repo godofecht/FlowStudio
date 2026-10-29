@@ -43,6 +43,7 @@ extern {
     function fs_py_debug_next() -> string
     function fs_py_debug_finish() -> string
     function fs_py_debug_continue() -> string
+    function fs_py_debug_run_to_line(line: string) -> string
     function fs_py_debug_stop() -> string
     function fs_py_debug_state() -> string
     function fs_py_inspect() -> string
@@ -383,6 +384,9 @@ function send_python_debug(action: string, body: string) -> void {
     }
     if eq(action, "continue") {
         output = fs_py_debug_continue()
+    }
+    if eq(action, "run-to-line") {
+        output = fs_py_debug_run_to_line(body)
     }
     if eq(action, "stop") {
         output = fs_py_debug_stop()
@@ -860,6 +864,10 @@ function dispatch() -> void {
         }
         if eq(path, "/api/debug/python/continue") {
             send_python_debug("continue", "")
+            return
+        }
+        if eq(path, "/api/debug/python/run-to-line") {
+            send_python_debug("run-to-line", fs_body())
             return
         }
         if eq(path, "/api/debug/python/stop") {

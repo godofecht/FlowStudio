@@ -673,6 +673,23 @@ def main() -> None:
                              "print('debug_unreached' in globals())", accepted_headers)
     assert status == 200 and output.strip() == "False", (status, output)
 
+    # Real one-shot run-to-line through Flow HTTP and the persistent CPython
+    # trace worker; the target is not retained after an intervening breakpoint.
+    go_source = "go_a = 1\ngo_b = go_a + 1\ngo_c = go_b + 1\nprint(go_c)\n"
+    status, payload = request("POST", "/api/debug/python/start",
+                              json.dumps({"source": go_source, "breakpoints": [2]}),
+                              accepted_headers)
+    assert status == 200 and json.loads(payload)["stack"][0]["line"] == 2, payload
+    status, payload = request("POST", "/api/debug/python/run-to-line", "99", accepted_headers)
+    assert status == 422 and json.loads(payload)["state"] == "paused", payload
+    status, payload = request("POST", "/api/debug/python/run-to-line", "4", accepted_headers)
+    assert status == 200 and json.loads(payload)["stack"][0]["line"] == 4, payload
+    status, payload = request("POST", "/api/debug/python/continue", "", accepted_headers)
+    assert status == 200 and json.loads(payload)["state"] == "done", payload
+    assert request("POST", "/api/debug/python/run-to-line", "4")[0] == 404
+    assert request("POST", "/api/debug/python/run-to-line", "4",
+                   {"X-FlowStudio-Intent": "run", "Origin": "http://attacker.invalid"})[0] == 404
+
     # Real CPython frame-depth stepping: next skips callees; finish exits them.
     depth_source = ("def depth_inner():\n    depth_local = 40\n    return depth_local\n"
                     "depth_result = depth_inner()\nprint(depth_result)\n")

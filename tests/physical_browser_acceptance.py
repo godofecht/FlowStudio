@@ -744,6 +744,32 @@ def test_native_conditional_debugger(page, timeout: int):
         timeout=timeout)
     assert "4" in page.locator("#pythonDebugOutput").inner_text()
 
+    # Actual DOM caret -> Flow HTTP -> persistent CPython trace run-to-line.
+    # This is a one-shot target; no Python source is simulated in the browser.
+    page.locator("#pythonBreakpoints").fill("2")
+    page.locator("#source").fill(
+        "run_a = 1\nrun_b = run_a + 1\nrun_c = run_b + 1\nprint(run_c)\n")
+    page.locator("#pythonDebugStart").click()
+    page.wait_for_function(
+        "() => document.querySelector('#pythonDebugOutput').textContent.includes('Line 2 in <module>')",
+        timeout=timeout)
+    page.locator("#source").evaluate(
+        """node => {
+          const at = node.value.indexOf('print(run_c)');
+          node.setSelectionRange(at, at);
+          node.dispatchEvent(new Event('select', {bubbles: true}));
+        }""")
+    assert not page.locator("#pythonDebugRunToCursor").is_disabled()
+    page.locator("#pythonDebugRunToCursor").click()
+    page.wait_for_function(
+        "() => document.querySelector('#pythonDebugOutput').textContent.includes('Line 4 in <module>')",
+        timeout=timeout)
+    assert "run_c: int = 3" in page.locator("#pythonDebugOutput").inner_text()
+    page.locator("#pythonDebugContinue").click()
+    page.wait_for_function(
+        "() => document.querySelector('#pythonDebugOutput').textContent.includes('Python debugger: done')",
+        timeout=timeout)
+
     # Opt-in exception tracing must pause on a real caught CPython exception.
     page.locator("#pythonBreakpoints").fill("")
     page.locator("#pythonPauseExceptions").check()

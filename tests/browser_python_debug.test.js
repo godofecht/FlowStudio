@@ -90,3 +90,66 @@ test("native debugger client uses intent-gated fixed routes and rejects invalid 
     globalThis.fetch=oldFetch;
   }
 });
+
+
+test("Python run-to-caret maps CRLF source positions and rejects invalid selections", () => {
+  const source = {value:"a = 1\r\nb = 2\nc = 3",selectionStart:0};
+  assert.equal(panel.caretLine(source),1);
+  source.selectionStart = source.value.indexOf("b = 2");
+  assert.equal(panel.caretLine(source),2);
+  source.selectionStart = source.value.indexOf("c = 3");
+  assert.equal(panel.caretLine(source),3);
+  source.selectionStart = -1;
+  assert.equal(panel.caretLine(source),null);
+  source.selectionStart = 999;
+  assert.equal(panel.caretLine(source),null);
+});
+
+test("Python run-to-caret uses native debugger and refuses changed editor source", async () => {
+  const calls = [];
+  const source={value:"x = 1\ny = x + 2\nprint(y)",selectionStart:14};
+  const runToCursorButton = button();
+  const live = panel.create({native:{available:()=>true,
+      async debugPythonStart(){return paused;},
+      async debugPythonRunToLine(line){calls.push(["caret",line]);return {...paused,stack:[{...paused.stack[0],line}]};},
+      async debugPythonCommand(){return done;}},
+    source,language:{value:"python"},breakpoints:{value:"2"},
+    startButton:button(),stepButton:button(),nextButton:button(),finishButton:button(),
+    continueButton:button(),runToCursorButton,stopButton:button(),statusButton:button(),
+    target:{textContent:""}});
+  assert.equal(runToCursorButton.disabled,true);
+  assert.equal(await live.execute("start"),true);
+  assert.equal(runToCursorButton.disabled,false);
+  source.selectionStart = source.value.indexOf("print(y)");
+  live.update();
+  assert.equal(await live.execute("run-to-cursor"),true);
+  assert.deepEqual(calls,[["caret",3]]);
+  source.value += "\nchanged = True";
+  assert.equal(await live.execute("run-to-cursor"),false);
+  assert.deepEqual(calls,[["caret",3]]);
+  assert.equal(runToCursorButton.disabled,true);
+});
+
+test("native Python run-to-line validates targets before intent-gated transport", async () => {
+  const oldLocation=globalThis.location, oldFetch=globalThis.fetch;
+  const requests=[];
+  globalThis.location=new URL("http://127.0.0.1:8751/app/");
+  globalThis.fetch=async (url,options)=>{
+    requests.push({url,options});
+    return {ok:true,status:200,headers:{get:()=>null},
+      text:async()=>JSON.stringify(paused)};
+  };
+  try {
+    await assert.rejects(native.debugPythonRunToLine(0),/positive source line/);
+    await assert.rejects(native.debugPythonRunToLine("2"),/positive source line/);
+    assert.deepEqual(await native.debugPythonRunToLine(3),paused);
+    assert.equal(requests.length,1);
+    assert.equal(requests[0].url,"/api/debug/python/run-to-line");
+    assert.equal(requests[0].options.body,"3");
+    assert.equal(requests[0].options.headers["X-FlowStudio-Intent"],"run");
+  } finally {
+    if (oldLocation===undefined) delete globalThis.location;
+    else globalThis.location=oldLocation;
+    globalThis.fetch=oldFetch;
+  }
+});

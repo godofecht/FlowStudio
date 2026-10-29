@@ -139,6 +139,11 @@ async function debugPythonStart(source, breakpoints, pauseOnException = false) {
     {source, breakpoints};
   return debugPythonResponse("/api/debug/python/start", JSON.stringify(payload));
 }
+async function debugPythonRunToLine(line) {
+  if (!Number.isSafeInteger(line) || line < 1 || line > 100000)
+    throw new Error("Python run-to-line requires a positive source line.");
+  return debugPythonResponse("/api/debug/python/run-to-line", String(line));
+}
 async function debugPythonCommand(action) {
   if (!["step", "next", "finish", "continue", "stop", "status"].includes(action))
     throw new Error("Unknown Python debugger action.");
@@ -465,7 +470,7 @@ function createRSession() {
     exportVariable:unsupported, importVariable:unsupported});
 }
 
-const api = Object.freeze({available, run, createRSession, checkSyntax, checkRSyntax, tracePython, debugRStart, debugRCommand, debugPythonStart, debugPythonCommand, gitStatus, gitHistory, gitDiff, gitStagedDiff, gitStage, gitUnstage, gitCommit, gitBranches, gitCreateBranch, gitSwitchBranch, gitDeleteBranch, gitMergeBranch});
+const api = Object.freeze({available, run, createRSession, checkSyntax, checkRSyntax, tracePython, debugRStart, debugRCommand, debugPythonStart, debugPythonCommand, debugPythonRunToLine, gitStatus, gitHistory, gitDiff, gitStagedDiff, gitStage, gitUnstage, gitCommit, gitBranches, gitCreateBranch, gitSwitchBranch, gitDeleteBranch, gitMergeBranch});
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 global.FlowStudioNativeFlow = api;
 })(globalThis);

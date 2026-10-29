@@ -227,7 +227,7 @@ def serve() -> None:
             length = int(header[1:], 16)
         except ValueError:
             return
-        if header[:1] not in (b"E", b"I", b"P", b"T", b"B", b"S", b"N", b"F", b"C", b"X", b"Q") or length > MAX_SOURCE or (header[:1] in (b"I", b"P", b"S", b"N", b"F", b"C", b"X", b"Q") and length != 0):
+        if header[:1] not in (b"E", b"I", b"P", b"T", b"B", b"S", b"N", b"F", b"C", b"X", b"Q", b"G") or length > MAX_SOURCE or (header[:1] in (b"I", b"P", b"S", b"N", b"F", b"C", b"X", b"Q") and length != 0):
             return
         data = read_exact(stdin, length)
         if data is None:

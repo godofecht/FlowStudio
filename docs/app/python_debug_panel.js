@@ -155,7 +155,7 @@ function create({native, source, language, breakpoints, pauseOnException, startB
       if (state === "paused" && result.stack.length && sourceIsCurrent())
         selectFrame(0, true);
       if (notice) notice("Native Python debugger: " + state +
-        (state === "paused" && !sourceIsCurrent() ?
+        (frameHost && state === "paused" && !sourceIsCurrent() ?
           " (editor changed; navigation disabled)." : "") + ".");
       return result.ok;
     } catch (error) {

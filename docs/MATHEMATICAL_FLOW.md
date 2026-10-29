@@ -2,6 +2,31 @@
 
 The repository contains a **separate mathematical Flow frontend** in `src/math_flow.py`. It now dispatches two explicitly supported PDE families: incompressible periodic 2D Navier–Stokes and scalar 2D heat diffusion with periodic or constant face-Dirichlet boundaries. `src/math_flow_heat.py` implements the second family; `src/math_flow_expr.py` provides a bounded, dimension-checked scalar expression AST used by both families' initial conditions. It lexes Unicode source into positioned tokens, parses and validates the domain/model/solver and observation pipeline, and executes the supported two-dimensional incompressible Navier–Stokes equations using NumPy. This is **not** a modification of the upstream Flow 2.0 compiler, and arbitrary mathematical Flow expressions are not supported. Unsupported equations, methods, units, fields, and boundary conditions are errors rather than silently ignored.
 
+## Measured semantic RK2 inspection (first step)
+
+The executable heat frontend now emits `semantic_trace` alongside its actual
+NumPy simulation. This is **measured execution metadata**, not editor syntax
+highlighting, simulated output or a free-form AI explanation. The validated
+temperature equation is split into its signed AST terms, classified as diffusion,
+cross-diffusion, advection, reaction or prescribed forcing. Each term is evaluated
+using the **same typed NumPy lowering and boundary conditions** as the solver
+at both the initial and predictor RK2 stages. The inspector reports physical
+units (K/s), actual symbol dependencies, contribution mean and extrema, stage
+times, and the maximum residual between the signed term sum and the full RHS.
+
+The native workbench presents the two stages with a stage selector, mathematical
+roles, numerical contributions and the actual RK2 predictor/corrector mean.
+Only the **first timestep** is captured, with a maximum of 16 terms and no
+stored full-resolution state snapshots. A larger equation continues to run but
+does not emit this trace. The roles describe the validated mathematics; they
+do **not** infer the author's unstated intent. This is not an interactive
+general-purpose debugger, reverse execution, or Navier–Stokes semantic stepping.
+
+```sh
+python3 src/math_flow.py examples/heat_composed_forcing.flow
+python3 -m unittest discover -s tests -p 'test_math_flow_semantic_trace.py' -v
+```
+
 ## Bounded saturating nonlinear reaction (executable)
 
 `examples/heat_saturating_reaction.flow` uses the checked scalar AST and NumPy

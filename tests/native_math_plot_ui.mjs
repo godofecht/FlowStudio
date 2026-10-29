@@ -45,6 +45,21 @@ try {
     assert.equal(await spatial.count(), 1, 'Real spatial SVG must render');
     assert.ok(await spatial.locator('rect').count() >= 16 * 16, 'Actual sampled heatmap cells');
     assert.match(await spatial.getAttribute('aria-label'), /Spatial/);
+    if (source === 'examples/heat_composed_forcing.flow') {
+      const inspector = page.locator('#mathFlowPlot [data-mathflow-semantic="rk2"]');
+      assert.equal(await inspector.count(), 1, 'Real RK2 semantic inspector must render');
+      assert.equal(await inspector.locator('ol li').count(), 6,
+        'All six actual signed equation terms must be inspected');
+      assert.match(await inspector.textContent(), /decomposition residual/);
+      assert.match(await inspector.textContent(), /forcing/);
+      await inspector.locator('select[aria-label="Mathematical Flow semantic stage"]').selectOption('1');
+      assert.match(await inspector.textContent(), /predictor/i);
+      assert.match(await inspector.textContent(), /t = 0\.000100000 s/);
+    }
+    if (source === 'examples/navier_stokes_smoke.flow') {
+      assert.equal(await page.locator('#mathFlowPlot [data-mathflow-semantic]').count(), 0,
+        'Do not pretend the heat AST trace applies to Navier–Stokes');
+    }
     if (source === 'examples/heat_neumann.flow') {
       const note = page.locator('#mathFlowPlot [data-mathflow-boundary="Neumann"]');
       assert.equal(await note.count(), 1, 'Native plot must display Neumann metadata');
@@ -106,10 +121,10 @@ try {
     const path = await page.locator('#mathFlowPlot svg path').getAttribute('d');
     assert.ok(path.startsWith('M') && path.includes('L'), path);
     assert.ok(!/NaN|Infinity/.test(path));
-    await page.locator('#mathFlowPlot select').selectOption(other);
+    await page.locator('#mathFlowPlot select[aria-label="Mathematical Flow plotted quantity"]').selectOption(other);
     assert.match(await page.locator('#mathFlowPlot svg').first().getAttribute('aria-label'),
       /over simulated time/);
-    assert.equal(await page.locator('#mathFlowPlot select').inputValue(), other);
+    assert.equal(await page.locator('#mathFlowPlot select[aria-label="Mathematical Flow plotted quantity"]').inputValue(), other);
   }
   assert.deepEqual(errors, [], errors.join('\n'));
   console.log('PASS: native mathematical Flow HTTP, linear/nonlinear NumPy PDEs and actual SVG plots in Chromium');

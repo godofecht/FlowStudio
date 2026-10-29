@@ -147,6 +147,100 @@
     }
     return svg;
   }
+  const TRACE_ROLES = Object.freeze(["diffusion", "crossDiffusion", "advection", "reaction", "forcing"]);
+  function prepareSemanticTrace(result) {
+    const trace = result?.semantic_trace;
+    if (trace === undefined) return null;
+    const finite = value => typeof value === "number" && Number.isFinite(value);
+    if (!trace || trace.schema !== 1 || trace.field !== "temperature" ||
+        trace.integrator !== "RungeKuttaSecondOrder" || trace.rateUnit !== "K/s" ||
+        !finite(trace.timeStep) || trace.timeStep <= 0 ||
+        !Array.isArray(trace.stages) || trace.stages.length !== 2)
+      throw new TypeError("Invalid mathematical Flow semantic trace.");
+    const update = trace.update;
+    if (!update || !["initialMean", "predictorMean", "updatedMean",
+                      "maximumCorrectorDifference"].every(key => finite(update[key])) ||
+        update.maximumCorrectorDifference < 0)
+      throw new TypeError("Invalid semantic RK2 update.");
+    for (const [index, stage] of trace.stages.entries()) {
+      if (!stage || stage.name !== (index ? "predictorSlope" : "initialSlope") ||
+          !finite(stage.time) || Math.abs(stage.time - index * trace.timeStep) >
+            1e-9 * Math.max(1, trace.timeStep) ||
+          !finite(stage.rhsMean) || !finite(stage.maximumDecompositionResidual) ||
+          stage.maximumDecompositionResidual < 0 ||
+          !Array.isArray(stage.terms) || stage.terms.length < 1 || stage.terms.length > 16)
+        throw new TypeError("Invalid semantic RK2 stage.");
+      for (const term of stage.terms) {
+        if (!term || !TRACE_ROLES.includes(term.role) ||
+            typeof term.meaning !== "string" || term.meaning.length > 256 ||
+            ![-1, 1].includes(term.sign) ||
+            typeof term.rootOperator !== "string" || term.rootOperator.length > 32 ||
+            !Array.isArray(term.symbols) || term.symbols.length > 24 ||
+            !term.symbols.every(symbol => typeof symbol === "string" &&
+              /^[A-Za-z_][A-Za-z_0-9]*$/.test(symbol) && symbol.length <= 64) ||
+            !Array.isArray(term.dimension) || term.dimension.length !== 4 ||
+            term.dimension.some((power, i) => power !== [0, 0, -1, 1][i]) ||
+            !["mean", "minimum", "maximum"].every(key => finite(term[key])) ||
+            term.minimum > term.maximum)
+          throw new TypeError("Invalid semantic equation term.");
+      }
+    }
+    if (trace.stages[0].terms.length !== trace.stages[1].terms.length ||
+        trace.stages[0].terms.some((term, index) =>
+          term.role !== trace.stages[1].terms[index].role ||
+          term.sign !== trace.stages[1].terms[index].sign))
+      throw new TypeError("RK2 stages must evaluate the same validated equation.");
+    return trace;
+  }
+  function renderSemanticTrace(doc, result) {
+    const trace = prepareSemanticTrace(result);
+    if (!trace) return null;
+    const section = doc.createElement("section");
+    section.setAttribute("data-mathflow-semantic", "rk2");
+    const heading = doc.createElement("h3");
+    heading.textContent = "Mathematical execution · first RK2 step";
+    const label = doc.createElement("label");
+    label.textContent = "Stage ";
+    const select = doc.createElement("select");
+    select.setAttribute("aria-label", "Mathematical Flow semantic stage");
+    for (const [index, name] of ["Initial slope", "Predictor slope"].entries()) {
+      const option = doc.createElement("option");
+      option.value = String(index);
+      option.textContent = name;
+      select.append(option);
+    }
+    label.append(select);
+    const details = doc.createElement("p");
+    const terms = doc.createElement("ol");
+    function showStage() {
+      const stage = trace.stages[Number(select.value)];
+      details.textContent = "t = " + stage.time.toPrecision(6) +
+        " s · mean ∂ₜtemperature = " + stage.rhsMean.toPrecision(6) +
+        " K/s · decomposition residual = " +
+        stage.maximumDecompositionResidual.toExponential(2) + " K/s";
+      terms.replaceChildren();
+      for (const term of stage.terms) {
+        const item = doc.createElement("li");
+        item.textContent = (term.sign < 0 ? "− " : "+ ") + term.role +
+          " · " + term.meaning + " AST: " + term.rootOperator +
+          " (" + term.symbols.join(", ") + ")" +
+          " · mean " + term.mean.toPrecision(6) + " K/s" +
+          " · range [" + term.minimum.toPrecision(5) + ", " +
+          term.maximum.toPrecision(5) + "] K/s";
+        terms.append(item);
+      }
+    }
+    select.addEventListener("change", showStage);
+    const update = doc.createElement("p");
+    update.textContent = "RK2 mean: " + trace.update.initialMean.toPrecision(6) +
+      " → predictor " + trace.update.predictorMean.toPrecision(6) +
+      " → corrected " + trace.update.updatedMean.toPrecision(6) +
+      " K · maximum predictor/corrector difference " +
+      trace.update.maximumCorrectorDifference.toExponential(3) + " K";
+    section.append(heading, label, details, terms, update);
+    showStage();
+    return section;
+  }
   function render(doc, host, result) {
     const series = prepare(result);
     const heading = doc.createElement("h3");
@@ -278,16 +372,19 @@
     }
     select.addEventListener("change", draw);
     const spatialSvg = renderSpatial(doc, result);
+    const semantic = renderSemanticTrace(doc, result);
     if (spatialSvg) {
       const spatialHeading = doc.createElement("h3");
       spatialHeading.textContent = "Final simulated spatial fields";
-      host.replaceChildren(heading, ...(boundaryNote ? [boundaryNote] : []), label, svg, spatialHeading, spatialSvg);
-    } else host.replaceChildren(heading, ...(boundaryNote ? [boundaryNote] : []), label, svg);
+      host.replaceChildren(heading, ...(boundaryNote ? [boundaryNote] : []), label, svg,
+        spatialHeading, spatialSvg, ...(semantic ? [semantic] : []));
+    } else host.replaceChildren(heading, ...(boundaryNote ? [boundaryNote] : []),
+      label, svg, ...(semantic ? [semantic] : []));
     host.hidden = false;
     draw();
     return series;
   }
-  const api = Object.freeze({ prepare, coordinates, prepareSpatial, renderSpatial, render });
+  const api = Object.freeze({ prepare, coordinates, prepareSpatial, renderSpatial, prepareSemanticTrace, renderSemanticTrace, render });
   root.FlowStudioMathPlots = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

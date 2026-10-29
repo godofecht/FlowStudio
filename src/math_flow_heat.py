@@ -10,7 +10,8 @@ import math
 
 from math_flow_spatial import spatial_snapshot
 from math_flow_expr import TEMPERATURE, parse_expression, evaluate, ExpressionError
-from math_flow_equations import Equation, compile_heat_equation, TEMPERATURE_RATE
+from math_flow_equations import (Equation, compile_heat_equation, TEMPERATURE_RATE,
+                                 semantic_heat_terms, expression_symbols, SEMANTIC_ROLES)
 
 
 @dataclass(frozen=True)
@@ -351,6 +352,44 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
         return ((np.roll(a, -1, axis=0) + np.roll(a, 1, axis=0) - 2 * a) / dx**2 +
                 (np.roll(a, -1, axis=1) + np.roll(a, 1, axis=1) - 2 * a) / dy**2)
 
+    def evaluate_stage(expression, state, time):
+        """Use the identical typed NumPy lowering for the solver and inspection."""
+        return np.broadcast_to(evaluate(
+            expression, x, y, expected_dimension=TEMPERATURE_RATE,
+            values={"temperature": state, "diffusivity": model.diffusivity,
+                    "diffusivityX": model.diffusivity, "diffusivityY": diffusivity_y,
+                    "crossDiffusivity": model.cross_diffusivity,
+                    "reactionRate": model.reaction_rate,
+                    "ambientTemperature": model.ambient_temperature,
+                    "advectionVelocityX": model.advection_velocity_x,
+                    "advectionVelocityY": model.advection_velocity_y,
+                    "t": time},
+            boundary_temperature=model.boundary_temperature,
+            boundary_gradient=model.boundary_gradient,
+            boundary_axes=model.boundary_axes,
+            boundary_faces=model.boundary_faces), (nx, ny))
+
+    def inspect_stage(name, state, time, slope, classified):
+        """Measure each actual signed RHS term at a single RK2 stage."""
+        terms = []
+        accumulated = np.zeros_like(slope)
+        for expression, sign, role in classified:
+            contribution = sign * evaluate_stage(expression, state, time)
+            accumulated += contribution
+            terms.append({"role": role, "meaning": SEMANTIC_ROLES[role],
+                          "sign": sign, "rootOperator": expression.operator,
+                          "symbols": expression_symbols(expression),
+                          "dimension": list(expression.dimension),
+                          "mean": float(np.mean(contribution)),
+                          "minimum": float(np.min(contribution)),
+                          "maximum": float(np.max(contribution))})
+        residual = float(np.max(np.abs(accumulated - slope)))
+        if residual > 1e-8 * max(1.0, float(np.max(np.abs(slope)))):
+            raise error_type("Semantic RHS decomposition disagrees with numerical evaluation")
+        return {"name": name, "time": float(time),
+                "rhsMean": float(np.mean(slope)),
+                "maximumDecompositionResidual": residual, "terms": terms}
+
     def rhs(state, time):
         if not np.all(np.isfinite(state)):
             raise error_type("Non-finite temperature during heat integration")
@@ -377,30 +416,34 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
                      reaction_stiffness / 4) > .45:
                 raise error_type("Heat time step violates nonlinear reaction stability bound")
         try:
-            return np.broadcast_to(evaluate(
-                model.equation.rhs, x, y, expected_dimension=TEMPERATURE_RATE,
-                values={"temperature": state, "diffusivity": model.diffusivity,
-                        "diffusivityX": model.diffusivity, "diffusivityY": diffusivity_y,
-                        "crossDiffusivity": model.cross_diffusivity,
-                        "reactionRate": model.reaction_rate,
-                        "ambientTemperature": model.ambient_temperature,
-                        "advectionVelocityX": model.advection_velocity_x,
-                        "advectionVelocityY": model.advection_velocity_y,
-                        "t": time},
-                boundary_temperature=model.boundary_temperature,
-                boundary_gradient=model.boundary_gradient,
-                boundary_axes=model.boundary_axes,
-                boundary_faces=model.boundary_faces), (nx, ny))
+            return evaluate_stage(model.equation.rhs, state, time)
         except (ExpressionError, ValueError) as exc:
             raise error_type(f"Invalid heat equation evaluation: {exc}") from exc
 
     observations = [{"time": 0.0, "meanTemperature": initial_mean,
                      "temperatureVariance": initial_variance}]
     sample_stride = max(1, math.ceil(steps / 128))
+    semantic_trace = None
     for step_index in range(steps):
         stage_time = step_index * dt
         k1 = rhs(field, stage_time)
-        k2 = rhs(field + dt * k1, stage_time + dt)
+        predictor = field + dt * k1
+        k2 = rhs(predictor, stage_time + dt)
+        if step_index == 0 and model.equation is not None:
+            classified = semantic_heat_terms(model.equation)
+            # Bounded inspection: no unbounded per-step or per-term history.
+            if len(classified) <= 16:
+                first_stage = inspect_stage("initialSlope", field, stage_time, k1, classified)
+                second_stage = inspect_stage("predictorSlope", predictor, stage_time + dt, k2, classified)
+                semantic_trace = {
+                    "schema": 1, "field": "temperature", "integrator": "RungeKuttaSecondOrder",
+                    "rateUnit": "K/s", "timeStep": float(dt),
+                    "stages": [first_stage, second_stage],
+                    "update": {"initialMean": float(np.mean(field)),
+                               "predictorMean": float(np.mean(predictor)),
+                               "updatedMean": float(np.mean(field + .5 * dt * (k1 + k2))),
+                               "maximumCorrectorDifference": float(np.max(np.abs(
+                                   .5 * dt * (k2 - k1))))}}
         field += .5 * dt * (k1 + k2)
         if not np.all(np.isfinite(field)):
             raise error_type("Non-finite temperature during heat integration")
@@ -433,5 +476,6 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
                                                            model.boundary_faces)}
                                if model.boundary_faces is not None else None),
             "observations": observations,
+            **({"semantic_trace": semantic_trace} if semantic_trace is not None else {}),
             "spatial": spatial_snapshot(
                 {"temperature": field}, (model.length_x, model.length_y))}

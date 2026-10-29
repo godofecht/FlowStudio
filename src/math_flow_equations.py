@@ -298,3 +298,54 @@ def compile_heat_equation(tokens: list[str], *, reaction: bool = False,
         raise ExpressionError("Heat dynamics requires exactly the declared diffusion operators and relaxation")
     return Equation("temperature", rhs, forcing, relaxation, nonlinear, advection,
                     reaction_power, reaction_kind)
+
+# These categories describe the mathematical meaning of *validated* terms.
+# They do not claim to recover the author's unrecorded intention.
+SEMANTIC_ROLES = {
+    "diffusion": "Spatial redistribution driven by temperature curvature.",
+    "crossDiffusion": "Mixed spatial derivative coupling the two coordinate directions.",
+    "advection": "Transport by the declared constant velocity.",
+    "reaction": "Local relaxation toward the declared ambient temperature.",
+    "forcing": "Prescribed source independent of the evolving temperature field.",
+}
+
+
+def semantic_heat_terms(equation: Equation):
+    """Return signed, dimension-checked AST terms with grounded physical roles.
+
+    Classification is performed only after compile_heat_equation has rejected
+    unsupported dynamics. No symbolic rewriting or speculative intent inference.
+    """
+    if equation.field != "temperature" or equation.rhs.dimension != TEMPERATURE_RATE:
+        raise ExpressionError("Semantic inspection requires a validated temperature-rate equation")
+    classified = []
+    for expression, sign in _signed_terms(equation.rhs):
+        if (_diffusion(expression) or any(_anisotropic_diffusion(expression, axis)
+                                         for axis in ("x", "y"))):
+            role = "diffusion"
+        elif _mixed_diffusion(expression):
+            role = "crossDiffusion"
+        elif any(_advection(expression, axis) for axis in ("x", "y")):
+            role = "advection"
+        elif (_relaxation(expression) or _quadratic_relaxation(expression)
+              or _polynomial_relaxation(expression) is not None
+              or _saturating_relaxation(expression)):
+            role = "reaction"
+        elif _independent(expression) and expression.dimension == TEMPERATURE_RATE:
+            role = "forcing"
+        else:
+            raise ExpressionError("Unclassified mathematical term in validated heat equation")
+        classified.append((expression, sign, role))
+    return tuple(classified)
+
+
+def expression_symbols(expression: Expression) -> list[str]:
+    """Return the actual typed AST symbol dependencies, never inferred prose."""
+    names = set()
+    def visit(node: Expression):
+        if node.operator == "name":
+            names.add(str(node.value))
+        for child in node.operands:
+            visit(child)
+    visit(expression)
+    return sorted(names)

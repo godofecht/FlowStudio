@@ -287,7 +287,7 @@
         trace.update.initialKineticEnergy.toPrecision(6) + " → predictor " +
         trace.update.predictorKineticEnergy.toPrecision(6) + " → corrected " +
         trace.update.updatedKineticEnergy.toPrecision(6) +
-        " J · maximum unprojected corrector difference " +
+        " J/m (per unit depth) · maximum unprojected corrector difference " +
         trace.update.maximumCorrectorDifference.toExponential(3) + " m/s";
       section.append(heading, label, details, terms, projections, update);
       showStage();

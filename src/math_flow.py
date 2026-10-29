@@ -21,7 +21,7 @@ from math_flow_expr import parse_expression, evaluate, ExpressionError, VELOCITY
 TOKEN = re.compile(
     r"\s+|#[^\n]*|10[⁻−-][⁰¹²³⁴⁵⁶⁷⁸⁹0-9]+|"
     r"\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|"
-    r"[A-Za-z_][A-Za-z_0-9]*|[∂∇∫ₜₓᵧπ²³⁻⁰¹⁴⁵⁶⁷⁸⁹×·÷√∛▷−½≤≥]|"
+    r"[A-Za-z_][A-Za-z_0-9]*|[∂∇∫ₜₓᵧπ²³⁻⁰¹⁴⁵⁶⁷⁸⁹×·÷√∛▷−½≤≥∧∨¬]|"
     r"[{}()<>=:,/+*.\-^|]"
 )
 SUPERSCRIPTS = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁻", "0123456789-")

@@ -527,3 +527,30 @@ python3 -m unittest discover -s tests -p 'test_math_flow_inverse_trigonometry.py
 This extends the opt-in scalar expression language only. General coupled
 PDEs, upstream Flow 2.0 grammar integration and unrestricted mathematical
 equation compilation remain incomplete.
+
+## Symmetric mixed spatial derivatives (periodic)
+
+The checked scalar expression compiler accepts both `∂ₓᵧ(field)` and
+`∂ᵧₓ(field)`. Both normalize to the same typed mixed-derivative AST node,
+with physical dimension `dimension(field) / m²`, and execute using the
+four-corner centered finite-difference stencil. The equivalent nested
+forms `∂ₓ(∂ᵧ(field))` and `∂ᵧ(∂ₓ(field))` are also accepted by the
+cross-diffusion PDE compiler. This equivalence is defined on the current
+**periodic Cartesian grid**; compact mixed derivatives with nonperiodic
+boundaries are explicitly rejected.
+
+`examples/heat_cross_diffusion_compact.flow` is an executable anisotropic
+cross-diffusion program using the compact operator. The analytic regression
+tests compare the actual numerical field against the discrete Fourier-mode
+eigenvalue, compare both nested orders and both compact spellings, check
+physical dimensions and verify CLI execution. Native Chromium acceptance
+loads the program and displays its computed temperature heatmap.
+
+```sh
+python3 src/math_flow.py --check examples/heat_cross_diffusion_compact.flow
+python3 src/math_flow.py examples/heat_cross_diffusion_compact.flow
+python3 -m unittest discover -s tests -p 'test_math_flow_mixed_derivatives.py' -v
+```
+
+This remains an opt-in bounded scalar PDE frontend, not general tensor
+calculus or upstream Flow 2.0 grammar integration.

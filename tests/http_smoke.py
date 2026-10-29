@@ -118,6 +118,17 @@ def main() -> None:
     assert status == 200, ("native mathematical Flow compile", status, body)
     status, body = request("POST", "/api/run/flow", native_math_source, accepted_headers)
     assert status == 200, ("native mathematical Flow execution", status, body)
+    # A genuinely coupled three-state native Flow model with a conservative
+    # transport generator, independent exact eigenmode values, RK2 refinement,
+    # positivity, deterministic replay, rescaling and negative-input assertions.
+    # Exit-code assertions are enforced by the actual /api/run/flow transport:
+    # any nonzero main() result becomes HTTP 422, never a false positive.
+    cyclic_source = (Path(__file__).resolve().parents[1] /
+                     "examples/native_cyclic_network.flow").read_text(encoding="utf-8")
+    status, body = request("POST", "/api/check/flow", cyclic_source, accepted_headers)
+    assert status == 200, ("native cyclic Flow compile", status, body)
+    status, body = request("POST", "/api/run/flow", cyclic_source, accepted_headers)
+    assert status == 200, ("native cyclic Flow eigenmode acceptance", status, body)
     # Real Flow HTTP route, request intent/origin gate, and safe Quarto
     # preflight rejection (does not require Quarto to be installed).
     invalid_qmd = "---\nformat: pdf\n---\n\n# Wrong format\n"

@@ -30,7 +30,9 @@ function fixture(native, identity = () => 0) {
   const instance = panel.create({native, source, language, runtime, startButton,
     stepButton, continueButton, evaluateButton, stopButton, statusButton,
     targetLine, watchExpression, target, documentIdentity:identity});
-  return {instance, source, language, runtime, target, watchExpression};
+  return {instance, source, language, runtime, target, watchExpression,
+    startButton, stepButton, continueButton, evaluateButton, stopButton, statusButton,
+    targetLine};
 }
 
 test("R source line navigation respects real textarea lines and CRLF", () => {
@@ -84,7 +86,7 @@ test("R debugger refuses stale document, language and changed-source navigation"
   assert.equal(await f.instance.execute("start"), true);
   assert.equal(f.source.selectionStart, 7);
   document++;
-  assert.equal(await f.instance.execute("step"), true);
+  assert.equal(await f.instance.execute("step"), false);
   assert.equal(f.source.selectionStart, 7);
   document--;
   f.source.value = "changed\nsource";
@@ -114,6 +116,12 @@ test("R debugger never navigates an asynchronous start into a replaced editor", 
   assert.equal(await pending, true);
   assert.equal(f.source.selectionStart, -1);
   assert.match(f.target.textContent, /Next expression at line 2/);
+  assert.equal(f.stepButton.disabled, true);
+  assert.equal(f.continueButton.disabled, true);
+  assert.equal(f.evaluateButton.disabled, true);
+  assert.equal(f.stopButton.disabled, false);
+  assert.equal(f.statusButton.disabled, false);
+  assert.equal(await f.instance.execute("step"), false);
 });
 
 test("native Pages R debugger passes changing editor and session identity", () => {
@@ -122,4 +130,73 @@ test("native Pages R debugger passes changing editor and session identity", () =
   assert.match(html, /setFilename: \(name, path\) => \{ editorIdentity\+\+/);
   assert.match(html, /editorIdentity\+\+; \$\("source"\)\.value = source/);
   assert.match(html, /editorIdentity\+\+; fileName = name\.replace/);
+});
+
+test("R paused commands cannot execute a changed or edit-undone source snapshot", async () => {
+  const calls = [];
+  const native = {
+    available:() => true,
+    async debugRStart(source) { calls.push(["start", source]); return result("paused"); },
+    async debugRCommand(action) {
+      calls.push([action]);
+      return action === "stop" ? result("idle", {total:0}) : result("paused");
+    }
+  };
+  const f = fixture(native);
+  assert.equal(await f.instance.execute("start"), true);
+  assert.equal(f.stepButton.disabled, false);
+  f.source.value += "\nnew_value <- 3";
+  f.source.emit("input");
+  assert.equal(f.stepButton.disabled, true);
+  assert.equal(f.continueButton.disabled, true);
+  assert.equal(f.evaluateButton.disabled, true);
+  assert.equal(f.targetLine.disabled, true);
+  assert.equal(f.stopButton.disabled, false);
+  assert.equal(f.statusButton.disabled, false);
+  assert.equal(await f.instance.execute("step"), false);
+  assert.equal(await f.instance.execute("continue"), false);
+  f.watchExpression.value = "a + 1";
+  assert.equal(await f.instance.execute("evaluate"), false);
+  assert.match(f.target.textContent, /source changed/);
+  assert.deepEqual(calls.map(item => item[0]), ["start"]);
+  // Undo restores the characters, but not the original source revision.
+  f.source.value = "a <- 1\nb <- 2\nstop('bad')";
+  f.source.emit("input");
+  assert.equal(await f.instance.execute("step"), false);
+  assert.equal(f.stepButton.disabled, true);
+  assert.equal(await f.instance.execute("status"), true);
+  assert.equal(f.stepButton.disabled, true);
+  assert.equal(await f.instance.execute("stop"), true);
+  assert.equal(await f.instance.execute("start"), true);
+  assert.equal(f.stepButton.disabled, false);
+  assert.deepEqual(calls.map(item => item[0]), ["start", "status", "stop", "start"]);
+});
+
+test("R failed-frame evaluation cannot target a different document", async () => {
+  let document = 0;
+  const calls = [];
+  const native = {
+    available:() => true,
+    async debugRStart() { return result("paused"); },
+    async debugRCommand(action) {
+      calls.push(action);
+      if (action === "step") return result("error", {
+        ok:false, failed_line:2, frames:[{id:1, call:"broken()", locals:["x"]}]
+      });
+      if (action === "stop") return result("idle", {total:0, frames:[]});
+      return result("error", {failed_line:2});
+    }
+  };
+  const f = fixture(native, () => document);
+  assert.equal(await f.instance.execute("start"), true);
+  assert.equal(await f.instance.execute("step"), false);
+  assert.equal(f.evaluateButton.disabled, false);
+  document++;
+  f.instance.update();
+  assert.equal(f.evaluateButton.disabled, true);
+  f.watchExpression.value = "x";
+  assert.equal(await f.instance.execute("evaluate"), false);
+  assert.equal(await f.instance.execute("status"), true);
+  assert.equal(await f.instance.execute("stop"), true);
+  assert.deepEqual(calls, ["step", "status", "stop"]);
 });

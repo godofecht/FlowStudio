@@ -165,6 +165,28 @@ def main() -> None:
     status, body = request("POST", "/api/run/flow", tensor_source, accepted_headers)
     assert status == 200 and "native-tensor-grid-ok" in body, (
         "native tensor grid analytic execution", status, body)
+    # Actual upstream Flow evolution DSL, not a hand-coded ODE or Python
+    # interpreter: four coupled states with compiler-generated RK4, checked
+    # against a discrete Fourier/Poisson oracle and fourth-order refinement.
+    ring_source = (Path(__file__).resolve().parents[1] /
+                   "examples/native_evolution_ring.flow").read_text(encoding="utf-8")
+    status, body = request("POST", "/api/check/flow", ring_source, accepted_headers)
+    assert status == 200, ("native evolution ring compile", status, body)
+    status, body = request("POST", "/api/run/flow", ring_source, accepted_headers)
+    assert status == 200 and "native-evolution-ring-ok" in body, (
+        "native evolution ring RK4 analytic execution", status, body)
+    # Negative compiler acceptance: malformed evolution syntax must be
+    # rejected by the real compiler rather than accepted by a lexical scan.
+    invalid_ring = ring_source.replace(
+        "west evolves as rate * (south - west)",
+        "west evolves as rate * (south -",
+        1,
+    )
+    assert invalid_ring != ring_source
+    status, body = request("POST", "/api/check/flow", invalid_ring, accepted_headers)
+    assert status == 422 and body.strip(), (
+        "native evolution malformed-source rejection", status, body)
+
     # Four independently phased Fourier modes through the REAL persistent CPython
     # kernel and Flow-owned HTTP transport, not a replacement numerical solver.
     # Execute the checked-in solver source in an isolated namespace to prevent

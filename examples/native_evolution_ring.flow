@@ -1,0 +1,174 @@
+# Native Flow 2.0 evolution DSL: four-state directed ring transport.
+# The compiler-generated RK4 integrator advances all four coupled states.
+# dX_j/dt = rate * (X_(j-1) - X_j), indices modulo four.
+#
+# Analytic reference: a continuous-time Poisson ring with four Fourier
+# eigenmodes (1, -1, i, -i), including the oscillatory conjugate pair.
+# No Python numerical backend, hand-coded RK4, or mock compiler is used.
+# Run: flow run examples/native_evolution_ring.flow
+
+flow RingTransport {
+    state north : f64 = 1.0
+    state east  : f64 = 0.0
+    state south : f64 = 0.0
+    state west  : f64 = 0.0
+
+    param rate : f64 = 0.8
+
+    solver { dt 1 ms method rk4 }
+
+    north evolves as rate * (west - north)
+    east evolves as rate * (north - east)
+    south evolves as rate * (east - south)
+    west evolves as rate * (south - west)
+}
+
+struct RingRun {
+    valid: bool,
+    state: RingTransport
+}
+
+function absolute(value: f64) -> f64 {
+    if value < 0.0 { return -value }
+    return value
+}
+
+function maximum(first: f64, second: f64) -> f64 {
+    if first > second { return first }
+    return second
+}
+
+function difference(first: RingTransport, second: RingTransport) -> f64 {
+    let mut error: f64 = absolute(first.north - second.north)
+    error = maximum(error, absolute(first.east - second.east))
+    error = maximum(error, absolute(first.south - second.south))
+    error = maximum(error, absolute(first.west - second.west))
+    return error
+}
+
+function total(state: RingTransport) -> f64 {
+    return state.north + state.east + state.south + state.west
+}
+
+function validRun(rate: f64, duration: f64, steps: i32) -> bool {
+    if steps <= 0 or steps > 100000 { return false }
+    # Bounded comparisons also reject NaN and infinities.
+    if not (rate >= 0.0 and rate <= 100.0) { return false }
+    if not (duration >= 0.0 and duration <= 100.0) { return false }
+    # Conservative bound for the RK4 ring generator.
+    if rate * duration / (steps as f64) > 0.25 { return false }
+    return true
+}
+
+function runFrom(initial: RingTransport, rate: f64,
+                 duration: f64, steps: i32) -> RingRun {
+    if not validRun(rate, duration, steps) {
+        return RingRun { valid: false, state: initial }
+    }
+    let mut state: RingTransport = initial
+    state.rate = rate
+    let dt: f64 = duration / (steps as f64)
+    for index in 0 to steps {
+        RingTransport_step(&state, dt)
+    }
+    return RingRun { valid: true, state: state }
+}
+
+function integrate(rate: f64, duration: f64, steps: i32) -> RingRun {
+    return runFrom(RingTransport_new(), rate, duration, steps)
+}
+
+function analyticReference() -> RingTransport {
+    # Independent discrete-Fourier solution at rate=0.8, t=2:
+    # p_j = 1/4 + exp(-1.6)/2 * cos(1.6 - j*pi/2)
+    #              + exp(-3.2)/4 * (-1)^j.
+    let mut state: RingTransport = RingTransport_new()
+    state.north = 0.25724291005472283
+    state.east = 0.34071466397213435
+    state.south = 0.26313819193446030
+    state.west = 0.13890423403868257
+    return state
+}
+
+function main() -> i32 {
+    let expected: RingTransport = analyticReference()
+    let coarse: RingRun = integrate(0.8, 2.0, 8)
+    let medium: RingRun = integrate(0.8, 2.0, 16)
+    let fine: RingRun = integrate(0.8, 2.0, 32)
+    let finest: RingRun = integrate(0.8, 2.0, 64)
+    if not coarse.valid or not medium.valid or
+       not fine.valid or not finest.valid { return 1 }
+
+    let error8: f64 = difference(coarse.state, expected)
+    let error16: f64 = difference(medium.state, expected)
+    let error32: f64 = difference(fine.state, expected)
+    let error64: f64 = difference(finest.state, expected)
+    if error8 < 0.000001 { return 2 }
+    if error64 > 0.00000001 { return 3 }
+    # Global fourth-order convergence, not merely a single lucky value.
+    if error16 >= 0.09 * error8 { return 4 }
+    if error32 >= 0.09 * error16 { return 5 }
+    if error64 >= 0.09 * error32 { return 6 }
+
+    if absolute(total(finest.state) - 1.0) > 0.000000000001 { return 7 }
+    if finest.state.north < 0.0 or finest.state.north > 1.0 or
+       finest.state.east < 0.0 or finest.state.east > 1.0 or
+       finest.state.south < 0.0 or finest.state.south > 1.0 or
+       finest.state.west < 0.0 or finest.state.west > 1.0 { return 8 }
+
+    let replay: RingRun = integrate(0.8, 2.0, 64)
+    if not replay.valid or difference(replay.state, finest.state) > 0.000000000001 {
+        return 9
+    }
+    let firstHalf: RingRun = integrate(0.8, 1.0, 32)
+    if not firstHalf.valid { return 10 }
+    let secondHalf: RingRun = runFrom(firstHalf.state, 0.8, 1.0, 32)
+    if not secondHalf.valid or
+       difference(secondHalf.state, finest.state) > 0.000000000001 { return 11 }
+
+    # Scaling rate by 1/2 and duration by 2 preserves the trajectory.
+    let scaled: RingRun = integrate(0.4, 4.0, 64)
+    if not scaled.valid or
+       difference(scaled.state, finest.state) > 0.000000000001 { return 12 }
+
+    # Rotating the initial population by one node rotates the whole solution.
+    let mut rotatedInitial: RingTransport = RingTransport_new()
+    rotatedInitial.north = 0.0
+    rotatedInitial.east = 1.0
+    let rotated: RingRun = runFrom(rotatedInitial, 0.8, 2.0, 64)
+    let mut rotatedExpected: RingTransport = RingTransport_new()
+    rotatedExpected.north = finest.state.west
+    rotatedExpected.east = finest.state.north
+    rotatedExpected.south = finest.state.east
+    rotatedExpected.west = finest.state.south
+    if not rotated.valid or
+       difference(rotated.state, rotatedExpected) > 0.000000000001 { return 13 }
+
+    # Uniform equilibrium and the zero-rate/zero-duration limits.
+    let mut uniform: RingTransport = RingTransport_new()
+    uniform.north = 0.25
+    uniform.east = 0.25
+    uniform.south = 0.25
+    uniform.west = 0.25
+    let equilibrium: RingRun = runFrom(uniform, 0.8, 2.0, 64)
+    if not equilibrium.valid or
+       difference(equilibrium.state, uniform) > 0.000000000001 { return 14 }
+    let frozen: RingRun = integrate(0.0, 2.0, 8)
+    if not frozen.valid or
+       difference(frozen.state, RingTransport_new()) > 0.000000000001 { return 15 }
+    let zeroDuration: RingRun = integrate(0.8, 0.0, 8)
+    if not zeroDuration.valid or
+       difference(zeroDuration.state, RingTransport_new()) > 0.000000000001 { return 16 }
+
+    # Invalid parameters and excessive work must be rejected before stepping.
+    if integrate(0.8, 2.0, 0).valid { return 17 }
+    if integrate(0.8, 2.0, 100001).valid { return 18 }
+    if integrate(-0.8, 2.0, 64).valid { return 19 }
+    if integrate(0.8, -2.0, 64).valid { return 20 }
+    if integrate(100.1, 2.0, 64).valid { return 21 }
+    if integrate(0.8, 100.1, 64).valid { return 22 }
+    if integrate(4.0, 2.0, 1).valid { return 23 }
+
+    println("native-evolution-ring-ok")
+    return 0
+}

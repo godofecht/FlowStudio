@@ -84,7 +84,7 @@ try {
   // unrelated source while the native kernel remains paused.
   await page.evaluate(() => {
     const source = document.getElementById('source');
-    source.value = 'def inner():\\n    value = 40\\n    return value\\nanswer = inner()\\nprint(answer)\\n';
+    source.value = 'def inner():\n    value = 40\n    return value\nanswer = inner()\nprint(answer)\n';
     source.dispatchEvent(new Event('input', { bubbles: true }));
   });
   await page.locator('#liveDebugBreakpoints').fill('3');

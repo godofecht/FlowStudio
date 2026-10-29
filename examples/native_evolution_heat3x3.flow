@@ -1,0 +1,198 @@
+# Real Flow 2.0 nine-state, 3x3 periodic anisotropic heat evolution.
+# Unlike 2x2 grids, both periodic neighbors are distinct on each axis.
+# Flow's compiler generates the RK4 stepping function; no Python runtime.
+# Discrete Fourier eigenvalues: lambda_x = -3*Dx/dx^2 = -0.24,
+# lambda_y = -3*Dy/dy^2 = -0.48, lambda_xy = -0.72.
+# Initial field = 3 + 0.6 cos(2pi*x/3) - 0.4 cos(2pi*y/3)
+#                 + 0.3 cos(2pi*x/3) cos(2pi*y/3).
+# Exact semidiscrete solution: multiply each Fourier amplitude by exp(lambda*t).
+# Run: flow run examples/native_evolution_heat3x3.flow
+
+flow PeriodicHeat3x3 {
+    state northwest: f64 = 3.5
+    state north: f64 = 2.15
+    state northeast: f64 = 2.15
+    state west: f64 = 3.65
+    state center: f64 = 2.975
+    state east: f64 = 2.975
+    state southwest: f64 = 3.65
+    state south: f64 = 2.975
+    state southeast: f64 = 2.975
+
+    param diffusivity_x: f64 = 0.02
+    param diffusivity_y: f64 = 0.04
+    param spacing_x: f64 = 0.5
+    param spacing_y: f64 = 0.5
+
+    solver { dt 1 ms method rk4 }
+
+    northwest evolves as diffusivity_x * (northeast + north - 2.0 * northwest) / (spacing_x * spacing_x) + diffusivity_y * (southwest + west - 2.0 * northwest) / (spacing_y * spacing_y)
+    north evolves as diffusivity_x * (northwest + northeast - 2.0 * north) / (spacing_x * spacing_x) + diffusivity_y * (south + center - 2.0 * north) / (spacing_y * spacing_y)
+    northeast evolves as diffusivity_x * (north + northwest - 2.0 * northeast) / (spacing_x * spacing_x) + diffusivity_y * (southeast + east - 2.0 * northeast) / (spacing_y * spacing_y)
+    west evolves as diffusivity_x * (east + center - 2.0 * west) / (spacing_x * spacing_x) + diffusivity_y * (northwest + southwest - 2.0 * west) / (spacing_y * spacing_y)
+    center evolves as diffusivity_x * (west + east - 2.0 * center) / (spacing_x * spacing_x) + diffusivity_y * (north + south - 2.0 * center) / (spacing_y * spacing_y)
+    east evolves as diffusivity_x * (center + west - 2.0 * east) / (spacing_x * spacing_x) + diffusivity_y * (northeast + southeast - 2.0 * east) / (spacing_y * spacing_y)
+    southwest evolves as diffusivity_x * (southeast + south - 2.0 * southwest) / (spacing_x * spacing_x) + diffusivity_y * (west + northwest - 2.0 * southwest) / (spacing_y * spacing_y)
+    south evolves as diffusivity_x * (southwest + southeast - 2.0 * south) / (spacing_x * spacing_x) + diffusivity_y * (center + north - 2.0 * south) / (spacing_y * spacing_y)
+    southeast evolves as diffusivity_x * (south + southwest - 2.0 * southeast) / (spacing_x * spacing_x) + diffusivity_y * (east + northeast - 2.0 * southeast) / (spacing_y * spacing_y)
+}
+struct HeatRun3x3 {
+    valid: bool,
+    state: PeriodicHeat3x3
+}
+
+function absolute(value: f64) -> f64 {
+    if value < 0.0 { return -value }
+    return value
+}
+
+function maximum(first: f64, second: f64) -> f64 {
+    if first > second { return first }
+    return second
+}
+
+function maxDifference(first: PeriodicHeat3x3, second: PeriodicHeat3x3) -> f64 {
+    let mut error: f64 = 0.0
+    error = maximum(error, absolute(first.northwest - second.northwest))
+    error = maximum(error, absolute(first.north - second.north))
+    error = maximum(error, absolute(first.northeast - second.northeast))
+    error = maximum(error, absolute(first.west - second.west))
+    error = maximum(error, absolute(first.center - second.center))
+    error = maximum(error, absolute(first.east - second.east))
+    error = maximum(error, absolute(first.southwest - second.southwest))
+    error = maximum(error, absolute(first.south - second.south))
+    error = maximum(error, absolute(first.southeast - second.southeast))
+    return error
+}
+
+function meanTemperature(state: PeriodicHeat3x3) -> f64 {
+    return (state.northwest + state.north + state.northeast + state.west + state.center + state.east + state.southwest + state.south + state.southeast) / 9.0
+}
+
+function validRun(state: PeriodicHeat3x3, duration: f64, steps: i32) -> bool {
+    if steps <= 0 or steps > 100000 { return false }
+    if not (duration >= 0.0 and duration <= 100.0) { return false }
+    if not (state.spacing_x > 0.0 and state.spacing_x <= 100.0) { return false }
+    if not (state.spacing_y > 0.0 and state.spacing_y <= 100.0) { return false }
+    if not (state.diffusivity_x >= 0.0 and state.diffusivity_x <= 100.0) { return false }
+    if not (state.diffusivity_y >= 0.0 and state.diffusivity_y <= 100.0) { return false }
+    # Conservative RK4 step restriction, including invalid huge coefficients.
+    let maximum_rate: f64 = 4.0 * (
+        state.diffusivity_x / (state.spacing_x * state.spacing_x) +
+        state.diffusivity_y / (state.spacing_y * state.spacing_y))
+    return duration * maximum_rate / (steps as f64) <= 1.0
+}
+
+function runFrom(initial: PeriodicHeat3x3, duration: f64, steps: i32) -> HeatRun3x3 {
+    if not validRun(initial, duration, steps) {
+        return HeatRun3x3 { valid: false, state: initial }
+    }
+    let mut state: PeriodicHeat3x3 = initial
+    let dt: f64 = duration / (steps as f64)
+    for index in 0 to steps {
+        PeriodicHeat3x3_step(&state, dt)
+    }
+    return HeatRun3x3 { valid: true, state: state }
+}
+
+function integrate(duration: f64, steps: i32) -> HeatRun3x3 {
+    return runFrom(PeriodicHeat3x3_new(), duration, steps)
+}
+
+function analyticReference() -> PeriodicHeat3x3 {
+    let mut reference: PeriodicHeat3x3 = PeriodicHeat3x3_new()
+    reference.northwest = 3.370489036705467
+    reference.north = 2.443485446563582
+    reference.northeast = 2.443485446563581
+    reference.west = 3.5227205566071644
+    reference.center = 2.92427473923826
+    reference.east = 2.9242747392382595
+    reference.southwest = 3.5227205566071644
+    reference.south = 2.92427473923826
+    reference.southeast = 2.92427473923826
+    return reference
+}
+
+function main() -> i32 {
+    let reference: PeriodicHeat3x3 = analyticReference()
+    let coarse: HeatRun3x3 = integrate(1.0, 4)
+    let medium: HeatRun3x3 = integrate(1.0, 8)
+    let fine: HeatRun3x3 = integrate(1.0, 16)
+    let finest: HeatRun3x3 = integrate(1.0, 64)
+    if not coarse.valid or not medium.valid or not fine.valid or not finest.valid { return 1 }
+    let error4: f64 = maxDifference(coarse.state, reference)
+    let error8: f64 = maxDifference(medium.state, reference)
+    let error16: f64 = maxDifference(fine.state, reference)
+    let error64: f64 = maxDifference(finest.state, reference)
+    if error4 < 0.0000001 { return 2 }
+    if error64 > 0.0000000001 { return 3 }
+    if error8 >= error4 * 0.08 { return 4 }
+    if error16 >= error8 * 0.08 { return 5 }
+    if absolute(meanTemperature(finest.state) - 3.0) > 0.000000000001 { return 6 }
+
+    let replay: HeatRun3x3 = integrate(1.0, 64)
+    if not replay.valid or maxDifference(replay.state, finest.state) > 0.000000000001 { return 7 }
+    let half: HeatRun3x3 = integrate(0.5, 32)
+    if not half.valid { return 8 }
+    let secondHalf: HeatRun3x3 = runFrom(half.state, 0.5, 32)
+    if not secondHalf.valid or maxDifference(secondHalf.state, finest.state) > 0.000000000001 { return 9 }
+
+    # Transposition of the grid and diffusivity tensor must commute with evolution.
+    let mut transposed: PeriodicHeat3x3 = PeriodicHeat3x3_new()
+    transposed.north = 3.65
+    transposed.northeast = 3.65
+    transposed.west = 2.15
+    transposed.east = 2.975
+    transposed.southwest = 2.15
+    transposed.south = 2.975
+    transposed.diffusivity_x = 0.04
+    transposed.diffusivity_y = 0.02
+    let transposedRun: HeatRun3x3 = runFrom(transposed, 1.0, 64)
+    let mut transposedExpected: PeriodicHeat3x3 = finest.state
+    transposedExpected.north = finest.state.west
+    transposedExpected.northeast = finest.state.southwest
+    transposedExpected.west = finest.state.north
+    transposedExpected.east = finest.state.south
+    transposedExpected.southwest = finest.state.northeast
+    transposedExpected.south = finest.state.east
+    if not transposedRun.valid or
+       maxDifference(transposedRun.state, transposedExpected) > 0.000000000001 { return 10 }
+
+    let mut uniform: PeriodicHeat3x3 = PeriodicHeat3x3_new()
+    uniform.northwest = 7.0
+    uniform.north = 7.0
+    uniform.northeast = 7.0
+    uniform.west = 7.0
+    uniform.center = 7.0
+    uniform.east = 7.0
+    uniform.southwest = 7.0
+    uniform.south = 7.0
+    uniform.southeast = 7.0
+    let equilibrium: HeatRun3x3 = runFrom(uniform, 1.0, 64)
+    if not equilibrium.valid or maxDifference(equilibrium.state, uniform) > 0.000000000001 { return 11 }
+    let mut frozen: PeriodicHeat3x3 = PeriodicHeat3x3_new()
+    frozen.diffusivity_x = 0.0
+    frozen.diffusivity_y = 0.0
+    let stationary: HeatRun3x3 = runFrom(frozen, 1.0, 8)
+    if not stationary.valid or maxDifference(stationary.state, frozen) > 0.000000000001 { return 12 }
+
+    if integrate(1.0, 0).valid { return 13 }
+    if integrate(1.0, 100001).valid { return 14 }
+    if integrate(-1.0, 64).valid { return 15 }
+    if integrate(100.1, 64).valid { return 16 }
+    let mut invalid: PeriodicHeat3x3 = PeriodicHeat3x3_new()
+    invalid.spacing_x = 0.0
+    if runFrom(invalid, 1.0, 64).valid { return 17 }
+    invalid = PeriodicHeat3x3_new()
+    invalid.diffusivity_y = -0.04
+    if runFrom(invalid, 1.0, 64).valid { return 18 }
+    invalid = PeriodicHeat3x3_new()
+    invalid.diffusivity_x = 100.1
+    if runFrom(invalid, 1.0, 64).valid { return 19 }
+    invalid = PeriodicHeat3x3_new()
+    invalid.diffusivity_x = 1.0
+    if runFrom(invalid, 1.0, 1).valid { return 20 }
+
+    println("native-evolution-heat3x3-ok")
+    return 0
+}

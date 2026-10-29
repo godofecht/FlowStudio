@@ -13,23 +13,23 @@ function midpoint_step(t: f64, y: f64, step: f64) -> f64 {
     return y + step * derivative(t + half, midpoint_value)
 }
 
-function integrate_quadratic(steps: i32) -> f64 {
+function integrate_quadratic(steps: f64) -> f64 {
     if steps <= 0 {
         return -1.0
     }
-    let step: f64 = 1.0 / (steps as f64)
+    let step: f64 = 1.0 / steps
     let mut time: f64 = 0.0
     let mut value: f64 = 0.0
-    let mut index: i32 = 0
+    let mut index: f64 = 0.0
     while index < steps {
         value = midpoint_step(time, value, step)
         time = time + step
-        index = index + 1
+        index = index + 1.0
     }
     return value
 }
 
-function analytic_error(steps: i32) -> f64 {
+function analytic_error(steps: f64) -> f64 {
     let result: f64 = integrate_quadratic(steps)
     let difference: f64 = result - 1.0
     if difference < 0.0 {

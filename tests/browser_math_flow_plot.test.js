@@ -81,3 +81,35 @@ test("bounded real spatial grids are validated before SVG rendering", () => {
   assert.throws(() => plots.prepareSpatial({...sample,
     spatial: {...sample.spatial, fields: {temperature: [[300, 301]]}}}), /finite/);
 });
+
+test("real semantic RK2 trace is bounded and checked before rendering", () => {
+  const term = {
+    role: "diffusion", meaning: "Spatial redistribution driven by temperature curvature.",
+    sign: 1, rootOperator: "mul", symbols: ["diffusivity", "temperature"],
+    dimension: [0, 0, -1, 1], mean: -0.2, minimum: -1, maximum: 1
+  };
+  const trace = {
+    schema: 1, field: "temperature", integrator: "RungeKuttaSecondOrder",
+    rateUnit: "K/s", timeStep: 0.01,
+    stages: [
+      {name: "initialSlope", time: 0, rhsMean: -0.2,
+        maximumDecompositionResidual: 0, terms: [term]},
+      {name: "predictorSlope", time: 0.01, rhsMean: -0.19,
+        maximumDecompositionResidual: 1e-15, terms: [{...term, mean: -0.19}]}
+    ],
+    update: {initialMean: 301, predictorMean: 300.998,
+      updatedMean: 300.99805, maximumCorrectorDifference: 0.00005}
+  };
+  assert.equal(plots.prepareSemanticTrace({...heat, semantic_trace: trace}), trace);
+  assert.equal(plots.prepareSemanticTrace(heat), null);
+  for (const bad of [
+    {...trace, timeStep: 0},
+    {...trace, stages: [trace.stages[0]]},
+    {...trace, stages: [trace.stages[0], {...trace.stages[1], time: 0}]},
+    {...trace, stages: [trace.stages[0], {...trace.stages[1], terms: [{...term, mean: NaN}]}]},
+    {...trace, stages: [trace.stages[0], {...trace.stages[1], terms: [{...term, role: "invented"}]}]},
+    {...trace, stages: [trace.stages[0], {...trace.stages[1], terms: [{...term, dimension: [1, 0, -1, 1]}]}]},
+    {...trace, stages: [trace.stages[0], {...trace.stages[1], terms: [{...term, symbols: ["<script>"]}]}]},
+    {...trace, update: {...trace.update, updatedMean: Infinity}}
+  ]) assert.throws(() => plots.prepareSemanticTrace({...heat, semantic_trace: bad}));
+});

@@ -16,8 +16,11 @@ suite exercises native transport start/step/continue, response display, control
 states, origin refusal and the Flow route/script wiring. A focused V8 run of
 the exact checked-in native transport and browser debugger modules passed
 real-request-shape pause/continue simulation and syntax/route checks.
-**No native Flow build, Node suite, cross-platform CI or physical Chromium
-acceptance is claimed for this change yet.** The existing real HTTP debugger
+A physical Chromium acceptance sequence was also added to the existing
+native UI test, exercising the real Flow HTTP route through pause, step and
+continue, but **has not yet been executed** for this change.
+**No native Flow build, full Node suite, cross-platform CI or physical Chromium
+acceptance pass is claimed for this change yet.** The existing real HTTP debugger
 acceptance in `tests/http_smoke.py` is a separate pre-existing gate.
 The native Flow backend and hosted CI configuration were not modified.
 

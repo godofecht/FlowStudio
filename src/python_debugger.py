@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+from itertools import chain
 import math
 import operator
 import re
@@ -78,12 +79,21 @@ def _stack(frame: Any) -> list[dict[str, object]]:
     while frame is not None and len(result) < MAX_FRAMES:
         if frame.f_code.co_filename == SOURCE_NAME:
             values: dict[str, dict[str, str]] = {}
-            for name, value in frame.f_locals.items():
-                if type(name) is not str or name.startswith("__"):
+            # A module frame uses the persistent kernel's shared globals.
+            # Showing the first 16 insertion-order entries hides variables
+            # from the source being debugged once the session has history.
+            # Prioritize names actually referenced by this compiled source,
+            # then fall back to other bindings within the same hard cap.
+            local_bindings = frame.f_locals
+            priority = (frame.f_code.co_names if frame.f_code.co_name == "<module>"
+                        else frame.f_code.co_varnames)
+            for name in chain(priority, local_bindings):
+                if (type(name) is not str or name.startswith("__")
+                        or name[:80] in values or name not in local_bindings):
                     continue
                 if len(values) >= MAX_LOCALS:
                     break
-                values[name[:80]] = _preview(value)
+                values[name[:80]] = _preview(local_bindings[name])
             result.append({"line": frame.f_lineno,
                            "function": frame.f_code.co_name[:80], "locals": values})
         frame = frame.f_back

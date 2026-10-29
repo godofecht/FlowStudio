@@ -165,6 +165,33 @@ def main() -> None:
     status, body = request("POST", "/api/run/flow", tensor_source, accepted_headers)
     assert status == 200 and "native-tensor-grid-ok" in body, (
         "native tensor grid analytic execution", status, body)
+    # Four independently phased Fourier modes through the REAL persistent CPython
+    # kernel and Flow-owned HTTP transport, not a replacement numerical solver.
+    # Execute the checked-in solver source in an isolated namespace to prevent
+    # its CLI entrypoint from running, then execute the same complex example.
+    solver_source = (Path(__file__).resolve().parents[1] /
+                     "examples/spectral_interop_python.py").read_text(encoding="utf-8")
+    complex_source = (Path(__file__).resolve().parents[1] /
+                      "examples/complex_multimode_tensor.py").read_text(encoding="utf-8")
+    solver_import = "from spectral_interop_python import integrate\n"
+    assert solver_import in complex_source
+    complex_http = (
+        "solver_namespace = {'__name__': 'flowstudio_spectral_import'}\n"
+        + "exec(" + repr(solver_source) + ", solver_namespace)\n"
+        + "integrate = solver_namespace['integrate']\n"
+        + complex_source.replace(solver_import, "").replace("from __future__ import annotations\n", "")
+        + "\nprint('complex-multimode-http ' + json.dumps(verify(), allow_nan=False))\n"
+    )
+    status, body = request("POST", "/api/run/python", complex_http, accepted_headers)
+    assert status == 200, ("complex multimode Python HTTP", status, body[:500])
+    marker = "complex-multimode-http "
+    assert marker in body, ("complex multimode marker", body[-500:])
+    report = json.loads(body.split(marker)[-1].strip())
+    assert (report["grid"], report["modes"], report["steps"]) == (24, 4, 80), report
+    assert report["max_discrete_error"] < 3e-10, report
+    assert abs(report["mean"] - 50.0) < 2e-11, report
+    assert (report["temporal_errors"][0] > 3.4 * report["temporal_errors"][1]
+            and report["temporal_errors"][1] > 3.4 * report["temporal_errors"][2]), report
     # Real Flow HTTP route, request intent/origin gate, and safe Quarto
     # preflight rejection (does not require Quarto to be installed).
     invalid_qmd = "---\nformat: pdf\n---\n\n# Wrong format\n"

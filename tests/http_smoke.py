@@ -527,6 +527,12 @@ def main() -> None:
         "fs_outer(40L)", "fs_inner(fs_outer_local)"], frames
     assert "fs_outer_local" in frames["frames"][0]["locals"], frames
     assert "fs_inner_local" in frames["frames"][1]["locals"], frames
+    # Source metadata is optional when R has discarded srcref. When present,
+    # it is a function definition line, not the live failure location.
+    assert all(frame["definition_line"] is None or
+               (isinstance(frame["definition_line"], int) and
+                1 <= frame["definition_line"] <= 2)
+               for frame in frames["frames"]), frames
     status, body = request("POST", "/api/debug/r/evaluate",
                            "@2\nfs_inner_local", accepted_headers)
     assert status == 200 and json.loads(body)["output"].strip() == "[1] 43", (status, body)

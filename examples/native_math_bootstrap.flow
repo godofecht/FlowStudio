@@ -1,0 +1,39 @@
+# Native mathematical Flow bootstrap: no Python or NumPy execution dependency.
+# This is a scalar ODE stepping kernel, not a general PDE compiler.
+# Midpoint Runge-Kutta integration for y'(t) = 2t, y(0) = 0.
+# Its exact solution is y(t) = t*t; midpoint is exact for this RHS.
+
+function derivative(t: f64, y: f64) -> f64 {
+    return 2.0 * t
+}
+
+function midpoint_step(t: f64, y: f64, step: f64) -> f64 {
+    let half: f64 = step * 0.5
+    let midpoint_value: f64 = y + half * derivative(t, y)
+    return y + step * derivative(t + half, midpoint_value)
+}
+
+function integrate_quadratic(steps: i32) -> f64 {
+    if steps <= 0 {
+        return -1.0
+    }
+    let step: f64 = 1.0 / (steps as f64)
+    let mut time: f64 = 0.0
+    let mut value: f64 = 0.0
+    let mut index: i32 = 0
+    while index < steps {
+        value = midpoint_step(time, value, step)
+        time = time + step
+        index = index + 1
+    }
+    return value
+}
+
+function analytic_error(steps: i32) -> f64 {
+    let result: f64 = integrate_quadratic(steps)
+    let difference: f64 = result - 1.0
+    if difference < 0.0 {
+        return -difference
+    }
+    return difference
+}

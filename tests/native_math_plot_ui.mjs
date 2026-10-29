@@ -35,6 +35,7 @@ try {
     ['examples/heat_composed_forcing.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_mean_field_feedback.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_mean_preserving_mixing.flow', 'temperatureVariance', 'meanTemperature'],
+    ['examples/heat_spatial_moments.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_transport_reaction.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/navier_stokes_smoke.flow', 'kineticEnergy', 'maximumDivergence']
   ]) {

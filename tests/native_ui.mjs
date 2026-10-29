@@ -283,6 +283,136 @@ try {
     return host && editor && host.clientWidth > 600 && Math.abs(editor.clientWidth - host.clientWidth) <= 2;
   });
   await page.screenshot({ path: 'build/ui/workbench-narrow.png' });
+
+  // Real Chromium -> Flow-owned server -> native Flow 2.0 and persistent Rscript.
+  // Unlike the HTTP controller suite, this exercises the actual notebook DOM,
+  // download/import controls, output rendering and fail-closed cell sequencing.
+  {
+    const {readFileSync} = await import('node:fs');
+    const notebookContext = await browser.newContext({acceptDownloads:true});
+    const notebookPage = await notebookContext.newPage();
+    const notebookErrors = [];
+    const notebookRequests = [];
+    notebookPage.on('pageerror', error => notebookErrors.push(error.message));
+    notebookPage.on('request', request => {
+      if (request.method() === 'POST') notebookRequests.push(new URL(request.url()).pathname);
+    });
+    try {
+      const response = await notebookPage.goto('http://127.0.0.1:8751/app/', {
+        waitUntil:'domcontentloaded'
+      });
+      assert.equal(response.status(), 200);
+      assert.equal(await notebookPage.evaluate(() =>
+        globalThis.FlowStudioNativeFlow?.available?.() === true), true);
+      await notebookPage.locator('#rRuntime').selectOption('native');
+      await notebookPage.locator('#language').selectOption('flow');
+      const coupled = readFileSync(new URL('../examples/native_coupled_diffusion_2d.flow',
+        import.meta.url), 'utf8').trimEnd();
+      const cyclic = readFileSync(new URL('../examples/native_cyclic_network.flow',
+        import.meta.url), 'utf8').trimEnd();
+      const rOracle = [
+        'flowstudio_ui_amplitude <- exp(-8 * 0.01 / (0.5^2) * 0.5)',
+        'flowstudio_ui_exchange <- 3 - exp(-2 * 0.2 * 0.5)',
+        'stopifnot(abs(flowstudio_ui_amplitude - 0.85214378896621135) < 1e-12,',
+        '          abs(flowstudio_ui_exchange - 2.1812692469220183) < 1e-12)',
+        "cat('r-coupled-oracle-ok\\n')"
+      ].join('\n');
+      const source = [
+        '# %% [markdown]\nIndependent coupled PDE and cyclic transport acceptance.\n',
+        '# %% [flow]\n' + coupled + '\n',
+        '# %% [r]\n' + rOracle + '\n',
+        '# %% [flow]\n' + cyclic + '\n',
+        '# %% [r]\nstopifnot(exists("flowstudio_ui_exchange", envir=.GlobalEnv),',
+        '  length(flowstudio_ui_amplitude) == 1L)\ncat("r-persistent-ok\\n")\n'
+      ].join('');
+      await notebookPage.locator('#source').fill(source);
+      await notebookPage.locator('#runNotebook').click();
+      await notebookPage.waitForFunction(() =>
+        document.querySelector('#notice')?.textContent === 'Notebook executed 4 cells.',
+        null, {timeout:120000});
+      assert.equal(await notebookPage.locator('#notebookOutput .notebook-cell').count(), 5);
+      const output = await notebookPage.locator('#notebookOutput').innerText();
+      assert.match(output, /Cell 2 \(flow\) — complete/);
+      assert.match(output, /Cell 3 \(r\) — complete/);
+      assert.match(output, /Cell 4 \(flow\) — complete/);
+      assert.match(output, /Cell 5 \(r\) — complete/);
+      assert.match(output, /r-coupled-oracle-ok/);
+      assert.match(output, /r-persistent-ok/);
+      assert.equal(notebookRequests.filter(route => route === '/api/run/flow').length, 2);
+      assert.equal(notebookRequests.filter(route => route === '/api/run/r').length, 2);
+
+      // Real downloaded .fsnb must restore display snapshots without executing
+      // any Flow or R code or pretending to restore interpreter state.
+      const [download] = await Promise.all([
+        notebookPage.waitForEvent('download', {timeout:30000}),
+        notebookPage.locator('#saveFlowNotebook').click()
+      ]);
+      const bundle = JSON.parse(readFileSync(await download.path(), 'utf8'));
+      assert.equal(bundle.source, source);
+      assert.equal(bundle.language, 'flow');
+      assert.equal(bundle.results.length, 4);
+      const beforeImport = notebookRequests.length;
+      await notebookPage.locator('#source').fill('# %% [r]\nstop("must-not-run")\n');
+      await notebookPage.locator('#flowNotebookFile').setInputFiles({
+        name:'complex-physical.fsnb', mimeType:'application/json',
+        buffer:Buffer.from(JSON.stringify(bundle))
+      });
+      await notebookPage.waitForFunction(() =>
+        document.querySelector('#notice')?.textContent.startsWith(
+          'FlowStudio notebook imported with saved outputs; interpreter state was not restored.'),
+        null, {timeout:30000});
+      assert.equal(await notebookPage.locator('#source').inputValue(), source);
+      assert.match(await notebookPage.locator('#notebookOutput').innerText(), /r-persistent-ok/);
+      assert.equal(notebookRequests.length, beforeImport,
+        'Import must never execute saved notebook source');
+
+      // A failing native Flow cell must stop before the subsequent R side effect.
+      const beforeFailureR = notebookRequests.filter(route => route === '/api/run/r').length;
+      await notebookPage.locator('#source').fill(
+        '# %% [flow]\nfunction main() -> i32 { return 37 }\n' +
+        '# %% [r]\nflowstudio_should_not_run <- TRUE\n');
+      await notebookPage.locator('#runNotebook').click();
+      await notebookPage.waitForFunction(() =>
+        document.querySelector('#notice')?.textContent.startsWith(
+          'Notebook stopped after 1 cells:'),
+        null, {timeout:90000});
+      assert.equal(await notebookPage.locator('#notebookOutput .notebook-cell').count(), 1);
+      assert.match(await notebookPage.locator('#notebookOutput').innerText(),
+        /Cell 1 \(flow\) — failed/);
+      assert.equal(notebookRequests.filter(route => route === '/api/run/r').length,
+        beforeFailureR);
+
+      // Check the real persistent R workspace after the failure, not a mock.
+      await notebookPage.locator('#source').fill(
+        '# %% [r]\n' +
+        "stopifnot(!exists('flowstudio_should_not_run', envir=.GlobalEnv, inherits=FALSE))\n" +
+        "cat('r-fail-closed-ok\\n')\n");
+      await notebookPage.locator('#runNotebook').click();
+      await notebookPage.waitForFunction(() =>
+        document.querySelector('#notice')?.textContent === 'Notebook executed 1 cells.',
+        null, {timeout:30000});
+      assert.match(await notebookPage.locator('#notebookOutput').innerText(),
+        /r-fail-closed-ok/);
+
+      // The same real Rscript session must render a genuine captured plot in
+      // the browser; a text-only notebook test cannot establish plotting.
+      await notebookPage.locator('#language').selectOption('r');
+      await notebookPage.locator('#source').fill(
+        "plot(c(1,2,3), c(3,1,4), type='l'); cat('native-plot-ui-ok\\n')\n");
+      await notebookPage.locator('#run').click();
+      await notebookPage.waitForFunction(() =>
+        document.querySelector('#notice')?.textContent === 'r execution complete.',
+        null, {timeout:60000});
+      await notebookPage.locator(
+        "#workspace img[alt^='R plot'], #workspace embed[aria-label^='R plot']"
+      ).first().waitFor({timeout:30000});
+      assert.deepEqual(notebookErrors, []);
+      console.log('PASS: physical Chromium native Flow/R complex notebook, .fsnb roundtrip, stop-on-error and real R plot');
+    } finally {
+      await notebookContext.close();
+    }
+  }
+
   assert.deepEqual(errors, [], 'The affected flow must have clean runtime logs');
   console.log('PASS: Monaco editing, per-document undo, find/replace, native selection execution, commands, worker and narrow layout');
   await context.close();

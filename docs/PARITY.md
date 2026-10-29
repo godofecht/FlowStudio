@@ -10,12 +10,22 @@ browser workspace expose Run to caret; source revision and document identity
 guards still prohibit resuming edited or unrelated buffers. Python kernel
 execution is real and retains local user permissions, not sandboxed.
 
-**Status: partial / PR CI pending.** Native Python unit tests, real HTTP
-acceptance, browser controller and workspace wiring tests were added; no
-passing CI or physical-browser acceptance is claimed until independently
-observed. This does not implement live function-level R stepping, Flow source
-debugging, authenticated remote sessions or complete RStudio parity. No hosted
-CI configuration changed.
+**Status: partial / independently verified in all six Linux/macOS CI
+jobs in [CI #40839701030](https://github.com/godofecht/FlowStudio/actions/runs/40839701030).**
+Each source/transport platform passed 1,090 of 1,102 Node tests (12 skipped,
+zero failures) and 247 Python tests (13 skipped, zero failures). Both native
+Flow 2.0.0 builds and real CPython/Flow HTTP smoke suites passed, as did both
+FlowJIT jobs. Actual Ubuntu Chromium acceptance exercised the primary native
+workspace's editor caret → Flow HTTP → persistent CPython one-shot pause on
+the target line and subsequent completion. The separate physical-browser
+acceptance script was extended but was not independently run as part of this
+claim; macOS physical-browser acceptance remains unverified. An initial CI
+run exposed a missing G opcode in the Python kernel's framed-header allowlist,
+which was corrected before the passing run. [PR #179](https://github.com/godofecht/FlowStudio/pull/179)
+merged as [4389a2a](https://github.com/godofecht/FlowStudio/commit/4389a2a98a8f0e0c3d3cc51b45f40697b8ca255b).
+This does not implement live function-level R stepping, Flow source debugging,
+authenticated remote sessions or complete RStudio parity. No hosted CI
+configuration changed.
 
 ## 2026-10-29: native R debugger run-to-caret (verification pending)
 

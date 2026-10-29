@@ -16,6 +16,8 @@ function format(result) {
   lines.push("Expression " + Math.min(result.index, result.total) + " of " + result.total);
   if (Array.isArray(result.frames)) for (const frame of result.frames)
     lines.push("Postmortem frame " + frame.id + ": " + frame.call +
+      (Number.isSafeInteger(frame.definition_line) ?
+        " (function defined at line " + frame.definition_line + ")" : "") +
       " (locals: " + (frame.locals.join(", ") || "none") + ")");
   if (result.output) lines.push("Output:\n" + result.output);
   return lines.join("\n");
@@ -43,14 +45,14 @@ function revealSourceLine(source, line) {
   return true;
 }
 function create({native, source, language, runtime, startButton, stepButton,
-                 continueButton, targetLine, watchExpression, frameInput, evaluateButton,
+                 continueButton, targetLine, watchExpression, frameInput, frameList, evaluateButton,
                  stopButton, statusButton, target, notice, documentIdentity, revealLine}) {
   if (!native || !source || !language || !runtime || !startButton || !stepButton ||
       !continueButton || !targetLine || !watchExpression || !evaluateButton ||
       !stopButton || !statusButton || !target)
     throw Error("Missing R debugger controls.");
   const supported = native.available();
-  let state = "idle", pending = false, frameCount = 0;
+  let state = "idle", pending = false, frameCount = 0, frames = [];
   let sourceRevision = 0, runSnapshot = null;
   const identity = typeof documentIdentity === "function" ? documentIdentity : () => null;
   // A paused R expression belongs to the original document revision.
@@ -72,6 +74,37 @@ function create({native, source, language, runtime, startButton, stepButton,
     return typeof revealLine === "function" ? revealLine(line) :
       revealSourceLine(source, line);
   }
+  // The real R kernel has already unwound on error. Selecting a retained
+  // function frame changes the environment used by Evaluate; it never resumes
+  // execution or claims to reveal the failing instruction inside the function.
+  function renderFrames() {
+    if (!frameList || typeof frameList.replaceChildren !== "function") return;
+    const owner = frameList.ownerDocument || global.document;
+    if (!owner || typeof owner.createElement !== "function") return;
+    const selectable = !pending && state === "error" && snapshotCurrent();
+    const selected = frameInput ? Number(frameInput.value) : 0;
+    const buttons = frames.map(frame => {
+      const button = owner.createElement("button");
+      button.type = "button";
+      button.textContent = "Frame " + frame.id + ": " + frame.call +
+        (Number.isSafeInteger(frame.definition_line) ?
+          " — definition line " + frame.definition_line : "");
+      button.title = "Select retained postmortem environment for R Evaluate";
+      button.disabled = !selectable;
+      button.setAttribute("aria-pressed", String(selected === frame.id));
+      button.addEventListener("click", () => {
+        if (pending || state !== "error" || !snapshotCurrent()) return;
+        if (frameInput) frameInput.value = String(frame.id);
+        if (Number.isSafeInteger(frame.definition_line)) {
+          if (typeof revealLine === "function") revealLine(frame.definition_line);
+          else revealSourceLine(source, frame.definition_line);
+        }
+        renderFrames();
+      });
+      return button;
+    });
+    frameList.replaceChildren(...buttons);
+  }
   function update() {
     const enabled = supported && language.value === "r" && runtime.value === "native";
     const current = snapshotCurrent();
@@ -84,6 +117,7 @@ function create({native, source, language, runtime, startButton, stepButton,
     evaluateButton.disabled = !enabled || pending || (state !== "paused" && state !== "error") || !current;
     stopButton.disabled = !enabled || pending || state === "idle";
     statusButton.disabled = !enabled || pending;
+    renderFrames();
   }
   async function execute(action) {
     if (pending || !supported || language.value !== "r" || runtime.value !== "native")
@@ -121,7 +155,8 @@ function create({native, source, language, runtime, startButton, stepButton,
       state = result.state;
       if (started) runSnapshot = started;
       if (state === "idle" || state === "done") runSnapshot = null;
-      frameCount = state === "error" && Array.isArray(result.frames) ? result.frames.length : 0;
+      frames = state === "error" && Array.isArray(result.frames) ? result.frames : [];
+      frameCount = frames.length;
       if (frameInput && (!Number.isSafeInteger(Number(frameInput.value)) ||
           Number(frameInput.value) > frameCount || state !== "error"))
         frameInput.value = "0";
@@ -146,6 +181,7 @@ function create({native, source, language, runtime, startButton, stepButton,
   evaluateButton.addEventListener("click", () => { void execute("evaluate"); });
   stopButton.addEventListener("click", () => { void execute("stop"); });
   statusButton.addEventListener("click", () => { void execute("status"); });
+  if (frameInput) frameInput.addEventListener("change", update);
   language.addEventListener("change", update);
   runtime.addEventListener("change", update);
   if (!supported) target.textContent = "Native R debugger requires FlowStudio on localhost:8751.";

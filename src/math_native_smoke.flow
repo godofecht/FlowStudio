@@ -1,0 +1,41 @@
+# Real Flow 2.0 numerical acceptance: run with flow run src/math_native_smoke.flow
+# Failures return distinct nonzero exit codes; no Python reference backend.
+import .math_native { ScalarLinearEquation, State2, LinearEquation2, scalar_integrate, linear_integrate_2 }
+
+function absolute(value: f64) -> f64 {
+    if value < 0.0 { return -value }
+    return value
+}
+
+function main() -> i32 {
+    # y' = 2t, y(0) = 0, y(1) = 1. RK2 is exact up to rounding.
+    let quadratic: ScalarLinearEquation = ScalarLinearEquation {
+        state_coefficient: 0.0, time_coefficient: 2.0, constant: 0.0
+    }
+    let quadratic_result: f64 = scalar_integrate(quadratic, 0.0, 0.0, 1.0, 20)
+    if absolute(quadratic_result - 1.0) > 0.000000000001 { return 1 }
+
+    # y' = -y, y(0) = 1: second-order convergence to exp(-1).
+    let decay: ScalarLinearEquation = ScalarLinearEquation {
+        state_coefficient: -1.0, time_coefficient: 0.0, constant: 0.0
+    }
+    let coarse: f64 = scalar_integrate(decay, 0.0, 1.0, 1.0, 10)
+    let fine: f64 = scalar_integrate(decay, 0.0, 1.0, 1.0, 20)
+    let coarse_error: f64 = absolute(coarse - 0.36787944117144233)
+    let fine_error: f64 = absolute(fine - 0.36787944117144233)
+    if fine_error > 0.0002 { return 2 }
+    if fine_error >= coarse_error * 0.30 { return 3 }
+
+    # Coupled oscillator: x' = -y, y' = x, initial (1,0).
+    let oscillator: LinearEquation2 = LinearEquation2 {
+        first_first: 0.0, first_second: -1.0,
+        second_first: 1.0, second_second: 0.0
+    }
+    let initial: State2 = State2 { first: 1.0, second: 0.0 }
+    let result: State2 = linear_integrate_2(oscillator, initial, 1.0, 100)
+    if absolute(result.first - 0.5403023058681398) > 0.0001 { return 4 }
+    if absolute(result.second - 0.8414709848078965) > 0.0001 { return 5 }
+    let energy: f64 = result.first * result.first + result.second * result.second
+    if absolute(energy - 1.0) > 0.0001 { return 6 }
+    return 0
+}

@@ -102,12 +102,6 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/debug_panel.js" {
         return StaticAsset { path: "web/debug_panel.js", mime: "text/javascript; charset=utf-8", found: true }
     }
-    if url == "/native_flow.js" {
-        return StaticAsset { path: "docs/app/native_flow.js", mime: "text/javascript; charset=utf-8", found: true }
-    }
-    if url == "/python_debug_panel.js" {
-        return StaticAsset { path: "docs/app/python_debug_panel.js", mime: "text/javascript; charset=utf-8", found: true }
-    }
     if url == "/workspace_panels.js" {
         return StaticAsset { path: "web/workspace_panels.js", mime: "text/javascript; charset=utf-8", found: true }
     }

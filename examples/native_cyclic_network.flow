@@ -1,0 +1,125 @@
+# Three-species conservative cyclic transport, compiled by native Flow 2.0.
+# Executable numerical acceptance: every failure returns a distinct exit code.
+# Analytic oracle: eigenmodes of a 3x3 cyclic Markov generator.
+# This is a standalone program so /api/run/flow executes the same code as CLI.
+struct State3 {
+    first: f64,
+    second: f64,
+    third: f64
+}
+
+struct IntegrationResult3 {
+    valid: bool,
+    state: State3
+}
+
+function absolute(value: f64) -> f64 {
+    if value < 0.0 { return -value }
+    return value
+}
+
+function maximum3(a: f64, b: f64, c: f64) -> f64 {
+    let mut result: f64 = a
+    if b > result { result = b }
+    if c > result { result = c }
+    return result
+}
+
+function distance(a: State3, b: State3) -> f64 {
+    return maximum3(
+        absolute(a.first - b.first),
+        absolute(a.second - b.second),
+        absolute(a.third - b.third)
+    )
+}
+
+function total(state: State3) -> f64 {
+    return state.first + state.second + state.third
+}
+
+function derivative(state: State3, rate: f64) -> State3 {
+    return State3 {
+        first: rate * (state.third - state.first),
+        second: rate * (state.first - state.second),
+        third: rate * (state.second - state.third)
+    }
+}
+
+function midpointStep(state: State3, rate: f64, step: f64) -> State3 {
+    let slope: State3 = derivative(state, rate)
+    let midpoint: State3 = State3 {
+        first: state.first + 0.5 * step * slope.first,
+        second: state.second + 0.5 * step * slope.second,
+        third: state.third + 0.5 * step * slope.third
+    }
+    let midpointSlope: State3 = derivative(midpoint, rate)
+    return State3 {
+        first: state.first + step * midpointSlope.first,
+        second: state.second + step * midpointSlope.second,
+        third: state.third + step * midpointSlope.third
+    }
+}
+
+function integrateCyclic(initial: State3, rate: f64, duration: f64, steps: i32) -> IntegrationResult3 {
+    if rate < 0.0 or duration < 0.0 or steps <= 0 or steps > 1000000 {
+        return IntegrationResult3 { valid: false, state: initial }
+    }
+    let step: f64 = duration / (steps as f64)
+    let mut state: State3 = initial
+    let mut index: i32 = 0
+    while index < steps {
+        state = midpointStep(state, rate, step)
+        index = index + 1
+    }
+    return IntegrationResult3 { valid: true, state: state }
+}
+
+function main() -> i32 {
+    let initial: State3 = State3 { first: 1.0, second: 0.0, third: 0.0 }
+    let expected: State3 = State3 {
+        first: 0.34446742325344565,
+        second: 0.37924709108242444,
+        third: 0.27628548566412986
+    }
+    # Independent exact eigenmode reference at rate 0.8, time 2:
+    # p_j(t) = 1/3 + 2/3 exp(-3kt/2) cos(sqrt(3)kt/2 - 2pi*j/3).
+    let coarse: IntegrationResult3 = integrateCyclic(initial, 0.8, 2.0, 20)
+    let medium: IntegrationResult3 = integrateCyclic(initial, 0.8, 2.0, 40)
+    let fine: IntegrationResult3 = integrateCyclic(initial, 0.8, 2.0, 80)
+    if not coarse.valid or not medium.valid or not fine.valid { return 1 }
+    let coarseError: f64 = distance(coarse.state, expected)
+    let mediumError: f64 = distance(medium.state, expected)
+    let fineError: f64 = distance(fine.state, expected)
+    if fineError > 0.00004 { return 2 }
+    if mediumError >= coarseError * 0.30 { return 3 }
+    if fineError >= mediumError * 0.30 { return 4 }
+    if absolute(total(fine.state) - 1.0) > 0.000000000001 { return 5 }
+    if fine.state.first < 0.0 or fine.state.second < 0.0 or fine.state.third < 0.0 { return 6 }
+
+    # Semigroup consistency and deterministic replay of a coupled trajectory.
+    let half: IntegrationResult3 = integrateCyclic(initial, 0.8, 1.0, 80)
+    let secondHalf: IntegrationResult3 = integrateCyclic(half.state, 0.8, 1.0, 80)
+    let full: IntegrationResult3 = integrateCyclic(initial, 0.8, 2.0, 160)
+    let replay: IntegrationResult3 = integrateCyclic(initial, 0.8, 2.0, 160)
+    if not half.valid or not secondHalf.valid or not full.valid or not replay.valid { return 7 }
+    if distance(secondHalf.state, full.state) > 0.000000000001 { return 8 }
+    if distance(replay.state, full.state) > 0.000000000001 { return 9 }
+
+    # A second independent eigenmode check: doubling the rate doubles elapsed
+    # nondimensional time, and the exact state must match rate 0.8 at time 2.
+    let rescaled: IntegrationResult3 = integrateCyclic(initial, 1.6, 1.0, 160)
+    if not rescaled.valid { return 10 }
+    if distance(rescaled.state, full.state) > 0.000000000001 { return 11 }
+
+    # Degenerate valid cases and fail-closed resource/physical constraints.
+    let zeroRate: IntegrationResult3 = integrateCyclic(initial, 0.0, 2.0, 20)
+    let zeroDuration: IntegrationResult3 = integrateCyclic(initial, 0.8, 0.0, 20)
+    if not zeroRate.valid or not zeroDuration.valid { return 12 }
+    if distance(zeroRate.state, initial) > 0.000000000001 { return 13 }
+    if distance(zeroDuration.state, initial) > 0.000000000001 { return 14 }
+    if integrateCyclic(initial, -0.8, 2.0, 20).valid { return 15 }
+    if integrateCyclic(initial, 0.8, -2.0, 20).valid { return 16 }
+    if integrateCyclic(initial, 0.8, 2.0, 0).valid { return 17 }
+    if integrateCyclic(initial, 0.8, 2.0, 1000001).valid { return 18 }
+    return 0
+}

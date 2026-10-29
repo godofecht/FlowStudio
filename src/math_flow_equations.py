@@ -235,10 +235,13 @@ def _signed_terms(expr: Expression, sign: int = 1):
 def compile_heat_equation(tokens: list[str], *, reaction: bool = False,
                           advection: bool = False, anisotropic: bool = False,
                           cross_diffusion: bool = False) -> Equation:
-    source = "".join(tokens)
-    if source.count("=") != 1:
-        raise ExpressionError("Heat dynamics requires exactly one equality")
-    lhs, rhs_source = source.split("=", 1)
+    # The first assignment token separates the evolved field from its RHS.
+    # Equality comparisons (==) and inequality (!=) are valid within that RHS;
+    # counting every equals character incorrectly rejects executable predicates.
+    if "=" not in tokens:
+        raise ExpressionError("Heat dynamics requires an assignment equality")
+    assignment = tokens.index("=")
+    lhs, rhs_source = "".join(tokens[:assignment]), "".join(tokens[assignment + 1:])
     if lhs != "∂ₜtemperature":
         raise ExpressionError("Heat dynamics must evolve ∂ₜtemperature")
     symbols = {**SYMBOLS, **(REACTION_SYMBOLS if reaction else {}),

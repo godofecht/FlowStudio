@@ -11,18 +11,21 @@ exceptions. An empty live breakpoint field inherits the current editor
 document's cursor breakpoints; explicit entries override that list. Replay
 navigation remains available as a separate post-execution feature.
 
-**Status: partial / PR verification pending.** The checked-in Node regression
-suite exercises native transport start/step/continue, response display, control
-states, origin refusal and the Flow route/script wiring. A focused V8 run of
-the exact checked-in native transport and browser debugger modules passed
-real-request-shape pause/continue simulation and syntax/route checks.
-A physical Chromium acceptance sequence was also added to the existing
-native UI test, exercising the real Flow HTTP route through pause, step and
-continue, but **has not yet been executed** for this change.
-**No native Flow build, full Node suite, cross-platform CI or physical Chromium
-acceptance pass is claimed for this change yet.** The existing real HTTP debugger
-acceptance in `tests/http_smoke.py` is a separate pre-existing gate.
-The native Flow backend and hosted CI configuration were not modified.
+**Status: partial / independently verified in all six Linux/macOS jobs
+in [CI #40796313540](https://github.com/godofecht/FlowStudio/actions/runs/40796313540).**
+Each source/transport platform passed 1,060 of 1,072 Node tests (12 skipped,
+zero failures) and 218 Python tests (13 skipped, zero failures). Both native
+Flow builds compiled and completed their real HTTP acceptance; both FlowJIT
+jobs passed. The existing native Chromium acceptance on **Ubuntu** exercised
+the new real Flow-to-CPython start, breakpoint pause, step and continue path
+and completed successfully. macOS native compilation/HTTP acceptance passed,
+but this is not a claim of a separate macOS physical-browser run. Three new
+Node tests cover the actual debugger transport, control states, conditional
+breakpoint payloads, origin refusal and native script wiring. Focused V8
+execution of the exact modules also passed before CI.
+[PR #165](https://github.com/godofecht/FlowStudio/pull/165) merged as
+[ee9575f](https://github.com/godofecht/FlowStudio/commit/ee9575f5adfb469fe6361dcc158591648e94da0c).
+The Flow-owned backend and hosted CI configuration were unchanged.
 
 Limitations: the live debugger executes source with local user privileges,
 not in a sandbox. It is single-user, Python-only and shares the persistent

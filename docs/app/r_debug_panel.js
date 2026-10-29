@@ -53,13 +53,19 @@ function create({native, source, language, runtime, startButton, stepButton,
   let state = "idle", pending = false, frameCount = 0;
   let sourceRevision = 0, runSnapshot = null;
   const identity = typeof documentIdentity === "function" ? documentIdentity : () => null;
-  source.addEventListener("input", () => { sourceRevision++; });
+  // A paused R expression belongs to the original document revision.
+  // Postmortem inspection is safe to display, but continuing stale execution
+  // would execute code that no longer matches the visible editor.
+  function snapshotCurrent() {
+    return runSnapshot !== null &&
+      source.value === runSnapshot.source &&
+      sourceRevision === runSnapshot.revision &&
+      identity() === runSnapshot.identity &&
+      language.value === "r" && runtime.value === "native";
+  }
+  source.addEventListener("input", () => { sourceRevision++; update(); });
   function navigate(result, action) {
-    if (action === "evaluate" || !runSnapshot ||
-        source.value !== runSnapshot.source ||
-        sourceRevision !== runSnapshot.revision ||
-        identity() !== runSnapshot.identity ||
-        language.value !== "r" || runtime.value !== "native") return false;
+    if (action === "evaluate" || !snapshotCurrent()) return false;
     const line = result.state === "paused" ? result.next_line :
       result.state === "error" ? result.failed_line : null;
     if (!Number.isSafeInteger(line) || line < 1) return false;
@@ -68,13 +74,14 @@ function create({native, source, language, runtime, startButton, stepButton,
   }
   function update() {
     const enabled = supported && language.value === "r" && runtime.value === "native";
+    const current = snapshotCurrent();
     startButton.disabled = !enabled || pending || state === "paused";
-    stepButton.disabled = !enabled || pending || state !== "paused";
-    continueButton.disabled = !enabled || pending || state !== "paused";
-    targetLine.disabled = !enabled || pending || state !== "paused";
-    watchExpression.disabled = !enabled || pending || (state !== "paused" && state !== "error");
-    if (frameInput) frameInput.disabled = !enabled || pending || state !== "error" || !frameCount;
-    evaluateButton.disabled = !enabled || pending || (state !== "paused" && state !== "error");
+    stepButton.disabled = !enabled || pending || state !== "paused" || !current;
+    continueButton.disabled = !enabled || pending || state !== "paused" || !current;
+    targetLine.disabled = !enabled || pending || state !== "paused" || !current;
+    watchExpression.disabled = !enabled || pending || (state !== "paused" && state !== "error") || !current;
+    if (frameInput) frameInput.disabled = !enabled || pending || state !== "error" || !frameCount || !current;
+    evaluateButton.disabled = !enabled || pending || (state !== "paused" && state !== "error") || !current;
     stopButton.disabled = !enabled || pending || state === "idle";
     statusButton.disabled = !enabled || pending;
   }
@@ -83,6 +90,12 @@ function create({native, source, language, runtime, startButton, stepButton,
       return false;
     if ((action === "step" || action === "continue") && state !== "paused") return false;
     if (action === "evaluate" && state !== "paused" && state !== "error") return false;
+    if (["step", "continue", "evaluate"].includes(action) && !snapshotCurrent()) {
+      target.textContent = "Native R debugger: source changed; Stop or Status is available. Restart debugging to execute the current source.";
+      if (notice) notice(target.textContent);
+      update();
+      return false;
+    }
     const started = action === "start" ? {
       source:source.value, revision:sourceRevision, identity:identity()
     } : null;

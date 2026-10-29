@@ -328,6 +328,9 @@ mountPanel("FlowStudioDebugPanel", global.FlowStudioDebugPanel, DebugPanel => {
       nextButton: el("liveDebugNext"), finishButton: el("liveDebugFinish"),
       continueButton: el("liveDebugContinue"), stopButton: el("liveDebugStop"),
       statusButton: el("liveDebugStatus"), target: el("liveDebugOutput"),
+      frameHost: el("liveDebugFrames"),
+      getDocId: activeDocumentId,
+      onFrame: frame => global.FlowStudioApp.revealPosition(frame.line, 1),
       notice: message => {
         el("resultStatus").textContent = message;
         el("resultStatus").dataset.state = message.includes("error") ? "error" : "ok";

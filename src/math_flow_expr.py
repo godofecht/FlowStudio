@@ -21,8 +21,11 @@ UNITS: dict[str, Dimension] = {
 SUPERSCRIPT = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁻−", "0123456789--")
 _NUMBER = r"(?:10[⁻−-][⁰¹²³⁴⁵⁶⁷⁸⁹0-9]+|(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)"
 _UNIT = r"(?:kg|Pa|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)?(?:/(?:kg|Pa|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*))?"
-_TOKEN = re.compile(rf"(?P<space>\s+)|(?P<quantity>{_NUMBER}(?:{_UNIT})?)|(?P<name>∂ₓ²|∂ᵧ²|∂ₓ|∂ᵧ|∇²|[A-Za-z_][A-Za-z_0-9]*|π)|(?P<postfix>[²³⁴⁵⁶⁷⁸])|(?P<op>[+\-−*/×·÷√∛(),^|<>≤≥])")
+_TOKEN = re.compile(rf"(?P<space>\s+)|(?P<quantity>{_NUMBER}(?:{_UNIT})?)|(?P<name>∂ₓ²|∂ᵧ²|∂ₓ|∂ᵧ|∇²|[A-Za-z_][A-Za-z_0-9]*|π)|(?P<postfix>[²³⁴⁵⁶⁷⁸])|(?P<op>[+\-−*/×·÷√∛(),^|<>≤≥∧∨¬])")
 _UNIT_PART = re.compile(r"(kg|Pa|m|s|K)([²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)\Z")
+
+
+PREDICATE_OPERATORS = frozenset(("lt", "le", "gt", "ge", "and", "or", "not"))
 
 
 class ExpressionError(ValueError):
@@ -124,11 +127,16 @@ class _Parser:
             if self.take() != "|":
                 raise ExpressionError("Expected closing absolute-value bar")
             left = Expression("abs", (inner,), dimension=inner.dimension)
+        elif first == "¬":
+            operand = self.expression(30, depth + 1)
+            if operand.operator not in PREDICATE_OPERATORS:
+                raise ExpressionError("¬ requires a comparison or logical predicate")
+            left = Expression("not", (operand,), dimension=DIMENSIONLESS)
         elif first == "where":
             if self.take() != "(":
                 raise ExpressionError("Expected '(' after where")
             predicate = self.expression(0, depth + 1)
-            if predicate.operator not in ("lt", "le", "gt", "ge"):
+            if predicate.operator not in PREDICATE_OPERATORS:
                 raise ExpressionError("where requires a typed comparison predicate")
             if self.take() != ",":
                 raise ExpressionError("where requires a predicate and two branches")
@@ -138,6 +146,8 @@ class _Parser:
             when_false = self.expression(0, depth + 1)
             if self.take() != ")":
                 raise ExpressionError("where requires exactly three arguments")
+            if when_true.operator in PREDICATE_OPERATORS or when_false.operator in PREDICATE_OPERATORS:
+                raise ExpressionError("where branches must be numerical expressions")
             if when_true.dimension != when_false.dimension:
                 raise ExpressionError("where branches require matching physical dimensions")
             left = Expression("where", (predicate, when_true, when_false),
@@ -199,7 +209,9 @@ class _Parser:
             nxt = self.peek()
             if stop_at_bar and nxt == "|":
                 break
-            if nxt in ("<", "≤", ">", "≥"):
+            if nxt in ("∧", "∨"):
+                operator, precedence = ("and", 4) if nxt == "∧" else ("or", 3)
+            elif nxt in ("<", "≤", ">", "≥"):
                 operator, precedence = {"<": "lt", "≤": "le", ">": "gt", "≥": "ge"}[nxt], 5
             elif nxt in ("^", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸"):
                 operator, precedence = "pow", 40
@@ -229,22 +241,32 @@ class _Parser:
                 left = Expression("pow", (left, right),
                                   dimension=tuple(exponent * power for power in left.dimension))
                 continue
-            if nxt in ("+", "-", "−", "*", "×", "·", "/", "÷", "<", "≤", ">", "≥"):
+            if nxt in ("+", "-", "−", "*", "×", "·", "/", "÷", "<", "≤", ">", "≥", "∧", "∨"):
                 self.take()
             right = self.expression(precedence + 1, depth + 1, stop_at_bar=stop_at_bar)
-            if operator in ("lt", "le", "gt", "ge"):
-                if left.operator in ("lt", "le", "gt", "ge") or right.operator in ("lt", "le", "gt", "ge"):
-                    raise ExpressionError("Chained comparisons are not supported")
+            if operator in ("and", "or"):
+                if left.operator not in PREDICATE_OPERATORS or right.operator not in PREDICATE_OPERATORS:
+                    raise ExpressionError("Logical operators require comparison predicates")
+                dim = DIMENSIONLESS
+            elif operator in ("lt", "le", "gt", "ge"):
+                if left.operator in PREDICATE_OPERATORS or right.operator in PREDICATE_OPERATORS:
+                    raise ExpressionError("Chained or mixed comparisons are not supported")
                 if left.dimension != right.dimension:
                     raise ExpressionError("Comparison requires matching physical dimensions")
                 dim = DIMENSIONLESS
             elif operator in ("add", "sub"):
+                if left.operator in PREDICATE_OPERATORS or right.operator in PREDICATE_OPERATORS:
+                    raise ExpressionError("Boolean predicates cannot be used as numerical values")
                 if left.dimension != right.dimension:
                     raise ExpressionError(f"Cannot {operator} dimensions {left.dimension} and {right.dimension}")
                 dim = left.dimension
             elif operator == "mul":
+                if left.operator in PREDICATE_OPERATORS or right.operator in PREDICATE_OPERATORS:
+                    raise ExpressionError("Boolean predicates cannot be multiplied")
                 dim = _plus(left.dimension, right.dimension)
             else:
+                if left.operator in PREDICATE_OPERATORS or right.operator in PREDICATE_OPERATORS:
+                    raise ExpressionError("Boolean predicates cannot be divided")
                 dim = _minus(left.dimension, right.dimension)
             left = Expression(operator, (left, right), dimension=dim)
         return left
@@ -262,8 +284,12 @@ def parse_expression(source: str, *, symbols: dict[str, Dimension] | None = None
     if parser.peek() != "<EOF>":
         raise ExpressionError(f"Unexpected trailing token {parser.peek()!r}")
     def validate_predicates(node: Expression, *, allowed: bool = False):
-        if node.operator in ("lt", "le", "gt", "ge") and not allowed:
-            raise ExpressionError("Comparisons are only valid as where predicates")
+        if node.operator in PREDICATE_OPERATORS:
+            if not allowed:
+                raise ExpressionError("Boolean predicates are only valid as where predicates")
+            for child in node.operands:
+                validate_predicates(child, allowed=node.operator in ("and", "or", "not"))
+            return
         for index, child in enumerate(node.operands):
             validate_predicates(child, allowed=node.operator == "where" and index == 0)
     validate_predicates(expression)
@@ -469,6 +495,10 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
         if node.operator in ("lt", "le", "gt", "ge"):
             return {"lt": np.less, "le": np.less_equal,
                     "gt": np.greater, "ge": np.greater_equal}[node.operator](args[0], args[1])
+        if node.operator in ("and", "or"):
+            return (np.logical_and if node.operator == "and" else np.logical_or)(args[0], args[1])
+        if node.operator == "not":
+            return np.logical_not(args[0])
         if node.operator == "where":
             return np.where(args[0], args[1], args[2])
         if node.operator == "add": return args[0] + args[1]

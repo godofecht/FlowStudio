@@ -1,6 +1,6 @@
 # Real Flow 2.0 numerical acceptance: run with flow run src/math_native_smoke.flow
 # Failures return distinct nonzero exit codes; no Python reference backend.
-import .math_native { ScalarLinearEquation, State2, LinearEquation2, scalar_integrate, linear_integrate_2 }
+import .math_native { ScalarLinearEquation, State2, LinearEquation2, ScalarIntegrationResult, LinearIntegrationResult2, scalar_integrate, linear_integrate_2 }
 
 function absolute(value: f64) -> f64 {
     if value < 0.0 { return -value }
@@ -12,19 +12,22 @@ function main() -> i32 {
     let quadratic: ScalarLinearEquation = ScalarLinearEquation {
         state_coefficient: 0.0, time_coefficient: 2.0, constant: 0.0
     }
-    let quadratic_result: f64 = scalar_integrate(quadratic, 0.0, 0.0, 1.0, 20)
-    if absolute(quadratic_result - 1.0) > 0.000000000001 { return 1 }
+    let quadratic_result: ScalarIntegrationResult = scalar_integrate(quadratic, 0.0, 0.0, 1.0, 20)
+    if not quadratic_result.valid { return 1 }
+    if absolute(quadratic_result.value - 1.0) > 0.000000000001 { return 2 }
+    if scalar_integrate(quadratic, 0.0, 0.0, 1.0, 0).valid { return 3 }
 
     # y' = -y, y(0) = 1: second-order convergence to exp(-1).
     let decay: ScalarLinearEquation = ScalarLinearEquation {
         state_coefficient: -1.0, time_coefficient: 0.0, constant: 0.0
     }
-    let coarse: f64 = scalar_integrate(decay, 0.0, 1.0, 1.0, 10)
-    let fine: f64 = scalar_integrate(decay, 0.0, 1.0, 1.0, 20)
-    let coarse_error: f64 = absolute(coarse - 0.36787944117144233)
-    let fine_error: f64 = absolute(fine - 0.36787944117144233)
-    if fine_error > 0.0002 { return 2 }
-    if fine_error >= coarse_error * 0.30 { return 3 }
+    let coarse: ScalarIntegrationResult = scalar_integrate(decay, 0.0, 1.0, 1.0, 10)
+    let fine: ScalarIntegrationResult = scalar_integrate(decay, 0.0, 1.0, 1.0, 20)
+    if not coarse.valid or not fine.valid { return 4 }
+    let coarse_error: f64 = absolute(coarse.value - 0.36787944117144233)
+    let fine_error: f64 = absolute(fine.value - 0.36787944117144233)
+    if fine_error > 0.0002 { return 5 }
+    if fine_error >= coarse_error * 0.30 { return 6 }
 
     # Coupled oscillator: x' = -y, y' = x, initial (1,0).
     let oscillator: LinearEquation2 = LinearEquation2 {
@@ -32,10 +35,12 @@ function main() -> i32 {
         second_first: 1.0, second_second: 0.0
     }
     let initial: State2 = State2 { first: 1.0, second: 0.0 }
-    let result: State2 = linear_integrate_2(oscillator, initial, 1.0, 100)
-    if absolute(result.first - 0.5403023058681398) > 0.0001 { return 4 }
-    if absolute(result.second - 0.8414709848078965) > 0.0001 { return 5 }
-    let energy: f64 = result.first * result.first + result.second * result.second
-    if absolute(energy - 1.0) > 0.0001 { return 6 }
+    let result: LinearIntegrationResult2 = linear_integrate_2(oscillator, initial, 1.0, 100)
+    if not result.valid { return 7 }
+    if linear_integrate_2(oscillator, initial, 1.0, 0).valid { return 8 }
+    if absolute(result.value.first - 0.5403023058681398) > 0.0001 { return 9 }
+    if absolute(result.value.second - 0.8414709848078965) > 0.0001 { return 10 }
+    let energy: f64 = result.value.first * result.value.first + result.value.second * result.value.second
+    if absolute(energy - 1.0) > 0.0001 { return 11 }
     return 0
 }

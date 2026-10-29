@@ -748,7 +748,7 @@ def test_native_conditional_debugger(page, timeout: int):
     # This is a one-shot target; no Python source is simulated in the browser.
     page.locator("#pythonBreakpoints").fill("2")
     page.locator("#source").fill(
-        "run_a = 1\\nrun_b = run_a + 1\\nrun_c = run_b + 1\\nprint(run_c)\\n")
+        "run_a = 1\nrun_b = run_a + 1\nrun_c = run_b + 1\nprint(run_c)\n")
     page.locator("#pythonDebugStart").click()
     page.wait_for_function(
         "() => document.querySelector('#pythonDebugOutput').textContent.includes('Line 2 in <module>')",

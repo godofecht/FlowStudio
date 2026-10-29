@@ -40,8 +40,7 @@ export function temperature_dimension() -> Dimension {
 }
 
 export function same_dimension(a: Dimension, b: Dimension) -> bool {
-    return a.length == b.length and a.mass == b.mass and
-           a.time == b.time and a.temperature == b.temperature
+    return a.length == b.length and a.mass == b.mass and a.time == b.time and a.temperature == b.temperature
 }
 
 export function product_dimension(a: Dimension, b: Dimension) -> Dimension {

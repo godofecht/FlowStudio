@@ -27,15 +27,45 @@ function validRTargets(value) {
   return tokens.length <= 64 && tokens.every(token =>
     /^[1-9][0-9]{0,5}(?:\?[A-Za-z][A-Za-z0-9._]*(?:==|!=|>=|<=|>|<)-?(?:0|[1-9][0-9]{0,12})(?:\.[0-9]{1,12})?)?$/.test(token));
 }
+// Navigate only to a line that actually exists in the exact source snapshot.
+function revealSourceLine(source, line) {
+  if (!source || typeof source.value !== "string" ||
+      typeof source.setSelectionRange !== "function" ||
+      !Number.isSafeInteger(line) || line < 1) return false;
+  let offset = 0;
+  for (let current = 1; current < line; current++) {
+    const newline = source.value.indexOf("\n", offset);
+    if (newline < 0) return false;
+    offset = newline + 1;
+  }
+  source.setSelectionRange(offset, offset);
+  if (typeof source.focus === "function") source.focus();
+  return true;
+}
 function create({native, source, language, runtime, startButton, stepButton,
                  continueButton, targetLine, watchExpression, frameInput, evaluateButton,
-                 stopButton, statusButton, target, notice}) {
+                 stopButton, statusButton, target, notice, documentIdentity, revealLine}) {
   if (!native || !source || !language || !runtime || !startButton || !stepButton ||
       !continueButton || !targetLine || !watchExpression || !evaluateButton ||
       !stopButton || !statusButton || !target)
     throw Error("Missing R debugger controls.");
   const supported = native.available();
   let state = "idle", pending = false, frameCount = 0;
+  let sourceRevision = 0, runSnapshot = null;
+  const identity = typeof documentIdentity === "function" ? documentIdentity : () => null;
+  source.addEventListener("input", () => { sourceRevision++; });
+  function navigate(result, action) {
+    if (action === "evaluate" || !runSnapshot ||
+        source.value !== runSnapshot.source ||
+        sourceRevision !== runSnapshot.revision ||
+        identity() !== runSnapshot.identity ||
+        language.value !== "r" || runtime.value !== "native") return false;
+    const line = result.state === "paused" ? result.next_line :
+      result.state === "error" ? result.failed_line : null;
+    if (!Number.isSafeInteger(line) || line < 1) return false;
+    return typeof revealLine === "function" ? revealLine(line) :
+      revealSourceLine(source, line);
+  }
   function update() {
     const enabled = supported && language.value === "r" && runtime.value === "native";
     startButton.disabled = !enabled || pending || state === "paused";
@@ -53,6 +83,9 @@ function create({native, source, language, runtime, startButton, stepButton,
       return false;
     if ((action === "step" || action === "continue") && state !== "paused") return false;
     if (action === "evaluate" && state !== "paused" && state !== "error") return false;
+    const started = action === "start" ? {
+      source:source.value, revision:sourceRevision, identity:identity()
+    } : null;
     pending = true;
     update();
     try {
@@ -73,11 +106,16 @@ function create({native, source, language, runtime, startButton, stepButton,
         await native.debugRStart(source.value) :
         await native.debugRCommand(action, line, selectedFrame);
       state = result.state;
+      if (started) runSnapshot = started;
+      if (state === "idle" || state === "done") runSnapshot = null;
       frameCount = state === "error" && Array.isArray(result.frames) ? result.frames.length : 0;
       if (frameInput && (!Number.isSafeInteger(Number(frameInput.value)) ||
           Number(frameInput.value) > frameCount || state !== "error"))
         frameInput.value = "0";
       target.textContent = format(result);
+      // A delayed response may describe a different file or edited buffer.
+      // Keep its diagnostic text, but never move the editor to that source.
+      navigate(result, action);
       if (notice) notice("Native R expression debugger: " + state + ".");
       return result.ok;
     } catch (error) {
@@ -101,7 +139,7 @@ function create({native, source, language, runtime, startButton, stepButton,
   update();
   return Object.freeze({execute, update});
 }
-const api = Object.freeze({format, create});
+const api = Object.freeze({format, create, revealSourceLine});
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 global.FlowStudioRDebugPanel = api;
 })(globalThis);

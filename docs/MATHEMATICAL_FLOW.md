@@ -1,5 +1,30 @@
 # Executable mathematical Flow subsets (experimental)
 
+## Typed Navier momentum equation AST (bounded)
+
+`src/math_flow_vector.py` now compiles the checked Navier–Stokes momentum
+equation into ordered, immutable `VectorTerm` nodes with physical dimensions
+`m/s²`, explicit signs, symbol dependencies and an implicit-pressure marker.
+The runtime assembles the advection/diffusion RK2 slopes in **source order**
+from those validated nodes; the semantic trace uses the same nodes for
+provenance. The pressure-gradient term is represented in the AST but lowered
+through the existing discrete pressure projection, rather than falsely
+treated as an explicit slope. Rearranging the three supported terms preserves
+the numerical solution, and the regression suite verifies the change with
+real execution.
+
+The compiler still accepts **exactly** the validated incompressible Navier
+term family: negative convective transport, negative pressure gradient,
+positive viscous diffusion. It rejects missing, repeated, incorrectly signed,
+or arbitrary terms; this is not a general vector equation compiler and does
+not change upstream Flow 2.0.
+
+```sh
+python3 src/math_flow.py examples/navier_stokes_smoke.flow
+python3 -m unittest discover -s tests -p 'test_math_flow_vector_ast.py' -v
+```
+
+
 The repository contains a **separate mathematical Flow frontend** in `src/math_flow.py`. It now dispatches two explicitly supported PDE families: incompressible periodic 2D Navier–Stokes and scalar 2D heat diffusion with periodic or constant face-Dirichlet boundaries. `src/math_flow_heat.py` implements the second family; `src/math_flow_expr.py` provides a bounded, dimension-checked scalar expression AST used by both families' initial conditions. It lexes Unicode source into positioned tokens, parses and validates the domain/model/solver and observation pipeline, and executes the supported two-dimensional incompressible Navier–Stokes equations using NumPy. This is **not** a modification of the upstream Flow 2.0 compiler, and arbitrary mathematical Flow expressions are not supported. Unsupported equations, methods, units, fields, and boundary conditions are errors rather than silently ignored.
 
 ## Measured Navier–Stokes RK2 and pressure-projection inspection

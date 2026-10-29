@@ -15,6 +15,7 @@ from pathlib import Path
 import re
 import sys
 from math_flow_spatial import spatial_snapshot
+from math_flow_vector import VectorEquation, compile_vector_equation
 from math_flow_expr import parse_expression, evaluate, ExpressionError, VELOCITY
 
 TOKEN = re.compile(
@@ -209,6 +210,7 @@ class Model:
     step: float
     tolerance: float
     until: float
+    equation: VectorEquation
 
 
 def parse(source: str) -> Model:
@@ -267,10 +269,10 @@ def parse(source: str) -> Model:
     viscosity = number(consts["kinematicViscosity"], ["m", "²", "/", "s"])
     if density <= 0 or viscosity < 0:
         raise FlowMathError("Density must be positive and viscosity nonnegative")
-    dynamics = "".join(t.text for t in sections["dynamics"])
-    required = "∂ₜvelocity=−(velocity·∇)velocity−∇pressure/density+kinematicViscosity∇²velocity"
-    if dynamics != required:
-        raise FlowMathError("Unsupported dynamics: expected 2D incompressible Navier-Stokes equation")
+    try:
+        equation = compile_vector_equation([token.text for token in sections["dynamics"]])
+    except ValueError as exc:
+        raise FlowMathError(f"Unsupported dynamics: {exc}") from exc
     if "".join(t.text for t in sections["constraint"]) != "∇·velocity=0":
         raise FlowMathError("Only incompressibility constraint ∇ · velocity = 0 is implemented")
     initial = assignments(sections["initial"])
@@ -362,7 +364,7 @@ def parse(source: str) -> Model:
     if p.peek() != "<EOF>":
         raise FlowMathError(f"Unexpected trailing token {p.peek()}")
     return Model(width, height, length_x, length_y, density, viscosity,
-                 parts[0], parts[1], step, tolerance, until)
+                 parts[0], parts[1], step, tolerance, until, equation)
 
 
 def assignments_tokens(statements: list[list[str]]) -> dict[str, list[str]]:
@@ -461,8 +463,10 @@ def simulate(model: Model, *, grid: int | None = None, until: float | None = Non
         vx, vy = center(b, 0, dx), center(b, 1, dy)
         advection = (-a * ux - b * uy, -a * vx - b * vy)
         diffusion = (model.viscosity * laplacian(a), model.viscosity * laplacian(b))
-        slope = (advection[0] + diffusion[0], advection[1] + diffusion[1])
-        return (slope, (advection, diffusion)) if inspect else slope
+        contributions = {"advection": advection, "diffusion": diffusion}
+        ordered = tuple(contributions[term.role] for term in model.equation.explicit_terms)
+        slope = (sum(part[0] for part in ordered), sum(part[1] for part in ordered))
+        return (slope, ordered) if inspect else slope
 
     def kinetic_energy(a, b):
         return float(.5 * model.density * dx * dy * np.sum(a*a + b*b))
@@ -476,18 +480,18 @@ def simulate(model: Model, *, grid: int | None = None, until: float | None = Non
                 "pressureMean": float(np.mean(pressure_field))}
 
     def inspect_stage(name, time, slope, terms):
-        meanings = ("Nonlinear velocity transport by the resolved velocity field.",
-                    "Viscous redistribution by the discrete velocity Laplacian.")
+        meanings = {"advection": "Nonlinear velocity transport by the resolved velocity field.",
+                    "diffusion": "Viscous redistribution by the discrete velocity Laplacian."}
         inspected = []
         reconstructed = (np.zeros_like(slope[0]), np.zeros_like(slope[1]))
-        for role, meaning, component in zip(("advection", "diffusion"), meanings, terms):
+        for term, component in zip(model.equation.explicit_terms, terms):
+            role, meaning = term.role, meanings[term.role]
             reconstructed = (reconstructed[0] + component[0],
                              reconstructed[1] + component[1])
             magnitude = np.hypot(component[0], component[1])
-            inspected.append({"role": role, "meaning": meaning, "sign": 1,
-                              "symbols": (["velocity"] if role == "advection"
-                                          else ["kinematicViscosity", "velocity"]),
-                              "dimension": [1, 0, -2, 0],
+            inspected.append({"role": role, "meaning": meaning, "sign": term.sign,
+                              "symbols": list(term.symbols),
+                              "dimension": list(term.dimension),
                               "meanMagnitude": float(np.mean(magnitude)),
                               "maximumMagnitude": float(np.max(magnitude))})
         residual = float(max(np.max(np.abs(reconstructed[0] - slope[0])),

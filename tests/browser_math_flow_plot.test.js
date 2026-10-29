@@ -116,7 +116,7 @@ test("real semantic RK2 trace is bounded and checked before rendering", () => {
 
 test("measured Navier-Stokes RK2 terms and projections validate before rendering", () => {
   const term = (role, value) => ({
-    role, meaning: "Measured numerical contribution.", sign: 1,
+    role, meaning: "Measured numerical contribution.", sign: role === "advection" ? -1 : 1,
     symbols: role === "advection" ? ["velocity"] : ["kinematicViscosity", "velocity"],
     dimension: [1, 0, -2, 0], meanMagnitude: value / 2, maximumMagnitude: value
   });
@@ -139,7 +139,15 @@ test("measured Navier-Stokes RK2 terms and projections validate before rendering
       updatedKineticEnergy: 0.98, maximumCorrectorDifference: 0.001}
   };
   assert.equal(plots.prepareSemanticTrace({...heat, semantic_trace: trace}), trace);
+  const reversed = {...trace, stages: trace.stages.map(stage => ({
+    ...stage, terms: [...stage.terms].reverse()
+  }))};
+  assert.equal(plots.prepareSemanticTrace({...heat, semantic_trace: reversed}), reversed);
   for (const bad of [
+    {...trace, stages: [trace.stages[0], {...trace.stages[1],
+      terms: [...trace.stages[1].terms].reverse()}]},
+    {...trace, stages: [trace.stages[0], {...trace.stages[1],
+      terms: [{...term("advection", 1), sign: 1}, term("diffusion", 0.1)]}]},
     {...trace, rateUnit: "K/s"},
     {...trace, stages: [trace.stages[0]]},
     {...trace, stages: [trace.stages[0], {...trace.stages[1], time: 0}]},

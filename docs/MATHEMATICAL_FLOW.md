@@ -1,4 +1,4 @@
-## Native three-species conservative cyclic network (CI verification pending)
+## Native three-species conservative cyclic network (six CI jobs passed)
 
 `examples/native_cyclic_network.flow` is a standalone Flow 2.0 program, with
 no Python/NumPy dependency, implementing explicit midpoint RK2 integration
@@ -18,9 +18,11 @@ check and Flow-owned `/api/run/flow` endpoint, which returns HTTP 422 if
 the compiled program exits unsuccessfully. The existing native Linux/macOS
 CI invokes that HTTP acceptance through `scripts/verify_native.py`.
 A local independent Python implementation of the midpoint scheme confirmed
-the reference and refinement thresholds, but the native Flow compiler
-cannot be run in this authoring environment. **Native compiler, HTTP and
-cross-platform CI results are pending and must not be counted as passed.**
+the reference and refinement thresholds. **All six Linux/macOS jobs passed**
+in [CI #40924380694](https://github.com/godofecht/FlowStudio/actions/runs/40924380694),
+including native Flow 2.0 compilation, real Flow-owned HTTP execution, R/Python
+and FlowJIT acceptance, and Ubuntu Chromium acceptance. This does not establish
+separate macOS physical-browser acceptance or post-merge main CI success.
 
 ```sh
 flow run examples/native_cyclic_network.flow

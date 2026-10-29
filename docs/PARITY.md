@@ -1,25 +1,33 @@
-## 2026-10-29: opt-in idle Flow compiler diagnostics (PR validation pending)
+## 2026-10-29: opt-in idle Flow compiler diagnostics (six CI jobs passed)
 
-The primary Monaco workspace now offers an **unchecked by default** "Check on
-idle" control for Flow source. After 1.1 seconds without edits it calls the
-existing strict, nonexecuting Flow 2.0 compiler endpoint. Background results
-decorate compiler-reported source locations and populate the same problems
-panel as manual Check Flow, but **never move the caret**. Editing, undoing,
-switching documents or languages, and disabling the option invalidate stale
-responses. Pending background requests are coalesced rather than launching
-parallel compiler checks; an explicit manual check retains source navigation.
+The primary Monaco workspace offers an **unchecked by default** "Check on
+idle" control for Flow source. After 1.1 seconds without edits it invokes
+the existing strict, nonexecuting Flow 2.0 compiler endpoint. Background
+results decorate real compiler-reported source locations and populate the
+same problems panel as manual Check Flow, but **never move the caret**.
+Edits, undo, document or language switches, and disabling the option
+invalidate stale results. Idle checks are coalesced rather than starting
+another background compilation while one is in flight. An explicit manual
+check retains its existing first-problem source navigation.
 
-**Status: partial / new PR validation pending.** Six deterministic assertions
-against the exact proposed browser controller passed in a local V8 isolate;
-six corresponding Node regression tests are committed but have not yet been
-run in GitHub CI. No native compiler or physical-browser acceptance is claimed
-for this change until verified. The existing real strict compiler, Flow-owned
-HTTP backend and Linux/macOS build workflows are unchanged. Compiler checks
-can take up to 60 seconds; there is no cancellation of an already-running
-native compilation and no continuous language server. This does not implement
-live Flow debugging, function-level R stepping, multi-user remote isolation,
+**Status: partial / independently verified in all six Linux/macOS jobs
+in [CI #40877104038](https://github.com/godofecht/FlowStudio/actions/runs/40877104038).**
+Each source/transport platform passed 1,121 of 1,133 Node tests
+(12 skipped, zero failures) and 280 Python tests (13 skipped, zero failures).
+Six new focused Node tests passed on both platforms and six equivalent
+assertions passed in a local V8 harness against the exact controller.
+Both native Flow 2.0 builds, real HTTP acceptance and both FlowJIT jobs
+passed. Actual Ubuntu Chromium acceptance exercised the new checkbox,
+idle timer, strict Flow compiler execution and caret preservation without
+a manual Check Flow click. **Independent macOS physical-browser acceptance
+was not performed.** [PR #190](https://github.com/godofecht/FlowStudio/pull/190)
+merged as [30da5e1](https://github.com/godofecht/FlowStudio/commit/30da5e15df929e0e8be4cc1d486fe128daaadbaf).
+No hosted CI definition or native Flow compiler/backend was changed.
+
+Checks can take up to 60 seconds; an already-running native compiler process
+is not cancelled on edit. This is not a continuous language server, live
+Flow debugging, function-level R stepping, multi-user remote isolation,
 or complete RStudio parity.
-
 ## 2026-10-29: navigable source-owned Flow compiler problems (six CI jobs passed)
 
 The primary Monaco editor now renders each valid location reported by the

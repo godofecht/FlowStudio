@@ -52,6 +52,7 @@ try {
   await page.locator('#rRuntime').selectOption('native');
   const rSource = 'a <- 1L\nb <- a + 1L\nprint(b)';
   await page.locator('#source').fill(rSource);
+  await page.locator('#rDebugPanel > summary').click();
   await page.locator('#rDebugStart').click();
   await page.waitForFunction(() =>
     document.querySelector('#rDebugOutput')?.textContent.includes('Next expression at line 1'));

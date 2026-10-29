@@ -1,3 +1,26 @@
+## 2026-10-29: source-owned multi-location Flow compiler diagnostics (PR validation pending)
+
+The existing strict Flow 2.0 compiler check now collects up to 64 distinct,
+bounded `line:column` diagnostics from its **actual output**, including the
+upstream parser's `parse error:` form. Only locations whose filename matches
+the native transport's `/tmp/flowstudio-XXXXXX.flow` checked source are
+mapped into Monaco; imported files, generated C, unrelated compiler output and
+HTTP process failures are retained as text without falsely decorating the
+current editor. Repeated diagnostics are deduplicated in compiler order. The
+existing Monaco panel can display all valid locations and navigates to the
+first. Source-revision and document identity guards are unchanged.
+
+**Status: partial / local parser validation only, CI pending.** Four isolated
+Node 22.16.0 parser assertions passed, covering upstream parser text, multiple
+locations/deduplication, foreign paths and the 64-entry cap. The added native
+client and Monaco regressions and the real malformed-source Ubuntu Chromium
+acceptance still require independent GitHub CI. The local environment lacks
+Flow, Rscript and a runnable native server; no local end-to-end claim is made.
+The strict compiler may itself stop after its first parse error, so support
+for multiple reported locations is not a promise of compiler error recovery.
+No Flow grammar, Flow backend, native HTTP route or hosted CI definition changed.
+This is not a language server or RStudio feature parity.
+
 ## 2026-10-29: native Flow compiler diagnostics in primary Monaco workspace (PR validation pending)
 
 The primary FlowStudio editor now exposes **Check Flow** in the topbar and Run

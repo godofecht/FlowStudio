@@ -121,10 +121,10 @@ try {
     const path = await page.locator('#mathFlowPlot svg path').getAttribute('d');
     assert.ok(path.startsWith('M') && path.includes('L'), path);
     assert.ok(!/NaN|Infinity/.test(path));
-    await page.locator('#mathFlowPlot select').selectOption(other);
+    await page.locator('#mathFlowPlot select[aria-label="Mathematical Flow plotted quantity"]').selectOption(other);
     assert.match(await page.locator('#mathFlowPlot svg').first().getAttribute('aria-label'),
       /over simulated time/);
-    assert.equal(await page.locator('#mathFlowPlot select').inputValue(), other);
+    assert.equal(await page.locator('#mathFlowPlot select[aria-label="Mathematical Flow plotted quantity"]').inputValue(), other);
   }
   assert.deepEqual(errors, [], errors.join('\n'));
   console.log('PASS: native mathematical Flow HTTP, linear/nonlinear NumPy PDEs and actual SVG plots in Chromium');

@@ -48,7 +48,7 @@ class HyperbolicFlowTest(unittest.TestCase):
                 with self.assertRaises(ExpressionError):
                     parse_expression(expression)
         for expression in ("acosh(0.9)", "atanh(1)", "atanh(-1)",
-                           "atanh(x/1m)", "sinh(1000)"):
+                           "atanh(2*x/1m)", "sinh(1000)"):
             with self.subTest(expression=expression):
                 with self.assertRaises(ExpressionError):
                     evaluate(parse_expression(expression), self.x, self.y)

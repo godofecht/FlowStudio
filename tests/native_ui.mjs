@@ -155,6 +155,9 @@ try {
     source.value = 'function main() -> i32 {\n    return 0\n}\n';
     source.dispatchEvent(new Event('input', { bubbles: true }));
   });
+  // The preceding command-palette interaction leaves a modal open in some
+  // Chromium builds; close it before testing the real topbar control.
+  await page.evaluate(() => document.getElementById('commandPalette').close());
   await page.locator('#checkFlow').click();
   await page.waitForFunction(() =>
     document.getElementById('resultStatus').textContent === 'Flow compile check passed.');

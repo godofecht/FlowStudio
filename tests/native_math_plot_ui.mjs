@@ -187,6 +187,16 @@ try {
     null, { timeout: 80000 });
   assert.match(await page.locator('#console').textContent(), /native-coupled-evolution2d-ok/);
 
+  // Execute the distinct-neighbor 3x3 periodic heat PDE via the actual
+  // Monaco Run control and upstream Flow compiler, not the Python math route.
+  await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
+    readFileSync('examples/native_evolution_heat3x3.flow', 'utf8'));
+  await page.locator('#run').click();
+  await page.waitForFunction(() =>
+    document.querySelector('#console')?.textContent?.includes('native-evolution-heat3x3-ok'),
+    null, { timeout: 80000 });
+  assert.match(await page.locator('#console').textContent(), /native-evolution-heat3x3-ok/);
+
   assert.deepEqual(errors, [], errors.join('\n'));
   console.log('PASS: native mathematical Flow HTTP, linear/nonlinear NumPy PDEs and actual SVG plots in Chromium');
 } finally {

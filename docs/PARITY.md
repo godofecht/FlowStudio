@@ -1,3 +1,42 @@
+## 2026-10-29: real Python/R tensor-diffusion interoperability and plot acceptance (six CI jobs passed)
+
+The checked-in `examples/spectral_interop_python.py` now executes a
+deterministic 16×16 anisotropic two-dimensional heat equation with a nonzero
+mixed derivative in the **real persistent CPython kernel**, through the
+Flow-owned `/api/run/python` HTTP route. It uses an explicit midpoint RK2
+finite-difference operator, checks all 256 samples against its discrete Fourier
+mode, verifies temporal second-order convergence, conservation, deterministic
+replay and semigroup consistency, and rejects invalid grids, indefinite
+diffusion tensors, nonfinite inputs and excessive/unstable steps. No NumPy or
+randomness is required for this example.
+
+`tests/spectral_interop_http.py`, invoked by the production
+`tests/http_smoke.py` gate, transfers those 256 finite numbers to the **real
+persistent Rscript kernel** using validated numeric literals. The separate
+`examples/spectral_interop_r.R` independently derives the discrete Fourier
+eigenvalue and RK2 amplification in base R and verifies every cell, mean,
+variance and bounds. The same live HTTP session captures an actual R heatmap
+via `/api/plot/r`, corrupts one cell and verifies HTTP 422, restores the
+values, reruns successfully and inspects the retained R environment. The
+heatmap uses R raster rendering to stay within the native 60 KiB plot limit.
+No R/Python kernel mocks, fake plot or CI workflow changes were introduced.
+
+**Status: tested for this bounded cross-language example / partial overall.**
+[PR #205](https://github.com/godofecht/FlowStudio/pull/205) merged as
+[f6da965](https://github.com/godofecht/FlowStudio/commit/f6da965dc1588a19411ffa66d50e0c1804ece464)
+after all six independent Ubuntu/macOS jobs passed in
+[CI #40934327611](https://github.com/godofecht/FlowStudio/actions/runs/40934327611).
+Both native Flow build/real HTTP jobs, source/transport jobs and FlowJIT jobs
+passed, including existing Ubuntu Chromium acceptance. Three focused Python
+unit tests passed locally with zero failures; the real R HTTP path was
+verified by CI because Rscript and Flow were unavailable locally. The initial
+CI run correctly caught an SVG exceeding the native 60 KiB capture limit;
+raster rendering fixed that failure before the six-job passing run.
+A separate physical-browser interaction with the new cross-language example,
+notebook persistence/restore, remote multi-user isolation and complete RStudio
+parity remain **unverified or incomplete**. Post-merge main CI is separate
+from the successful PR run.
+
 ## 2026-10-29: native Flow three-state cyclic eigenmode acceptance (six CI jobs passed)
 
 The checked-in `examples/native_cyclic_network.flow` now executes a

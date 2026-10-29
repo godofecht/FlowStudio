@@ -92,6 +92,7 @@ jobs:
           flow run src/math_dimensions_smoke.flow
           flow run src/math_physical_ode_smoke.flow
           flow run examples/native_math_bootstrap.flow
+          flow run examples/native_periodic_heat.flow
       - name: Execute checked-in Navier-Stokes and piecewise heat Flow programs
         run: |
           python3 src/math_flow.py --check examples/navier_stokes_smoke.flow

@@ -639,3 +639,23 @@ python3 -m unittest discover -s tests -p 'test_math_flow_mixed_derivatives.py' -
 
 This remains an opt-in bounded scalar PDE frontend, not general tensor
 calculus or upstream Flow 2.0 grammar integration.
+
+
+## Native periodic heat PDE kernel (Flow 2.0, no Python)
+
+`examples/native_periodic_heat.flow` is an independently executable native
+Flow 2.0 program for a **four-cell one-dimensional periodic heat equation**
+with uniform forcing. The source implements the centered periodic Laplacian,
+midpoint Runge–Kutta evolution, and an explicit RK2 stability bound. Its
+`main()` returns distinct nonzero exit codes on failed assertions, including
+an exact semidiscrete alternating Fourier eigenmode, second-order temporal
+refinement, mean conservation plus source injection, symmetry, semigroup
+consistency, deterministic replay, uniform-field forcing, and invalid
+coefficients, spatial spacing, duration, steps, and stability.
+
+The native Linux/macOS CI jobs execute `flow run examples/native_periodic_heat.flow`
+and the real Flow-owned HTTP acceptance runs the same source through both
+`/api/check/flow` and `/api/run/flow`. This is a bounded native PDE
+numerical kernel, **not** a general Flow PDE grammar, a dynamic spatial grid,
+a replacement for the existing Python-backed Navier–Stokes frontend, or a
+spatial visualization interface.

@@ -1,0 +1,173 @@
+# Native Flow 2.0: periodic one-dimensional four-cell heat equation.
+# Real numerical execution via flow run and FlowStudio /api/run/flow.
+# Semidiscrete finite-volume / centered-difference heat operator:
+# dT_i/dt = diffusivity * (T_(i-1) - 2*T_i + T_(i+1))/spacing^2 + forcing.
+# The four-cell stencil is a deliberately bounded first native PDE kernel.
+# No Python/NumPy dependency, no claim of general PDE syntax or grid support.
+
+struct HeatState4 {
+    first: f64,
+    second: f64,
+    third: f64,
+    fourth: f64
+}
+
+struct HeatEquation4 {
+    diffusivity: f64,
+    spacing: f64,
+    forcing: f64
+}
+
+struct HeatResult4 {
+    valid: bool,
+    state: HeatState4
+}
+
+function absolute(value: f64) -> f64 {
+    if value < 0.0 { return -value }
+    return value
+}
+
+function maxDifference(a: HeatState4, b: HeatState4) -> f64 {
+    let mut maximum: f64 = absolute(a.first - b.first)
+    let second: f64 = absolute(a.second - b.second)
+    let third: f64 = absolute(a.third - b.third)
+    let fourth: f64 = absolute(a.fourth - b.fourth)
+    if second > maximum { maximum = second }
+    if third > maximum { maximum = third }
+    if fourth > maximum { maximum = fourth }
+    return maximum
+}
+
+function meanTemperature(state: HeatState4) -> f64 {
+    return (state.first + state.second + state.third + state.fourth) * 0.25
+}
+
+function heatDerivative(equation: HeatEquation4, state: HeatState4) -> HeatState4 {
+    let factor: f64 = equation.diffusivity / (equation.spacing * equation.spacing)
+    return HeatState4 {
+        first: factor * (state.fourth - 2.0 * state.first + state.second) + equation.forcing,
+        second: factor * (state.first - 2.0 * state.second + state.third) + equation.forcing,
+        third: factor * (state.second - 2.0 * state.third + state.fourth) + equation.forcing,
+        fourth: factor * (state.third - 2.0 * state.fourth + state.first) + equation.forcing
+    }
+}
+
+function midpointHeatStep(equation: HeatEquation4, state: HeatState4, step: f64) -> HeatState4 {
+    let slope: HeatState4 = heatDerivative(equation, state)
+    let midpoint: HeatState4 = HeatState4 {
+        first: state.first + 0.5 * step * slope.first,
+        second: state.second + 0.5 * step * slope.second,
+        third: state.third + 0.5 * step * slope.third,
+        fourth: state.fourth + 0.5 * step * slope.fourth
+    }
+    let midpointSlope: HeatState4 = heatDerivative(equation, midpoint)
+    return HeatState4 {
+        first: state.first + step * midpointSlope.first,
+        second: state.second + step * midpointSlope.second,
+        third: state.third + step * midpointSlope.third,
+        fourth: state.fourth + step * midpointSlope.fourth
+    }
+}
+
+function integrateHeat(equation: HeatEquation4, initial: HeatState4, duration: f64, steps: i32) -> HeatResult4 {
+    if steps <= 0 or steps > 1000000 or duration < 0.0 {
+        return HeatResult4 { valid: false, state: initial }
+    }
+    if equation.diffusivity < 0.0 or equation.spacing <= 0.0 {
+        return HeatResult4 { valid: false, state: initial }
+    }
+    let step: f64 = duration / (steps as f64)
+    let stability: f64 = equation.diffusivity * step / (equation.spacing * equation.spacing)
+    # RK2 stability along the negative real axis: the largest eigenvalue
+    # magnitude of this four-cell periodic Laplacian is 4*kappa/dx^2.
+    if stability > 0.5 {
+        return HeatResult4 { valid: false, state: initial }
+    }
+    let mut state: HeatState4 = initial
+    let mut index: i32 = 0
+    while index < steps {
+        state = midpointHeatStep(equation, state, step)
+        index = index + 1
+    }
+    return HeatResult4 { valid: true, state: state }
+}
+
+function main() -> i32 {
+    let initial: HeatState4 = HeatState4 {
+        first: 3.0, second: 1.0, third: 3.0, fourth: 1.0
+    }
+    let equation: HeatEquation4 = HeatEquation4 {
+        diffusivity: 0.02, spacing: 0.25, forcing: 0.3
+    }
+    # Exact semidiscrete Fourier mode at t=0.5:
+    # T_i = 2 + 0.3*t + (-1)^i * exp(-4*0.02*t/0.25^2).
+    # exp(-0.64) = 0.5272924240430485.
+    let expected: HeatState4 = HeatState4 {
+        first: 2.6772924240430485, second: 1.6227075759569515,
+        third: 2.6772924240430485, fourth: 1.6227075759569515
+    }
+    let coarse: HeatResult4 = integrateHeat(equation, initial, 0.5, 20)
+    let medium: HeatResult4 = integrateHeat(equation, initial, 0.5, 40)
+    let fine: HeatResult4 = integrateHeat(equation, initial, 0.5, 80)
+    if not coarse.valid or not medium.valid or not fine.valid { return 1 }
+    let coarseError: f64 = maxDifference(coarse.state, expected)
+    let mediumError: f64 = maxDifference(medium.state, expected)
+    let fineError: f64 = maxDifference(fine.state, expected)
+    if fineError > 0.000004 { return 2 }
+    if mediumError >= coarseError * 0.30 { return 3 }
+    if fineError >= mediumError * 0.30 { return 4 }
+    if absolute(meanTemperature(fine.state) - 2.15) > 0.000000000001 { return 5 }
+    if maxDifference(fine.state, expected) > 0.000004 { return 6 }
+
+    # A periodic discrete Laplacian preserves the mean and the Fourier parity.
+    if absolute(fine.state.first - fine.state.third) > 0.000000000001 { return 7 }
+    if absolute(fine.state.second - fine.state.fourth) > 0.000000000001 { return 8 }
+    if fine.state.first < fine.state.second { return 9 }
+
+    # Equal-step semigroup, deterministic replay, and exact uniform forcing.
+    let half: HeatResult4 = integrateHeat(equation, initial, 0.25, 40)
+    let remaining: HeatResult4 = integrateHeat(equation, half.state, 0.25, 40)
+    let replay: HeatResult4 = integrateHeat(equation, initial, 0.5, 80)
+    if not half.valid or not remaining.valid or not replay.valid { return 10 }
+    if maxDifference(remaining.state, fine.state) > 0.000000000001 { return 11 }
+    if maxDifference(replay.state, fine.state) > 0.000000000001 { return 12 }
+
+    let uniform: HeatState4 = HeatState4 {
+        first: 300.0, second: 300.0, third: 300.0, fourth: 300.0
+    }
+    let uniformResult: HeatResult4 = integrateHeat(equation, uniform, 0.5, 80)
+    if not uniformResult.valid { return 13 }
+    if absolute(uniformResult.state.first - 300.15) > 0.0000000001 { return 14 }
+    if maxDifference(uniformResult.state, HeatState4 {
+        first: 300.15, second: 300.15, third: 300.15, fourth: 300.15
+    }) > 0.0000000001 { return 15 }
+
+    # Fail closed on invalid spatial, temporal and explicit stability settings.
+    if integrateHeat(equation, initial, 0.5, 0).valid { return 16 }
+    if integrateHeat(equation, initial, 0.5, 1000001).valid { return 17 }
+    if integrateHeat(equation, initial, -0.5, 80).valid { return 18 }
+    let negativeDiffusion: HeatEquation4 = HeatEquation4 {
+        diffusivity: -0.02, spacing: 0.25, forcing: 0.3
+    }
+    if integrateHeat(negativeDiffusion, initial, 0.5, 80).valid { return 19 }
+    let zeroSpacing: HeatEquation4 = HeatEquation4 {
+        diffusivity: 0.02, spacing: 0.0, forcing: 0.3
+    }
+    if integrateHeat(zeroSpacing, initial, 0.5, 80).valid { return 20 }
+    let unstable: HeatEquation4 = HeatEquation4 {
+        diffusivity: 1.0, spacing: 0.25, forcing: 0.3
+    }
+    if integrateHeat(unstable, initial, 0.5, 1).valid { return 21 }
+
+    let zeroDiffusion: HeatEquation4 = HeatEquation4 {
+        diffusivity: 0.0, spacing: 0.25, forcing: 0.3
+    }
+    let noDiffusion: HeatResult4 = integrateHeat(zeroDiffusion, initial, 0.5, 20)
+    if not noDiffusion.valid { return 22 }
+    if absolute(noDiffusion.state.first - 3.15) > 0.000000000001 { return 23 }
+    let zeroDuration: HeatResult4 = integrateHeat(equation, initial, 0.0, 20)
+    if not zeroDuration.valid { return 24 }
+    if maxDifference(zeroDuration.state, initial) > 0.000000000001 { return 25 }
+    return 0
+}

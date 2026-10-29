@@ -99,9 +99,12 @@ try {
   await page.locator('#newDocumentTab').click();
   await page.keyboard.insertText('unrelated = 1');
   const unrelatedLine = await page.evaluate(() => FlowStudioEditor.editor.getPosition().lineNumber);
-  await page.locator('#liveDebugFrames button').first().click();
-  assert.equal(await page.evaluate(() => FlowStudioEditor.editor.getPosition().lineNumber), unrelatedLine);
+  // The editor input event disables stale-frame controls immediately.
+  // Playwright cannot click a disabled control; verify the actual controller
+  // refuses the navigation as well as preserving the unrelated caret.
   assert.equal(await page.locator('#liveDebugFrames button').first().isDisabled(), true);
+  assert.equal(await page.evaluate(() => FlowStudioWorkspacePanels.liveDebugPanel.selectFrame(0)), false);
+  assert.equal(await page.evaluate(() => FlowStudioEditor.editor.getPosition().lineNumber), unrelatedLine);
   await page.locator('#liveDebugStop').click();
   await page.waitForFunction(() =>
     document.getElementById('liveDebugOutput').textContent.includes('Python debugger: stopped'));

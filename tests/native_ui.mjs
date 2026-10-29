@@ -356,6 +356,12 @@ try {
       assert.equal(notebookRequests.filter(route => route === '/api/run/flow').length, 2);
       assert.equal(notebookRequests.filter(route => route === '/api/run/r').length, 2);
 
+      // The completion notice is published before the asynchronous native R
+      // environment inspection finishes. Export must wait until the notebook
+      // runner clears busy, rather than racing its explicit busy guard.
+      await notebookPage.waitForFunction(() =>
+        !document.querySelector('#runNotebook').disabled, null, {timeout:30000});
+
       // Real downloaded .fsnb must restore display snapshots without executing
       // any Flow or R code or pretending to restore interpreter state.
       // Diagnose a failed export at its actual boundary instead of timing out

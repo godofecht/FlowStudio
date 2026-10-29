@@ -14,16 +14,21 @@ are unchanged. Six new Node regression cases cover the declaration forms,
 field source locations, F12 usage, real recursive project search, invalid
 forms and language separation.
 
-**Status: partial / focused V8 execution passed, hosted CI pending.**
-The exact proposed `web/ide_symbols.js` and `web/project.js` were evaluated
-in an isolated V8 harness; domain outline, PDE field navigation, invalid
-syntax rejection and recursive project F12 assertions passed. The complete
-Node test suite, real browser interaction and native Flow build have **not**
-been executed for this PR. The local environment has no network-accessible
-Git checkout or installed native Flow compiler. This remains lexical source
-navigation, not compiler-backed semantic resolution, import resolution, live
-Flow debugging or complete RStudio parity. No hosted CI configuration,
-native backend or Flow compiler was changed.
+**Status: partial / all six Linux/macOS CI jobs passed in
+[CI #40905395790](https://github.com/godofecht/FlowStudio/actions/runs/40905395790).**
+Each source/transport platform passed 1,143 of 1,155 Node tests (12 skipped,
+zero failures) and 295 Python tests (13 skipped, zero failures). The six
+new Node regression cases also passed against the exact committed sources
+in an isolated V8 harness before CI. Both native Flow 2.0 builds, real HTTP
+acceptance, existing Ubuntu Chromium acceptance and both FlowJIT jobs passed.
+A separate physical-browser test specifically selecting a `flow`, `dsys`,
+`horizon` or `field` outline entry has **not** been executed. The local
+environment has no network-accessible Git checkout or installed native Flow
+compiler. [PR #197](https://github.com/godofecht/FlowStudio/pull/197)
+merged as [e78bb3c](https://github.com/godofecht/FlowStudio/commit/e78bb3c6e3c331abac950d68deeab7569b393da5).
+This remains lexical source navigation, not compiler-backed semantic
+resolution, import resolution, live Flow debugging or complete RStudio parity.
+No hosted CI configuration, native backend or Flow compiler was changed.
 
 ## 2026-10-29: project-wide lexical Go to Definition (verification pending)
 

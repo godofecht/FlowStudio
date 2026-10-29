@@ -152,7 +152,7 @@ class _Parser:
                 raise ExpressionError("where branches require matching physical dimensions")
             left = Expression("where", (predicate, when_true, when_false),
                               dimension=when_true.dimension)
-        elif first in ("min", "max"):
+        elif first in ("min", "max", "atan2", "hypot"):
             if self.take() != "(":
                 raise ExpressionError(f"Expected '(' after {first}")
             first_arg = self.expression(0, depth + 1)
@@ -163,8 +163,9 @@ class _Parser:
                 raise ExpressionError(f"{first} requires exactly two arguments")
             if first_arg.dimension != second_arg.dimension:
                 raise ExpressionError(f"{first} requires matching physical dimensions")
-            left = Expression(first, (first_arg, second_arg), dimension=first_arg.dimension)
-        elif first in ("sin", "cos", "exp", "log", "ln", "log10", "log1p", "sqrt", "cbrt", "√", "∛", "tanh", "abs", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∇²"):
+            left = Expression(first, (first_arg, second_arg),
+                              dimension=DIMENSIONLESS if first == "atan2" else first_arg.dimension)
+        elif first in ("sin", "cos", "asin", "acos", "atan", "exp", "log", "ln", "log10", "log1p", "sqrt", "cbrt", "√", "∛", "tanh", "abs", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∇²"):
             if first in ("∇²", "√", "∛") and self.peek() != "(":
                 # Prefix Unicode differential/radical operators bind more tightly than products.
                 arg = self.expression(30, depth + 1)
@@ -174,7 +175,7 @@ class _Parser:
                 arg = self.expression(0, depth + 1)
                 if self.take() != ")":
                     raise ExpressionError("Expected closing parenthesis")
-            if first in ("sin", "cos", "exp", "log", "ln", "log10", "log1p", "tanh") and arg.dimension != DIMENSIONLESS:
+            if first in ("sin", "cos", "asin", "acos", "atan", "exp", "log", "ln", "log10", "log1p", "tanh") and arg.dimension != DIMENSIONLESS:
                 raise ExpressionError(f"{first} requires a dimensionless argument")
             if first in ("sqrt", "√") and any(x % 2 for x in arg.dimension):
                 raise ExpressionError("sqrt requires even physical dimension exponents")
@@ -219,7 +220,7 @@ class _Parser:
                 operator, precedence = ("add" if nxt == "+" else "sub"), 10
             elif nxt in ("*", "×", "·", "/", "÷"):
                 operator, precedence = ("div" if nxt in ("/", "÷") else "mul"), 20
-            elif nxt in ("(", "|", "π", "pi", "x", "y", "sin", "cos", "exp", "log", "ln", "log10", "log1p", "sqrt", "cbrt", "√", "∛", "tanh", "abs", "min", "max", "where", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∇²") or nxt in self.symbols or re.fullmatch(rf"{_NUMBER}(?:{_UNIT})?", nxt):
+            elif nxt in ("(", "|", "π", "pi", "x", "y", "sin", "cos", "asin", "acos", "atan", "atan2", "hypot", "exp", "log", "ln", "log10", "log1p", "sqrt", "cbrt", "√", "∛", "tanh", "abs", "min", "max", "where", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∇²") or nxt in self.symbols or re.fullmatch(rf"{_NUMBER}(?:{_UNIT})?", nxt):
                 operator, precedence = "mul", 20
             else:
                 break
@@ -276,7 +277,7 @@ def parse_expression(source: str, *, symbols: dict[str, Dimension] | None = None
     if symbols:
         for name, dimension in symbols.items():
             if (not re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", name)
-                    or name in ("x", "y", "pi", "sin", "cos", "exp", "log", "ln", "log10", "log1p", "sqrt", "cbrt", "tanh", "abs", "min", "max", "where")
+                    or name in ("x", "y", "pi", "sin", "cos", "asin", "acos", "atan", "atan2", "hypot", "exp", "log", "ln", "log10", "log1p", "sqrt", "cbrt", "tanh", "abs", "min", "max", "where")
                     or len(dimension) != 4 or any(type(power) is not int for power in dimension)):
                 raise ExpressionError(f"Invalid typed symbol {name!r}")
     parser = _Parser(tokenize(source), symbols)
@@ -515,9 +516,14 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
         if node.operator == "pos": return args[0]
         if node.operator in ("min", "max"):
             return (np.minimum if node.operator == "min" else np.maximum)(args[0], args[1])
-        if node.operator in ("sin", "cos", "exp", "log", "log10", "log1p", "sqrt", "cbrt", "tanh", "abs"):
+        if node.operator in ("atan2", "hypot"):
+            if node.operator == "atan2" and np.any((np.asarray(args[0]) == 0) & (np.asarray(args[1]) == 0)):
+                raise ExpressionError("atan2 is undefined when both arguments are zero")
             with np.errstate(over="ignore", invalid="ignore"):
-                return getattr(np, node.operator)(args[0])
+                return (np.arctan2 if node.operator == "atan2" else np.hypot)(args[0], args[1])
+        if node.operator in ("sin", "cos", "asin", "acos", "atan", "exp", "log", "log10", "log1p", "sqrt", "cbrt", "tanh", "abs"):
+            with np.errstate(over="ignore", invalid="ignore"):
+                return getattr(np, {"asin": "arcsin", "acos": "arccos", "atan": "arctan"}.get(node.operator, node.operator))(args[0])
         raise ExpressionError(f"Unsupported operator {node.operator!r}")
     result = np.asarray(visit(expression), dtype=np.float64)
     if not np.all(np.isfinite(result)):

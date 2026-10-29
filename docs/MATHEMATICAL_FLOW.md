@@ -450,3 +450,31 @@ python3 -m unittest discover -s tests -p 'test_math_flow_unicode_radicals.py' -v
 
 These are bounded scalar expression operators, **not** an upstream Flow 2.0
 grammar extension or arbitrary equation-system compilation.
+
+## Typed inverse trigonometry and Euclidean norm
+
+The experimental mathematical Flow expression compiler accepts `asin()`,
+`acos()`, `atan()`, `atan2(y, x)` and `hypot(a, b)`. Inverse
+trigonometric functions produce dimensionless radians. Their unary inputs
+must be dimensionless; the two arguments of `atan2` must have identical
+physical dimensions. `hypot` also requires matching input dimensions
+and preserves them in the output. The runtime rejects inverse-sine/cosine
+arguments outside [-1, 1], non-finite results and the undefined `atan2(0, 0)`
+case. All calls are typed AST nodes lowered to NumPy, not editor snippets.
+
+`examples/heat_inverse_trigonometry.flow` contains a genuine executable
+periodic Fourier-forced heat equation using all five functions. The forcing
+simplifies analytically to `5 K/s * sin(2πx / 1m)`; the regression tests
+compare the numerical field and variance against its closed-form discrete
+Laplacian eigenmode response. CI executes the checked-in source on native
+Linux and macOS.
+
+```sh
+python3 src/math_flow.py --check examples/heat_inverse_trigonometry.flow
+python3 src/math_flow.py examples/heat_inverse_trigonometry.flow
+python3 -m unittest discover -s tests -p 'test_math_flow_inverse_trigonometry.py' -v
+```
+
+This extends the opt-in scalar expression language only. General coupled
+PDEs, upstream Flow 2.0 grammar integration and unrestricted mathematical
+equation compilation remain incomplete.

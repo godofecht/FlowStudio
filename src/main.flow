@@ -17,6 +17,8 @@ extern {
     function fs_intent_allowed() -> i32
     function fs_reply(status: i32, content_type: string, body: string) -> void
     function fs_write_temp_flow(code: string) -> string
+    function fs_write_temp_flow_run(code: string) -> string
+    function fs_clean_run_dir() -> void
     function fs_make_temp_c() -> string
     function fs_r_run(code: string) -> string
     function fs_r_check(code: string) -> string
@@ -85,11 +87,11 @@ function execute(language: string, code: string, check_only: bool, backend: stri
         }
         proc_arg(command, temp_path)
     } elif eq(language, "flow") {
-        temp_path = fs_write_temp_flow(code)
-        if eq(temp_path, "") {
-            return ExecutionResult { status: 500, output: "FlowStudio: unable to create temporary Flow source file." }
-        }
         if check_only {
+            temp_path = fs_write_temp_flow(code)
+            if eq(temp_path, "") {
+                return ExecutionResult { status: 500, output: "FlowStudio: unable to create temporary Flow source file." }
+            }
             output_path = fs_make_temp_c()
             if eq(output_path, "") {
                 let _removed: i32 = unlink(temp_path)
@@ -103,6 +105,22 @@ function execute(language: string, code: string, check_only: bool, backend: stri
             proc_arg(command, temp_path)
             proc_arg(command, output_path)
         } else {
+            # The MLIR backend refuses imports unless a flow.toml sits above
+            # the program, so backend runs stage into a managed temporary
+            # project directory whose empty manifest leaves stdlib bundling
+            # on the compiler fallback. The C backend keeps the bare /tmp
+            # file it has always used.
+            if eq(backend, "") {
+                temp_path = fs_write_temp_flow(code)
+                if eq(temp_path, "") {
+                    return ExecutionResult { status: 500, output: "FlowStudio: unable to create temporary Flow source file." }
+                }
+            } else {
+                temp_path = fs_write_temp_flow_run(code)
+                if eq(temp_path, "") {
+                    return ExecutionResult { status: 500, output: "FlowStudio: unable to create temporary Flow run project staging." }
+                }
+            }
             proc_arg(command, "run")
             proc_arg(command, temp_path)
             if not eq(backend, "") {
@@ -127,6 +145,8 @@ function execute(language: string, code: string, check_only: bool, backend: stri
     if not eq(temp_path, "") {
         let _removed: i32 = unlink(temp_path)
     }
+    # Removes the staging directory of backend runs; a no-op otherwise.
+    fs_clean_run_dir()
     if not eq(output_path, "") {
         let _removed: i32 = unlink(output_path)
     }

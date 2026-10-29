@@ -1,3 +1,26 @@
+## 2026-10-29: project-wide lexical Go to Definition (verification pending)
+
+The primary native workspace's F12 Go to Definition now falls back to a
+**read-only search of browser-granted project files** when neither the active
+source nor any already-open same-language buffer contains a declaration.
+It uses the existing bounded File System Access project search, reads the
+matching real disk files, checks the search snapshot, and recognizes actual
+Flow, R or Python declarations using the existing conservative outline
+scanner. Only a **single unambiguous** unopened declaration is navigable.
+Unsaved open tabs take precedence over their on-disk files. Truncated,
+oversized, unsafe-encoding, changed or ambiguous results fail closed; a
+document, caret, language or project change while the asynchronous search
+is running also blocks navigation. No code is executed and no new server
+routes, hosted CI definitions or upstream Flow grammar changes are involved.
+
+**Status: partial / verification pending.** Ten focused Node tests were
+added for real recursive project search, Flow/R/Python declarations, ambiguous
+definitions, comments/strings, open-buffer precedence, incomplete searches,
+changed files, invalid UTF-8, invalid input and browser wiring. This is
+lexical navigation, **not semantic import resolution**, language-server
+navigation or full RStudio parity. Real physical-browser acceptance and
+cross-platform CI must pass before this can be marked tested.
+
 ## 2026-10-29: serialized native Flow compiler checks (CI pending)
 
 The primary Monaco workspace now enforces **one in-flight native strict Flow

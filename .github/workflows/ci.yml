@@ -92,6 +92,8 @@ jobs:
           python3 src/math_flow.py examples/navier_stokes_smoke.flow
           python3 src/math_flow.py --check examples/heat_piecewise_forcing.flow
           python3 src/math_flow.py examples/heat_piecewise_forcing.flow
+          python3 src/math_flow.py --check examples/heat_conditional_forcing.flow
+          python3 src/math_flow.py examples/heat_conditional_forcing.flow
       - name: Confirm compiler and build exact checked-out source
         run: |
           flow version

@@ -65,8 +65,8 @@ try {
   await page.locator('#source').fill('# changed\nb <- a + 1L\nprint(b)');
   await page.locator('#source').evaluate(el => el.setSelectionRange(0, 0));
   await page.locator('#rDebugStatus').click();
-  await page.waitForFunction(() =>
-    document.querySelector('#rDebugOutput')?.textContent.includes('Next expression at line 2'));
+  await page.waitForFunction(() => !document.querySelector('#rDebugStatus')?.disabled);
+  assert.match(await page.locator('#rDebugOutput').textContent(), /Next expression at line 2/);
   assert.equal(await page.locator('#source').evaluate(el => el.selectionStart), 0);
   await page.locator('#rDebugStop').click();
   await page.waitForFunction(() =>

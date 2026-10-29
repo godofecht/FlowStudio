@@ -139,6 +139,14 @@ def main() -> None:
     assert status == 200, ("native periodic heat compile", status, body)
     status, body = request("POST", "/api/run/flow", heat_native_source, accepted_headers)
     assert status == 200, ("native periodic heat analytic execution", status, body)
+    # The same native Flow 2.0 wave PDE runs through the production compiler
+    # and HTTP execution route; main() checks analytic modes and invalid input.
+    wave_native_source = (Path(__file__).resolve().parents[1] /
+                          "examples/native_periodic_wave.flow").read_text(encoding="utf-8")
+    status, body = request("POST", "/api/check/flow", wave_native_source, accepted_headers)
+    assert status == 200, ("native periodic wave compile", status, body)
+    status, body = request("POST", "/api/run/flow", wave_native_source, accepted_headers)
+    assert status == 200, ("native periodic wave analytic execution", status, body)
     # Real Flow HTTP route, request intent/origin gate, and safe Quarto
     # preflight rejection (does not require Quarto to be installed).
     invalid_qmd = "---\nformat: pdf\n---\n\n# Wrong format\n"

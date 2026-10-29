@@ -94,6 +94,8 @@ jobs:
           python3 src/math_flow.py examples/heat_piecewise_forcing.flow
           python3 src/math_flow.py --check examples/heat_conditional_forcing.flow
           python3 src/math_flow.py examples/heat_conditional_forcing.flow
+          python3 src/math_flow.py --check examples/heat_boolean_mask.flow
+          python3 src/math_flow.py examples/heat_boolean_mask.flow
       - name: Confirm compiler and build exact checked-out source
         run: |
           flow version

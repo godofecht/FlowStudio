@@ -1,0 +1,31 @@
+# Native dimensional arithmetic acceptance; flow run src/math_dimensions_smoke.flow
+import .math_dimensions { Dimension, Quantity, CheckedQuantity, dimensionless, length_dimension, time_dimension, mass_dimension, temperature_dimension, same_dimension, product_dimension, quotient_dimension, quantity, quantity_add, quantity_subtract, quantity_multiply, quantity_divide }
+
+function main() -> i32 {
+    let distance: Quantity = quantity(10.0, length_dimension())
+    let duration: Quantity = quantity(2.0, time_dimension())
+    let velocity: CheckedQuantity = quantity_divide(distance, duration)
+    if not velocity.valid { return 1 }
+    if velocity.quantity.value != 5.0 { return 2 }
+    let expected_velocity: Dimension = quotient_dimension(length_dimension(), time_dimension())
+    if not same_dimension(velocity.quantity.dimension, expected_velocity) { return 3 }
+    let acceleration: CheckedQuantity = quantity_divide(velocity.quantity, duration)
+    if not acceleration.valid { return 4 }
+    if acceleration.quantity.value != 2.5 { return 5 }
+    let expected_acceleration: Dimension = quotient_dimension(expected_velocity, time_dimension())
+    if not same_dimension(acceleration.quantity.dimension, expected_acceleration) { return 6 }
+    let doubled: CheckedQuantity = quantity_add(distance, distance)
+    if not doubled.valid or doubled.quantity.value != 20.0 { return 7 }
+    let zero: CheckedQuantity = quantity_subtract(distance, distance)
+    if not zero.valid or zero.quantity.value != 0.0 { return 8 }
+    if quantity_add(distance, duration).valid { return 9 }
+    if quantity_subtract(distance, duration).valid { return 10 }
+    if quantity_divide(distance, quantity(0.0, time_dimension())).valid { return 11 }
+    let area: Quantity = quantity_multiply(distance, distance)
+    let expected_area: Dimension = product_dimension(length_dimension(), length_dimension())
+    if not same_dimension(area.dimension, expected_area) { return 12 }
+    if area.value != 100.0 { return 13 }
+    if same_dimension(mass_dimension(), temperature_dimension()) { return 14 }
+    if not same_dimension(dimensionless(), quotient_dimension(time_dimension(), time_dimension())) { return 15 }
+    return 0
+}

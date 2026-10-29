@@ -1,0 +1,91 @@
+# Native Flow numerical kernels. No Python or NumPy execution dependency.
+# Explicit dimensionless scalar and two-state linear ODE systems.
+# This is a reusable runtime foundation, not yet a general equation parser.
+
+export struct ScalarLinearEquation {
+    state_coefficient: f64,
+    time_coefficient: f64,
+    constant: f64
+}
+
+export struct State2 {
+    first: f64,
+    second: f64
+}
+
+export struct ScalarIntegrationResult {
+    valid: bool,
+    value: f64
+}
+
+export struct LinearIntegrationResult2 {
+    valid: bool,
+    value: State2
+}
+
+export struct LinearEquation2 {
+    first_first: f64,
+    first_second: f64,
+    second_first: f64,
+    second_second: f64
+}
+
+export function scalar_derivative(equation: ScalarLinearEquation, time: f64, state: f64) -> f64 {
+    return equation.state_coefficient * state + equation.time_coefficient * time + equation.constant
+}
+
+export function scalar_midpoint_step(equation: ScalarLinearEquation, time: f64, state: f64, step: f64) -> f64 {
+    let half: f64 = step * 0.5
+    let midpoint: f64 = state + half * scalar_derivative(equation, time, state)
+    return state + step * scalar_derivative(equation, time + half, midpoint)
+}
+
+export function scalar_integrate(equation: ScalarLinearEquation, initial_time: f64, initial_state: f64, duration: f64, steps: i32) -> ScalarIntegrationResult {
+    if steps <= 0 or steps > 1000000 {
+        return ScalarIntegrationResult { valid: false, value: initial_state }
+    }
+    let step: f64 = duration / (steps as f64)
+    let mut time: f64 = initial_time
+    let mut state: f64 = initial_state
+    let mut index: i32 = 0
+    while index < steps {
+        state = scalar_midpoint_step(equation, time, state, step)
+        time = time + step
+        index = index + 1
+    }
+    return ScalarIntegrationResult { valid: true, value: state }
+}
+
+export function linear_derivative_2(equation: LinearEquation2, state: State2) -> State2 {
+    return State2 {
+        first: equation.first_first * state.first + equation.first_second * state.second,
+        second: equation.second_first * state.first + equation.second_second * state.second
+    }
+}
+
+export function linear_midpoint_step_2(equation: LinearEquation2, state: State2, step: f64) -> State2 {
+    let slope: State2 = linear_derivative_2(equation, state)
+    let midpoint: State2 = State2 {
+        first: state.first + 0.5 * step * slope.first,
+        second: state.second + 0.5 * step * slope.second
+    }
+    let midpoint_slope: State2 = linear_derivative_2(equation, midpoint)
+    return State2 {
+        first: state.first + step * midpoint_slope.first,
+        second: state.second + step * midpoint_slope.second
+    }
+}
+
+export function linear_integrate_2(equation: LinearEquation2, initial: State2, duration: f64, steps: i32) -> LinearIntegrationResult2 {
+    if steps <= 0 or steps > 1000000 {
+        return LinearIntegrationResult2 { valid: false, value: initial }
+    }
+    let step: f64 = duration / (steps as f64)
+    let mut state: State2 = initial
+    let mut index: i32 = 0
+    while index < steps {
+        state = linear_midpoint_step_2(equation, state, step)
+        index = index + 1
+    }
+    return LinearIntegrationResult2 { valid: true, value: state }
+}

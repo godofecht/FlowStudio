@@ -1,0 +1,106 @@
+# Native Flow dimensional arithmetic for mathematical numerical programs.
+# Dimensions are exponents of SI base length, mass, time and temperature.
+# Runtime checks are explicit; this is not yet compiler-wide static inference.
+
+export struct Dimension {
+    length: i32,
+    mass: i32,
+    time: i32,
+    temperature: i32
+}
+
+export struct Quantity {
+    value: f64,
+    dimension: Dimension
+}
+
+export struct CheckedQuantity {
+    valid: bool,
+    quantity: Quantity
+}
+
+export function dimensionless() -> Dimension {
+    return Dimension { length: 0, mass: 0, time: 0, temperature: 0 }
+}
+
+export function length_dimension() -> Dimension {
+    return Dimension { length: 1, mass: 0, time: 0, temperature: 0 }
+}
+
+export function time_dimension() -> Dimension {
+    return Dimension { length: 0, mass: 0, time: 1, temperature: 0 }
+}
+
+export function mass_dimension() -> Dimension {
+    return Dimension { length: 0, mass: 1, time: 0, temperature: 0 }
+}
+
+export function temperature_dimension() -> Dimension {
+    return Dimension { length: 0, mass: 0, time: 0, temperature: 1 }
+}
+
+export function same_dimension(a: Dimension, b: Dimension) -> bool {
+    return a.length == b.length and a.mass == b.mass and a.time == b.time and a.temperature == b.temperature
+}
+
+export function product_dimension(a: Dimension, b: Dimension) -> Dimension {
+    return Dimension {
+        length: a.length + b.length,
+        mass: a.mass + b.mass,
+        time: a.time + b.time,
+        temperature: a.temperature + b.temperature
+    }
+}
+
+export function quotient_dimension(a: Dimension, b: Dimension) -> Dimension {
+    return Dimension {
+        length: a.length - b.length,
+        mass: a.mass - b.mass,
+        time: a.time - b.time,
+        temperature: a.temperature - b.temperature
+    }
+}
+
+export function quantity(value: f64, dimension: Dimension) -> Quantity {
+    return Quantity { value: value, dimension: dimension }
+}
+
+export function quantity_add(a: Quantity, b: Quantity) -> CheckedQuantity {
+    if not same_dimension(a.dimension, b.dimension) {
+        return CheckedQuantity { valid: false, quantity: a }
+    }
+    return CheckedQuantity {
+        valid: true,
+        quantity: Quantity { value: a.value + b.value, dimension: a.dimension }
+    }
+}
+
+export function quantity_subtract(a: Quantity, b: Quantity) -> CheckedQuantity {
+    if not same_dimension(a.dimension, b.dimension) {
+        return CheckedQuantity { valid: false, quantity: a }
+    }
+    return CheckedQuantity {
+        valid: true,
+        quantity: Quantity { value: a.value - b.value, dimension: a.dimension }
+    }
+}
+
+export function quantity_multiply(a: Quantity, b: Quantity) -> Quantity {
+    return Quantity {
+        value: a.value * b.value,
+        dimension: product_dimension(a.dimension, b.dimension)
+    }
+}
+
+export function quantity_divide(a: Quantity, b: Quantity) -> CheckedQuantity {
+    if b.value == 0.0 {
+        return CheckedQuantity { valid: false, quantity: a }
+    }
+    return CheckedQuantity {
+        valid: true,
+        quantity: Quantity {
+            value: a.value / b.value,
+            dimension: quotient_dimension(a.dimension, b.dimension)
+        }
+    }
+}

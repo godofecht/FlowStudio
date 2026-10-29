@@ -19,7 +19,7 @@ sh scripts/build.sh
 ~~~
 
 Configure OpenSSH access with a verified/pinned host key in the local
-\`known_hosts\` file, an authorized SSH public key for the remote account,
+`known_hosts` file, an authorized SSH public key for the remote account,
 and a server policy that permits local TCP forwarding to 127.0.0.1:8751.
 Verify the server is owned by the intended account; do not share this account
 or run the native server on an untrusted multi-user machine.
@@ -34,7 +34,7 @@ python3 scripts/ssh_tunnel.py researcher@compute.example --ssh-port 2222 --ident
 ~~~
 
 Open **http://127.0.0.1:8751/** in the local browser after the helper reports
-that the real remote \`/health\` endpoint is ready. The helper refuses an
+that the real remote `/health` endpoint is ready. The helper refuses an
 occupied local port; it cannot choose a different local port because the
 native Flow HTTP origin and Host restrictions require exactly 8751. Press
 Ctrl+C to close the tunnel. It does not start or stop the remote FlowStudio
@@ -60,7 +60,7 @@ process lifecycle management, concurrent-user isolation, or authorization
 inside FlowStudio. All users of a shared remote OS account would share
 the same R/Python kernel and code-execution privileges.
 
-Run \`python3 -m unittest discover -s tests -p test_ssh_tunnel.py -v\` for
+Run `python3 -m unittest discover -s tests -p test_ssh_tunnel.py -v` for
 command policy, rejection, cleanup and actual local HTTP health checks.
 These tests do **not** establish successful SSH authentication, encrypted
 forwarding, remote Flow compilation, or physical browser acceptance.

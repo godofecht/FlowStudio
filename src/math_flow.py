@@ -272,7 +272,7 @@ def parse(source: str) -> Model:
     try:
         equation = compile_vector_equation([token.text for token in sections["dynamics"]])
     except ValueError as exc:
-        raise FlowMathError(f"Invalid Navier-Stokes dynamics: {exc}") from exc
+        raise FlowMathError(f"Unsupported dynamics: {exc}") from exc
     if "".join(t.text for t in sections["constraint"]) != "∇·velocity=0":
         raise FlowMathError("Only incompressibility constraint ∇ · velocity = 0 is implemented")
     initial = assignments(sections["initial"])

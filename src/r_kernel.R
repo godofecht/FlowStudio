@@ -222,8 +222,17 @@ evaluate_source <- function(source, expressions_override = NULL,
                                                       width.cutoff = 100L),
                                               collapse = " "), 1L, 180L)
                         locals <- head(ls(envir = frames[[i]], all.names = TRUE), 16L)
+                        # This is the function DEFINITION line, never a claim
+                        # about the currently executing or failing statement.
+                        srcref <- attr(fn, "srcref", exact = TRUE)
+                        definition_line <- if (inherits(srcref, "srcref"))
+                            suppressWarnings(as.integer(srcref[[1L]])) else NA_integer_
+                        if (length(definition_line) != 1L || is.na(definition_line) ||
+                            definition_line < 1L || definition_line > 1000000L)
+                            definition_line <- NULL
                         selected[[length(selected) + 1L]] <- list(
                             call = label, locals = substr(locals, 1L, 80L),
+                            definition_line = definition_line,
                             envir = frames[[i]])
                     }
                     tail(selected, 8L)
@@ -279,7 +288,10 @@ debug_reply <- function(success = TRUE, output = "", executed_line = NULL) {
     frame_json <- vapply(seq_along(debug_frames), function(i) {
         frame <- debug_frames[[i]]
         locals <- vapply(frame$locals, json_quote, character(1L), USE.NAMES = FALSE)
+        definition_line <- if (is.null(frame$definition_line)) "null" else
+            as.character(frame$definition_line)
         paste0('{"id":', i, ',"call":', json_quote(frame$call),
+               ',"definition_line":', definition_line,
                ',"locals":[', paste(locals, collapse = ","), ']}')
     }, character(1L), USE.NAMES = FALSE)
     json <- paste0('{"state":', json_quote(debug_state),

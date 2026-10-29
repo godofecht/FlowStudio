@@ -1,0 +1,41 @@
+# Executable typed inverse trigonometry and norm in a periodic Fourier-mode source.
+domain ThermalDomain {
+    grid       = 32 × 32
+    extent     = 1m × 1m
+    boundaries = Periodic
+}
+
+model HeatEquation on ThermalDomain {
+    const diffusivity = 0.01m²/s
+    field temperature: Scalar<Kelvin>
+
+    dynamics {
+        ∂ₜtemperature = diffusivity ∇²temperature + 1K/s * (sin(atan2(sin(2πx / 1m), cos(2πx / 1m))) + sin(asin(sin(2πx / 1m))) + cos(acos(sin(2πx / 1m))) + (atan(1) * 4 / π) * sin(2πx / 1m) + (hypot(3m, 4m) / 5m) * sin(2πx / 1m))
+    }
+    initial {
+        temperature = 300K
+    }
+}
+
+solver ThermalSolver for HeatEquation {
+    spatial {
+        method    = FiniteDifference
+        diffusion = CentralDifference
+    }
+    temporal {
+        method   = RungeKuttaSecondOrder
+        timeStep = 10⁻⁴s
+    }
+}
+
+let simulation = HeatEquation ▷ ThermalSolver ▷ Evolve(until: 0.01s)
+
+simulation
+    ▷ Observe {
+        meanTemperature     = Mean(temperature)
+        temperatureVariance = Mean((temperature − meanTemperature)²)
+    }
+    ▷ Visualize {
+        temperature         = Heatmap
+        temperatureVariance = LineGraph
+    }

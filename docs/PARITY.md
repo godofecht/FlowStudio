@@ -1,3 +1,61 @@
+## 2026-10-29: four-mode anisotropic tensor diffusion acceptance (six CI jobs passed)
+
+`examples/complex_multimode_tensor.py` executes the real production
+`spectral_interop_python.integrate` periodic finite-difference RK2 solver
+with four nontrivial, independently phased Fourier modes, signed wave numbers,
+and a positive-definite 2D diffusion tensor with a nonzero mixed derivative.
+It independently derives the discrete Fourier symbol, compares every one of
+576 computed cells at three time resolutions, verifies temporal second-order
+convergence, mean conservation, energy decay, deterministic replay, semigroup
+consistency, linearity, translation equivariance, and fail-closed invalid
+parameters, unstable timesteps, nonfinite values and resource limits.
+
+`tests/test_complex_multimode_tensor.py` executes the checked-in example
+as a subprocess, checks the independent spatial stencil symbol for every
+cell and mode, verifies additional 8/12/16 grids and includes a mutation
+test proving a non-evolving solver is detected. `tests/http_smoke.py`
+submits the real solver and exact example source through the persistent
+CPython kernel behind the production Flow-owned `/api/run/python` route,
+and checks numerical output rather than only HTTP status. No fake kernel
+or hosted CI workflow changes are introduced.
+
+**Status: all six Linux/macOS CI jobs passed in
+[CI #40957545970](https://github.com/godofecht/FlowStudio/actions/runs/40957545970);
+tested for this bounded example / partial overall.** The local 24x24 four-mode case produced maximum
+cellwise error 6.40e-14, temporal errors 2.8492e-4 / 7.0076e-5 /
+1.7377e-5 and conserved mean 50.0. The exact HTTP composition was
+syntax-checked and executed locally using that same solver copy.
+The final CI independently executed the exact checked-in sources through the
+production Flow-owned HTTP server and real persistent CPython kernel on both
+Ubuntu and macOS. The source/transport jobs passed 1,143 Node tests
+(12 skipped) and 315 Python tests (13 skipped), including all four new
+multimode tests and the new live debugger regression. Both native builds,
+FlowJIT jobs and existing Ubuntu Chromium acceptance passed. Local native
+Flow/R/HTTP and physical-browser acceptance specifically for this new
+multimode example remain unexecuted.
+This is a more demanding test of the existing Python solver, not general
+upstream Flow PDE syntax, browser notebook parity or RStudio parity.
+
+### Native acceptance regression found during this PR
+
+The first PR CI run, [#40956775914](https://github.com/godofecht/FlowStudio/actions/runs/40956775914),
+passed four source/transport and FlowJIT jobs but failed both native HTTP
+jobs **before reaching the new multimode example**. The pre-existing live
+Python debugger test expected `debug_value` at a breakpoint but the
+16-variable stack snapshot only displayed the first 16 old entries in the
+persistent kernel's shared global namespace. The fix in
+`src/python_debugger.py` prioritizes variables referenced by the current
+compiled source before unrelated historical globals, while retaining the
+same 16-entry cap and safe scalar-only previews. A real `DebugSession`
+regression now creates 80 prior globals and asserts breakpoint, variable
+inspection, continuation and persistence. The fix was verified by all six jobs in
+[CI #40957545970](https://github.com/godofecht/FlowStudio/actions/runs/40957545970),
+including real HTTP breakpoint inspection and the 80-global unit regression.
+Attempts [#40957380781](https://github.com/godofecht/FlowStudio/actions/runs/40957380781)
+and [#40957418749](https://github.com/godofecht/FlowStudio/actions/runs/40957418749)
+were cancelled before jobs started and are not counted as passing evidence.
+This is not evidence of a successful native multimode HTTP run yet.
+
 ## 2026-10-29: real native Flow/Python/R numerical notebook acceptance (six CI jobs passed)
 
 [PR #207](https://github.com/godofecht/FlowStudio/pull/207) merged as

@@ -130,6 +130,11 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
 .debug-step button:hover{background:var(--accent-dim)}
 .debug-step.debug-step-active button{background:var(--accent-dim);border-color:#3d5c95}
 .debug-step-here button{color:var(--warn)}
+.live-debugger{border-top:1px solid var(--line);margin-top:12px;padding-top:10px}
+.live-debugger h3{font-size:13px;margin:0 0 6px}
+.live-debugger input[type=text]{width:100%;min-width:0;background:var(--surface-2);border:1px solid var(--line);padding:6px;border-radius:5px;color:var(--ink);font:12px var(--mono)}
+.live-debugger label{display:block;margin:6px 0;font-size:12px}
+.live-debug-output{white-space:pre-wrap;overflow:auto;max-height:230px;overflow-wrap:anywhere;background:#0d1119;border:1px solid var(--line);padding:8px;font:12px/1.5 var(--mono)}
 .debug-locals table{border-collapse:collapse;width:100%;font:12px/1.5 var(--mono)}
 .debug-locals td,.debug-locals th{border:1px solid var(--line);padding:3px 7px;text-align:left;overflow-wrap:anywhere}
 #packageTable table,#pythonEnvironment table{border-collapse:collapse;width:100%;font:12px/1.5 var(--mono)}
@@ -428,6 +433,23 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
       <p id="debugSummary" class="muted"></p>
       <div id="debugSteps" class="debug-steps"></div>
       <div id="debugLocals" class="debug-locals"></div>
+      <section class="live-debugger" aria-label="Interactive native Python debugger">
+        <h3>Live Python debugger</h3>
+        <p class="muted hint">Real CPython pause, step, step over, finish, continue and stop through the local Flow server. Unlike replay, this executes the buffer and may change interpreter state. Leave the breakpoint field empty to use cursor breakpoints above.</p>
+        <label for="liveDebugBreakpoints">Breakpoint lines (optional numeric conditions)</label>
+        <input id="liveDebugBreakpoints" type="text" maxlength="512" placeholder="2, 5?counter>=3" aria-label="Live debugger breakpoints">
+        <label><input id="liveDebugPauseException" type="checkbox"> Pause on raised exceptions</label>
+        <div class="project-tools" role="group" aria-label="Live Python debugger controls">
+          <button id="liveDebugStart" type="button">Start</button>
+          <button id="liveDebugStep" type="button" disabled>Step</button>
+          <button id="liveDebugNext" type="button" disabled>Step over</button>
+          <button id="liveDebugFinish" type="button" disabled>Finish</button>
+          <button id="liveDebugContinue" type="button" disabled>Continue</button>
+          <button id="liveDebugStop" type="button" disabled>Stop</button>
+          <button id="liveDebugStatus" type="button">Status</button>
+        </div>
+        <pre id="liveDebugOutput" class="live-debug-output" role="status" aria-live="polite">Start a Python session to inspect live stack frames.</pre>
+      </section>
     </div>
   </aside>
   <div class="splitter" data-splitter data-axis="x" data-panel="sidebar" role="separator" aria-orientation="vertical" aria-label="Resize project sidebar" tabindex="0"></div>
@@ -2220,6 +2242,8 @@ renderTabs();
 <script src="/examples_gallery.js"></script>
 <script src="/saved_projects.js"></script>
 <script src="/debug_panel.js"></script>
+<script src="/app/native_flow.js"></script>
+<script src="/app/python_debug_panel.js"></script>
 <script src="/ide_shell.js"></script>
 <script src="/ide_symbols.js"></script>
 <script src="/ide_outline.js"></script>

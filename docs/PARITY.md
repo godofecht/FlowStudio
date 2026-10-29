@@ -1,3 +1,35 @@
+## 2026-10-29: live native Python debugger exposed in the Flow-owned workspace (verification pending)
+
+The primary native workspace now exposes the existing **real CPython interactive
+debugger**, instead of offering only completed-execution replay. Start, step
+into, step over, finish, continue, stop and status controls use the existing
+Flow-owned `/api/debug/python/*` HTTP routes and the persistent CPython kernel.
+The live panel renders bounded actual stack frames, builtin local previews,
+exception metadata and captured output as text. It supports validated
+conditional numeric breakpoints (`line?name>=number`) and pause on raised
+exceptions. An empty live breakpoint field inherits the current editor
+document's cursor breakpoints; explicit entries override that list. Replay
+navigation remains available as a separate post-execution feature.
+
+**Status: partial / PR verification pending.** The checked-in Node regression
+suite exercises native transport start/step/continue, response display, control
+states, origin refusal and the Flow route/script wiring. A focused V8 run of
+the exact checked-in native transport and browser debugger modules passed
+real-request-shape pause/continue simulation and syntax/route checks.
+A physical Chromium acceptance sequence was also added to the existing
+native UI test, exercising the real Flow HTTP route through pause, step and
+continue, but **has not yet been executed** for this change.
+**No native Flow build, full Node suite, cross-platform CI or physical Chromium
+acceptance pass is claimed for this change yet.** The existing real HTTP debugger
+acceptance in `tests/http_smoke.py` is a separate pre-existing gate.
+The native Flow backend and hosted CI configuration were not modified.
+
+Limitations: the live debugger executes source with local user privileges,
+not in a sandbox. It is single-user, Python-only and shares the persistent
+Python interpreter; Flow/R debugging, authenticated remote sessions and
+RStudio parity remain incomplete. Changing editor documents while paused
+does not rebind the already-running Python source snapshot.
+
 ## 2026-10-28: native workspace Python replay navigation (verification pending)
 
 The Flow-owned native workspace's bounded Python trace explorer now exposes

@@ -58,6 +58,27 @@ try {
   await page.waitForFunction(() => !document.getElementById('run').disabled);
   assert.doesNotMatch(await page.locator('#console').innerText(), /RuntimeError/);
 
+  // Exercise real Flow HTTP -> persistent CPython pause/step/continue from
+  // the primary workspace. No mocked trace or browser-only interpreter.
+  await page.evaluate(() => {
+    const source = document.getElementById('source');
+    source.value = 'live_value = 40\nlive_value += 2\nprint(live_value)\n';
+    source.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.locator('#tab-debug').click();
+  await page.locator('#liveDebugBreakpoints').fill('2');
+  await page.locator('#liveDebugStart').click();
+  await page.waitForFunction(() =>
+    document.getElementById('liveDebugOutput').textContent.includes('Python debugger: paused'));
+  assert.match(await page.locator('#liveDebugOutput').innerText(), /Line 2 in/);
+  await page.locator('#liveDebugStep').click();
+  await page.waitForFunction(() =>
+    document.getElementById('liveDebugOutput').textContent.includes('Line 3 in'));
+  await page.locator('#liveDebugContinue').click();
+  await page.waitForFunction(() =>
+    document.getElementById('liveDebugOutput').textContent.includes('Python debugger: done'));
+  assert.match(await page.locator('#liveDebugOutput').innerText(), /Output:\n42/);
+
   await page.locator('#commandLauncher').click();
   await page.locator('#commandQuery').fill('go to symbol');
   await page.keyboard.press('Enter');

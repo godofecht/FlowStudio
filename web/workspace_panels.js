@@ -305,6 +305,37 @@ mountPanel("FlowStudioDebugPanel", global.FlowStudioDebugPanel, DebugPanel => {
       el("resultStatus").dataset.state = result.ok ? "ok" : "error";
     }
   });
+  // The existing native CPython debugger already implements genuine pausing
+  // in the persistent Python kernel. Mount its tested browser controller in
+  // the native workspace rather than substituting another replay tracer.
+  // An empty live breakpoint input inherits the editor's cursor breakpoints;
+  // explicit entries support the backend's bounded numeric conditions.
+  const NativePython = global.FlowStudioNativeFlow;
+  const LivePython = global.FlowStudioPythonDebugPanel;
+  if (NativePython && LivePython) {
+    const liveBreakpointInput = el("liveDebugBreakpoints");
+    const liveBreakpoints = {
+      get value() {
+        return liveBreakpointInput.value.trim() ||
+          breakpoints.lines(activeDocumentId()).join(",");
+      }
+    };
+    exports.liveDebugPanel = LivePython.create({
+      native: NativePython, source: el("source"), language,
+      breakpoints: liveBreakpoints,
+      pauseOnException: el("liveDebugPauseException"),
+      startButton: el("liveDebugStart"), stepButton: el("liveDebugStep"),
+      nextButton: el("liveDebugNext"), finishButton: el("liveDebugFinish"),
+      continueButton: el("liveDebugContinue"), stopButton: el("liveDebugStop"),
+      statusButton: el("liveDebugStatus"), target: el("liveDebugOutput"),
+      notice: message => {
+        el("resultStatus").textContent = message;
+        el("resultStatus").dataset.state = message.includes("error") ? "error" : "ok";
+      }
+    });
+  } else {
+    el("liveDebugOutput").textContent = "Native Python debugger scripts unavailable.";
+  }
   exports.breakpoints = breakpoints;
   exports.debugPanel = debugPanel;
   exports.renderBreakpoints = renderBreakpoints;

@@ -8,15 +8,22 @@ duplicate compilers. A queued request is discarded if its document, language
 or edit revision changes again. Idle checks retain their debounce and
 coalescing behavior, and failed compiler transports release the gate.
 
-**Status: partial / six focused Node 22.16.0 regression tests passed locally.**
-The tests cover nonoverlapping manual checks, source/document invalidation,
-idle coalescing, transport failure recovery and duplicate manual clicks.
+**Status: partial / all six Linux/macOS CI jobs passed in
+[CI #40885456574](https://github.com/godofecht/FlowStudio/actions/runs/40885456574).**
+Both platforms passed 1,127 of 1,139 Node tests (12 skipped, zero failures)
+and 284 Python tests (13 skipped, zero failures). The six new Node regressions
+also passed locally on Node 22.16.0, covering nonoverlapping manual checks,
+source/document invalidation, idle coalescing, transport failure recovery and
+duplicate manual clicks. Both native Flow builds, real HTTP acceptance,
+FlowJIT jobs and existing Ubuntu Chromium acceptance passed; the new
+queued-request behavior was tested by the Node harness, not by a separate
+physical-browser interaction. [PR #193](https://github.com/godofecht/FlowStudio/pull/193)
+merged as [1122244](https://github.com/godofecht/FlowStudio/commit/1122244f4399031967f939a36a32d9770d81ff22).
 This is an editor-side single-flight guarantee, not cancellation of the
 already-running native compiler process, global server-wide scheduling or a
 continuous language server. The native compiler, HTTP routes and hosted CI
-configuration are unchanged. Cross-platform CI and physical-browser
-acceptance for this change are not yet verified. Complete RStudio parity
-remains unimplemented.
+configuration are unchanged. Independent macOS physical-browser acceptance
+and complete RStudio parity remain unimplemented.
 
 ## 2026-10-29: opt-in idle Flow compiler diagnostics (six CI jobs passed)
 

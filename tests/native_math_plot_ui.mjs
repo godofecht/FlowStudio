@@ -34,6 +34,7 @@ try {
     ['examples/heat_saturating_reaction.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_composed_forcing.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_mean_field_feedback.flow', 'temperatureVariance', 'meanTemperature'],
+    ['examples/heat_mean_preserving_mixing.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_transport_reaction.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/navier_stokes_smoke.flow', 'kineticEnergy', 'maximumDivergence']
   ]) {
@@ -57,6 +58,15 @@ try {
         'Measured diffusion and nonlocal mean-field contributions must be shown');
       assert.match(await inspector.textContent(), /meanField/);
       assert.match(await inspector.textContent(), /Nonlocal feedback/);
+      await inspector.locator('select[aria-label="Mathematical Flow semantic stage"]').selectOption('1');
+      assert.match(await inspector.textContent(), /predictor/i);
+    }
+    if (source === 'examples/heat_mean_preserving_mixing.flow') {
+      const inspector = page.locator('#mathFlowPlot [data-mathflow-semantic="rk2"]');
+      assert.equal(await inspector.count(), 1, 'Mean-conserving PDE must expose live RK2 terms');
+      assert.equal(await inspector.locator('ol li').count(), 2);
+      assert.match(await inspector.textContent(), /meanDeviation/);
+      assert.match(await inspector.textContent(), /Mean-conserving relaxation/);
       await inspector.locator('select[aria-label="Mathematical Flow semantic stage"]').selectOption('1');
       assert.match(await inspector.textContent(), /predictor/i);
     }

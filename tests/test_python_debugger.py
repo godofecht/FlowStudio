@@ -80,6 +80,47 @@ class DebugTests(unittest.TestCase):
         self.assertEqual(debugger.command("finish")["state"], "done")
         self.assertEqual(namespace["y"], 2)
 
+    def test_run_to_line_is_real_temporary_breakpoint(self):
+        source = "a = 1\\nb = a + 1\\nc = b + 1\\nprint(c)\\n"
+        debugger, namespace, result = self.start(source, [2])
+        self.assertEqual(result["stack"][0]["line"], 2)
+        result = debugger.command("run-to-line", 4)
+        self.assertEqual(result["state"], "paused")
+        self.assertEqual(result["stack"][0]["line"], 4)
+        self.assertEqual(namespace["c"], 3)
+        self.assertIsNone(debugger.run_to_line)
+        self.assertEqual(debugger.command("continue")["state"], "done")
+
+    def test_run_to_line_invalid_target_does_not_resume(self):
+        debugger, namespace, result = self.start("x = 1\\ny = 2\\n", [1])
+        self.assertEqual(result["state"], "paused")
+        for target in (None, True, 0, 3, "2", 1.5):
+            invalid = debugger.command("run-to-line", target)
+            self.assertFalse(invalid["ok"])
+            self.assertEqual(invalid["state"], "paused")
+            self.assertNotIn("x", namespace)
+        self.assertEqual(debugger.command("run-to-line", 2)["stack"][0]["line"], 2)
+        self.assertEqual(debugger.command("continue")["state"], "done")
+
+    def test_run_to_line_does_not_override_earlier_breakpoint(self):
+        source = "a = 1\\nb = 2\\nc = 3\\nd = 4\\n"
+        debugger, namespace, result = self.start(source, [1, 3])
+        self.assertEqual(result["stack"][0]["line"], 1)
+        result = debugger.command("run-to-line", 4)
+        self.assertEqual(result["stack"][0]["line"], 3)
+        self.assertIsNone(debugger.run_to_line)
+        self.assertEqual(debugger.command("continue")["state"], "done")
+        self.assertEqual(namespace["d"], 4)
+
+    def test_run_to_line_unreachable_target_completes_without_false_pause(self):
+        source = "x = 1\\nif False:\\n    x = 2\\nprint(x)\\n"
+        debugger, namespace, result = self.start(source, [1])
+        self.assertEqual(result["state"], "paused")
+        result = debugger.command("run-to-line", 3)
+        self.assertEqual(result["state"], "done")
+        self.assertIsNone(debugger.run_to_line)
+        self.assertEqual(namespace["x"], 1)
+
     def test_stop_preserves_unexecuted_lines(self):
         debugger, namespace, result = self.start("x = 1\ny = 2\n", [2])
         self.assertEqual(result["state"], "paused")

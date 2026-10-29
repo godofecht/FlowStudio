@@ -107,6 +107,8 @@ class DebugSession:
         self.mode = "run"
         self.anchor_depth = 0
         self.breakpoints: dict[int, tuple[str, str, int | float] | None] = {}
+        self.source_lines = 0
+        self.run_to_line: int | None = None
         self.frames: list[dict[str, object]] = []
         self.writer: Any = None
         self.ok = True
@@ -163,13 +165,17 @@ class DebugSession:
                 pause = True
             else:
                 depth = _source_depth(frame)
-                pause = (self._breakpoint_hit(frame) or self.mode == "step" or
+                pause = (self.run_to_line == frame.f_lineno or
+                         self._breakpoint_hit(frame) or self.mode == "step" or
                          (self.mode == "next" and depth <= self.anchor_depth) or
                          (self.mode == "finish" and depth < self.anchor_depth))
                 if pause:
                     self.exception = None
             if not pause:
                 return self._trace
+            # Run-to-line is temporary, even if an ordinary breakpoint or
+            # exception interrupted execution before reaching its target.
+            self.run_to_line = None
             self.anchor_depth = _source_depth(frame)
             self.frames = _stack(frame)
             self.state = "paused"
@@ -195,6 +201,7 @@ class DebugSession:
             finally:
                 sys.settrace(None)
         with self.cv:
+            self.run_to_line = None
             self.last_exception = None
             self.exception = None
             self.ok = ok
@@ -228,6 +235,8 @@ class DebugSession:
             self.mode = "run" if parsed or pause_on_exception else "step"
             self.anchor_depth = 0
             self.breakpoints = parsed
+            self.source_lines = len(source.splitlines())
+            self.run_to_line = None
             self.frames = []
             self.writer = writer
             self.ok = True
@@ -240,18 +249,26 @@ class DebugSession:
             self.thread.start()
             return self._wait()
 
-    def command(self, action: str) -> dict[str, object]:
+    def command(self, action: str, target_line: int | None = None) -> dict[str, object]:
         with self.cv:
             if action == "status":
                 return self._snapshot()
-            if action not in ("step", "next", "finish", "continue", "stop"):
+            if action not in ("step", "next", "finish", "continue", "stop", "run-to-line"):
                 return {"state": self.state, "ok": False, "stack": [], "output": "", "message": "Unknown debugger command."}
+            if action == "run-to-line" and (type(target_line) is not int or
+                    not 1 <= target_line <= self.source_lines):
+                return {**self._snapshot(), "ok": False,
+                        "message": "Run-to-line target is outside the current source."}
+            if action != "run-to-line" and target_line is not None:
+                return {**self._snapshot(), "ok": False,
+                        "message": "Unexpected run-to-line target."}
             if self.state not in ("paused", "running"):
                 return {"state": self.state, "ok": False, "stack": self.frames, "output": "", "message": "No active debugging session."}
             if action == "stop":
                 self.stop_requested = True
             elif self.state != "paused":
                 return {"state": self.state, "ok": False, "stack": [], "output": "", "message": "Debugger has not reached a breakpoint."}
+            self.run_to_line = target_line if action == "run-to-line" else None
             self.mode = action if action in ("step", "next", "finish") else "run"
             if self.state == "paused":
                 self.state = "running"

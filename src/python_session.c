@@ -181,6 +181,7 @@ const char *fs_py_debug_step(void) { return request_python('S', ""); }
 const char *fs_py_debug_next(void) { return request_python('N', ""); }
 const char *fs_py_debug_finish(void) { return request_python('F', ""); }
 const char *fs_py_debug_continue(void) { return request_python('C', ""); }
+const char *fs_py_debug_run_to_line(const char *line) { return request_python('G', line); }
 const char *fs_py_debug_stop(void) { return request_python('X', ""); }
 const char *fs_py_debug_state(void) { return request_python('Q', ""); }
 int fs_py_status(void) { return last_status; }

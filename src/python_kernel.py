@@ -232,13 +232,17 @@ def serve() -> None:
         data = read_exact(stdin, length)
         if data is None:
             return
-        if header[:1] in (b"B", b"S", b"N", b"F", b"C", b"X", b"Q"):
+        if header[:1] in (b"B", b"S", b"N", b"F", b"C", b"X", b"Q", b"G"):
             if header[:1] == b"B":
                 try:
                     ok, payload = encode(debugger.start(data.decode("utf-8", "strict"), namespace, LimitedWriter()))
                 except UnicodeDecodeError:
                     ok, payload = encode({"state": "idle", "ok": False, "stack": [],
                                           "output": "", "message": "Invalid UTF-8 debugger request."})
+            elif header[:1] == b"G":
+                # A decimal source line, not an expression or a Python command.
+                line = int(data) if 1 <= len(data) <= 6 and data[:1] != b"0" and data.isdigit() else None
+                ok, payload = encode(debugger.command("run-to-line", line))
             else:
                 actions = {b"S": "step", b"N": "next", b"F": "finish", b"C": "continue", b"X": "stop", b"Q": "status"}
                 ok, payload = encode(debugger.command(actions[header[:1]]))

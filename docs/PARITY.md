@@ -1,3 +1,29 @@
+## 2026-10-29: navigable source-owned Flow compiler problems (PR verification pending)
+
+The primary Monaco editor now renders each valid location reported by the
+**actual Flow 2.0 strict compiler** as an individual, keyboard-accessible
+source-navigation button. Clicking any listed problem reveals its checked
+line and column, not merely the first diagnostic. The original bounded raw
+compiler output and source underlines remain intact. Problem text is rendered
+with `textContent`, never HTML; the existing source-path ownership checks
+remain in the Flow transport.
+
+Navigation is tied to the exact checked Monaco model, document ID, edit
+revision and language. Edits, undo, file changes and language changes clear
+the problem list; even a previously captured click handler refuses stale
+navigation. Compiler responses arriving after invalidation cannot repopulate
+it. Invalid/out-of-range locations are excluded, and the existing 64-record
+diagnostic cap is respected. No new compiler errors are inferred.
+
+**Status: partial / eight new focused tests passed in an isolated V8 harness
+against the exact committed branch source.** The full Node test suite,
+native Flow compiler execution, Chromium acceptance and Linux/macOS CI have
+not yet been independently verified for this change. No hosted CI
+configuration, Flow grammar, native backend or interpreter was modified.
+This is not a complete language server or RStudio parity. Function-level R
+stepping, live Flow debugging, and multi-user remote isolation remain
+unimplemented.
+
 ## 2026-10-29: source-owned multi-location Flow compiler diagnostics (six CI jobs passed)
 
 The existing strict Flow 2.0 compiler check now collects up to 64 distinct,

@@ -1,0 +1,228 @@
+# Native Flow 2.0 coupled reaction-diffusion on a periodic 2x2 Cartesian grid.
+# Both fields are evolved together by the same midpoint RK2 stage.
+# This is executable native Flow, not the Python mathematical frontend.
+# The fixed grid is intentional; this is not a general PDE parser.
+
+struct Grid2 {
+    top_left: f64,
+    top_right: f64,
+    bottom_left: f64,
+    bottom_right: f64
+}
+
+struct CoupledState2D {
+    first: Grid2,
+    second: Grid2
+}
+
+struct CoupledDiffusion2D {
+    diffusivity: f64,
+    spacing: f64,
+    exchange: f64
+}
+
+struct CoupledResult2D {
+    valid: bool,
+    state: CoupledState2D
+}
+
+function absolute(value: f64) -> f64 {
+    if value < 0.0 { return -value }
+    return value
+}
+
+function addScaledGrid(base: Grid2, slope: Grid2, scale: f64) -> Grid2 {
+    return Grid2 {
+        top_left: base.top_left + scale * slope.top_left,
+        top_right: base.top_right + scale * slope.top_right,
+        bottom_left: base.bottom_left + scale * slope.bottom_left,
+        bottom_right: base.bottom_right + scale * slope.bottom_right
+    }
+}
+
+function addScaledState(base: CoupledState2D, slope: CoupledState2D, scale: f64) -> CoupledState2D {
+    return CoupledState2D {
+        first: addScaledGrid(base.first, slope.first, scale),
+        second: addScaledGrid(base.second, slope.second, scale)
+    }
+}
+
+function maxGridDifference(a: Grid2, b: Grid2) -> f64 {
+    let mut result: f64 = absolute(a.top_left - b.top_left)
+    let top_right: f64 = absolute(a.top_right - b.top_right)
+    let bottom_left: f64 = absolute(a.bottom_left - b.bottom_left)
+    let bottom_right: f64 = absolute(a.bottom_right - b.bottom_right)
+    if top_right > result { result = top_right }
+    if bottom_left > result { result = bottom_left }
+    if bottom_right > result { result = bottom_right }
+    return result
+}
+
+function maxStateDifference(a: CoupledState2D, b: CoupledState2D) -> f64 {
+    let first: f64 = maxGridDifference(a.first, b.first)
+    let second: f64 = maxGridDifference(a.second, b.second)
+    if second > first { return second }
+    return first
+}
+
+function gridSum(grid: Grid2) -> f64 {
+    return grid.top_left + grid.top_right + grid.bottom_left + grid.bottom_right
+}
+
+function totalMean(state: CoupledState2D) -> f64 {
+    return 0.125 * (gridSum(state.first) + gridSum(state.second))
+}
+
+function coupledDerivative(equation: CoupledDiffusion2D, state: CoupledState2D) -> CoupledState2D {
+    # On a periodic 2x2 grid each axis' two neighbours coincide.
+    # Thus the centered 2D Laplacian has coefficient 2*D/dx^2.
+    let diffusion: f64 = 2.0 * equation.diffusivity / (equation.spacing * equation.spacing)
+    let exchange: f64 = equation.exchange
+    let u: Grid2 = state.first
+    let v: Grid2 = state.second
+    return CoupledState2D {
+        first: Grid2 {
+            top_left: diffusion * (u.top_right + u.bottom_left - 2.0 * u.top_left) + exchange * (v.top_left - u.top_left),
+            top_right: diffusion * (u.top_left + u.bottom_right - 2.0 * u.top_right) + exchange * (v.top_right - u.top_right),
+            bottom_left: diffusion * (u.bottom_right + u.top_left - 2.0 * u.bottom_left) + exchange * (v.bottom_left - u.bottom_left),
+            bottom_right: diffusion * (u.bottom_left + u.top_right - 2.0 * u.bottom_right) + exchange * (v.bottom_right - u.bottom_right)
+        },
+        second: Grid2 {
+            top_left: diffusion * (v.top_right + v.bottom_left - 2.0 * v.top_left) + exchange * (u.top_left - v.top_left),
+            top_right: diffusion * (v.top_left + v.bottom_right - 2.0 * v.top_right) + exchange * (u.top_right - v.top_right),
+            bottom_left: diffusion * (v.bottom_right + v.top_left - 2.0 * v.bottom_left) + exchange * (u.bottom_left - v.bottom_left),
+            bottom_right: diffusion * (v.bottom_left + v.top_right - 2.0 * v.bottom_right) + exchange * (u.bottom_right - v.bottom_right)
+        }
+    }
+}
+
+function midpointCoupledStep(equation: CoupledDiffusion2D, state: CoupledState2D, step: f64) -> CoupledState2D {
+    let firstSlope: CoupledState2D = coupledDerivative(equation, state)
+    let midpoint: CoupledState2D = addScaledState(state, firstSlope, 0.5 * step)
+    let midpointSlope: CoupledState2D = coupledDerivative(equation, midpoint)
+    return addScaledState(state, midpointSlope, step)
+}
+
+function integrateCoupled(equation: CoupledDiffusion2D, initial: CoupledState2D, duration: f64, steps: i32) -> CoupledResult2D {
+    if steps <= 0 or steps > 1000000 or duration < 0.0 {
+        return CoupledResult2D { valid: false, state: initial }
+    }
+    if equation.diffusivity < 0.0 or equation.exchange < 0.0 or equation.spacing <= 0.0 {
+        return CoupledResult2D { valid: false, state: initial }
+    }
+    let step: f64 = duration / (steps as f64)
+    # Maximum decay eigenvalue is 8*D/dx^2 + 2*exchange.
+    # Midpoint RK2 is stable on the negative real axis for step*lambda <= 2.
+    let maximumRate: f64 = 8.0 * equation.diffusivity / (equation.spacing * equation.spacing) + 2.0 * equation.exchange
+    if step * maximumRate > 2.0 {
+        return CoupledResult2D { valid: false, state: initial }
+    }
+    let mut state: CoupledState2D = initial
+    let mut index: i32 = 0
+    while index < steps {
+        state = midpointCoupledStep(equation, state, step)
+        index = index + 1
+    }
+    return CoupledResult2D { valid: true, state: state }
+}
+
+function main() -> i32 {
+    let checkerboard: Grid2 = Grid2 {
+        top_left: 1.0, top_right: -1.0, bottom_left: -1.0, bottom_right: 1.0
+    }
+    let opposite: Grid2 = Grid2 {
+        top_left: -1.0, top_right: 1.0, bottom_left: 1.0, bottom_right: -1.0
+    }
+    let initial: CoupledState2D = CoupledState2D { first: checkerboard, second: opposite }
+    let equation: CoupledDiffusion2D = CoupledDiffusion2D {
+        diffusivity: 0.01, spacing: 0.5, exchange: 0.2
+    }
+    # Independent analytic eigenmode: exp(-(8*0.01/0.5^2 + 2*0.2)*0.5).
+    let expectedAmplitude: f64 = 0.69767632607103103
+    let expected: CoupledState2D = CoupledState2D {
+        first: Grid2 {
+            top_left: expectedAmplitude, top_right: -expectedAmplitude,
+            bottom_left: -expectedAmplitude, bottom_right: expectedAmplitude
+        },
+        second: Grid2 {
+            top_left: -expectedAmplitude, top_right: expectedAmplitude,
+            bottom_left: expectedAmplitude, bottom_right: -expectedAmplitude
+        }
+    }
+    let coarse: CoupledResult2D = integrateCoupled(equation, initial, 0.5, 20)
+    let medium: CoupledResult2D = integrateCoupled(equation, initial, 0.5, 40)
+    let fine: CoupledResult2D = integrateCoupled(equation, initial, 0.5, 80)
+    if not coarse.valid or not medium.valid or not fine.valid { return 1 }
+    let coarseError: f64 = maxStateDifference(coarse.state, expected)
+    let mediumError: f64 = maxStateDifference(medium.state, expected)
+    let fineError: f64 = maxStateDifference(fine.state, expected)
+    if fineError > 0.000002 { return 2 }
+    if mediumError >= coarseError * 0.30 { return 3 }
+    if fineError >= mediumError * 0.30 { return 4 }
+    if absolute(totalMean(fine.state)) > 0.000000000001 { return 5 }
+    if absolute(fine.state.first.top_left - fine.state.first.bottom_right) > 0.000000000001 { return 6 }
+    if absolute(fine.state.first.top_right - fine.state.first.bottom_left) > 0.000000000001 { return 7 }
+    if absolute(fine.state.first.top_left + fine.state.second.top_left) > 0.000000000001 { return 8 }
+
+    # Semigroup and deterministic replay at exactly equal step sizes.
+    let half: CoupledResult2D = integrateCoupled(equation, initial, 0.25, 40)
+    let remaining: CoupledResult2D = integrateCoupled(equation, half.state, 0.25, 40)
+    let replay: CoupledResult2D = integrateCoupled(equation, initial, 0.5, 80)
+    if not half.valid or not remaining.valid or not replay.valid { return 9 }
+    if maxStateDifference(remaining.state, fine.state) > 0.000000000001 { return 10 }
+    if maxStateDifference(replay.state, fine.state) > 0.000000000001 { return 11 }
+
+    # In-phase spatial Fourier mode removes exchange, but retains 2D diffusion.
+    let inPhase: CoupledState2D = CoupledState2D {
+        first: checkerboard, second: checkerboard
+    }
+    let inPhaseResult: CoupledResult2D = integrateCoupled(equation, inPhase, 0.5, 80)
+    let inPhaseAmplitude: f64 = 0.85214378896621135
+    if not inPhaseResult.valid { return 12 }
+    if absolute(inPhaseResult.state.first.top_left - inPhaseAmplitude) > 0.000002 { return 13 }
+    if maxGridDifference(inPhaseResult.state.first, inPhaseResult.state.second) > 0.000000000001 { return 14 }
+
+    # Uniform species exchange: spatial Laplacian vanishes, total mean stays 3.
+    let uniform: CoupledState2D = CoupledState2D {
+        first: Grid2 { top_left: 2.0, top_right: 2.0, bottom_left: 2.0, bottom_right: 2.0 },
+        second: Grid2 { top_left: 4.0, top_right: 4.0, bottom_left: 4.0, bottom_right: 4.0 }
+    }
+    let uniformResult: CoupledResult2D = integrateCoupled(equation, uniform, 0.5, 80)
+    if not uniformResult.valid { return 15 }
+    if absolute(uniformResult.state.first.top_left - 2.1812692469220183) > 0.000002 { return 16 }
+    if absolute(uniformResult.state.second.top_left - 3.8187307530779817) > 0.000002 { return 17 }
+    if absolute(totalMean(uniformResult.state) - 3.0) > 0.000000000001 { return 18 }
+
+    # Reject invalid time, grid, coefficients and explicit stability.
+    if integrateCoupled(equation, initial, 0.5, 0).valid { return 19 }
+    if integrateCoupled(equation, initial, 0.5, 1000001).valid { return 20 }
+    if integrateCoupled(equation, initial, -0.5, 80).valid { return 21 }
+    let negativeDiffusion: CoupledDiffusion2D = CoupledDiffusion2D {
+        diffusivity: -0.01, spacing: 0.5, exchange: 0.2
+    }
+    if integrateCoupled(negativeDiffusion, initial, 0.5, 80).valid { return 22 }
+    let negativeExchange: CoupledDiffusion2D = CoupledDiffusion2D {
+        diffusivity: 0.01, spacing: 0.5, exchange: -0.2
+    }
+    if integrateCoupled(negativeExchange, initial, 0.5, 80).valid { return 23 }
+    let zeroSpacing: CoupledDiffusion2D = CoupledDiffusion2D {
+        diffusivity: 0.01, spacing: 0.0, exchange: 0.2
+    }
+    if integrateCoupled(zeroSpacing, initial, 0.5, 80).valid { return 24 }
+    let unstable: CoupledDiffusion2D = CoupledDiffusion2D {
+        diffusivity: 1.0, spacing: 0.5, exchange: 0.2
+    }
+    if integrateCoupled(unstable, initial, 0.5, 1).valid { return 25 }
+    let zeroDuration: CoupledResult2D = integrateCoupled(equation, initial, 0.0, 80)
+    if not zeroDuration.valid { return 26 }
+    if maxStateDifference(zeroDuration.state, initial) > 0.000000000001 { return 27 }
+
+    # With no coupling or diffusion, both fields remain exactly unchanged.
+    let staticEquation: CoupledDiffusion2D = CoupledDiffusion2D {
+        diffusivity: 0.0, spacing: 0.5, exchange: 0.0
+    }
+    let staticResult: CoupledResult2D = integrateCoupled(staticEquation, initial, 0.5, 80)
+    if not staticResult.valid { return 28 }
+    if maxStateDifference(staticResult.state, initial) > 0.000000000001 { return 29 }
+    return 0
+}

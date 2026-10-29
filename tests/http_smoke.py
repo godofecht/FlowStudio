@@ -148,6 +148,14 @@ def main() -> None:
     assert status == 200, ("native periodic wave compile", status, body)
     status, body = request("POST", "/api/run/flow", wave_native_source, accepted_headers)
     assert status == 200, ("native periodic wave analytic execution", status, body)
+    # Native coupled 2D reaction-diffusion: real Flow compiler and RK2 execution.
+    # The .flow main() checks 29 analytic, convergence and invalid-input cases.
+    coupled_native_source = (Path(__file__).resolve().parents[1] /
+                             "examples/native_coupled_diffusion_2d.flow").read_text(encoding="utf-8")
+    status, body = request("POST", "/api/check/flow", coupled_native_source, accepted_headers)
+    assert status == 200, ("native coupled diffusion compile", status, body)
+    status, body = request("POST", "/api/run/flow", coupled_native_source, accepted_headers)
+    assert status == 200, ("native coupled diffusion analytic execution", status, body)
     # Real Flow HTTP route, request intent/origin gate, and safe Quarto
     # preflight rejection (does not require Quarto to be installed).
     invalid_qmd = "---\nformat: pdf\n---\n\n# Wrong format\n"

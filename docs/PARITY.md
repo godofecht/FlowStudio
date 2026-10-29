@@ -16,12 +16,17 @@ R engines invalidates navigation. An asynchronous response from an earlier
 document can still be inspected as text but cannot move the current editor.
 The editor uses the returned 1-based source line only when that line exists.
 
-**Status: partial / five focused V8 tests passed against the committed
-browser module and new Node regression file.** The existing native Chromium
-acceptance script has also been extended to exercise actual Flow HTTP →
-Rscript start, step, source caret positioning and changed-buffer refusal,
-but that new physical-browser path has **not yet been run successfully**.
-Full Node, native Flow/Rscript and Chromium CI acceptance remain pending. This update modifies only
+**Status: partial / independently verified in all six Linux/macOS
+jobs in [CI #40808667329](https://github.com/godofecht/FlowStudio/actions/runs/40808667329).**
+Both source/transport platforms passed 1,072 Node tests (12 skipped, zero
+failures) and 224 Python tests (13 skipped, zero failures). Both native
+Flow 2.0.0 builds compiled and passed real Rscript/HTTP acceptance; both
+FlowJIT jobs passed. On Ubuntu, physical Chromium executed the actual
+Flow HTTP → Rscript start, step, source caret positioning and changed-buffer
+refusal successfully. The five new focused V8 regression tests also passed
+before CI. This does not claim a separate macOS physical-browser run.
+[PR #169](https://github.com/godofecht/FlowStudio/pull/169)
+merged as [9cbe8f6](https://github.com/godofecht/FlowStudio/commit/9cbe8f6a8af0c63c7b312a934fef22bd14b01342). This update modifies only
 the browser debugger panel, browser workspace wiring, regression tests and
 this evidence document. The native Flow server, R interpreter implementation,
 upstream Flow compiler and hosted CI definitions are unchanged. RStudio

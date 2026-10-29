@@ -1735,14 +1735,17 @@ async function runProject() {
   if (ok) status(plan.title + " ran all " + plan.steps.length + " file(s).", "ok");
   return ok;
 }
-async function openEditorHandle(handle, path = null) {
+async function openEditorHandle(handle, path = null, guard = () => true) {
+  if (!guard()) return false;
   const existing = documents.list().find(doc => doc.handle === handle &&
     (path === null || doc.path === path));
   if (existing) {
+    if (!guard()) return false;
     status("Switched to " + FlowStudioDocuments.label(existing), "ok");
     return activateDocument(existing.id);
   }
   const content = await FlowStudioFileSave.readSnapshot(handle);
+  if (!guard()) return false;
   saveEditorBuffer();
   let opened;
   try {
@@ -2332,7 +2335,7 @@ function scheduleOutlineRefresh() {
   if (outlineTimer) clearTimeout(outlineTimer);
   outlineTimer = setTimeout(() => { outlineTimer = 0; refreshOutline(); }, 250);
 }
-function goToDefinition() {
+async function goToDefinition() {
   try {
     const name = FlowStudioSymbols.identifierAt(language.value, src.value, src.selectionStart);
     if (!name) {
@@ -2354,13 +2357,52 @@ function goToDefinition() {
       status("Definition: " + name + " in another open tab", "ok");
       return true;
     }
-    status(match.state === "ambiguous"
-      ? "Multiple open files define " + name + "; select a file explicitly."
-      : "No definition of " + name + " found in open source buffers.", "error");
+    if (match.state === "ambiguous") {
+      status("Multiple open files define " + name + "; select a file explicitly.", "error");
+      return false;
+    }
+    if (!project.hasProject()) {
+      status("No definition of " + name + " found in open source buffers.", "error");
+      return false;
+    }
+    // Async disk search must not navigate a different document, edit revision,
+    // caret, language, or project folder after the user has moved on.
+    const snapshot = {id: current?.id, source: src.value, cursor: src.selectionStart,
+      language: language.value, projectRevision: searchRevision};
+    const isCurrent = () => activeDocument()?.id === snapshot.id &&
+      src.value === snapshot.source && src.selectionStart === snapshot.cursor &&
+      language.value === snapshot.language && searchRevision === snapshot.projectRevision &&
+      project.hasProject();
+    const found = await FlowStudioSymbols.findProjectDefinition(
+      project, snapshot.language, name, documents.list());
+    if (!isCurrent()) return false;
+    if (found.state !== "unique") {
+      const messages = {
+        ambiguous: "Multiple project files define " + name + "; open one explicitly.",
+        incomplete: "Project definition search was incomplete; open the file explicitly.",
+        changed: "A project file changed during definition search; retry.",
+        missing: "No definition of " + name + " found in open or project source files."
+      };
+      status(messages[found.state] || "Definition search unavailable.", "error");
+      return false;
+    }
+    if (!await openEditorHandle(found.handle, found.path, isCurrent)) return false;
+    // An already-open document or a changed disk snapshot must never be
+    // navigated using source locations from an older file image.
+    if (src.value !== found.source ||
+        !FlowStudioSymbols.findDefinitions(snapshot.language, src.value, name)
+          .some(symbol => symbol.line === found.symbol.line &&
+            symbol.column === found.symbol.column)) {
+      status("Definition source changed while opening; retry.", "error");
+      return false;
+    }
+    revealPosition(found.symbol.line, found.symbol.column);
+    status("Definition: " + name + " in " + found.path, "ok");
+    return true;
   } catch (error) {
     status("Definition navigation: " + (error.message || String(error)), "error");
+    return false;
   }
-  return false;
 }
 
 function findReferencesAtCaret() {

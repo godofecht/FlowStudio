@@ -9,6 +9,7 @@
 #endif
 #include <arpa/inet.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <netinet/in.h>
 #include <signal.h>
 #include <stdio.h>
@@ -306,4 +307,94 @@ const char *fs_write_temp_flow(const char *code)
         return "";
     }
     return path;
+}
+
+/* Per-run staging directory for compiler modes that require a project root
+ * above the program (the MLIR backend bundles imports only under a
+ * flow.toml). The manifest stays empty, which is supported: stdlib imports
+ * then bundle from the compiler's own lib/stdlib fallback. Returns the
+ * program path, or "" after cleaning up the half-built directory. */
+static char fs_last_run_dir[64];
+
+const char *fs_write_temp_flow_run(const char *code)
+{
+    static char prog[96];
+    char toml[96];
+    strcpy(fs_last_run_dir, "/tmp/flowstudio-run-XXXXXX");
+    char *dir = mkdtemp(fs_last_run_dir);
+    if (dir == NULL)
+    {
+        fs_last_run_dir[0] = 0;
+        return "";
+    }
+    if (snprintf(prog, sizeof(prog), "%s/prog.flow", dir) >= (int)sizeof(prog) ||
+        snprintf(toml, sizeof(toml), "%s/flow.toml", dir) >= (int)sizeof(toml))
+    {
+        rmdir(dir);
+        fs_last_run_dir[0] = 0;
+        return "";
+    }
+    int tfd = open(toml, O_WRONLY | O_CREAT | O_EXCL, 0600);
+    if (tfd < 0)
+    {
+        rmdir(dir);
+        fs_last_run_dir[0] = 0;
+        return "";
+    }
+    if (close(tfd) != 0)
+    {
+        unlink(toml);
+        rmdir(dir);
+        fs_last_run_dir[0] = 0;
+        return "";
+    }
+    int fd = open(prog, O_WRONLY | O_CREAT | O_EXCL, 0600);
+    if (fd < 0)
+    {
+        unlink(toml);
+        rmdir(dir);
+        fs_last_run_dir[0] = 0;
+        return "";
+    }
+    const char *p = code;
+    size_t remaining = strlen(code);
+    while (remaining > 0)
+    {
+        ssize_t n = write(fd, p, remaining);
+        if (n < 0 && errno == EINTR) continue;
+        if (n <= 0)
+        {
+            close(fd);
+            unlink(prog);
+            unlink(toml);
+            rmdir(dir);
+            fs_last_run_dir[0] = 0;
+            return "";
+        }
+        p += n;
+        remaining -= (size_t)n;
+    }
+    if (close(fd) != 0)
+    {
+        unlink(prog);
+        unlink(toml);
+        rmdir(dir);
+        fs_last_run_dir[0] = 0;
+        return "";
+    }
+    return prog;
+}
+
+/* Remove the staging directory of the last backend run; a no-op when the
+ * flat /tmp file path was used (its file is unlinked from Flow). */
+void fs_clean_run_dir(void)
+{
+    if (fs_last_run_dir[0] == 0) return;
+    char prog[96], toml[96];
+    snprintf(prog, sizeof(prog), "%s/prog.flow", fs_last_run_dir);
+    snprintf(toml, sizeof(toml), "%s/flow.toml", fs_last_run_dir);
+    unlink(prog);
+    unlink(toml);
+    rmdir(fs_last_run_dir);
+    fs_last_run_dir[0] = 0;
 }

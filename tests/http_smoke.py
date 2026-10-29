@@ -26,7 +26,7 @@ def request(method: str, path: str, body: str | None = None,
         ROOT + path, data=data, method=method, headers=headers or {}
     )
     try:
-        with urllib.request.urlopen(req, timeout=80 if path in ("/api/run/flow", "/api/check/flow", "/api/render/quarto") else 25) as reply:
+        with urllib.request.urlopen(req, timeout=80 if path in ("/api/run/flow", "/api/run/flow-mlir", "/api/check/flow", "/api/render/quarto") else 25) as reply:
             return reply.status, reply.read().decode("utf-8")
     except urllib.error.HTTPError as exc:
         return exc.code, exc.read().decode("utf-8")
@@ -103,7 +103,7 @@ def main() -> None:
     assert status == 200 and "FlowStudioSessionSnapshot" in session_script, (status, session_script[:100])
     assert 'id="exportSession"' in browser and 'id="importSession"' in browser
     # The Pyodide environment helper must be available from the real Flow
-    # static-asset allowlist, not only from GitHub Pages.
+    # static-asset allowlist as well as GitHub Pages.
     status, capture_helper = request("GET", "/app/environment_capture.py")
     assert status == 200 and "def capture(namespace):" in capture_helper, (status, capture_helper[:100])
     status, _ = request("GET", "/app/not-a-real-asset.js")
@@ -120,7 +120,8 @@ def main() -> None:
     status, body = request("POST", "/api/render/quarto", invalid_qmd, accepted_headers)
     assert status == 422 and "format: html" in body, (status, body)
     if shutil.which("quarto"):
-        # This is actual installed-Quarto acceptance, not a fake renderer.
+        # This is actual installed-Quarto acceptance; the renderer invokes
+        # the real quarto binary.
         status, body = request("POST", "/api/render/quarto",
                                "---\ntitle: Native Quarto smoke\nformat: html\n---\n\n"
                                "## Native Quarto smoke\n", accepted_headers)
@@ -245,8 +246,8 @@ def main() -> None:
         "− advectionVelocityX ∂ₓ(temperature)", "+ advectionVelocityX ∂ₓ(temperature)")
     status, body = request("POST", "/api/check/mathflow", invalid_advection, accepted_headers)
     assert status == 422 and not json.loads(body)["ok"], (status, body)
-    # Composed typed transport, linear reaction and forcing must execute through
-    # the native FlowStudio HTTP route, not merely standalone Python tests.
+    # Composed typed transport, linear reaction and forcing must execute
+    # through the native FlowStudio HTTP route and the real compiler.
     combined_source = (Path(__file__).resolve().parents[1] /
                        "examples/heat_transport_reaction.flow").read_text(encoding="utf-8")
     status, body = request("POST", "/api/check/mathflow", combined_source, accepted_headers)
@@ -396,7 +397,7 @@ def main() -> None:
     status, body = request("POST", "/api/check/mathflow", invalid_forcing, accepted_headers)
     assert status == 422 and not json.loads(body)["ok"], (status, body)
     # Unicode spatial derivative ASTs must survive the actual native Flow HTTP
-    # request path, not merely local Python expression unit tests.
+    # request path and the local Python expression unit tests.
     for example, expected_steps, metric in (
         ("navier_stokes_spatial_derivative.flow", 10, "kinetic_energy"),
         ("heat_equation_spatial_derivative.flow", 100, "temperature_variance"),
@@ -528,7 +529,8 @@ def main() -> None:
     assert "fs_outer_local" in frames["frames"][0]["locals"], frames
     assert "fs_inner_local" in frames["frames"][1]["locals"], frames
     # Source metadata is optional when R has discarded srcref. When present,
-    # it is a function definition line, not the live failure location.
+    # definition_line marks where the function is defined; the live failure
+    # location stays in the frame line.
     assert all(frame["definition_line"] is None or
                (isinstance(frame["definition_line"], int) and
                 1 <= frame["definition_line"] <= 2)
@@ -834,7 +836,7 @@ def main() -> None:
                                  'flowstudio_r_value <- flowstudio_r_value + 1; cat(flowstudio_r_value, "\\n")',
                                  accepted_headers)
         assert status == 200 and output.strip() == "42", (status, output)
-        # Exercise compiled C via the actual native R HTTP kernel, not a mock.
+        # Exercise compiled C via the actual native R HTTP kernel.
         status, output = request(
             "POST", "/api/run/r",
             "flowjit_x <- as.double(seq_len(512L)); "
@@ -1047,6 +1049,22 @@ def main() -> None:
         status, output = request("POST", "/api/check/flow",
                                  "function main( -> i32 {", accepted_headers)
         assert status == 422 and output.strip(), (status, output)
+
+        # The MLIR backend bundles stdlib imports under a flow.toml it finds
+        # above the staged program; backend runs must get that staging.
+        if shutil.which("llc") or shutil.which("clang"):
+            mlir_source = ('import std.io { io_read_text }\n'
+                           'function main() -> i32 {\n'
+                           '    let r: FileRead = io_read_text("/etc/hosts")\n'
+                           '    if r.ok == false { print("missing"); return 1 }\n'
+                           '    print("flowstudio-mlir-ok")\n'
+                           '    return 0\n'
+                           '}\n')
+            status, output = request("POST", "/api/run/flow-mlir",
+                                     mlir_source, accepted_headers)
+            assert status == 200 and "flowstudio-mlir-ok" in output, (status, output)
+        else:
+            print("SKIP Flow MLIR backend: LLVM tooling not on PATH")
     else:
         print("SKIP Flow subprocess: executable not on PATH")
 

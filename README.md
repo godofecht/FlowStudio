@@ -8,6 +8,15 @@ A **Flow-first scientific IDE** intended to become a capable successor to RStudi
 
 **Current status:** early, unverified developer preview. This is **not** RStudio feature parity. Exact coverage and acceptance criteria are in [docs/PARITY.md](docs/PARITY.md).
 
+## Authenticated remote access (single-user preview)
+
+Connect to a remote, already-running FlowStudio using the
+[OpenSSH loopback tunnel](docs/REMOTE_SESSIONS.md):
+`python3 scripts/ssh_tunnel.py user@host`. The remote Flow-owned server
+continues listening only on 127.0.0.1:8751; SSH handles host/user
+authentication. This is **not** HTTP authentication or multi-user isolation.
+Do not expose the native code-execution service on a public interface.
+
 ## First executable slice
 
 The initial implementation includes a native Flow server (src/main.flow), a small POSIX sockets/temp-file bridge (src/http_bridge.c), and a tabbed browser workspace (web/index.html) with a menu bar, one tab per open document (unsaved markers, close controls, Ctrl/⌘+Tab cycling), a resizable project sidebar, an environment panel and a console dock.

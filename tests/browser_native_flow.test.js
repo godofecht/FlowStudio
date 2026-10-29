@@ -128,7 +128,7 @@ test("Flow check never maps imported-file or generated-C errors into the current
     "/tmp/flowstudio-check-aB1234.c:7:4: error: generated C",
     "/tmp/flowstudio-aB1234.flow:0:1: invalid line",
     "/tmp/flowstudio-aB1234.flow:2:0: invalid column",
-    "/tmp/flowstudio-source.flow:3:3: not a transport-generated path",
+    "/tmp/flowstudio-source7.flow:3:3: not a transport-generated path",
     "/tmp/flowstudio-aB1234.flow:5:6: error: actual source error"
   ].join("\n");
   await withBrowser(localhost, async () => ({

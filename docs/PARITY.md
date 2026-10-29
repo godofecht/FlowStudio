@@ -1,20 +1,29 @@
-## 2026-10-29: native R debugger stale-source command isolation (verification pending)
+## 2026-10-29: native R debugger stale-source command isolation (six independent CI jobs passed)
 
-The existing Flow-owned Rscript top-level expression debugger now refuses Step,
+The existing Flow-owned Rscript top-level expression debugger refuses Step,
 Continue and paused/postmortem Evaluate when the editor source, edit revision,
 document identity, language or runtime no longer matches the snapshot captured
 at debugger start. Undoing an edit does not silently reauthorize old paused
-execution. Buttons disable on input changes, and direct programmatic calls are
-also rejected. Stop and Status remain usable to recover the persistent R
+execution. Buttons disable on input changes, and direct programmatic calls
+are also rejected. Stop and Status remain usable to recover the persistent R
 kernel. Delayed Start/Status responses cannot reenable stale execution controls.
-Regression tests cover edited/undone source, cross-document postmortem frame
-evaluation, command refusal, stop/status recovery and delayed Start isolation.
 
-**Status: partial / committed; independent CI and physical Chromium acceptance
-pending.** This is a browser-side safety and correctness guard around the
-existing real Flow-owned R debugger, not function-level R stepping, a new R
-interpreter, authenticated remote sessions or RStudio parity. The Flow backend,
-Rscript kernel and hosted CI definitions are unchanged.
+**Status: partial / independently verified in all six Linux/macOS jobs in
+[CI #40819918981](https://github.com/godofecht/FlowStudio/actions/runs/40819918981).**
+Both source platforms passed 1,079 of 1,091 Node tests (12 skipped, zero
+failures) and 231 Python tests (13 skipped, zero failures). Both native Flow
+2.0.0 builds and real Rscript/HTTP acceptance passed; both FlowJIT jobs
+passed. Real Ubuntu Chromium acceptance exercised Flow HTTP → Rscript
+breakpoint pause, editor source change, disabled Step/Continue/Evaluate,
+Status/Stop recovery, fresh Start and actual stepping. A first candidate
+CI run failed one newly added test because its mock postmortem Status response
+incorrectly reported `ok:false`; the fixture was corrected and the complete
+six-job run passed. This is not a claim of independent macOS physical-browser
+acceptance. [PR #173](https://github.com/godofecht/FlowStudio/pull/173)
+merged as [2aa392f](https://github.com/godofecht/FlowStudio/commit/2aa392f2fe02362bc5b0614109524ed4faae4f87).
+No Flow compiler, R kernel, backend route or hosted CI definition changed.
+Function-level R stepping, live Flow debugging, authenticated remote sessions
+and complete RStudio parity remain unimplemented.
 
 ## 2026-10-29: native Python debugger stale-source execution isolation (six CI jobs passed)
 

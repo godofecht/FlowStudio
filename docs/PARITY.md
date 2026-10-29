@@ -1,4 +1,4 @@
-## 2026-10-29: source-owned multi-location Flow compiler diagnostics (PR validation pending)
+## 2026-10-29: source-owned multi-location Flow compiler diagnostics (six CI jobs passed)
 
 The existing strict Flow 2.0 compiler check now collects up to 64 distinct,
 bounded `line:column` diagnostics from its **actual output**, including the
@@ -10,12 +10,23 @@ current editor. Repeated diagnostics are deduplicated in compiler order. The
 existing Monaco panel can display all valid locations and navigates to the
 first. Source-revision and document identity guards are unchanged.
 
-**Status: partial / local parser validation only, CI pending.** Four isolated
-Node 22.16.0 parser assertions passed, covering upstream parser text, multiple
-locations/deduplication, foreign paths and the 64-entry cap. The added native
-client and Monaco regressions and the real malformed-source Ubuntu Chromium
-acceptance still require independent GitHub CI. The local environment lacks
-Flow, Rscript and a runnable native server; no local end-to-end claim is made.
+**Status: partial / independently verified by all six Linux/macOS jobs in
+[CI #40860891453](https://github.com/godofecht/FlowStudio/actions/runs/40860891453).**
+Both source platforms passed 1,103 of 1,115 Node tests (12 skipped, zero
+failures) and 269 Python tests (13 skipped, zero failures). Both native Flow
+2.0.0 builds, real HTTP/compiler acceptance, real R/CPython kernels, and
+FlowJIT jobs passed. Actual Ubuntu Chromium acceptance checked malformed Flow
+source through the native Flow HTTP compiler, confirmed its genuine line-2
+diagnostic, Monaco caret navigation and rendered inline error marker.
+Four isolated Node 22.16.0 parser assertions also passed locally. The first
+candidate CI run exposed an incorrect foreign-path test fixture (a six-character
+suffix is valid); the next run passed both source suites but revealed the
+expected HTTP 422 being counted as a browser console error. The final
+six-job rerun passed after explicitly accounting for that expected response.
+[PR #185](https://github.com/godofecht/FlowStudio/pull/185) merged as
+[a00002a](https://github.com/godofecht/FlowStudio/commit/a00002ab97bed261edf6296400e2d6b2f9b696e0).
+The local environment lacks Flow, Rscript and a runnable native server;
+independent local native acceptance was not performed.
 The strict compiler may itself stop after its first parse error, so support
 for multiple reported locations is not a promise of compiler error recovery.
 No Flow grammar, Flow backend, native HTTP route or hosted CI definition changed.

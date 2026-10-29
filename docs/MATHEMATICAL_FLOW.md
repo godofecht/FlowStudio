@@ -397,3 +397,33 @@ python3 -m unittest discover -s tests -p 'test_math_flow_per_face.py' -v
 These are constant per-face conditions, not spatially or temporally varying
 boundary functions. General coupled PDE systems and upstream Flow 2.0 grammar
 integration remain outstanding.
+
+## Dimension-checked Unicode radicals and division
+
+The opt-in scalar mathematical Flow frontend now compiles `√`, `∛` and
+`÷` directly to the checked expression AST. The ASCII functions `sqrt()`
+and `cbrt()` use the same typed runtime operators. The square root requires
+every physical dimension exponent to be even; the real cube root requires
+every exponent to be divisible by three. Division subtracts dimension
+exponents. Invalid dimensions, non-finite arithmetic and unknown functions
+fail closed; no Python `eval` is used.
+
+```flow
+∂ₜtemperature = diffusivity ∇²temperature
+               + 1K/s * √(4m²) ÷ 2m * ∛(sin(2πx / 1m)³)
+```
+
+The checked-in `examples/heat_unicode_radicals.flow` executes that
+equation using the finite-difference NumPy runtime. Its tests verify the
+discrete Fourier forcing against the analytic mode response, CLI execution,
+physical dimensions and error rejection. Native HTTP and Chromium acceptance
+also exercise its actual spatial and temporal plots.
+
+```sh
+python3 src/math_flow.py --check examples/heat_unicode_radicals.flow
+python3 src/math_flow.py examples/heat_unicode_radicals.flow
+python3 -m unittest discover -s tests -p 'test_math_flow_unicode_radicals.py' -v
+```
+
+These are bounded scalar expression operators, **not** an upstream Flow 2.0
+grammar extension or arbitrary equation-system compilation.

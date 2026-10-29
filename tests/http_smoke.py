@@ -227,6 +227,28 @@ def main() -> None:
     assert status == 422 and body.strip(), (
         "native evolution heat3x3 malformed-source rejection", status, body)
 
+    # Real upstream Flow 2.0 compiler-generated RK4 for eighteen states:
+    # two exchanging species on a 3x3 periodic grid, distinct neighbors,
+    # unequal anisotropic tensors, nine 2D Fourier matrix-exponential modes.
+    # Flow main() asserts all 18 cells, fourth-order convergence, invariants,
+    # spatial/species symmetries, semigroup consistency and invalid inputs.
+    coupled3x3_source = (Path(__file__).resolve().parents[1] /
+                        "examples/native_coupled_evolution3x3.flow").read_text(encoding="utf-8")
+    status, body = request("POST", "/api/check/flow", coupled3x3_source, accepted_headers)
+    assert status == 200, ("native coupled evolution3x3 compile", status, body)
+    status, body = request("POST", "/api/run/flow", coupled3x3_source, accepted_headers)
+    assert status == 200 and "native-coupled-evolution3x3-ok" in body, (
+        "native coupled evolution3x3 analytical RK4 execution", status, body)
+    malformed_coupled3x3 = coupled3x3_source.replace(
+        "vSoutheast evolves as diffusivity_vx *",
+        "vSoutheast evolves as (diffusivity_vx *",
+        1,
+    )
+    assert malformed_coupled3x3 != coupled3x3_source
+    status, body = request("POST", "/api/check/flow", malformed_coupled3x3, accepted_headers)
+    assert status == 422 and body.strip(), (
+        "native coupled evolution3x3 malformed-source rejection", status, body)
+
     # Eight coupled states, two anisotropic diffusion tensors and a nonzero
     # species-exchange rate: the upstream Flow compiler generates the RK4
     # integrator. Flow main() verifies all eight exact Walsh/matrix-exponential

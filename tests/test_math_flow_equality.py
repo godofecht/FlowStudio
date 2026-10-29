@@ -77,6 +77,12 @@ class EqualityPredicateTest(unittest.TestCase):
         self.assertGreater(result["temperature_variance"], 0)
         self.assertIn("temperature", result["spatial"]["fields"])
         self.assertIn("semantic_trace", result)
+        # Exercise the complete Flow lexer and solver with both inequality spellings.
+        for inequality in ("≠", "!="):
+            with self.subTest(inequality=inequality):
+                alternate = parse(SOURCE.replace("x == y", f"x {inequality} y"))
+                alternate_result = simulate(alternate)
+                self.assertLess(abs(alternate_result["mean_temperature"] - 300.019375), 1e-9)
 
     def test_real_cli_compilation_and_execution(self):
         for flags in (["--check"], []):

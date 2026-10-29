@@ -57,8 +57,18 @@ try {
       assert.match(await inspector.textContent(), /t = 0\.000100000 s/);
     }
     if (source === 'examples/navier_stokes_smoke.flow') {
-      assert.equal(await page.locator('#mathFlowPlot [data-mathflow-semantic]').count(), 0,
-        'Do not pretend the heat AST trace applies to Navier–Stokes');
+      const inspector = page.locator('#mathFlowPlot [data-mathflow-semantic="navier-rk2"]');
+      assert.equal(await inspector.count(), 1,
+        'Real Navier-Stokes numerical semantic inspector must render');
+      assert.equal(await inspector.locator('ol').first().locator('li').count(), 2,
+        'Both measured momentum RHS contributions must be visible');
+      assert.equal(await inspector.locator('ol').nth(1).locator('li').count(), 3,
+        'All three actual pressure projections must be visible');
+      assert.match(await inspector.textContent(), /decomposition residual/);
+      assert.match(await inspector.textContent(), /pressure projection/);
+      await inspector.locator('select[aria-label="Mathematical Flow semantic stage"]').selectOption('1');
+      assert.match(await inspector.textContent(), /t = 0\\.000100000 s/);
+      assert.match(await inspector.textContent(), /Viscous redistribution/);
     }
     if (source === 'examples/heat_neumann.flow') {
       const note = page.locator('#mathFlowPlot [data-mathflow-boundary="Neumann"]');

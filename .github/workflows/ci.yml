@@ -96,6 +96,8 @@ jobs:
           flow run examples/native_periodic_wave.flow
           flow run examples/native_coupled_diffusion_2d.flow
           flow run examples/native_tensor_grid.flow
+          flow run examples/native_evolution_ring.flow
+          flow run examples/native_evolution_heat2d.flow
       - name: Execute checked-in Navier-Stokes and piecewise heat Flow programs
         run: |
           python3 src/math_flow.py --check examples/navier_stokes_smoke.flow

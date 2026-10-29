@@ -167,6 +167,8 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
 #flowDiagnostics{flex:none;max-height:145px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;margin:0;padding:9px 13px;border-top:1px solid var(--line);background:#1a151a;color:#ffb4a8;font:12px/1.5 var(--mono)}
 #flowProblems{flex:none;max-height:150px;overflow:auto;padding:5px 8px;border-top:1px solid var(--line);background:#1a151a;display:flex;flex-direction:column;gap:3px}
 #flowProblems[hidden]{display:none}
+.flow-auto-check{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;font:12px var(--mono);color:var(--muted);cursor:pointer}
+.flow-auto-check input{accent-color:var(--accent)}
 #flowProblems .flow-problem{display:block;width:100%;padding:5px 8px;text-align:left;white-space:normal;overflow-wrap:anywhere;color:var(--error);font:12px/1.4 var(--mono);background:transparent;border:1px solid transparent;border-radius:4px}
 #flowProblems .flow-problem:hover,#flowProblems .flow-problem:focus-visible{background:#ffffff12;border-color:#835b62}
 .monaco-editor .flowstudio-flow-error{text-decoration:underline wavy #e78179;text-underline-offset:3px}
@@ -346,6 +348,7 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
     <button id="run" class="primary" title="Run selection or entire buffer (Ctrl/⌘+Enter)"><i data-lucide="play"></i>Run</button>
     <button id="runProject" title="Run every file of the active example project in its declared order, stopping at the first failure">Run Project</button>
     <button id="checkFlow" type="button" title="Compile-check the current Flow buffer without running it">Check Flow</button>
+    <label class="flow-auto-check" title="Opt in to strict, nonexecuting Flow compiler checks after 1.1 seconds of inactivity; checks can take up to 60 seconds"><input id="autoCheckFlow" type="checkbox">Check on idle</label>
     <button id="runMathFlow" title="Run the supported Unicode mathematical Flow PDE dialect (NumPy required)">Run MathFlow</button>
     <button id="runCell" title="Run current # %% cell (Ctrl/⌘+Shift+Enter)">Run cell</button>
     <button id="resetR" type="button" title="Discard native R variables and restart its interpreter">Reset R</button>

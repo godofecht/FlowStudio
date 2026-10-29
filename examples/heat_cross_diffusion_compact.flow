@@ -1,0 +1,43 @@
+# Executable positive-definite cross diffusion with symmetric mixed Unicode derivative operator.
+domain ThermalDomain {
+    grid       = 32 × 32
+    extent     = 1m × 1m
+    boundaries = Periodic
+}
+
+model HeatEquation on ThermalDomain {
+    const diffusivityX = 0.01m²/s
+    const diffusivityY = 0.02m²/s
+    const crossDiffusivity = 0.01m²/s
+    field temperature: Scalar<Kelvin>
+
+    dynamics {
+        ∂ₜtemperature = diffusivityX ∂ₓ²(temperature) + diffusivityY ∂ᵧ²(temperature) + crossDiffusivity ∂ₓᵧ(temperature)
+    }
+    initial {
+        temperature = 300K + 10K * sin(2πx / 1m + 2πy / 1m)
+    }
+}
+
+solver ThermalSolver for HeatEquation {
+    spatial {
+        method    = FiniteDifference
+        diffusion = CentralDifference
+    }
+    temporal {
+        method   = RungeKuttaSecondOrder
+        timeStep = 10⁻⁴s
+    }
+}
+
+let simulation = HeatEquation ▷ ThermalSolver ▷ Evolve(until: 0.01s)
+
+simulation
+    ▷ Observe {
+        meanTemperature     = Mean(temperature)
+        temperatureVariance = Mean((temperature − meanTemperature)²)
+    }
+    ▷ Visualize {
+        temperature         = Heatmap
+        temperatureVariance = LineGraph
+    }

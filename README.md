@@ -35,8 +35,11 @@ npm run build:ui
 ```
 
 UI sources live in `frontend/`. Each open document has a Monaco model for undo
-history and cursor state. Ctrl+K opens the command menu. Flow syntax coloring is
-lexical; it does not provide compiler diagnostics or a language server.
+history and cursor state. Ctrl+K opens the command menu. Flow syntax coloring is lexical, and **Check Flow** runs the actual strict
+Flow 2.x compiler check without executing the source. The primary Monaco
+workspace shows compiler output and underlines source locations reported by
+flowc. Diagnostics are invalidated after edits or document switches; this is
+an explicit check, not a live language server or full compiler diagnostic index.
 
 Run `npm test` for module tests and `python3 scripts/verify_native.py` for the real
 Flow build and HTTP checks. With the native server running, `npm run test:ui`

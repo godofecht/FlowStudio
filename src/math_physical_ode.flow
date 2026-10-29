@@ -1,0 +1,50 @@
+# Native Flow physical-unit checking for scalar linear ODE integration.
+# Checks dimensions before invoking the native Flow midpoint RK2 kernel.
+# No Python/NumPy dependency. Runtime validation, not static Flow inference.
+import .math_dimensions { Dimension, Quantity, same_dimension, dimensionless, time_dimension, quotient_dimension }
+import .math_native { ScalarLinearEquation, ScalarIntegrationResult, scalar_integrate }
+
+export struct PhysicalScalarEquation {
+    state_coefficient: Quantity,
+    time_coefficient: Quantity,
+    constant: Quantity
+}
+
+export struct PhysicalScalarResult {
+    valid: bool,
+    state: Quantity
+}
+
+export function integrate_physical_scalar(equation: PhysicalScalarEquation, initial_time: Quantity, initial_state: Quantity, duration: Quantity, steps: i32) -> PhysicalScalarResult {
+    let time_unit: Dimension = time_dimension()
+    if not same_dimension(initial_time.dimension, time_unit) {
+        return PhysicalScalarResult { valid: false, state: initial_state }
+    }
+    if not same_dimension(duration.dimension, time_unit) {
+        return PhysicalScalarResult { valid: false, state: initial_state }
+    }
+    let state_rate: Dimension = quotient_dimension(initial_state.dimension, time_unit)
+    let expected_state_coefficient: Dimension = quotient_dimension(dimensionless(), time_unit)
+    let expected_time_coefficient: Dimension = quotient_dimension(state_rate, time_unit)
+    if not same_dimension(equation.state_coefficient.dimension, expected_state_coefficient) {
+        return PhysicalScalarResult { valid: false, state: initial_state }
+    }
+    if not same_dimension(equation.time_coefficient.dimension, expected_time_coefficient) {
+        return PhysicalScalarResult { valid: false, state: initial_state }
+    }
+    if not same_dimension(equation.constant.dimension, state_rate) {
+        return PhysicalScalarResult { valid: false, state: initial_state }
+    }
+    let numeric_equation: ScalarLinearEquation = ScalarLinearEquation {
+        state_coefficient: equation.state_coefficient.value,
+        time_coefficient: equation.time_coefficient.value,
+        constant: equation.constant.value
+    }
+    let result: ScalarIntegrationResult = scalar_integrate(
+        numeric_equation, initial_time.value, initial_state.value, duration.value, steps
+    )
+    return PhysicalScalarResult {
+        valid: result.valid,
+        state: Quantity { value: result.value, dimension: initial_state.dimension }
+    }
+}

@@ -189,6 +189,24 @@ try {
     /Failed to load resource:.*422/.test(message)), JSON.stringify(errors));
   errors.length = 0;
 
+  // Real idle-check acceptance: edit a valid Flow buffer, opt in, and let the
+  // native strict compiler finish without an explicit Check Flow click.
+  // Background diagnostics must not reposition the Monaco caret.
+  await page.evaluate(() => {
+    const source = document.getElementById('source');
+    source.value = 'function main() -> i32 {\n    return 0\n}\n';
+    source.dispatchEvent(new Event('input', { bubbles: true }));
+    FlowStudioEditor.editor.setPosition({lineNumber: 3, column: 1});
+  });
+  await page.locator('#autoCheckFlow').check();
+  await page.waitForFunction(() =>
+    document.getElementById('resultStatus').textContent === 'Flow compile check passed.',
+    null, {timeout: 90000});
+  assert.equal(await page.evaluate(() => FlowStudioEditor.editor.getPosition().lineNumber), 3,
+    'idle compiler diagnostics must preserve the user caret');
+  assert.equal(await page.locator('#autoCheckFlow').isChecked(), true);
+  await page.locator('#autoCheckFlow').uncheck();
+
   // Exercise the worker path and wait beyond rendering and deferred callbacks.
   const workerResult = await page.evaluate(async () => {
     const worker = MonacoEnvironment.getWorker();

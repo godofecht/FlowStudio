@@ -161,6 +161,24 @@ class DebugTests(unittest.TestCase):
         self.assertNotIn("value", result["stack"][0]["locals"]["e"])
         self.assertEqual(debugger.command("continue")["state"], "done")
 
+    def test_live_stack_keeps_current_source_values_after_many_prior_runs(self):
+        # A real persistent kernel accumulates globals across dozens of
+        # executions. Source-local values must not disappear behind the
+        # first 16 unrelated insertion-order entries in the module frame.
+        namespace = {"__name__": "__main__"}
+        namespace.update({f"earlier_value_{i}": i for i in range(80)})
+        debugger = DebugSession()
+        result = debugger.start(
+            json.dumps({"source": "debug_value = 40\ndebug_value += 2\nprint(debug_value)\n",
+                        "breakpoints": [2]}),
+            namespace, Writer())
+        self.assertEqual(result["state"], "paused")
+        self.assertEqual(result["stack"][0]["line"], 2)
+        self.assertEqual(result["stack"][0]["locals"]["debug_value"]["value"], "40")
+        self.assertLessEqual(len(result["stack"][0]["locals"]), 16)
+        self.assertEqual(debugger.command("continue")["state"], "done")
+        self.assertEqual(namespace["debug_value"], 42)
+
     def test_encode_bounded(self):
         ok, payload = encode({"state": "done", "ok": True, "stack": [],
                               "output": "x" * 140000, "message": ""})

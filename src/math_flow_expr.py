@@ -175,7 +175,7 @@ class _Parser:
                 arg = self.expression(0, depth + 1)
                 if self.take() != ")":
                     raise ExpressionError("Expected closing parenthesis")
-            if first in ("sin", "cos", "asin", "acos", "atan", "exp", "log", "ln", "log10", "log1p", "tanh") and arg.dimension != DIMENSIONLESS:
+            if first in ("sin", "cos", "asin", "acos", "atan", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "ln", "log10", "log1p", "tanh") and arg.dimension != DIMENSIONLESS:
                 raise ExpressionError(f"{first} requires a dimensionless argument")
             if first in ("sqrt", "√") and any(x % 2 for x in arg.dimension):
                 raise ExpressionError("sqrt requires even physical dimension exponents")

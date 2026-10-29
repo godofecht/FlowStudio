@@ -1,3 +1,29 @@
+## 2026-10-29: native Flow compiler diagnostics in primary Monaco workspace (PR validation pending)
+
+The primary FlowStudio editor now exposes **Check Flow** in the topbar and Run
+menu. It submits the current **Flow** buffer to the existing, strict
+`/api/check/flow` route through `FlowStudioNativeFlow.checkSyntax`, which
+invokes the real upstream Flow 2.0 compiler without running submitted source.
+The compiler output appears in a bounded diagnostics panel. When the native
+compiler reports a source line/column, Monaco decorates that exact position
+and reveals it; unsupported or out-of-range locations are not fabricated.
+Results are tied to the original document identity, model, version and
+language. Edits (including undo), tab changes and language switches clear
+diagnostics and reject delayed responses. No native execution route, compiler
+grammar, hosted CI definition or checked-in Monaco bundle was changed.
+
+**Status: partial / eight focused Node tests passed locally on Node 22.16.0;
+independent CI and physical Chromium acceptance pending.** Unit tests use a
+controlled native-client response to validate Monaco UI state and stale-result
+rejection; they do **not** establish successful flowc compilation. The
+repository's existing real native Flow HTTP smoke tests check compiler success,
+syntax failure and nonexecution. The extended Chromium acceptance now checks
+a real, valid Flow 2.0 source through the native route when run on a host with
+Flow installed. The current compiler adapter extracts only its first
+recognizable location; this is not continuous background checking, an LSP,
+a complete problems panel or live Flow debugging. Full RStudio parity remains
+unimplemented.
+
 ## 2026-10-29: authenticated SSH loopback remote access (local tests only)
 
 FlowStudio now has a real OpenSSH local-forwarding client in

@@ -21,7 +21,7 @@ UNITS: dict[str, Dimension] = {
 SUPERSCRIPT = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁻−", "0123456789--")
 _NUMBER = r"(?:10[⁻−-][⁰¹²³⁴⁵⁶⁷⁸⁹0-9]+|(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)"
 _UNIT = r"(?:kg|Pa|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)?(?:/(?:kg|Pa|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*))?"
-_TOKEN = re.compile(rf"(?P<space>\s+)|(?P<quantity>{_NUMBER}(?:{_UNIT})?)|(?P<name>∂ₓ²|∂ᵧ²|∂ₓ|∂ᵧ|∇²|[A-Za-z_][A-Za-z_0-9]*|π)|(?P<postfix>[²³⁴⁵⁶⁷⁸])|(?P<op>[+\-−*/×·÷√∛(),^|])")
+_TOKEN = re.compile(rf"(?P<space>\s+)|(?P<quantity>{_NUMBER}(?:{_UNIT})?)|(?P<name>∂ₓ²|∂ᵧ²|∂ₓ|∂ᵧ|∇²|[A-Za-z_][A-Za-z_0-9]*|π)|(?P<postfix>[²³⁴⁵⁶⁷⁸])|(?P<op>[+\-−*/×·÷√∛(),^|<>≤≥])")
 _UNIT_PART = re.compile(r"(kg|Pa|m|s|K)([²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)\Z")
 
 
@@ -124,6 +124,24 @@ class _Parser:
             if self.take() != "|":
                 raise ExpressionError("Expected closing absolute-value bar")
             left = Expression("abs", (inner,), dimension=inner.dimension)
+        elif first == "where":
+            if self.take() != "(":
+                raise ExpressionError("Expected '(' after where")
+            predicate = self.expression(0, depth + 1)
+            if predicate.operator not in ("lt", "le", "gt", "ge"):
+                raise ExpressionError("where requires a typed comparison predicate")
+            if self.take() != ",":
+                raise ExpressionError("where requires a predicate and two branches")
+            when_true = self.expression(0, depth + 1)
+            if self.take() != ",":
+                raise ExpressionError("where requires exactly three arguments")
+            when_false = self.expression(0, depth + 1)
+            if self.take() != ")":
+                raise ExpressionError("where requires exactly three arguments")
+            if when_true.dimension != when_false.dimension:
+                raise ExpressionError("where branches require matching physical dimensions")
+            left = Expression("where", (predicate, when_true, when_false),
+                              dimension=when_true.dimension)
         elif first in ("min", "max"):
             if self.take() != "(":
                 raise ExpressionError(f"Expected '(' after {first}")
@@ -181,13 +199,15 @@ class _Parser:
             nxt = self.peek()
             if stop_at_bar and nxt == "|":
                 break
-            if nxt in ("^", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸"):
+            if nxt in ("<", "≤", ">", "≥"):
+                operator, precedence = {"<": "lt", "≤": "le", ">": "gt", "≥": "ge"}[nxt], 5
+            elif nxt in ("^", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸"):
                 operator, precedence = "pow", 40
             elif nxt in ("+", "-", "−"):
                 operator, precedence = ("add" if nxt == "+" else "sub"), 10
             elif nxt in ("*", "×", "·", "/", "÷"):
                 operator, precedence = ("div" if nxt in ("/", "÷") else "mul"), 20
-            elif nxt in ("(", "|", "π", "pi", "x", "y", "sin", "cos", "exp", "sqrt", "cbrt", "√", "∛", "tanh", "abs", "min", "max", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∇²") or nxt in self.symbols or re.fullmatch(rf"{_NUMBER}(?:{_UNIT})?", nxt):
+            elif nxt in ("(", "|", "π", "pi", "x", "y", "sin", "cos", "exp", "sqrt", "cbrt", "√", "∛", "tanh", "abs", "min", "max", "where", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∇²") or nxt in self.symbols or re.fullmatch(rf"{_NUMBER}(?:{_UNIT})?", nxt):
                 operator, precedence = "mul", 20
             else:
                 break
@@ -212,7 +232,13 @@ class _Parser:
             if nxt in ("+", "-", "−", "*", "×", "·", "/", "÷"):
                 self.take()
             right = self.expression(precedence + 1, depth + 1, stop_at_bar=stop_at_bar)
-            if operator in ("add", "sub"):
+            if operator in ("lt", "le", "gt", "ge"):
+                if left.operator in ("lt", "le", "gt", "ge") or right.operator in ("lt", "le", "gt", "ge"):
+                    raise ExpressionError("Chained comparisons are not supported")
+                if left.dimension != right.dimension:
+                    raise ExpressionError("Comparison requires matching physical dimensions")
+                dim = DIMENSIONLESS
+            elif operator in ("add", "sub"):
                 if left.dimension != right.dimension:
                     raise ExpressionError(f"Cannot {operator} dimensions {left.dimension} and {right.dimension}")
                 dim = left.dimension
@@ -228,7 +254,7 @@ def parse_expression(source: str, *, symbols: dict[str, Dimension] | None = None
     if symbols:
         for name, dimension in symbols.items():
             if (not re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", name)
-                    or name in ("x", "y", "pi", "sin", "cos", "exp", "sqrt", "cbrt", "tanh", "abs", "min", "max")
+                    or name in ("x", "y", "pi", "sin", "cos", "exp", "sqrt", "cbrt", "tanh", "abs", "min", "max", "where")
                     or len(dimension) != 4 or any(type(power) is not int for power in dimension)):
                 raise ExpressionError(f"Invalid typed symbol {name!r}")
     parser = _Parser(tokenize(source), symbols)
@@ -434,6 +460,11 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
                 raise ExpressionError(f"Missing numerical value for {node.value!r}")
             return values[node.value]
         args = tuple(visit(arg) for arg in node.operands)
+        if node.operator in ("lt", "le", "gt", "ge"):
+            return {"lt": np.less, "le": np.less_equal,
+                    "gt": np.greater, "ge": np.greater_equal}[node.operator](args[0], args[1])
+        if node.operator == "where":
+            return np.where(args[0], args[1], args[2])
         if node.operator == "add": return args[0] + args[1]
         if node.operator == "sub": return args[0] - args[1]
         if node.operator == "mul": return args[0] * args[1]

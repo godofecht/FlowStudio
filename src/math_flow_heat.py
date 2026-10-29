@@ -187,7 +187,9 @@ def parse_heat(source: str, base) -> HeatModel:
     # Infer optional operator families independently; require complete declarations.
     # This permits one equation AST to compose advection and reaction while
     # rejecting partial, misspelled, or undeclared physical constants.
-    reaction = bool({"reactionRate", "ambientTemperature"} & consts.keys())
+    reaction = "reactionRate" in consts
+    if "ambientTemperature" in consts and not reaction:
+        raise error("ambientTemperature requires reactionRate")
     advection = bool({"advectionVelocityX", "advectionVelocityY"} & consts.keys())
     anisotropic = bool({"diffusivityX", "diffusivityY"} & consts.keys())
     cross_diffusion = "crossDiffusivity" in consts
@@ -202,7 +204,9 @@ def parse_heat(source: str, base) -> HeatModel:
     if cross_diffusion:
         required.add("crossDiffusivity")
     if reaction:
-        required.update({"reactionRate", "ambientTemperature"})
+        required.add("reactionRate")
+        if "ambientTemperature" in consts:
+            required.add("ambientTemperature")
     if advection:
         required.update({"advectionVelocityX", "advectionVelocityY"})
     base.expect_keys(consts, required, "heat constants")
@@ -217,7 +221,8 @@ def parse_heat(source: str, base) -> HeatModel:
     if cross_diffusion and abs(cross_diffusivity) >= 2 * math.sqrt(diffusivity * diffusivity_y):
         raise error("Cross diffusion tensor must be strictly positive definite")
     reaction_rate = base.number(consts["reactionRate"], ["s", "⁻", "¹"]) if reaction else 0.0
-    ambient_temperature = base.number(consts["ambientTemperature"], ["K"]) if reaction else 0.0
+    ambient_temperature = (base.number(consts["ambientTemperature"], ["K"])
+                           if "ambientTemperature" in consts else 0.0)
     if reaction and reaction_rate <= 0:
         raise error("Reaction rate must be positive")
     velocity_x = base.number(consts["advectionVelocityX"], ["m", "/", "s"]) if advection else 0.0
@@ -228,6 +233,11 @@ def parse_heat(source: str, base) -> HeatModel:
                                          cross_diffusion=cross_diffusion)
     except ExpressionError as exc:
         raise error(f"Unsupported heat dynamics: {exc}") from exc
+    if equation.reaction_kind == "meanDeviation":
+        if "ambientTemperature" in consts:
+            raise error("Mean-conserving mixing does not use ambientTemperature")
+    elif reaction and "ambientTemperature" not in consts:
+        raise error("Thermal relaxation requires ambientTemperature")
     if equation.nonlinear and ambient_temperature <= 0:
         raise error("Polynomial thermal relaxation requires positive ambientTemperature")
     initial = base.assignments(sections["initial"])

@@ -110,6 +110,19 @@ def _mean_field_relaxation(expr: Expression) -> bool:
             and _name(ambient, "ambientTemperature"))
 
 
+def _mean_deviation_relaxation(expr: Expression) -> bool:
+    """Rate times the live departure from its spatial mean (mean-conserving)."""
+    if expr.operator != "mul" or len(expr.operands) != 2:
+        return False
+    a, b = expr.operands
+    response = b if _name(a, "reactionRate") else a if _name(b, "reactionRate") else None
+    if response is None or response.operator != "sub" or len(response.operands) != 2:
+        return False
+    field, mean = response.operands
+    return (_name(field, "temperature") and mean.operator == "mean"
+            and len(mean.operands) == 1 and _name(mean.operands[0], "temperature"))
+
+
 def _quadratic_relaxation(expr: Expression) -> bool:
     """Match reactionRate * (temperature - ambient)^2 / ambient, using explicit products.
 
@@ -291,11 +304,13 @@ def compile_heat_equation(tokens: list[str], *, reaction: bool = False,
         elif reaction and sign == -1 and relaxation is None and (
                 _relaxation(term) or _quadratic_relaxation(term)
                 or _polynomial_relaxation(term) is not None
-                or _saturating_relaxation(term) or _mean_field_relaxation(term)):
+                or _saturating_relaxation(term) or _mean_field_relaxation(term)
+                or _mean_deviation_relaxation(term)):
             relaxation = term
             reaction_power = (2 if _quadratic_relaxation(term)
                               else _polynomial_relaxation(term) or 1)
-            reaction_kind = ("meanField" if _mean_field_relaxation(term) else
+            reaction_kind = ("meanDeviation" if _mean_deviation_relaxation(term) else
+                             "meanField" if _mean_field_relaxation(term) else
                              "saturating" if _saturating_relaxation(term) else
                              "polynomial" if reaction_power > 1 else "linear")
             nonlinear = reaction_kind in ("saturating", "polynomial")
@@ -330,6 +345,7 @@ SEMANTIC_ROLES = {
     "advection": "Transport by the declared constant velocity.",
     "reaction": "Local relaxation toward the declared ambient temperature.",
     "meanField": "Nonlocal feedback on the live spatial mean of temperature.",
+    "meanDeviation": "Mean-conserving relaxation of spatial fluctuations at each RK2 stage.",
     "forcing": "Prescribed source independent of the evolving temperature field.",
 }
 
@@ -353,6 +369,8 @@ def semantic_heat_terms(equation: Equation):
             role = "advection"
         elif _mean_field_relaxation(expression):
             role = "meanField"
+        elif _mean_deviation_relaxation(expression):
+            role = "meanDeviation"
         elif (_relaxation(expression) or _quadratic_relaxation(expression)
               or _polynomial_relaxation(expression) is not None
               or _saturating_relaxation(expression)):

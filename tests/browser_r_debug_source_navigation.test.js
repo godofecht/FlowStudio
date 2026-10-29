@@ -53,7 +53,7 @@ test("R debugger navigates actual paused and failed top-level lines, not evaluat
     async debugRCommand(action) {
       if (action === "step") return result("paused", {next_line:3});
       if (action === "continue") return result("error");
-      if (action === "evaluate") return result("error", {output:"[1] 42"});
+      if (action === "evaluate") return result("error", {ok:true, output:"[1] 42"});
       return result("idle", {total:0});
     }
   };

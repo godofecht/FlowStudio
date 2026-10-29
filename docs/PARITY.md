@@ -20,8 +20,13 @@ and checks numerical output rather than only HTTP status. No fake kernel
 or hosted CI workflow changes are introduced.
 
 **Status: all six Linux/macOS CI jobs passed in
-[CI #40957545970](https://github.com/godofecht/FlowStudio/actions/runs/40957545970);
-tested for this bounded example / partial overall.** The local 24x24 four-mode case produced maximum
+[CI #40957545970](https://github.com/godofecht/FlowStudio/actions/runs/40957545970)
+and again after rebasing onto native tensor-grid PR #211 in
+[CI #40958502290](https://github.com/godofecht/FlowStudio/actions/runs/40958502290);
+tested for this bounded example / partial overall.**
+[PR #210](https://github.com/godofecht/FlowStudio/pull/210) merged as
+[0647667](https://github.com/godofecht/FlowStudio/commit/0647667ce3838e79e19d124cbbd5c1d3e015d3e4).
+Post-merge main CI remains independently unverified. The local 24x24 four-mode case produced maximum
 cellwise error 6.40e-14, temporal errors 2.8492e-4 / 7.0076e-5 /
 1.7377e-5 and conserved mean 50.0. The exact HTTP composition was
 syntax-checked and executed locally using that same solver copy.

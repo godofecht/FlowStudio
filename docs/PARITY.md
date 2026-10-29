@@ -1,4 +1,4 @@
-## 2026-10-29: navigable source-owned Flow compiler problems (PR verification pending)
+## 2026-10-29: navigable source-owned Flow compiler problems (six CI jobs passed)
 
 The primary Monaco editor now renders each valid location reported by the
 **actual Flow 2.0 strict compiler** as an individual, keyboard-accessible
@@ -15,14 +15,21 @@ navigation. Compiler responses arriving after invalidation cannot repopulate
 it. Invalid/out-of-range locations are excluded, and the existing 64-record
 diagnostic cap is respected. No new compiler errors are inferred.
 
-**Status: partial / eight new focused tests passed in an isolated V8 harness
-against the exact committed branch source.** The full Node test suite,
-native Flow compiler execution, Chromium acceptance and Linux/macOS CI have
-not yet been independently verified for this change. No hosted CI
-configuration, Flow grammar, native backend or interpreter was modified.
-This is not a complete language server or RStudio parity. Function-level R
-stepping, live Flow debugging, and multi-user remote isolation remain
-unimplemented.
+**Status: partial / independently verified in all six Linux/macOS jobs
+in [CI #40868376425](https://github.com/godofecht/FlowStudio/actions/runs/40868376425).**
+Each source/transport platform passed 1,115 of 1,127 Node tests
+(12 skipped, zero failures) and 274 Python tests (13 skipped, zero failures).
+Both native Flow 2.0 builds and real HTTP acceptance jobs passed, as did
+both FlowJIT jobs. Eight new focused tests also passed against the exact
+committed source in an isolated V8 harness before CI. The existing native
+Chromium acceptance passed on Ubuntu, but a new physical-browser interaction
+specifically clicking the problem list was **not** independently executed.
+[PR #188](https://github.com/godofecht/FlowStudio/pull/188) merged as
+[5d1c53c](https://github.com/godofecht/FlowStudio/commit/5d1c53cc6750a50b39b6e0e898b7f7cd092e3447).
+No hosted CI configuration, Flow grammar, native backend or interpreter
+was modified. This is not a complete language server or RStudio parity.
+Function-level R stepping, live Flow debugging and multi-user remote
+isolation remain unimplemented.
 
 ## 2026-10-29: source-owned multi-location Flow compiler diagnostics (six CI jobs passed)
 

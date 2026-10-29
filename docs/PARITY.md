@@ -1,3 +1,30 @@
+## 2026-10-29: source-linked native R top-level expression debugging (verification pending)
+
+The existing Flow-owned persistent Rscript expression debugger now moves the
+browser source editor caret to the actual `next_line` returned on a paused
+top-level expression, or to the actual `failed_line` returned on an R error.
+This uses the existing real R debugger HTTP response; it does not simulate
+R execution, implement function-level stepping or claim an R source map.
+Evaluation in the retained postmortem environment does not reposition the
+caret. Completion and stop do not reposition the caret either.
+
+Navigation is tied to the exact source text, an editor-input revision,
+document-replacement identity and interpreter-session generation captured
+when debugging starts. Editing source, switching files, importing a notebook,
+reloading/renaming a project file, resetting the selected session or switching
+R engines invalidates navigation. An asynchronous response from an earlier
+document can still be inspected as text but cannot move the current editor.
+The editor uses the returned 1-based source line only when that line exists.
+
+**Status: partial / five focused V8 tests passed against the committed
+browser module and new Node regression file; full Node, native Flow/Rscript
+and physical Chromium acceptance are pending.** This update modifies only
+the browser debugger panel, browser workspace wiring, regression tests and
+this evidence document. The native Flow server, R interpreter implementation,
+upstream Flow compiler and hosted CI definitions are unchanged. RStudio
+parity, R function-level stepping and authenticated remote sessions remain
+incomplete.
+
 ## 2026-10-29: source-linked native Python stack-frame selection (six independent CI jobs passed)
 
 The existing Flow-owned native CPython debugger now presents the real paused

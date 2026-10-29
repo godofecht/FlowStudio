@@ -152,7 +152,7 @@ try {
   // This must never execute the submitted source or use a browser-only parser.
   await page.evaluate(() => {
     const source = document.getElementById('source');
-    source.value = 'function main() -> i32 {\\n    return 0\\n}\\n';
+    source.value = 'function main() -> i32 {\n    return 0\n}\n';
     source.dispatchEvent(new Event('input', { bubbles: true }));
   });
   await page.locator('#checkFlow').click();

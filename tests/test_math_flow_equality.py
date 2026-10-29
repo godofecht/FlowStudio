@@ -56,6 +56,8 @@ class EqualityPredicateTest(unittest.TestCase):
             with self.subTest(source=source):
                 with self.assertRaises(ExpressionError):
                     parse_expression(source)
+        with self.assertRaises(FlowMathError):
+            parse(SOURCE.replace("2K/s, 0K/s)", "2K/s, 0K/s) = 2K/s"))
         for replacement in ("x == 1s", "x ≠ 1s", "x != 1s"):
             with self.subTest(replacement=replacement):
                 with self.assertRaises(FlowMathError):

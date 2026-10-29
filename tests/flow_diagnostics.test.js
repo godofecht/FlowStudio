@@ -106,3 +106,15 @@ test("invalid response is rejected without inventing compiler markers",async()=>
   assert.match(f.output.textContent,/Invalid native Flow compiler response/);
   assert.deepEqual(f.markers.at(-1),[]);
 });
+
+test("multiple real compiler locations decorate distinct Monaco lines in compiler order", async () => {
+  const f = fixture(async () => ({ok:false, output:"two errors", diagnostics:[
+    {line:2,column:3,message:"parse error: unexpected token"},
+    {line:1,column:10,message:"type error: invalid declaration"}
+  ]}));
+  assert.equal(await f.controller.check(), false);
+  assert.equal(f.markers.at(-1).length, 2);
+  assert.deepEqual(f.markers.at(-1).map(item => item.range.startLineNumber), [2,1]);
+  assert.equal(f.markers.at(-1)[0].options.hoverMessage.value, "parse error: unexpected token");
+  assert.equal(f.editor.position.lineNumber, 2);
+});

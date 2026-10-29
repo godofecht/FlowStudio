@@ -1,3 +1,35 @@
+## Native three-species conservative cyclic network (CI verification pending)
+
+`examples/native_cyclic_network.flow` is a standalone Flow 2.0 program, with
+no Python/NumPy dependency, implementing explicit midpoint RK2 integration
+of the three-state transport system
+`x' = k(z-x), y' = k(x-y), z' = k(y-z)`.
+Its independently calculated eigenmode oracle at `k=0.8`, `t=2`,
+`(x,y,z)(0)=(1,0,0)` is
+`(0.34446742325344565, 0.37924709108242444, 0.27628548566412986)`.
+The program exits nonzero for numerical errors, failed second-order
+refinement, mass nonconservation, negative populations, semigroup mismatch,
+nondeterministic replay, rate/time rescaling mismatch, or incorrect acceptance
+of invalid parameters and excessive step counts. This is a checked-in
+executable model, not a renderer or a mocked result.
+
+`tests/http_smoke.py` submits the **same source** to the real Flow compiler
+check and Flow-owned `/api/run/flow` endpoint, which returns HTTP 422 if
+the compiled program exits unsuccessfully. The existing native Linux/macOS
+CI invokes that HTTP acceptance through `scripts/verify_native.py`.
+A local independent Python implementation of the midpoint scheme confirmed
+the reference and refinement thresholds, but the native Flow compiler
+cannot be run in this authoring environment. **Native compiler, HTTP and
+cross-platform CI results are pending and must not be counted as passed.**
+
+```sh
+flow run examples/native_cyclic_network.flow
+python3 scripts/verify_native.py --require-r
+```
+
+This is a deliberately bounded 3-state ODE example. It does not establish
+general equation parsing, a native PDE backend or RStudio parity.
+
 # Executable mathematical Flow subsets (experimental)
 
 ## Native Flow numerical runtime migration (PR #201, merged)

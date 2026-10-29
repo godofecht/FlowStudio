@@ -184,6 +184,7 @@ test("R failed-frame evaluation cannot target a different document", async () =>
         ok:false, failed_line:2, frames:[{id:1, call:"broken()", locals:["x"]}]
       });
       if (action === "stop") return result("idle", {total:0, frames:[]});
+      if (action === "status") return result("error", {ok:true, failed_line:2});
       return result("error", {failed_line:2});
     }
   };

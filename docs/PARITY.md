@@ -10,13 +10,16 @@ validates the SSH destination, checks the actual FlowStudio /health endpoint
 and tears down the SSH process on failure or interrupt. See
 [`docs/REMOTE_SESSIONS.md`](REMOTE_SESSIONS.md) for setup and limitations.
 
-**Status: partial / 9 local Python unit tests passed on Python 3.13.5.**
-These test the exact proposed helper, argv policy, injection rejection, SSH
-port and identity validation, local collision, real local HTTP health,
-failure reporting and child cleanup. Python compilation passed. The local
+**Status: partial / all six independent Linux/macOS CI jobs passed
+in [CI #40845329979](https://github.com/godofecht/FlowStudio/actions/runs/40845329979).**
+The nine focused Python tests passed locally on Python 3.13.5, covering
+the exact proposed helper, argv policy, injection rejection, SSH port and
+identity validation, local collision, real local HTTP health, failure
+reporting and child cleanup. Python compilation passed. The cross-platform
+CI source/transport suites, native Flow 2.0.0 builds with real HTTP acceptance,
+Ubuntu Chromium acceptance and FlowJIT jobs all succeeded. The local
 container has no SSH client, Rscript or Flow compiler, so **actual SSH
-authentication, remote two-host execution, native Flow builds, and physical
-browser acceptance were not run**. Independent Linux/macOS CI is pending.
+authentication and remote two-host browser execution remain unverified**.
 No hosted CI definition, Flow 2.0 compiler, native HTTP binding or kernel
 was changed. SSH authenticates the transport, **not FlowStudio HTTP requests**;
 the native server remains single-user and not safe for shared OS accounts.

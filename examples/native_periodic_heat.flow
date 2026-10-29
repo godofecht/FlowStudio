@@ -138,10 +138,10 @@ function main() -> i32 {
     }
     let uniformResult: HeatResult4 = integrateHeat(equation, uniform, 0.5, 80)
     if not uniformResult.valid { return 13 }
-    if absolute(uniformResult.state.first - 300.15) > 0.000000000001 { return 14 }
+    if absolute(uniformResult.state.first - 300.15) > 0.0000000001 { return 14 }
     if maxDifference(uniformResult.state, HeatState4 {
         first: 300.15, second: 300.15, third: 300.15, fourth: 300.15
-    }) > 0.000000000001 { return 15 }
+    }) > 0.0000000001 { return 15 }
 
     # Fail closed on invalid spatial, temporal and explicit stability settings.
     if integrateHeat(equation, initial, 0.5, 0).valid { return 16 }

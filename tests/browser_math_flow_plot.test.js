@@ -101,6 +101,13 @@ test("real semantic RK2 trace is bounded and checked before rendering", () => {
       updatedMean: 300.99805, maximumCorrectorDifference: 0.00005}
   };
   assert.equal(plots.prepareSemanticTrace({...heat, semantic_trace: trace}), trace);
+  const meanField = {...trace, stages: trace.stages.map(stage => ({
+    ...stage, terms: [...stage.terms, {...term, role: "meanField", sign: -1,
+      meaning: "Nonlocal feedback on the live spatial mean of temperature.",
+      symbols: ["reactionRate", "temperature", "ambientTemperature"],
+      mean: -10, minimum: -10, maximum: -10}]
+  }))};
+  assert.equal(plots.prepareSemanticTrace({...heat, semantic_trace: meanField}), meanField);
   assert.equal(plots.prepareSemanticTrace(heat), null);
   for (const bad of [
     {...trace, timeStep: 0},

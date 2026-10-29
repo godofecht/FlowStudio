@@ -207,6 +207,26 @@ def main() -> None:
     assert status == 422 and body.strip(), (
         "native evolution heat2d malformed-equation rejection", status, body)
 
+    # Real upstream Flow 2.0 compiler-generated RK4 on a 3x3 periodic grid.
+    # Distinct left/right and up/down neighbors; nine coupled states, exact
+    # semidiscrete Fourier oracle, convergence, conservation and transposition.
+    heat3x3_source = (Path(__file__).resolve().parents[1] /
+                     "examples/native_evolution_heat3x3.flow").read_text(encoding="utf-8")
+    status, body = request("POST", "/api/check/flow", heat3x3_source, accepted_headers)
+    assert status == 200, ("native evolution heat3x3 compile", status, body)
+    status, body = request("POST", "/api/run/flow", heat3x3_source, accepted_headers)
+    assert status == 200 and "native-evolution-heat3x3-ok" in body, (
+        "native evolution heat3x3 analytic RK4 execution", status, body)
+    invalid_heat3x3 = heat3x3_source.replace(
+        "southeast evolves as diffusivity_x *",
+        "southeast evolves as (diffusivity_x *",
+        1,
+    )
+    assert invalid_heat3x3 != heat3x3_source
+    status, body = request("POST", "/api/check/flow", invalid_heat3x3, accepted_headers)
+    assert status == 422 and body.strip(), (
+        "native evolution heat3x3 malformed-source rejection", status, body)
+
     # Eight coupled states, two anisotropic diffusion tensors and a nonzero
     # species-exchange rate: the upstream Flow compiler generates the RK4
     # integrator. Flow main() verifies all eight exact Walsh/matrix-exponential

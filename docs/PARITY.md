@@ -13,13 +13,20 @@ document, caret, language or project change while the asynchronous search
 is running also blocks navigation. No code is executed and no new server
 routes, hosted CI definitions or upstream Flow grammar changes are involved.
 
-**Status: partial / verification pending.** Ten focused Node tests were
-added for real recursive project search, Flow/R/Python declarations, ambiguous
-definitions, comments/strings, open-buffer precedence, incomplete searches,
-changed files, invalid UTF-8, invalid input and browser wiring. This is
-lexical navigation, **not semantic import resolution**, language-server
-navigation or full RStudio parity. Real physical-browser acceptance and
-cross-platform CI must pass before this can be marked tested.
+**Status: partial / all six independent Linux/macOS CI jobs passed in
+[CI #40894935553](https://github.com/godofecht/FlowStudio/actions/runs/40894935553).**
+Each source/transport platform passed 1,137 Node tests (12 skipped, zero
+failures) and 290 Python tests (13 skipped, zero failures). Ten focused
+Node regressions cover real recursive project search, Flow/R/Python
+declarations, ambiguity, comments/strings, open-buffer precedence,
+incomplete searches, changed files, invalid UTF-8, invalid input and
+browser wiring. Both native Flow 2.0 builds and HTTP acceptance suites
+passed, as did both FlowJIT jobs. The new project F12 interaction was
+verified in Node tests, **not** a separate physical-browser folder-picker
+acceptance. This is lexical navigation, **not semantic import resolution**,
+a language server, function-level R stepping, live Flow debugging,
+remote multi-user isolation or full RStudio parity. No hosted CI
+configuration changed. [PR #195](https://github.com/godofecht/FlowStudio/pull/195).
 
 ## 2026-10-29: serialized native Flow compiler checks (CI pending)
 

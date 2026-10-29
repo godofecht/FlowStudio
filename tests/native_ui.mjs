@@ -358,10 +358,28 @@ try {
 
       // Real downloaded .fsnb must restore display snapshots without executing
       // any Flow or R code or pretending to restore interpreter state.
-      const [download] = await Promise.all([
-        notebookPage.waitForEvent('download', {timeout:30000}),
-        notebookPage.locator('#saveFlowNotebook').click()
-      ]);
+      // Diagnose a failed export at its actual boundary instead of timing out
+      // on an absent browser download event with no application context.
+      const exportPreflight = await notebookPage.evaluate(() => {
+        const source = document.querySelector('#source').value;
+        const language = document.querySelector('#language').value;
+        try {
+          const json = FlowStudioNotebookFormat.encodeBundle(source, language, [],
+            FlowStudioSourceCells.parseCells);
+          return {ok:true, bytes:new Blob([json]).size};
+        } catch (error) {
+          return {ok:false, error:String(error?.message || error)};
+        }
+      });
+      assert.equal(exportPreflight.ok, true, JSON.stringify(exportPreflight));
+      const downloadPromise = notebookPage.waitForEvent('download', {timeout:8000})
+        .catch(async error => {
+          const notice = await notebookPage.locator('#notice').innerText();
+          throw new Error('FlowStudio .fsnb download missing; UI notice: ' + notice +
+            '; preflight: ' + JSON.stringify(exportPreflight), {cause:error});
+        });
+      await notebookPage.locator('#saveFlowNotebook').click();
+      const download = await downloadPromise;
       const bundle = JSON.parse(readFileSync(await download.path(), 'utf8'));
       assert.equal(bundle.source, source);
       assert.equal(bundle.language, 'flow');

@@ -169,7 +169,7 @@ try {
   // navigate to it. This is not a fabricated browser-side parse diagnostic.
   await page.evaluate(() => {
     const source = document.getElementById('source');
-    source.value = 'function main() -> i32 {\\n    return ???\\n}\\n';
+    source.value = 'function main() -> i32 {\n    return ???\n}\n';
     source.dispatchEvent(new Event('input', { bubbles: true }));
   });
   await page.locator('#checkFlow').click();

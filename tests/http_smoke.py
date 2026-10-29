@@ -675,7 +675,7 @@ def main() -> None:
 
     # Real one-shot run-to-line through Flow HTTP and the persistent CPython
     # trace worker; the target is not retained after an intervening breakpoint.
-    go_source = "go_a = 1\\ngo_b = go_a + 1\\ngo_c = go_b + 1\\nprint(go_c)\\n"
+    go_source = "go_a = 1\ngo_b = go_a + 1\ngo_c = go_b + 1\nprint(go_c)\n"
     status, payload = request("POST", "/api/debug/python/start",
                               json.dumps({"source": go_source, "breakpoints": [2]}),
                               accepted_headers)

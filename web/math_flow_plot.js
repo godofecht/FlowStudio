@@ -166,9 +166,14 @@
             !finite(stage.maximumDecompositionResidual) || stage.maximumDecompositionResidual < 0 ||
             !Array.isArray(stage.terms) || stage.terms.length !== 2)
           throw new TypeError("Invalid Navier-Stokes RK2 stage.");
-        for (const [termIndex, term] of stage.terms.entries()) {
-          if (!term || term.role !== (termIndex ? "diffusion" : "advection") ||
-              term.sign !== 1 || typeof term.meaning !== "string" ||
+        const roles = stage.terms.map(term => term?.role);
+        if (new Set(roles).size !== 2 || !roles.includes("advection") ||
+            !roles.includes("diffusion") ||
+            (index && roles.some((role, i) => role !== trace.stages[0].terms[i].role)))
+          throw new TypeError("Invalid Navier-Stokes source-ordered terms.");
+        for (const term of stage.terms) {
+          if (!term || term.sign !== (term.role === "advection" ? -1 : 1) ||
+              typeof term.meaning !== "string" ||
               term.meaning.length < 1 || term.meaning.length > 256 ||
               !Array.isArray(term.symbols) || term.symbols.length > 8 ||
               !term.symbols.every(symbol => typeof symbol === "string" &&

@@ -1,5 +1,36 @@
 # Executable mathematical Flow subsets (experimental)
 
+## Native Flow numerical runtime migration (PR #201, pending CI)
+
+The migration away from the separate Python/NumPy mathematical dialect has
+started with `src/math_native.flow`, a reusable **Flow 2.0** numerical
+library. It currently implements typed scalar linear/nonautonomous ODE
+derivatives and two-state linear coupled ODE derivatives with explicit midpoint
+Runge–Kutta time stepping. Invalid step counts return a result with
+`valid: false` rather than silently claiming a successful integration.
+
+`src/math_native_smoke.flow` exercises an exact quadratic solution,
+second-order convergence of exponential decay, and a coupled oscillator
+against sine/cosine reference values and an energy invariant. The standalone
+`examples/native_math_bootstrap.flow` provides a real native Flow program
+for the existing `/api/check/flow` and `/api/run/flow` workbench routes.
+Both programs use the actual Flow compiler/runtime, not Python. Native
+Linux/macOS CI and live HTTP acceptance have been added, but verification
+must be established by passing CI before this PR is merged.
+
+```sh
+flow run src/math_native_smoke.flow
+flow run examples/native_math_bootstrap.flow
+```
+
+**Not implemented by this migration:** self-hosted equation parsing,
+dimensional inference, general Unicode lowering, PDE discretization, solver
+selection, boundary conditions, or migration of the existing Navier–Stokes
+and heat examples. Those continue using the bounded Python dialect until
+there is a tested native replacement. Do not mistake the new numerical
+library for completion of mathematical Flow or Flow 2.0 grammar integration.
+
+
 ## Typed 2D spatial area integrals (executable)
 
 The bounded scalar expression compiler accepts `integral(expression)` and

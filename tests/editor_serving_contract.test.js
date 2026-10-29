@@ -57,3 +57,18 @@ test("native project replacement has an explicit conflict-checked undo", () => {
   assert.match(html, /project\.undoReplace\(\{isBlocked: blocked\}\)/);
   assert.match(html, /entry\.handle\.isSameEntry\(doc\.handle\)/);
 });
+
+test("Flow compile-check is wired to the native strict route and allowlisted Monaco panel", () => {
+  const html = read("web/index.html");
+  const routes = read("src/data_routes.flow");
+  const client = read("docs/app/native_flow.js");
+  const controller = read("web/flow_diagnostics.js");
+  assert.match(html, /id="checkFlow"/);
+  assert.match(html, /id="flowDiagnostics"/);
+  assert.match(html, /checkFlow: \(\) => el\("checkFlow"\)\.click\(\)/);
+  assert.match(html, /<script src="\/flow_diagnostics\.js"><\/script>/);
+  assert.match(routes, /if url == "\/flow_diagnostics\.js"/);
+  assert.match(routes, /path: "web\/flow_diagnostics\.js"/);
+  assert.match(client, /request\("\/api\/check\/flow", code\)/);
+  assert.match(controller, /native\.checkSyntax\(source\)/);
+});

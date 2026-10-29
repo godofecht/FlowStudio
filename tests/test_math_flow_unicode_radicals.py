@@ -42,7 +42,7 @@ class UnicodeRadicalsTest(unittest.TestCase):
                     parse_expression(source)
         with self.assertRaises(ExpressionError):
             evaluate(parse_expression("√(−1)"), 0, 0)
-        with self.assertRaises(ExpressionError):
+        with self.assertRaisesRegex(FlowMathError, "sqrt requires even physical dimension exponents"):
             parse(SOURCE.replace("√(4m²)", "√(4m)"))
 
     def test_real_heat_equation_and_analytic_fourier_response(self):

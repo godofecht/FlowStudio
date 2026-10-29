@@ -79,6 +79,34 @@ try {
     document.getElementById('liveDebugOutput').textContent.includes('Python debugger: done'));
   assert.match(await page.locator('#liveDebugOutput').innerText(), /Output:\n42/);
 
+  // Actual native Chromium/Flow/CPython stack-frame navigation: select a
+  // caller frame, then ensure switching editor documents cannot jump into
+  // unrelated source while the native kernel remains paused.
+  await page.evaluate(() => {
+    const source = document.getElementById('source');
+    source.value = 'def inner():\n    value = 40\n    return value\nanswer = inner()\nprint(answer)\n';
+    source.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.locator('#liveDebugBreakpoints').fill('3');
+  await page.locator('#liveDebugStart').click();
+  await page.waitForFunction(() =>
+    document.getElementById('liveDebugOutput').textContent.includes('Python debugger: paused') &&
+    document.querySelectorAll('#liveDebugFrames button').length === 2);
+  assert.equal(await page.evaluate(() => FlowStudioEditor.editor.getPosition().lineNumber), 3);
+  await page.locator('#liveDebugFrames button').nth(1).click();
+  assert.equal(await page.evaluate(() => FlowStudioEditor.editor.getPosition().lineNumber), 4);
+  assert.equal(await page.locator('#liveDebugFrames button').nth(1).getAttribute('aria-current'), 'true');
+  await page.locator('#newDocumentTab').click();
+  await page.keyboard.insertText('unrelated = 1');
+  const unrelatedLine = await page.evaluate(() => FlowStudioEditor.editor.getPosition().lineNumber);
+  await page.locator('#liveDebugFrames button').first().click();
+  assert.equal(await page.evaluate(() => FlowStudioEditor.editor.getPosition().lineNumber), unrelatedLine);
+  assert.equal(await page.locator('#liveDebugFrames button').first().isDisabled(), true);
+  await page.locator('#liveDebugStop').click();
+  await page.waitForFunction(() =>
+    document.getElementById('liveDebugOutput').textContent.includes('Python debugger: stopped'));
+  assert.equal(await page.locator('#liveDebugFrames button').count(), 0);
+
   await page.locator('#commandLauncher').click();
   await page.locator('#commandQuery').fill('go to symbol');
   await page.keyboard.press('Enter');

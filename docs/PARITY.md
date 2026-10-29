@@ -1,3 +1,39 @@
+## 2026-10-29: source-linked native Python stack-frame selection (six independent CI jobs passed)
+
+The existing Flow-owned native CPython debugger now presents the real paused
+stack as individually selectable frame controls. Selecting a frame reveals
+that frame's actual source line in the primary workspace editor; each new
+pause defaults to the active top frame. The controls use text-only rendering
+and the existing debugger response, without executing a second interpreter
+or inventing stack data. Completing or stopping execution clears the selectable frames; a finish
+command that pauses in a caller instead presents that caller's stack.
+
+Navigation is bound to the exact document ID, source text and Python language
+captured at debugger start. Switching documents or editing the source while
+paused disables navigation, including after an asynchronous debugger response.
+The captured stack remains inspectable as text; it is not silently rebound
+to another editor buffer. Regression tests cover nested stack selection,
+step transitions, completed sessions, changed documents/source/language,
+asynchronous stale responses, unowned status requests and native UI wiring.
+The existing native Chromium acceptance was also extended to run a real
+Flow HTTP → CPython nested-stack pause, click the caller frame, verify Monaco
+caret movement, and reject navigation after switching documents. This
+acceptance **passed on Ubuntu**.
+
+**Status: partial / independently verified in all six Linux/macOS jobs in
+[CI #40803005855](https://github.com/godofecht/FlowStudio/actions/runs/40803005855).**
+Each source platform passed 1,066 of 1,078 Node tests (12 skipped,
+zero failures) and 221 Python tests (13 skipped, zero failures). Both native
+Flow builds compiled and passed real HTTP acceptance; both FlowJIT jobs
+passed. The existing Ubuntu native Chromium suite executed the new actual
+nested-stack frame-selection and stale-document guard successfully. This
+is not a claim of a separate macOS physical-browser run. No hosted CI
+configuration changed. This is an implemented source-navigation
+extension of the existing live Python debugger, not full interactive
+Flow/R debugging, source-map support for imported modules, or authenticated
+remote sessions. No Flow backend/compiler or hosted CI workflow was changed.
+RStudio feature parity remains incomplete.
+
 ## 2026-10-29: live native Python debugger exposed in the Flow-owned workspace (verification pending)
 
 The primary native workspace now exposes the existing **real CPython interactive

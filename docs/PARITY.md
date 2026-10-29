@@ -1,3 +1,23 @@
+## 2026-10-29: serialized native Flow compiler checks (CI pending)
+
+The primary Monaco workspace now enforces **one in-flight native strict Flow
+compiler request per editor** even when an edit invalidates its response.
+A manual Check Flow issued after invalidation waits for the old request to
+finish before checking the latest source; repeated clicks cannot start
+duplicate compilers. A queued request is discarded if its document, language
+or edit revision changes again. Idle checks retain their debounce and
+coalescing behavior, and failed compiler transports release the gate.
+
+**Status: partial / six focused Node 22.16.0 regression tests passed locally.**
+The tests cover nonoverlapping manual checks, source/document invalidation,
+idle coalescing, transport failure recovery and duplicate manual clicks.
+This is an editor-side single-flight guarantee, not cancellation of the
+already-running native compiler process, global server-wide scheduling or a
+continuous language server. The native compiler, HTTP routes and hosted CI
+configuration are unchanged. Cross-platform CI and physical-browser
+acceptance for this change are not yet verified. Complete RStudio parity
+remains unimplemented.
+
 ## 2026-10-29: opt-in idle Flow compiler diagnostics (six CI jobs passed)
 
 The primary Monaco workspace offers an **unchecked by default** "Check on

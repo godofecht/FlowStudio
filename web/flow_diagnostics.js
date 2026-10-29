@@ -18,6 +18,10 @@ function mount({editor, native, app, language, button, output, status, problems 
   // opt-in, debounced, and serialized with all other checks from this editor.
   let timer = null;
   let activeRequests = 0;
+  // Resolves only after the current compiler response has been processed and
+  // its bookkeeping released. A newer manual check waits instead of spawning
+  // a second 60-second compiler after an edit invalidates the first result.
+  let activeDone = null;
   let autoRunning = false;
   let autoQueued = false;
   function cancelAuto() {
@@ -115,7 +119,25 @@ function mount({editor, native, app, language, button, output, status, problems 
     if (!doc || !source.trim()) return false;
     const documentId = doc.id;
     const version = model.getVersionId();
+    if (activeDone) {
+      // A stale compiler process is still running. Keep only this explicit
+      // request; background checks are coalesced by the existing idle queue.
+      if (!navigate) { autoQueued = true; return false; }
+      const queuedGeneration = generation;
+      pending = true;
+      update();
+      await activeDone;
+      if (queuedGeneration !== generation || editor.getModel() !== model ||
+          model.getVersionId() !== version ||
+          app.documents.active()?.id !== documentId || !available()) return false;
+      pending = false;
+      update();
+      return check(true);
+    }
     const token = ++generation;
+    let release;
+    const done = new Promise(resolve => { release = resolve; });
+    activeDone = done;
     decorations.clear();
     clearProblems();
     output.hidden = true;
@@ -163,6 +185,8 @@ function mount({editor, native, app, language, button, output, status, problems 
         autoQueued = false;
         scheduleAuto();
       }
+      if (activeDone === done) activeDone = null;
+      release();
     }
   }
   editor.onDidChangeModelContent(invalidate);

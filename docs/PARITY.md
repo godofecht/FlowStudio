@@ -5,7 +5,9 @@ The persistent Rscript debugger now exposes optional, bounded function
 The native R HTTP response validates these line numbers. The browser presents
 selectable stack-frame controls, uses the selected real retained environment
 for the existing Evaluate command, and reveals a function's definition line
-when source references survive R parsing. A missing source reference is
+when source references survive R parsing **and identify the current parsed
+source**. Functions defined in earlier runs or external files cannot redirect
+the editor using unrelated line numbers. A missing source reference is
 displayed without inventing a location. The source/document revision guard
 also disables stack-frame navigation after edits or document changes, and
 Stop clears the frame list. The existing numeric frame selector remains

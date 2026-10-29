@@ -147,7 +147,7 @@
     }
     return svg;
   }
-  const TRACE_ROLES = Object.freeze(["diffusion", "crossDiffusion", "advection", "reaction", "meanField", "forcing"]);
+  const TRACE_ROLES = Object.freeze(["diffusion", "crossDiffusion", "advection", "reaction", "meanField", "meanDeviation", "forcing"]);
   function prepareSemanticTrace(result) {
     const trace = result?.semantic_trace;
     if (trace === undefined) return null;

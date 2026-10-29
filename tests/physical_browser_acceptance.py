@@ -646,6 +646,47 @@ def test_native_r_expression_debugger(page, timeout: int):
         timeout=timeout)
 
 
+    # A paused R AST is not allowed to continue after an editor revision
+    # changes. Status/Stop still operate on the real retained Rscript kernel.
+    page.locator("#source").fill(
+        "fs_r_stale <- 10L\nfs_r_stale <- fs_r_stale + 1L\ncat(fs_r_stale)")
+    page.locator("#rDebugStart").click()
+    page.wait_for_function(
+        "() => document.querySelector('#rDebugOutput').textContent.includes('Next expression at line 1')",
+        timeout=timeout)
+    page.locator("#source").fill(
+        "fs_r_stale <- 10L\nfs_r_stale <- fs_r_stale + 2L\ncat(fs_r_stale)")
+    page.wait_for_function(
+        "() => document.querySelector('#rDebugStep').disabled && "
+        "document.querySelector('#rDebugContinue').disabled && "
+        "document.querySelector('#rDebugEvaluate').disabled",
+        timeout=timeout)
+    assert not page.locator("#rDebugStop").is_disabled()
+    assert not page.locator("#rDebugStatus").is_disabled()
+    page.locator("#rDebugStatus").click()
+    page.wait_for_function(
+        "() => document.querySelector('#rDebugOutput').textContent.includes('Next expression at line 1')",
+        timeout=timeout)
+    assert page.locator("#rDebugStep").is_disabled()
+    page.locator("#rDebugStop").click()
+    page.wait_for_function(
+        "() => document.querySelector('#rDebugOutput').textContent.includes('R expression debugger: idle')",
+        timeout=timeout)
+    page.locator("#rDebugStart").click()
+    page.wait_for_function(
+        "() => document.querySelector('#rDebugOutput').textContent.includes('Next expression at line 1')",
+        timeout=timeout)
+    assert not page.locator("#rDebugStep").is_disabled()
+    page.locator("#rDebugStep").click()
+    page.wait_for_function(
+        "() => document.querySelector('#rDebugOutput').textContent.includes('Next expression at line 2')",
+        timeout=timeout)
+    page.locator("#rDebugStop").click()
+    page.wait_for_function(
+        "() => document.querySelector('#rDebugOutput').textContent.includes('R expression debugger: idle')",
+        timeout=timeout)
+
+
 def test_native_conditional_debugger(page, timeout: int):
     # Actual Chromium/Firefox/WebKit DOM -> Flow localhost HTTP -> CPython.
     page.locator("#pythonDebugPanel summary").click()

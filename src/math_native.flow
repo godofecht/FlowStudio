@@ -13,6 +13,16 @@ export struct State2 {
     second: f64
 }
 
+export struct ScalarIntegrationResult {
+    valid: bool,
+    value: f64
+}
+
+export struct LinearIntegrationResult2 {
+    valid: bool,
+    value: State2
+}
+
 export struct LinearEquation2 {
     first_first: f64,
     first_second: f64,
@@ -30,9 +40,9 @@ export function scalar_midpoint_step(equation: ScalarLinearEquation, time: f64, 
     return state + step * scalar_derivative(equation, time + half, midpoint)
 }
 
-export function scalar_integrate(equation: ScalarLinearEquation, initial_time: f64, initial_state: f64, duration: f64, steps: i32) -> f64 {
+export function scalar_integrate(equation: ScalarLinearEquation, initial_time: f64, initial_state: f64, duration: f64, steps: i32) -> ScalarIntegrationResult {
     if steps <= 0 or steps > 1000000 {
-        return initial_state
+        return ScalarIntegrationResult { valid: false, value: initial_state }
     }
     let step: f64 = duration / (steps as f64)
     let mut time: f64 = initial_time
@@ -43,7 +53,7 @@ export function scalar_integrate(equation: ScalarLinearEquation, initial_time: f
         time = time + step
         index = index + 1
     }
-    return state
+    return ScalarIntegrationResult { valid: true, value: state }
 }
 
 export function linear_derivative_2(equation: LinearEquation2, state: State2) -> State2 {
@@ -66,9 +76,9 @@ export function linear_midpoint_step_2(equation: LinearEquation2, state: State2,
     }
 }
 
-export function linear_integrate_2(equation: LinearEquation2, initial: State2, duration: f64, steps: i32) -> State2 {
+export function linear_integrate_2(equation: LinearEquation2, initial: State2, duration: f64, steps: i32) -> LinearIntegrationResult2 {
     if steps <= 0 or steps > 1000000 {
-        return initial
+        return LinearIntegrationResult2 { valid: false, value: initial }
     }
     let step: f64 = duration / (steps as f64)
     let mut state: State2 = initial
@@ -77,5 +87,5 @@ export function linear_integrate_2(equation: LinearEquation2, initial: State2, d
         state = linear_midpoint_step_2(equation, state, step)
         index = index + 1
     }
-    return state
+    return LinearIntegrationResult2 { valid: true, value: state }
 }

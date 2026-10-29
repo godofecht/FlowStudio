@@ -65,12 +65,58 @@ function format(data) {
   return lines.join("\n");
 }
 function create({native, source, language, breakpoints, pauseOnException, startButton, stepButton,
-                 nextButton, finishButton, continueButton, stopButton, statusButton, target, notice}) {
+                 nextButton, finishButton, continueButton, stopButton, statusButton, target, notice,
+                 frameHost = null, getDocId = () => null, onFrame = () => {}}) {
   if (!native || !source || !language || !breakpoints || !startButton ||
       !stepButton || !nextButton || !finishButton || !continueButton || !stopButton || !statusButton || !target)
     throw Error("Native Python debugger requires its controls.");
   const supported = !!native.available();
   let state = "idle", pending = false;
+  let sourceSnapshot = null, documentSnapshot = null;
+  let currentResult = null, selectedFrame = -1;
+
+  // The native kernel retains the source passed to start(), not subsequent
+  // editor edits. Never navigate a different document or a changed buffer.
+  function sourceIsCurrent() {
+    return sourceSnapshot !== null && documentSnapshot !== null &&
+      getDocId() === documentSnapshot && source.value === sourceSnapshot &&
+      language.value === "python";
+  }
+  function selectFrame(index, automatic = false) {
+    if (!automatic && pending) return false;
+    if (state !== "paused" || !currentResult ||
+        !Number.isSafeInteger(index) || index < 0 ||
+        index >= currentResult.stack.length) return false;
+    if (!sourceIsCurrent()) {
+      if (notice) notice("Editor changed since debugger start; frame navigation disabled.");
+      update();
+      return false;
+    }
+    selectedFrame = index;
+    if (frameHost) {
+      for (let i = 0; i < frameHost.children.length; i++)
+        frameHost.children[i].setAttribute("aria-current", i === index ? "true" : "false");
+    }
+    onFrame(currentResult.stack[index], index);
+    return true;
+  }
+  function renderFrames(result) {
+    selectedFrame = result.state === "paused" && result.stack.length ? 0 : -1;
+    if (!frameHost) return;
+    frameHost.replaceChildren();
+    if (selectedFrame < 0) return;
+    const doc = frameHost.ownerDocument || global.document;
+    for (let index = 0; index < result.stack.length; index++) {
+      const frame = result.stack[index];
+      const button = doc.createElement("button");
+      button.type = "button";
+      button.className = "live-debug-frame";
+      button.textContent = "Frame " + (index + 1) + ": " + frame.function + " · line " + frame.line;
+      button.setAttribute("aria-current", index === selectedFrame ? "true" : "false");
+      button.addEventListener("click", () => { selectFrame(index); });
+      frameHost.append(button);
+    }
+  }
   function update() {
     startButton.disabled = !supported || pending || state === "paused" || state === "running";
     stepButton.disabled = !supported || pending || state !== "paused";
@@ -79,6 +125,10 @@ function create({native, source, language, breakpoints, pauseOnException, startB
     continueButton.disabled = !supported || pending || state !== "paused";
     stopButton.disabled = !supported || pending || (state !== "paused" && state !== "running");
     statusButton.disabled = !supported || pending;
+    if (frameHost) {
+      for (const button of frameHost.children)
+        button.disabled = !supported || pending || state !== "paused" || !sourceIsCurrent();
+    }
   }
   async function execute(action) {
     if (!supported || pending) return false;
@@ -91,16 +141,27 @@ function create({native, source, language, breakpoints, pauseOnException, startB
       let result;
       if (action === "start") {
         if (language.value !== "python") throw Error("Select Python to debug native source.");
-        const lines = source.value.split(/\r\n|\r|\n/).length;
-        result = await native.debugPythonStart(source.value, parseBreakpoints(breakpoints.value, lines),
+        sourceSnapshot = source.value;
+        documentSnapshot = getDocId();
+        const lines = sourceSnapshot.split(/\r\n|\r|\n/).length;
+        result = await native.debugPythonStart(sourceSnapshot, parseBreakpoints(breakpoints.value, lines),
           !!(pauseOnException && pauseOnException.checked));
       } else result = await native.debugPythonCommand(action);
       validate(result);
       state = result.state;
+      currentResult = result;
       target.textContent = format(result);
-      if (notice) notice("Native Python debugger: " + state + ".");
+      renderFrames(result);
+      if (state === "paused" && result.stack.length && sourceIsCurrent())
+        selectFrame(0, true);
+      if (notice) notice("Native Python debugger: " + state +
+        (state === "paused" && !sourceIsCurrent() ?
+          " (editor changed; navigation disabled)." : "") + ".");
       return result.ok;
     } catch (error) {
+      currentResult = null;
+      selectedFrame = -1;
+      if (frameHost) frameHost.replaceChildren();
       target.textContent = "Native Python debugger error: " + String(error.message || error);
       if (notice) notice(target.textContent);
       return false;
@@ -118,7 +179,7 @@ function create({native, source, language, breakpoints, pauseOnException, startB
   statusButton.addEventListener("click", () => { void execute("status"); });
   if (!supported) target.textContent = "Native Python debugger requires the FlowStudio localhost server.";
   update();
-  return Object.freeze({execute, supported});
+  return Object.freeze({execute, supported, selectFrame});
 }
 const api = Object.freeze({validate, parseBreakpoints, format, create});
 if (typeof module !== "undefined" && module.exports) module.exports = api;

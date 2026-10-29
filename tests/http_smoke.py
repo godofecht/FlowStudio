@@ -110,6 +110,14 @@ def main() -> None:
     assert status == 404, status
 
     accepted_headers = {"X-FlowStudio-Intent": "run"}
+    # The native mathematical bootstrap runs through the actual Flow 2.0
+    # compiler/runtime, not /api/run/mathflow's Python/NumPy frontend.
+    native_math_source = (Path(__file__).resolve().parents[1] /
+                          "examples/native_math_bootstrap.flow").read_text(encoding="utf-8")
+    status, body = request("POST", "/api/check/flow", native_math_source, accepted_headers)
+    assert status == 200, ("native mathematical Flow compile", status, body)
+    status, body = request("POST", "/api/run/flow", native_math_source, accepted_headers)
+    assert status == 200, ("native mathematical Flow execution", status, body)
     # Real Flow HTTP route, request intent/origin gate, and safe Quarto
     # preflight rejection (does not require Quarto to be installed).
     invalid_qmd = "---\nformat: pdf\n---\n\n# Wrong format\n"

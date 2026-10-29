@@ -80,7 +80,8 @@ class SemanticTraceTest(unittest.TestCase):
                     self.assertEqual(len(result["semantic_trace"]["stages"]), 2)
                 else:
                     self.assertLess(result["max_divergence"], 1e-4)
-                    self.assertNotIn("semantic_trace", result)
+                    self.assertEqual(result["semantic_trace"]["schema"], 2)
+                    self.assertEqual(result["semantic_trace"]["field"], "velocity")
 
 
 if __name__ == "__main__":

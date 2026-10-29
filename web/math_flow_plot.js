@@ -152,6 +152,48 @@
     const trace = result?.semantic_trace;
     if (trace === undefined) return null;
     const finite = value => typeof value === "number" && Number.isFinite(value);
+    if (trace?.schema === 2) {
+      if (trace.field !== "velocity" || trace.integrator !== "RungeKuttaSecondOrder" ||
+          trace.rateUnit !== "m/s²" || !finite(trace.timeStep) || trace.timeStep <= 0 ||
+          !Array.isArray(trace.stages) || trace.stages.length !== 2 ||
+          !Array.isArray(trace.projections) || trace.projections.length !== 3)
+        throw new TypeError("Invalid Navier-Stokes semantic trace.");
+      for (const [index, stage] of trace.stages.entries()) {
+        if (!stage || stage.name !== (index ? "predictorSlope" : "initialSlope") ||
+            !finite(stage.time) ||
+            Math.abs(stage.time - index * trace.timeStep) > 1e-9 * Math.max(1, trace.timeStep) ||
+            !finite(stage.rhsRms) || stage.rhsRms < 0 ||
+            !finite(stage.maximumDecompositionResidual) || stage.maximumDecompositionResidual < 0 ||
+            !Array.isArray(stage.terms) || stage.terms.length !== 2)
+          throw new TypeError("Invalid Navier-Stokes RK2 stage.");
+        for (const [termIndex, term] of stage.terms.entries()) {
+          if (!term || term.role !== (termIndex ? "diffusion" : "advection") ||
+              term.sign !== 1 || typeof term.meaning !== "string" ||
+              term.meaning.length < 1 || term.meaning.length > 256 ||
+              !Array.isArray(term.symbols) || term.symbols.length > 8 ||
+              !term.symbols.every(symbol => typeof symbol === "string" &&
+                /^[A-Za-z_][A-Za-z_0-9]*$/.test(symbol) && symbol.length <= 64) ||
+              !Array.isArray(term.dimension) || term.dimension.length !== 4 ||
+              term.dimension.some((power, i) => power !== [1, 0, -2, 0][i]) ||
+              !finite(term.meanMagnitude) || term.meanMagnitude < 0 ||
+              !finite(term.maximumMagnitude) || term.maximumMagnitude < term.meanMagnitude)
+            throw new TypeError("Invalid Navier-Stokes semantic term.");
+        }
+      }
+      for (const [index, projection] of trace.projections.entries()) {
+        if (!projection || projection.name !== ["initial", "predictor", "corrector"][index] ||
+            !["maximumDivergenceBefore", "maximumDivergenceAfter", "correctionRms"]
+              .every(key => finite(projection[key]) && projection[key] >= 0) ||
+            !finite(projection.pressureMean))
+          throw new TypeError("Invalid Navier-Stokes pressure projection.");
+      }
+      const update = trace.update;
+      if (!update || !["initialKineticEnergy", "predictorKineticEnergy",
+                         "updatedKineticEnergy", "maximumCorrectorDifference"]
+            .every(key => finite(update[key]) && update[key] >= 0))
+        throw new TypeError("Invalid Navier-Stokes RK2 update.");
+      return trace;
+    }
     if (!trace || trace.schema !== 1 || trace.field !== "temperature" ||
         trace.integrator !== "RungeKuttaSecondOrder" || trace.rateUnit !== "K/s" ||
         !finite(trace.timeStep) || trace.timeStep <= 0 ||
@@ -195,6 +237,62 @@
   function renderSemanticTrace(doc, result) {
     const trace = prepareSemanticTrace(result);
     if (!trace) return null;
+    if (trace.schema === 2) {
+      const section = doc.createElement("section");
+      section.setAttribute("data-mathflow-semantic", "navier-rk2");
+      const heading = doc.createElement("h3");
+      heading.textContent = "Navier-Stokes · measured first RK2 step";
+      const label = doc.createElement("label");
+      label.textContent = "Stage ";
+      const select = doc.createElement("select");
+      select.setAttribute("aria-label", "Mathematical Flow semantic stage");
+      for (const [index, name] of ["Initial slope", "Predictor slope"].entries()) {
+        const option = doc.createElement("option");
+        option.value = String(index);
+        option.textContent = name;
+        select.append(option);
+      }
+      label.append(select);
+      const details = doc.createElement("p");
+      const terms = doc.createElement("ol");
+      function showStage() {
+        const stage = trace.stages[Number(select.value)];
+        details.textContent = "t = " + stage.time.toPrecision(6) +
+          " s · velocity RHS RMS = " + stage.rhsRms.toPrecision(6) +
+          " m/s² · decomposition residual = " +
+          stage.maximumDecompositionResidual.toExponential(2) + " m/s²";
+        terms.replaceChildren();
+        for (const term of stage.terms) {
+          const item = doc.createElement("li");
+          item.textContent = term.role + " · " + term.meaning +
+            " (" + term.symbols.join(", ") + ")" +
+            " · mean magnitude " + term.meanMagnitude.toPrecision(6) +
+            " m/s² · maximum " + term.maximumMagnitude.toPrecision(6) + " m/s²";
+          terms.append(item);
+        }
+      }
+      select.addEventListener("change", showStage);
+      const projections = doc.createElement("ol");
+      for (const projection of trace.projections) {
+        const item = doc.createElement("li");
+        item.textContent = projection.name + " pressure projection · divergence " +
+          projection.maximumDivergenceBefore.toExponential(3) + " → " +
+          projection.maximumDivergenceAfter.toExponential(3) +
+          " 1/s · correction RMS " + projection.correctionRms.toExponential(3) +
+          " m/s · pressure mean " + projection.pressureMean.toExponential(3) + " Pa";
+        projections.append(item);
+      }
+      const update = doc.createElement("p");
+      update.textContent = "RK2 kinetic energy: " +
+        trace.update.initialKineticEnergy.toPrecision(6) + " → predictor " +
+        trace.update.predictorKineticEnergy.toPrecision(6) + " → corrected " +
+        trace.update.updatedKineticEnergy.toPrecision(6) +
+        " J/m (per unit depth) · maximum unprojected corrector difference " +
+        trace.update.maximumCorrectorDifference.toExponential(3) + " m/s";
+      section.append(heading, label, details, terms, projections, update);
+      showStage();
+      return section;
+    }
     const section = doc.createElement("section");
     section.setAttribute("data-mathflow-semantic", "rk2");
     const heading = doc.createElement("h3");

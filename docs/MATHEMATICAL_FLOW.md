@@ -2,6 +2,36 @@
 
 The repository contains a **separate mathematical Flow frontend** in `src/math_flow.py`. It now dispatches two explicitly supported PDE families: incompressible periodic 2D Navier–Stokes and scalar 2D heat diffusion with periodic or constant face-Dirichlet boundaries. `src/math_flow_heat.py` implements the second family; `src/math_flow_expr.py` provides a bounded, dimension-checked scalar expression AST used by both families' initial conditions. It lexes Unicode source into positioned tokens, parses and validates the domain/model/solver and observation pipeline, and executes the supported two-dimensional incompressible Navier–Stokes equations using NumPy. This is **not** a modification of the upstream Flow 2.0 compiler, and arbitrary mathematical Flow expressions are not supported. Unsupported equations, methods, units, fields, and boundary conditions are errors rather than silently ignored.
 
+## Measured Navier–Stokes RK2 and pressure-projection inspection
+
+The checked-in `examples/navier_stokes_smoke.flow` now produces a **measured**
+`semantic_trace` in addition to its actual numerical solution. The first
+RK2 step reports the initial and predictor momentum slopes, decomposed into
+nonlinear advection and viscous diffusion contributions using the same
+finite-difference operations as the numerical solver. Each vector term has
+dimension `m/s²`, actual symbol dependencies, mean and maximum vector
+magnitude, and a checked maximum decomposition residual.
+
+Three separately measured pressure projections (initial, predictor, corrector)
+report discrete divergence before/after projection, velocity correction RMS,
+and the mean-zero pressure gauge. The trace also reports the three kinetic
+energy values per unit depth and the difference between Euler prediction and
+RK2 correction before pressure projection. The native Plots tab validates and
+renders these data with an actual stage selector. Python analytic Fourier shear
+tests, CLI execution, browser validation, and native HTTP/Chromium acceptance
+exercise the same implementation.
+
+Only the **first timestep** is retained, and this trace is specific to the
+validated incompressible periodic 2D Navier–Stokes model. The Navier dynamics
+are still recognized by a checked equation pattern, **not** by a generalized
+Navier equation AST. The descriptions are numerical-method semantics rather
+than claims about the author's unstated intent.
+
+```sh
+python3 src/math_flow.py examples/navier_stokes_smoke.flow
+python3 -m unittest discover -s tests -p 'test_math_flow_navier_semantic.py' -v
+```
+
 ## Measured semantic RK2 inspection (first step)
 
 The executable heat frontend now emits `semantic_trace` alongside its actual
@@ -20,7 +50,8 @@ Only the **first timestep** is captured, with a maximum of 16 terms and no
 stored full-resolution state snapshots. A larger equation continues to run but
 does not emit this trace. The roles describe the validated mathematics; they
 do **not** infer the author's unstated intent. This is not an interactive
-general-purpose debugger, reverse execution, or Navier–Stokes semantic stepping.
+general-purpose debugger or reverse execution. Navier–Stokes has its own
+separately measured first-step inspector described above.
 
 ```sh
 python3 src/math_flow.py examples/heat_composed_forcing.flow

@@ -456,25 +456,92 @@ def simulate(model: Model, *, grid: int | None = None, until: float | None = Non
         return (a - stage_dt * forward(pressure, 0, dx) / model.density,
                 b - stage_dt * forward(pressure, 1, dy) / model.density, pressure)
 
-    def rhs(a, b):
+    def rhs(a, b, *, inspect=False):
         ux, uy = center(a, 0, dx), center(a, 1, dy)
         vx, vy = center(b, 0, dx), center(b, 1, dy)
-        return (-a * ux - b * uy + model.viscosity * laplacian(a),
-                -a * vx - b * vy + model.viscosity * laplacian(b))
+        advection = (-a * ux - b * uy, -a * vx - b * vy)
+        diffusion = (model.viscosity * laplacian(a), model.viscosity * laplacian(b))
+        slope = (advection[0] + diffusion[0], advection[1] + diffusion[1])
+        return (slope, (advection, diffusion)) if inspect else slope
 
+    def kinetic_energy(a, b):
+        return float(.5 * model.density * dx * dy * np.sum(a*a + b*b))
+
+    def projection_summary(name, before_u, before_v, after_u, after_v, pressure_field):
+        return {"name": name,
+                "maximumDivergenceBefore": float(np.max(np.abs(divergence(before_u, before_v)))),
+                "maximumDivergenceAfter": float(np.max(np.abs(divergence(after_u, after_v)))),
+                "correctionRms": float(np.sqrt(np.mean(
+                    (after_u - before_u)**2 + (after_v - before_v)**2))),
+                "pressureMean": float(np.mean(pressure_field))}
+
+    def inspect_stage(name, time, slope, terms):
+        meanings = ("Nonlinear velocity transport by the resolved velocity field.",
+                    "Viscous redistribution by the discrete velocity Laplacian.")
+        inspected = []
+        reconstructed = (np.zeros_like(slope[0]), np.zeros_like(slope[1]))
+        for role, meaning, component in zip(("advection", "diffusion"), meanings, terms):
+            reconstructed = (reconstructed[0] + component[0],
+                             reconstructed[1] + component[1])
+            magnitude = np.hypot(component[0], component[1])
+            inspected.append({"role": role, "meaning": meaning, "sign": 1,
+                              "symbols": (["velocity"] if role == "advection"
+                                          else ["kinematicViscosity", "velocity"]),
+                              "dimension": [1, 0, -2, 0],
+                              "meanMagnitude": float(np.mean(magnitude)),
+                              "maximumMagnitude": float(np.max(magnitude))})
+        residual = float(max(np.max(np.abs(reconstructed[0] - slope[0])),
+                             np.max(np.abs(reconstructed[1] - slope[1]))))
+        if residual > 1e-8 * max(1.0, float(np.max(np.hypot(*slope)))):
+            raise FlowMathError("Navier-Stokes semantic RHS decomposition disagrees with numerical evaluation")
+        return {"name": name, "time": float(time),
+                "rhsRms": float(np.sqrt(np.mean(slope[0]**2 + slope[1]**2))),
+                "maximumDecompositionResidual": residual, "terms": inspected}
+
+    initial_u, initial_v = u, v
     u, v, pressure = project(u, v, dt)
+    initial_projection = projection_summary(
+        "initial", initial_u, initial_v, u, v, pressure)
     initial_energy = .5 * model.density * dx * dy * np.sum(u*u + v*v)
     observations = [{"time": 0.0, "kineticEnergy": float(initial_energy),
                      "maximumDivergence": float(np.max(np.abs(divergence(u, v))))}]
     sample_stride = max(1, math.ceil(steps / 128))
+    semantic_trace = None
     for step_index in range(steps):
-        du, dv = rhs(u, v)
-        stage_u, stage_v, _ = project(u + dt * du, v + dt * dv, dt)
-        du2, dv2 = rhs(stage_u, stage_v)
-        u, v, pressure = project(u + .5 * dt * (du + du2),
-                                 v + .5 * dt * (dv + dv2), dt)
+        if step_index == 0:
+            first_u, first_v = u, v
+            (du, dv), initial_terms = rhs(u, v, inspect=True)
+        else:
+            du, dv = rhs(u, v)
+        predictor_u, predictor_v = u + dt * du, v + dt * dv
+        stage_u, stage_v, predictor_pressure = project(predictor_u, predictor_v, dt)
+        if step_index == 0:
+            (du2, dv2), predictor_terms = rhs(stage_u, stage_v, inspect=True)
+        else:
+            du2, dv2 = rhs(stage_u, stage_v)
+        corrected_u, corrected_v = u + .5 * dt * (du + du2), v + .5 * dt * (dv + dv2)
+        u, v, pressure = project(corrected_u, corrected_v, dt)
         if not (np.all(np.isfinite(u)) and np.all(np.isfinite(v))):
             raise FlowMathError("Non-finite velocity during integration")
+        if step_index == 0:
+            semantic_trace = {
+                "schema": 2, "field": "velocity", "integrator": "RungeKuttaSecondOrder",
+                "rateUnit": "m/s²", "timeStep": float(dt),
+                "stages": [
+                    inspect_stage("initialSlope", 0, (du, dv), initial_terms),
+                    inspect_stage("predictorSlope", dt, (du2, dv2), predictor_terms)],
+                "projections": [
+                    initial_projection,
+                    projection_summary("predictor", predictor_u, predictor_v,
+                                       stage_u, stage_v, predictor_pressure),
+                    projection_summary("corrector", corrected_u, corrected_v,
+                                       u, v, pressure)],
+                "update": {
+                    "initialKineticEnergy": kinetic_energy(first_u, first_v),
+                    "predictorKineticEnergy": kinetic_energy(stage_u, stage_v),
+                    "updatedKineticEnergy": kinetic_energy(u, v),
+                    "maximumCorrectorDifference": float(np.max(np.hypot(
+                        .5 * dt * (du2 - du), .5 * dt * (dv2 - dv))))}}
         if (step_index + 1) % sample_stride == 0 or step_index + 1 == steps:
             observations.append({"time": float((step_index + 1) * dt),
                                  "kineticEnergy": float(.5 * model.density * dx * dy * np.sum(u*u + v*v)),
@@ -490,6 +557,7 @@ def simulate(model: Model, *, grid: int | None = None, until: float | None = Non
             "pressure_mean": float(np.mean(pressure)),
             "pressure_solver": "conjugate gradient of periodic -D_backward G_forward",
             "observations": observations,
+            **({"semantic_trace": semantic_trace} if semantic_trace is not None else {}),
             "spatial": spatial_snapshot(
                 {"velocity_x": u, "velocity_y": v, "vorticity": vorticity},
                 (model.length_x, model.length_y))}

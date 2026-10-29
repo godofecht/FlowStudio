@@ -207,6 +207,29 @@ def main() -> None:
     assert status == 422 and body.strip(), (
         "native evolution heat2d malformed-equation rejection", status, body)
 
+    # Eight coupled states, two anisotropic diffusion tensors and a nonzero
+    # species-exchange rate: the upstream Flow compiler generates the RK4
+    # integrator. Flow main() verifies all eight exact Walsh/matrix-exponential
+    # cells, fourth-order convergence, conservation, species exchange,
+    # transpose and rate/time symmetries, plus fail-closed invalid inputs.
+    coupled_evolution_source = (Path(__file__).resolve().parents[1] /
+                                "examples/native_coupled_evolution2d.flow").read_text(encoding="utf-8")
+    status, body = request("POST", "/api/check/flow", coupled_evolution_source, accepted_headers)
+    assert status == 200, ("native coupled evolution2d compile", status, body)
+    status, body = request("POST", "/api/run/flow", coupled_evolution_source, accepted_headers)
+    assert status == 200 and "native-coupled-evolution2d-ok" in body, (
+        "native coupled evolution2d analytical RK4 execution", status, body)
+    # Reject an actually malformed coupled evolution equation through flowc.
+    invalid_coupled = coupled_evolution_source.replace(
+        "vSoutheast evolves as 2.0 * diffusivity_vx *",
+        "vSoutheast evolves as (2.0 * diffusivity_vx *",
+        1,
+    )
+    assert invalid_coupled != coupled_evolution_source
+    status, body = request("POST", "/api/check/flow", invalid_coupled, accepted_headers)
+    assert status == 422 and body.strip(), (
+        "native coupled evolution malformed-source rejection", status, body)
+
     # Four independently phased Fourier modes through the REAL persistent CPython
     # kernel and Flow-owned HTTP transport, not a replacement numerical solver.
     # Execute the checked-in solver source in an isolated namespace to prevent

@@ -1,3 +1,27 @@
+## 2026-10-29: native mixed-language numerical notebook acceptance (CI pending)
+
+The new `tests/native_mixed_notebook_http.cjs` is invoked by the real
+`tests/http_smoke.py` against a running Flow-owned native server. It uses
+the production percent-cell parser and notebook runner to execute a complete
+native Flow three-species cyclic model, a deterministic 16×16 Python
+anisotropic tensor-diffusion solver, an independent base-R Fourier oracle
+checking all 256 cells, and subsequent Python/R state checks in the same
+persistent kernels. A prior real Python request explicitly serializes the
+finite numerical samples into an R notebook assignment; there is **no**
+implicit Python/R namespace sharing. The test also captures an actual R
+plot through `/api/plot/r`, saves and restores a portable mixed-language
+`.fsnb` display snapshot, rejects mismatched saved languages and incorrect
+single-kernel Jupyter export, checks stop-on-error for real R and Flow
+failures, verifies preflight cell limits without interpreter calls, and
+confirms both kernels recover after failures.
+
+**Status: implementation committed to a PR branch; native HTTP/CI execution
+not yet verified.** Local Node syntax checking of the acceptance script
+passed; the local environment cannot run the native Flow server or Rscript.
+This does not test a physical browser, automatic cross-language data transfer,
+restoration of interpreter state, live debugging, general PDE grammar or full
+RStudio parity. No hosted CI workflow definition was modified.
+
 ## 2026-10-29: real Python/R tensor-diffusion interoperability and plot acceptance (six CI jobs passed)
 
 The checked-in `examples/spectral_interop_python.py` now executes a

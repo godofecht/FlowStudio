@@ -1,0 +1,46 @@
+# Executable bounded nonlinear thermal relaxation with signed deviations.
+# The reaction Jacobian is globally bounded: |dR/dT| <= reactionRate.
+domain ThermalDomain {
+    grid       = 32 × 32
+    extent     = 1m × 1m
+    boundaries = Periodic
+}
+
+model HeatEquation on ThermalDomain {
+    const diffusivity        = 0.01m²/s
+    const reactionRate       = 2s⁻¹
+    const ambientTemperature = 300K
+    field temperature: Scalar<Kelvin>
+
+    dynamics {
+        ∂ₜtemperature = diffusivity ∇²temperature
+                        − reactionRate * ambientTemperature
+                          * tanh((temperature − ambientTemperature) / ambientTemperature)
+    }
+    initial {
+        temperature = 300K + 10K * sin(2πx / 1m) * sin(2πy / 1m)
+    }
+}
+
+solver ThermalSolver for HeatEquation {
+    spatial {
+        method    = FiniteDifference
+        diffusion = CentralDifference
+    }
+    temporal {
+        method   = RungeKuttaSecondOrder
+        timeStep = 0.001s
+    }
+}
+
+let simulation = HeatEquation ▷ ThermalSolver ▷ Evolve(until: 0.1s)
+
+simulation
+    ▷ Observe {
+        meanTemperature     = Mean(temperature)
+        temperatureVariance = Mean((temperature − meanTemperature)²)
+    }
+    ▷ Visualize {
+        temperature         = Heatmap
+        temperatureVariance = LineGraph
+    }

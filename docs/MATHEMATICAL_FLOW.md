@@ -2,6 +2,38 @@
 
 The repository contains a **separate mathematical Flow frontend** in `src/math_flow.py`. It now dispatches two explicitly supported PDE families: incompressible periodic 2D Navier–Stokes and scalar 2D heat diffusion with periodic or constant face-Dirichlet boundaries. `src/math_flow_heat.py` implements the second family; `src/math_flow_expr.py` provides a bounded, dimension-checked scalar expression AST used by both families' initial conditions. It lexes Unicode source into positioned tokens, parses and validates the domain/model/solver and observation pipeline, and executes the supported two-dimensional incompressible Navier–Stokes equations using NumPy. This is **not** a modification of the upstream Flow 2.0 compiler, and arbitrary mathematical Flow expressions are not supported. Unsupported equations, methods, units, fields, and boundary conditions are errors rather than silently ignored.
 
+## Bounded saturating nonlinear reaction (executable)
+
+`examples/heat_saturating_reaction.flow` uses the checked scalar AST and NumPy
+backend to evolve a temperature field above **and below** ambient:
+
+```flow
+∂ₜtemperature = diffusivity ∇²temperature
+                − reactionRate * ambientTemperature
+                  * tanh((temperature − ambientTemperature) / ambientTemperature)
+```
+
+`tanh` requires a dimensionless argument and is lowered to NumPy arithmetic,
+not Python evaluation. The exact reaction pattern must have the declared
+positive rate (1/s), positive ambient temperature (K), and negative sign.
+The globally bounded reaction Jacobian, `|dR/dT| ≤ reactionRate`, is checked
+in the explicit RK2 stability guard at both stages; unlike polynomial
+relaxation, the saturating sink admits signed deviations from ambient.
+For a spatially uniform field, the exact solution is
+`T(t) = A * (1 + asinh(sinh((T0-A)/A) * exp(-k*t)))`.
+The regression suite checks this solution from both sides of ambient,
+second-order RK2 convergence, the discrete Fourier-mode RHS, malformed
+equation rejection, real CLI, native HTTP and Chromium spatial visualization.
+
+```sh
+python3 src/math_flow.py examples/heat_saturating_reaction.flow
+python3 -m unittest discover -s tests -p 'test_math_flow_saturating.py' -v
+```
+
+This is one additional validated scalar reaction family. It does **not**
+implement arbitrary nonlinear source terms, coupled PDEs, unrestricted
+Unicode operators, or integration with the upstream Flow 2.0 grammar.
+
 ## Run and validate
 
 ```sh

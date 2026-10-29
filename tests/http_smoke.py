@@ -201,6 +201,23 @@ def main() -> None:
                                                "+ temperature / 1s")
     status, body = request("POST", "/api/check/mathflow", invalid_composed, accepted_headers)
     assert status == 422 and not json.loads(body)["ok"], (status, body)
+    # Saturating nonlinear kinetics must be parsed, dimension checked and
+    # executed through the actual Flow router and NumPy RK2 stages.
+    saturating_source = (Path(__file__).resolve().parents[1] /
+                         "examples/heat_saturating_reaction.flow").read_text(encoding="utf-8")
+    status, body = request("POST", "/api/check/mathflow", saturating_source, accepted_headers)
+    assert status == 200 and json.loads(body)["ok"], (status, body)
+    status, body = request("POST", "/api/run/mathflow", saturating_source, accepted_headers)
+    saturating = json.loads(body)
+    assert status == 200 and saturating["ok"] and saturating["steps"] == 100, (status, saturating)
+    assert abs(saturating["mean_temperature"] - 300) < 1e-9, saturating
+    assert saturating["temperature_variance"] < saturating["initial_temperature_variance"], saturating
+    assert saturating["spatial"]["fields"]["temperature"], saturating
+    invalid_saturating = saturating_source.replace(
+        "tanh((temperature − ambientTemperature) / ambientTemperature)",
+        "tanh(temperature)")
+    status, body = request("POST", "/api/check/mathflow", invalid_saturating, accepted_headers)
+    assert status == 422 and not json.loads(body)["ok"], (status, body)
     # Typed reaction-diffusion: native Flow HTTP -> NumPy RK2 -> real field diagnostics.
     reaction_source = (Path(__file__).resolve().parents[1] /
                        "examples/heat_reaction_diffusion.flow").read_text(encoding="utf-8")

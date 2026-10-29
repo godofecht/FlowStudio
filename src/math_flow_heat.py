@@ -359,15 +359,20 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
         if model.equation.nonlinear:
             if model.ambient_temperature <= 0:
                 raise error_type("Polynomial thermal relaxation requires positive ambientTemperature")
-            if np.any(state < model.ambient_temperature - 1e-10):
+            if (model.equation.reaction_kind != "saturating"
+                    and np.any(state < model.ambient_temperature - 1e-10)):
                 raise error_type("Polynomial thermal relaxation requires temperature >= ambientTemperature")
-            maximum_excess = float(np.max(np.maximum(state - model.ambient_temperature, 0.0)))
-            # Jacobian of -k*(T-A)^n/A^(n-1) is -n*k*((T-A)/A)^(n-1).
-            # Check both RK2 stages, not just the initial field.
-            reaction_power = model.equation.reaction_power
-            reaction_stiffness = (reaction_power * model.reaction_rate
-                                  * (maximum_excess / model.ambient_temperature)
-                                  ** (reaction_power - 1))
+            # The saturating tanh sink has a globally bounded Jacobian
+            # |dR/dT| <= reactionRate, including below ambient temperature.
+            # Polynomial kinetics instead require positive excess temperature.
+            if model.equation.reaction_kind == "saturating":
+                reaction_stiffness = model.reaction_rate
+            else:
+                maximum_excess = float(np.max(np.maximum(state - model.ambient_temperature, 0.0)))
+                reaction_power = model.equation.reaction_power
+                reaction_stiffness = (reaction_power * model.reaction_rate
+                                      * (maximum_excess / model.ambient_temperature)
+                                      ** (reaction_power - 1))
             if dt * (diffusion_stiffness + advective_stiffness +
                      reaction_stiffness / 4) > .45:
                 raise error_type("Heat time step violates nonlinear reaction stability bound")

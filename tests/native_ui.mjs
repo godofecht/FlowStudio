@@ -148,6 +148,19 @@ try {
   await page.locator('#language').selectOption('flow');
   await page.evaluate(id => FlowStudioApp.activateDocument(id), firstId);
 
+  // Compile-check a real Flow 2.0 source through native HTTP and flowc.
+  // This must never execute the submitted source or use a browser-only parser.
+  await page.evaluate(() => {
+    const source = document.getElementById('source');
+    source.value = 'function main() -> i32 {\\n    return 0\\n}\\n';
+    source.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.locator('#checkFlow').click();
+  await page.waitForFunction(() =>
+    document.getElementById('resultStatus').textContent === 'Flow compile check passed.');
+  assert.match(await page.locator('#flowDiagnostics').innerText(), /not executed|compile check/i);
+  assert.equal(await page.locator('#flowDiagnostics').isVisible(), true);
+
   // Exercise the worker path and wait beyond rendering and deferred callbacks.
   const workerResult = await page.evaluate(async () => {
     const worker = MonacoEnvironment.getWorker();

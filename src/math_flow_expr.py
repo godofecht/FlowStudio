@@ -229,7 +229,7 @@ class _Parser:
                 left = Expression("pow", (left, right),
                                   dimension=tuple(exponent * power for power in left.dimension))
                 continue
-            if nxt in ("+", "-", "−", "*", "×", "·", "/", "÷"):
+            if nxt in ("+", "-", "−", "*", "×", "·", "/", "÷", "<", "≤", ">", "≥"):
                 self.take()
             right = self.expression(precedence + 1, depth + 1, stop_at_bar=stop_at_bar)
             if operator in ("lt", "le", "gt", "ge"):

@@ -52,11 +52,16 @@ class MeanFieldFlowTest(unittest.TestCase):
             SOURCE.replace("− reactionRate", "+ reactionRate"),
             SOURCE.replace("mean(temperature)", "mean(temperature * temperature)"),
             SOURCE.replace("mean(temperature)", "mean(temperature − 295K)"),
-            SOURCE.replace("mean(temperature)", "temperature"),
         ):
             with self.subTest(bad=bad[bad.index("dynamics"):bad.index("initial")]):
                 with self.assertRaises(FlowMathError):
                     parse(bad)
+
+    def test_existing_local_relaxation_remains_valid(self):
+        local = parse(SOURCE.replace("mean(temperature)", "temperature"))
+        self.assertEqual(local.equation.reaction_kind, "linear")
+        self.assertEqual([role for _, _, role in semantic_heat_terms(local.equation)],
+                         ["diffusion", "reaction"])
 
     def test_analytic_mean_and_fourier_mode_are_independent(self):
         model = parse(SOURCE)

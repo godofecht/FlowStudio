@@ -7,7 +7,29 @@ not an arbitrary vector-calculus parser.
 """
 from dataclasses import dataclass
 
+# Dimensions are (length, mass, time, temperature) powers.
+VELOCITY = (1, 0, -1, 0)
+PRESSURE = (-1, 1, -2, 0)
+DENSITY = (-3, 1, 0, 0)
+KINEMATIC_VISCOSITY = (2, 0, -1, 0)
+LENGTH = (1, 0, 0, 0)
+TIME = (0, 0, 1, 0)
 VELOCITY_RATE = (1, 0, -2, 0)
+
+
+def _add(a, b):
+    return tuple(x + y for x, y in zip(a, b))
+
+
+def _sub(a, b):
+    return tuple(x - y for x, y in zip(a, b))
+
+
+_TERM_DIMENSIONS = {
+    "advection": _add(VELOCITY, _sub(VELOCITY, LENGTH)),
+    "pressureGradient": _sub(_sub(PRESSURE, LENGTH), DENSITY),
+    "diffusion": _add(KINEMATIC_VISCOSITY, _sub(VELOCITY, (2, 0, 0, 0))),
+}
 
 
 @dataclass(frozen=True)
@@ -90,7 +112,10 @@ def compile_vector_equation(tokens: list[str]) -> VectorEquation:
             raise ValueError(f"Incorrect sign for {role} term")
         if role in found:
             raise ValueError(f"Duplicate {role} term")
-        term = VectorTerm(role, sign, VELOCITY_RATE, symbols, implicit)
+        dimension = _TERM_DIMENSIONS[role]
+        if dimension != _sub(VELOCITY, TIME):
+            raise ValueError(f"Invalid physical dimension for {role}")
+        term = VectorTerm(role, sign, dimension, symbols, implicit)
         found[role] = term
         terms.append(term)
     if set(found) != {"advection", "pressureGradient", "diffusion"}:

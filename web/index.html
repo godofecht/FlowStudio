@@ -134,6 +134,10 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
 .live-debugger h3{font-size:13px;margin:0 0 6px}
 .live-debugger input[type=text]{width:100%;min-width:0;background:var(--surface-2);border:1px solid var(--line);padding:6px;border-radius:5px;color:var(--ink);font:12px var(--mono)}
 .live-debugger label{display:block;margin:6px 0;font-size:12px}
+.live-debug-frames{display:flex;flex-direction:column;gap:4px;margin:6px 0;max-height:150px;overflow:auto}
+.live-debug-frame{font:12px/1.4 var(--mono);text-align:left;background:var(--surface-2);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:5px 7px}
+.live-debug-frame[aria-current="true"]{border-color:var(--accent);background:var(--accent-dim)}
+.live-debug-frame:disabled{opacity:.55;cursor:not-allowed}
 .live-debug-output{white-space:pre-wrap;overflow:auto;max-height:230px;overflow-wrap:anywhere;background:#0d1119;border:1px solid var(--line);padding:8px;font:12px/1.5 var(--mono)}
 .debug-locals table{border-collapse:collapse;width:100%;font:12px/1.5 var(--mono)}
 .debug-locals td,.debug-locals th{border:1px solid var(--line);padding:3px 7px;text-align:left;overflow-wrap:anywhere}
@@ -448,6 +452,7 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
           <button id="liveDebugStop" type="button" disabled>Stop</button>
           <button id="liveDebugStatus" type="button">Status</button>
         </div>
+        <div id="liveDebugFrames" class="live-debug-frames" role="group" aria-label="Paused Python stack frames"></div>
         <pre id="liveDebugOutput" class="live-debug-output" role="status" aria-live="polite">Start a Python session to inspect live stack frames.</pre>
       </section>
     </div>

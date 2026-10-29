@@ -618,6 +618,42 @@ def test_native_r_expression_debugger(page, timeout: int):
         "() => document.querySelector('#rDebugOutput').textContent.includes('R expression debugger: idle')",
         timeout=timeout)
 
+    # Real DOM caret -> Flow-owned HTTP -> persistent Rscript top-level target.
+    # A separate typed conditional target must remain unchanged.
+    page.locator("#source").fill(
+        "fs_r_browser_caret <- 40L\n"
+        "fs_r_browser_caret <- fs_r_browser_caret + 2L\n"
+        "cat(fs_r_browser_caret)")
+    page.locator("#rDebugStart").click()
+    page.wait_for_function(
+        "() => document.querySelector('#rDebugOutput').textContent.includes('Next expression at line 1')",
+        timeout=timeout)
+    page.locator("#source").evaluate(
+        """el => {
+            el.focus();
+            const offset = el.value.indexOf('cat(');
+            el.setSelectionRange(offset, offset);
+            el.dispatchEvent(new Event('select', {bubbles:true}));
+        }""")
+    assert page.locator("#rDebugRunToCursor").is_enabled()
+    page.locator("#rDebugTargetLine").fill("2?counter>=100")
+    page.locator("#rDebugRunToCursor").click()
+    page.wait_for_function(
+        "() => document.querySelector('#rDebugOutput').textContent.includes('Next expression at line 3')",
+        timeout=timeout)
+    assert page.locator("#rDebugTargetLine").input_value() == "2?counter>=100"
+    assert page.locator("#rDebugRunToCursor").is_disabled()
+    page.locator("#rDebugTargetLine").fill("")
+    page.locator("#rDebugContinue").click()
+    page.wait_for_function(
+        "() => document.querySelector('#rDebugOutput').textContent.includes('R expression debugger: done')",
+        timeout=timeout)
+    assert "Output:\n42" in page.locator("#rDebugOutput").inner_text()
+    page.locator("#rDebugStop").click()
+    page.wait_for_function(
+        "() => document.querySelector('#rDebugOutput').textContent.includes('R expression debugger: idle')",
+        timeout=timeout)
+
     # Conditional R breakpoint: line 2 fails at zero; line 3 matches at one.
     page.locator("#source").fill(
         "fs_r_browser_condition <- 0L\n"

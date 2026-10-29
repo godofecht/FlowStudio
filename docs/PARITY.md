@@ -1,3 +1,24 @@
+## 2026-10-29: native R debugger run-to-caret (verification pending)
+
+The native workspace now offers **Run R to caret**, using the actual editor
+selection to derive a 1-based source line (including CRLF source) and the
+existing Flow-owned `/api/debug/r/continue` route to run the persistent Rscript
+kernel to that target. The R kernel still requires a **later top-level
+expression** beginning on that line; it reports a real no-match error rather
+than simulating a breakpoint inside a function. The user-entered conditional
+breakpoint field is preserved. The control disables while a request is pending,
+after source changes or edit-and-undo, and when the caret is at or before the
+next paused expression. Direct programmatic execution enforces the same
+source-revision and caret guards. No new interpreter, backend route, compiler
+feature or hosted CI configuration is introduced.
+
+**Status: partial / independent CI verification pending.** Five new Node
+regressions cover source line mapping, actual native continue transport,
+breakpoint-field preservation, stale-source refusal and no-match responses.
+[PR #177](https://github.com/godofecht/FlowStudio/pull/177).
+This is not function-level R stepping, live Flow debugging, authenticated
+remote sessions or complete RStudio parity.
+
 ## 2026-10-29: native R postmortem function-frame navigation (verification pending)
 
 The persistent Rscript debugger now exposes optional, bounded function

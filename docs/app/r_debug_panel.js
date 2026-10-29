@@ -44,15 +44,27 @@ function revealSourceLine(source, line) {
   if (typeof source.focus === "function") source.focus();
   return true;
 }
+// A cursor target is a 1-based source line, not an expression index. The R
+// kernel checks whether a later top-level expression actually starts there.
+function caretLine(source) {
+  if (!source || typeof source.value !== "string" ||
+      !Number.isSafeInteger(source.selectionStart) ||
+      source.selectionStart < 0 || source.selectionStart > source.value.length)
+    return null;
+  let line = 1;
+  for (let i = 0; i < source.selectionStart; i++)
+    if (source.value[i] === "\n") line++;
+  return line;
+}
 function create({native, source, language, runtime, startButton, stepButton,
-                 continueButton, targetLine, watchExpression, frameInput, frameList, evaluateButton,
+                 continueButton, runToCursorButton, targetLine, watchExpression, frameInput, frameList, evaluateButton,
                  stopButton, statusButton, target, notice, documentIdentity, revealLine}) {
   if (!native || !source || !language || !runtime || !startButton || !stepButton ||
       !continueButton || !targetLine || !watchExpression || !evaluateButton ||
       !stopButton || !statusButton || !target)
     throw Error("Missing R debugger controls.");
   const supported = native.available();
-  let state = "idle", pending = false, frameCount = 0, frames = [];
+  let state = "idle", pending = false, frameCount = 0, frames = [], nextLine = null;
   let sourceRevision = 0, runSnapshot = null;
   const identity = typeof documentIdentity === "function" ? documentIdentity : () => null;
   // A paused R expression belongs to the original document revision.
@@ -66,8 +78,17 @@ function create({native, source, language, runtime, startButton, stepButton,
       language.value === "r" && runtime.value === "native";
   }
   source.addEventListener("input", () => { sourceRevision++; update(); });
+  if (runToCursorButton) {
+    source.addEventListener("click", update);
+    source.addEventListener("keyup", update);
+    source.addEventListener("select", update);
+  }
   function navigate(result, action) {
-    if (action === "evaluate" || !snapshotCurrent()) return false;
+    // A rejected Continue target leaves the kernel paused at the same
+    // expression. Preserve the user's requested caret instead of jumping
+    // back to the paused line and hiding the failed target.
+    if (action === "evaluate" || !snapshotCurrent() ||
+        (result.state === "paused" && result.ok === false)) return false;
     const line = result.state === "paused" ? result.next_line :
       result.state === "error" ? result.failed_line : null;
     if (!Number.isSafeInteger(line) || line < 1) return false;
@@ -111,6 +132,12 @@ function create({native, source, language, runtime, startButton, stepButton,
     startButton.disabled = !enabled || pending || state === "paused";
     stepButton.disabled = !enabled || pending || state !== "paused" || !current;
     continueButton.disabled = !enabled || pending || state !== "paused" || !current;
+    if (runToCursorButton) {
+      const cursor = caretLine(source);
+      runToCursorButton.disabled = !enabled || pending || state !== "paused" ||
+        !current || cursor === null ||
+        (Number.isSafeInteger(nextLine) && cursor <= nextLine);
+    }
     targetLine.disabled = !enabled || pending || state !== "paused" || !current;
     watchExpression.disabled = !enabled || pending || (state !== "paused" && state !== "error") || !current;
     if (frameInput) frameInput.disabled = !enabled || pending || state !== "error" || !frameCount || !current;
@@ -122,11 +149,19 @@ function create({native, source, language, runtime, startButton, stepButton,
   async function execute(action) {
     if (pending || !supported || language.value !== "r" || runtime.value !== "native")
       return false;
-    if ((action === "step" || action === "continue") && state !== "paused") return false;
+    if ((action === "step" || action === "continue" || action === "run-to-cursor") &&
+        state !== "paused") return false;
     if (action === "evaluate" && state !== "paused" && state !== "error") return false;
-    if (["step", "continue", "evaluate"].includes(action) && !snapshotCurrent()) {
+    if (["step", "continue", "run-to-cursor", "evaluate"].includes(action) && !snapshotCurrent()) {
       target.textContent = "Native R debugger: source changed; Stop or Status is available. Restart debugging to execute the current source.";
       if (notice) notice(target.textContent);
+      update();
+      return false;
+    }
+    const cursor = action === "run-to-cursor" ? caretLine(source) : null;
+    if (action === "run-to-cursor" &&
+        (cursor === null || (Number.isSafeInteger(nextLine) && cursor <= nextLine))) {
+      target.textContent = "Select a source line after the next paused top-level expression.";
       update();
       return false;
     }
@@ -136,9 +171,10 @@ function create({native, source, language, runtime, startButton, stepButton,
     pending = true;
     update();
     try {
-      const line = action === "continue" ? targetLine.value.trim() :
+      const line = action === "run-to-cursor" ? String(cursor) :
+        action === "continue" ? targetLine.value.trim() :
         action === "evaluate" ? watchExpression.value : "";
-      if (action === "continue" && !validRTargets(line))
+      if ((action === "continue" || action === "run-to-cursor") && !validRTargets(line))
         throw Error("R continue targets must be 1 to 64 comma-separated positive source lines with optional numeric conditions.");
       const selectedFrame = action === "evaluate" && frameInput ?
         Number(frameInput.value) : 0;
@@ -151,8 +187,9 @@ function create({native, source, language, runtime, startButton, stepButton,
         throw Error("R debugger evaluation requires 1 to 4096 bytes of source.");
       const result = action === "start" ?
         await native.debugRStart(source.value) :
-        await native.debugRCommand(action, line, selectedFrame);
+        await native.debugRCommand(action === "run-to-cursor" ? "continue" : action, line, selectedFrame);
       state = result.state;
+      nextLine = state === "paused" ? result.next_line : null;
       if (started) runSnapshot = started;
       if (state === "idle" || state === "done") runSnapshot = null;
       frames = state === "error" && Array.isArray(result.frames) ? result.frames : [];
@@ -178,6 +215,8 @@ function create({native, source, language, runtime, startButton, stepButton,
   startButton.addEventListener("click", () => { void execute("start"); });
   stepButton.addEventListener("click", () => { void execute("step"); });
   continueButton.addEventListener("click", () => { void execute("continue"); });
+  if (runToCursorButton)
+    runToCursorButton.addEventListener("click", () => { void execute("run-to-cursor"); });
   evaluateButton.addEventListener("click", () => { void execute("evaluate"); });
   stopButton.addEventListener("click", () => { void execute("stop"); });
   statusButton.addEventListener("click", () => { void execute("status"); });
@@ -188,7 +227,7 @@ function create({native, source, language, runtime, startButton, stepButton,
   update();
   return Object.freeze({execute, update});
 }
-const api = Object.freeze({format, create, revealSourceLine});
+const api = Object.freeze({format, create, revealSourceLine, caretLine});
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 global.FlowStudioRDebugPanel = api;
 })(globalThis);

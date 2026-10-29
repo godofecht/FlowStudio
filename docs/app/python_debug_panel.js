@@ -73,14 +73,21 @@ function create({native, source, language, breakpoints, pauseOnException, startB
   const supported = !!native.available();
   let state = "idle", pending = false;
   let sourceSnapshot = null, documentSnapshot = null;
+  let sourceRevision = 0, revisionSnapshot = null;
   let currentResult = null, selectedFrame = -1;
 
   // The native kernel retains the source passed to start(), not subsequent
   // editor edits. Never navigate a different document or a changed buffer.
-  function sourceIsCurrent() {
-    return sourceSnapshot !== null && documentSnapshot !== null &&
+  function executionIsCurrent() {
+    // A changed-then-restored buffer is not the same editor revision.
+    // A null document ID is permitted for standalone debugger clients, but
+    // the workspace supplies real IDs for navigation and isolation.
+    return sourceSnapshot !== null && revisionSnapshot === sourceRevision &&
       getDocId() === documentSnapshot && source.value === sourceSnapshot &&
       language.value === "python";
+  }
+  function sourceIsCurrent() {
+    return documentSnapshot !== null && executionIsCurrent();
   }
   function selectFrame(index, automatic = false) {
     if (!automatic && pending) return false;
@@ -119,10 +126,10 @@ function create({native, source, language, breakpoints, pauseOnException, startB
   }
   function update() {
     startButton.disabled = !supported || pending || state === "paused" || state === "running";
-    stepButton.disabled = !supported || pending || state !== "paused";
-    nextButton.disabled = !supported || pending || state !== "paused";
-    finishButton.disabled = !supported || pending || state !== "paused";
-    continueButton.disabled = !supported || pending || state !== "paused";
+    stepButton.disabled = !supported || pending || state !== "paused" || !executionIsCurrent();
+    nextButton.disabled = !supported || pending || state !== "paused" || !executionIsCurrent();
+    finishButton.disabled = !supported || pending || state !== "paused" || !executionIsCurrent();
+    continueButton.disabled = !supported || pending || state !== "paused" || !executionIsCurrent();
     stopButton.disabled = !supported || pending || (state !== "paused" && state !== "running");
     statusButton.disabled = !supported || pending;
     if (frameHost) {
@@ -133,7 +140,14 @@ function create({native, source, language, breakpoints, pauseOnException, startB
   async function execute(action) {
     if (!supported || pending) return false;
     if (action === "start" && (state === "paused" || state === "running")) return false;
-    if (["step", "next", "finish", "continue"].includes(action) && state !== "paused") return false;
+    if (["step", "next", "finish", "continue"].includes(action)) {
+      if (state !== "paused") return false;
+      if (!executionIsCurrent()) {
+        if (notice) notice("Editor changed since debugger start; stop the old session before continuing.");
+        update();
+        return false;
+      }
+    }
     if (action === "stop" && state !== "paused" && state !== "running") return false;
     pending = true;
     update();
@@ -143,6 +157,7 @@ function create({native, source, language, breakpoints, pauseOnException, startB
         if (language.value !== "python") throw Error("Select Python to debug native source.");
         sourceSnapshot = source.value;
         documentSnapshot = getDocId();
+        revisionSnapshot = sourceRevision;
         const lines = sourceSnapshot.split(/\r\n|\r|\n/).length;
         result = await native.debugPythonStart(sourceSnapshot, parseBreakpoints(breakpoints.value, lines),
           !!(pauseOnException && pauseOnException.checked));
@@ -170,6 +185,10 @@ function create({native, source, language, breakpoints, pauseOnException, startB
       update();
     }
   }
+  // Input events also invalidate an edit-then-undo of the same source text.
+  // Stop and status remain available to recover the old paused kernel.
+  source.addEventListener?.("input", () => { sourceRevision++; update(); });
+  language.addEventListener?.("change", update);
   startButton.addEventListener("click", () => { void execute("start"); });
   stepButton.addEventListener("click", () => { void execute("step"); });
   nextButton.addEventListener("click", () => { void execute("next"); });

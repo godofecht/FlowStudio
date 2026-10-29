@@ -122,6 +122,7 @@ test("R run-to-caret preserves the paused state when R reports no matching futur
   assert.equal(await f.instance.execute("run-to-cursor"), false);
   assert.deepEqual(calls, [["continue", "4"]]);
   assert.match(f.target.textContent, /No later top-level expression/);
+  assert.equal(f.source.selectionStart, f.source.value.indexOf("cat(c)") + 2);
   assert.equal(f.runToCursorButton.disabled, false);
 });
 

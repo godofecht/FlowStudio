@@ -1,3 +1,36 @@
+## 2026-10-29: native eight-state coupled anisotropic evolution (CI pending)
+
+`examples/native_coupled_evolution2d.flow` defines **eight real upstream
+Flow 2.0 `flow` states** for two interacting species on a periodic 2x2 grid,
+with independent x/y diffusion coefficients for each species and local
+reaction exchange. The compiler-generated `CoupledEvolution2D_step` uses
+RK4; no hand-written numerical integrator or separate Python mathematical
+frontend executes the Flow example. The unequal species diffusion tensors
+make the reaction and diffusion operators noncommuting. The exact reference
+uses four 2x2 Walsh/Fourier-mode matrix exponentials, not a scalar decay
+shortcut. The Flow program asserts all eight reference values, fourth-order
+convergence at 8/16/32/64 steps, total conservation, species exchange,
+positivity, deterministic replay, semigroup composition, rate/time scaling,
+species swap, grid transpose, uniform equilibrium, zero-rate/time limits,
+uncoupled species conservation and 10 invalid-input cases. A nonzero
+`main()` result fails real HTTP execution.
+
+`tests/test_native_flow_coupled_oracle.py` independently verifies the
+eight constants, an 8x8 direct finite-difference RK4 implementation,
+convergence thresholds, exchange/transposition symmetries, equilibrium and
+mutation sensitivity. **Five independent Python oracle tests passed locally**
+on 29 October 2026; they do not compile or execute Flow. The production
+`tests/http_smoke.py` checks and runs the exact Flow source through the
+real `/api/check/flow` and `/api/run/flow` endpoints and checks that the
+native compiler rejects malformed evolution syntax with HTTP 422.
+
+**Status: implementation committed on a focused branch; native Flow
+compilation, HTTP acceptance, Linux/macOS CI and browser execution are
+not yet verified.** The local environment has no accessible Flow compiler
+or native FlowStudio server. This does not establish general native PDE
+grammar, scalable grids, live Flow debugging, multi-user isolation or
+RStudio parity. Hosted CI configuration is unchanged.
+
 ## 2026-10-29: compiler-generated four-state Flow evolution numerical gate (CI pending)
 
 `examples/native_evolution_ring.flow` uses the **actual upstream Flow 2.0

@@ -32,6 +32,7 @@ class Equation:
     nonlinear: bool = False
     advection: bool = False
     reaction_power: int = 1
+    reaction_kind: str = "linear"
 
 
 def _name(expr: Expression, value: str) -> bool:
@@ -166,6 +167,35 @@ def _polynomial_relaxation(expr: Expression) -> int | None:
     return None
 
 
+def _saturating_relaxation(expr: Expression) -> bool:
+    """Recognize a bounded dissipative sink with an exact dimensionless argument.
+
+    reactionRate * ambientTemperature *
+        tanh((temperature - ambientTemperature) / ambientTemperature)
+
+    Its Jacobian is -reactionRate * sech²(...), so the stiffness is
+    globally bounded by the declared positive reaction rate.
+    """
+    if expr.operator != "mul" or len(expr.operands) != 2:
+        return False
+    coefficient, response = expr.operands
+    if (coefficient.operator != "mul" or len(coefficient.operands) != 2
+            or not ((_name(coefficient.operands[0], "reactionRate")
+                     and _name(coefficient.operands[1], "ambientTemperature"))
+                    or (_name(coefficient.operands[1], "reactionRate")
+                        and _name(coefficient.operands[0], "ambientTemperature")))
+            or response.operator != "tanh" or len(response.operands) != 1):
+        return False
+    argument = response.operands[0]
+    if (argument.operator != "div" or len(argument.operands) != 2
+            or not _name(argument.operands[1], "ambientTemperature")):
+        return False
+    difference = argument.operands[0]
+    return (difference.operator == "sub" and len(difference.operands) == 2
+            and _name(difference.operands[0], "temperature")
+            and _name(difference.operands[1], "ambientTemperature"))
+
+
 def _advection(expr: Expression, axis: str) -> bool:
     """Match a declared constant velocity times a centered spatial derivative."""
     if expr.operator != "mul" or len(expr.operands) != 2:
@@ -224,6 +254,7 @@ def compile_heat_equation(tokens: list[str], *, reaction: bool = False,
     relaxation = None
     nonlinear = False
     reaction_power = 1
+    reaction_kind = "linear"
     advection_axes: set[str] = set()
     mixed_count = 0
     for term, sign in _signed_terms(rhs):
@@ -237,11 +268,14 @@ def compile_heat_equation(tokens: list[str], *, reaction: bool = False,
             mixed_count += 1
         elif reaction and sign == -1 and relaxation is None and (
                 _relaxation(term) or _quadratic_relaxation(term)
-                or _polynomial_relaxation(term) is not None):
+                or _polynomial_relaxation(term) is not None
+                or _saturating_relaxation(term)):
             relaxation = term
             reaction_power = (2 if _quadratic_relaxation(term)
                               else _polynomial_relaxation(term) or 1)
-            nonlinear = reaction_power > 1
+            reaction_kind = ("saturating" if _saturating_relaxation(term) else
+                             "polynomial" if reaction_power > 1 else "linear")
+            nonlinear = reaction_kind != "linear"
         elif advection and sign == -1 and any(
                 _advection(term, axis) and axis not in advection_axes for axis in ("x", "y")):
             advection_axes.add("x" if _advection(term, "x") else "y")
@@ -262,4 +296,5 @@ def compile_heat_equation(tokens: list[str], *, reaction: bool = False,
             (reaction and relaxation is None) or (advection and advection_axes != {"x", "y"})
             or mixed_count != int(cross_diffusion)):
         raise ExpressionError("Heat dynamics requires exactly the declared diffusion operators and relaxation")
-    return Equation("temperature", rhs, forcing, relaxation, nonlinear, advection, reaction_power)
+    return Equation("temperature", rhs, forcing, relaxation, nonlinear, advection,
+                    reaction_power, reaction_kind)

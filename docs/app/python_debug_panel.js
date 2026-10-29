@@ -50,6 +50,13 @@ function parseBreakpoints(input, lineCount) {
   if (new Set(lines).size !== lines.length) throw Error("Duplicate breakpoint line.");
   return points;
 }
+function caretLine(source) {
+  if (!source || typeof source.value !== "string" ||
+      !Number.isSafeInteger(source.selectionStart) ||
+      source.selectionStart < 0 || source.selectionStart > source.value.length)
+    return null;
+  return source.value.slice(0, source.selectionStart).split(/\r\n|\r|\n/).length;
+}
 function format(data) {
   validate(data);
   const lines = ["Python debugger: " + data.state + (data.ok ? "" : " (error)")];
@@ -66,6 +73,7 @@ function format(data) {
 }
 function create({native, source, language, breakpoints, pauseOnException, startButton, stepButton,
                  nextButton, finishButton, continueButton, stopButton, statusButton, target, notice,
+                 runToCursorButton = null,
                  frameHost = null, getDocId = () => null, onFrame = () => {}}) {
   if (!native || !source || !language || !breakpoints || !startButton ||
       !stepButton || !nextButton || !finishButton || !continueButton || !stopButton || !statusButton || !target)
@@ -130,6 +138,8 @@ function create({native, source, language, breakpoints, pauseOnException, startB
     nextButton.disabled = !supported || pending || state !== "paused" || !executionIsCurrent();
     finishButton.disabled = !supported || pending || state !== "paused" || !executionIsCurrent();
     continueButton.disabled = !supported || pending || state !== "paused" || !executionIsCurrent();
+    if (runToCursorButton) runToCursorButton.disabled = !supported || pending ||
+      state !== "paused" || !executionIsCurrent() || caretLine(source) === null;
     stopButton.disabled = !supported || pending || (state !== "paused" && state !== "running");
     statusButton.disabled = !supported || pending;
     if (frameHost) {
@@ -140,7 +150,7 @@ function create({native, source, language, breakpoints, pauseOnException, startB
   async function execute(action) {
     if (!supported || pending) return false;
     if (action === "start" && (state === "paused" || state === "running")) return false;
-    if (["step", "next", "finish", "continue"].includes(action)) {
+    if (["step", "next", "finish", "continue", "run-to-cursor"].includes(action)) {
       if (state !== "paused") return false;
       if (!executionIsCurrent()) {
         if (notice) notice("Editor changed since debugger start; stop the old session before continuing.");
@@ -161,6 +171,10 @@ function create({native, source, language, breakpoints, pauseOnException, startB
         const lines = sourceSnapshot.split(/\r\n|\r|\n/).length;
         result = await native.debugPythonStart(sourceSnapshot, parseBreakpoints(breakpoints.value, lines),
           !!(pauseOnException && pauseOnException.checked));
+      } else if (action === "run-to-cursor") {
+        const line = caretLine(source);
+        if (line === null) throw Error("Place the editor caret on a valid source line.");
+        result = await native.debugPythonRunToLine(line);
       } else result = await native.debugPythonCommand(action);
       validate(result);
       state = result.state;
@@ -189,6 +203,10 @@ function create({native, source, language, breakpoints, pauseOnException, startB
   // Stop and status remain available to recover the old paused kernel.
   source.addEventListener?.("input", () => { sourceRevision++; update(); });
   language.addEventListener?.("change", update);
+  if (runToCursorButton) {
+    runToCursorButton.addEventListener("click", () => { void execute("run-to-cursor"); });
+    for (const event of ["click", "keyup", "select"]) source.addEventListener?.(event, update);
+  }
   startButton.addEventListener("click", () => { void execute("start"); });
   stepButton.addEventListener("click", () => { void execute("step"); });
   nextButton.addEventListener("click", () => { void execute("next"); });
@@ -198,9 +216,9 @@ function create({native, source, language, breakpoints, pauseOnException, startB
   statusButton.addEventListener("click", () => { void execute("status"); });
   if (!supported) target.textContent = "Native Python debugger requires the FlowStudio localhost server.";
   update();
-  return Object.freeze({execute, supported, selectFrame});
+  return Object.freeze({execute, supported, selectFrame, update});
 }
-const api = Object.freeze({validate, parseBreakpoints, format, create});
+const api = Object.freeze({validate, parseBreakpoints, caretLine, format, create});
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 global.FlowStudioPythonDebugPanel = api;
 })(globalThis);

@@ -45,7 +45,7 @@ test("native workspace routes reuse the real Flow-owned debugger transport", () 
     assert.ok(html.indexOf(tag) < html.indexOf('<script src="/workspace_panels.js"></script>'));
   }
   for (const id of ["liveDebugStart","liveDebugStep","liveDebugNext",
-    "liveDebugFinish","liveDebugContinue","liveDebugStop","liveDebugStatus",
+    "liveDebugFinish","liveDebugContinue","liveDebugRunToCursor","liveDebugStop","liveDebugStatus",
     "liveDebugBreakpoints","liveDebugPauseException","liveDebugOutput"]) {
     assert.ok(html.includes('id="' + id + '"'), id);
     assert.ok(workspace.includes('el("' + id + '")'), id);
@@ -54,6 +54,7 @@ test("native workspace routes reuse the real Flow-owned debugger transport", () 
   assert.match(workspace, /breakpoints\.lines\(activeDocumentId\(\)\)\.join\(","\)/);
   assert.match(read("src/main.flow"), /send_python_debug\("start", fs_body\(\)\)/);
   assert.match(read("src/main.flow"), /send_python_debug\("next", ""\)/);
+  assert.match(read("src/main.flow"), /send_python_debug\("run-to-line", fs_body\(\)\)/);
 });
 
 test("live debugger executes actual HTTP start, step and continue with bounded conditions", async () => {

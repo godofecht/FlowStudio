@@ -322,7 +322,7 @@ try {
         '# %% [flow]\n' + coupled + '\n',
         '# %% [r]\n' + rOracle + '\n',
         '# %% [flow]\n' + cyclic + '\n',
-        '# %% [r]\nstopifnot(exists("flowstudio_ui_exchange", envir=.GlobalEnv),',
+        '# %% [r]\nstopifnot(abs(flowstudio_ui_exchange - 2.1812692469220183) < 1e-12,',
         '  length(flowstudio_ui_amplitude) == 1L)\ncat("r-persistent-ok\\n")\n'
       ].join('');
       // The legacy /app/ textarea can have zero layout height in headless
@@ -400,7 +400,7 @@ try {
       // Check the real persistent R workspace after the failure, not a mock.
       await setNotebookSource(
         '# %% [r]\n' +
-        "stopifnot(!exists('flowstudio_should_not_run', envir=.GlobalEnv, inherits=FALSE))\n" +
+        "stopifnot(!exists('flowstudio_should_not_run', inherits=TRUE))\n" +
         "cat('r-fail-closed-ok\\n')\n");
       await notebookPage.locator('#runNotebook').click();
       await notebookPage.waitForFunction(() =>

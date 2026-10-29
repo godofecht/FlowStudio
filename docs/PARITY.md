@@ -15,6 +15,10 @@ The captured stack remains inspectable as text; it is not silently rebound
 to another editor buffer. Regression tests cover nested stack selection,
 step transitions, completed sessions, changed documents/source/language,
 asynchronous stale responses, unowned status requests and native UI wiring.
+The existing native Chromium acceptance was also extended to run a real
+Flow HTTP → CPython nested-stack pause, click the caller frame, verify Monaco
+caret movement, and reject navigation after switching documents. This
+acceptance is **added but not yet verified passing**.
 
 **Status: partial / CI pending.** This is an implemented source-navigation
 extension of the existing live Python debugger, not full interactive

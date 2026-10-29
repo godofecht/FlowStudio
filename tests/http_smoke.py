@@ -295,6 +295,35 @@ def main() -> None:
     bad_neumann = neumann_source.replace("Neumann(0K/m)", "Neumann(300K)")
     status, body = request("POST", "/api/check/mathflow", bad_neumann, accepted_headers)
     assert status == 422 and not json.loads(body)["ok"], (status, body)
+    # Complex oblique Fourier tensor diffusion: production Flow-owned HTTP,
+    # actual typed mathematical compiler and NumPy RK2, independent discrete
+    # Fourier eigenvalue oracle, every rendered spatial sample, and rejection.
+    tensor_source = (Path(__file__).resolve().parents[1] /
+                     "examples/heat_fourier_tensor_validation.flow").read_text(encoding="utf-8")
+    status, body = request("POST", "/api/check/mathflow", tensor_source, accepted_headers)
+    assert status == 200 and json.loads(body)["ok"], (status, body)
+    status, body = request("POST", "/api/run/mathflow", tensor_source, accepted_headers)
+    tensor = json.loads(body)
+    assert status == 200 and tensor["ok"] and tensor["steps"] == 100, (status, tensor)
+    n = 24
+    eigenvalue = (-4*n*n*.01*math.sin(2*math.pi/n)**2
+                  -4*n*n*.02*math.sin(3*math.pi/n)**2
+                  -.01*n*n*math.sin(4*math.pi/n)*math.sin(6*math.pi/n))
+    z = eigenvalue * .0001
+    amplitude = 10 * (1 + z + z*z/2)**100
+    assert abs(tensor["mean_temperature"] - 300) < 2e-9, tensor
+    assert abs(tensor["temperature_variance"] - amplitude*amplitude/2) < 2e-7, tensor
+    assert tensor["spatial"]["grid"] == [24, 24], tensor["spatial"]["grid"]
+    for i, row in enumerate(tensor["spatial"]["fields"]["temperature"]):
+        for j, actual in enumerate(row):
+            x, y = (i + .5)/n, (j + .5)/n
+            expected = 300 + amplitude * math.sin(4*math.pi*x + 6*math.pi*y)
+            assert abs(actual - expected) < 2e-8, (i, j, actual, expected)
+    bad_tensor = tensor_source.replace("crossDiffusivity = 0.01m²/s",
+                                       "crossDiffusivity = 0.05m²/s")
+    status, body = request("POST", "/api/check/mathflow", bad_tensor, accepted_headers)
+    assert status == 422 and not json.loads(body)["ok"], (status, body)
+
     # Independently selected x-Dirichlet and y-Neumann ghost cells, executed
     # through the native HTTP route rather than editor-only syntax.
     mixed_source = (Path(__file__).resolve().parents[1] /

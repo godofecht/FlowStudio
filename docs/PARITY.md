@@ -1,3 +1,33 @@
+## 2026-10-29: project-wide lexical Go to Definition (verification pending)
+
+The primary native workspace's F12 Go to Definition now falls back to a
+**read-only search of browser-granted project files** when neither the active
+source nor any already-open same-language buffer contains a declaration.
+It uses the existing bounded File System Access project search, reads the
+matching real disk files, checks the search snapshot, and recognizes actual
+Flow, R or Python declarations using the existing conservative outline
+scanner. Only a **single unambiguous** unopened declaration is navigable.
+Unsaved open tabs take precedence over their on-disk files. Truncated,
+oversized, unsafe-encoding, changed or ambiguous results fail closed; a
+document, caret, language or project change while the asynchronous search
+is running also blocks navigation. No code is executed and no new server
+routes, hosted CI definitions or upstream Flow grammar changes are involved.
+
+**Status: partial / all six independent Linux/macOS CI jobs passed in
+[CI #40894935553](https://github.com/godofecht/FlowStudio/actions/runs/40894935553).**
+Each source/transport platform passed 1,137 Node tests (12 skipped, zero
+failures) and 290 Python tests (13 skipped, zero failures). Ten focused
+Node regressions cover real recursive project search, Flow/R/Python
+declarations, ambiguity, comments/strings, open-buffer precedence,
+incomplete searches, changed files, invalid UTF-8, invalid input and
+browser wiring. Both native Flow 2.0 builds and HTTP acceptance suites
+passed, as did both FlowJIT jobs. The new project F12 interaction was
+verified in Node tests, **not** a separate physical-browser folder-picker
+acceptance. This is lexical navigation, **not semantic import resolution**,
+a language server, function-level R stepping, live Flow debugging,
+remote multi-user isolation or full RStudio parity. No hosted CI
+configuration changed. [PR #195](https://github.com/godofecht/FlowStudio/pull/195).
+
 ## 2026-10-29: serialized native Flow compiler checks (CI pending)
 
 The primary Monaco workspace now enforces **one in-flight native strict Flow

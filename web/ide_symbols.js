@@ -437,7 +437,67 @@ function applyOpenRename(model, plan) {
   return { documents: changed.length, references: plan.count };
 }
 
-const api = Object.freeze({ planOpenRename, applyOpenRename, parse, glyph, clip, identifierAt, findDefinitions, findDefinition,
+/* F12 fallback for browser-granted project files that are not already open.
+ * Search is lexical, read-only, and deliberately fails closed when the
+ * existing project search is incomplete or a disk snapshot has changed.
+ * It never resolves imports or executes source. */
+async function findProjectDefinition(project, language, name, openDocuments = [], options = {}) {
+  const valid = language === "r"
+    ? /^[A-Za-z._][A-Za-z0-9._]*$/ : /^[A-Za-z_][A-Za-z0-9_]*$/;
+  if (!LANGUAGES.includes(language) || typeof name !== "string" ||
+      !valid.test(name) || !project || typeof project.search !== "function" ||
+      !Array.isArray(openDocuments) || openDocuments.length > 24)
+    throw new TypeError("Invalid project definition lookup.");
+  const result = await project.search(name, {
+    caseSensitive: true, wholeWord: true, signal: options.signal
+  });
+  if (!result || !Array.isArray(result.matches) ||
+      result.truncated || result.skippedLarge || result.skippedUnsafe)
+    return {state: "incomplete"};
+  const extension = {flow: /\.flow$/i, python: /\.py$/i, r: /\.r$/i}[language];
+  const seen = new Set();
+  const matches = [];
+  for (const hit of result.matches) {
+    if (options.signal?.aborted) {
+      const error = new Error("Definition search cancelled.");
+      error.name = "AbortError";
+      throw error;
+    }
+    if (!hit || typeof hit.path !== "string" || !extension.test(hit.path) ||
+        !hit.handle || seen.has(hit.handle)) continue;
+    seen.add(hit.handle);
+    if (openDocuments.some(doc => doc && (doc.handle === hit.handle ||
+        (doc.path && doc.path === hit.path)))) continue;
+    let source;
+    try {
+      const file = await hit.handle.getFile();
+      if (!file || file.size > 1024 * 1024) return {state: "incomplete"};
+      const bytes = await file.arrayBuffer();
+      if (bytes.byteLength > 1024 * 1024) return {state: "incomplete"};
+      source = new TextDecoder("utf-8", {fatal: true, ignoreBOM: true}).decode(bytes);
+      if (source.includes("\0") || source.length > MAX_SOURCE) return {state: "incomplete"};
+    } catch (error) {
+      if (error.name === "AbortError") throw error;
+      return {state: "incomplete"};
+    }
+    // The project search and source scan must refer to the same file bytes.
+    for (const found of result.matches) {
+      if (found.handle !== hit.handle) continue;
+      if (!Number.isSafeInteger(found.index) || !Number.isSafeInteger(found.length) ||
+          source.slice(found.index, found.index + found.length) !== found.text)
+        return {state: "changed"};
+    }
+    const symbols = parse(language, source);
+    if (symbols.length >= MAX_SYMBOLS) return {state: "incomplete"};
+    for (const symbol of findDefinitions(language, source, name)) {
+      matches.push({path: hit.path, handle: hit.handle, symbol, source});
+      if (matches.length > 1) return {state: "ambiguous"};
+    }
+  }
+  return matches.length ? {state: "unique", ...matches[0]} : {state: "missing"};
+}
+
+const api = Object.freeze({ planOpenRename, applyOpenRename, findProjectDefinition, parse, glyph, clip, identifierAt, findDefinitions, findDefinition,
   definitionAt, uniqueOpenDefinition, findReferences, findOpenReferences, MAX_REFERENCES, MAX_SOURCE, MAX_SYMBOLS, MAX_LINE, LANGUAGES, GLYPHS });
 root.FlowStudioSymbols = api;
 if (typeof module !== "undefined" && module.exports) module.exports = api;

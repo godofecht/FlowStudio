@@ -1,0 +1,56 @@
+# Real native Flow 2.0 dimension-checked ODE integration acceptance.
+# flow run src/math_physical_ode_smoke.flow
+import .math_dimensions { Dimension, Quantity, dimensionless, length_dimension, temperature_dimension, time_dimension, quotient_dimension, quantity, same_dimension }
+import .math_physical_ode { PhysicalScalarEquation, PhysicalScalarResult, integrate_physical_scalar }
+
+function absolute(value: f64) -> f64 {
+    if value < 0.0 { return -value }
+    return value
+}
+
+function main() -> i32 {
+    let time_unit: Dimension = time_dimension()
+    let reciprocal_time: Dimension = quotient_dimension(dimensionless(), time_unit)
+    let distance_rate: Dimension = quotient_dimension(length_dimension(), time_unit)
+    let distance_acceleration: Dimension = quotient_dimension(distance_rate, time_unit)
+    let quadratic: PhysicalScalarEquation = PhysicalScalarEquation {
+        state_coefficient: quantity(0.0, reciprocal_time),
+        time_coefficient: quantity(2.0, distance_acceleration),
+        constant: quantity(0.0, distance_rate)
+    }
+    let initial_time: Quantity = quantity(0.0, time_unit)
+    let duration: Quantity = quantity(1.0, time_unit)
+    let initial_distance: Quantity = quantity(0.0, length_dimension())
+    let solution: PhysicalScalarResult = integrate_physical_scalar(quadratic, initial_time, initial_distance, duration, 20)
+    if not solution.valid { return 1 }
+    if absolute(solution.state.value - 1.0) > 0.000000000001 { return 2 }
+    if not same_dimension(solution.state.dimension, length_dimension()) { return 3 }
+    if integrate_physical_scalar(quadratic, initial_time, initial_distance, duration, 0).valid { return 4 }
+    if integrate_physical_scalar(quadratic, initial_time, initial_distance, initial_distance, 20).valid { return 5 }
+    let invalid_coefficient: PhysicalScalarEquation = PhysicalScalarEquation {
+        state_coefficient: quantity(0.0, length_dimension()),
+        time_coefficient: quantity(2.0, distance_acceleration),
+        constant: quantity(0.0, distance_rate)
+    }
+    if integrate_physical_scalar(invalid_coefficient, initial_time, initial_distance, duration, 20).valid { return 6 }
+    let invalid_constant: PhysicalScalarEquation = PhysicalScalarEquation {
+        state_coefficient: quantity(0.0, reciprocal_time),
+        time_coefficient: quantity(2.0, distance_acceleration),
+        constant: quantity(0.0, length_dimension())
+    }
+    if integrate_physical_scalar(invalid_constant, initial_time, initial_distance, duration, 20).valid { return 7 }
+    let temperature_rate: Dimension = quotient_dimension(temperature_dimension(), time_unit)
+    let temperature_acceleration: Dimension = quotient_dimension(temperature_rate, time_unit)
+    let decay: PhysicalScalarEquation = PhysicalScalarEquation {
+        state_coefficient: quantity(-1.0, reciprocal_time),
+        time_coefficient: quantity(0.0, temperature_acceleration),
+        constant: quantity(0.0, temperature_rate)
+    }
+    let temperature: PhysicalScalarResult = integrate_physical_scalar(
+        decay, initial_time, quantity(1.0, temperature_dimension()), duration, 20
+    )
+    if not temperature.valid { return 8 }
+    if absolute(temperature.state.value - 0.36787944117144233) > 0.0002 { return 9 }
+    if not same_dimension(temperature.state.dimension, temperature_dimension()) { return 10 }
+    return 0
+}

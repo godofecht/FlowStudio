@@ -541,6 +541,18 @@ def main() -> None:
     assert status == 422 and "No retained R function frame" in json.loads(body)["output"]
     status, body = request("POST", "/api/debug/r/stop", "", accepted_headers)
     assert status == 200 and json.loads(body)["frames"] == [], (status, body)
+    # The same function called from a later source buffer must not expose its
+    # old definition line as a navigation target in the current editor.
+    status, body = request("POST", "/api/debug/r/start",
+                           "fs_outer(41L)", accepted_headers)
+    assert status == 200, (status, body)
+    status, body = request("POST", "/api/debug/r/step", "", accepted_headers)
+    prior_frames = json.loads(body)
+    assert status == 422 and prior_frames["state"] == "error", prior_frames
+    assert len(prior_frames["frames"]) == 2, prior_frames
+    assert all(frame["definition_line"] is None
+               for frame in prior_frames["frames"]), prior_frames
+    assert request("POST", "/api/debug/r/stop", "", accepted_headers)[0] == 200
 
     # Native Git reads and writes require the existing intent/origin gate.
     assert request("GET", "/api/git/status")[0] == 404

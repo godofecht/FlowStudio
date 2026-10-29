@@ -84,7 +84,11 @@ function create({native, source, language, runtime, startButton, stepButton,
     source.addEventListener("select", update);
   }
   function navigate(result, action) {
-    if (action === "evaluate" || !snapshotCurrent()) return false;
+    // A rejected Continue target leaves the kernel paused at the same
+    // expression. Preserve the user's requested caret instead of jumping
+    // back to the paused line and hiding the failed target.
+    if (action === "evaluate" || !snapshotCurrent() ||
+        (result.state === "paused" && result.ok === false)) return false;
     const line = result.state === "paused" ? result.next_line :
       result.state === "error" ? result.failed_line : null;
     if (!Number.isSafeInteger(line) || line < 1) return false;

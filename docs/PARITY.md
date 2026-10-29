@@ -20,13 +20,25 @@ the **production** `/api/check/flow` and `/api/run/flow` routes, requires
 the successful execution marker, and checks that malformed `evolves as`
 source is rejected by the native compiler with HTTP 422.
 
-**Status: implementation committed to a PR branch; native Flow compiler,
-real HTTP execution, Linux/macOS CI and physical-browser acceptance are
-not yet verified for this change.** Do not claim this gate passed until the
-corresponding real CI run is observed. The upstream evolution compiler's
-numerical integration is being tested, not a general Flow PDE compiler,
-full live debugger, remote-session isolation or complete RStudio parity.
-No hosted CI workflow was modified.
+**Status: tested for this bounded upstream Flow evolution example;
+partial overall.** [PR #212](https://github.com/godofecht/FlowStudio/pull/212)
+merged as [ad95d96](https://github.com/godofecht/FlowStudio/commit/ad95d967f4fa00770aec7c3035e7bb3ff1d57d1f)
+after **all six Linux/macOS CI jobs passed** in
+[CI #40961329413](https://github.com/godofecht/FlowStudio/actions/runs/40961329413).
+Both source/transport platforms passed 1,143 Node tests (12 skipped,
+zero failed) and 319 Python tests (13 skipped, zero failed), including
+all four independent Poisson/Fourier oracle tests. Both native Flow 2.0
+build/HTTP jobs executed the checked-in evolution model and malformed
+compiler rejection through the real Flow-owned server, and both FlowJIT
+jobs passed. Existing Ubuntu Chromium acceptance passed; a separate
+physical-browser interaction specifically for the ring model was not
+executed. Local independent Poisson/Fourier/RK4 assertions passed, but
+native Flow/R/HTTP execution was unavailable locally. Post-merge
+`main` CI remains separately unverified at the time of this update.
+
+The upstream evolution compiler's numerical integration is being tested,
+not a general Flow PDE compiler, full live debugger, remote-session
+isolation or complete RStudio parity. No hosted CI workflow was modified.
 
 ## 2026-10-29: four-mode anisotropic tensor diffusion acceptance (six CI jobs passed)
 

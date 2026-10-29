@@ -523,7 +523,7 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
                 return (np.arctan2 if node.operator == "atan2" else np.hypot)(args[0], args[1])
         if node.operator in ("sin", "cos", "asin", "acos", "atan", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "log10", "log1p", "sqrt", "cbrt", "tanh", "abs"):
             with np.errstate(over="ignore", invalid="ignore"):
-                return getattr(np, {"asin": "arcsin", "acos": "arccos", "atan": "arctan"}.get(node.operator, node.operator))(args[0])
+                return getattr(np, {"asin": "arcsin", "acos": "arccos", "atan": "arctan", "asinh": "arcsinh", "acosh": "arccosh", "atanh": "arctanh"}.get(node.operator, node.operator))(args[0])
         raise ExpressionError(f"Unsupported operator {node.operator!r}")
     result = np.asarray(visit(expression), dtype=np.float64)
     if not np.all(np.isfinite(result)):

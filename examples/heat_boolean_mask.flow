@@ -1,0 +1,41 @@
+# Executable typed Unicode boolean masks, evaluated at both real RK2 stages.
+domain ThermalDomain {
+    grid       = 32 × 32
+    extent     = 1m × 1m
+    boundaries = Periodic
+}
+
+model HeatEquation on ThermalDomain {
+    const diffusivity = 0.01m²/s
+    field temperature: Scalar<Kelvin>
+
+    dynamics {
+        ∂ₜtemperature = diffusivity ∇²temperature + where((x < 0.5m ∧ y < 0.5m) ∨ (¬(x < 0.5m) ∧ ¬(y < 0.5m)), 2K/s, 0K/s)
+    }
+    initial {
+        temperature = 300K
+    }
+}
+
+solver ThermalSolver for HeatEquation {
+    spatial {
+        method    = FiniteDifference
+        diffusion = CentralDifference
+    }
+    temporal {
+        method   = RungeKuttaSecondOrder
+        timeStep = 10⁻⁴s
+    }
+}
+
+let simulation = HeatEquation ▷ ThermalSolver ▷ Evolve(until: 0.01s)
+
+simulation
+    ▷ Observe {
+        meanTemperature     = Mean(temperature)
+        temperatureVariance = Mean((temperature − meanTemperature)²)
+    }
+    ▷ Visualize {
+        temperature         = Heatmap
+        temperatureVariance = LineGraph
+    }

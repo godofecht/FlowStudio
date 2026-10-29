@@ -129,6 +129,14 @@ def main() -> None:
     assert status == 200, ("native cyclic Flow compile", status, body)
     status, body = request("POST", "/api/run/flow", cyclic_source, accepted_headers)
     assert status == 200, ("native cyclic Flow eigenmode acceptance", status, body)
+    # Native periodic heat PDE: actual Flow compiler and numerical RK2 run.
+    # All 25 numerical and invalid-input assertions are in Flow main().
+    heat_native_source = (Path(__file__).resolve().parents[1] /
+                          "examples/native_periodic_heat.flow").read_text(encoding="utf-8")
+    status, body = request("POST", "/api/check/flow", heat_native_source, accepted_headers)
+    assert status == 200, ("native periodic heat compile", status, body)
+    status, body = request("POST", "/api/run/flow", heat_native_source, accepted_headers)
+    assert status == 200, ("native periodic heat analytic execution", status, body)
     # Real Flow HTTP route, request intent/origin gate, and safe Quarto
     # preflight rejection (does not require Quarto to be installed).
     invalid_qmd = "---\nformat: pdf\n---\n\n# Wrong format\n"

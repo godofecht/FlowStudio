@@ -110,7 +110,7 @@ test("Flow check retains multiple source-owned compiler locations and de-duplica
     "/tmp/flowstudio-aB1234.flow:2:7: parse error: unexpected identifier 'bad' (byte 23)",
     "/tmp/flowstudio-aB1234.flow:4:2: type error: expected i32",
     "/tmp/flowstudio-aB1234.flow:2:7: parse error: unexpected identifier 'bad' (byte 23)"
-  ].join("\\n");
+  ].join("\n");
   await withBrowser(localhost, async (url) => {
     assert.equal(url, "/api/check/flow");
     return {ok:false, status:422, headers:{get:()=>null}, text:async()=>output};
@@ -130,7 +130,7 @@ test("Flow check never maps imported-file or generated-C errors into the current
     "/tmp/flowstudio-aB1234.flow:2:0: invalid column",
     "/tmp/flowstudio-source.flow:3:3: not a transport-generated path",
     "/tmp/flowstudio-aB1234.flow:5:6: error: actual source error"
-  ].join("\\n");
+  ].join("\n");
   await withBrowser(localhost, async () => ({
     ok:false, status:422, headers:{get:()=>null}, text:async()=>output
   }), async () => assert.deepEqual((await native.checkSyntax("bad")).diagnostics,
@@ -139,7 +139,7 @@ test("Flow check never maps imported-file or generated-C errors into the current
 
 test("Flow check bounds compiler locations and never decorates HTTP process failures", async () => {
   const output = Array.from({length:100}, (_,i) =>
-    `/tmp/flowstudio-aB1234.flow:${i+1}:1: ${"x".repeat(600)}`).join("\\r\\n");
+    `/tmp/flowstudio-aB1234.flow:${i+1}:1: ${"x".repeat(600)}`).join("\r\n");
   await withBrowser(localhost, async () => ({
     ok:false, status:422, headers:{get:()=>null}, text:async()=>output
   }), async () => {

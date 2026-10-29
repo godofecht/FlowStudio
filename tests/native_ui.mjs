@@ -325,7 +325,15 @@ try {
         '# %% [r]\nstopifnot(exists("flowstudio_ui_exchange", envir=.GlobalEnv),',
         '  length(flowstudio_ui_amplitude) == 1L)\ncat("r-persistent-ok\\n")\n'
       ].join('');
-      await notebookPage.locator('#source').fill(source);
+      // The legacy /app/ textarea can have zero layout height in headless
+      // Chromium at this viewport. Dispatch the real input event on the
+      // production DOM; execution, downloads and imports still use UI controls.
+      const setNotebookSource = value => notebookPage.evaluate(text => {
+        const editor = document.getElementById('source');
+        editor.value = text;
+        editor.dispatchEvent(new Event('input', {bubbles:true}));
+      }, value);
+      await setNotebookSource(source);
       await notebookPage.locator('#runNotebook').click();
       await notebookPage.waitForFunction(() =>
         document.querySelector('#notice')?.textContent === 'Notebook executed 4 cells.',
@@ -352,7 +360,7 @@ try {
       assert.equal(bundle.language, 'flow');
       assert.equal(bundle.results.length, 4);
       const beforeImport = notebookRequests.length;
-      await notebookPage.locator('#source').fill('# %% [r]\nstop("must-not-run")\n');
+      await setNotebookSource('# %% [r]\nstop("must-not-run")\n');
       await notebookPage.locator('#flowNotebookFile').setInputFiles({
         name:'complex-physical.fsnb', mimeType:'application/json',
         buffer:Buffer.from(JSON.stringify(bundle))
@@ -368,7 +376,7 @@ try {
 
       // A failing native Flow cell must stop before the subsequent R side effect.
       const beforeFailureR = notebookRequests.filter(route => route === '/api/run/r').length;
-      await notebookPage.locator('#source').fill(
+      await setNotebookSource(
         '# %% [flow]\nfunction main() -> i32 { return 37 }\n' +
         '# %% [r]\nflowstudio_should_not_run <- TRUE\n');
       await notebookPage.locator('#runNotebook').click();
@@ -383,7 +391,7 @@ try {
         beforeFailureR);
 
       // Check the real persistent R workspace after the failure, not a mock.
-      await notebookPage.locator('#source').fill(
+      await setNotebookSource(
         '# %% [r]\n' +
         "stopifnot(!exists('flowstudio_should_not_run', envir=.GlobalEnv, inherits=FALSE))\n" +
         "cat('r-fail-closed-ok\\n')\n");
@@ -397,7 +405,7 @@ try {
       // The same real Rscript session must render a genuine captured plot in
       // the browser; a text-only notebook test cannot establish plotting.
       await notebookPage.locator('#language').selectOption('r');
-      await notebookPage.locator('#source').fill(
+      await setNotebookSource(
         "plot(c(1,2,3), c(3,1,4), type='l'); cat('native-plot-ui-ok\\n')\n");
       await notebookPage.locator('#run').click();
       await notebookPage.waitForFunction(() =>

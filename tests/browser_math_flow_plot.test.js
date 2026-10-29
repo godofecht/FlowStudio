@@ -113,3 +113,40 @@ test("real semantic RK2 trace is bounded and checked before rendering", () => {
     {...trace, update: {...trace.update, updatedMean: Infinity}}
   ]) assert.throws(() => plots.prepareSemanticTrace({...heat, semantic_trace: bad}));
 });
+
+test("measured Navier-Stokes RK2 terms and projections validate before rendering", () => {
+  const term = (role, value) => ({
+    role, meaning: "Measured numerical contribution.", sign: 1,
+    symbols: role === "advection" ? ["velocity"] : ["kinematicViscosity", "velocity"],
+    dimension: [1, 0, -2, 0], meanMagnitude: value / 2, maximumMagnitude: value
+  });
+  const trace = {
+    schema: 2, field: "velocity", integrator: "RungeKuttaSecondOrder",
+    rateUnit: "m/s²", timeStep: 0.0001,
+    stages: [
+      {name: "initialSlope", time: 0, rhsRms: 1,
+        maximumDecompositionResidual: 0,
+        terms: [term("advection", 1), term("diffusion", 0.1)]},
+      {name: "predictorSlope", time: 0.0001, rhsRms: 0.9,
+        maximumDecompositionResidual: 1e-15,
+        terms: [term("advection", 0.9), term("diffusion", 0.09)]}
+    ],
+    projections: ["initial", "predictor", "corrector"].map(name => ({
+      name, maximumDivergenceBefore: 1, maximumDivergenceAfter: 1e-10,
+      correctionRms: 0.1, pressureMean: 0
+    })),
+    update: {initialKineticEnergy: 1, predictorKineticEnergy: 0.99,
+      updatedKineticEnergy: 0.98, maximumCorrectorDifference: 0.001}
+  };
+  assert.equal(plots.prepareSemanticTrace({...heat, semantic_trace: trace}), trace);
+  for (const bad of [
+    {...trace, rateUnit: "K/s"},
+    {...trace, stages: [trace.stages[0]]},
+    {...trace, stages: [trace.stages[0], {...trace.stages[1], time: 0}]},
+    {...trace, stages: [trace.stages[0], {...trace.stages[1],
+      terms: [term("reaction", 1), term("diffusion", 0.1)]}]},
+    {...trace, projections: [{...trace.projections[0], pressureMean: NaN},
+      ...trace.projections.slice(1)]},
+    {...trace, update: {...trace.update, updatedKineticEnergy: -1}}
+  ]) assert.throws(() => plots.prepareSemanticTrace({...heat, semantic_trace: bad}));
+});

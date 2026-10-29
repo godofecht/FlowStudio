@@ -65,8 +65,12 @@ Press **F12** with the caret on a Flow, R or Python identifier to navigate to
 its declaration in the active buffer. If absent, FlowStudio checks other
 already-open same-language tabs and switches only when there is exactly one
 match. The lookup is lexical and conservative, not semantic: imports,
-members, local bindings and unopened files are not resolved. It never executes
-source or reads additional files.
+members and local bindings are not resolved. If no open buffer defines the
+identifier, it can also search the browser-granted project for one unique
+unopened declaration; incomplete or ambiguous searches fail closed. Flow
+outlines include compiler-shipped evolution models (`flow`), dynamics
+systems (`dsys`), analysis horizons and PDE fields alongside ordinary
+functions, structs and bindings. Navigation never executes source.
 
 Run its tests with:
 

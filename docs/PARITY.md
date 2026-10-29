@@ -1,3 +1,30 @@
+## 2026-10-29: Flow-native evolution and PDE declaration navigation (PR verification pending)
+
+The primary FlowStudio outline and F12 declaration lookup now recognize
+four real upstream Flow 2.0 source constructs that were previously invisible:
+`flow Name { ... }` evolution models, `dsys name { ... }` dynamics systems,
+`horizon name finite/infinite ...` analysis horizons, and
+`field Name : Type[Size] on Domain` PDE fields. These are grounded in the
+upstream Flow compiler's shipped dynamics/field DSL documentation and
+fixtures. The existing lexical same-buffer, open-document and browser-granted
+project F12 paths reuse the new symbols without invoking a fake language
+server or executing code. Invalid, commented, quoted and indented
+non-top-level declarations are excluded conservatively. R/Python scanners
+are unchanged. Six new Node regression cases cover the declaration forms,
+field source locations, F12 usage, real recursive project search, invalid
+forms and language separation.
+
+**Status: partial / focused V8 execution passed, hosted CI pending.**
+The exact proposed `web/ide_symbols.js` and `web/project.js` were evaluated
+in an isolated V8 harness; domain outline, PDE field navigation, invalid
+syntax rejection and recursive project F12 assertions passed. The complete
+Node test suite, real browser interaction and native Flow build have **not**
+been executed for this PR. The local environment has no network-accessible
+Git checkout or installed native Flow compiler. This remains lexical source
+navigation, not compiler-backed semantic resolution, import resolution, live
+Flow debugging or complete RStudio parity. No hosted CI configuration,
+native backend or Flow compiler was changed.
+
 ## 2026-10-29: project-wide lexical Go to Definition (verification pending)
 
 The primary native workspace's F12 Go to Definition now falls back to a

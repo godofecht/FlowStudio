@@ -17,6 +17,10 @@ const GLYPHS = Object.freeze({
   class: "C",
   struct: "S",
   enum: "E",
+  flow: "~",
+  dsys: "D",
+  horizon: "H",
+  field: "F",
   value: "\u2022",
   import: "\u21e3"
 });
@@ -55,6 +59,28 @@ function flowSymbol(line, number) {
   if (match) {
     return { name: match[1], kind: "function", line: number,
       column: columnOf(line, match[1], 1), depth: 0, detail: clip(match[2]) };
+  }
+  /* The self-hosted Flow 2.0 compiler expands these real, named
+   * evolution, dynamics and PDE declarations before the core parser.
+   * They are top-level declarations, not ordinary function-local values. */
+  if (moduleScope) {
+    match = /^(flow|dsys)\s+([A-Za-z_]\w*)\s*\{\s*(?:#.*)?$/.exec(trimmed);
+    if (match) {
+      return { name: match[2], kind: match[1], line: number,
+        column: columnOf(line, match[2], 1), depth: 0, detail: "{" };
+    }
+    match = /^horizon\s+([A-Za-z_]\w*)\s+(finite|infinite)\b(.*)$/.exec(trimmed);
+    if (match) {
+      return { name: match[1], kind: "horizon", line: number,
+        column: columnOf(line, match[1], 1), depth: 0,
+        detail: clip(match[2] + match[3]) };
+    }
+    match = /^field\s+([A-Za-z_]\w*)\s*:\s*(.+?)\s+on\s+([A-Za-z_]\w*)(?:\s*#.*)?$/.exec(trimmed);
+    if (match) {
+      return { name: match[1], kind: "field", line: number,
+        column: columnOf(line, match[1], 1), depth: 0,
+        detail: clip(match[2] + " on " + match[3]) };
+    }
   }
   match = /^(?:export\s+)?(struct|enum)\s+([A-Za-z_]\w*)\s*(.*)$/.exec(trimmed);
   if (match) {

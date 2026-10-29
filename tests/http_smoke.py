@@ -11,6 +11,7 @@ import json
 import math
 import socket
 import shutil
+import subprocess
 from pathlib import Path
 import uuid
 import urllib.error
@@ -1090,6 +1091,20 @@ def main() -> None:
         # acceptance. The independent R oracle verifies every Fourier cell,
         # rejects a corrupted transfer, and survives the failed evaluation.
         verify_spectral_interop(request, accepted_headers)
+
+        # The production notebook controller executes mixed Flow/Python/R cells
+        # through this running Flow-owned server. Assert real numerics, graphics,
+        # portable .fsnb restoration, persistent kernels and fail-closed limits.
+        notebook = subprocess.run(
+            ["node", str(Path(__file__).with_name("native_mixed_notebook_http.cjs"))],
+            cwd=Path(__file__).resolve().parents[1], capture_output=True,
+            text=True, timeout=90, check=False,
+        )
+        assert notebook.returncode == 0, (
+            "real mixed-language notebook", notebook.returncode,
+            notebook.stdout[-2000:], notebook.stderr[-4000:],
+        )
+        print(notebook.stdout.strip())
 
         status, output = request("POST", "/api/reset/r", "", accepted_headers)
         assert status == 200 and "reset" in output, (status, output)

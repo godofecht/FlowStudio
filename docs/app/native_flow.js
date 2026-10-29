@@ -69,7 +69,11 @@ async function debugRResponse(endpoint, body) {
         data.frames.length <= 8 && data.frames.every((frame, i) =>
           frame && typeof frame === "object" && !Array.isArray(frame) &&
           frame.id === i + 1 && typeof frame.call === "string" &&
-          frame.call.length <= 180 && Array.isArray(frame.locals) &&
+          frame.call.length <= 180 &&
+          (frame.definition_line === undefined || frame.definition_line === null ||
+            (Number.isSafeInteger(frame.definition_line) &&
+             frame.definition_line > 0 && frame.definition_line <= 1000000)) &&
+          Array.isArray(frame.locals) &&
           frame.locals.length <= 16 && frame.locals.every(name =>
             typeof name === "string" && name.length <= 80)))))
     throw new Error("Invalid native R debugger response.");

@@ -62,7 +62,7 @@ try {
   // the primary workspace. No mocked trace or browser-only interpreter.
   await page.evaluate(() => {
     const source = document.getElementById('source');
-    source.value = 'live_value = 40\\nlive_value += 2\\nprint(live_value)\\n';
+    source.value = 'live_value = 40\nlive_value += 2\nprint(live_value)\n';
     source.dispatchEvent(new Event('input', { bubbles: true }));
   });
   await page.locator('#tab-debug').click();
@@ -77,7 +77,7 @@ try {
   await page.locator('#liveDebugContinue').click();
   await page.waitForFunction(() =>
     document.getElementById('liveDebugOutput').textContent.includes('Python debugger: done'));
-  assert.match(await page.locator('#liveDebugOutput').innerText(), /Output:\\n42/);
+  assert.match(await page.locator('#liveDebugOutput').innerText(), /Output:\n42/);
 
   await page.locator('#commandLauncher').click();
   await page.locator('#commandQuery').fill('go to symbol');

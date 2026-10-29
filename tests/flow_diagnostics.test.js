@@ -92,8 +92,13 @@ test("a newer check wins after editing while an older compiler call is pending",
   const first=f.controller.check();
   f.edit("function main() -> i32 {\n  return 1\n}");
   const second=f.controller.check();
+  // The second request must wait: an invalidated strict compiler can still
+  // occupy its native process for up to 60 seconds.
+  assert.equal(replies.length,1);
   replies[0]({ok:false,output:"old",diagnostics:[{line:1,column:1,message:"old"}]});
   assert.equal(await first,false);
+  await Promise.resolve();
+  assert.equal(replies.length,2);
   assert.equal(f.button.disabled,true);
   replies[1]({ok:true,output:"new check passed",diagnostics:[]});
   assert.equal(await second,true);

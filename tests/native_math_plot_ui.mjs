@@ -24,6 +24,7 @@ try {
     ['examples/heat_robin_transfer_profile.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_anisotropic.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_cross_diffusion.flow', 'temperatureVariance', 'meanTemperature'],
+    ['examples/heat_cross_diffusion_compact.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_nonlinear_reaction.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_power_reaction.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_unicode_radicals.flow', 'temperatureVariance', 'meanTemperature'],

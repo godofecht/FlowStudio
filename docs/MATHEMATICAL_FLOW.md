@@ -50,7 +50,8 @@ Only the **first timestep** is captured, with a maximum of 16 terms and no
 stored full-resolution state snapshots. A larger equation continues to run but
 does not emit this trace. The roles describe the validated mathematics; they
 do **not** infer the author's unstated intent. This is not an interactive
-general-purpose debugger, reverse execution, or Navier–Stokes semantic stepping.
+general-purpose debugger or reverse execution. Navier–Stokes has its own
+separately measured first-step inspector described above.
 
 ```sh
 python3 src/math_flow.py examples/heat_composed_forcing.flow

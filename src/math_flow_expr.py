@@ -21,7 +21,7 @@ UNITS: dict[str, Dimension] = {
 SUPERSCRIPT = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁻−", "0123456789--")
 _NUMBER = r"(?:10[⁻−-][⁰¹²³⁴⁵⁶⁷⁸⁹0-9]+|(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)"
 _UNIT = r"(?:kg|Pa|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)?(?:/(?:kg|Pa|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*))?"
-_TOKEN = re.compile(rf"(?P<space>\s+)|(?P<quantity>{_NUMBER}(?:{_UNIT})?)|(?P<name>∂ₓ²|∂ᵧ²|∂ₓ|∂ᵧ|∇²|∫|[A-Za-z_][A-Za-z_0-9]*|π)|(?P<postfix>[²³⁴⁵⁶⁷⁸])|(?P<op>==|!=|[+\-−*/×·÷√∛(),^|<>≤≥≠∧∨¬])")
+_TOKEN = re.compile(rf"(?P<space>\s+)|(?P<quantity>{_NUMBER}(?:{_UNIT})?)|(?P<name>∂ₓᵧ|∂ᵧₓ|∂ₓ²|∂ᵧ²|∂ₓ|∂ᵧ|∇²|∫|[A-Za-z_][A-Za-z_0-9]*|π)|(?P<postfix>[²³⁴⁵⁶⁷⁸])|(?P<op>==|!=|[+\-−*/×·÷√∛(),^|<>≤≥≠∧∨¬])")
 _UNIT_PART = re.compile(r"(kg|Pa|m|s|K)([²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)\Z")
 
 
@@ -165,7 +165,7 @@ class _Parser:
                 raise ExpressionError(f"{first} requires matching physical dimensions")
             left = Expression(first, (first_arg, second_arg),
                               dimension=DIMENSIONLESS if first == "atan2" else first_arg.dimension)
-        elif first in ("sin", "cos", "asin", "acos", "atan", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "ln", "log10", "log1p", "sqrt", "cbrt", "√", "∛", "tanh", "abs", "mean", "variance", "std", "rms", "integral", "∫", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∇²"):
+        elif first in ("sin", "cos", "asin", "acos", "atan", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "ln", "log10", "log1p", "sqrt", "cbrt", "√", "∛", "tanh", "abs", "mean", "variance", "std", "rms", "integral", "∫", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∂ₓᵧ", "∂ᵧₓ", "∇²"):
             if first in ("∇²", "√", "∛") and self.peek() != "(":
                 # Prefix Unicode differential/radical operators bind more tightly than products.
                 arg = self.expression(30, depth + 1)
@@ -187,7 +187,7 @@ class _Parser:
                 dim = tuple(x // 3 for x in arg.dimension)
             elif first in ("∂ₓ", "∂ᵧ"):
                 dim = _minus(arg.dimension, LENGTH)
-            elif first in ("∂ₓ²", "∂ᵧ²"):
+            elif first in ("∂ₓ²", "∂ᵧ²", "∂ₓᵧ", "∂ᵧₓ"):
                 dim = _minus(arg.dimension, (2, 0, 0, 0))
             elif first == "∇²":
                 dim = _minus(arg.dimension, (2, 0, 0, 0))
@@ -199,7 +199,7 @@ class _Parser:
                 dim = arg.dimension
             else:
                 dim = DIMENSIONLESS
-            left = Expression({"√": "sqrt", "∛": "cbrt", "ln": "log", "∫": "integral"}.get(first, first), (arg,), dimension=dim)
+            left = Expression({"√": "sqrt", "∛": "cbrt", "ln": "log", "∫": "integral", "∂ᵧₓ": "∂ₓᵧ"}.get(first, first), (arg,), dimension=dim)
         elif first in ("x", "y", "π", "pi"):
             left = Expression("name", value="pi" if first in ("π", "pi") else first,
                               dimension=LENGTH if first in ("x", "y") else DIMENSIONLESS)
@@ -224,7 +224,7 @@ class _Parser:
                 operator, precedence = ("add" if nxt == "+" else "sub"), 10
             elif nxt in ("*", "×", "·", "/", "÷"):
                 operator, precedence = ("div" if nxt in ("/", "÷") else "mul"), 20
-            elif nxt in ("(", "|", "π", "pi", "x", "y", "sin", "cos", "asin", "acos", "atan", "atan2", "hypot", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "ln", "log10", "log1p", "sqrt", "cbrt", "√", "∛", "tanh", "abs", "mean", "variance", "std", "rms", "integral", "∫", "min", "max", "where", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∇²") or nxt in self.symbols or re.fullmatch(rf"{_NUMBER}(?:{_UNIT})?", nxt):
+            elif nxt in ("(", "|", "π", "pi", "x", "y", "sin", "cos", "asin", "acos", "atan", "atan2", "hypot", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "ln", "log10", "log1p", "sqrt", "cbrt", "√", "∛", "tanh", "abs", "mean", "variance", "std", "rms", "integral", "∫", "min", "max", "where", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∂ₓᵧ", "∂ᵧₓ", "∇²") or nxt in self.symbols or re.fullmatch(rf"{_NUMBER}(?:{_UNIT})?", nxt):
                 operator, precedence = "mul", 20
             else:
                 break
@@ -335,7 +335,7 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
             if profile.dimension != expected:
                 raise ExpressionError(f"{kind} has incorrect physical dimensions")
             def check_profile(node):
-                if node.operator in ("∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∇²"):
+                if node.operator in ("∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∂ₓᵧ", "∂ᵧₓ", "∇²"):
                     raise ExpressionError(f"{kind} cannot contain spatial derivatives")
                 for child in node.operands:
                     check_profile(child)
@@ -357,7 +357,7 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
                 if profile.dimension != expected:
                     raise ExpressionError(f"Robin {description} has incorrect physical dimensions")
                 def check_robin_profile(node):
-                    if node.operator in ("∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∇²"):
+                    if node.operator in ("∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∂ₓᵧ", "∂ᵧₓ", "∇²"):
                         raise ExpressionError(f"Robin {description} cannot contain spatial derivatives")
                     for child in node.operands:
                         check_robin_profile(child)
@@ -468,7 +468,7 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
         return shifted
 
     def visit(node: Expression):
-        if node.operator in ("∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∇²"):
+        if node.operator in ("∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∂ₓᵧ", "∂ᵧₓ", "∇²"):
             shape, spacing_x, spacing_y = cartesian_grid()
             if (boundary_temperature is not None or boundary_gradient is not None
                     or (boundary_axes is not None and any(kind != "Periodic" for kind, _ in boundary_axes))
@@ -486,6 +486,17 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
                 return (neighbor(field, 0, True, spacing_x) + neighbor(field, 0, False, spacing_x) - 2 * field) / spacing_x**2
             if node.operator == "∂ᵧ²":
                 return (neighbor(field, 1, True, spacing_y) + neighbor(field, 1, False, spacing_y) - 2 * field) / spacing_y**2
+            if node.operator == "∂ₓᵧ":
+                # Cross diffusion is currently periodic only. A centered four-point
+                # stencil equals ∂ₓ(∂ᵧ(field)) and ∂ᵧ(∂ₓ(field)) on that grid.
+                if (boundary_temperature is not None or boundary_gradient is not None
+                        or (boundary_axes is not None and any(kind != "Periodic" for kind, _ in boundary_axes))
+                        or (boundary_faces is not None and any(kind != "Periodic" for kind, _ in boundary_faces))):
+                    raise ExpressionError("Mixed derivatives currently require periodic boundaries")
+                return (np.roll(np.roll(field, -1, axis=0), -1, axis=1)
+                        - np.roll(np.roll(field, -1, axis=0), 1, axis=1)
+                        - np.roll(np.roll(field, 1, axis=0), -1, axis=1)
+                        + np.roll(np.roll(field, 1, axis=0), 1, axis=1)) / (4 * spacing_x * spacing_y)
             return ((neighbor(field, 0, True, spacing_x) + neighbor(field, 0, False, spacing_x) - 2 * field) / spacing_x**2
                     + (neighbor(field, 1, True, spacing_y) + neighbor(field, 1, False, spacing_y) - 2 * field) / spacing_y**2)
         if node.operator == "literal":

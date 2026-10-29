@@ -1,3 +1,35 @@
+## 2026-10-29: 18-state native coupled 3x3 PDE acceptance (verification pending)
+
+`examples/native_coupled_evolution3x3.flow` uses **actual upstream Flow 2.0
+`flow` evolution declarations and compiler-generated RK4**, not the separate
+Python mathematical frontend. Eighteen real states represent two exchanging
+species on a periodic 3x3 grid with distinct left/right and up/down neighbors,
+unequal anisotropic diffusion tensors, and noncommuting reaction/diffusion.
+Every computed state is asserted against an independent nine-mode 2D discrete
+Fourier / 2x2 matrix-exponential oracle at t=1. Additional Flow assertions
+check fourth-order refinement, conservation, positivity, species exchange,
+transpose and translation equivariance, semigroup consistency, rate/time
+scaling, equilibrium, frozen states, deterministic replay and input limits.
+
+`tests/test_native_flow_coupled3x3_oracle.py` independently calculates the
+18 reference constants, runs a separate 18x18 finite-difference RK4 solver,
+checks the 3x3 stencil and reference source, detects parameter mutations and
+verifies numerical tolerances. This Python oracle is **not** a Flow compiler
+test. Production `tests/http_smoke.py` now checks and executes the exact
+source via the real Flow-owned `/api/check/flow` and `/api/run/flow` endpoints
+and requires HTTP 422 for malformed evolution syntax.
+`tests/native_math_plot_ui.mjs` runs the same source from the real Monaco Run
+button through the production server.
+
+**Status: unverified pending Linux/macOS CI; partial overall.** The local
+environment has no native Flow compiler or R installation and cannot execute
+the production HTTP/browser acceptance. Independent local Python Fourier/RK4
+calculations produced maximum cellwise errors 8.138253e-6 at 4 steps and
+approximately 6.4e-12 at 128 steps; these calculations do **not** establish
+that the checked-in Flow source compiles. No hosted CI configuration changed.
+General native PDE syntax, scalable grids, live Flow/R debugging, remote
+multi-user isolation and complete RStudio parity remain incomplete.
+
 ## 2026-10-29: native eight-state coupled anisotropic evolution (CI pending)
 
 `examples/native_coupled_evolution2d.flow` defines **eight real upstream

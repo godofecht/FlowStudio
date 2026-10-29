@@ -492,7 +492,7 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
                 raise ExpressionError(f"Missing numerical value for {node.value!r}")
             return values[node.value]
         args = tuple(visit(arg) for arg in node.operands)
-        if node.operator in ("lt", "le", "gt", "ge"):
+        if node.operator in ("lt", "le", "gt", "ge", "eq", "ne"):
             return {"lt": np.less, "le": np.less_equal,
                     "gt": np.greater, "ge": np.greater_equal,
                     "eq": np.equal, "ne": np.not_equal}[node.operator](args[0], args[1])

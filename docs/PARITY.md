@@ -28,12 +28,22 @@ Chromium CI gate, also loads the exact source into the real Monaco editor,
 selects Flow and clicks the primary Run button, requiring the real compiler's
 success marker in the terminal. This browser interaction is pending CI.
 
-**Status: implementation committed on a focused branch; native Flow
-compilation, HTTP acceptance, Linux/macOS CI and browser execution are
-not yet verified.** The local environment has no accessible Flow compiler
-or native FlowStudio server. This does not establish general native PDE
-grammar, scalable grids, live Flow debugging, multi-user isolation or
-RStudio parity. Hosted CI configuration is unchanged.
+**Status: tested for this bounded eight-state native evolution model;
+partial overall.** All six Linux/macOS CI jobs passed in
+[CI #40969162424](https://github.com/godofecht/FlowStudio/actions/runs/40969162424).
+Both source/transport platforms passed 1,143 Node tests (12 skipped, zero
+failed) and 324 Python tests (13 skipped, zero failed), including all five
+new independent oracle tests. Both native Flow 2.0 build/HTTP jobs checked
+and executed the exact coupled model through the production Flow-owned
+server, including real malformed-source rejection with HTTP 422. Both
+FlowJIT jobs passed. Ubuntu Chromium acceptance also loaded the exact
+model into Monaco, selected Flow and executed it through the actual Run
+button, asserting the real compiler's success marker in the terminal.
+The local Python oracle passed all five tests; local native Flow/R/HTTP
+and macOS physical-browser execution were unavailable. Post-merge
+`main` CI is not yet independently verified. This does not establish
+general native PDE grammar, scalable grids, live Flow debugging,
+multi-user isolation or RStudio parity. Hosted CI configuration is unchanged.
 
 ## 2026-10-29: compiler-generated four-state Flow evolution numerical gate (CI pending)
 

@@ -1,0 +1,46 @@
+# Analytically verifiable anisotropic cross diffusion with oblique Fourier modes.
+# Eigenvalue: -4*nx^2*Dx*sin(pi*kx/nx)^2 -4*ny^2*Dy*sin(pi*ky/ny)^2
+#             -C*nx*ny*sin(2*pi*kx/nx)*sin(2*pi*ky/ny).
+# RK2 amplification per step is 1 + lambda*dt + (lambda*dt)^2/2.
+domain ThermalDomain {
+    grid       = 24 × 24
+    extent     = 1m × 1m
+    boundaries = Periodic
+}
+
+model HeatEquation on ThermalDomain {
+    const diffusivityX = 0.01m²/s
+    const diffusivityY = 0.02m²/s
+    const crossDiffusivity = 0.01m²/s
+    field temperature: Scalar<Kelvin>
+
+    dynamics {
+        ∂ₜtemperature = diffusivityX ∂ₓ²(temperature) + diffusivityY ∂ᵧ²(temperature) + crossDiffusivity ∂ₓᵧ(temperature)
+    }
+    initial {
+        temperature = 300K + 10K * sin(4πx / 1m + 6πy / 1m)
+    }
+}
+
+solver ThermalSolver for HeatEquation {
+    spatial {
+        method    = FiniteDifference
+        diffusion = CentralDifference
+    }
+    temporal {
+        method   = RungeKuttaSecondOrder
+        timeStep = 0.0001s
+    }
+}
+
+let simulation = HeatEquation ▷ ThermalSolver ▷ Evolve(until: 0.01s)
+
+simulation
+    ▷ Observe {
+        meanTemperature     = Mean(temperature)
+        temperatureVariance = Mean((temperature − meanTemperature)²)
+    }
+    ▷ Visualize {
+        temperature         = Heatmap
+        temperatureVariance = LineGraph
+    }

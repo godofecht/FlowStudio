@@ -29,9 +29,9 @@ class VectorEquationTest(unittest.TestCase):
         self.assertIn(ORIGINAL, SOURCE)
         original = simulate(parse(SOURCE))
         reordered = simulate(parse(SOURCE.replace(ORIGINAL, REORDERED)))
-        self.assertEqual([term.role for term in reordered["semantic_trace"]["stages"][0]["terms"]],
+        self.assertEqual([term["role"] for term in reordered["semantic_trace"]["stages"][0]["terms"]],
                          ["diffusion", "advection"])
-        self.assertEqual([term.sign for term in reordered["semantic_trace"]["stages"][0]["terms"]],
+        self.assertEqual([term["sign"] for term in reordered["semantic_trace"]["stages"][0]["terms"]],
                          [1, -1])
         self.assertLess(abs(original["kinetic_energy"] - reordered["kinetic_energy"]), 1e-10)
         self.assertLess(reordered["max_divergence"], 1e-5)

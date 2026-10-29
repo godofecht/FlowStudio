@@ -172,18 +172,36 @@ async function checkRSyntax(code) {
     [{line, column, message:match[3].slice(0, 512)}] : [];
   return {ok:false, output:response.output, diagnostics};
 }
+// The native C transport writes the checked buffer to a unique
+// /tmp/flowstudio-XXXXXX.flow path (mkstemps). The compiler can also report
+// locations in imported Flow files or its generated C output; those do not
+// belong to the current Monaco document and must never become editor markers.
+function parseFlowDiagnostics(output) {
+  const diagnostics = [];
+  const seen = new Set();
+  for (const text of output.split(/\r?\n/)) {
+    const match = /^\s*\/tmp\/flowstudio-[A-Za-z0-9]{6}\.flow:([1-9][0-9]{0,6}):([1-9][0-9]{0,6}):\s*(.+)$/.exec(text);
+    if (!match) continue;
+    const line = Number(match[1]);
+    const column = Number(match[2]);
+    // Flow 2.x prints "parse error: ..." while C-style diagnostics may
+    // prefix "error:". Preserve all other compiler wording verbatim.
+    const message = match[3].replace(/^error:\s*/, "").slice(0, 512);
+    const key = `${line}:${column}:${message}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    diagnostics.push({line, column, message});
+    if (diagnostics.length === 64) break;
+  }
+  return diagnostics;
+}
 async function checkSyntax(code) {
   const response = await request("/api/check/flow", code);
   if (response.ok) return {ok:true, output:response.output, diagnostics:[]};
-  // Strict flowc diagnostics use FILE:LINE:COLUMN: severity: message.
-  // Keep compiler output when it does not carry a source location.
-  const match = /(?:^|\n)[^\r\n]*?:(\d+):(\d+):\s*(?:error:\s*)?([^\r\n]+)/.exec(response.output);
-  const line = match ? Number(match[1]) : 0;
-  const column = match ? Number(match[2]) : 0;
-  const diagnostics = match && Number.isSafeInteger(line) && line > 0 &&
-    Number.isSafeInteger(column) && column > 0 ?
-    [{line, column, message:match[3].slice(0, 512)}] : [];
-  return {ok:false, output:response.output, diagnostics};
+  // Preserve the complete bounded compiler output even when it has no
+  // source-owned locations, including process and transport failures.
+  return {ok:false, output:response.output,
+    diagnostics:response.status === 422 ? parseFlowDiagnostics(response.output) : []};
 }
 async function gitStatus() {
   return request("/api/git/status", "");

@@ -77,6 +77,7 @@ x + 2</textarea><div id="findPanel" role="search" aria-label="Source find and re
 const $ = id => document.getElementById(id);
 let worker, pending = new Map(), sequence = 0, busy = false, fileName = "untitled.py", imageURL = null, sessionGeneration = 0;
 let notebookRunner = null, notebookOutput = null;
+let editorIdentity = 0; // Changes whenever the displayed document is replaced.
 let notebookEntries = [], notebookExecutionSource = null, notebookExecutionLanguage = null;
 let notebookRecoveryFailed = false;
 function clearNotebookRecovery() { FlowStudioNotebookRecovery.clear(draftStorage); notebookRecoveryFailed = false; }
@@ -106,7 +107,8 @@ if (typeof FlowStudioRDebugPanel !== "undefined" && typeof FlowStudioNativeFlow 
     continueButton:$("rDebugContinue"), targetLine:$("rDebugTargetLine"),
     watchExpression:$("rDebugWatch"), frameInput:$("rDebugFrame"), evaluateButton:$("rDebugEvaluate"),
     stopButton:$("rDebugStop"), statusButton:$("rDebugStatus"),
-    target:$("rDebugOutput"), notice});
+    target:$("rDebugOutput"), notice,
+    documentIdentity:() => editorIdentity + ":" + sessionGeneration});
 const plotHistory = FlowStudioPlotHistory.create($("workspace"));
 const environmentData = FlowStudioEnvironmentData.create({
   target:$("workspace"), document, dataApi:FlowStudioData,
@@ -665,7 +667,7 @@ $("file").addEventListener("change", async event => {
   const source = await file.text();
   if (source.includes("\0")) { notice("NUL bytes are not supported."); return; }
   if (projectWorkspace.dirty() && !window.confirm("Discard unsaved editor changes?")) return;
-  $("source").value = source; notebookEntries = []; clearNotebookRecovery(); projectWorkspace.notifyExternalOpen(); fileName = file.name; $("filename").textContent = fileName;
+  editorIdentity++; $("source").value = source; notebookEntries = []; clearNotebookRecovery(); projectWorkspace.notifyExternalOpen(); fileName = file.name; $("filename").textContent = fileName;
   $("language").value = /\.py$/i.test(fileName) ? "python" : /\.flow$/i.test(fileName) ? "flow" : "r";
   packagePanel.updateLanguage?.();
   notice("Opened local file " + fileName);
@@ -719,7 +721,7 @@ const projectWorkspace = FlowStudioProjectWorkspace.create({
   saveFileButton: $("saveProjectFile"), reloadFileButton: $("reloadProjectFile"), saveAsButton: $("saveAsProjectFile"), newFileButton: $("newProjectFile"), newFolderButton: $("newProjectFolder"),
    deleteFileButton: $("deleteProjectFile"), renameFileButton: $("renameProjectFile"),
   status: notice, onDraft: queueDraft,
-  setFilename: (name, path) => { fileName = name; $("filename").textContent = path; notebookEntries = []; clearNotebookRecovery(); packagePanel.updateLanguage?.(); },
+  setFilename: (name, path) => { editorIdentity++; fileName = name; $("filename").textContent = path; notebookEntries = []; clearNotebookRecovery(); packagePanel.updateLanguage?.(); },
   picker: typeof window.showDirectoryPicker === "function"
     ? options => window.showDirectoryPicker({...options, mode:"readwrite"}) : null,
   saveAsPicker: typeof window.showSaveFilePicker === "function"
@@ -750,7 +752,7 @@ FlowStudioNotebookIO.create({
     $("source").value = imported.source;
     $("language").value = imported.language;
     packagePanel.updateLanguage?.();
-    fileName = name.replace(/\.(?:ipynb|fsnb|rmd|qmd)$/i, "") + (imported.language === "r" ? ".R" : imported.language === "flow" ? ".flow" : ".py");
+    editorIdentity++; fileName = name.replace(/\.(?:ipynb|fsnb|rmd|qmd)$/i, "") + (imported.language === "r" ? ".R" : imported.language === "flow" ? ".flow" : ".py");
     $("filename").textContent = name + " (imported notebook)";
     projectWorkspace.notifyExternalOpen();
     notebookEntries = [];

@@ -17,8 +17,11 @@ document can still be inspected as text but cannot move the current editor.
 The editor uses the returned 1-based source line only when that line exists.
 
 **Status: partial / five focused V8 tests passed against the committed
-browser module and new Node regression file; full Node, native Flow/Rscript
-and physical Chromium acceptance are pending.** This update modifies only
+browser module and new Node regression file.** The existing native Chromium
+acceptance script has also been extended to exercise actual Flow HTTP →
+Rscript start, step, source caret positioning and changed-buffer refusal,
+but that new physical-browser path has **not yet been run successfully**.
+Full Node, native Flow/Rscript and Chromium CI acceptance remain pending. This update modifies only
 the browser debugger panel, browser workspace wiring, regression tests and
 this evidence document. The native Flow server, R interpreter implementation,
 upstream Flow compiler and hosted CI definitions are unchanged. RStudio

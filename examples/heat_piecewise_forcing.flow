@@ -1,0 +1,41 @@
+# Executable typed scalar PDE with periodic heat diffusion and typed absolute value, min/max and time-dependent forcing evaluated at RK2 stage times.
+domain ThermalDomain {
+    grid       = 32 × 32
+    extent     = 1m × 1m
+    boundaries = Periodic
+}
+
+model HeatEquation on ThermalDomain {
+    const diffusivity = 0.01m²/s
+    field temperature: Scalar<Kelvin>
+
+    dynamics {
+        ∂ₜtemperature = diffusivity ∇²temperature + max(0K/s, min(2K/s, 2K/s * |sin(2πt / 1s)|))
+    }
+    initial {
+        temperature = 300K
+    }
+}
+
+solver ThermalSolver for HeatEquation {
+    spatial {
+        method    = FiniteDifference
+        diffusion = CentralDifference
+    }
+    temporal {
+        method   = RungeKuttaSecondOrder
+        timeStep = 10⁻⁴s
+    }
+}
+
+let simulation = HeatEquation ▷ ThermalSolver ▷ Evolve(until: 0.01s)
+
+simulation
+    ▷ Observe {
+        meanTemperature     = Mean(temperature)
+        temperatureVariance = Mean((temperature − meanTemperature)²)
+    }
+    ▷ Visualize {
+        temperature         = Heatmap
+        temperatureVariance = LineGraph
+    }

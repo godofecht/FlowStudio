@@ -21,7 +21,7 @@ UNITS: dict[str, Dimension] = {
 SUPERSCRIPT = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁻−", "0123456789--")
 _NUMBER = r"(?:10[⁻−-][⁰¹²³⁴⁵⁶⁷⁸⁹0-9]+|(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)"
 _UNIT = r"(?:kg|Pa|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)?(?:/(?:kg|Pa|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*))?"
-_TOKEN = re.compile(rf"(?P<space>\s+)|(?P<quantity>{_NUMBER}(?:{_UNIT})?)|(?P<name>∂ₓ²|∂ᵧ²|∂ₓ|∂ᵧ|∇²|[A-Za-z_][A-Za-z_0-9]*|π)|(?P<postfix>[²³⁴⁵⁶⁷⁸])|(?P<op>[+\-−*/×·÷√∛(),^])")
+_TOKEN = re.compile(rf"(?P<space>\s+)|(?P<quantity>{_NUMBER}(?:{_UNIT})?)|(?P<name>∂ₓ²|∂ᵧ²|∂ₓ|∂ᵧ|∇²|[A-Za-z_][A-Za-z_0-9]*|π)|(?P<postfix>[²³⁴⁵⁶⁷⁸])|(?P<op>[+\-−*/×·÷√∛(),^|])")
 _UNIT_PART = re.compile(r"(kg|Pa|m|s|K)([²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)\Z")
 
 
@@ -108,7 +108,7 @@ class _Parser:
         self.pos += 1
         return token
 
-    def expression(self, minimum: int = 0, depth: int = 0) -> Expression:
+    def expression(self, minimum: int = 0, depth: int = 0, stop_at_bar: bool = False) -> Expression:
         if depth > 32:
             raise ExpressionError("Expression nesting exceeds 32")
         first = self.take()
@@ -119,7 +119,24 @@ class _Parser:
             left = self.expression(0, depth + 1)
             if self.take() != ")":
                 raise ExpressionError("Expected closing parenthesis")
-        elif first in ("sin", "cos", "exp", "sqrt", "cbrt", "√", "∛", "tanh", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∇²"):
+        elif first == "|":
+            inner = self.expression(0, depth + 1, stop_at_bar=True)
+            if self.take() != "|":
+                raise ExpressionError("Expected closing absolute-value bar")
+            left = Expression("abs", (inner,), dimension=inner.dimension)
+        elif first in ("min", "max"):
+            if self.take() != "(":
+                raise ExpressionError(f"Expected '(' after {first}")
+            first_arg = self.expression(0, depth + 1)
+            if self.take() != ",":
+                raise ExpressionError(f"{first} requires exactly two arguments")
+            second_arg = self.expression(0, depth + 1)
+            if self.take() != ")":
+                raise ExpressionError(f"{first} requires exactly two arguments")
+            if first_arg.dimension != second_arg.dimension:
+                raise ExpressionError(f"{first} requires matching physical dimensions")
+            left = Expression(first, (first_arg, second_arg), dimension=first_arg.dimension)
+        elif first in ("sin", "cos", "exp", "sqrt", "cbrt", "√", "∛", "tanh", "abs", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∇²"):
             if first in ("∇²", "√", "∛") and self.peek() != "(":
                 # Prefix Unicode differential/radical operators bind more tightly than products.
                 arg = self.expression(30, depth + 1)
@@ -145,6 +162,8 @@ class _Parser:
                 dim = _minus(arg.dimension, (2, 0, 0, 0))
             elif first == "∇²":
                 dim = _minus(arg.dimension, (2, 0, 0, 0))
+            elif first == "abs":
+                dim = arg.dimension
             else:
                 dim = DIMENSIONLESS
             left = Expression({"√": "sqrt", "∛": "cbrt"}.get(first, first), (arg,), dimension=dim)
@@ -160,13 +179,15 @@ class _Parser:
             raise ExpressionError(f"Unknown symbol or operator {first!r}")
         while True:
             nxt = self.peek()
+            if stop_at_bar and nxt == "|":
+                break
             if nxt in ("^", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸"):
                 operator, precedence = "pow", 40
             elif nxt in ("+", "-", "−"):
                 operator, precedence = ("add" if nxt == "+" else "sub"), 10
             elif nxt in ("*", "×", "·", "/", "÷"):
                 operator, precedence = ("div" if nxt in ("/", "÷") else "mul"), 20
-            elif nxt in ("(", "π", "pi", "x", "y", "sin", "cos", "exp", "sqrt", "cbrt", "√", "∛", "tanh", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∇²") or nxt in self.symbols or re.fullmatch(rf"{_NUMBER}(?:{_UNIT})?", nxt):
+            elif nxt in ("(", "|", "π", "pi", "x", "y", "sin", "cos", "exp", "sqrt", "cbrt", "√", "∛", "tanh", "abs", "min", "max", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∇²") or nxt in self.symbols or re.fullmatch(rf"{_NUMBER}(?:{_UNIT})?", nxt):
                 operator, precedence = "mul", 20
             else:
                 break
@@ -190,7 +211,7 @@ class _Parser:
                 continue
             if nxt in ("+", "-", "−", "*", "×", "·", "/", "÷"):
                 self.take()
-            right = self.expression(precedence + 1, depth + 1)
+            right = self.expression(precedence + 1, depth + 1, stop_at_bar=stop_at_bar)
             if operator in ("add", "sub"):
                 if left.dimension != right.dimension:
                     raise ExpressionError(f"Cannot {operator} dimensions {left.dimension} and {right.dimension}")
@@ -207,7 +228,7 @@ def parse_expression(source: str, *, symbols: dict[str, Dimension] | None = None
     if symbols:
         for name, dimension in symbols.items():
             if (not re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", name)
-                    or name in ("x", "y", "pi", "sin", "cos", "exp", "sqrt", "cbrt", "tanh")
+                    or name in ("x", "y", "pi", "sin", "cos", "exp", "sqrt", "cbrt", "tanh", "abs", "min", "max")
                     or len(dimension) != 4 or any(type(power) is not int for power in dimension)):
                 raise ExpressionError(f"Invalid typed symbol {name!r}")
     parser = _Parser(tokenize(source), symbols)
@@ -424,7 +445,9 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
                 return np.divide(args[0], args[1])
         if node.operator == "neg": return -args[0]
         if node.operator == "pos": return args[0]
-        if node.operator in ("sin", "cos", "exp", "sqrt", "cbrt", "tanh"):
+        if node.operator in ("min", "max"):
+            return (np.minimum if node.operator == "min" else np.maximum)(args[0], args[1])
+        if node.operator in ("sin", "cos", "exp", "sqrt", "cbrt", "tanh", "abs"):
             with np.errstate(over="ignore", invalid="ignore"):
                 return getattr(np, node.operator)(args[0])
         raise ExpressionError(f"Unsupported operator {node.operator!r}")

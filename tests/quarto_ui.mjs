@@ -45,8 +45,34 @@ try {
   });
   await page.waitForFunction(() => document.body.textContent.includes('Quarto import failed'));
   assert.equal(await page.locator('#source').inputValue(), before);
+
+  // Real Flow HTTP -> persistent Rscript debugger -> source textarea caret.
+  // This exercises actual native R execution, not a mocked debugger result.
+  await page.locator('#language').selectOption('r');
+  await page.locator('#rRuntime').selectOption('native');
+  const rSource = 'a <- 1L\nb <- a + 1L\nprint(b)';
+  await page.locator('#source').fill(rSource);
+  await page.locator('#rDebugStart').click();
+  await page.waitForFunction(() =>
+    document.querySelector('#rDebugOutput')?.textContent.includes('Next expression at line 1'));
+  assert.equal(await page.locator('#source').evaluate(el => el.selectionStart), 0);
+  await page.locator('#rDebugStep').click();
+  await page.waitForFunction(() =>
+    document.querySelector('#rDebugOutput')?.textContent.includes('Next expression at line 2'));
+  assert.equal(await page.locator('#source').evaluate(el => el.selectionStart),
+    rSource.indexOf('b <-'));
+  // An edited buffer must never be moved by a later real debugger response.
+  await page.locator('#source').fill('# changed\nb <- a + 1L\nprint(b)');
+  await page.locator('#source').evaluate(el => el.setSelectionRange(0, 0));
+  await page.locator('#rDebugStatus').click();
+  await page.waitForFunction(() =>
+    document.querySelector('#rDebugOutput')?.textContent.includes('Next expression at line 2'));
+  assert.equal(await page.locator('#source').evaluate(el => el.selectionStart), 0);
+  await page.locator('#rDebugStop').click();
+  await page.waitForFunction(() =>
+    document.querySelector('#rDebugOutput')?.textContent.includes('R expression debugger: idle'));
   assert.deepEqual(errors, [], errors.join('\n'));
-  console.log('PASS: real Chromium Quarto import/export, native routes and fail-closed rejection');
+  console.log('PASS: real Chromium Quarto import/export and native R debugger source navigation');
 } finally {
   await browser.close();
 }

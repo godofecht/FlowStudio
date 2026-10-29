@@ -179,6 +179,15 @@ try {
   assert.equal(await page.evaluate(() => FlowStudioEditor.editor.getPosition().lineNumber), 2);
   assert.ok(await page.locator('.flowstudio-flow-error').count() > 0,
     'real Flow compiler error should decorate the submitted Monaco source');
+  // HTTP 422 is the expected, real strict-compiler rejection. Chromium emits
+  // a console resource error for it; account for only this known response
+  // without masking unrelated page errors from the rest of the acceptance.
+  assert.ok(errors.some(message =>
+    message === '422 http://127.0.0.1:8751/api/check/flow'));
+  assert.ok(errors.every(message =>
+    message === '422 http://127.0.0.1:8751/api/check/flow' ||
+    /Failed to load resource:.*422/.test(message)), JSON.stringify(errors));
+  errors.length = 0;
 
   // Exercise the worker path and wait beyond rendering and deferred callbacks.
   const workerResult = await page.evaluate(async () => {

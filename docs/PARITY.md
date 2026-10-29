@@ -12,12 +12,22 @@ next paused expression. Direct programmatic execution enforces the same
 source-revision and caret guards. No new interpreter, backend route, compiler
 feature or hosted CI configuration is introduced.
 
-**Status: partial / independent CI verification pending.** Five new Node
-regressions cover source line mapping, actual native continue transport,
+**Status: partial / independently verified in all six Linux/macOS jobs in
+[CI #40831699195](https://github.com/godofecht/FlowStudio/actions/runs/40831699195).**
+Each source platform passed 1,087 of 1,099 Node tests (12 skipped, zero
+failures) and 239 Python tests (13 skipped, zero failures). Both native Flow
+2.0.0 builds and HTTP acceptance suites passed, as did both FlowJIT jobs.
+Real Ubuntu Chromium acceptance exercised editor caret positioning, the
+Flow-owned R debugger HTTP continue route, actual Rscript execution, the
+top-level breakpoint pause, preserved typed conditional targets and completion.
+The five new Node regressions cover source line mapping, native transport,
 breakpoint-field preservation, stale-source refusal and no-match responses.
-[PR #177](https://github.com/godofecht/FlowStudio/pull/177).
-This is not function-level R stepping, live Flow debugging, authenticated
-remote sessions or complete RStudio parity.
+The rejected-target path also preserves the editor caret for correction.
+[PR #177](https://github.com/godofecht/FlowStudio/pull/177) merged as
+[88e7ba2](https://github.com/godofecht/FlowStudio/commit/88e7ba20ab30a51c2d565f2184593c9a065c6f3c).
+No hosted CI configuration changed. This is not independent macOS
+physical-browser acceptance, function-level R stepping, live Flow debugging,
+authenticated remote sessions or complete RStudio parity.
 
 ## 2026-10-29: native R postmortem function-frame navigation (verification pending)
 

@@ -28,6 +28,7 @@ try {
     ['examples/heat_power_reaction.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_unicode_radicals.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_piecewise_forcing.flow', 'temperatureVariance', 'meanTemperature'],
+    ['examples/heat_boolean_mask.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_cubic_reaction.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_saturating_reaction.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_composed_forcing.flow', 'temperatureVariance', 'meanTemperature'],

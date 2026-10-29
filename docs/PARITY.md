@@ -21,12 +21,22 @@ and requires HTTP 422 for malformed evolution syntax.
 `tests/native_math_plot_ui.mjs` runs the same source from the real Monaco Run
 button through the production server.
 
-**Status: unverified pending Linux/macOS CI; partial overall.** The local
-environment has no native Flow compiler or R installation and cannot execute
-the production HTTP/browser acceptance. Independent local Python Fourier/RK4
-calculations produced maximum cellwise errors 8.138253e-6 at 4 steps and
-approximately 6.4e-12 at 128 steps; these calculations do **not** establish
-that the checked-in Flow source compiles. No hosted CI configuration changed.
+**Status: tested for this bounded native 18-state model; partial overall.**
+All six Linux/macOS jobs passed in
+[CI #40975614671](https://github.com/godofecht/FlowStudio/actions/runs/40975614671).
+Each source/transport platform passed 1,143 of 1,155 Node tests (12 skipped,
+zero failed) and 316 of 329 Python tests (13 skipped, zero failed), including
+all five new independent Fourier/RK4/stencil regressions. Both native Flow
+2.0 platforms compiled and executed the exact 18-state source through the
+real Flow-owned HTTP server and rejected malformed syntax with HTTP 422.
+Ubuntu Chromium additionally loaded the source into Monaco and clicked
+the actual Run button, observing the successful native compiler output.
+Both FlowJIT jobs passed. Local independent Python numerical tests passed
+five checks, with maximum cellwise errors 8.138253e-6 at 4 steps and
+6.406209e-12 at 128 steps. The local environment has no native Flow compiler
+or R installation; native HTTP/browser verification was performed in CI.
+Independent macOS physical-browser acceptance was not performed.
+Post-merge main CI remains unverified. No hosted CI configuration changed.
 General native PDE syntax, scalable grids, live Flow/R debugging, remote
 multi-user isolation and complete RStudio parity remain incomplete.
 

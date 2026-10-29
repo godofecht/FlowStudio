@@ -261,6 +261,12 @@ def parse_expression(source: str, *, symbols: dict[str, Dimension] | None = None
     expression = parser.expression()
     if parser.peek() != "<EOF>":
         raise ExpressionError(f"Unexpected trailing token {parser.peek()!r}")
+    def validate_predicates(node: Expression, *, allowed: bool = False):
+        if node.operator in ("lt", "le", "gt", "ge") and not allowed:
+            raise ExpressionError("Comparisons are only valid as where predicates")
+        for index, child in enumerate(node.operands):
+            validate_predicates(child, allowed=node.operator == "where" and index == 0)
+    validate_predicates(expression)
     return expression
 
 

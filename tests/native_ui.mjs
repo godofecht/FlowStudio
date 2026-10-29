@@ -392,6 +392,15 @@ try {
       assert.equal(bundle.results.length, 4);
       const beforeImport = notebookRequests.length;
       await setNotebookSource('# %% [r]\nstop("must-not-run")\n');
+      // Importing over a modified project is intentionally confirmation-gated.
+      // Chromium dismisses dialogs by default, which would silently abort
+      // the real import; explicitly accept the production safety prompt.
+      let importConfirmed = false;
+      notebookPage.once('dialog', async dialog => {
+        assert.match(dialog.message(), /Discard unsaved editor changes/);
+        importConfirmed = true;
+        await dialog.accept();
+      });
       await notebookPage.locator('#flowNotebookFile').setInputFiles({
         name:'complex-physical.fsnb', mimeType:'application/json',
         buffer:Buffer.from(JSON.stringify(bundle))
@@ -400,6 +409,7 @@ try {
         document.querySelector('#notice')?.textContent.startsWith(
           'FlowStudio notebook imported with saved outputs; interpreter state was not restored.'),
         null, {timeout:30000});
+      assert.equal(importConfirmed, true, 'Modified-source import must request confirmation');
       assert.equal(await notebookPage.locator('#source').inputValue(), source);
       assert.match(await notebookPage.locator('#notebookOutput').innerText(), /r-persistent-ok/);
       assert.equal(notebookRequests.length, beforeImport,

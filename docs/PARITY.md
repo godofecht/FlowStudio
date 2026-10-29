@@ -1,3 +1,45 @@
+## 2026-10-29: 18-state native coupled 3x3 PDE acceptance (verification pending)
+
+`examples/native_coupled_evolution3x3.flow` uses **actual upstream Flow 2.0
+`flow` evolution declarations and compiler-generated RK4**, not the separate
+Python mathematical frontend. Eighteen real states represent two exchanging
+species on a periodic 3x3 grid with distinct left/right and up/down neighbors,
+unequal anisotropic diffusion tensors, and noncommuting reaction/diffusion.
+Every computed state is asserted against an independent nine-mode 2D discrete
+Fourier / 2x2 matrix-exponential oracle at t=1. Additional Flow assertions
+check fourth-order refinement, conservation, positivity, species exchange,
+transpose and translation equivariance, semigroup consistency, rate/time
+scaling, equilibrium, frozen states, deterministic replay and input limits.
+
+`tests/test_native_flow_coupled3x3_oracle.py` independently calculates the
+18 reference constants, runs a separate 18x18 finite-difference RK4 solver,
+checks the 3x3 stencil and reference source, detects parameter mutations and
+verifies numerical tolerances. This Python oracle is **not** a Flow compiler
+test. Production `tests/http_smoke.py` now checks and executes the exact
+source via the real Flow-owned `/api/check/flow` and `/api/run/flow` endpoints
+and requires HTTP 422 for malformed evolution syntax.
+`tests/native_math_plot_ui.mjs` runs the same source from the real Monaco Run
+button through the production server.
+
+**Status: tested for this bounded native 18-state model; partial overall.**
+All six Linux/macOS jobs passed in
+[CI #40975614671](https://github.com/godofecht/FlowStudio/actions/runs/40975614671).
+Each source/transport platform passed 1,143 of 1,155 Node tests (12 skipped,
+zero failed) and 316 of 329 Python tests (13 skipped, zero failed), including
+all five new independent Fourier/RK4/stencil regressions. Both native Flow
+2.0 platforms compiled and executed the exact 18-state source through the
+real Flow-owned HTTP server and rejected malformed syntax with HTTP 422.
+Ubuntu Chromium additionally loaded the source into Monaco and clicked
+the actual Run button, observing the successful native compiler output.
+Both FlowJIT jobs passed. Local independent Python numerical tests passed
+five checks, with maximum cellwise errors 8.138253e-6 at 4 steps and
+6.406209e-12 at 128 steps. The local environment has no native Flow compiler
+or R installation; native HTTP/browser verification was performed in CI.
+Independent macOS physical-browser acceptance was not performed.
+Post-merge main CI remains unverified. No hosted CI configuration changed.
+General native PDE syntax, scalable grids, live Flow/R debugging, remote
+multi-user isolation and complete RStudio parity remain incomplete.
+
 ## 2026-10-29: native eight-state coupled anisotropic evolution (CI pending)
 
 `examples/native_coupled_evolution2d.flow` defines **eight real upstream

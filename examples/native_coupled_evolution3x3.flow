@@ -1,0 +1,429 @@
+# Actual upstream Flow 2.0 compiler-generated RK4 for 18 coupled PDE states.
+# Two species on a periodic 3x3 grid, distinct left/right and up/down
+# neighbors, noncommuting species exchange and unequal anisotropic tensors.
+# Every state is compared against an independent 2D discrete Fourier /
+# symmetric 2x2 matrix-exponential solution. No Python executes this program.
+# Numerical oracle: tests/test_native_flow_coupled3x3_oracle.py
+# Run: flow run examples/native_coupled_evolution3x3.flow
+
+flow CoupledHeat3x3 {
+    state uNorthwest: f64 = 3.5
+    state uNorth: f64 = 2.4011473670974874
+    state uNortheast: f64 = 1.8988526329025126
+    state uWest: f64 = 3.442153903091735
+    state uCenter: f64 = 3.074820508075689
+    state uEast: f64 = 2.6413526329025125
+    state uSouthwest: f64 = 3.8578460969082653
+    state uSouth: f64 = 3.143647367097487
+    state uSoutheast: f64 = 3.0401794919243113
+    state vNorthwest: f64 = 1.4
+    state vNorth: f64 = 2.7
+    state vNortheast: f64 = 2.3
+    state vWest: f64 = 1.8
+    state vCenter: f64 = 2.1
+    state vEast: f64 = 3
+    state vSouthwest: f64 = 2.4
+    state vSouth: f64 = 1.6
+    state vSoutheast: f64 = 2.8
+
+    param diffusivity_ux: f64 = 0.02
+    param diffusivity_uy: f64 = 0.04
+    param diffusivity_vx: f64 = 0.05
+    param diffusivity_vy: f64 = 0.01
+    param exchange_rate: f64 = 0.15
+    param spacing_x: f64 = 0.5
+    param spacing_y: f64 = 0.5
+
+    solver { dt 1 ms method rk4 }
+
+    uNorthwest evolves as diffusivity_ux * (uNortheast + uNorth - 2.0 * uNorthwest) / (spacing_x * spacing_x) + diffusivity_uy * (uSouthwest + uWest - 2.0 * uNorthwest) / (spacing_y * spacing_y) + exchange_rate * (vNorthwest - uNorthwest)
+    uNorth evolves as diffusivity_ux * (uNorthwest + uNortheast - 2.0 * uNorth) / (spacing_x * spacing_x) + diffusivity_uy * (uSouth + uCenter - 2.0 * uNorth) / (spacing_y * spacing_y) + exchange_rate * (vNorth - uNorth)
+    uNortheast evolves as diffusivity_ux * (uNorth + uNorthwest - 2.0 * uNortheast) / (spacing_x * spacing_x) + diffusivity_uy * (uSoutheast + uEast - 2.0 * uNortheast) / (spacing_y * spacing_y) + exchange_rate * (vNortheast - uNortheast)
+    uWest evolves as diffusivity_ux * (uEast + uCenter - 2.0 * uWest) / (spacing_x * spacing_x) + diffusivity_uy * (uNorthwest + uSouthwest - 2.0 * uWest) / (spacing_y * spacing_y) + exchange_rate * (vWest - uWest)
+    uCenter evolves as diffusivity_ux * (uWest + uEast - 2.0 * uCenter) / (spacing_x * spacing_x) + diffusivity_uy * (uNorth + uSouth - 2.0 * uCenter) / (spacing_y * spacing_y) + exchange_rate * (vCenter - uCenter)
+    uEast evolves as diffusivity_ux * (uCenter + uWest - 2.0 * uEast) / (spacing_x * spacing_x) + diffusivity_uy * (uNortheast + uSoutheast - 2.0 * uEast) / (spacing_y * spacing_y) + exchange_rate * (vEast - uEast)
+    uSouthwest evolves as diffusivity_ux * (uSoutheast + uSouth - 2.0 * uSouthwest) / (spacing_x * spacing_x) + diffusivity_uy * (uWest + uNorthwest - 2.0 * uSouthwest) / (spacing_y * spacing_y) + exchange_rate * (vSouthwest - uSouthwest)
+    uSouth evolves as diffusivity_ux * (uSouthwest + uSoutheast - 2.0 * uSouth) / (spacing_x * spacing_x) + diffusivity_uy * (uCenter + uNorth - 2.0 * uSouth) / (spacing_y * spacing_y) + exchange_rate * (vSouth - uSouth)
+    uSoutheast evolves as diffusivity_ux * (uSouth + uSouthwest - 2.0 * uSoutheast) / (spacing_x * spacing_x) + diffusivity_uy * (uEast + uNortheast - 2.0 * uSoutheast) / (spacing_y * spacing_y) + exchange_rate * (vSoutheast - uSoutheast)
+    vNorthwest evolves as diffusivity_vx * (vNortheast + vNorth - 2.0 * vNorthwest) / (spacing_x * spacing_x) + diffusivity_vy * (vSouthwest + vWest - 2.0 * vNorthwest) / (spacing_y * spacing_y) + exchange_rate * (uNorthwest - vNorthwest)
+    vNorth evolves as diffusivity_vx * (vNorthwest + vNortheast - 2.0 * vNorth) / (spacing_x * spacing_x) + diffusivity_vy * (vSouth + vCenter - 2.0 * vNorth) / (spacing_y * spacing_y) + exchange_rate * (uNorth - vNorth)
+    vNortheast evolves as diffusivity_vx * (vNorth + vNorthwest - 2.0 * vNortheast) / (spacing_x * spacing_x) + diffusivity_vy * (vSoutheast + vEast - 2.0 * vNortheast) / (spacing_y * spacing_y) + exchange_rate * (uNortheast - vNortheast)
+    vWest evolves as diffusivity_vx * (vEast + vCenter - 2.0 * vWest) / (spacing_x * spacing_x) + diffusivity_vy * (vNorthwest + vSouthwest - 2.0 * vWest) / (spacing_y * spacing_y) + exchange_rate * (uWest - vWest)
+    vCenter evolves as diffusivity_vx * (vWest + vEast - 2.0 * vCenter) / (spacing_x * spacing_x) + diffusivity_vy * (vNorth + vSouth - 2.0 * vCenter) / (spacing_y * spacing_y) + exchange_rate * (uCenter - vCenter)
+    vEast evolves as diffusivity_vx * (vCenter + vWest - 2.0 * vEast) / (spacing_x * spacing_x) + diffusivity_vy * (vNortheast + vSoutheast - 2.0 * vEast) / (spacing_y * spacing_y) + exchange_rate * (uEast - vEast)
+    vSouthwest evolves as diffusivity_vx * (vSoutheast + vSouth - 2.0 * vSouthwest) / (spacing_x * spacing_x) + diffusivity_vy * (vWest + vNorthwest - 2.0 * vSouthwest) / (spacing_y * spacing_y) + exchange_rate * (uSouthwest - vSouthwest)
+    vSouth evolves as diffusivity_vx * (vSouthwest + vSoutheast - 2.0 * vSouth) / (spacing_x * spacing_x) + diffusivity_vy * (vCenter + vNorth - 2.0 * vSouth) / (spacing_y * spacing_y) + exchange_rate * (uSouth - vSouth)
+    vSoutheast evolves as diffusivity_vx * (vSouth + vSouthwest - 2.0 * vSoutheast) / (spacing_x * spacing_x) + diffusivity_vy * (vEast + vNortheast - 2.0 * vSoutheast) / (spacing_y * spacing_y) + exchange_rate * (uSoutheast - vSoutheast)
+}
+
+struct CoupledRun3x3 {
+    valid: bool,
+    state: CoupledHeat3x3
+}
+
+function absolute(value: f64) -> f64 {
+    if value < 0.0 { return -value }
+    return value
+}
+
+function maximum(first: f64, second: f64) -> f64 {
+    if first > second { return first }
+    return second
+}
+
+function maxDifference(first: CoupledHeat3x3, second: CoupledHeat3x3) -> f64 {
+    let mut error: f64 = 0.0
+    error = maximum(error, absolute(first.uNorthwest - second.uNorthwest))
+    error = maximum(error, absolute(first.uNorth - second.uNorth))
+    error = maximum(error, absolute(first.uNortheast - second.uNortheast))
+    error = maximum(error, absolute(first.uWest - second.uWest))
+    error = maximum(error, absolute(first.uCenter - second.uCenter))
+    error = maximum(error, absolute(first.uEast - second.uEast))
+    error = maximum(error, absolute(first.uSouthwest - second.uSouthwest))
+    error = maximum(error, absolute(first.uSouth - second.uSouth))
+    error = maximum(error, absolute(first.uSoutheast - second.uSoutheast))
+    error = maximum(error, absolute(first.vNorthwest - second.vNorthwest))
+    error = maximum(error, absolute(first.vNorth - second.vNorth))
+    error = maximum(error, absolute(first.vNortheast - second.vNortheast))
+    error = maximum(error, absolute(first.vWest - second.vWest))
+    error = maximum(error, absolute(first.vCenter - second.vCenter))
+    error = maximum(error, absolute(first.vEast - second.vEast))
+    error = maximum(error, absolute(first.vSouthwest - second.vSouthwest))
+    error = maximum(error, absolute(first.vSouth - second.vSouth))
+    error = maximum(error, absolute(first.vSoutheast - second.vSoutheast))
+    return error
+}
+
+function totalMass(state: CoupledHeat3x3) -> f64 {
+    return speciesUMass(state) + speciesVMass(state)
+}
+
+function speciesUMass(state: CoupledHeat3x3) -> f64 {
+    return state.uNorthwest + state.uNorth + state.uNortheast + state.uWest + state.uCenter + state.uEast + state.uSouthwest + state.uSouth + state.uSoutheast
+}
+
+function speciesVMass(state: CoupledHeat3x3) -> f64 {
+    return state.vNorthwest + state.vNorth + state.vNortheast + state.vWest + state.vCenter + state.vEast + state.vSouthwest + state.vSouth + state.vSoutheast
+}
+
+function boundedPositive(state: CoupledHeat3x3) -> bool {
+    if not (state.uNorthwest >= 1.4 and state.uNorthwest <= 3.86) { return false }
+    if not (state.uNorth >= 1.4 and state.uNorth <= 3.86) { return false }
+    if not (state.uNortheast >= 1.4 and state.uNortheast <= 3.86) { return false }
+    if not (state.uWest >= 1.4 and state.uWest <= 3.86) { return false }
+    if not (state.uCenter >= 1.4 and state.uCenter <= 3.86) { return false }
+    if not (state.uEast >= 1.4 and state.uEast <= 3.86) { return false }
+    if not (state.uSouthwest >= 1.4 and state.uSouthwest <= 3.86) { return false }
+    if not (state.uSouth >= 1.4 and state.uSouth <= 3.86) { return false }
+    if not (state.uSoutheast >= 1.4 and state.uSoutheast <= 3.86) { return false }
+    if not (state.vNorthwest >= 1.4 and state.vNorthwest <= 3.86) { return false }
+    if not (state.vNorth >= 1.4 and state.vNorth <= 3.86) { return false }
+    if not (state.vNortheast >= 1.4 and state.vNortheast <= 3.86) { return false }
+    if not (state.vWest >= 1.4 and state.vWest <= 3.86) { return false }
+    if not (state.vCenter >= 1.4 and state.vCenter <= 3.86) { return false }
+    if not (state.vEast >= 1.4 and state.vEast <= 3.86) { return false }
+    if not (state.vSouthwest >= 1.4 and state.vSouthwest <= 3.86) { return false }
+    if not (state.vSouth >= 1.4 and state.vSouth <= 3.86) { return false }
+    if not (state.vSoutheast >= 1.4 and state.vSoutheast <= 3.86) { return false }
+    return true
+}
+
+function validRun(state: CoupledHeat3x3, duration: f64, steps: i32) -> bool {
+    if steps <= 0 or steps > 100000 { return false }
+    if not (duration >= 0.0 and duration <= 100.0) { return false }
+    if not (state.spacing_x > 0.0 and state.spacing_x <= 100.0) { return false }
+    if not (state.spacing_y > 0.0 and state.spacing_y <= 100.0) { return false }
+    if not (state.diffusivity_ux >= 0.0 and state.diffusivity_ux <= 100.0) { return false }
+    if not (state.diffusivity_uy >= 0.0 and state.diffusivity_uy <= 100.0) { return false }
+    if not (state.diffusivity_vx >= 0.0 and state.diffusivity_vx <= 100.0) { return false }
+    if not (state.diffusivity_vy >= 0.0 and state.diffusivity_vy <= 100.0) { return false }
+    if not (state.exchange_rate >= 0.0 and state.exchange_rate <= 100.0) { return false }
+    let dx: f64 = maximum(state.diffusivity_ux, state.diffusivity_vx)
+    let dy: f64 = maximum(state.diffusivity_uy, state.diffusivity_vy)
+    let rate: f64 = 4.0 * (dx / (state.spacing_x * state.spacing_x) +
+        dy / (state.spacing_y * state.spacing_y)) + 2.0 * state.exchange_rate
+    return duration * rate / (steps as f64) <= 1.0
+}
+
+function runFrom(initial: CoupledHeat3x3, duration: f64, steps: i32) -> CoupledRun3x3 {
+    if not validRun(initial, duration, steps) {
+        return CoupledRun3x3 { valid: false, state: initial }
+    }
+    let mut state: CoupledHeat3x3 = initial
+    let dt: f64 = duration / (steps as f64)
+    for index in 0 to steps {
+        CoupledHeat3x3_step(&state, dt)
+    }
+    return CoupledRun3x3 { valid: true, state: state }
+}
+
+function integrate(duration: f64, steps: i32) -> CoupledRun3x3 {
+    return runFrom(CoupledHeat3x3_new(), duration, steps)
+}
+
+function analyticReference() -> CoupledHeat3x3 {
+    let mut expected: CoupledHeat3x3 = CoupledHeat3x3_new()
+    expected.uNorthwest = 3.158134001082791
+    expected.uNorth = 2.5914949698255807
+    expected.uNortheast = 2.276093283702315
+    expected.uWest = 3.2168228247013446
+    expected.uCenter = 2.89703052312093
+    expected.uEast = 2.6927912152645277
+    expected.uSouthwest = 3.463744162060445
+    expected.uSouth = 2.927607652360204
+    expected.uSoutheast = 2.88210422923379
+    expected.vNorthwest = 1.9565045000838235
+    expected.vNorth = 2.436183941870097
+    expected.vNortheast = 2.258233258660332
+    expected.vWest = 2.1953612803045823
+    expected.vCenter = 2.2975103757734465
+    expected.vEast = 2.6746768759442805
+    expected.vSouthwest = 2.47405523123391
+    expected.vSouth = 2.0882835690409842
+    expected.vSoutheast = 2.613368105736613
+    return expected
+}
+
+function main() -> i32 {
+    let initial: CoupledHeat3x3 = CoupledHeat3x3_new()
+    let expected: CoupledHeat3x3 = analyticReference()
+    let coarse: CoupledRun3x3 = integrate(1.0, 4)
+    let medium: CoupledRun3x3 = integrate(1.0, 8)
+    let fine: CoupledRun3x3 = integrate(1.0, 16)
+    let finer: CoupledRun3x3 = integrate(1.0, 32)
+    let finest: CoupledRun3x3 = integrate(1.0, 128)
+    if not coarse.valid or not medium.valid or not fine.valid or not finer.valid or not finest.valid { return 1 }
+    let error4: f64 = maxDifference(coarse.state, expected)
+    let error8: f64 = maxDifference(medium.state, expected)
+    let error16: f64 = maxDifference(fine.state, expected)
+    let error32: f64 = maxDifference(finer.state, expected)
+    let error128: f64 = maxDifference(finest.state, expected)
+    if error4 < 0.000001 { return 2 }
+    if error128 > 0.00000000002 { return 3 }
+    if error8 >= 0.09 * error4 { return 4 }
+    if error16 >= 0.09 * error8 { return 5 }
+    if error32 >= 0.09 * error16 { return 6 }
+    if absolute(totalMass(finest.state) - 47.1) > 0.00000000001 { return 7 }
+    if absolute(speciesUMass(finest.state) - 26.10582286135193) > 0.000000001 { return 8 }
+    if not boundedPositive(finest.state) { return 9 }
+    if maxDifference(initial, finest.state) < 0.01 { return 10 }
+
+    let replay: CoupledRun3x3 = integrate(1.0, 128)
+    if not replay.valid or maxDifference(replay.state, finest.state) > 0.00000000001 { return 11 }
+    let half: CoupledRun3x3 = integrate(0.5, 64)
+    if not half.valid { return 12 }
+    let secondHalf: CoupledRun3x3 = runFrom(half.state, 0.5, 64)
+    if not secondHalf.valid or maxDifference(secondHalf.state, finest.state) > 0.00000000001 { return 13 }
+
+    # Species exchange equivariance with noncommuting diffusion operators.
+    let mut swapped: CoupledHeat3x3 = initial
+    swapped.uNorthwest = initial.vNorthwest
+    swapped.uNorth = initial.vNorth
+    swapped.uNortheast = initial.vNortheast
+    swapped.uWest = initial.vWest
+    swapped.uCenter = initial.vCenter
+    swapped.uEast = initial.vEast
+    swapped.uSouthwest = initial.vSouthwest
+    swapped.uSouth = initial.vSouth
+    swapped.uSoutheast = initial.vSoutheast
+    swapped.vNorthwest = initial.uNorthwest
+    swapped.vNorth = initial.uNorth
+    swapped.vNortheast = initial.uNortheast
+    swapped.vWest = initial.uWest
+    swapped.vCenter = initial.uCenter
+    swapped.vEast = initial.uEast
+    swapped.vSouthwest = initial.uSouthwest
+    swapped.vSouth = initial.uSouth
+    swapped.vSoutheast = initial.uSoutheast
+    swapped.diffusivity_ux = initial.diffusivity_vx
+    swapped.diffusivity_uy = initial.diffusivity_vy
+    swapped.diffusivity_vx = initial.diffusivity_ux
+    swapped.diffusivity_vy = initial.diffusivity_uy
+    let swappedRun: CoupledRun3x3 = runFrom(swapped, 1.0, 128)
+    let mut swappedExpected: CoupledHeat3x3 = finest.state
+    swappedExpected.uNorthwest = finest.state.vNorthwest
+    swappedExpected.uNorth = finest.state.vNorth
+    swappedExpected.uNortheast = finest.state.vNortheast
+    swappedExpected.uWest = finest.state.vWest
+    swappedExpected.uCenter = finest.state.vCenter
+    swappedExpected.uEast = finest.state.vEast
+    swappedExpected.uSouthwest = finest.state.vSouthwest
+    swappedExpected.uSouth = finest.state.vSouth
+    swappedExpected.uSoutheast = finest.state.vSoutheast
+    swappedExpected.vNorthwest = finest.state.uNorthwest
+    swappedExpected.vNorth = finest.state.uNorth
+    swappedExpected.vNortheast = finest.state.uNortheast
+    swappedExpected.vWest = finest.state.uWest
+    swappedExpected.vCenter = finest.state.uCenter
+    swappedExpected.vEast = finest.state.uEast
+    swappedExpected.vSouthwest = finest.state.uSouthwest
+    swappedExpected.vSouth = finest.state.uSouth
+    swappedExpected.vSoutheast = finest.state.uSoutheast
+    if not swappedRun.valid or maxDifference(swappedRun.state, swappedExpected) > 0.00000000001 { return 14 }
+
+    # Transpose the 3x3 grid and exchange x/y diffusivities for each species.
+    let mut transposed: CoupledHeat3x3 = initial
+    transposed.uNorthwest = initial.uNorthwest
+    transposed.uNorth = initial.uWest
+    transposed.uNortheast = initial.uSouthwest
+    transposed.uWest = initial.uNorth
+    transposed.uCenter = initial.uCenter
+    transposed.uEast = initial.uSouth
+    transposed.uSouthwest = initial.uNortheast
+    transposed.uSouth = initial.uEast
+    transposed.uSoutheast = initial.uSoutheast
+    transposed.vNorthwest = initial.vNorthwest
+    transposed.vNorth = initial.vWest
+    transposed.vNortheast = initial.vSouthwest
+    transposed.vWest = initial.vNorth
+    transposed.vCenter = initial.vCenter
+    transposed.vEast = initial.vSouth
+    transposed.vSouthwest = initial.vNortheast
+    transposed.vSouth = initial.vEast
+    transposed.vSoutheast = initial.vSoutheast
+    transposed.diffusivity_ux = initial.diffusivity_uy
+    transposed.diffusivity_uy = initial.diffusivity_ux
+    transposed.diffusivity_vx = initial.diffusivity_vy
+    transposed.diffusivity_vy = initial.diffusivity_vx
+    let transposedRun: CoupledRun3x3 = runFrom(transposed, 1.0, 128)
+    let mut transposedExpected: CoupledHeat3x3 = finest.state
+    transposedExpected.uNorthwest = finest.state.uNorthwest
+    transposedExpected.uNorth = finest.state.uWest
+    transposedExpected.uNortheast = finest.state.uSouthwest
+    transposedExpected.uWest = finest.state.uNorth
+    transposedExpected.uCenter = finest.state.uCenter
+    transposedExpected.uEast = finest.state.uSouth
+    transposedExpected.uSouthwest = finest.state.uNortheast
+    transposedExpected.uSouth = finest.state.uEast
+    transposedExpected.uSoutheast = finest.state.uSoutheast
+    transposedExpected.vNorthwest = finest.state.vNorthwest
+    transposedExpected.vNorth = finest.state.vWest
+    transposedExpected.vNortheast = finest.state.vSouthwest
+    transposedExpected.vWest = finest.state.vNorth
+    transposedExpected.vCenter = finest.state.vCenter
+    transposedExpected.vEast = finest.state.vSouth
+    transposedExpected.vSouthwest = finest.state.vNortheast
+    transposedExpected.vSouth = finest.state.vEast
+    transposedExpected.vSoutheast = finest.state.vSoutheast
+    if not transposedRun.valid or maxDifference(transposedRun.state, transposedExpected) > 0.00000000001 { return 15 }
+
+    # One-cell periodic x translation is a genuine 3x3 symmetry.
+    let mut shifted: CoupledHeat3x3 = initial
+    shifted.uNorthwest = initial.uNortheast
+    shifted.uNorth = initial.uNorthwest
+    shifted.uNortheast = initial.uNorth
+    shifted.uWest = initial.uEast
+    shifted.uCenter = initial.uWest
+    shifted.uEast = initial.uCenter
+    shifted.uSouthwest = initial.uSoutheast
+    shifted.uSouth = initial.uSouthwest
+    shifted.uSoutheast = initial.uSouth
+    shifted.vNorthwest = initial.vNortheast
+    shifted.vNorth = initial.vNorthwest
+    shifted.vNortheast = initial.vNorth
+    shifted.vWest = initial.vEast
+    shifted.vCenter = initial.vWest
+    shifted.vEast = initial.vCenter
+    shifted.vSouthwest = initial.vSoutheast
+    shifted.vSouth = initial.vSouthwest
+    shifted.vSoutheast = initial.vSouth
+    let shiftedRun: CoupledRun3x3 = runFrom(shifted, 1.0, 128)
+    let mut shiftedExpected: CoupledHeat3x3 = finest.state
+    shiftedExpected.uNorthwest = finest.state.uNortheast
+    shiftedExpected.uNorth = finest.state.uNorthwest
+    shiftedExpected.uNortheast = finest.state.uNorth
+    shiftedExpected.uWest = finest.state.uEast
+    shiftedExpected.uCenter = finest.state.uWest
+    shiftedExpected.uEast = finest.state.uCenter
+    shiftedExpected.uSouthwest = finest.state.uSoutheast
+    shiftedExpected.uSouth = finest.state.uSouthwest
+    shiftedExpected.uSoutheast = finest.state.uSouth
+    shiftedExpected.vNorthwest = finest.state.vNortheast
+    shiftedExpected.vNorth = finest.state.vNorthwest
+    shiftedExpected.vNortheast = finest.state.vNorth
+    shiftedExpected.vWest = finest.state.vEast
+    shiftedExpected.vCenter = finest.state.vWest
+    shiftedExpected.vEast = finest.state.vCenter
+    shiftedExpected.vSouthwest = finest.state.vSoutheast
+    shiftedExpected.vSouth = finest.state.vSouthwest
+    shiftedExpected.vSoutheast = finest.state.vSouth
+    if not shiftedRun.valid or maxDifference(shiftedRun.state, shiftedExpected) > 0.00000000001 { return 16 }
+
+    # Halving all rates and doubling duration preserves the integration path.
+    let mut scaled: CoupledHeat3x3 = initial
+    scaled.diffusivity_ux = 0.01
+    scaled.diffusivity_uy = 0.02
+    scaled.diffusivity_vx = 0.025
+    scaled.diffusivity_vy = 0.005
+    scaled.exchange_rate = 0.075
+    let scaledRun: CoupledRun3x3 = runFrom(scaled, 2.0, 128)
+    if not scaledRun.valid or maxDifference(scaledRun.state, finest.state) > 0.00000000001 { return 17 }
+
+    let mut uncoupled: CoupledHeat3x3 = initial
+    uncoupled.exchange_rate = 0.0
+    let uncoupledRun: CoupledRun3x3 = runFrom(uncoupled, 1.0, 128)
+    if not uncoupledRun.valid or absolute(speciesUMass(uncoupledRun.state) - 27.0) > 0.00000000001 { return 18 }
+    if absolute(speciesVMass(uncoupledRun.state) - 20.1) > 0.00000000001 { return 19 }
+    if absolute(speciesUMass(finest.state) - 27.0) < 0.1 { return 20 }
+
+    let mut uniform: CoupledHeat3x3 = initial
+    uniform.uNorthwest = 2.6
+    uniform.uNorth = 2.6
+    uniform.uNortheast = 2.6
+    uniform.uWest = 2.6
+    uniform.uCenter = 2.6
+    uniform.uEast = 2.6
+    uniform.uSouthwest = 2.6
+    uniform.uSouth = 2.6
+    uniform.uSoutheast = 2.6
+    uniform.vNorthwest = 2.6
+    uniform.vNorth = 2.6
+    uniform.vNortheast = 2.6
+    uniform.vWest = 2.6
+    uniform.vCenter = 2.6
+    uniform.vEast = 2.6
+    uniform.vSouthwest = 2.6
+    uniform.vSouth = 2.6
+    uniform.vSoutheast = 2.6
+    let equilibrium: CoupledRun3x3 = runFrom(uniform, 1.0, 128)
+    if not equilibrium.valid or maxDifference(equilibrium.state, uniform) > 0.00000000001 { return 21 }
+    let mut frozen: CoupledHeat3x3 = initial
+    frozen.diffusivity_ux = 0.0
+    frozen.diffusivity_uy = 0.0
+    frozen.diffusivity_vx = 0.0
+    frozen.diffusivity_vy = 0.0
+    frozen.exchange_rate = 0.0
+    let stationary: CoupledRun3x3 = runFrom(frozen, 1.0, 8)
+    if not stationary.valid or maxDifference(stationary.state, frozen) > 0.00000000001 { return 22 }
+    let zeroTime: CoupledRun3x3 = integrate(0.0, 8)
+    if not zeroTime.valid or maxDifference(zeroTime.state, initial) > 0.00000000001 { return 23 }
+
+    if integrate(1.0, 0).valid { return 24 }
+    if integrate(1.0, 100001).valid { return 25 }
+    if integrate(-1.0, 128).valid { return 26 }
+    if integrate(100.1, 128).valid { return 27 }
+    let mut invalid: CoupledHeat3x3 = initial
+    invalid.spacing_x = 0.0
+    if runFrom(invalid, 1.0, 128).valid { return 28 }
+    invalid = initial
+    invalid.spacing_y = -0.5
+    if runFrom(invalid, 1.0, 128).valid { return 29 }
+    invalid = initial
+    invalid.diffusivity_ux = -0.01
+    if runFrom(invalid, 1.0, 128).valid { return 30 }
+    invalid = initial
+    invalid.diffusivity_vy = 100.1
+    if runFrom(invalid, 1.0, 128).valid { return 31 }
+    invalid = initial
+    invalid.exchange_rate = -0.1
+    if runFrom(invalid, 1.0, 128).valid { return 32 }
+    invalid = initial
+    invalid.exchange_rate = 100.1
+    if runFrom(invalid, 1.0, 128).valid { return 33 }
+    invalid = initial
+    invalid.diffusivity_vx = 1.0
+    if runFrom(invalid, 1.0, 1).valid { return 34 }
+
+    println("native-coupled-evolution3x3-ok")
+    return 0
+}

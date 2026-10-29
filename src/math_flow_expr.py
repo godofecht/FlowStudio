@@ -119,7 +119,7 @@ class _Parser:
             left = self.expression(0, depth + 1)
             if self.take() != ")":
                 raise ExpressionError("Expected closing parenthesis")
-        elif first in ("sin", "cos", "exp", "sqrt", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∇²"):
+        elif first in ("sin", "cos", "exp", "sqrt", "tanh", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∇²"):
             if first == "∇²" and self.peek() != "(":
                 # Prefix Unicode Laplacian, as in diffusivity ∇²temperature.
                 arg = self.expression(30, depth + 1)
@@ -129,7 +129,7 @@ class _Parser:
                 arg = self.expression(0, depth + 1)
                 if self.take() != ")":
                     raise ExpressionError("Expected closing parenthesis")
-            if first in ("sin", "cos", "exp") and arg.dimension != DIMENSIONLESS:
+            if first in ("sin", "cos", "exp", "tanh") and arg.dimension != DIMENSIONLESS:
                 raise ExpressionError(f"{first} requires a dimensionless argument")
             if first == "sqrt" and any(x % 2 for x in arg.dimension):
                 raise ExpressionError("sqrt requires even physical dimension exponents")
@@ -162,7 +162,7 @@ class _Parser:
                 operator, precedence = ("add" if nxt == "+" else "sub"), 10
             elif nxt in ("*", "×", "·", "/"):
                 operator, precedence = ("div" if nxt == "/" else "mul"), 20
-            elif nxt in ("(", "π", "pi", "x", "y", "sin", "cos", "exp", "sqrt", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∇²") or nxt in self.symbols or re.fullmatch(rf"{_NUMBER}(?:{_UNIT})?", nxt):
+            elif nxt in ("(", "π", "pi", "x", "y", "sin", "cos", "exp", "sqrt", "tanh", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∇²") or nxt in self.symbols or re.fullmatch(rf"{_NUMBER}(?:{_UNIT})?", nxt):
                 operator, precedence = "mul", 20
             else:
                 break
@@ -203,7 +203,7 @@ def parse_expression(source: str, *, symbols: dict[str, Dimension] | None = None
     if symbols:
         for name, dimension in symbols.items():
             if (not re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", name)
-                    or name in ("x", "y", "pi", "sin", "cos", "exp", "sqrt")
+                    or name in ("x", "y", "pi", "sin", "cos", "exp", "sqrt", "tanh")
                     or len(dimension) != 4 or any(type(power) is not int for power in dimension)):
                 raise ExpressionError(f"Invalid typed symbol {name!r}")
     parser = _Parser(tokenize(source), symbols)
@@ -420,7 +420,7 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
                 return np.divide(args[0], args[1])
         if node.operator == "neg": return -args[0]
         if node.operator == "pos": return args[0]
-        if node.operator in ("sin", "cos", "exp", "sqrt"):
+        if node.operator in ("sin", "cos", "exp", "sqrt", "tanh"):
             with np.errstate(over="ignore", invalid="ignore"):
                 return getattr(np, node.operator)(args[0])
         raise ExpressionError(f"Unsupported operator {node.operator!r}")

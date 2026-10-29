@@ -83,7 +83,7 @@ try {
   // run-to-line. The target is executed, not emulated by editor navigation.
   await page.evaluate(() => {
     const source = document.getElementById('source');
-    source.value = 'caret_a = 1\\ncaret_b = caret_a + 1\\ncaret_result = caret_b + 1\\nprint(caret_result)\\n';
+    source.value = 'caret_a = 1\ncaret_b = caret_a + 1\ncaret_result = caret_b + 1\nprint(caret_result)\n';
     source.dispatchEvent(new Event('input', { bubbles: true }));
   });
   await page.locator('#liveDebugBreakpoints').fill('2');

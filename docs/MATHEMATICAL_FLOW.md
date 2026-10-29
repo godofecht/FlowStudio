@@ -1,5 +1,27 @@
 # Executable mathematical Flow subsets (experimental)
 
+## Typed spatial moment reductions (executable)
+
+The bounded mathematical Flow expression AST now compiles `mean(expression)`,
+`variance(expression)`, `std(expression)`, and `rms(expression)` to real
+NumPy spatial reductions. Variance doubles each physical dimension exponent;
+standard deviation and root-mean-square preserve the argument dimension.
+RMS uses scaled squaring to avoid avoidable overflow for large finite values.
+All reductions reject malformed arity and nonfinite numerical results.
+
+`examples/heat_spatial_moments.flow` evaluates three distinct reductions of a
+spatial sine field inside an executable heat-equation forcing coefficient.
+Its source term and RK2 Fourier-mode evolution are checked against the exact
+semidiscrete analytic solution. Native Linux/macOS CI executes the checked-in
+program, and Chromium acceptance renders its actual temperature heatmap.
+These operations do **not** imply general coupled PDE support or upstream Flow
+2.0 grammar integration.
+
+```sh
+python3 src/math_flow.py examples/heat_spatial_moments.flow
+python3 -m unittest discover -s tests -p 'test_math_flow_spatial_moments.py' -v
+```
+
 ## Dimension-checked logarithms (executable)
 
 The experimental scalar expression AST supports `log()` and `ln()` as natural

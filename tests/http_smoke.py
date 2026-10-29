@@ -187,6 +187,26 @@ def main() -> None:
     assert status == 422 and body.strip(), (
         "native evolution malformed-source rejection", status, body)
 
+    # Actual upstream Flow 2.0 evolution DSL on a 2x2 periodic anisotropic
+    # heat grid: four compiler-generated RK4 coupled states, analytic Fourier
+    # convergence, mean conservation, transposition, and invalid-input checks.
+    heat2d_source = (Path(__file__).resolve().parents[1] /
+                     "examples/native_evolution_heat2d.flow").read_text(encoding="utf-8")
+    status, body = request("POST", "/api/check/flow", heat2d_source, accepted_headers)
+    assert status == 200, ("native evolution heat2d compile", status, body)
+    status, body = request("POST", "/api/run/flow", heat2d_source, accepted_headers)
+    assert status == 200 and "native-evolution-heat2d-ok" in body, (
+        "native evolution heat2d RK4 Fourier acceptance", status, body)
+    invalid_heat2d = heat2d_source.replace(
+        "southeast evolves as 2.0 * diffusivity_x",
+        "southeast evolves as (2.0 * diffusivity_x",
+        1,
+    )
+    assert invalid_heat2d != heat2d_source
+    status, body = request("POST", "/api/check/flow", invalid_heat2d, accepted_headers)
+    assert status == 422 and body.strip(), (
+        "native evolution heat2d malformed-equation rejection", status, body)
+
     # Four independently phased Fourier modes through the REAL persistent CPython
     # kernel and Flow-owned HTTP transport, not a replacement numerical solver.
     # Execute the checked-in solver source in an isolated namespace to prevent

@@ -1,3 +1,21 @@
+## 2026-10-29: native R debugger stale-source command isolation (verification pending)
+
+The existing Flow-owned Rscript top-level expression debugger now refuses Step,
+Continue and paused/postmortem Evaluate when the editor source, edit revision,
+document identity, language or runtime no longer matches the snapshot captured
+at debugger start. Undoing an edit does not silently reauthorize old paused
+execution. Buttons disable on input changes, and direct programmatic calls are
+also rejected. Stop and Status remain usable to recover the persistent R
+kernel. Delayed Start/Status responses cannot reenable stale execution controls.
+Regression tests cover edited/undone source, cross-document postmortem frame
+evaluation, command refusal, stop/status recovery and delayed Start isolation.
+
+**Status: partial / committed; independent CI and physical Chromium acceptance
+pending.** This is a browser-side safety and correctness guard around the
+existing real Flow-owned R debugger, not function-level R stepping, a new R
+interpreter, authenticated remote sessions or RStudio parity. The Flow backend,
+Rscript kernel and hosted CI definitions are unchanged.
+
 ## 2026-10-29: native Python debugger stale-source execution isolation (six CI jobs passed)
 
 The real Flow-owned CPython debugger no longer permits step, next, finish or

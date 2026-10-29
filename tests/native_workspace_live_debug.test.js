@@ -14,7 +14,7 @@ function button() {
 }
 function fixture() {
   const controls = {
-    source: {value: "counter = 2\\ncounter += 1\\nprint(counter)\\n"},
+    source: {value: "counter = 2\ncounter += 1\nprint(counter)\n"},
     language: {value: "python"},
     breakpoints: {value: "2?counter>=2"},
     pauseOnException: {checked: true},
@@ -28,7 +28,7 @@ function fixture() {
 const paused = {state:"paused", ok:true, stack:[{
   line:2, function:"<module>", locals:{counter:{type:"int",value:"2"}}
 }], output:"", message:"", exception:null};
-const done = {state:"done", ok:true, stack:[], output:"3\\n", message:"", exception:null};
+const done = {state:"done", ok:true, stack:[], output:"3\n", message:"", exception:null};
 
 test("native workspace routes reuse the real Flow-owned debugger transport", () => {
   const routes = read("src/data_routes.flow");
@@ -50,10 +50,10 @@ test("native workspace routes reuse the real Flow-owned debugger transport", () 
     assert.ok(html.includes('id="' + id + '"'), id);
     assert.ok(workspace.includes('el("' + id + '")'), id);
   }
-  assert.match(workspace, /LivePython\\.create\\(/);
-  assert.match(workspace, /breakpoints\\.lines\\(activeDocumentId\\(\\)\\)\\.join\\(","\\)/);
-  assert.match(read("src/main.flow"), /send_python_debug\\("start", fs_body\\(\\)\\)/);
-  assert.match(read("src/main.flow"), /send_python_debug\\("next", ""\\)/);
+  assert.match(workspace, /LivePython\.create\(/);
+  assert.match(workspace, /breakpoints\.lines\(activeDocumentId\(\)\)\.join\(","\)/);
+  assert.match(read("src/main.flow"), /send_python_debug\("start", fs_body\(\)\)/);
+  assert.match(read("src/main.flow"), /send_python_debug\("next", ""\)/);
 });
 
 test("live debugger executes actual HTTP start, step and continue with bounded conditions", async () => {
@@ -80,7 +80,7 @@ test("live debugger executes actual HTTP start, step and continue with bounded c
     assert.equal(await ui.execute("continue"), true);
     assert.equal(controls.startButton.disabled, false);
     assert.equal(controls.stepButton.disabled, true);
-    assert.match(controls.target.textContent, /Output:\\n3/);
+    assert.match(controls.target.textContent, /Output:\n3/);
     assert.deepEqual(requests.map(x=>x.url), [
       "/api/debug/python/start", "/api/debug/python/step",
       "/api/debug/python/continue"

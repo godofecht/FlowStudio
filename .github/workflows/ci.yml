@@ -104,6 +104,8 @@ jobs:
           python3 src/math_flow.py examples/heat_inverse_trigonometry.flow
           python3 src/math_flow.py --check examples/heat_hyperbolic_forcing.flow
           python3 src/math_flow.py examples/heat_hyperbolic_forcing.flow
+          python3 src/math_flow.py --check examples/heat_mean_field_feedback.flow
+          python3 src/math_flow.py examples/heat_mean_field_feedback.flow
       - name: Confirm compiler and build exact checked-out source
         run: |
           flow version

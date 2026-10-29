@@ -156,6 +156,15 @@ def main() -> None:
     assert status == 200, ("native coupled diffusion compile", status, body)
     status, body = request("POST", "/api/run/flow", coupled_native_source, accepted_headers)
     assert status == 200, ("native coupled diffusion analytic execution", status, body)
+    # Native configurable 2D anisotropic tensor diffusion: real Flow compiler,
+    # symmetric mixed derivative, 4x4 and 8x8 analytic Fourier oracles.
+    tensor_source = (Path(__file__).resolve().parents[1] /
+                     "examples/native_tensor_grid.flow").read_text(encoding="utf-8")
+    status, body = request("POST", "/api/check/flow", tensor_source, accepted_headers)
+    assert status == 200, ("native tensor grid compile", status, body)
+    status, body = request("POST", "/api/run/flow", tensor_source, accepted_headers)
+    assert status == 200 and "native-tensor-grid-ok" in body, (
+        "native tensor grid analytic execution", status, body)
     # Real Flow HTTP route, request intent/origin gate, and safe Quarto
     # preflight rejection (does not require Quarto to be installed).
     invalid_qmd = "---\nformat: pdf\n---\n\n# Wrong format\n"

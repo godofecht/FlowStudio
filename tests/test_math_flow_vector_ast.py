@@ -10,7 +10,7 @@ from math_flow import FlowMathError, parse, simulate
 from math_flow_vector import VELOCITY_RATE
 
 SOURCE = (ROOT / "examples/navier_stokes_smoke.flow").read_text(encoding="utf-8")
-ORIGINAL = "∂ₜvelocity = −(velocity · ∇)velocity − ∇pressure / density\n                   + kinematicViscosity ∇²velocity"
+ORIGINAL = "∂ₜvelocity =\n            −(velocity · ∇)velocity\n            − ∇pressure / density\n            + kinematicViscosity ∇²velocity"
 REORDERED = "∂ₜvelocity = kinematicViscosity ∇²velocity\n                   − ∇pressure / density − (velocity · ∇)velocity"
 
 

@@ -146,3 +146,28 @@ test("opened projects appear as saved project files and reopen on demand", () =>
   assert.match(savedSection.children.find(node => node.className === "muted").textContent,
     /saved on this device/);
 });
+
+test("upgradeFiles replaces only buffers holding the legacy Reader source", () => {
+  const legacy = { name: "pipeline.flow", language: "flow", text: "import std {}\nfor row in Reader {}\n" };
+  const untouched = { name: "generate.py", language: "python", text: "print(1)\n" };
+  const fixed = gallery.upgradeFiles([legacy, untouched]);
+  assert.ok(Array.isArray(fixed), "upgrade returns the file list when it upgrades");
+  assert.equal(fixed.length, 2, "file count preserved");
+  assert.ok(!fixed[0].text.includes("for row in Reader"),
+    "legacy pipeline text replaced with the current curated source");
+  assert.ok(fixed[0].text.includes("io_read_text"),
+    "replacement text is the working io_read_text pipeline");
+  assert.equal(fixed[0].name, legacy.name, "file names survive the upgrade");
+  assert.equal(fixed[1].text, untouched.text, "files without the marker are untouched");
+  assert.equal(gallery.upgradeFiles([{ name: "a.flow", language: "flow", text: "print(1)" }]), null,
+    "no marker means no upgrade");
+  assert.equal(gallery.upgradeFiles(null), null, "non-array input is not upgraded");
+  assert.equal(gallery.upgradeFiles("junk"), null, "string input is not upgraded");
+});
+
+test("curated examples never contain the legacy Reader source", () => {
+  for (const example of gallery.examples())
+    for (const file of example.files)
+      assert.ok(!file.text.includes("for row in Reader"),
+        example.id + "/" + file.name + " is current source");
+});

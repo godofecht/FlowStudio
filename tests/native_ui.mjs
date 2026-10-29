@@ -164,6 +164,22 @@ try {
   assert.match(await page.locator('#flowDiagnostics').innerText(), /not executed|compile check/i);
   assert.equal(await page.locator('#flowDiagnostics').isVisible(), true);
 
+  // Physical compiler-error acceptance: the upstream Flow 2.x parser must
+  // report the checked temporary source's actual location, and Monaco must
+  // navigate to it. This is not a fabricated browser-side parse diagnostic.
+  await page.evaluate(() => {
+    const source = document.getElementById('source');
+    source.value = 'function main() -> i32 {\\n    return ???\\n}\\n';
+    source.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.locator('#checkFlow').click();
+  await page.waitForFunction(() =>
+    document.getElementById('resultStatus').textContent === 'Flow compile check failed; see diagnostics.');
+  assert.match(await page.locator('#flowDiagnostics').innerText(), /parse error|unexpected/i);
+  assert.equal(await page.evaluate(() => FlowStudioEditor.editor.getPosition().lineNumber), 2);
+  assert.ok(await page.locator('.flowstudio-flow-error').count() > 0,
+    'real Flow compiler error should decorate the submitted Monaco source');
+
   // Exercise the worker path and wait beyond rendering and deferred callbacks.
   const workerResult = await page.evaluate(async () => {
     const worker = MonacoEnvironment.getWorker();

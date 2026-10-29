@@ -1,3 +1,44 @@
+## 2026-10-29: complex PDE numerical acceptance battery (six CI jobs passed)
+
+A checked-in oblique Fourier tensor-diffusion program,
+`examples/heat_fourier_tensor_validation.flow`, now exercises a positive-definite
+anisotropic heat operator with nonzero mixed spatial derivatives and a
+two-dimensional oblique Fourier initial condition. Eight new Python acceptance
+tests in `tests/test_math_flow_complex_acceptance.py` execute the **real**
+mathematical Flow parser, typed NumPy lowering and RK2 solver against an
+independently derived *discrete* Fourier eigenvalue and RK2 amplification.
+The matrix covers multiple grid sizes, wave orientations, positive/negative/zero
+cross coefficients, full 24×24 spatial-field comparison, equivalent Unicode
+mixed derivative spellings, temporal second-order convergence, mean conservation,
+monotone variance, deterministic replay, semantic trace decomposition,
+invalid tensor/units/boundary/grid/operator rejection, CLI check/run and
+negative exit. The same suite also executes checked-in spatial moments,
+logarithmic forcing, nonlinear saturating reaction and Navier–Stokes programs.
+The native Flow-owned HTTP smoke additionally checks, executes and numerically
+validates the oblique program **at every returned spatial cell**, and verifies
+that an indefinite diffusion tensor is rejected with HTTP 422.
+
+**Status: tested for these bounded examples, partial overall.**
+[PR #200](https://github.com/godofecht/FlowStudio/pull/200) merged as
+[49252de](https://github.com/godofecht/FlowStudio/commit/49252de77bda29d8d46dac7ffcb56da17bdf8477)
+after all six Linux/macOS jobs passed in
+[CI #40914795131](https://github.com/godofecht/FlowStudio/actions/runs/40914795131).
+Each source/transport platform passed 1,143 of 1,155 Node tests
+(12 skipped, zero failed) and 307 Python tests
+(13 skipped, zero failed). Both native Flow builds and real Flow-owned
+HTTP smoke passed; Ubuntu native Chromium mathematical Flow/plotting
+acceptance and both FlowJIT jobs passed. The added numerical tests themselves
+were not skipped. Independent local production execution was unavailable
+because this environment cannot fetch the repository or install the native
+Flow compiler; the independent analytic oracle was checked locally, but
+**CI is the execution evidence**. Post-documentation main CI remains
+separate from PR CI until observed. No hosted CI configuration was modified.
+
+This tests the explicitly bounded, **separate** mathematical Flow frontend.
+It does **not** establish upstream Flow 2.0 grammar integration, general
+coupled PDE execution, full live debugging, multi-user remote isolation,
+complete RStudio parity or independent macOS physical-browser acceptance.
+
 ## 2026-10-29: Flow-native evolution and PDE declaration navigation (PR verification pending)
 
 The primary FlowStudio outline and F12 declaration lookup now recognize

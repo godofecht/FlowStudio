@@ -1,5 +1,28 @@
 # Executable mathematical Flow subsets (experimental)
 
+## Dimension-checked logarithms (executable)
+
+The experimental scalar expression AST supports `log()` and `ln()` as natural
+logarithms, `log10()` as base-ten logarithm, and `log1p()` as the stable
+natural logarithm of one plus its argument. All four require dimensionless
+inputs and produce dimensionless results. The NumPy lowering rejects nonfinite
+results, including logarithms of zero or negative arguments and `log1p`
+inputs at or below minus one. These functions work in field-independent heat
+forcing and typed initial expressions, not in arbitrary coupled PDEs.
+
+`examples/heat_logarithmic_forcing.flow` executes all four through the actual
+Flow mathematical frontend and RK2 solver. Its four inverse-exponential terms
+reduce analytically to a prescribed `4K/s * sin(2πx/1m)` source. Tests verify
+the discrete Fourier-mode RHS, mean conservation and variance against the
+closed-form semidiscrete heat solution. Both Linux and macOS native CI run
+`--check` and full numerical execution of this checked-in program.
+
+```sh
+python3 src/math_flow.py examples/heat_logarithmic_forcing.flow
+python3 -m unittest discover -s tests -p 'test_math_flow_logarithms.py' -v
+```
+
+
 ## Typed Navier momentum equation AST (bounded)
 
 `src/math_flow_vector.py` now compiles the checked Navier–Stokes momentum

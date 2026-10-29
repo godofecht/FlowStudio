@@ -12,17 +12,24 @@ language. Edits (including undo), tab changes and language switches clear
 diagnostics and reject delayed responses. No native execution route, compiler
 grammar, hosted CI definition or checked-in Monaco bundle was changed.
 
-**Status: partial / eight focused Node tests passed locally on Node 22.16.0;
-independent CI and physical Chromium acceptance pending.** Unit tests use a
-controlled native-client response to validate Monaco UI state and stale-result
-rejection; they do **not** establish successful flowc compilation. The
-repository's existing real native Flow HTTP smoke tests check compiler success,
-syntax failure and nonexecution. The extended Chromium acceptance now checks
-a real, valid Flow 2.0 source through the native route when run on a host with
-Flow installed. The current compiler adapter extracts only its first
-recognizable location; this is not continuous background checking, an LSP,
-a complete problems panel or live Flow debugging. Full RStudio parity remains
-unimplemented.
+**Status: partial / independently verified in all six Linux/macOS CI jobs
+in [CI #40853840391](https://github.com/godofecht/FlowStudio/actions/runs/40853840391).**
+Both source platforms passed 1,099 of 1,111 Node tests (12 skipped, zero
+failures) and 264 Python tests (13 skipped, zero failures). Both native Flow
+2.0.0 builds, actual HTTP/compiler acceptance and FlowJIT jobs passed.
+Real Ubuntu Chromium acceptance exercised the Monaco workspace's **Check Flow**
+control through the native Flow HTTP route with a valid Flow 2.0 source.
+Eight focused Node tests also passed locally on Node 22.16.0. The unit tests
+use controlled native-client responses for source-decoration and stale-result
+cases; actual malformed-source Monaco underlining and separate macOS physical
+Chromium acceptance are not independently verified. An initial CI run failed
+because the existing command palette dialog intercepted the new acceptance
+test's topbar click; the fixture now closes that dialog, and all six jobs
+passed on rerun. [PR #183](https://github.com/godofecht/FlowStudio/pull/183)
+merged as [adea7f5](https://github.com/godofecht/FlowStudio/commit/adea7f58454173afca8f25e0c5927354a3c3d43b).
+The compiler adapter still extracts at most one recognized location. This is
+not continuous background checking, an LSP, a complete problems panel or live
+Flow debugging. Full RStudio parity remains unimplemented.
 
 ## 2026-10-29: authenticated SSH loopback remote access (local tests only)
 

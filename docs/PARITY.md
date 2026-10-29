@@ -1,3 +1,31 @@
+## 2026-10-29: native Python debugger stale-source execution isolation (six CI jobs passed)
+
+The real Flow-owned CPython debugger no longer permits step, next, finish or
+continue from a changed editor document, a different language or a modified
+source revision. A change followed by undo does not silently reauthorize
+execution of the old paused source. The existing stop and status controls
+remain available to recover the persistent kernel; standalone debugger clients
+without a document ID can still step unchanged source, but cannot navigate
+an unowned editor document. Browser input and language-change events immediately
+update disabled controls. No interpreter emulation or Flow backend replacement
+was introduced.
+
+**Status: partial / independently verified in all six Linux/macOS jobs in
+[CI #40814566355](https://github.com/godofecht/FlowStudio/actions/runs/40814566355).**
+Both source platforms passed 1,077 of 1,089 Node tests (12 skipped, zero
+failures) and 227 Python tests (13 skipped, zero failures). Both native Flow
+2.0.0 builds and HTTP acceptance suites passed, both FlowJIT jobs passed,
+and actual Ubuntu Chromium native debugger acceptance passed. The first
+candidate CI failed because the existing Chromium test attempted to click a
+frame that was now correctly disabled immediately on editor change; the
+acceptance was corrected to assert the disabled control and directly verify
+that the controller rejects navigation. The corrected six-job run passed.
+[PR #171](https://github.com/godofecht/FlowStudio/pull/171) merged as
+[f4a5334](https://github.com/godofecht/FlowStudio/commit/f4a5334f6cd4e39c721003554e24380f2c161591).
+No hosted CI definitions changed. This does not establish independent macOS
+physical-browser acceptance, function-level R stepping, live Flow debugging,
+authenticated remote sessions or complete RStudio parity.
+
 ## 2026-10-29: source-linked native R top-level expression debugging (verification pending)
 
 The existing Flow-owned persistent Rscript expression debugger now moves the

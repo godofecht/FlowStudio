@@ -1,3 +1,28 @@
+## 2026-10-29: authenticated SSH loopback remote access (local tests only)
+
+FlowStudio now has a real OpenSSH local-forwarding client in
+[`scripts/ssh_tunnel.py`](../scripts/ssh_tunnel.py). It connects the local
+127.0.0.1:8751 to a remote host's **already-running** Flow-owned native server
+at 127.0.0.1:8751. It uses the real SSH client with strict host-key checking,
+non-interactive key authentication, no remote shell command, no agent/X11
+forwarding and no public HTTP listener. It refuses an occupied local port,
+validates the SSH destination, checks the actual FlowStudio /health endpoint
+and tears down the SSH process on failure or interrupt. See
+[`docs/REMOTE_SESSIONS.md`](REMOTE_SESSIONS.md) for setup and limitations.
+
+**Status: partial / 9 local Python unit tests passed on Python 3.13.5.**
+These test the exact proposed helper, argv policy, injection rejection, SSH
+port and identity validation, local collision, real local HTTP health,
+failure reporting and child cleanup. Python compilation passed. The local
+container has no SSH client, Rscript or Flow compiler, so **actual SSH
+authentication, remote two-host execution, native Flow builds, and physical
+browser acceptance were not run**. Independent Linux/macOS CI is pending.
+No hosted CI definition, Flow 2.0 compiler, native HTTP binding or kernel
+was changed. SSH authenticates the transport, **not FlowStudio HTTP requests**;
+the native server remains single-user and not safe for shared OS accounts.
+Function-level live R stepping, Flow source debugging, multi-user remote
+isolation and RStudio parity remain unimplemented.
+
 ## 2026-10-29: native CPython one-shot run-to-caret (PR verification pending)
 
 The Flow-owned persistent CPython trace debugger now accepts an explicit,

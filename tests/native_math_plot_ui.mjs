@@ -67,7 +67,7 @@ try {
       assert.match(await inspector.textContent(), /decomposition residual/);
       assert.match(await inspector.textContent(), /pressure projection/);
       await inspector.locator('select[aria-label="Mathematical Flow semantic stage"]').selectOption('1');
-      assert.match(await inspector.textContent(), /t = 0\\.000100000 s/);
+      assert.match(await inspector.textContent(), /t = 0\.000100000 s/);
       assert.match(await inspector.textContent(), /Viscous redistribution/);
     }
     if (source === 'examples/heat_neumann.flow') {

@@ -13,12 +13,17 @@ also disables stack-frame navigation after edits or document changes, and
 Stop clears the frame list. The existing numeric frame selector remains
 available.
 
-**Status: partial / verification pending.** Added browser regression tests
-for frame selection, real evaluation frame indices, source positioning,
-stale-editor refusal, cleanup, and malformed metadata; extended native HTTP
-acceptance to inspect actual Rscript frame metadata. JavaScript syntax was
-checked locally, but a full Node, Rscript, Flow HTTP, Chromium and Linux/macOS
-CI run has not yet been independently established for this change.
+**Status: partial / independently verified in all six Linux/macOS jobs
+in [CI #40825843880](https://github.com/godofecht/FlowStudio/actions/runs/40825843880).**
+Each source platform passed 1,082 of 1,094 Node tests (12 skipped, zero
+failures) and 235 Python tests (13 skipped, zero failures). Both native Flow
+2.0.0 builds passed real Rscript/Flow HTTP acceptance, including retained
+function frame metadata, frame evaluation and rejection of source locations
+from earlier debug sessions. Both FlowJIT jobs passed. The ten focused R
+source-navigation tests also passed in a local V8 assertion harness before
+CI. This is not independent macOS physical-browser stack-selection acceptance.
+[PR #175](https://github.com/godofecht/FlowStudio/pull/175)
+merged as [40a00e9](https://github.com/godofecht/FlowStudio/commit/40a00e9941eb6cf9cf4d8df53bdf04266e8b8caf).
 This is **postmortem stack navigation**, not function-level live R stepping,
 an R continuation/resume facility, live Flow debugging or authenticated
 remote sessions. Flow 2.0.0 remains the native backend. Hosted CI definitions

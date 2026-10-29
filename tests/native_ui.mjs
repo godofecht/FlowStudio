@@ -336,8 +336,15 @@ try {
       await setNotebookSource(source);
       await notebookPage.locator('#runNotebook').click();
       await notebookPage.waitForFunction(() =>
-        document.querySelector('#notice')?.textContent === 'Notebook executed 4 cells.',
-        null, {timeout:120000});
+        /^Notebook (executed|stopped|execution failed)/.test(
+          document.querySelector('#notice')?.textContent || ''),
+        null, {timeout:90000});
+      assert.equal(await notebookPage.locator('#notice').innerText(),
+        'Notebook executed 4 cells.', JSON.stringify({
+          requests:notebookRequests,
+          output:await notebookPage.locator('#notebookOutput').innerText(),
+          errors:notebookErrors
+        }).slice(0,3000));
       assert.equal(await notebookPage.locator('#notebookOutput .notebook-cell').count(), 5);
       const output = await notebookPage.locator('#notebookOutput').innerText();
       assert.match(output, /Cell 2 \(flow\) — complete/);

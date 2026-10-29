@@ -70,8 +70,13 @@ def _mixed_diffusion(expr: Expression) -> bool:
         return False
     a, b = expr.operands
     def derivative(node: Expression) -> bool:
-        return (node.operator == "∂ₓ" and len(node.operands) == 1
-                and node.operands[0].operator == "∂ᵧ"
+        if (node.operator == "∂ₓᵧ" and len(node.operands) == 1
+                and _name(node.operands[0], "temperature")):
+            return True
+        # Both nesting orders denote the same mixed derivative on the
+        # periodic Cartesian grid used by this cross-diffusion solver.
+        return (node.operator in ("∂ₓ", "∂ᵧ") and len(node.operands) == 1
+                and node.operands[0].operator == ("∂ᵧ" if node.operator == "∂ₓ" else "∂ₓ")
                 and len(node.operands[0].operands) == 1
                 and _name(node.operands[0].operands[0], "temperature"))
     return (_name(a, "crossDiffusivity") and derivative(b)

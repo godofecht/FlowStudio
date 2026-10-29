@@ -1,6 +1,6 @@
 # Executable mathematical Flow subsets (experimental)
 
-## Native Flow numerical runtime migration (PR #201, pending CI)
+## Native Flow numerical runtime migration (PR #201, merged)
 
 The migration away from the separate Python/NumPy mathematical dialect has
 started with `src/math_native.flow`, a reusable **Flow 2.0** numerical
@@ -15,12 +15,32 @@ against sine/cosine reference values and an energy invariant. The standalone
 `examples/native_math_bootstrap.flow` provides a real native Flow program
 for the existing `/api/check/flow` and `/api/run/flow` workbench routes.
 Both programs use the actual Flow compiler/runtime, not Python. Native
-Linux/macOS CI and live HTTP acceptance have been added, but verification
-must be established by passing CI before this PR is merged.
+Linux/macOS CI and live HTTP acceptance passed in PR #201
+([run #40921960342](https://github.com/godofecht/FlowStudio/actions/runs/40921960342)).
 
 ```sh
 flow run src/math_native_smoke.flow
 flow run examples/native_math_bootstrap.flow
+```
+
+### Dimension-checked native scalar ODE execution (follow-up, pending CI)
+
+`src/math_dimensions.flow` provides physical-dimension arithmetic for
+quantities represented by length, mass, time and temperature exponents. This
+is runtime checking in actual Flow 2.0 code, not compiler-wide type inference.
+`src/math_physical_ode.flow` connects those checked quantities to the
+native midpoint integrator. It validates the dimensions of initial time,
+duration, initial state and every coefficient before numerical execution.
+The resulting state retains the original physical dimension; invalid
+combinations and invalid timestep counts return `valid: false`.
+
+`src/math_physical_ode_smoke.flow` tests an exact quadratic trajectory in
+metres, exponential temperature decay in kelvin and deliberate unit errors
+through the real native Flow compiler and runtime. Linux/macOS CI acceptance
+is required before this follow-up is merged.
+
+```sh
+flow run src/math_physical_ode_smoke.flow
 ```
 
 **Not implemented by this migration:** self-hosted equation parsing,

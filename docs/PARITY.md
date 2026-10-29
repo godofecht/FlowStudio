@@ -1,3 +1,34 @@
+## 2026-10-29: native Flow three-state cyclic eigenmode acceptance (six CI jobs passed)
+
+The checked-in `examples/native_cyclic_network.flow` now executes a
+conservative, coupled three-species transport system through the **actual
+native Flow 2.0 compiler**. Its midpoint RK2 numerical assertions compare
+against an independent analytic eigenmode solution and check second-order
+refinement, mass conservation, positivity, semigroup consistency, exact
+deterministic replay, rate/time rescaling, zero-rate/duration limits and
+rejection of invalid physical parameters or excessive step counts.
+Every failed assertion returns a distinct nonzero exit code. The exact
+source is submitted to both real `/api/check/flow` and `/api/run/flow`
+by `tests/http_smoke.py`; the Flow-owned server converts nonzero exits to
+HTTP 422. This is **not** a Python-only numerical simulation.
+
+**Status: tested / all six Linux/macOS CI jobs passed in
+[CI #40924380694](https://github.com/godofecht/FlowStudio/actions/runs/40924380694).**
+Both native Flow build/HTTP jobs, source/transport jobs and FlowJIT jobs
+passed, as did existing Ubuntu Chromium acceptance. Independent local
+Python calculations checked the exact constants and convergence thresholds;
+the authoring environment did not have a native Flow compiler. The new
+three-state source was exercised by real HTTP, **not** a separate
+physical-browser interaction. Independent macOS browser acceptance and
+post-merge `main` CI are not verified. [PR #203](https://github.com/godofecht/FlowStudio/pull/203)
+merged as [080e626](https://github.com/godofecht/FlowStudio/commit/080e62629d97b4339c21dd7e125bb824799a9507).
+No hosted CI definition changed.
+
+This remains a standalone, deliberately bounded numerical model; general
+native PDE parsing, integrated dimensional inference, function-level R
+debugging, remote multi-user isolation and full RStudio parity remain
+unimplemented or partial.
+
 ## 2026-10-29: complex PDE numerical acceptance battery (six CI jobs passed)
 
 A checked-in oblique Fourier tensor-diffusion program,

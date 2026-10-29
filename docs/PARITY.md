@@ -1,3 +1,27 @@
+## 2026-10-29: native R postmortem function-frame navigation (verification pending)
+
+The persistent Rscript debugger now exposes optional, bounded function
+**definition** source lines for retained user-owned call frames on errors.
+The native R HTTP response validates these line numbers. The browser presents
+selectable stack-frame controls, uses the selected real retained environment
+for the existing Evaluate command, and reveals a function's definition line
+when source references survive R parsing. A missing source reference is
+displayed without inventing a location. The source/document revision guard
+also disables stack-frame navigation after edits or document changes, and
+Stop clears the frame list. The existing numeric frame selector remains
+available.
+
+**Status: partial / verification pending.** Added browser regression tests
+for frame selection, real evaluation frame indices, source positioning,
+stale-editor refusal, cleanup, and malformed metadata; extended native HTTP
+acceptance to inspect actual Rscript frame metadata. JavaScript syntax was
+checked locally, but a full Node, Rscript, Flow HTTP, Chromium and Linux/macOS
+CI run has not yet been independently established for this change.
+This is **postmortem stack navigation**, not function-level live R stepping,
+an R continuation/resume facility, live Flow debugging or authenticated
+remote sessions. Flow 2.0.0 remains the native backend. Hosted CI definitions
+are unchanged. Complete RStudio parity is not achieved.
+
 ## 2026-10-29: native R debugger stale-source command isolation (six independent CI jobs passed)
 
 The existing Flow-owned Rscript top-level expression debugger refuses Step,

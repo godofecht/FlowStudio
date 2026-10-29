@@ -298,5 +298,5 @@ test("R postmortem frame controls refuse stale editor revisions and never claim 
 test("native R frame buttons are present and wired in the actual workspace", () => {
   const html = fs.readFileSync(path.join(__dirname, "../docs/app/index.html"), "utf8");
   assert.match(html, /id="rDebugFrames"/);
-  assert.match(html, /frameList:\$("rDebugFrames"\)/);
+  assert.ok(html.includes('frameList:$("rDebugFrames")'));
 });

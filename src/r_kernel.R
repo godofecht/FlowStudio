@@ -225,7 +225,7 @@ evaluate_source <- function(source, expressions_override = NULL,
                         # This is the function DEFINITION line, never a claim
                         # about the currently executing or failing statement.
                         srcref <- attr(fn, "srcref", exact = TRUE)
-                        definition_line <- if (inherits(srcref, "srcref"))
+                        definition_line <- if (inherits(srcref, "srcref") && length(srcref) >= 1L)
                             suppressWarnings(as.integer(srcref[[1L]])) else NA_integer_
                         if (length(definition_line) != 1L || is.na(definition_line) ||
                             definition_line < 1L || definition_line > 1000000L)

@@ -34,6 +34,7 @@ if (abs(variance - (7 * amplification)^2 / 2) > 2e-10) {
 }
 if (any(values < 293) || any(values > 307)) stop("spectral positivity/bounds failed")
 image(seq_len(n), seq_len(n), matrix(values, nrow = n, byrow = TRUE),
-      col = heat.colors(32), xlab = "Periodic x", ylab = "Periodic y",
+      col = heat.colors(32), useRaster = TRUE,
+      xlab = "Periodic x", ylab = "Periodic y",
       main = "FlowStudio Python to R: anisotropic diffusion")
 cat("spectral-r-ok\n")

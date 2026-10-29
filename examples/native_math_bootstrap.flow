@@ -13,23 +13,23 @@ function midpoint_step(t: f64, y: f64, step: f64) -> f64 {
     return y + step * derivative(t + half, midpoint_value)
 }
 
-function integrate_quadratic(steps: f64) -> f64 {
-    if steps <= 0.0 {
+function integrate_quadratic(steps: i32) -> f64 {
+    if steps <= 0 {
         return -1.0
     }
-    let step: f64 = 1.0 / steps
+    let step: f64 = 1.0 / (steps as f64)
     let mut time: f64 = 0.0
     let mut value: f64 = 0.0
-    let mut index: f64 = 0.0
+    let mut index: i32 = 0
     while index < steps {
         value = midpoint_step(time, value, step)
         time = time + step
-        index = index + 1.0
+        index = index + 1
     }
     return value
 }
 
-function analytic_error(steps: f64) -> f64 {
+function analytic_error(steps: i32) -> f64 {
     let result: f64 = integrate_quadratic(steps)
     let difference: f64 = result - 1.0
     if difference < 0.0 {
@@ -41,7 +41,7 @@ function analytic_error(steps: f64) -> f64 {
 # Standalone native FlowStudio /api/run/flow and CLI acceptance entrypoint.
 # A nonzero result makes CI fail rather than merely printing a plausible value.
 function main() -> i32 {
-    if analytic_error(10.0) > 0.000000000001 { return 1 }
-    if analytic_error(100.0) > 0.000000000001 { return 2 }
+    if analytic_error(10) > 0.000000000001 { return 1 }
+    if analytic_error(100) > 0.000000000001 { return 2 }
     return 0
 }

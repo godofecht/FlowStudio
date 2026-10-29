@@ -3,21 +3,23 @@
 # Flow's compiler generates the RK4 stepping function; no Python runtime.
 # Discrete Fourier eigenvalues: lambda_x = -3*Dx/dx^2 = -0.24,
 # lambda_y = -3*Dy/dy^2 = -0.48, lambda_xy = -0.72.
-# Initial field = 3 + 0.6 cos(2pi*x/3) - 0.4 cos(2pi*y/3)
-#                 + 0.3 cos(2pi*x/3) cos(2pi*y/3).
+# Initial field = 3 + 0.6 cx + 0.2 sx - 0.4 cy - 0.17 sy
+#                 + 0.3 cx cy + 0.11 sx sy + 0.09 sx cy - 0.07 cx sy,
+# where cx = cos(2pi*x/3), sx = sin(2pi*x/3), likewise for y.
+# All nine initial cells differ, exercising genuinely distinct neighbors.
 # Exact semidiscrete solution: multiply each Fourier amplitude by exp(lambda*t).
 # Run: flow run examples/native_evolution_heat3x3.flow
 
 flow PeriodicHeat3x3 {
     state northwest: f64 = 3.5
-    state north: f64 = 2.15
-    state northeast: f64 = 2.15
-    state west: f64 = 3.65
-    state center: f64 = 2.975
-    state east: f64 = 2.975
-    state southwest: f64 = 3.65
-    state south: f64 = 2.975
-    state southeast: f64 = 2.975
+    state north: f64 = 2.4011473670974874
+    state northeast: f64 = 1.8988526329025126
+    state west: f64 = 3.442153903091735
+    state center: f64 = 3.074820508075689
+    state east: f64 = 2.6413526329025125
+    state southwest: f64 = 3.8578460969082653
+    state south: f64 = 3.143647367097487
+    state southeast: f64 = 3.0401794919243113
 
     param diffusivity_x: f64 = 0.02
     param diffusivity_y: f64 = 0.04
@@ -102,14 +104,14 @@ function integrate(duration: f64, steps: i32) -> HeatRun3x3 {
 function analyticReference() -> PeriodicHeat3x3 {
     let mut reference: PeriodicHeat3x3 = PeriodicHeat3x3_new()
     reference.northwest = 3.370489036705467
-    reference.north = 2.443485446563582
-    reference.northeast = 2.443485446563581
-    reference.west = 3.5227205566071644
-    reference.center = 2.92427473923826
-    reference.east = 2.9242747392382595
-    reference.southwest = 3.5227205566071644
-    reference.south = 2.92427473923826
-    reference.southeast = 2.92427473923826
+    reference.north = 2.617671972476197
+    reference.northeast = 2.269298920650966
+    reference.west = 3.4021128060299306
+    reference.center = 3.005364381120018
+    reference.east = 2.6904929581942865
+    reference.southwest = 3.643328307184398
+    reference.south = 3.077742398048838
+    reference.southeast = 2.9234992195898974
     return reference
 }
 
@@ -138,13 +140,14 @@ function main() -> i32 {
     if not secondHalf.valid or maxDifference(secondHalf.state, finest.state) > 0.000000000001 { return 9 }
 
     # Transposition of the grid and diffusivity tensor must commute with evolution.
-    let mut transposed: PeriodicHeat3x3 = PeriodicHeat3x3_new()
-    transposed.north = 3.65
-    transposed.northeast = 3.65
-    transposed.west = 2.15
-    transposed.east = 2.975
-    transposed.southwest = 2.15
-    transposed.south = 2.975
+    let initial: PeriodicHeat3x3 = PeriodicHeat3x3_new()
+    let mut transposed: PeriodicHeat3x3 = initial
+    transposed.north = initial.west
+    transposed.northeast = initial.southwest
+    transposed.west = initial.north
+    transposed.east = initial.south
+    transposed.southwest = initial.northeast
+    transposed.south = initial.east
     transposed.diffusivity_x = 0.04
     transposed.diffusivity_y = 0.02
     let transposedRun: HeatRun3x3 = runFrom(transposed, 1.0, 64)

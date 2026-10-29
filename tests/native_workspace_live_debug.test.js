@@ -35,8 +35,8 @@ test("native workspace routes reuse the real Flow-owned debugger transport", () 
   const html = read("web/index.html");
   const workspace = read("web/workspace_panels.js");
   for (const [route, file] of [
-    ["/native_flow.js", "docs/app/native_flow.js"],
-    ["/python_debug_panel.js", "docs/app/python_debug_panel.js"]
+    ["/app/native_flow.js", "docs/app/native_flow.js"],
+    ["/app/python_debug_panel.js", "docs/app/python_debug_panel.js"]
   ]) {
     assert.ok(routes.includes('if url == "' + route + '"'));
     assert.ok(routes.includes('path: "' + file + '"'));

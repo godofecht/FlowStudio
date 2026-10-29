@@ -1,3 +1,33 @@
+## 2026-10-29: compiler-generated four-state Flow evolution numerical gate (CI pending)
+
+`examples/native_evolution_ring.flow` uses the **actual upstream Flow 2.0
+`flow` declaration**, four coupled `evolves as` equations, and a
+compiler-generated RK4 `RingTransport_step`. This is not the separate
+Python mathematical frontend, a hand-coded Runge-Kutta kernel, or a general
+PDE parser. Its `main()` contains 23 distinct nonzero failure exits covering
+a four-mode discrete Fourier reference, fourth-order temporal refinement
+at 8/16/32/64 steps, mass conservation, positivity, deterministic replay,
+semigroup composition, rate/time scaling, rotational equivariance, uniform
+equilibrium, zero-rate/zero-duration limits, invalid parameters, excessive
+step counts and a conservative timestep bound.
+
+`tests/test_native_flow_ring_oracle.py` independently reconstructs the
+analytic reference using Poisson jump-count probabilities, then cross-checks
+the Fourier formula and an independent Python RK4 implementation. This test
+validates the reference and thresholds **only**; it does not execute Flow.
+`tests/http_smoke.py` checks and executes the exact Flow source through
+the **production** `/api/check/flow` and `/api/run/flow` routes, requires
+the successful execution marker, and checks that malformed `evolves as`
+source is rejected by the native compiler with HTTP 422.
+
+**Status: implementation committed to a PR branch; native Flow compiler,
+real HTTP execution, Linux/macOS CI and physical-browser acceptance are
+not yet verified for this change.** Do not claim this gate passed until the
+corresponding real CI run is observed. The upstream evolution compiler's
+numerical integration is being tested, not a general Flow PDE compiler,
+full live debugger, remote-session isolation or complete RStudio parity.
+No hosted CI workflow was modified.
+
 ## 2026-10-29: four-mode anisotropic tensor diffusion acceptance (six CI jobs passed)
 
 `examples/complex_multimode_tensor.py` executes the real production

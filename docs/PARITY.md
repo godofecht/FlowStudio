@@ -23,6 +23,10 @@ on 29 October 2026; they do not compile or execute Flow. The production
 `tests/http_smoke.py` checks and runs the exact Flow source through the
 real `/api/check/flow` and `/api/run/flow` endpoints and checks that the
 native compiler rejects malformed evolution syntax with HTTP 422.
+`tests/native_math_plot_ui.mjs`, already run by the existing Ubuntu native
+Chromium CI gate, also loads the exact source into the real Monaco editor,
+selects Flow and clicks the primary Run button, requiring the real compiler's
+success marker in the terminal. This browser interaction is pending CI.
 
 **Status: implementation committed on a focused branch; native Flow
 compilation, HTTP acceptance, Linux/macOS CI and browser execution are

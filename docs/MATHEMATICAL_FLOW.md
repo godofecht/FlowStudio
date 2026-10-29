@@ -659,3 +659,22 @@ and the real Flow-owned HTTP acceptance runs the same source through both
 numerical kernel, **not** a general Flow PDE grammar, a dynamic spatial grid,
 a replacement for the existing Python-backed Navier–Stokes frontend, or a
 spatial visualization interface.
+
+## Native periodic wave PDE kernel (Flow 2.0, no Python)
+
+`examples/native_periodic_wave.flow` implements the four-cell periodic
+semidiscrete wave equation `u_tt = c^2 Δ_h u` directly in Flow 2.0.
+Its velocity-Verlet integrator is second order and symplectic. The program
+checks the alternating Fourier eigenmode against independent cosine/sine
+values, convergence on 20/40/80 steps, mean displacement and velocity,
+bounded discrete physical-energy drift, replay/semigroup consistency,
+uniform fields, the zero-speed free-particle limit, and invalid parameters.
+It rejects a time step when `c*dt/dx > 1`, the linear stability limit for
+the centered periodic stencil and velocity Verlet.
+
+The native CI executes `flow run examples/native_periodic_wave.flow` on
+Linux and macOS. The native HTTP smoke test compiles and runs the identical
+source through `/api/check/flow` and `/api/run/flow`; a nonzero assertion
+exit must fail the request. This is a second *bounded* native PDE family,
+not a general equation parser, a dynamically sized grid, a native
+Navier–Stokes implementation, or a spatial visualization pipeline.

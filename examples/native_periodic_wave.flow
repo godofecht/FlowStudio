@@ -1,0 +1,216 @@
+# Native Flow 2.0: periodic four-cell one-dimensional wave equation.
+# u_tt = c^2 * (u_(i-1) - 2*u_i + u_(i+1)) / dx^2.
+# Velocity Verlet is symplectic and second order in time.
+# This is a bounded real Flow PDE kernel, not general equation syntax.
+# Run: flow run examples/native_periodic_wave.flow
+
+struct WaveField4 {
+    first: f64,
+    second: f64,
+    third: f64,
+    fourth: f64
+}
+
+struct WaveState4 {
+    displacement: WaveField4,
+    velocity: WaveField4
+}
+
+struct WaveEquation4 {
+    speed: f64,
+    spacing: f64
+}
+
+struct WaveResult4 {
+    valid: bool,
+    state: WaveState4
+}
+
+function absolute(value: f64) -> f64 {
+    if value < 0.0 { return -value }
+    return value
+}
+
+function addScaledField(base: WaveField4, direction: WaveField4, scale: f64) -> WaveField4 {
+    return WaveField4 {
+        first: base.first + scale * direction.first,
+        second: base.second + scale * direction.second,
+        third: base.third + scale * direction.third,
+        fourth: base.fourth + scale * direction.fourth
+    }
+}
+
+function maxFieldDifference(first: WaveField4, second: WaveField4) -> f64 {
+    let mut maximum: f64 = absolute(first.first - second.first)
+    let b: f64 = absolute(first.second - second.second)
+    let c: f64 = absolute(first.third - second.third)
+    let d: f64 = absolute(first.fourth - second.fourth)
+    if b > maximum { maximum = b }
+    if c > maximum { maximum = c }
+    if d > maximum { maximum = d }
+    return maximum
+}
+
+function maxStateDifference(first: WaveState4, second: WaveState4) -> f64 {
+    let displacement: f64 = maxFieldDifference(first.displacement, second.displacement)
+    let velocity: f64 = maxFieldDifference(first.velocity, second.velocity)
+    if velocity > displacement { return velocity }
+    return displacement
+}
+
+function fieldMean(field: WaveField4) -> f64 {
+    return 0.25 * (field.first + field.second + field.third + field.fourth)
+}
+
+function waveAcceleration(equation: WaveEquation4, field: WaveField4) -> WaveField4 {
+    let factor: f64 = equation.speed * equation.speed / (equation.spacing * equation.spacing)
+    return WaveField4 {
+        first: factor * (field.fourth - 2.0 * field.first + field.second),
+        second: factor * (field.first - 2.0 * field.second + field.third),
+        third: factor * (field.second - 2.0 * field.third + field.fourth),
+        fourth: factor * (field.third - 2.0 * field.fourth + field.first)
+    }
+}
+
+function verletWaveStep(equation: WaveEquation4, state: WaveState4, step: f64) -> WaveState4 {
+    let acceleration: WaveField4 = waveAcceleration(equation, state.displacement)
+    let midpointVelocity: WaveField4 = addScaledField(state.velocity, acceleration, 0.5 * step)
+    let nextDisplacement: WaveField4 = addScaledField(state.displacement, midpointVelocity, step)
+    let nextAcceleration: WaveField4 = waveAcceleration(equation, nextDisplacement)
+    let nextVelocity: WaveField4 = addScaledField(midpointVelocity, nextAcceleration, 0.5 * step)
+    return WaveState4 { displacement: nextDisplacement, velocity: nextVelocity }
+}
+
+function waveEnergy(equation: WaveEquation4, state: WaveState4) -> f64 {
+    let u: WaveField4 = state.displacement
+    let v: WaveField4 = state.velocity
+    let kinetic: f64 = 0.5 * (v.first * v.first + v.second * v.second +
+                             v.third * v.third + v.fourth * v.fourth)
+    let first: f64 = u.second - u.first
+    let second: f64 = u.third - u.second
+    let third: f64 = u.fourth - u.third
+    let fourth: f64 = u.first - u.fourth
+    let factor: f64 = equation.speed * equation.speed / (equation.spacing * equation.spacing)
+    return kinetic + 0.5 * factor * (first * first + second * second +
+                                    third * third + fourth * fourth)
+}
+
+function integrateWave(equation: WaveEquation4, initial: WaveState4, duration: f64, steps: i32) -> WaveResult4 {
+    if steps <= 0 or steps > 1000000 or duration < 0.0 {
+        return WaveResult4 { valid: false, state: initial }
+    }
+    if equation.speed < 0.0 or equation.spacing <= 0.0 {
+        return WaveResult4 { valid: false, state: initial }
+    }
+    let step: f64 = duration / (steps as f64)
+    # For the periodic centered Laplacian, max angular frequency = 2*c/dx.
+    # Velocity Verlet is linearly stable when omega_max * step <= 2.
+    if equation.speed * step / equation.spacing > 1.0 {
+        return WaveResult4 { valid: false, state: initial }
+    }
+    let mut state: WaveState4 = initial
+    let mut index: i32 = 0
+    while index < steps {
+        state = verletWaveStep(equation, state, step)
+        index = index + 1
+    }
+    return WaveResult4 { valid: true, state: state }
+}
+
+function main() -> i32 {
+    let alternating: WaveField4 = WaveField4 {
+        first: 1.0, second: -1.0, third: 1.0, fourth: -1.0
+    }
+    let zero: WaveField4 = WaveField4 {
+        first: 0.0, second: 0.0, third: 0.0, fourth: 0.0
+    }
+    let initial: WaveState4 = WaveState4 {
+        displacement: alternating, velocity: zero
+    }
+    let equation: WaveEquation4 = WaveEquation4 {
+        speed: 0.2, spacing: 0.25
+    }
+    # Alternating periodic Fourier mode: omega = 2*c/dx = 1.6.
+    # At t=0.5: u = cos(0.8) * alternating,
+    #            v = -1.6*sin(0.8) * alternating.
+    # Constants are independent analytic oracle values.
+    let expected: WaveState4 = WaveState4 {
+        displacement: WaveField4 {
+            first: 0.6967067093471654, second: -0.6967067093471654,
+            third: 0.6967067093471654, fourth: -0.6967067093471654
+        },
+        velocity: WaveField4 {
+            first: -1.1477697454392366, second: 1.1477697454392366,
+            third: -1.1477697454392366, fourth: 1.1477697454392366
+        }
+    }
+    let coarse: WaveResult4 = integrateWave(equation, initial, 0.5, 20)
+    let medium: WaveResult4 = integrateWave(equation, initial, 0.5, 40)
+    let fine: WaveResult4 = integrateWave(equation, initial, 0.5, 80)
+    if not coarse.valid or not medium.valid or not fine.valid { return 1 }
+    let coarseError: f64 = maxStateDifference(coarse.state, expected)
+    let mediumError: f64 = maxStateDifference(medium.state, expected)
+    let fineError: f64 = maxStateDifference(fine.state, expected)
+    if fineError > 0.00002 { return 2 }
+    if mediumError >= coarseError * 0.30 { return 3 }
+    if fineError >= mediumError * 0.30 { return 4 }
+
+    # The discrete wave equation conserves mean displacement and velocity.
+    if absolute(fieldMean(fine.state.displacement)) > 0.000000000001 { return 5 }
+    if absolute(fieldMean(fine.state.velocity)) > 0.000000000001 { return 6 }
+    if maxFieldDifference(fine.state.displacement, WaveField4 {
+        first: fine.state.displacement.third, second: fine.state.displacement.fourth,
+        third: fine.state.displacement.first, fourth: fine.state.displacement.second
+    }) > 0.000000000001 { return 7 }
+    # Physical discrete energy is conserved by the exact semidiscrete system.
+    # Symplectic Verlet has bounded O(dt^2) physical energy oscillations.
+    if absolute(waveEnergy(equation, initial) - 5.12) > 0.000000000001 { return 8 }
+    if absolute(waveEnergy(equation, fine.state) - 5.12) > 0.0001 { return 9 }
+
+    # Replaying the same steps and composing two half-runs is deterministic.
+    let half: WaveResult4 = integrateWave(equation, initial, 0.25, 40)
+    if not half.valid { return 10 }
+    let continued: WaveResult4 = integrateWave(equation, half.state, 0.25, 40)
+    let replay: WaveResult4 = integrateWave(equation, initial, 0.5, 80)
+    if not continued.valid or not replay.valid { return 11 }
+    if maxStateDifference(continued.state, fine.state) > 0.000000000001 { return 12 }
+    if maxStateDifference(replay.state, fine.state) > 0.000000000001 { return 13 }
+
+    # Uniform displacement has zero Laplacian and remains unchanged.
+    let uniform: WaveField4 = WaveField4 {
+        first: 7.0, second: 7.0, third: 7.0, fourth: 7.0
+    }
+    let uniformInitial: WaveState4 = WaveState4 {
+        displacement: uniform, velocity: zero
+    }
+    let uniformResult: WaveResult4 = integrateWave(equation, uniformInitial, 0.5, 80)
+    if not uniformResult.valid { return 14 }
+    if maxStateDifference(uniformResult.state, uniformInitial) > 0.000000000001 { return 15 }
+
+    # c=0 is the exact free-particle limit u(t)=u(0)+t*v(0).
+    let noWave: WaveEquation4 = WaveEquation4 { speed: 0.0, spacing: 0.25 }
+    let moving: WaveState4 = WaveState4 {
+        displacement: zero, velocity: alternating
+    }
+    let freeResult: WaveResult4 = integrateWave(noWave, moving, 0.5, 20)
+    if not freeResult.valid { return 16 }
+    if maxFieldDifference(freeResult.state.displacement, WaveField4 {
+        first: 0.5, second: -0.5, third: 0.5, fourth: -0.5
+    }) > 0.000000000001 { return 17 }
+    if maxFieldDifference(freeResult.state.velocity, alternating) > 0.000000000001 { return 18 }
+
+    # Fail closed on invalid domain, timestep, resource and CFL parameters.
+    if integrateWave(equation, initial, 0.5, 0).valid { return 19 }
+    if integrateWave(equation, initial, 0.5, 1000001).valid { return 20 }
+    if integrateWave(equation, initial, -0.5, 80).valid { return 21 }
+    let negativeSpeed: WaveEquation4 = WaveEquation4 { speed: -0.2, spacing: 0.25 }
+    if integrateWave(negativeSpeed, initial, 0.5, 80).valid { return 22 }
+    let invalidSpacing: WaveEquation4 = WaveEquation4 { speed: 0.2, spacing: 0.0 }
+    if integrateWave(invalidSpacing, initial, 0.5, 80).valid { return 23 }
+    let unstable: WaveEquation4 = WaveEquation4 { speed: 2.0, spacing: 0.25 }
+    if integrateWave(unstable, initial, 0.5, 1).valid { return 24 }
+    let zeroDuration: WaveResult4 = integrateWave(equation, initial, 0.0, 20)
+    if not zeroDuration.valid { return 25 }
+    if maxStateDifference(zeroDuration.state, initial) > 0.000000000001 { return 26 }
+    return 0
+}

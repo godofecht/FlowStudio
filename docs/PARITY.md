@@ -1,27 +1,38 @@
-## 2026-10-29: native mixed-language numerical notebook acceptance (CI pending)
+## 2026-10-29: real native Flow/Python/R numerical notebook acceptance (six CI jobs passed)
 
-The new `tests/native_mixed_notebook_http.cjs` is invoked by the real
-`tests/http_smoke.py` against a running Flow-owned native server. It uses
-the production percent-cell parser and notebook runner to execute a complete
-native Flow three-species cyclic model, a deterministic 16×16 Python
-anisotropic tensor-diffusion solver, an independent base-R Fourier oracle
-checking all 256 cells, and subsequent Python/R state checks in the same
-persistent kernels. A prior real Python request explicitly serializes the
-finite numerical samples into an R notebook assignment; there is **no**
-implicit Python/R namespace sharing. The test also captures an actual R
-plot through `/api/plot/r`, saves and restores a portable mixed-language
-`.fsnb` display snapshot, rejects mismatched saved languages and incorrect
-single-kernel Jupyter export, checks stop-on-error for real R and Flow
-failures, verifies preflight cell limits without interpreter calls, and
-confirms both kernels recover after failures.
+[PR #207](https://github.com/godofecht/FlowStudio/pull/207) merged as
+[dc7ce00](https://github.com/godofecht/FlowStudio/commit/dc7ce00e23d7c6602976696338c4d144af5cb8fd).
+The production percent-cell parser and notebook runner now have an independent
+**real native HTTP acceptance** in `tests/native_mixed_notebook_http.cjs`,
+invoked by `tests/http_smoke.py` while the Flow-owned server is running.
+The test executes the checked-in native Flow cyclic transport program, a
+deterministic 16×16 Python anisotropic tensor-diffusion solver, an independent
+R Fourier oracle over all 256 cells, and subsequent Python/R persistence checks.
+An initial real Python HTTP request explicitly serializes finite samples into
+the R notebook source; this is **not** automatic Python/R object sharing.
+The same test captures an actual R graphic, round-trips portable `.fsnb`
+display snapshots, rejects wrong-language saved results and single-kernel
+Jupyter export, verifies R/Flow stop-on-error and recovery, and checks that
+129 cells, oversized cells and hosted Flow cells are rejected before runtime
+side effects.
 
-**Status: implementation committed to a PR branch; native HTTP/CI execution
-not yet verified.** Local Node syntax checking of the acceptance script
-passed; the local environment cannot run the native Flow server or Rscript.
-This does not test a physical browser, automatic cross-language data transfer,
-restoration of interpreter state, live debugging, general PDE grammar or full
-RStudio parity. No hosted CI workflow definition was modified.
+**Status: tested for this bounded end-to-end notebook / partial overall.**
+All six Linux/macOS jobs passed in
+[CI #40943001675](https://github.com/godofecht/FlowStudio/actions/runs/40943001675).
+The Ubuntu and macOS native job logs each explicitly report the notebook
+acceptance PASS line, with real Flow 2.0 compilation, Rscript, CPython and
+plot capture. Both source/transport jobs and FlowJIT jobs passed; existing
+Ubuntu Chromium acceptance passed. The notebook script passed local
+`node --check`, but local native HTTP execution was unavailable because the
+authoring environment has no Flow/R server. The optional MLIR backend was
+skipped on both native platforms because LLVM tooling was absent. The PR CI
+is verified; post-merge main CI is a separate run.
 
+This does not establish physical-browser interaction for the new notebook,
+automatic cross-language sharing, restoration of interpreter state from
+`.fsnb`, general upstream Flow PDE grammar, live debugging, remote
+multi-user isolation or full RStudio parity. Hosted CI workflow definitions
+were unchanged.
 ## 2026-10-29: real Python/R tensor-diffusion interoperability and plot acceptance (six CI jobs passed)
 
 The checked-in `examples/spectral_interop_python.py` now executes a

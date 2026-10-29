@@ -1051,20 +1051,22 @@ def main() -> None:
         assert status == 422 and output.strip(), (status, output)
 
         # The MLIR backend bundles stdlib imports under a flow.toml it finds
-        # above the staged program; backend runs must get that staging.
-        if shutil.which("llc") or shutil.which("clang"):
-            mlir_source = ('import std.io { io_read_text }\n'
-                           'function main() -> i32 {\n'
-                           '    let r: FileRead = io_read_text("/etc/hosts")\n'
-                           '    if r.ok == false { print("missing"); return 1 }\n'
-                           '    print("flowstudio-mlir-ok")\n'
-                           '    return 0\n'
-                           '}\n')
-            status, output = request("POST", "/api/run/flow-mlir",
-                                     mlir_source, accepted_headers)
-            assert status == 200 and "flowstudio-mlir-ok" in output, (status, output)
+        # above the staged program; backend runs must get that staging. The
+        # route reports a missing local LLVM install itself, which skips
+        # this regression on machines without './flow install'.
+        mlir_source = ('import std.io { io_read_text }\n'
+                       'function main() -> i32 {\n'
+                       '    let r: FileRead = io_read_text("/etc/hosts")\n'
+                       '    if r.ok == false { print("missing"); return 1 }\n'
+                       '    print("flowstudio-mlir-ok")\n'
+                       '    return 0\n'
+                       '}\n')
+        status, output = request("POST", "/api/run/flow-mlir",
+                                 mlir_source, accepted_headers)
+        if status == 422 and "MLIR tools not found" in output:
+            print("SKIP Flow MLIR backend: run './flow install' for local LLVM tooling")
         else:
-            print("SKIP Flow MLIR backend: LLVM tooling not on PATH")
+            assert status == 200 and "flowstudio-mlir-ok" in output, (status, output)
     else:
         print("SKIP Flow subprocess: executable not on PATH")
 

@@ -4,7 +4,7 @@
 (function (global) {
 "use strict";
 const MAX_VISIBLE_OUTPUT = 12000;
-function mount({editor, native, app, language, button, output, status}) {
+function mount({editor, native, app, language, button, output, status, problems = null}) {
   if (!editor || typeof editor.createDecorationsCollection !== "function" ||
       !native || typeof native.checkSyntax !== "function" ||
       !app?.documents?.active || !language || !button || !output || !status)
@@ -12,6 +12,53 @@ function mount({editor, native, app, language, button, output, status}) {
   const decorations = editor.createDecorationsCollection();
   let generation = 0;
   let pending = false;
+  let activeProblems = [];
+  let problemSnapshot = null;
+  function clearProblems() {
+    activeProblems = [];
+    problemSnapshot = null;
+    if (problems) {
+      problems.replaceChildren();
+      problems.hidden = true;
+    }
+  }
+  // Every jump is tied to the exact checked model, document and edit revision.
+  // A click queued before a source edit must not navigate the replacement file.
+  function navigateToProblem(index) {
+    const snapshot = problemSnapshot;
+    if (!snapshot || snapshot.generation !== generation ||
+        editor.getModel() !== snapshot.model ||
+        snapshot.model.getVersionId() !== snapshot.version ||
+        app.documents.active()?.id !== snapshot.documentId || !available()) return false;
+    const point = activeProblems[index];
+    if (!point) return false;
+    editor.setPosition(point);
+    editor.revealPositionInCenterIfOutsideViewport(point);
+    return true;
+  }
+  function renderProblems(errors, model, version, documentId, token) {
+    clearProblems();
+    activeProblems = errors.map(error => ({
+      lineNumber: error.range.startLineNumber, column: error.range.startColumn
+    }));
+    problemSnapshot = {model, version, documentId, generation:token};
+    if (!problems || !activeProblems.length) return;
+    const owner = problems.ownerDocument;
+    if (!owner || typeof owner.createElement !== "function") return;
+    const entries = errors.map((error, index) => {
+      const item = owner.createElement("button");
+      item.type = "button";
+      item.className = "flow-problem";
+      // textContent, never HTML: compiler output can contain user source.
+      item.textContent = "Line " + error.range.startLineNumber +
+        ", column " + error.range.startColumn + ": " +
+        error.options.hoverMessage.value;
+      item.addEventListener("click", () => { navigateToProblem(index); });
+      return item;
+    });
+    problems.replaceChildren(...entries);
+    problems.hidden = false;
+  }
   function available() {
     return language.value === "flow" && native.available() && !!editor.getModel();
   }
@@ -22,6 +69,7 @@ function mount({editor, native, app, language, button, output, status}) {
     generation++;
     pending = false;
     decorations.clear();
+    clearProblems();
     output.hidden = true;
     output.textContent = "";
     update();
@@ -42,6 +90,7 @@ function mount({editor, native, app, language, button, output, status}) {
     const version = model.getVersionId();
     const token = ++generation;
     decorations.clear();
+    clearProblems();
     output.hidden = true;
     pending = true;
     update();
@@ -70,14 +119,10 @@ function mount({editor, native, app, language, button, output, status}) {
         });
       }
       decorations.set(errors);
+      renderProblems(errors, model, version, documentId, token);
       show(result.output || (result.ok ? "Flow source passed compiler checking." :
         "Flow compiler rejected this source without a location."), result.ok);
-      if (errors.length) {
-        const point = {lineNumber:errors[0].range.startLineNumber,
-          column:errors[0].range.startColumn};
-        editor.setPosition(point);
-        editor.revealPositionInCenterIfOutsideViewport(point);
-      }
+      if (errors.length) navigateToProblem(0);
       return result.ok;
     } catch (error) {
       if (token === generation) show("Flow compiler check unavailable: " +
@@ -92,7 +137,7 @@ function mount({editor, native, app, language, button, output, status}) {
   language.addEventListener("change", invalidate);
   button.addEventListener("click", () => { void check(); });
   update();
-  return Object.freeze({check, invalidate});
+  return Object.freeze({check, invalidate, navigateToProblem});
 }
 const api = Object.freeze({mount});
 if (typeof module !== "undefined" && module.exports) module.exports = api;
@@ -106,6 +151,7 @@ if (typeof document !== "undefined") document.addEventListener("DOMContentLoaded
     language:document.getElementById("language"),
     button:document.getElementById("checkFlow"),
     output:document.getElementById("flowDiagnostics"),
+    problems:document.getElementById("flowProblems"),
     status:document.getElementById("resultStatus")
   });
 });

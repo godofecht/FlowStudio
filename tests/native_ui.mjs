@@ -289,7 +289,7 @@ try {
   // download/import controls, output rendering and fail-closed cell sequencing.
   {
     const {readFileSync} = await import('node:fs');
-    const notebookContext = await browser.newContext({acceptDownloads:true});
+    const notebookContext = await browser.newContext({acceptDownloads:true, viewport:{width:1920,height:1500}});
     const notebookPage = await notebookContext.newPage();
     const notebookErrors = [];
     const notebookRequests = [];

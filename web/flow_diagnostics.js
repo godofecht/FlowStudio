@@ -4,7 +4,7 @@
 (function (global) {
 "use strict";
 const MAX_VISIBLE_OUTPUT = 12000;
-function mount({editor, native, app, language, button, output, status, problems = null}) {
+function mount({editor, native, app, language, button, output, status, problems = null, autoCheck = null, scheduler = global, debounceMs = 1100}) {
   if (!editor || typeof editor.createDecorationsCollection !== "function" ||
       !native || typeof native.checkSyntax !== "function" ||
       !app?.documents?.active || !language || !button || !output || !status)
@@ -14,6 +14,30 @@ function mount({editor, native, app, language, button, output, status, problems 
   let pending = false;
   let activeProblems = [];
   let problemSnapshot = null;
+  // The real strict compiler may run for up to 60 seconds. Idle checks are
+  // opt-in, debounced, and serialized with all other checks from this editor.
+  let timer = null;
+  let activeRequests = 0;
+  let autoRunning = false;
+  let autoQueued = false;
+  function cancelAuto() {
+    if (timer !== null) { scheduler.clearTimeout(timer); timer = null; }
+  }
+  function scheduleAuto() {
+    cancelAuto();
+    if (!autoCheck?.checked || !available() ||
+        !editor.getModel()?.getValue().trim()) return;
+    timer = scheduler.setTimeout(() => {
+      timer = null;
+      if (!autoCheck.checked || !available()) return;
+      if (activeRequests > 0) { autoQueued = true; return; }
+      autoRunning = true;
+      void check(false).finally(() => {
+        autoRunning = false;
+        if (autoQueued) { autoQueued = false; scheduleAuto(); }
+      });
+    }, debounceMs);
+  }
   function clearProblems() {
     activeProblems = [];
     problemSnapshot = null;
@@ -66,6 +90,7 @@ function mount({editor, native, app, language, button, output, status, problems 
     button.disabled = pending || !available();
   }
   function invalidate() {
+    cancelAuto();
     generation++;
     pending = false;
     decorations.clear();
@@ -73,6 +98,7 @@ function mount({editor, native, app, language, button, output, status, problems 
     output.hidden = true;
     output.textContent = "";
     update();
+    scheduleAuto();
   }
   function show(message, ok) {
     output.textContent = message.slice(0, MAX_VISIBLE_OUTPUT);
@@ -80,7 +106,8 @@ function mount({editor, native, app, language, button, output, status, problems 
     status.textContent = ok ? "Flow compile check passed." : "Flow compile check failed; see diagnostics.";
     status.dataset.state = ok ? "ok" : "error";
   }
-  async function check() {
+  async function check(navigate = true) {
+    if (navigate) { cancelAuto(); autoQueued = false; }
     if (pending || !available()) return false;
     const model = editor.getModel();
     const source = model.getValue();
@@ -93,6 +120,7 @@ function mount({editor, native, app, language, button, output, status, problems 
     clearProblems();
     output.hidden = true;
     pending = true;
+    activeRequests++;
     update();
     try {
       // This calls the existing strict, nonexecuting Flow 2.x compiler route.
@@ -122,20 +150,33 @@ function mount({editor, native, app, language, button, output, status, problems 
       renderProblems(errors, model, version, documentId, token);
       show(result.output || (result.ok ? "Flow source passed compiler checking." :
         "Flow compiler rejected this source without a location."), result.ok);
-      if (errors.length) navigateToProblem(0);
+      if (errors.length && navigate) navigateToProblem(0);
       return result.ok;
     } catch (error) {
       if (token === generation) show("Flow compiler check unavailable: " +
         String(error?.message || error), false);
       return false;
     } finally {
+      activeRequests--;
       if (token === generation) { pending = false; update(); }
+      if (activeRequests === 0 && autoQueued && !autoRunning) {
+        autoQueued = false;
+        scheduleAuto();
+      }
     }
   }
   editor.onDidChangeModelContent(invalidate);
   editor.onDidChangeModel(invalidate);
   language.addEventListener("change", invalidate);
   button.addEventListener("click", () => { void check(); });
+  if (autoCheck) autoCheck.addEventListener("change", () => {
+    if (autoCheck.checked) scheduleAuto();
+    else {
+      cancelAuto();
+      autoQueued = false;
+      if (autoRunning) invalidate();
+    }
+  });
   update();
   return Object.freeze({check, invalidate, navigateToProblem});
 }
@@ -150,6 +191,7 @@ if (typeof document !== "undefined") document.addEventListener("DOMContentLoaded
     app:global.FlowStudioApp,
     language:document.getElementById("language"),
     button:document.getElementById("checkFlow"),
+    autoCheck:document.getElementById("autoCheckFlow"),
     output:document.getElementById("flowDiagnostics"),
     problems:document.getElementById("flowProblems"),
     status:document.getElementById("resultStatus")

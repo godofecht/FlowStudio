@@ -1,3 +1,25 @@
+## 2026-10-29: opt-in idle Flow compiler diagnostics (PR validation pending)
+
+The primary Monaco workspace now offers an **unchecked by default** "Check on
+idle" control for Flow source. After 1.1 seconds without edits it calls the
+existing strict, nonexecuting Flow 2.0 compiler endpoint. Background results
+decorate compiler-reported source locations and populate the same problems
+panel as manual Check Flow, but **never move the caret**. Editing, undoing,
+switching documents or languages, and disabling the option invalidate stale
+responses. Pending background requests are coalesced rather than launching
+parallel compiler checks; an explicit manual check retains source navigation.
+
+**Status: partial / new PR validation pending.** Six deterministic assertions
+against the exact proposed browser controller passed in a local V8 isolate;
+six corresponding Node regression tests are committed but have not yet been
+run in GitHub CI. No native compiler or physical-browser acceptance is claimed
+for this change until verified. The existing real strict compiler, Flow-owned
+HTTP backend and Linux/macOS build workflows are unchanged. Compiler checks
+can take up to 60 seconds; there is no cancellation of an already-running
+native compilation and no continuous language server. This does not implement
+live Flow debugging, function-level R stepping, multi-user remote isolation,
+or complete RStudio parity.
+
 ## 2026-10-29: navigable source-owned Flow compiler problems (six CI jobs passed)
 
 The primary Monaco editor now renders each valid location reported by the

@@ -21,7 +21,7 @@ UNITS: dict[str, Dimension] = {
 SUPERSCRIPT = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁻−", "0123456789--")
 _NUMBER = r"(?:10[⁻−-][⁰¹²³⁴⁵⁶⁷⁸⁹0-9]+|(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)"
 _UNIT = r"(?:kg|Pa|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)?(?:/(?:kg|Pa|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*))?"
-_TOKEN = re.compile(rf"(?P<space>\s+)|(?P<quantity>{_NUMBER}(?:{_UNIT})?)|(?P<name>∂ₓ²|∂ᵧ²|∂ₓ|∂ᵧ|∇²|[A-Za-z_][A-Za-z_0-9]*|π)|(?P<postfix>[²³⁴⁵⁶⁷⁸])|(?P<op>[+\-−*/×·(),^])")
+_TOKEN = re.compile(rf"(?P<space>\s+)|(?P<quantity>{_NUMBER}(?:{_UNIT})?)|(?P<name>∂ₓ²|∂ᵧ²|∂ₓ|∂ᵧ|∇²|[A-Za-z_][A-Za-z_0-9]*|π)|(?P<postfix>[²³⁴⁵⁶⁷⁸])|(?P<op>[+\-−*/×·÷√∛(),^])")
 _UNIT_PART = re.compile(r"(kg|Pa|m|s|K)([²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)\Z")
 
 
@@ -119,9 +119,9 @@ class _Parser:
             left = self.expression(0, depth + 1)
             if self.take() != ")":
                 raise ExpressionError("Expected closing parenthesis")
-        elif first in ("sin", "cos", "exp", "sqrt", "tanh", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∇²"):
-            if first == "∇²" and self.peek() != "(":
-                # Prefix Unicode Laplacian, as in diffusivity ∇²temperature.
+        elif first in ("sin", "cos", "exp", "sqrt", "cbrt", "√", "∛", "tanh", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∇²"):
+            if first in ("∇²", "√", "∛") and self.peek() != "(":
+                # Prefix Unicode differential/radical operators bind more tightly than products.
                 arg = self.expression(30, depth + 1)
             else:
                 if self.take() != "(":
@@ -131,10 +131,14 @@ class _Parser:
                     raise ExpressionError("Expected closing parenthesis")
             if first in ("sin", "cos", "exp", "tanh") and arg.dimension != DIMENSIONLESS:
                 raise ExpressionError(f"{first} requires a dimensionless argument")
-            if first == "sqrt" and any(x % 2 for x in arg.dimension):
+            if first in ("sqrt", "√") and any(x % 2 for x in arg.dimension):
                 raise ExpressionError("sqrt requires even physical dimension exponents")
-            if first == "sqrt":
+            if first in ("cbrt", "∛") and any(x % 3 for x in arg.dimension):
+                raise ExpressionError("cbrt requires physical dimension exponents divisible by three")
+            if first in ("sqrt", "√"):
                 dim = tuple(x // 2 for x in arg.dimension)
+            elif first in ("cbrt", "∛"):
+                dim = tuple(x // 3 for x in arg.dimension)
             elif first in ("∂ₓ", "∂ᵧ"):
                 dim = _minus(arg.dimension, LENGTH)
             elif first in ("∂ₓ²", "∂ᵧ²"):
@@ -143,7 +147,7 @@ class _Parser:
                 dim = _minus(arg.dimension, (2, 0, 0, 0))
             else:
                 dim = DIMENSIONLESS
-            left = Expression(first, (arg,), dimension=dim)
+            left = Expression({"√": "sqrt", "∛": "cbrt"}.get(first, first), (arg,), dimension=dim)
         elif first in ("x", "y", "π", "pi"):
             left = Expression("name", value="pi" if first in ("π", "pi") else first,
                               dimension=LENGTH if first in ("x", "y") else DIMENSIONLESS)
@@ -160,9 +164,9 @@ class _Parser:
                 operator, precedence = "pow", 40
             elif nxt in ("+", "-", "−"):
                 operator, precedence = ("add" if nxt == "+" else "sub"), 10
-            elif nxt in ("*", "×", "·", "/"):
-                operator, precedence = ("div" if nxt == "/" else "mul"), 20
-            elif nxt in ("(", "π", "pi", "x", "y", "sin", "cos", "exp", "sqrt", "tanh", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∇²") or nxt in self.symbols or re.fullmatch(rf"{_NUMBER}(?:{_UNIT})?", nxt):
+            elif nxt in ("*", "×", "·", "/", "÷"):
+                operator, precedence = ("div" if nxt in ("/", "÷") else "mul"), 20
+            elif nxt in ("(", "π", "pi", "x", "y", "sin", "cos", "exp", "sqrt", "cbrt", "√", "∛", "tanh", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∇²") or nxt in self.symbols or re.fullmatch(rf"{_NUMBER}(?:{_UNIT})?", nxt):
                 operator, precedence = "mul", 20
             else:
                 break
@@ -184,7 +188,7 @@ class _Parser:
                 left = Expression("pow", (left, right),
                                   dimension=tuple(exponent * power for power in left.dimension))
                 continue
-            if nxt in ("+", "-", "−", "*", "×", "·", "/"):
+            if nxt in ("+", "-", "−", "*", "×", "·", "/", "÷"):
                 self.take()
             right = self.expression(precedence + 1, depth + 1)
             if operator in ("add", "sub"):
@@ -203,7 +207,7 @@ def parse_expression(source: str, *, symbols: dict[str, Dimension] | None = None
     if symbols:
         for name, dimension in symbols.items():
             if (not re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", name)
-                    or name in ("x", "y", "pi", "sin", "cos", "exp", "sqrt", "tanh")
+                    or name in ("x", "y", "pi", "sin", "cos", "exp", "sqrt", "cbrt", "tanh")
                     or len(dimension) != 4 or any(type(power) is not int for power in dimension)):
                 raise ExpressionError(f"Invalid typed symbol {name!r}")
     parser = _Parser(tokenize(source), symbols)
@@ -420,7 +424,7 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
                 return np.divide(args[0], args[1])
         if node.operator == "neg": return -args[0]
         if node.operator == "pos": return args[0]
-        if node.operator in ("sin", "cos", "exp", "sqrt", "tanh"):
+        if node.operator in ("sin", "cos", "exp", "sqrt", "cbrt", "tanh"):
             with np.errstate(over="ignore", invalid="ignore"):
                 return getattr(np, node.operator)(args[0])
         raise ExpressionError(f"Unsupported operator {node.operator!r}")

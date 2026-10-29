@@ -98,6 +98,8 @@ jobs:
           python3 src/math_flow.py examples/heat_boolean_mask.flow
           python3 src/math_flow.py --check examples/heat_equality_mask.flow
           python3 src/math_flow.py examples/heat_equality_mask.flow
+          python3 src/math_flow.py --check examples/heat_logarithmic_forcing.flow
+          python3 src/math_flow.py examples/heat_logarithmic_forcing.flow
       - name: Confirm compiler and build exact checked-out source
         run: |
           flow version

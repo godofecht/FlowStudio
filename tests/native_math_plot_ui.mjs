@@ -36,6 +36,7 @@ try {
     ['examples/heat_mean_field_feedback.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_mean_preserving_mixing.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_spatial_moments.flow', 'temperatureVariance', 'meanTemperature'],
+    ['examples/heat_spatial_integral.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_transport_reaction.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/navier_stokes_smoke.flow', 'kineticEnergy', 'maximumDivergence']
   ]) {
@@ -52,6 +53,16 @@ try {
     assert.equal(await spatial.count(), 1, 'Real spatial SVG must render');
     assert.ok(await spatial.locator('rect').count() >= 16 * 16, 'Actual sampled heatmap cells');
     assert.match(await spatial.getAttribute('aria-label'), /Spatial/);
+    if (source === 'examples/heat_spatial_integral.flow') {
+      const inspector = page.locator('#mathFlowPlot [data-mathflow-semantic="rk2"]');
+      assert.equal(await inspector.count(), 1,
+        'Executed spatial integral must expose the actual RK2 semantic trace');
+      assert.equal(await inspector.locator('ol li').count(), 2,
+        'Integrated Fourier forcing must appear alongside diffusion');
+      assert.match(await inspector.textContent(), /forcing/);
+      await inspector.locator('select[aria-label="Mathematical Flow semantic stage"]').selectOption('1');
+      assert.match(await inspector.textContent(), /predictor/i);
+    }
     if (source === 'examples/heat_mean_field_feedback.flow') {
       const inspector = page.locator('#mathFlowPlot [data-mathflow-semantic="rk2"]');
       assert.equal(await inspector.count(), 1, 'Nonlocal PDE must show live RK2 semantic inspector');

@@ -1,5 +1,32 @@
 # Executable mathematical Flow subsets (experimental)
 
+## Typed 2D spatial area integrals (executable)
+
+The bounded scalar expression compiler accepts `integral(expression)` and
+Unicode `∫(expression)` as equivalent **two-dimensional spatial area**
+integrals. The typed AST adds two length exponents to its argument dimension:
+integrating Kelvin produces K·m², not Kelvin. The NumPy runtime computes
+cell-centered quadrature over the actual uniform Cartesian grid using its
+measured x/y spacings; constant expressions broadcast across the same grid.
+This is neither symbolic integration nor a temporal/line/surface integral in
+three dimensions. Non-Cartesian coordinates and malformed arguments fail closed.
+
+`examples/heat_spatial_integral.flow` evaluates both spellings in a Fourier
+heat-source coefficient. The regression suite checks physical dimensions,
+nonunit rectangular domains, live field integration, invalid expressions and
+the analytic semidiscrete RK2 solution. Native Linux/macOS CI checks and
+executes the program, while the real native HTTP/Chromium workbench acceptance
+exercises its computed heatmap and semantic Runge–Kutta trace.
+
+```sh
+python3 src/math_flow.py --check examples/heat_spatial_integral.flow
+python3 src/math_flow.py examples/heat_spatial_integral.flow
+python3 -m unittest discover -s tests -p 'test_math_flow_spatial_integral.py' -v
+```
+
+This remains an opt-in scalar dialect; upstream Flow 2.0 grammar integration,
+general equation ASTs and coupled PDE compilation are not implemented.
+
 ## Typed spatial moment reductions (executable)
 
 The bounded mathematical Flow expression AST now compiles `mean(expression)`,

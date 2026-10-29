@@ -18,6 +18,9 @@ debug_state <- "idle"
 debug_failed_line <- NULL
 # Retained R call environments are postmortem only; cleared on Start/Stop.
 debug_frames <- list()
+# Provenance for source navigation: a function defined in an earlier run or
+# external file must never navigate the current editor by line number.
+debug_srcfile <- NULL
 # Persistent user-owned library; never install into the system R libraries.
 user_library <- file.path(tools::R_user_dir("FlowStudio", which = "data"), "library")
 if (dir.exists(user_library)) .libPaths(c(user_library, .libPaths()))
@@ -222,8 +225,19 @@ evaluate_source <- function(source, expressions_override = NULL,
                                                       width.cutoff = 100L),
                                               collapse = " "), 1L, 180L)
                         locals <- head(ls(envir = frames[[i]], all.names = TRUE), 16L)
+                        # This is the function DEFINITION line, never a claim
+                        # about the currently executing or failing statement.
+                        srcref <- attr(fn, "srcref", exact = TRUE)
+                        definition_line <- if (inherits(srcref, "srcref") &&
+                            length(srcref) >= 1L && !is.null(debug_srcfile) &&
+                            identical(attr(srcref, "srcfile", exact = TRUE), debug_srcfile))
+                            suppressWarnings(as.integer(srcref[[1L]])) else NA_integer_
+                        if (length(definition_line) != 1L || is.na(definition_line) ||
+                            definition_line < 1L || definition_line > 1000000L)
+                            definition_line <- NULL
                         selected[[length(selected) + 1L]] <- list(
                             call = label, locals = substr(locals, 1L, 80L),
+                            definition_line = definition_line,
                             envir = frames[[i]])
                     }
                     tail(selected, 8L)
@@ -279,7 +293,10 @@ debug_reply <- function(success = TRUE, output = "", executed_line = NULL) {
     frame_json <- vapply(seq_along(debug_frames), function(i) {
         frame <- debug_frames[[i]]
         locals <- vapply(frame$locals, json_quote, character(1L), USE.NAMES = FALSE)
+        definition_line <- if (is.null(frame$definition_line)) "null" else
+            as.character(frame$definition_line)
         paste0('{"id":', i, ',"call":', json_quote(frame$call),
+               ',"definition_line":', definition_line,
                ',"locals":[', paste(locals, collapse = ","), ']}')
     }, character(1L), USE.NAMES = FALSE)
     json <- paste0('{"state":', json_quote(debug_state),
@@ -305,6 +322,7 @@ debug_start <- function(source) {
     debug_state <<- "idle"
     debug_failed_line <<- NULL
     debug_frames <<- list()
+    debug_srcfile <<- NULL
     parsed <- tryCatch(parse(text = source, keep.source = TRUE),
                        error = function(error) error)
     if (inherits(parsed, "error"))
@@ -312,6 +330,7 @@ debug_start <- function(source) {
     if (length(parsed) > 1024L)
         return(debug_reply(FALSE, "R debugger supports at most 1024 top-level expressions."))
     refs <- attr(parsed, "srcref", exact = TRUE)
+    if (length(refs)) debug_srcfile <<- attr(refs[[1L]], "srcfile", exact = TRUE)
     debug_lines <<- vapply(seq_along(parsed), function(index) {
         if (length(refs) < index || is.null(refs[[index]])) return(NA_integer_)
         as.integer(refs[[index]][[1L]])
@@ -474,6 +493,7 @@ debug_stop <- function() {
     debug_index <<- 1L
     debug_failed_line <<- NULL
     debug_frames <<- list()
+    debug_srcfile <<- NULL
     debug_state <<- "idle"
     debug_reply()
 }

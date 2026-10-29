@@ -281,6 +281,12 @@ test("native R frame evaluation protocol validates indexes and frame metadata", 
       text:async () => JSON.stringify(snapshot("error", {
         frames:[{id:2, call:"invalid", locals:[]}]}))});
     await assert.rejects(native.debugRCommand("status"), /Invalid native R debugger response/);
+    for (const badLine of [-1, 0, 1.5, 1000001, "1"]) {
+      globalThis.fetch = async () => ({ok:true, status:200, headers:{get:()=>null},
+        text:async () => JSON.stringify(snapshot("error", {
+          frames:[{id:1, call:"f()", definition_line:badLine, locals:[]}]}))});
+      await assert.rejects(native.debugRCommand("status"), /Invalid native R debugger response/);
+    }
   } finally {
     globalThis.location = previous.location;
     globalThis.fetch = previous.fetch;

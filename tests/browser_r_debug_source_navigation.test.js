@@ -201,3 +201,102 @@ test("R failed-frame evaluation cannot target a different document", async () =>
   assert.equal(await f.instance.execute("stop"), true);
   assert.deepEqual(calls, ["step", "status", "stop"]);
 });
+
+function mockFrameList() {
+  const ownerDocument = {
+    createElement() {
+      const listeners = new Map(), attributes = {};
+      return {
+        disabled:false, textContent:"", attributes,
+        setAttribute(name, value) { attributes[name] = value; },
+        addEventListener(name, handler) { listeners.set(name, handler); },
+        click() { listeners.get("click")?.(); }
+      };
+    }
+  };
+  return {ownerDocument, children:[], replaceChildren(...children) { this.children = children; }};
+}
+
+test("R postmortem frame controls select actual retained evaluation environments and definition lines", async () => {
+  const source = control("outer <- function() 1\ninner <- function() 2\nstop('bad')");
+  const language = control("r"), runtime = control("native");
+  const [startButton, stepButton, continueButton, evaluateButton, stopButton,
+    statusButton, targetLine, watchExpression] = Array.from({length:8}, () => control());
+  const frameInput = control("0"), frameList = mockFrameList(), target = control();
+  const frames = [
+    {id:1, call:"outer()", definition_line:1, locals:["outer_local"]},
+    {id:2, call:"inner()", definition_line:2, locals:["inner_local"]}
+  ];
+  const calls = [];
+  const native = {
+    available:() => true,
+    async debugRStart() { return result("paused"); },
+    async debugRCommand(action, expression, frame) {
+      calls.push([action, expression, frame]);
+      if (action === "step") return result("error", {ok:false, frames, failed_line:3});
+      if (action === "evaluate") return result("error", {ok:true, frames, failed_line:3});
+      if (action === "status") return result("error", {ok:true, frames, failed_line:3});
+      return result("idle", {total:0, frames:[]});
+    }
+  };
+  const p = panel.create({native, source, language, runtime, startButton, stepButton,
+    continueButton, evaluateButton, stopButton, statusButton, targetLine,
+    watchExpression, frameInput, frameList, target});
+  assert.equal(await p.execute("start"), true);
+  assert.equal(frameList.children.length, 0);
+  assert.equal(await p.execute("step"), false);
+  assert.equal(frameList.children.length, 2);
+  assert.equal(frameList.children[1].disabled, false);
+  assert.match(frameList.children[1].textContent, /definition line 2/);
+  frameList.children[1].click();
+  assert.equal(frameInput.value, "2");
+  assert.equal(source.selectionStart, source.value.indexOf("\n") + 1);
+  assert.equal(frameList.children[1].attributes["aria-pressed"], "true");
+  watchExpression.value = "inner_local";
+  assert.equal(await p.execute("evaluate"), true);
+  assert.deepEqual(calls.at(-1), ["evaluate", "inner_local", 2]);
+  assert.equal(await p.execute("status"), true);
+  assert.equal(frameInput.value, "2");
+  assert.equal(frameList.children[1].attributes["aria-pressed"], "true");
+  assert.equal(await p.execute("stop"), true);
+  assert.equal(frameList.children.length, 0);
+});
+
+test("R postmortem frame controls refuse stale editor revisions and never claim live stepping", async () => {
+  const source = control("f <- function() stop('bad')\nf()");
+  const language = control("r"), runtime = control("native");
+  const [startButton, stepButton, continueButton, evaluateButton, stopButton,
+    statusButton, targetLine, watchExpression] = Array.from({length:8}, () => control());
+  const frameInput = control("0"), frameList = mockFrameList(), target = control();
+  const frames = [{id:1, call:"f()", definition_line:1, locals:["value"]}];
+  const native = {
+    available:() => true,
+    async debugRStart() { return result("paused"); },
+    async debugRCommand(action) {
+      if (action === "step") return result("error", {ok:false, frames, failed_line:2});
+      if (action === "status") return result("error", {ok:true, frames, failed_line:2});
+      return result("idle", {total:0, frames:[]});
+    }
+  };
+  const p = panel.create({native, source, language, runtime, startButton, stepButton,
+    continueButton, evaluateButton, stopButton, statusButton, targetLine,
+    watchExpression, frameInput, frameList, target});
+  await p.execute("start");
+  await p.execute("step");
+  const previous = source.selectionStart;
+  source.value += "\nchanged <- TRUE";
+  source.emit("input");
+  assert.equal(frameList.children[0].disabled, true);
+  frameList.children[0].click();
+  assert.equal(frameInput.value, "0");
+  assert.equal(source.selectionStart, previous);
+  assert.equal(await p.execute("status"), true);
+  assert.equal(frameList.children[0].disabled, true);
+  assert.equal(await p.execute("stop"), true);
+});
+
+test("native R frame buttons are present and wired in the actual workspace", () => {
+  const html = fs.readFileSync(path.join(__dirname, "../docs/app/index.html"), "utf8");
+  assert.match(html, /id="rDebugFrames"/);
+  assert.ok(html.includes('frameList:$("rDebugFrames")'));
+});

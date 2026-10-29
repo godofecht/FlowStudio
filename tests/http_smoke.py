@@ -16,6 +16,8 @@ import uuid
 import urllib.error
 import urllib.request
 
+from spectral_interop_http import verify_spectral_interop
+
 ROOT = "http://127.0.0.1:8751"
 
 
@@ -1076,6 +1078,11 @@ def main() -> None:
         status, output = request("POST", "/api/run/r",
                                  'cat(flowstudio_r_value, "\\n")', accepted_headers)
         assert status == 200 and output.strip() == "42", (status, output)
+        # Full production Flow HTTP -> persistent CPython -> Rscript -> R plot
+        # acceptance. The independent R oracle verifies every Fourier cell,
+        # rejects a corrupted transfer, and survives the failed evaluation.
+        verify_spectral_interop(request, accepted_headers)
+
         status, output = request("POST", "/api/reset/r", "", accepted_headers)
         assert status == 200 and "reset" in output, (status, output)
         status, snapshot = request("POST", "/api/inspect/r", "", accepted_headers)

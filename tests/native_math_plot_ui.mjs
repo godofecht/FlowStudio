@@ -33,6 +33,7 @@ try {
     ['examples/heat_cubic_reaction.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_saturating_reaction.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_composed_forcing.flow', 'temperatureVariance', 'meanTemperature'],
+    ['examples/heat_mean_field_feedback.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/heat_transport_reaction.flow', 'temperatureVariance', 'meanTemperature'],
     ['examples/navier_stokes_smoke.flow', 'kineticEnergy', 'maximumDivergence']
   ]) {
@@ -49,6 +50,16 @@ try {
     assert.equal(await spatial.count(), 1, 'Real spatial SVG must render');
     assert.ok(await spatial.locator('rect').count() >= 16 * 16, 'Actual sampled heatmap cells');
     assert.match(await spatial.getAttribute('aria-label'), /Spatial/);
+    if (source === 'examples/heat_mean_field_feedback.flow') {
+      const inspector = page.locator('#mathFlowPlot [data-mathflow-semantic="rk2"]');
+      assert.equal(await inspector.count(), 1, 'Nonlocal PDE must show live RK2 semantic inspector');
+      assert.equal(await inspector.locator('ol li').count(), 2,
+        'Measured diffusion and nonlocal mean-field contributions must be shown');
+      assert.match(await inspector.textContent(), /meanField/);
+      assert.match(await inspector.textContent(), /Nonlocal feedback/);
+      await inspector.locator('select[aria-label="Mathematical Flow semantic stage"]').selectOption('1');
+      assert.match(await inspector.textContent(), /predictor/i);
+    }
     if (source === 'examples/heat_composed_forcing.flow') {
       const inspector = page.locator('#mathFlowPlot [data-mathflow-semantic="rk2"]');
       assert.equal(await inspector.count(), 1, 'Real RK2 semantic inspector must render');

@@ -91,6 +91,25 @@ def _relaxation(expr: Expression) -> bool:
             or _name(b, "reactionRate") and difference(a))
 
 
+def _mean_field_relaxation(expr: Expression) -> bool:
+    """Match a spatially uniform negative feedback on the *actual* field mean.
+
+    reactionRate * (mean(temperature) - ambientTemperature) has K/s units.
+    The nonlocal mean is evaluated from each live RK2 stage, not from an
+    initial snapshot, an editor preview, or a postprocessed observation.
+    """
+    if expr.operator != "mul" or len(expr.operands) != 2:
+        return False
+    a, b = expr.operands
+    response = b if _name(a, "reactionRate") else a if _name(b, "reactionRate") else None
+    if response is None or response.operator != "sub" or len(response.operands) != 2:
+        return False
+    mean, ambient = response.operands
+    return (mean.operator == "mean" and len(mean.operands) == 1
+            and _name(mean.operands[0], "temperature")
+            and _name(ambient, "ambientTemperature"))
+
+
 def _quadratic_relaxation(expr: Expression) -> bool:
     """Match reactionRate * (temperature - ambient)^2 / ambient, using explicit products.
 
@@ -272,13 +291,14 @@ def compile_heat_equation(tokens: list[str], *, reaction: bool = False,
         elif reaction and sign == -1 and relaxation is None and (
                 _relaxation(term) or _quadratic_relaxation(term)
                 or _polynomial_relaxation(term) is not None
-                or _saturating_relaxation(term)):
+                or _saturating_relaxation(term) or _mean_field_relaxation(term)):
             relaxation = term
             reaction_power = (2 if _quadratic_relaxation(term)
                               else _polynomial_relaxation(term) or 1)
-            reaction_kind = ("saturating" if _saturating_relaxation(term) else
+            reaction_kind = ("meanField" if _mean_field_relaxation(term) else
+                             "saturating" if _saturating_relaxation(term) else
                              "polynomial" if reaction_power > 1 else "linear")
-            nonlinear = reaction_kind != "linear"
+            nonlinear = reaction_kind in ("saturating", "polynomial")
         elif advection and sign == -1 and any(
                 _advection(term, axis) and axis not in advection_axes for axis in ("x", "y")):
             advection_axes.add("x" if _advection(term, "x") else "y")
@@ -309,6 +329,7 @@ SEMANTIC_ROLES = {
     "crossDiffusion": "Mixed spatial derivative coupling the two coordinate directions.",
     "advection": "Transport by the declared constant velocity.",
     "reaction": "Local relaxation toward the declared ambient temperature.",
+    "meanField": "Nonlocal feedback on the live spatial mean of temperature.",
     "forcing": "Prescribed source independent of the evolving temperature field.",
 }
 
@@ -330,6 +351,8 @@ def semantic_heat_terms(equation: Equation):
             role = "crossDiffusion"
         elif any(_advection(expression, axis) for axis in ("x", "y")):
             role = "advection"
+        elif _mean_field_relaxation(expression):
+            role = "meanField"
         elif (_relaxation(expression) or _quadratic_relaxation(expression)
               or _polynomial_relaxation(expression) is not None
               or _saturating_relaxation(expression)):

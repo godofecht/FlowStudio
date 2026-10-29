@@ -1,0 +1,277 @@
+# Native Flow 2.0 bounded tensor-diffusion PDE on a configurable periodic
+# Cartesian grid (3..8 cells per axis, at most 64 cells total).
+# Executed by the production Flow compiler; Python is not a runtime dependency.
+# dT/dt = Dxx * dxx(T) + 2*Dxy * dxy(T) + Dyy * dyy(T).
+# Mixed derivative uses the symmetric four-corner centered stencil.
+# This is a native numerical kernel, NOT a general equation parser.
+
+struct TensorGrid {
+    values: array<f64, 64>
+}
+
+struct TensorEquation {
+    width: i32,
+    height: i32,
+    spacing_x: f64,
+    spacing_y: f64,
+    diffusion_xx: f64,
+    diffusion_xy: f64,
+    diffusion_yy: f64
+}
+
+struct TensorResult {
+    valid: bool,
+    grid: TensorGrid
+}
+
+function absolute(value: f64) -> f64 {
+    if value < 0.0 { return -value }
+    return value
+}
+
+function blankGrid() -> TensorGrid {
+    let values: array<f64, 64> = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    return TensorGrid { values: values }
+}
+
+function validEquation(equation: TensorEquation) -> bool {
+    if equation.width < 3 or equation.height < 3 { return false }
+    if equation.width > 8 or equation.height > 8 { return false }
+    if equation.width * equation.height > 64 { return false }
+    # Bounded comparisons reject NaN and infinities as well as invalid values.
+    if not (equation.spacing_x > 0.0 and equation.spacing_x < 1000.0) { return false }
+    if not (equation.spacing_y > 0.0 and equation.spacing_y < 1000.0) { return false }
+    if not (equation.diffusion_xx >= 0.0 and equation.diffusion_xx < 1000.0) { return false }
+    if not (equation.diffusion_yy >= 0.0 and equation.diffusion_yy < 1000.0) { return false }
+    if not (absolute(equation.diffusion_xy) < 1000.0) { return false }
+    # Symmetric diffusion tensor must be positive semidefinite.
+    if equation.diffusion_xy * equation.diffusion_xy >
+       equation.diffusion_xx * equation.diffusion_yy { return false }
+    return true
+}
+
+function tensorDerivative(equation: TensorEquation, grid: TensorGrid) -> TensorGrid {
+    let mut output: array<f64, 64> = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    let width: i32 = equation.width
+    let height: i32 = equation.height
+    let inverse_xx: f64 = 1.0 / (equation.spacing_x * equation.spacing_x)
+    let inverse_yy: f64 = 1.0 / (equation.spacing_y * equation.spacing_y)
+    let inverse_xy: f64 = 0.25 / (equation.spacing_x * equation.spacing_y)
+    let mut y: i32 = 0
+    while y < height {
+        let mut down: i32 = y - 1
+        let mut up: i32 = y + 1
+        if down < 0 { down = height - 1 }
+        if up == height { up = 0 }
+        let mut x: i32 = 0
+        while x < width {
+            let mut left: i32 = x - 1
+            let mut right: i32 = x + 1
+            if left < 0 { left = width - 1 }
+            if right == width { right = 0 }
+            let center: f64 = grid.values[y * width + x]
+            let second_x: f64 = (grid.values[y * width + left] -
+                2.0 * center + grid.values[y * width + right]) * inverse_xx
+            let second_y: f64 = (grid.values[down * width + x] -
+                2.0 * center + grid.values[up * width + x]) * inverse_yy
+            let mixed: f64 = (grid.values[up * width + right] -
+                grid.values[up * width + left] -
+                grid.values[down * width + right] +
+                grid.values[down * width + left]) * inverse_xy
+            output[y * width + x] = equation.diffusion_xx * second_x +
+                2.0 * equation.diffusion_xy * mixed +
+                equation.diffusion_yy * second_y
+            x = x + 1
+        }
+        y = y + 1
+    }
+    return TensorGrid { values: output }
+}
+
+function addScaledGrid(base: TensorGrid, slope: TensorGrid,
+                       scale: f64, count: i32) -> TensorGrid {
+    let mut output: array<f64, 64> = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    let mut index: i32 = 0
+    while index < count {
+        output[index] = base.values[index] + scale * slope.values[index]
+        index = index + 1
+    }
+    return TensorGrid { values: output }
+}
+
+function midpointTensorStep(equation: TensorEquation, grid: TensorGrid,
+                            step: f64) -> TensorGrid {
+    let count: i32 = equation.width * equation.height
+    let slope: TensorGrid = tensorDerivative(equation, grid)
+    let midpoint: TensorGrid = addScaledGrid(grid, slope, 0.5 * step, count)
+    let midpointSlope: TensorGrid = tensorDerivative(equation, midpoint)
+    return addScaledGrid(grid, midpointSlope, step, count)
+}
+
+function integrateTensor(equation: TensorEquation, initial: TensorGrid,
+                         duration: f64, steps: i32) -> TensorResult {
+    if not validEquation(equation) or steps <= 0 or steps > 100000 {
+        return TensorResult { valid: false, grid: initial }
+    }
+    if not (duration >= 0.0 and duration <= 1000.0) {
+        return TensorResult { valid: false, grid: initial }
+    }
+    let step: f64 = duration / (steps as f64)
+    # Conservative RK2 real-axis bound. The Fourier symbol of the mixed
+    # derivative is bounded by |sin(kx)sin(ky)|/(dx*dy).
+    let maximum_rate: f64 =
+        4.0 * equation.diffusion_xx / (equation.spacing_x * equation.spacing_x) +
+        4.0 * equation.diffusion_yy / (equation.spacing_y * equation.spacing_y) +
+        2.0 * absolute(equation.diffusion_xy) /
+            (equation.spacing_x * equation.spacing_y)
+    if not (step * maximum_rate <= 2.0) {
+        return TensorResult { valid: false, grid: initial }
+    }
+    let mut grid: TensorGrid = initial
+    let mut index: i32 = 0
+    while index < steps {
+        grid = midpointTensorStep(equation, grid, step)
+        index = index + 1
+    }
+    return TensorResult { valid: true, grid: grid }
+}
+
+function gridMean(grid: TensorGrid, count: i32) -> f64 {
+    let mut total: f64 = 0.0
+    let mut index: i32 = 0
+    while index < count {
+        total = total + grid.values[index]
+        index = index + 1
+    }
+    return total / (count as f64)
+}
+
+function maxGridDifference(first: TensorGrid, second: TensorGrid,
+                           count: i32) -> f64 {
+    let mut maximum: f64 = 0.0
+    let mut index: i32 = 0
+    while index < count {
+        let error: f64 = absolute(first.values[index] - second.values[index])
+        if error > maximum { maximum = error }
+        index = index + 1
+    }
+    return maximum
+}
+
+function diagonalFourier4() -> TensorGrid {
+    let mut values: array<f64, 64> = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    let mut y: i32 = 0
+    while y < 4 {
+        let mut x: i32 = 0
+        while x < 4 {
+            let phase: i32 = x + y
+            if phase == 0 or phase == 4 { values[y * 4 + x] = 1.0 }
+            if phase == 2 or phase == 6 { values[y * 4 + x] = -1.0 }
+            x = x + 1
+        }
+        y = y + 1
+    }
+    return TensorGrid { values: values }
+}
+
+function stripeFourier8() -> TensorGrid {
+    let mut values: array<f64, 64> = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    let mut y: i32 = 0
+    while y < 8 {
+        let mut x: i32 = 0
+        while x < 8 {
+            if x == 0 or x == 4 { values[y * 8 + x] = 1.0 }
+            if x == 2 or x == 6 { values[y * 8 + x] = -1.0 }
+            x = x + 1
+        }
+        y = y + 1
+    }
+    return TensorGrid { values: values }
+}
+
+function main() -> i32 {
+    let equation: TensorEquation = TensorEquation {
+        width: 4, height: 4, spacing_x: 0.25, spacing_y: 0.25,
+        diffusion_xx: 0.01, diffusion_xy: 0.005, diffusion_yy: 0.02
+    }
+    let initial: TensorGrid = diagonalFourier4()
+    let coarse: TensorResult = integrateTensor(equation, initial, 0.5, 10)
+    let medium: TensorResult = integrateTensor(equation, initial, 0.5, 20)
+    let fine: TensorResult = integrateTensor(equation, initial, 0.5, 40)
+    if not coarse.valid or not medium.valid or not fine.valid { return 1 }
+    # Independent discrete Fourier symbol:
+    # lambda = 2*Dxx/dx^2 + 2*Dyy/dy^2 + 2*Dxy/(dx*dy) = 1.12.
+    # exp(-1.12 * 0.5) = 0.5712090638488149.
+    let exact: f64 = 0.5712090638488149
+    let coarseError: f64 = absolute(coarse.grid.values[0] - exact)
+    let mediumError: f64 = absolute(medium.grid.values[0] - exact)
+    let fineError: f64 = absolute(fine.grid.values[0] - exact)
+    if fineError > 0.000011 { return 2 }
+    if mediumError >= 0.30 * coarseError { return 3 }
+    if fineError >= 0.30 * mediumError { return 4 }
+    if absolute(fine.grid.values[5] + fine.grid.values[0]) > 0.000000000001 { return 5 }
+    if absolute(fine.grid.values[1]) > 0.000000000001 { return 6 }
+    if absolute(gridMean(fine.grid, 16)) > 0.000000000001 { return 7 }
+
+    let negativeCross: TensorEquation = TensorEquation {
+        width: 4, height: 4, spacing_x: 0.25, spacing_y: 0.25,
+        diffusion_xx: 0.01, diffusion_xy: -0.005, diffusion_yy: 0.02
+    }
+    let reversed: TensorResult = integrateTensor(negativeCross, initial, 0.5, 80)
+    if not reversed.valid { return 8 }
+    # Mixed derivative changes the diagonal Fourier decay to lambda=0.8.
+    if absolute(reversed.grid.values[0] - 0.6703200460356393) > 0.000003 { return 9 }
+    if reversed.grid.values[0] <= fine.grid.values[0] { return 10 }
+
+    let larger: TensorEquation = TensorEquation {
+        width: 8, height: 8, spacing_x: 0.125, spacing_y: 0.125,
+        diffusion_xx: 0.01, diffusion_xy: 0.005, diffusion_yy: 0.02
+    }
+    let stripe: TensorGrid = stripeFourier8()
+    let stripeResult: TensorResult = integrateTensor(larger, stripe, 0.5, 80)
+    if not stripeResult.valid { return 11 }
+    # Stripe has zero y and mixed derivatives; lambda=2*Dxx/dx^2=1.28.
+    if absolute(stripeResult.grid.values[0] - 0.5272924240430485) > 0.000004 { return 12 }
+    if absolute(stripeResult.grid.values[2] + stripeResult.grid.values[0]) > 0.000000000001 { return 13 }
+    if absolute(gridMean(stripeResult.grid, 64)) > 0.000000000001 { return 14 }
+
+    let firstHalf: TensorResult = integrateTensor(equation, initial, 0.25, 40)
+    let secondHalf: TensorResult = integrateTensor(equation, firstHalf.grid, 0.25, 40)
+    let whole: TensorResult = integrateTensor(equation, initial, 0.5, 80)
+    if not firstHalf.valid or not secondHalf.valid or not whole.valid { return 15 }
+    if maxGridDifference(secondHalf.grid, whole.grid, 16) > 0.000000000001 { return 16 }
+    let replay: TensorResult = integrateTensor(equation, initial, 0.5, 80)
+    if maxGridDifference(replay.grid, whole.grid, 16) > 0.000000000001 { return 17 }
+
+    let mut uniform: TensorGrid = blankGrid()
+    let mut index: i32 = 0
+    while index < 16 {
+        uniform.values[index] = 3.0
+        index = index + 1
+    }
+    let unchanged: TensorResult = integrateTensor(equation, uniform, 0.5, 40)
+    if not unchanged.valid { return 18 }
+    if maxGridDifference(unchanged.grid, uniform, 16) > 0.000000000001 { return 19 }
+
+    let invalidWidth: TensorEquation = TensorEquation {
+        width: 9, height: 4, spacing_x: 0.25, spacing_y: 0.25,
+        diffusion_xx: 0.01, diffusion_xy: 0.005, diffusion_yy: 0.02
+    }
+    if integrateTensor(invalidWidth, initial, 0.5, 40).valid { return 20 }
+    let invalidTensor: TensorEquation = TensorEquation {
+        width: 4, height: 4, spacing_x: 0.25, spacing_y: 0.25,
+        diffusion_xx: 0.01, diffusion_xy: 0.1, diffusion_yy: 0.02
+    }
+    if integrateTensor(invalidTensor, initial, 0.5, 40).valid { return 21 }
+    let invalidSpacing: TensorEquation = TensorEquation {
+        width: 4, height: 4, spacing_x: 0.0, spacing_y: 0.25,
+        diffusion_xx: 0.01, diffusion_xy: 0.005, diffusion_yy: 0.02
+    }
+    if integrateTensor(invalidSpacing, initial, 0.5, 40).valid { return 22 }
+    if integrateTensor(equation, initial, -0.5, 40).valid { return 23 }
+    if integrateTensor(equation, initial, 0.5, 0).valid { return 24 }
+    if integrateTensor(equation, initial, 0.5, 100001).valid { return 25 }
+    if integrateTensor(equation, initial, 100.0, 1).valid { return 26 }
+    println("native-tensor-grid-ok")
+    return 0
+}

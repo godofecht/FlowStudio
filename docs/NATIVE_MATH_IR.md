@@ -60,3 +60,29 @@ invalid opcodes and overflow. Existing Linux/macOS CI and production HTTP
 acceptance run that exact native program. These are eager postfix operations,
 not parsed source-level `sqrt`, `abs` or `hypot` calls. Independent
 browser execution of the new operations and post-merge main CI are pending.
+
+## Native infix-to-IR lowering (2026-10-30)
+
+`src/math_expression_source.flow` parses an explicitly bounded subset of
+physical scalar infix expressions **in native Flow 2.0**. Its public
+`parse_math_expression` returns a postfix `MathProgram` with UTF-8 source
+byte spans, and `evaluate_math_expression` executes that program through
+the existing dimension-checked native IR. This is real compiler/runtime code,
+not Monaco snippets or a Python parser. It accepts decimal/scientific numeric
+literals, optional immediate SI suffixes `m`, `s`, `kg`, `K`, ASCII
+`+ - * /`, Unicode `× ÷ −`, unary signs and parentheses, with conventional
+multiplication/division precedence and left associativity.
+
+Inputs are limited to 512 UTF-8 bytes and 16 emitted instructions; unknown
+identifiers, implicit multiplication, exponent syntax, unsupported Unicode,
+malformed numbers, invalid units and incomplete expressions fail closed.
+Runtime dimensional errors and division by zero retain the operator's
+original source byte offset. No identifiers, symbolic calculus, static
+inference, arbitrary function calls, general equation ASTs or PDE syntax
+are accepted by this parser. This is a source-to-IR *subset*, not a change to
+upstream Flow 2.0 grammar.
+
+`src/math_expression_source_smoke.flow` exercises nested precedence,
+unit-bearing arithmetic, Unicode lowering, numerical magnitudes and
+diagnostic offsets. Both Linux and macOS CI run it through `flow run`;
+the production HTTP acceptance also checks and runs the exact modules.

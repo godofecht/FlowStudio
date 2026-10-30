@@ -1,3 +1,23 @@
+## 2026-10-30: coupled nonlinear Gray-Scott native fields (verification pending)
+
+`examples/native_field_grayscott64.flow` uses two compiler-generated 64-cell
+`field` / `laplacian` / Dirichlet steppers and an explicitly coupled
+nonlinear Gray-Scott reaction update. The Flow main checks all 384 U/V
+checkpoint values at 32/128/256 steps against independent double-precision
+references, positivity, semigroup, deterministic replay, mutation sensitivity,
+invalid inputs, output nonmutation and a 131072-cell-step resource ceiling.
+`tests/test_native_field_grayscott64_oracle.py` independently reconstructs
+the nonlinear spatial stencil and includes six numerical/negative tests.
+The production native HTTP check/run acceptance and actual Chromium Monaco
+Run acceptance are wired to the exact checked-in source.
+
+**Pending:** independent oracle, native Flow compiler execution, production
+HTTP, physical Chromium, and Linux/macOS hosted CI. Local native and macOS
+physical-browser execution are not claimed. This establishes nonlinear
+coupling of existing 1D field steppers only if verified; it does not add
+general coupled PDE grammar, multidimensional operators or RStudio parity.
+No hosted CI workflow configuration changed.
+
 ## 2026-10-30: two independent compiler-backed 48-cell fields (Linux/macOS CI verified)
 
 `examples/native_field_dual48.flow` declares two separate upstream Flow 2.0

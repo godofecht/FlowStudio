@@ -175,7 +175,7 @@ function make_instruction(opcode: i32, value: Quantity, start: i32, end: i32) ->
 }
 
 # Operators are recognized only at exact byte sequences. Supported UTF-8
-# spellings include ×, ⋅, ∗, ÷, ∕, −, ≤, ≥, ≠, ∧ and ∨.
+# spellings include ×, ·, ⋅, ∙, ∗, ÷, ∕, −, ≤, ≥, ≠, ∧ and ∨.
 # Prefix ¬ is handled separately to enforce unary placement.
 # Unsupported Unicode cannot be silently normalized to another operation.
 function source_operator(bytes: ptr<u8>, position: i32, length: i32) -> i32 {
@@ -194,6 +194,7 @@ function source_operator(bytes: ptr<u8>, position: i32, length: i32) -> i32 {
     }
     if c == 61 and position + 1 < length and bytes[position + 1] == 61 { return 14 }
     if c == 33 and position + 1 < length and bytes[position + 1] == 61 { return 15 }
+    if c == 194 and position + 1 < length and bytes[position + 1] == 183 { return 3 } # ·
     if c == 195 and position + 1 < length {
         if bytes[position + 1] == 151 { return 3 } # ×
         if bytes[position + 1] == 183 { return 4 } # ÷
@@ -203,6 +204,7 @@ function source_operator(bytes: ptr<u8>, position: i32, length: i32) -> i32 {
         if bytes[position + 1] == 136 {
             if bytes[position + 2] == 149 { return 4 } # ∕
             if bytes[position + 2] == 151 { return 3 } # ∗
+            if bytes[position + 2] == 153 { return 3 } # ∙
             if bytes[position + 2] == 167 { return 16 } # ∧
             if bytes[position + 2] == 168 { return 17 } # ∨
         }
@@ -217,7 +219,7 @@ function source_operator(bytes: ptr<u8>, position: i32, length: i32) -> i32 {
 }
 
 function operator_bytes(bytes: ptr<u8>, position: i32) -> i32 {
-    if bytes[position] == 195 { return 2 }
+    if bytes[position] == 194 or bytes[position] == 195 { return 2 }
     if bytes[position] == 226 { return 3 }
     if bytes[position] == 61 or bytes[position] == 33 { return 2 }
     if (bytes[position] == 60 or bytes[position] == 62) and bytes[position + 1] == 61 { return 2 }

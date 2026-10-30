@@ -53,7 +53,8 @@ function main() -> i32 {
     result = evaluate_math_expression("3**2")
     if result.valid or result.failed_at != 2 { return 14 }
     result = evaluate_math_expression("3^2")
-    if result.valid or result.failed_at != 1 { return 15 }
+    if not result.valid or not near(result.result.value, 9.0) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 15 }
     result = evaluate_math_expression("foo")
     if result.valid or result.failed_at != 0 { return 16 }
     result = evaluate_math_expression("1e+")

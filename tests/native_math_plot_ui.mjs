@@ -294,6 +294,33 @@ try {
     null, { timeout: 80000 });
   assert.match(await page.locator('#console').textContent(), /native-math-source-ok/);
 
+  // Run the real checked-in native trigonometric IR, parser, static analysis
+  // and scalar equation acceptance through Monaco and the Flow HTTP server.
+  const nativeTrigFiles = [
+    'src/math_dimensions.flow',
+    'src/math_expression_ir.flow',
+    'src/math_expression_source.flow',
+    'src/math_equation.flow',
+    'src/math_static.flow',
+    'src/math_trigonometry_smoke.flow'
+  ];
+  const nativeTrigSource = nativeTrigFiles.map(path =>
+    readFileSync(path, 'utf8').split(/\r?\n/)
+      .filter(line => !line.startsWith('import .math_dimensions {') &&
+        !line.startsWith('import .math_expression_ir {') &&
+        !line.startsWith('import .math_expression_source {') &&
+        !line.startsWith('import .math_equation {') &&
+        !line.startsWith('import .math_static {'))
+      .map(line => line.replace(/^export /, '')).join('\n')
+  ).join('\n');
+  await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
+    nativeTrigSource);
+  await page.locator('#run').click();
+  await page.waitForFunction(() =>
+    document.querySelector('#console')?.textContent?.includes('native-math-trigonometry-ok'),
+    null, { timeout: 80000 });
+  assert.match(await page.locator('#console').textContent(), /native-math-trigonometry-ok/);
+
   assert.deepEqual(errors, [], errors.join('\n'));
   console.log('PASS: native mathematical Flow HTTP, linear/nonlinear NumPy PDEs and actual SVG plots in Chromium');
 } finally {

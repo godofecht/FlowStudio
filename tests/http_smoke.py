@@ -207,6 +207,25 @@ def main() -> None:
     assert status == 422 and body.strip(), (
         "native evolution heat2d malformed-equation rejection", status, body)
 
+    # Native bounded 2D advection-diffusion, including nonzero transport
+    # velocities and a complex Fourier eigenvalue. Real compiler and execution.
+    transport_source = (Path(__file__).resolve().parents[1] /
+                        "examples/native_advection_diffusion_2d.flow").read_text(encoding="utf-8")
+    status, body = request("POST", "/api/check/flow", transport_source, accepted_headers)
+    assert status == 200, ("native transport compile", status, body)
+    status, body = request("POST", "/api/run/flow", transport_source, accepted_headers)
+    assert status == 200 and "native-advection-diffusion2d-ok" in body, (
+        "native transport Fourier RK4 execution", status, body)
+    malformed_transport = transport_source.replace(
+        "let exactSine: f64 = 0.12293328235722417",
+        "let exactSine: f64 = (0.12293328235722417",
+        1,
+    )
+    assert malformed_transport != transport_source
+    status, body = request("POST", "/api/check/flow", malformed_transport, accepted_headers)
+    assert status == 422 and body.strip(), (
+        "native transport malformed-source rejection", status, body)
+
     # Real upstream Flow 2.0 compiler-generated RK4 on a 3x3 periodic grid.
     # Distinct left/right and up/down neighbors; nine coupled states, exact
     # semidiscrete Fourier oracle, convergence, conservation and transposition.

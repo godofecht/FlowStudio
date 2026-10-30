@@ -218,6 +218,30 @@ try {
     null, { timeout: 80000 });
   assert.match(await page.locator('#console').textContent(), /native-advection-diffusion2d-ok/);
 
+  // Real Monaco Run -> native Flow HTTP -> upstream Flow 2.0 compiler.
+  // HTTP stages sources without a relative import root, so concatenate
+  // exactly the checked-in modules as the production HTTP smoke does.
+  const mathSourceFiles = [
+    'src/math_dimensions.flow',
+    'src/math_expression_ir.flow',
+    'src/math_expression_source.flow',
+    'src/math_expression_source_smoke.flow'
+  ];
+  const nativeMathSource = mathSourceFiles.map(path =>
+    readFileSync(path, 'utf8').split(/\r?\n/)
+      .filter(line => !line.startsWith('import .math_dimensions {') &&
+        !line.startsWith('import .math_expression_ir {') &&
+        !line.startsWith('import .math_expression_source {'))
+      .map(line => line.replace(/^export /, '')).join('\n')
+  ).join('\n');
+  await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
+    nativeMathSource);
+  await page.locator('#run').click();
+  await page.waitForFunction(() =>
+    document.querySelector('#console')?.textContent?.includes('native-math-source-ok'),
+    null, { timeout: 80000 });
+  assert.match(await page.locator('#console').textContent(), /native-math-source-ok/);
+
   assert.deepEqual(errors, [], errors.join('\n'));
   console.log('PASS: native mathematical Flow HTTP, linear/nonlinear NumPy PDEs and actual SVG plots in Chromium');
 } finally {

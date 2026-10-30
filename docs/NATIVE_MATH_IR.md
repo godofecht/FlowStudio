@@ -186,3 +186,22 @@ negative acceptance cases for comparison truth values, arithmetic
 precedence, explicit typed symbol bindings, SI unit mismatch, chained
 comparison rejection, invalid syntax and UTF-8 spans. Linux/macOS native
 CI and production HTTP acceptance must pass before this change is merged.
+
+## Native source-level logical predicates (2026-10-30; CI pending)
+
+The executable native Flow source parser now recognizes the reserved ASCII
+keywords `not`, `and` and `or`. These lower to the existing typed IR
+opcodes 18, 16 and 17. Precedence is arithmetic, comparisons, `not`,
+`and`, then `or`; `not 1<2` means `not (1<2)`. Parentheses override
+the default order. The IR requires predicate operands and returns a
+predicate; numerical values cannot silently become Boolean values.
+All logical operations are **eager**, including `and` and `or`; an invalid
+right operand still fails even if the left value determines the truth
+value. Reserved keywords cannot be bound as numeric symbols.
+
+The checked-in native smoke adds 36 executable positive, negative,
+precedence, UTF-8/source-span, typed-binding and eager-error assertions.
+The existing Linux/macOS CI runs the actual Flow program, the original
+Navier–Stokes regression and production HTTP/Chromium acceptance. This is
+not compiler-wide Flow grammar integration, lazy conditional execution,
+general equation syntax, static unit inference or native PDE lowering.

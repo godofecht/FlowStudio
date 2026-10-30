@@ -9,7 +9,7 @@
 #          20 absolute, 21 physical square root, 22 stable two-component norm,
 #          24 typed Boolean literal (0 or 1, dimensionless),
 #          25 exponential, 26 natural logarithm, 27 base-10 logarithm,
-#          28 sine, 29 cosine, 30 tangent (dimensionless radians).
+#          28 sine, 29 cosine, 30 tangent, 31 arctangent (dimensionless radians).
 # Predicate values are dimensionless 0/1 with a separate runtime type bit.
 # where and logical operators evaluate operands eagerly (no short circuit).
 # Unsupported instructions and type mismatches fail closed.
@@ -214,6 +214,32 @@ function bounded_trigonometric(value: f64, cosine: bool) -> f64 {
     return sign * sum
 }
 
+# Dimensionless inverse tangent. Reciprocal reduction handles |x| > 1 without
+# squaring a large argument; the half-angle identity brings |x| <= 1 to
+# |tan(theta/2)| <= sqrt(2)-1. Thirty alternating corrections then give
+# double-precision accuracy without an external trigonometric library.
+function bounded_arctangent(value: f64) -> f64 {
+    let mut input: f64 = magnitude(value)
+    let mut reciprocal: bool = false
+    if input > 1.0 {
+        input = 1.0 / input
+        reciprocal = true
+    }
+    let reduced: f64 = input / (1.0 + positive_square_root(1.0 + input * input))
+    let mut term: f64 = reduced
+    let mut sum: f64 = reduced
+    let mut n: i32 = 1
+    while n <= 30 {
+        term = -term * reduced * reduced
+        sum = sum + term / ((2 * n + 1) as f64)
+        n = n + 1
+    }
+    let mut angle: f64 = 2.0 * sum
+    if reciprocal { angle = 1.57079632679489661923132169163975144 - angle }
+    if value < 0.0 { return -angle }
+    return angle
+}
+
 function even_dimension(dimension: Dimension) -> bool {
     return dimension.length == (dimension.length / 2) * 2 and
         dimension.mass == (dimension.mass / 2) * 2 and
@@ -264,7 +290,7 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
             predicate[depth] = true
             depth = depth + 1
         } elif opcode == 5 or opcode == 6 or opcode == 18 or opcode == 20 or opcode == 21 or opcode == 25 or
-             opcode == 26 or opcode == 27 or opcode == 28 or opcode == 29 or opcode == 30 {
+             opcode == 26 or opcode == 27 or opcode == 28 or opcode == 29 or opcode == 30 or opcode == 31 {
             if depth < 1 { return failed(instruction.source_start) }
             let input: Quantity = stack[depth - 1]
             if opcode == 18 {
@@ -298,6 +324,11 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
                     let mut logged: f64 = bounded_natural_log(input.value)
                     if opcode == 27 { logged = logged / 2.30258509299404568402 }
                     stack[depth - 1] = quantity(logged, dimensionless())
+                } elif opcode == 31 {
+                    if not same_dimension(input.dimension, dimensionless()) {
+                        return failed(instruction.source_start)
+                    }
+                    stack[depth - 1] = quantity(bounded_arctangent(input.value), dimensionless())
                 } elif opcode == 28 or opcode == 29 or opcode == 30 {
                     if not same_dimension(input.dimension, dimensionless()) or
                        magnitude(input.value) > 60.0 {

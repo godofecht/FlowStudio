@@ -77,7 +77,6 @@ function main() -> i32 {
     if parse_math_equation("1m) = 1m").valid { return 27 }
     if parse_math_equation("1m = 1m +").valid { return 28 }
     if parse_math_equation("1m = 1m + unknown").valid { return 29 }
-    if parse_math_equation("1m = 1m = 1m").valid == false { } # Already covered duplicate delimiter.
 
     let invalid_right: MathEquation = parse_math_equation("3m = 2m + foo")
     if invalid_right.valid or invalid_right.failed_at != 10 { return 30 }

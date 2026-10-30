@@ -253,3 +253,27 @@ This is a scalar equation AST and evaluator, **not** symbolic algebra, an
 equation solver, compiler-wide static dimensional inference, a general PDE
 grammar, or native Navier–Stokes. It intentionally does not reinterpret `==`
 as an equation delimiter.
+
+## Native Unicode mathematical operator lowering (2026-10-30)
+
+The executable Flow 2.0 source-to-IR parser now accepts additional exact
+UTF-8 operator spellings: multiplication `⋅` (U+22C5) and `∗` (U+2217),
+division `∕` (U+2215), logical conjunction `∧` (U+2227),
+disjunction `∨` (U+2228), and prefix negation `¬` (U+00AC).
+These share the same native IR opcodes, eager evaluation, precedence,
+physical dimension checks, predicate type checks, numerical bounds and
+UTF-8 byte-span diagnostics as their existing ASCII counterparts.
+They can be combined with numeric units, typed bindings, `where`
+expressions and the bounded scalar equation evaluator.
+
+The checked-in native source smoke contains 33 additional positive and
+negative assertions, including precedence, exact operator byte spans,
+division by zero, incompatible dimensions, eager logical errors and
+unsupported Unicode rejection. The equation smoke adds five end-to-end
+cases. The CI matrix executes both programs with the actual Flow 2.0
+compiler on Linux and macOS, alongside the checked-in Navier–Stokes
+program and the production HTTP/Chromium acceptance suites.
+
+This remains a deliberately bounded scalar parser, not full upstream
+Flow grammar integration, general Unicode normalization, static
+dimensional inference, symbolic PDE lowering, or native Navier–Stokes.

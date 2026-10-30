@@ -100,6 +100,15 @@ function main() -> i32 {
     result = evaluate_math_expression("2m²")
     if result.valid or result.failed_at != 2 { return 33 }
 
+    let unicode: ParsedMathExpression = parse_math_expression("2×3−1")
+    if not unicode.valid or unicode.program.count != 5 or
+       unicode.program.instructions[2].source_start != 1 or
+       unicode.program.instructions[2].source_end != 3 or
+       unicode.program.instructions[4].source_start != 4 or
+       unicode.program.instructions[4].source_end != 7 { return 34 }
+    result = evaluate_math_expression("2×3−1")
+    if not result.valid or not near(result.result.value, 5.0) { return 35 }
+
     println("native-math-source-ok")
     return 0
 }

@@ -60,9 +60,15 @@
     if (!data) return false;
     const values = data.fields.flatMap(field => field.values);
     const minimum = Math.min(...values), maximum = Math.max(...values);
-    const scale = Math.max(1, Math.abs(minimum), Math.abs(maximum));
-    const lo = minimum / scale, hi = maximum / scale;
-    const span = hi - lo || 1;
+    // Equal-valued fields need a genuine axis range; otherwise the plotted
+    // curve sits on the bottom axis while both extrema labels claim its value.
+    const constant = minimum === maximum;
+    const padding = constant ? Math.max(1, Math.abs(minimum)) * 0.05 : 0;
+    const plotMinimum = minimum - padding, plotMaximum = maximum + padding;
+    const span = plotMaximum - plotMinimum;
+    // Subtract before dividing: normalizing large, nearly equal values first
+    // can round both extrema to the same floating-point number.
+    const fraction = value => (value - plotMinimum) / span;
     const svg = doc.createElementNS(NS, "svg");
     svg.setAttribute("viewBox", "0 0 640 260");
     svg.setAttribute("width", "100%");
@@ -77,7 +83,7 @@
     svg.append(axis);
     // Numeric labels and the zero line are derived from executed field data,
     // not from a static example or an assumed [0, 1] concentration range.
-    for (const [value, y] of [[maximum, 24], [minimum, 214]]) {
+    for (const [value, y] of [[plotMaximum, 24], [plotMinimum, 214]]) {
       const tick = doc.createElementNS(NS, "text");
       tick.setAttribute("x", "44");
       tick.setAttribute("y", String(y));
@@ -92,7 +98,7 @@
       const zero = doc.createElementNS(NS, "line");
       zero.setAttribute("x1", "48");
       zero.setAttribute("x2", "616");
-      const zeroY = String(214 - 190 * ((-lo) / span));
+      const zeroY = String(214 - 190 * fraction(0));
       zero.setAttribute("y1", zeroY);
       zero.setAttribute("y2", zeroY);
       zero.setAttribute("stroke", "#8897a8");
@@ -104,7 +110,7 @@
       const path = doc.createElementNS(NS, "path");
       const points = field.values.map((value, i) => {
         const x = 48 + 568 * i / (data.count - 1);
-        const y = 214 - 190 * ((value / scale - lo) / span);
+        const y = 214 - 190 * fraction(value);
         return (i ? "L" : "M") + x.toFixed(3) + "," + y.toFixed(3);
       });
       path.setAttribute("d", points.join(" "));

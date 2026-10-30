@@ -1,6 +1,6 @@
 # Native Flow 2.0 source-to-postfix lowering for a deliberately bounded
 # physical scalar expression subset. This is executable code, not editor text.
-# Full Flow 2.0 grammar integration, variables and PDE equations remain pending.
+# Full Flow 2.0 grammar integration and PDE equations remain pending.
 # UTF-8 source offsets are retained for runtime dimension diagnostics.
 import std.string { ParseF64, str_parse_f64_at, str_is_ascii_ws, str_is_ascii_digit }
 import .math_dimensions { Dimension, Quantity, dimensionless, length_dimension, mass_dimension, time_dimension, temperature_dimension, quantity }
@@ -14,6 +14,78 @@ export struct ParsedMathExpression {
     valid: bool,
     program: MathProgram,
     failed_at: i32
+}
+
+# Explicit, bounded symbol bindings are supplied by the caller. Values are
+# lowered to typed IR literals; no implicit global state or name inference.
+export struct MathSymbol {
+    name: string,
+    value: Quantity
+}
+
+export struct MathBindings {
+    symbols: array<MathSymbol, 8>,
+    count: i32
+}
+
+export function empty_math_bindings() -> MathBindings {
+    let blank: MathSymbol = MathSymbol {
+        name: "", value: quantity(0.0, dimensionless())
+    }
+    return MathBindings { symbols: [blank], count: 0 }
+}
+
+function identifier_start(c: u8) -> bool {
+    return (c >= 65 and c <= 90) or (c >= 97 and c <= 122) or c == 95
+}
+
+function identifier_part(c: u8) -> bool {
+    return identifier_start(c) or (c >= 48 and c <= 57)
+}
+
+function identifier_matches(bytes: ptr<u8>, start: i32, end: i32, name: string) -> bool {
+    let length: i32 = strlen(name) as i32
+    if length != end - start { return false }
+    let name_bytes: ptr<u8> = name as ptr<u8>
+    let mut i: i32 = 0
+    while i < length {
+        if bytes[start + i] != name_bytes[i] { return false }
+        i = i + 1
+    }
+    return true
+}
+
+function valid_symbol_name(name: string) -> bool {
+    let length: i32 = strlen(name) as i32
+    if length < 1 or length > 32 { return false }
+    let bytes: ptr<u8> = name as ptr<u8>
+    if not identifier_start(bytes[0]) { return false }
+    let mut i: i32 = 1
+    while i < length {
+        if not identifier_part(bytes[i]) { return false }
+        i = i + 1
+    }
+    return true
+}
+
+function valid_bindings(bindings: MathBindings) -> bool {
+    if bindings.count < 0 or bindings.count > 8 { return false }
+    let mut i: i32 = 0
+    while i < bindings.count {
+        let name: string = bindings.symbols[i].name
+        if not valid_symbol_name(name) { return false }
+        let bytes: ptr<u8> = name as ptr<u8>
+        let length: i32 = strlen(name) as i32
+        let mut j: i32 = 0
+        while j < i {
+            if identifier_matches(bytes, 0, length, bindings.symbols[j].name) {
+                return false
+            }
+            j = j + 1
+        }
+        i = i + 1
+    }
+    return true
 }
 
 function blank_instruction() -> MathInstruction {
@@ -69,9 +141,11 @@ function operator_bytes(bytes: ptr<u8>, position: i32) -> i32 {
     return 1
 }
 
-export function parse_math_expression(source: string) -> ParsedMathExpression {
+export function parse_math_expression_with_bindings(source: string, bindings: MathBindings) -> ParsedMathExpression {
     let length: i32 = strlen(source) as i32
-    if length < 1 or length > 512 { return source_error(0, length) }
+    if length < 1 or length > 512 or not valid_bindings(bindings) {
+        return source_error(0, length)
+    }
     let bytes: ptr<u8> = source as ptr<u8>
     let blank: MathInstruction = blank_instruction()
     let mut instructions: array<MathInstruction, 16> = [blank]
@@ -162,6 +236,31 @@ export function parse_math_expression(source: string) -> ParsedMathExpression {
                 index = index + unary_width
                 continue
             }
+        }
+        if identifier_start(c) {
+            if not expect_operand { return source_error(index, length) }
+            let start: i32 = index
+            index = index + 1
+            while index < length and identifier_part(bytes[index]) {
+                index = index + 1
+            }
+            let mut found: bool = false
+            let mut value: Quantity = quantity(0.0, dimensionless())
+            let mut symbol_index: i32 = 0
+            while symbol_index < bindings.count {
+                if identifier_matches(bytes, start, index, bindings.symbols[symbol_index].name) {
+                    value = bindings.symbols[symbol_index].value
+                    found = true
+                    break
+                }
+                symbol_index = symbol_index + 1
+            }
+            if not found { return source_error(start, length) }
+            if count >= 16 { return source_error(start, length) }
+            instructions[count] = make_instruction(0, value, start, index)
+            count = count + 1
+            expect_operand = false
+            continue
         }
         if (c >= 48 and c <= 57) or c == 46 {
             if not expect_operand { return source_error(index, length) }
@@ -271,8 +370,12 @@ export function parse_math_expression(source: string) -> ParsedMathExpression {
     }
 }
 
-export function evaluate_math_expression(source: string) -> MathResult {
-    let parsed: ParsedMathExpression = parse_math_expression(source)
+export function parse_math_expression(source: string) -> ParsedMathExpression {
+    return parse_math_expression_with_bindings(source, empty_math_bindings())
+}
+
+export function evaluate_math_expression_with_bindings(source: string, bindings: MathBindings) -> MathResult {
+    let parsed: ParsedMathExpression = parse_math_expression_with_bindings(source, bindings)
     if not parsed.valid {
         return MathResult {
             valid: false, result: quantity(0.0, dimensionless()),
@@ -280,4 +383,8 @@ export function evaluate_math_expression(source: string) -> MathResult {
         }
     }
     return evaluate_math_ir(parsed.program)
+}
+
+export function evaluate_math_expression(source: string) -> MathResult {
+    return evaluate_math_expression_with_bindings(source, empty_math_bindings())
 }

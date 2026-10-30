@@ -60,6 +60,9 @@ function valid_symbol_name(name: string) -> bool {
     if length < 1 or length > 32 { return false }
     let bytes: ptr<u8> = name as ptr<u8>
     if not identifier_start(bytes[0]) { return false }
+    if identifier_matches(bytes, 0, length, "and") or
+       identifier_matches(bytes, 0, length, "or") or
+       identifier_matches(bytes, 0, length, "not") { return false }
     let mut i: i32 = 1
     while i < length {
         if not identifier_part(bytes[i]) { return false }
@@ -109,6 +112,10 @@ function precedence(opcode: i32) -> i32 {
     if opcode == 1 or opcode == 2 { return 1 }
     # Comparisons bind below arithmetic and lower to typed predicate IR.
     if opcode >= 10 and opcode <= 15 { return 0 }
+    # Logical precedence: comparisons > not > and > or.
+    if opcode == 18 { return -1 }
+    if opcode == 16 { return -2 }
+    if opcode == 17 { return -3 }
     return 0
 }
 
@@ -257,13 +264,44 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
             }
         }
         if identifier_start(c) {
-            if not expect_operand { return source_error(index, length) }
             let start: i32 = index
             index = index + 1
             while index < length and identifier_part(bytes[index]) {
                 index = index + 1
             }
-            let mut found: bool = false
+            # Keywords lower directly to the existing native predicate IR.
+            # They are reserved and cannot be shadowed by caller bindings.
+            if identifier_matches(bytes, start, index, "not") {
+                if not expect_operand or top >= 16 { return source_error(start, length) }
+                operators[top] = 18
+                positions[top] = start
+                widths[top] = index - start
+                top = top + 1
+                continue
+            }
+            if identifier_matches(bytes, start, index, "and") or
+               identifier_matches(bytes, start, index, "or") {
+                if expect_operand { return source_error(start, length) }
+                let mut logical: i32 = 16
+                if identifier_matches(bytes, start, index, "or") { logical = 17 }
+                while top > 0 and operators[top - 1] != -1 and
+                      precedence(operators[top - 1]) >= precedence(logical) {
+                    top = top - 1
+                    if count >= 16 { return source_error(start, length) }
+                    instructions[count] = make_instruction(operators[top],
+                        quantity(0.0, dimensionless()), positions[top], positions[top] + widths[top])
+                    count = count + 1
+                }
+                if top >= 16 { return source_error(start, length) }
+                operators[top] = logical
+                positions[top] = start
+                widths[top] = index - start
+                top = top + 1
+                expect_operand = true
+                continue
+            }
+            if not expect_operand { return source_error(start, length) }
+            let mut found: bool
             let mut value: Quantity = quantity(0.0, dimensionless())
             let mut symbol_index: i32 = 0
             while symbol_index < bindings.count {

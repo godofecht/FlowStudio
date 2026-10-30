@@ -135,8 +135,10 @@ function make_instruction(opcode: i32, value: Quantity, start: i32, end: i32) ->
     }
 }
 
-# Operators are recognized only at exact byte sequences. Unsupported Unicode
-# cannot be silently normalized to a different mathematical operation.
+# Operators are recognized only at exact byte sequences. Supported UTF-8
+# spellings include ×, ⋅, ∗, ÷, ∕, −, ≤, ≥, ≠, ∧ and ∨.
+# Prefix ¬ is handled separately to enforce unary placement.
+# Unsupported Unicode cannot be silently normalized to another operation.
 function source_operator(bytes: ptr<u8>, position: i32, length: i32) -> i32 {
     let c: u8 = bytes[position]
     if c == 43 { return 1 }
@@ -158,6 +160,13 @@ function source_operator(bytes: ptr<u8>, position: i32, length: i32) -> i32 {
         if bytes[position + 1] == 183 { return 4 } # ÷
     }
     if c == 226 and position + 2 < length {
+        if bytes[position + 1] == 139 and bytes[position + 2] == 133 { return 3 } # ⋅
+        if bytes[position + 1] == 136 {
+            if bytes[position + 2] == 149 { return 4 } # ∕
+            if bytes[position + 2] == 151 { return 3 } # ∗
+            if bytes[position + 2] == 167 { return 16 } # ∧
+            if bytes[position + 2] == 168 { return 17 } # ∨
+        }
         if bytes[position + 1] == 136 and bytes[position + 2] == 146 { return 2 } # −
         if bytes[position + 1] == 137 {
             if bytes[position + 2] == 164 { return 11 } # ≤
@@ -242,6 +251,17 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
             continue
         }
         previous_was_power = false
+        # U+00AC logical negation uses the same typed predicate IR as 'not'.
+        # It is a prefix operator and must not be accepted after an operand.
+        if expect_operand and c == 194 and index + 1 < length and bytes[index + 1] == 172 {
+            if top >= 16 { return source_error(index, length) }
+            operators[top] = 18
+            positions[top] = index
+            widths[top] = 2
+            top = top + 1
+            index = index + 2
+            continue
+        }
         # These source-level unary operations lower to the already validated
         # native typed IR (absolute: 20, physical square root: 21). Function
         # spellings require a parenthesized argument; √ is also a prefix.

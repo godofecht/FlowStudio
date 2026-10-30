@@ -1,6 +1,6 @@
 # Executable native scalar equation AST, source spans and dimensional residuals.
 # flow run src/math_equation_smoke.flow
-import .math_dimensions { Dimension, Quantity, dimensionless, length_dimension, time_dimension, quotient_dimension, quantity, same_dimension }
+import .math_dimensions { Dimension, Quantity, dimensionless, length_dimension, time_dimension, quotient_dimension, product_dimension, quantity, same_dimension }
 import .math_expression_source { MathSymbol, MathBindings, empty_math_bindings }
 import .math_equation { MathEquation, MathEquationResult, parse_math_equation, parse_math_equation_with_bindings, evaluate_math_equation, evaluate_math_equation_source, evaluate_math_equation_source_with_bindings }
 
@@ -87,6 +87,22 @@ function main() -> i32 {
     let nested_comparison: MathEquationResult = evaluate_math_equation_source(
         "where(1==1,3m,4m) = 3m", exact_m)
     if not nested_comparison.valid or not nested_comparison.satisfied { return 33 }
+
+    # The same Unicode lowering is executable inside scalar equations.
+    result = evaluate_math_equation_source(
+        "where(¬(1<2) ∨ 3<4,3m,4m) = 3m", exact_m)
+    if not result.valid or not result.satisfied { return 34 }
+    result = evaluate_math_equation_source(
+        "where(1<2 ∧ 3>4,3m,4m) = 4m", exact_m)
+    if not result.valid or not result.satisfied { return 35 }
+    let area: Dimension = product_dimension(metres, metres)
+    result = evaluate_math_equation_source("2m⋅3m = 3m⋅2m", quantity(0.0, area))
+    if not result.valid or not result.satisfied or
+       not same_dimension(result.residual.dimension, area) { return 36 }
+    result = evaluate_math_equation_source("9m∕3s = 3m/1s", quantity(0.0, speed))
+    if not result.valid or not result.satisfied { return 37 }
+    result = evaluate_math_equation_source("1m⋅2s = 2m", exact_m)
+    if result.valid { return 38 }
 
     println("native-math-equation-ok")
     return 0

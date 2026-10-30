@@ -241,6 +241,34 @@ function main() -> i32 {
     inferred = infer_math_equation_source("exp(1m) = 1")
     if inferred.valid or inferred.failed_at != 0 { return 71 }
 
+
+    # Static logarithmic type inference does not execute numeric domains.
+    inferred = infer_math_expression_source("ln(2)")
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension, dimensionless()) { return 72 }
+    inferred = infer_math_expression_source("log(2m/1m)")
+    if not inferred.valid or not same_dimension(inferred.dimension, dimensionless()) { return 73 }
+    inferred = infer_math_expression_source("log10(100)")
+    if not inferred.valid or not same_dimension(inferred.dimension, dimensionless()) { return 74 }
+    inferred = infer_math_expression_source("ln(1m)")
+    if inferred.valid or inferred.failed_at != 0 { return 75 }
+    inferred = infer_math_expression_source("log10(2s)")
+    if inferred.valid or inferred.failed_at != 0 { return 76 }
+    inferred = infer_math_expression_source("ln(true)")
+    if inferred.valid or inferred.failed_at != 0 { return 77 }
+    inferred = infer_math_expression_source("ln(0)")
+    if not inferred.valid or evaluate_math_expression("ln(0)").valid { return 78 }
+    inferred = infer_math_expression_source("log10(-1)")
+    if not inferred.valid or evaluate_math_expression("log10(-1)").valid { return 79 }
+    inferred = infer_math_expression_source("ln(1e-31)")
+    if not inferred.valid or not evaluate_math_expression("ln(1e-31)").valid { return 80 }
+    inferred = infer_math_equation_source("log10(100) = 2")
+    if not inferred.valid or not same_dimension(inferred.dimension, dimensionless()) { return 81 }
+    inferred = infer_math_equation_source("ln(1m) = 0")
+    if inferred.valid or inferred.failed_at != 0 { return 82 }
+    inferred = infer_math_expression_source("ln(exp(2))")
+    if not inferred.valid or not same_dimension(inferred.dimension, dimensionless()) { return 83 }
+
     println("native-math-static-ok")
     return 0
 }

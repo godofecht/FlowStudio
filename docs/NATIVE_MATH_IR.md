@@ -29,6 +29,9 @@ The result exposes `is_predicate` alongside `valid`, `result`, and
 | 10–15 | less, less-or-equal, greater, greater-or-equal, equal, not-equal | numerical values of equal dimensions; produce predicate |
 | 16, 17, 18 | logical and, or, not | predicate inputs only |
 | 19 | where | predicate, numerical true branch, numerical false branch with equal dimensions |
+| 20 | absolute | numerical operand; preserves its physical dimension |
+| 21 | square root | nonnegative numerical operand; every physical dimension exponent must be even |
+| 22 | hypot | two numerical operands with identical dimensions; scaled two-component Euclidean norm |
 
 Evaluation is **eager**, including both branches of `where` and both
 operands of logical operations. An invalid unselected branch still fails.
@@ -43,3 +46,17 @@ source lexer and parser, source-to-IR lowering with true source spans,
 static symbol/unit inference, vector/tensor equation ASTs, general PDE
 lowering, native Navier–Stokes and computed workbench visualization.
 The existing `src/math_flow.py` frontend remains Python-backed.
+
+## 2026-10-30: bounded native physical norms (CI pending)
+
+The native IR now implements absolute value, a deterministic 72-iteration
+Newton square root and a scaled two-component Euclidean norm. A square root
+rejects negative radicands and odd physical exponents; hypot requires matching
+units and does not square unscaled large inputs. Intermediate and final values
+remain subject to the 1e30 magnitude bound. The native
+`src/math_expression_ir_smoke.flow` checks the dimensioned Pythagorean
+identity, zero and extreme magnitudes, predicate rejection, mismatched units,
+invalid opcodes and overflow. Existing Linux/macOS CI and production HTTP
+acceptance run that exact native program. These are eager postfix operations,
+not parsed source-level `sqrt`, `abs` or `hypot` calls. Independent
+browser execution of the new operations and post-merge main CI are pending.

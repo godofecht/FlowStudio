@@ -1,4 +1,4 @@
-## 2026-10-30: native typed symbol binding acceptance (CI pending)
+## 2026-10-30: native typed symbol binding acceptance (Linux/macOS CI verified)
 
 The bounded Flow 2.0 source-to-IR parser now resolves up to eight explicitly
 provided, dimensioned scalar identifiers, preserving source byte spans and
@@ -10,10 +10,16 @@ malformed names, bounds, division by zero and overflow. The existing native
 Flow `flow run` and production HTTP compile/execute acceptance run this exact
 source on Linux/macOS; hosted CI workflow definitions are unchanged.
 
-**Verification pending:** this change has not yet passed native CI. The local
-host lacks the pinned Flow 2.0 compiler and R. Browser interaction for this
-new feature, generalized symbol inference, PDE grammar and full RStudio parity
-remain unverified or incomplete.
+**Verified:** all six Linux/macOS jobs passed in
+[CI #41005093641](https://github.com/godofecht/FlowStudio/actions/runs/41005093641).
+Each source/transport platform passed 1,143 of 1,155 Node tests (12 skipped,
+zero failed) and 326 of 339 Python tests (13 skipped, zero failed).
+Both native Flow compilers executed the exact extended source smoke and
+production HTTP acceptance, and both FlowJIT jobs passed. Existing Ubuntu
+Chromium workbench acceptance passed; a separate physical-browser interaction
+with the new symbol binding API was not performed. The local host lacks the
+pinned Flow 2.0 compiler and R. Post-merge main CI, generalized symbol
+inference, PDE grammar and full RStudio parity remain unverified or incomplete.
 
 ## 2026-10-30: nonsquare 5x7 three-mode native transport acceptance (CI pending)
 

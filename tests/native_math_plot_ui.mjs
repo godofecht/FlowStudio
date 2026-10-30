@@ -207,6 +207,17 @@ try {
     null, { timeout: 80000 });
   assert.match(await page.locator('#console').textContent(), /native-coupled-evolution3x3-ok/);
 
+  // The actual Monaco Run control must execute the 64-cell three-mode
+  // travelling Fourier acceptance through the native Flow 2.0 compiler.
+  // Its success marker is printed only after all numerical assertions pass.
+  await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
+    readFileSync('examples/native_advection_diffusion_2d.flow', 'utf8'));
+  await page.locator('#run').click();
+  await page.waitForFunction(() =>
+    document.querySelector('#console')?.textContent?.includes('native-advection-diffusion2d-ok'),
+    null, { timeout: 80000 });
+  assert.match(await page.locator('#console').textContent(), /native-advection-diffusion2d-ok/);
+
   assert.deepEqual(errors, [], errors.join('\n'));
   console.log('PASS: native mathematical Flow HTTP, linear/nonlinear NumPy PDEs and actual SVG plots in Chromium');
 } finally {

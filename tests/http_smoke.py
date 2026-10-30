@@ -207,6 +207,45 @@ def main() -> None:
     assert status == 422 and body.strip(), (
         "native evolution heat2d malformed-equation rejection", status, body)
 
+    # Execute the SAME native Flow unit and expression-IR modules through the
+    # production compiler/HTTP route. The server stages anonymous /tmp source,
+    # so relative imports cannot resolve; concatenate the checked-in modules
+    # without altering their executable bodies. This is not source-grammar
+    # lowering and does not imply the editor can import these modules directly.
+    math_sources = [
+        (Path(__file__).resolve().parents[1] / path).read_text(encoding="utf-8")
+        for path in (
+            "src/math_dimensions.flow",
+            "src/math_expression_ir.flow",
+            "src/math_expression_ir_smoke.flow",
+        )
+    ]
+    native_math_ir = "\\n".join(
+        "\\n".join(
+            line.removeprefix("export ")
+            for line in source.splitlines()
+            if not line.startswith("import .math_dimensions {")
+            and not line.startswith("import .math_expression_ir {")
+        )
+        for source in math_sources
+    )
+    assert "function evaluate_math_ir(" in native_math_ir
+    assert "native-math-ir-ok" in native_math_ir
+    status, body = request("POST", "/api/check/flow", native_math_ir, accepted_headers)
+    assert status == 200, ("native typed mathematical IR compile", status, body)
+    status, body = request("POST", "/api/run/flow", native_math_ir, accepted_headers)
+    assert status == 200 and "native-math-ir-ok" in body, (
+        "native typed mathematical IR execution", status, body)
+    malformed_math_ir = native_math_ir.replace(
+        "function evaluate_math_ir(program: MathProgram) -> MathResult {",
+        "function evaluate_math_ir(program: MathProgram -> MathResult {",
+        1,
+    )
+    assert malformed_math_ir != native_math_ir
+    status, body = request("POST", "/api/check/flow", malformed_math_ir, accepted_headers)
+    assert status == 422 and body.strip(), (
+        "native typed mathematical IR malformed source rejection", status, body)
+
     # Native bounded 2D advection-diffusion, including nonzero transport
     # velocities and a complex Fourier eigenvalue. Real compiler and execution.
     transport_source = (Path(__file__).resolve().parents[1] /

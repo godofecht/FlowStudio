@@ -203,6 +203,89 @@ function main() -> i32 {
     result = evaluate_math_ir(program)
     if not result.valid or not close(result.result.value, 1.5574077246549023) { return 65 }
 
+
+    # Inverse tangent executes through the same source parser, native typed IR,
+    # static dimension inference and scalar equation compiler as forward trig.
+    result = evaluate_math_expression("atan(0)")
+    if not result.valid or not close(result.result.value, 0.0) { return 66 }
+    result = evaluate_math_expression("atan(1)")
+    if not result.valid or not close(result.result.value, 0.7853981633974483) { return 67 }
+    result = evaluate_math_expression("atan(-1)")
+    if not result.valid or not close(result.result.value, -0.7853981633974483) { return 68 }
+    result = evaluate_math_expression("atan(0.5)")
+    if not result.valid or not close(result.result.value, 0.4636476090008061) { return 69 }
+    result = evaluate_math_expression("atan(-0.5)")
+    if not result.valid or not close(result.result.value, -0.4636476090008061) { return 70 }
+    result = evaluate_math_expression("atan(10)")
+    if not result.valid or not close(result.result.value, 1.4711276743037347) { return 71 }
+    result = evaluate_math_expression("atan(-10)")
+    if not result.valid or not close(result.result.value, -1.4711276743037347) { return 72 }
+    result = evaluate_math_expression("atan(60)")
+    if not result.valid or not close(result.result.value, 1.554131203080956) { return 73 }
+    result = evaluate_math_expression("atan(100000000000000000000)")
+    if not result.valid or not close(result.result.value, half_pi) { return 74 }
+    result = evaluate_math_expression("atan(tan(0.5))")
+    if not result.valid or not close(result.result.value, 0.5) { return 75 }
+    result = evaluate_math_expression("atan(1m/1m)")
+    if not result.valid or not close(result.result.value, 0.7853981633974483) { return 76 }
+    result = evaluate_math_expression("atan(1m)")
+    if result.valid or result.failed_at != 0 { return 77 }
+    result = evaluate_math_expression("atan(true)")
+    if result.valid or result.failed_at != 0 { return 78 }
+    result = evaluate_math_expression("atan(10000000000000000000000000000000)")
+    if result.valid { return 79 }
+    if parse_math_expression("atan(1,2)").valid { return 80 }
+    if parse_math_expression("atan()").valid { return 81 }
+    if parse_math_expression("atan (0)").valid { return 82 }
+    let atan_parsed: ParsedMathExpression = parse_math_expression("atan(0)")
+    if not atan_parsed.valid or atan_parsed.program.count != 2 or
+       atan_parsed.program.instructions[1].opcode != 31 or
+       atan_parsed.program.instructions[1].source_start != 0 or
+       atan_parsed.program.instructions[1].source_end != 4 { return 83 }
+    inferred = infer_math_expression_source("atan(61)")
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension, dimensionless()) { return 84 }
+    inferred = infer_math_expression_source("atan(1m)")
+    if inferred.valid or inferred.failed_at != 0 { return 85 }
+    inferred = infer_math_expression_source("atan(true)")
+    if inferred.valid or inferred.failed_at != 0 { return 86 }
+    inferred = infer_math_equation_source("atan(1) = 0.7853981633974483")
+    if not inferred.valid or not same_dimension(inferred.dimension, dimensionless()) { return 87 }
+    equation = evaluate_math_equation_source(
+        "atan(1) = 0.7853981633974483", tolerance)
+    if not equation.valid or not equation.satisfied { return 88 }
+    equation = evaluate_math_equation_source("atan(1m) = 0", tolerance)
+    if equation.valid { return 89 }
+    instructions[0] = MathInstruction {
+        opcode: 0, literal: quantity(1.0, dimensionless()),
+        exponent: 0, source_start: 0, source_end: 1
+    }
+    instructions[1] = MathInstruction {
+        opcode: 31, literal: quantity(0.0, dimensionless()),
+        exponent: 0, source_start: 1, source_end: 2
+    }
+    program = MathProgram { instructions: instructions, count: 2, source_length: 2 }
+    result = evaluate_math_ir(program)
+    if not result.valid or not close(result.result.value, 0.7853981633974483) { return 90 }
+    inferred = infer_math_ir(program)
+    if not inferred.valid or not same_dimension(inferred.dimension, dimensionless()) { return 91 }
+    instructions[0] = MathInstruction {
+        opcode: 0, literal: quantity(1.0, length_dimension()),
+        exponent: 0, source_start: 0, source_end: 1
+    }
+    program = MathProgram { instructions: instructions, count: 2, source_length: 2 }
+    result = evaluate_math_ir(program)
+    if result.valid or result.failed_at != 1 { return 92 }
+    inferred = infer_math_ir(program)
+    if inferred.valid or inferred.failed_at != 1 { return 93 }
+    instructions[0] = MathInstruction {
+        opcode: 0, literal: quantity(-10.0, dimensionless()),
+        exponent: 0, source_start: 0, source_end: 1
+    }
+    program = MathProgram { instructions: instructions, count: 2, source_length: 2 }
+    result = evaluate_math_ir(program)
+    if not result.valid or not close(result.result.value, -1.4711276743037347) { return 94 }
+
     println("native-math-trigonometry-ok")
     return 0
 }

@@ -32,6 +32,7 @@ The result exposes `is_predicate` alongside `valid`, `result`, and
 | 20 | absolute | numerical operand; preserves its physical dimension |
 | 21 | square root | nonnegative numerical operand; every physical dimension exponent must be even |
 | 22 | hypot | two numerical operands with identical dimensions; scaled two-component Euclidean norm |
+| 24 | Boolean literal | dimensionless 0 or 1, exponent zero; produces a typed predicate |
 
 Evaluation is **eager**, including both branches of `where` and both
 operands of logical operations. An invalid unselected branch still fails.
@@ -305,3 +306,18 @@ and a real 64-instruction program. Both native Linux/macOS CI and production
 HTTP check/run acceptance are wired to execute the exact module. Their
 success must be confirmed from GitHub Actions before claiming verification.
 
+
+## Native typed Boolean literals (2026-10-30)
+
+The native Flow source-to-IR parser accepts the reserved lowercase keywords
+`true` and `false` as typed predicate literals. They compile to opcode 24,
+retain UTF-8 source spans, and execute through the same strict Boolean type
+rules as comparisons. Boolean literals work in `not`, `and`, `or`, and
+`where` expressions, including nested dimensioned equations. They are not
+numeric quantities: arithmetic, numeric comparisons, and equation residuals
+reject predicates. Caller bindings cannot shadow either keyword. The IR and
+static type pass reject malformed Boolean literal values, units and exponents.
+
+This is a bounded native scalar language extension, not upstream Flow 2.0
+grammar integration, general symbolic equations, native Navier–Stokes, or
+computed workbench PDE visualization.

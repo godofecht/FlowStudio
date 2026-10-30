@@ -205,3 +205,24 @@ The existing Linux/macOS CI runs the actual Flow program, the original
 Navier–Stokes regression and production HTTP/Chromium acceptance. This is
 not compiler-wide Flow grammar integration, lazy conditional execution,
 general equation syntax, static unit inference or native PDE lowering.
+
+## Native multi-argument mathematical calls (2026-10-30; CI pending)
+
+The bounded native source parser now lowers `min(left,right)`,
+`max(left,right)`, `norm(first,second)`, `clamp(value,lower,upper)`
+and `where(predicate,true_value,false_value)` to the existing
+dimension-checked postfix instructions 7, 8, 22, 9 and 19. Arguments
+may contain nested calls, arithmetic, explicit typed bindings, comparisons
+and eager logical predicates. Commas are legal only inside a recognized
+call, with exactly the specified number of arguments. All calls are eager:
+`where` does not suppress errors in an unselected branch. Both `where`
+branches must have the same physical dimensions; `norm` uses the
+existing scale-stable two-component norm. Calls retain function-name
+UTF-8 source spans and the existing 16-instruction / 512-byte limits.
+
+The native smoke adds 39 executable cases for numerical values, physical
+dimensions, nesting, precedence, source spans, missing and excess arguments,
+comma rejection, unit mismatches, reversed clamp bounds, overflow and eager
+branch failure. This does **not** implement arbitrary functions, general
+source equations, PDE compilation or RStudio parity. Native compiler,
+HTTP and physical-browser verification remain pending CI.

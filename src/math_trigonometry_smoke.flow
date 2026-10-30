@@ -1,6 +1,6 @@
 # Executable native Flow 2.0 trigonometric source, IR, static type and equation acceptance.
 # flow run src/math_trigonometry_smoke.flow
-import .math_dimensions { dimensionless, length_dimension, quantity, same_dimension }
+import .math_dimensions { Quantity, dimensionless, length_dimension, quantity, same_dimension }
 import .math_expression_ir { MathInstruction, MathProgram, MathResult, evaluate_math_ir }
 import .math_expression_source { ParsedMathExpression, evaluate_math_expression, parse_math_expression }
 import .math_static { MathInferredType, infer_math_ir, infer_math_expression_source, infer_math_equation_source }
@@ -90,7 +90,7 @@ function main() -> i32 {
     inferred = infer_math_equation_source("sin(1m) = 0")
     if inferred.valid or inferred.failed_at != 0 { return 34 }
 
-    let tolerance = quantity(0.00000000001, dimensionless())
+    let tolerance: Quantity = quantity(0.00000000001, dimensionless())
     let mut equation: MathEquationResult = evaluate_math_equation_source(
         "sin(0) = 0", tolerance)
     if not equation.valid or not equation.satisfied { return 35 }

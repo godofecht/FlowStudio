@@ -146,9 +146,9 @@ class NativeTransportMultimodeOracle(unittest.TestCase):
         source = SOURCE.read_text(encoding="utf-8")
         original = embedded_grid(source, "referenceMultimode5x7")
         altered, count = re.subn(
-            r"(values\[17\] = )([0-9.eE+-]+)",
+            r"(function referenceMultimode5x7\(\) -> TransportGrid \{.*?values\[17\] = )([0-9.eE+-]+)",
             lambda match: match.group(1) + str(float(match.group(2)) + 0.01),
-            source, count=1)
+            source, count=1, flags=re.S)
         self.assertEqual(count, 1)
         changed = embedded_grid(altered, "referenceMultimode5x7")
         self.assertGreater(maximum_error(changed, exact_field(DURATION)), 0.009)

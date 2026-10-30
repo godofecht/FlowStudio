@@ -218,6 +218,17 @@ try {
     null, { timeout: 80000 });
   assert.match(await page.locator('#console').textContent(), /native-advection-diffusion2d-ok/);
 
+  // 256-cell tensor-diffusion acceptance through the real Monaco Run
+  // button, native Flow HTTP and upstream compiler. All 256 numerical
+  // assertions execute inside the checked-in Flow main().
+  await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
+    readFileSync('examples/native_tensor_grid.flow', 'utf8'));
+  await page.locator('#run').click();
+  await page.waitForFunction(() =>
+    document.querySelector('#console')?.textContent?.includes('native-tensor-grid-ok'),
+    null, { timeout: 80000 });
+  assert.match(await page.locator('#console').textContent(), /native-tensor-grid-ok/);
+
   // Real Monaco Run -> native Flow HTTP -> upstream Flow 2.0 compiler.
   // HTTP stages sources without a relative import root, so concatenate
   // exactly the checked-in modules as the production HTTP smoke does.

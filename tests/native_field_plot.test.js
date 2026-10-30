@@ -80,3 +80,41 @@ test("deterministic bounded 1D fields survive 120 seeded sizes and species count
       field.values.every(Number.isFinite)));
   }
 });
+
+
+test("all bounded seeded fields render finite, in-range SVG coordinates", () => {
+  class Element {
+    constructor(tag) { this.tag = tag; this.attributes = {}; this.children = []; this.hidden = true; }
+    setAttribute(name, value) { this.attributes[name] = value; }
+    append(child) { this.children.push(child); }
+    replaceChildren(...children) { this.children = children; }
+  }
+  const doc = {createElement: tag => new Element(tag),
+    createElementNS: (_namespace, tag) => new Element(tag)};
+  const container = new Element("div");
+  for (let seed = 1; seed <= 120; seed++) {
+    const count = 3 + seed % 510;
+    const species = 1 + seed % 4;
+    const rows = Array.from({length:species}, (_, j) => {
+      const values = Array.from({length:count}, (_, i) =>
+        ((i - count / 2) * (j + 1) * (seed % 2 ? 1 : -1) / count).toExponential(9));
+      return "F" + j + " " + values.join(" ");
+    });
+    const output = ["FLOWSTUDIO_FIELD_V1 " + count + " " + species,
+      ...rows, "FLOWSTUDIO_FIELD_END"].join("\n");
+    assert.equal(render(doc, container, output), true);
+    const svg = container.children[1];
+    const paths = svg.children.filter(child => child.attributes["data-field-name"]);
+    assert.equal(paths.length, species);
+    for (const path of paths) {
+      const points = [...path.attributes.d.matchAll(/([ML])([0-9.]+),([0-9.]+)/g)];
+      assert.equal(points.length, count);
+      assert.equal(points.map(point => point[0]).join(" "), path.attributes.d);
+      for (const point of points) {
+        const x = Number(point[2]), y = Number(point[3]);
+        assert.ok(Number.isFinite(x) && x >= 48 && x <= 616);
+        assert.ok(Number.isFinite(y) && y >= 24 && y <= 214);
+      }
+    }
+  }
+});

@@ -96,6 +96,7 @@ jobs:
           flow run examples/native_periodic_wave.flow
           flow run examples/native_coupled_diffusion_2d.flow
           flow run examples/native_tensor_grid.flow
+          flow run examples/native_advection_diffusion_2d.flow
           flow run examples/native_evolution_ring.flow
           flow run examples/native_evolution_heat2d.flow
           flow run examples/native_evolution_heat3x3.flow

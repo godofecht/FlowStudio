@@ -950,6 +950,38 @@ function main() -> i32 {
     result = evaluate_math_expression("0m⁻²")
     if result.valid or result.failed_at != 2 { return 340 }
 
+    # U+00B7 MIDDLE DOT and U+2219 BULLET OPERATOR are distinct
+    # UTF-8 multiplication tokens, preserving dimensional and byte-span semantics.
+    result = evaluate_math_expression("2m·3s")
+    if not result.valid or not near(result.result.value, 6.0) or
+       not same_dimension(result.result.dimension, product_dimension(length, time)) { return 341 }
+    result = evaluate_math_expression("2m∙3m")
+    if not result.valid or not near(result.result.value, 6.0) or
+       not same_dimension(result.result.dimension, area) { return 342 }
+    result = evaluate_math_expression("2m·3m∕2s")
+    if not result.valid or not near(result.result.value, 3.0) or
+       not same_dimension(result.result.dimension, area_per_time) { return 343 }
+    result = evaluate_math_expression_with_bindings("ρ·u₁", greek_bindings)
+    if not result.valid or not near(result.result.value, 6.0) or
+       not same_dimension(result.result.dimension, momentum_dimension) { return 344 }
+    let middle_dot: ParsedMathExpression = parse_math_expression("2m·3s")
+    if not middle_dot.valid or middle_dot.program.count != 3 or
+       middle_dot.program.instructions[2].opcode != 3 or
+       middle_dot.program.instructions[2].source_start != 2 or
+       middle_dot.program.instructions[2].source_end != 4 or
+       middle_dot.program.instructions[1].source_start != 4 { return 345 }
+    let bullet_dot: ParsedMathExpression = parse_math_expression("2m∙3m")
+    if not bullet_dot.valid or bullet_dot.program.count != 3 or
+       bullet_dot.program.instructions[2].opcode != 3 or
+       bullet_dot.program.instructions[2].source_start != 2 or
+       bullet_dot.program.instructions[2].source_end != 5 or
+       bullet_dot.program.instructions[1].source_start != 5 { return 346 }
+    if parse_math_expression("·1").valid { return 347 }
+    if parse_math_expression("∙1").valid { return 348 }
+    if parse_math_expression("1·").valid { return 349 }
+    result = evaluate_math_expression("1m·2s+3m")
+    if result.valid or result.failed_at != 6 { return 350 }
+
     println("native-math-source-ok")
     return 0
 }

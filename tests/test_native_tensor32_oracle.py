@@ -38,9 +38,8 @@ def exact_grid(duration=DURATION, cross=DIFFUSION_XY):
             for y in range(WIDTH) for x in range(WIDTH)]
 
 
-def derivative(grid, cross=DIFFUSION_XY, xx=DIFFUSION_XX,
-               yy=DIFFUSION_YY):
-    xx_coefficient, yy_coefficient = xx, yy
+def derivative(grid, cross=DIFFUSION_XY,
+               diffusion_xx=DIFFUSION_XX, diffusion_yy=DIFFUSION_YY):
     result = [0.0] * (WIDTH * WIDTH)
     for y in range(WIDTH):
         upper, lower = (y + 1) % WIDTH, (y - 1) % WIDTH
@@ -54,20 +53,20 @@ def derivative(grid, cross=DIFFUSION_XY, xx=DIFFUSION_XX,
             xy = ((grid[upper * WIDTH + right] - grid[upper * WIDTH + left] -
                    grid[lower * WIDTH + right] + grid[lower * WIDTH + left]) *
                   (WIDTH ** 2 / 4.0))
-            result[center] = (xx_coefficient * xx + 2.0 * cross * xy +
-                              yy_coefficient * yy)
+            result[center] = (diffusion_xx * xx + 2.0 * cross * xy +
+                              diffusion_yy * yy)
     return result
 
 
 def integrate(grid, steps, duration=DURATION, cross=DIFFUSION_XY,
-              xx=DIFFUSION_XX, yy=DIFFUSION_YY):
+              diffusion_xx=DIFFUSION_XX, diffusion_yy=DIFFUSION_YY):
     step = duration / steps
     state = grid[:]
     for _ in range(steps):
-        slope = derivative(state, cross, xx, yy)
+        slope = derivative(state, cross, diffusion_xx, diffusion_yy)
         midpoint = [value + step * slope_value / 2.0
                     for value, slope_value in zip(state, slope)]
-        midpoint_slope = derivative(midpoint, cross, xx, yy)
+        midpoint_slope = derivative(midpoint, cross, diffusion_xx, diffusion_yy)
         state = [value + step * slope_value
                  for value, slope_value in zip(state, midpoint_slope)]
     return state

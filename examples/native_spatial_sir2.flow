@@ -1,0 +1,240 @@
+# Nonlinear, two-cell reaction-diffusion SIR model in upstream Flow 2.0.
+# Compiler-generated RK4 advances six mutually coupled states.
+# Spatial coupling is a two-cell periodic finite-volume Laplacian:
+#   laplacian(left) = 2 * (right - left), and vice versa.
+# The independently computed high-accuracy six-state reference is at t=1.75.
+# Run: flow run examples/native_spatial_sir2.flow
+flow SpatialSIR2 {
+    state susceptibleLeft: f64 = 0.98
+    state infectedLeft: f64 = 0.02
+    state recoveredLeft: f64 = 0.0
+    state susceptibleRight: f64 = 0.90
+    state infectedRight: f64 = 0.05
+    state recoveredRight: f64 = 0.05
+
+    param infectionRate: f64 = 1.7
+    param recoveryRate: f64 = 0.35
+    param diffusionSusceptible: f64 = 0.12
+    param diffusionInfected: f64 = 0.08
+    param diffusionRecovered: f64 = 0.05
+
+    solver { dt 1 ms method rk4 }
+
+    susceptibleLeft evolves as -infectionRate * susceptibleLeft * infectedLeft + 2.0 * diffusionSusceptible * (susceptibleRight - susceptibleLeft)
+    infectedLeft evolves as infectionRate * susceptibleLeft * infectedLeft - recoveryRate * infectedLeft + 2.0 * diffusionInfected * (infectedRight - infectedLeft)
+    recoveredLeft evolves as recoveryRate * infectedLeft + 2.0 * diffusionRecovered * (recoveredRight - recoveredLeft)
+    susceptibleRight evolves as -infectionRate * susceptibleRight * infectedRight + 2.0 * diffusionSusceptible * (susceptibleLeft - susceptibleRight)
+    infectedRight evolves as infectionRate * susceptibleRight * infectedRight - recoveryRate * infectedRight + 2.0 * diffusionInfected * (infectedLeft - infectedRight)
+    recoveredRight evolves as recoveryRate * infectedRight + 2.0 * diffusionRecovered * (recoveredLeft - recoveredRight)
+}
+
+struct SpatialSIRRun {
+    valid: bool,
+    state: SpatialSIR2
+}
+
+function absolute(value: f64) -> f64 {
+    if value < 0.0 { return -value }
+    return value
+}
+
+function maximum(a: f64, b: f64) -> f64 {
+    if a > b { return a }
+    return b
+}
+
+function difference(a: SpatialSIR2, b: SpatialSIR2) -> f64 {
+    let mut error: f64 = absolute(a.susceptibleLeft - b.susceptibleLeft)
+    error = maximum(error, absolute(a.infectedLeft - b.infectedLeft))
+    error = maximum(error, absolute(a.recoveredLeft - b.recoveredLeft))
+    error = maximum(error, absolute(a.susceptibleRight - b.susceptibleRight))
+    error = maximum(error, absolute(a.infectedRight - b.infectedRight))
+    error = maximum(error, absolute(a.recoveredRight - b.recoveredRight))
+    return error
+}
+
+function total(state: SpatialSIR2) -> f64 {
+    return state.susceptibleLeft + state.infectedLeft + state.recoveredLeft
+         + state.susceptibleRight + state.infectedRight + state.recoveredRight
+}
+
+function validRun(initial: SpatialSIR2, duration: f64, steps: i32) -> bool {
+    if steps <= 0 or steps > 8192 { return false }
+    if not (duration >= 0.0 and duration <= 20.0) { return false }
+    if not (initial.infectionRate >= 0.0 and initial.infectionRate <= 10.0) or
+       not (initial.recoveryRate >= 0.0 and initial.recoveryRate <= 10.0) or
+       not (initial.diffusionSusceptible >= 0.0 and initial.diffusionSusceptible <= 10.0) or
+       not (initial.diffusionInfected >= 0.0 and initial.diffusionInfected <= 10.0) or
+       not (initial.diffusionRecovered >= 0.0 and initial.diffusionRecovered <= 10.0) {
+        return false
+    }
+    if not (initial.susceptibleLeft >= 0.0 and initial.susceptibleLeft <= 2.0) or
+       not (initial.infectedLeft >= 0.0 and initial.infectedLeft <= 2.0) or
+       not (initial.recoveredLeft >= 0.0 and initial.recoveredLeft <= 2.0) or
+       not (initial.susceptibleRight >= 0.0 and initial.susceptibleRight <= 2.0) or
+       not (initial.infectedRight >= 0.0 and initial.infectedRight <= 2.0) or
+       not (initial.recoveredRight >= 0.0 and initial.recoveredRight <= 2.0) {
+        return false
+    }
+    if absolute(total(initial) - 2.0) > 0.0000000001 { return false }
+    let rateBound: f64 = initial.infectionRate + initial.recoveryRate
+        + 2.0 * (initial.diffusionSusceptible + initial.diffusionInfected + initial.diffusionRecovered)
+    if duration * rateBound / (steps as f64) > 1.25 { return false }
+    return true
+}
+
+function runFrom(initial: SpatialSIR2, duration: f64, steps: i32) -> SpatialSIRRun {
+    if not validRun(initial, duration, steps) {
+        return SpatialSIRRun { valid: false, state: initial }
+    }
+    let mut state: SpatialSIR2 = initial
+    let dt: f64 = duration / (steps as f64)
+    for index in 0 to steps {
+        SpatialSIR2_step(&state, dt)
+    }
+    return SpatialSIRRun { valid: true, state: state }
+}
+
+function integrate(duration: f64, steps: i32) -> SpatialSIRRun {
+    return runFrom(SpatialSIR2_new(), duration, steps)
+}
+
+function independentReference() -> SpatialSIR2 {
+    # Independent Python RK4 with 32768 steps, compared against 65536.
+    # These are not values obtained from the Flow implementation.
+    let mut expected: SpatialSIR2 = SpatialSIR2_new()
+    expected.susceptibleLeft = 0.7340843061018968
+    expected.infectedLeft = 0.19151718293442213
+    expected.recoveredLeft = 0.06003023805422079
+    expected.susceptibleRight = 0.6341672913741969
+    expected.infectedRight = 0.2575878024884659
+    expected.recoveredRight = 0.12261317904680538
+    return expected
+}
+
+function swapped(original: SpatialSIR2) -> SpatialSIR2 {
+    let mut state: SpatialSIR2 = original
+    state.susceptibleLeft = original.susceptibleRight
+    state.infectedLeft = original.infectedRight
+    state.recoveredLeft = original.recoveredRight
+    state.susceptibleRight = original.susceptibleLeft
+    state.infectedRight = original.infectedLeft
+    state.recoveredRight = original.recoveredLeft
+    return state
+}
+
+function main() -> i32 {
+    let reference: SpatialSIR2 = independentReference()
+    let coarse: SpatialSIRRun = integrate(1.75, 4)
+    let medium: SpatialSIRRun = integrate(1.75, 8)
+    let fine: SpatialSIRRun = integrate(1.75, 16)
+    let finer: SpatialSIRRun = integrate(1.75, 32)
+    let finest: SpatialSIRRun = integrate(1.75, 64)
+    if not coarse.valid or not medium.valid or not fine.valid or
+       not finer.valid or not finest.valid { return 1 }
+    let error4: f64 = difference(coarse.state, reference)
+    let error8: f64 = difference(medium.state, reference)
+    let error16: f64 = difference(fine.state, reference)
+    let error32: f64 = difference(finer.state, reference)
+    let error64: f64 = difference(finest.state, reference)
+    if error4 < 0.0001 { return 2 }
+    if error8 >= 0.10 * error4 { return 3 }
+    if error16 >= 0.10 * error8 { return 4 }
+    if error32 >= 0.10 * error16 { return 5 }
+    if error64 >= 0.10 * error32 or error64 > 0.00000003 { return 6 }
+    if absolute(total(finest.state) - 2.0) > 0.000000000001 { return 7 }
+    if finest.state.susceptibleLeft < 0.0 or finest.state.infectedLeft < 0.0 or
+       finest.state.recoveredLeft < 0.0 or finest.state.susceptibleRight < 0.0 or
+       finest.state.infectedRight < 0.0 or finest.state.recoveredRight < 0.0 { return 8 }
+    if finest.state.susceptibleLeft >= 0.98 or
+       finest.state.susceptibleRight >= 0.90 or
+       finest.state.recoveredLeft <= 0.0 or
+       finest.state.recoveredRight <= 0.05 { return 9 }
+
+    let replay: SpatialSIRRun = integrate(1.75, 64)
+    if not replay.valid or difference(replay.state, finest.state) > 0.000000000001 {
+        return 10
+    }
+    let firstHalf: SpatialSIRRun = integrate(0.875, 32)
+    if not firstHalf.valid { return 11 }
+    let secondHalf: SpatialSIRRun = runFrom(firstHalf.state, 0.875, 32)
+    if not secondHalf.valid or difference(secondHalf.state, finest.state) > 0.000000000001 {
+        return 12
+    }
+
+    let mut scaledInitial: SpatialSIR2 = SpatialSIR2_new()
+    scaledInitial.infectionRate = 0.85
+    scaledInitial.recoveryRate = 0.175
+    scaledInitial.diffusionSusceptible = 0.06
+    scaledInitial.diffusionInfected = 0.04
+    scaledInitial.diffusionRecovered = 0.025
+    let scaled: SpatialSIRRun = runFrom(scaledInitial, 3.5, 64)
+    if not scaled.valid or difference(scaled.state, finest.state) > 0.000000000001 {
+        return 13
+    }
+
+    let rotated: SpatialSIRRun = runFrom(swapped(SpatialSIR2_new()), 1.75, 64)
+    if not rotated.valid or difference(rotated.state, swapped(finest.state)) > 0.000000000001 {
+        return 14
+    }
+
+    # Exact logistic solution when recovery and diffusion vanish.
+    let mut logisticInitial: SpatialSIR2 = SpatialSIR2_new()
+    logisticInitial.recoveryRate = 0.0
+    logisticInitial.diffusionSusceptible = 0.0
+    logisticInitial.diffusionInfected = 0.0
+    logisticInitial.diffusionRecovered = 0.0
+    let logistic: SpatialSIRRun = runFrom(logisticInitial, 1.75, 128)
+    if not logistic.valid { return 15 }
+    if absolute(logistic.state.infectedLeft - 0.28560622323743967) > 0.00000001 or
+       absolute(logistic.state.infectedRight - 0.45977629828970495) > 0.00000001 or
+       absolute(logistic.state.recoveredLeft) > 0.000000000001 or
+       absolute(logistic.state.recoveredRight - 0.05) > 0.000000000001 { return 16 }
+
+    # Exact exponential recovery with zero infection and zero diffusion.
+    let mut decayInitial: SpatialSIR2 = logisticInitial
+    decayInitial.infectionRate = 0.0
+    decayInitial.recoveryRate = 0.35
+    let decay: SpatialSIRRun = runFrom(decayInitial, 1.75, 128)
+    if not decay.valid { return 17 }
+    if absolute(decay.state.infectedLeft - 0.010839883769183743) > 0.00000001 or
+       absolute(decay.state.infectedRight - 0.027099709422959358) > 0.00000001 or
+       absolute(decay.state.susceptibleLeft - 0.98) > 0.000000000001 or
+       absolute(decay.state.susceptibleRight - 0.90) > 0.000000000001 { return 18 }
+
+    let mut frozenInitial: SpatialSIR2 = decayInitial
+    frozenInitial.recoveryRate = 0.0
+    let frozen: SpatialSIRRun = runFrom(frozenInitial, 1.75, 4)
+    if not frozen.valid or difference(frozen.state, frozenInitial) > 0.000000000001 {
+        return 19
+    }
+    let zeroDuration: SpatialSIRRun = integrate(0.0, 4)
+    if not zeroDuration.valid or difference(zeroDuration.state, SpatialSIR2_new()) > 0.000000000001 {
+        return 20
+    }
+
+    # Reject invalid physical parameters and bounded-work violations before RK4.
+    if integrate(-0.01, 64).valid { return 21 }
+    if integrate(20.01, 64).valid { return 22 }
+    if integrate(1.75, 0).valid { return 23 }
+    if integrate(1.75, 8193).valid { return 24 }
+    if integrate(1.75, 1).valid { return 25 }
+    let mut invalid: SpatialSIR2 = SpatialSIR2_new()
+    invalid.infectionRate = -0.1
+    if runFrom(invalid, 1.75, 64).valid { return 26 }
+    invalid = SpatialSIR2_new()
+    invalid.diffusionInfected = -0.1
+    if runFrom(invalid, 1.75, 64).valid { return 27 }
+    invalid = SpatialSIR2_new()
+    invalid.recoveryRate = 10.1
+    if runFrom(invalid, 1.75, 64).valid { return 28 }
+    invalid = SpatialSIR2_new()
+    invalid.infectedRight = -0.01
+    if runFrom(invalid, 1.75, 64).valid { return 29 }
+    invalid = SpatialSIR2_new()
+    invalid.susceptibleLeft = 1.1
+    if runFrom(invalid, 1.75, 64).valid { return 30 }
+
+    println("native-spatial-sir2-ok")
+    return 0
+}

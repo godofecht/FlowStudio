@@ -229,6 +229,17 @@ try {
     null, { timeout: 80000 });
   assert.match(await page.locator('#console').textContent(), /native-tensor-grid-ok/);
 
+  // Six-state nonlinear spatial SIR evolution: Monaco -> native Flow HTTP
+  // -> compiler-generated RK4. The checked-in Flow main() verifies the
+  // independent numerical reference and exact nonlinear limiting cases.
+  await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
+    readFileSync('examples/native_spatial_sir2.flow', 'utf8'));
+  await page.locator('#run').click();
+  await page.waitForFunction(() =>
+    document.querySelector('#console')?.textContent?.includes('native-spatial-sir2-ok'),
+    null, { timeout: 80000 });
+  assert.match(await page.locator('#console').textContent(), /native-spatial-sir2-ok/);
+
   // Real Monaco Run -> native Flow HTTP -> upstream Flow 2.0 compiler.
   // HTTP stages sources without a relative import root, so concatenate
   // exactly the checked-in modules as the production HTTP smoke does.

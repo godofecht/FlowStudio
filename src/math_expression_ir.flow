@@ -2,7 +2,8 @@
 # The upstream Flow grammar does not yet lower source expressions to this IR.
 # Instructions are postfix; source spans are UTF-8 byte offsets into original source.
 # Opcodes: 0 literal, 1 add, 2 subtract, 3 multiply, 4 divide,
-#          5 negate, 6 integer power. Unsupported instructions fail closed.
+#          5 negate, 6 integer power, 7 minimum, 8 maximum,
+#          9 clamp (value, lower, upper). Unsupported instructions fail closed.
 import .math_dimensions { Dimension, Quantity, CheckedQuantity, dimensionless, quantity, quantity_add, quantity_subtract, quantity_multiply, quantity_divide, same_dimension }
 
 export struct MathInstruction {
@@ -124,7 +125,7 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
                 if not result.valid { return failed(instruction.source_start) }
                 stack[depth - 1] = result.quantity
             }
-        } elif opcode >= 1 and opcode <= 4 {
+        } elif (opcode >= 1 and opcode <= 4) or opcode == 7 or opcode == 8 {
             if depth < 2 { return failed(instruction.source_start) }
             let right: Quantity = stack[depth - 1]
             let left: Quantity = stack[depth - 2]
@@ -135,12 +136,38 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
                 result = CheckedQuantity { valid: true, quantity: quantity_multiply(left, right) }
             }
             if opcode == 4 { result = quantity_divide(left, right) }
+            if opcode == 7 or opcode == 8 {
+                if not same_dimension(left.dimension, right.dimension) {
+                    return failed(instruction.source_start)
+                }
+                let mut selected: Quantity = left
+                if (opcode == 7 and right.value < left.value) or
+                   (opcode == 8 and right.value > left.value) {
+                    selected = right
+                }
+                result = CheckedQuantity { valid: true, quantity: selected }
+            }
             if not result.valid or not bounded_value(result.quantity.value) or
                not bounded_dimension(result.quantity.dimension) {
                 return failed(instruction.source_start)
             }
             depth = depth - 1
             stack[depth - 1] = result.quantity
+        } elif opcode == 9 {
+            if depth < 3 { return failed(instruction.source_start) }
+            let upper: Quantity = stack[depth - 1]
+            let lower: Quantity = stack[depth - 2]
+            let input: Quantity = stack[depth - 3]
+            if not same_dimension(input.dimension, lower.dimension) or
+               not same_dimension(input.dimension, upper.dimension) or
+               lower.value > upper.value {
+                return failed(instruction.source_start)
+            }
+            let mut clipped: Quantity = input
+            if clipped.value < lower.value { clipped = lower }
+            if clipped.value > upper.value { clipped = upper }
+            depth = depth - 2
+            stack[depth - 1] = clipped
         } else {
             return failed(instruction.source_start)
         }

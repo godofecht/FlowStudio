@@ -12,7 +12,8 @@
 #          28 sine, 29 cosine, 30 tangent, 31 arctangent,
 #          32 atan2(y, x), including matching physical dimensions,
 #          33 asin(x), 34 acos(x), principal angles with |x| <= 1,
-#          35 sinh(x), 36 cosh(x), 37 tanh(x), dimensionless |x| <= 60.
+#          35 sinh(x), 36 cosh(x), 37 tanh(x), dimensionless |x| <= 60,
+#          38 asinh(x), 39 acosh(x), 40 atanh(x), dimensionless with domain guards.
 # Predicate values are dimensionless 0/1 with a separate runtime type bit.
 # where and logical operators evaluate operands eagerly (no short circuit).
 # Unsupported instructions and type mismatches fail closed.
@@ -234,6 +235,52 @@ function bounded_natural_log(value: f64) -> f64 {
     return 2.0 * sum + (binary_exponent as f64) * 0.69314718055994530942
 }
 
+# Inverse hyperbolic functions use the same bounded native logarithm and
+# square-root kernels. Small inputs use convergent series to avoid loss of
+# significance; atanh rejects its singular endpoints and exterior domain.
+function bounded_inverse_hyperbolic(value: f64, opcode: i32) -> f64 {
+    let absolute: f64 = magnitude(value)
+    if opcode == 38 {
+        if absolute <= 0.5 {
+            let mut term: f64 = value
+            let mut sum: f64 = term
+            let mut n: i32 = 1
+            while n <= 25 {
+                let odd: f64 = (2 * n - 1) as f64
+                term = term * (-odd * odd * value * value) /
+                    ((2 * n * (2 * n + 1)) as f64)
+                sum = sum + term
+                n = n + 1
+            }
+            return sum
+        }
+        let mut result: f64 = bounded_natural_log(
+            absolute + positive_square_root(absolute * absolute + 1.0))
+        if value < 0.0 { result = -result }
+        return result
+    }
+    if opcode == 39 {
+        return bounded_natural_log(
+            value + positive_square_root((value - 1.0) * (value + 1.0)))
+    }
+    if absolute <= 0.5 {
+        let mut term: f64 = absolute
+        let mut sum: f64 = term
+        let mut n: i32 = 1
+        while n <= 30 {
+            term = term * absolute * absolute
+            sum = sum + term / ((2 * n + 1) as f64)
+            n = n + 1
+        }
+        if value < 0.0 { sum = -sum }
+        return sum
+    }
+    let mut result: f64 = 0.5 * bounded_natural_log(
+        (1.0 + absolute) / (1.0 - absolute))
+    if value < 0.0 { result = -result }
+    return result
+}
+
 # Native bounded dimensionless trigonometry. Reduce [-60,60] to [-pi,pi],
 # then reflect into [-pi/2,pi/2] before the alternating Taylor series.
 # Sixteen correction terms give f64 accuracy on this bounded interval.
@@ -370,7 +417,8 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
             depth = depth + 1
         } elif opcode == 5 or opcode == 6 or opcode == 18 or opcode == 20 or opcode == 21 or opcode == 25 or
              opcode == 26 or opcode == 27 or opcode == 28 or opcode == 29 or opcode == 30 or opcode == 31 or
-             opcode == 33 or opcode == 34 or opcode == 35 or opcode == 36 or opcode == 37 {
+             opcode == 33 or opcode == 34 or opcode == 35 or opcode == 36 or opcode == 37 or
+             opcode == 38 or opcode == 39 or opcode == 40 {
             if depth < 1 { return failed(instruction.source_start) }
             let input: Quantity = stack[depth - 1]
             if opcode == 18 {
@@ -404,6 +452,17 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
                     let mut logged: f64 = bounded_natural_log(input.value)
                     if opcode == 27 { logged = logged / 2.30258509299404568402 }
                     stack[depth - 1] = quantity(logged, dimensionless())
+                } elif opcode == 38 or opcode == 39 or opcode == 40 {
+                    if not same_dimension(input.dimension, dimensionless()) {
+                        return failed(instruction.source_start)
+                    }
+                    if (opcode == 38 and magnitude(input.value) > 100000000000000.0) or
+                       (opcode == 39 and (input.value < 1.0 or input.value > 100000000000000.0)) or
+                       (opcode == 40 and magnitude(input.value) >= 1.0) {
+                        return failed(instruction.source_start)
+                    }
+                    stack[depth - 1] = quantity(
+                        bounded_inverse_hyperbolic(input.value, opcode), dimensionless())
                 } elif opcode == 35 or opcode == 36 or opcode == 37 {
                     if not same_dimension(input.dimension, dimensionless()) or
                        magnitude(input.value) > 60.0 {

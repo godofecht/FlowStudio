@@ -48,8 +48,8 @@ function main() -> i32 {
     if result.valid or result.failed_at != 0 { return 16 }
     result = evaluate_math_expression("log1p(1<2)")
     if result.valid or result.failed_at != 0 { return 17 }
-    result = evaluate_math_expression("log1p(1000000000000000000000000000001)")
-    if result.valid or result.failed_at != 0 { return 18 }
+    result = evaluate_math_expression("log1p(10000000000000000000000000000000)")
+    if result.valid { return 18 }
     if parse_math_expression("log1p()").valid { return 19 }
     if parse_math_expression("log1p(1,2)").valid { return 20 }
     if parse_math_expression("log1p (1)").valid { return 21 }

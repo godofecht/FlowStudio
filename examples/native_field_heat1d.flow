@@ -1,0 +1,205 @@
+# Upstream Flow 2.0 field/boundary/evolves-as grammar, not manually enumerated states.
+# A 32-cell Dirichlet rod with two independent discrete sine eigenmodes.
+# Compiler-generated T_field_step invokes the upstream stdlib PDE operator.
+# All 32 cells are checked against independent analytical Euler eigenvalues.
+# Run: flow run examples/native_field_heat1d.flow
+import "stdlib/dynamics/pde.flow"
+
+const N: i32 = 32
+const RATIO: f64 = 0.4
+
+field T : f64[32] on Line
+T evolves as laplacian(T)
+boundary T { left = 0.0  right = 0.0 }
+
+function absolute(value: f64) -> f64 {
+    if value < 0.0 { return -value }
+    return value
+}
+
+# The generated field step has no input guard. Enforce explicit Euler's
+# Dirichlet stability condition and a deterministic 4096-step resource cap.
+function integrate(initial: ptr<f64>, output: ptr<f64>, ratio: f64, steps: i32) -> bool {
+    if steps < 0 or steps > 4096 or ratio != ratio or
+       ratio < 0.0 or ratio > 0.5 { return false }
+    let current: array<f64, 32> = [0.0]
+    let next: array<f64, 32> = [0.0]
+    for i in 0 to N {
+        if initial[i] != initial[i] or
+           initial[i] < -1000000.0 or initial[i] > 1000000.0 { return false }
+        current[i] = initial[i]
+    }
+    if current[0] != 0.0 or current[N - 1] != 0.0 { return false }
+    for step in 0 to steps {
+        T_field_step(current, next, ratio)
+        field_copy_1d(next, current, N)
+        for i in 0 to N {
+            if current[i] != current[i] or
+               current[i] < -1000000.0 or current[i] > 1000000.0 { return false }
+        }
+    }
+    for i in 0 to N { output[i] = current[i] }
+    return true
+}
+
+function main() -> i32 {
+    let initial: array<f64, 32> = [
+        0.0,
+        0.29214558086687170,
+        0.57397750470575781,
+        0.83595896702802541,
+        1.0700373498707612,
+        1.2702188772134779,
+        1.4329595658494458,
+        1.5573382426928695,
+        1.6449973192749066,
+        1.6998582304093928,
+        1.7276390115857316,
+        1.7352195231148853,
+        1.7299136755348365,
+        1.7187164015636727,
+        1.7075952867850002,
+        1.7008925170436722,
+        1.7008925170436722,
+        1.7075952867850002,
+        1.7187164015636727,
+        1.7299136755348365,
+        1.7352195231148848,
+        1.7276390115857316,
+        1.6998582304093932,
+        1.6449973192749070,
+        1.5573382426928697,
+        1.4329595658494458,
+        1.2702188772134779,
+        1.0700373498707614,
+        0.83595896702802563,
+        0.57397750470575826,
+        0.29214558086687303,
+        0.0
+    ]
+    let expected16: array<f64, 32> = [
+        0.0,
+        0.23883404435359679,
+        0.47119449609070946,
+        0.69104317056074227,
+        0.89317438776225555,
+        1.0735389437542793,
+        1.2294668167870781,
+        1.3597697070049737,
+        1.4647154654197103,
+        1.5458781383721634,
+        1.6058786682763455,
+        1.6480412132490678,
+        1.6759976683297972,
+        1.6932775916870286,
+        1.7029219380105658,
+        1.7071566696827527,
+        1.7071566696827527,
+        1.7029219380105656,
+        1.6932775916870286,
+        1.6759976683297975,
+        1.6480412132490678,
+        1.6058786682763455,
+        1.5458781383721640,
+        1.4647154654197110,
+        1.3597697070049737,
+        1.2294668167870781,
+        1.0735389437542793,
+        0.89317438776225566,
+        0.69104317056074249,
+        0.47119449609070974,
+        0.23883404435359795,
+        0.0
+    ]
+    let expected64: array<f64, 32> = [
+        0.0,
+        0.16371954954763965,
+        0.32509025745124920,
+        0.48184873296680736,
+        0.63189598332303953,
+        0.77336393599315389,
+        0.90466472757917393,
+        1.0245194908932334,
+        1.1319651989232309,
+        1.2263400713684198,
+        1.3072499384159832,
+        1.3745196149349368,
+        1.4281346150725174,
+        1.4681793162459706,
+        1.4947778923753821,
+        1.5080439607393481,
+        1.5080439607393481,
+        1.4947778923753821,
+        1.4681793162459706,
+        1.4281346150725176,
+        1.3745196149349368,
+        1.3072499384159832,
+        1.2263400713684203,
+        1.1319651989232316,
+        1.0245194908932334,
+        0.90466472757917393,
+        0.77336393599315389,
+        0.63189598332303965,
+        0.48184873296680752,
+        0.32509025745124942,
+        0.16371954954764054,
+        0.0
+    ]
+    let after16: array<f64, 32> = [0.0]
+    let after64: array<f64, 32> = [0.0]
+    let composed: array<f64, 32> = [0.0]
+    let replay: array<f64, 32> = [0.0]
+    let half: array<f64, 32> = [0.0]
+    if not integrate(initial, after16, RATIO, 16) { return 1 }
+    if not integrate(initial, after64, RATIO, 64) { return 2 }
+    let mut initial_energy: f64 = 0.0
+    let mut energy16: f64 = 0.0
+    let mut energy64: f64 = 0.0
+    for i in 0 to N {
+        if absolute(after16[i] - expected16[i]) > 0.00000000001 { return 3 }
+        if absolute(after64[i] - expected64[i]) > 0.00000000001 { return 4 }
+        if after16[i] < -0.000000000001 or after64[i] < -0.000000000001 { return 5 }
+        initial_energy = initial_energy + initial[i] * initial[i]
+        energy16 = energy16 + after16[i] * after16[i]
+        energy64 = energy64 + after64[i] * after64[i]
+    }
+    if not (initial_energy > energy16 and energy16 > energy64) { return 6 }
+    if after64[0] != 0.0 or after64[N - 1] != 0.0 { return 7 }
+    if not integrate(initial, half, RATIO, 32) or
+       not integrate(half, composed, RATIO, 32) { return 8 }
+    if not integrate(initial, replay, RATIO, 64) { return 9 }
+    for i in 0 to N {
+        if absolute(composed[i] - after64[i]) > 0.000000000001 { return 10 }
+        if replay[i] != after64[i] { return 11 }
+    }
+    let unchanged: array<f64, 32> = [0.0]
+    if not integrate(initial, unchanged, 0.0, 64) { return 12 }
+    for i in 0 to N {
+        if unchanged[i] != initial[i] { return 13 }
+    }
+    if not integrate(initial, unchanged, RATIO, 0) { return 14 }
+    for i in 0 to N {
+        if unchanged[i] != initial[i] { return 15 }
+    }
+    let zero: array<f64, 32> = [0.0]
+    if not integrate(zero, unchanged, RATIO, 64) { return 16 }
+    for i in 0 to N {
+        if unchanged[i] != 0.0 { return 17 }
+    }
+    if integrate(initial, unchanged, -0.1, 64) { return 18 }
+    if integrate(initial, unchanged, 0.500001, 64) { return 19 }
+    if integrate(initial, unchanged, RATIO, -1) { return 20 }
+    if integrate(initial, unchanged, RATIO, 4097) { return 21 }
+    let mut malformed: array<f64, 32> = [0.0]
+    for i in 0 to N { malformed[i] = initial[i] }
+    malformed[0] = 1.0
+    if integrate(malformed, unchanged, RATIO, 64) { return 22 }
+    malformed[0] = 0.0
+    malformed[15] = 1000001.0
+    if integrate(malformed, unchanged, RATIO, 64) { return 23 }
+    malformed[15] = initial[15] + 0.1
+    if not integrate(malformed, unchanged, RATIO, 64) { return 24 }
+    if absolute(unchanged[15] - after64[15]) < 0.000001 { return 25 }
+    println("native-field-heat1d-ok")
+    return 0
+}

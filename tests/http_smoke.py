@@ -212,7 +212,7 @@ def main() -> None:
         values = [float(value) for value in tokens[1:]]
         assert all(math.isfinite(value) and 0 <= value <= 1.5 for value in values)
         expected_match = re.search(
-            rf"let expected{field}256: array<f64, 64> = \\[(.*?)\\]",
+            rf"let expected{field}256: array<f64, 64> = \[(.*?)\]",
             grayscott_source, re.S)
         assert expected_match is not None, field
         reference = [float(value.strip()) for value in

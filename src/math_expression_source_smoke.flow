@@ -914,9 +914,6 @@ function main() -> i32 {
     if not result.valid or not near(result.result.value, 0.00390625) { return 320 }
     result = evaluate_math_expression("2⁻⁰")
     if not result.valid or not near(result.result.value, 1.0) { return 321 }
-    let inverse_area: Dimension = Dimension {
-        length: -2, mass: 0, time: 0, temperature: 0
-    }
     result = evaluate_math_expression("3m⁻²")
     if not result.valid or not near(result.result.value, 1.0 / 9.0) or
        not same_dimension(result.result.dimension, inverse_area) { return 322 }

@@ -780,16 +780,15 @@ function main() -> i32 {
     if not result.valid or not near(result.result.value, 32.0) { return 270 }
     # 33 terms require 65 instructions and must fail before writing past capacity.
     if parse_math_expression("1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1").valid { return 271 }
-    if not evaluate_math_expression("((((((((1))))))))").valid { return 86 }
-    if not evaluate_math_expression("((((((((((((((((1))))))))))))))))").valid { return 87 }
-    let deep_failure: MathResult = evaluate_math_expression("(((((((((((((((((1)))))))))))))))))")
-    if not deep_failure.valid { return 100 + deep_failure.failed_at }
-    if not evaluate_math_expression("((((((((((((((((((((((((1))))))))))))))))))))))))").valid { return 81 }
-    if not evaluate_math_expression("(((((((((((((((((((((((((((((((1)))))))))))))))))))))))))))))))").valid { return 82 }
-    if not evaluate_math_expression("1                                                                ").valid { return 85 }
+    if not evaluate_math_expression("(((((((((((((((((1)))))))))))))))))").valid { return 274 }
+    if not evaluate_math_expression("((((((((((((((((((((((((1))))))))))))))))))))))))").valid { return 275 }
+    if not evaluate_math_expression("(((((((((((((((((((((((((((((((1)))))))))))))))))))))))))))))))").valid { return 276 }
+    if not evaluate_math_expression("((((((((((((((((((((((((((((((((1))))))))))))))))))))))))))))))))").valid { return 277 }
+    if not evaluate_math_expression("((((((((((((((((((((((((((((((((((((((((((((((((1))))))))))))))))))))))))))))))))))))))))))))))))").valid { return 278 }
+    if not evaluate_math_expression("(((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((1)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))").valid { return 279 }
+    if not evaluate_math_expression("1                                                                ").valid { return 280 }
     result = evaluate_math_expression("((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((1))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))")
-    if not result.valid { return 83 }
-    if not near(result.result.value, 1.0) { return 84 }
+    if not result.valid or not near(result.result.value, 1.0) { return 272 }
     if parse_math_expression("(((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((1)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))").valid { return 273 }
 
     println("native-math-source-ok")

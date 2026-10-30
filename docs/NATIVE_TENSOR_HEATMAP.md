@@ -17,6 +17,17 @@ coordinates, original numeric values and a shared numeric color scale.
 No NumPy interpretation, precomputed image, browser simulation or HTML
 injection is involved in this path.
 
+For coupled two-species frames, each field now uses its **own computed**
+minimum and maximum for the color ramp and its adjacent numeric extrema
+labels. A shared global range would conceal a low-amplitude but spatially
+varying species alongside a high-amplitude species. The SVG advertises
+`data-native-flow-grid-scale="per-field"`; colors must therefore **not** be
+compared quantitatively across species without reading each field's extrema.
+Constant species render at the midpoint color. Raw numeric cell values are
+retained in `data-grid-value` without rescaling. The 32-seed two-field
+regression checks all rendered cells at unequal magnitudes, alongside
+constant-field and per-field-extrema cases.
+
 The protocol rejects duplicate/mixed frames, malformed headers, nonfinite
 or excessive values, duplicate field names, incomplete data and dimensions
 outside 3..32 per axis, at most 1,024 cells and two fields. Total output is

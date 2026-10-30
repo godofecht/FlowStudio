@@ -13,6 +13,9 @@ const good = frame([1, .5, .75, 1], [0, .25, .125, 0]);
 test("real native field protocol parses exact species and cells", () => {
   assert.equal(parse("ordinary Flow output\n"), null);
   assert.equal(parse("ordinary output\n".repeat(10000)), null);
+  const largeOrdinary = "ordinary output\n".repeat(10000);
+  assert.equal(parse(largeOrdinary + "FLOWSTUDIO_FIELD_V1not-a-frame\n"), null);
+  assert.equal(parse(largeOrdinary + "prefix FLOWSTUDIO_FIELD_V1 4 2\n"), null);
   assert.equal(parse("FLOWSTUDIO_FIELD_V1not-a-frame\n"), null);
   assert.deepEqual(parse(good.replace(" 4 2", "\t4\t2")), {count:4, fields:[
     {name:"U", values:[1,.5,.75,1]},

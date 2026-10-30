@@ -3,7 +3,12 @@
 # Instructions are postfix; source spans are UTF-8 byte offsets into original source.
 # Opcodes: 0 literal, 1 add, 2 subtract, 3 multiply, 4 divide,
 #          5 negate, 6 integer power, 7 minimum, 8 maximum,
-#          9 clamp (value, lower, upper). Unsupported instructions fail closed.
+#          9 clamp (value, lower, upper), 10-15 ordered/equality comparisons,
+#          16 logical and, 17 logical or, 18 logical not,
+#          19 where(predicate, true_branch, false_branch).
+# Predicate values are dimensionless 0/1 with a separate runtime type bit.
+# where and logical operators evaluate operands eagerly (no short circuit).
+# Unsupported instructions and type mismatches fail closed.
 import .math_dimensions { Dimension, Quantity, CheckedQuantity, dimensionless, quantity, quantity_add, quantity_subtract, quantity_multiply, quantity_divide, same_dimension }
 
 export struct MathInstruction {
@@ -23,7 +28,8 @@ export struct MathProgram {
 export struct MathResult {
     valid: bool,
     result: Quantity,
-    failed_at: i32
+    failed_at: i32,
+    is_predicate: bool
 }
 
 function magnitude(value: f64) -> f64 {
@@ -47,7 +53,8 @@ function failed(position: i32) -> MathResult {
     return MathResult {
         valid: false,
         result: quantity(0.0, dimensionless()),
-        failed_at: position
+        failed_at: position,
+        is_predicate: false
     }
 }
 
@@ -99,6 +106,7 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
         return failed(0)
     }
     let mut stack: array<Quantity, 16> = [quantity(0.0, dimensionless())]
+    let mut predicate: array<bool, 16> = [false]
     let mut depth: i32 = 0
     let mut index: i32 = 0
     while index < program.count {
@@ -114,38 +122,84 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
                 return failed(instruction.source_start)
             }
             stack[depth] = instruction.literal
+            predicate[depth] = false
             depth = depth + 1
-        } elif opcode == 5 or opcode == 6 {
+        } elif opcode == 5 or opcode == 6 or opcode == 18 {
             if depth < 1 { return failed(instruction.source_start) }
             let input: Quantity = stack[depth - 1]
-            if opcode == 5 {
-                stack[depth - 1] = quantity(-input.value, input.dimension)
+            if opcode == 18 {
+                if not predicate[depth - 1] { return failed(instruction.source_start) }
+                let mut inverted: f64 = 1.0
+                if input.value != 0.0 { inverted = 0.0 }
+                stack[depth - 1] = quantity(inverted, dimensionless())
             } else {
-                let result: CheckedQuantity = integer_power(input, instruction.exponent)
-                if not result.valid { return failed(instruction.source_start) }
-                stack[depth - 1] = result.quantity
+                if predicate[depth - 1] { return failed(instruction.source_start) }
+                if opcode == 5 {
+                    stack[depth - 1] = quantity(-input.value, input.dimension)
+                } else {
+                    let powered: CheckedQuantity = integer_power(input, instruction.exponent)
+                    if not powered.valid { return failed(instruction.source_start) }
+                    stack[depth - 1] = powered.quantity
+                }
             }
-        } elif (opcode >= 1 and opcode <= 4) or opcode == 7 or opcode == 8 {
+        } elif (opcode >= 1 and opcode <= 4) or opcode == 7 or opcode == 8 or
+             (opcode >= 10 and opcode <= 17) {
             if depth < 2 { return failed(instruction.source_start) }
             let right: Quantity = stack[depth - 1]
             let left: Quantity = stack[depth - 2]
+            let left_predicate: bool = predicate[depth - 2]
+            let right_predicate: bool = predicate[depth - 1]
             let mut result: CheckedQuantity = CheckedQuantity { valid: false, quantity: left }
-            if opcode == 1 { result = quantity_add(left, right) }
-            if opcode == 2 { result = quantity_subtract(left, right) }
-            if opcode == 3 {
-                result = CheckedQuantity { valid: true, quantity: quantity_multiply(left, right) }
-            }
-            if opcode == 4 { result = quantity_divide(left, right) }
-            if opcode == 7 or opcode == 8 {
-                if not same_dimension(left.dimension, right.dimension) {
+            let mut result_predicate: bool = false
+            if opcode == 16 or opcode == 17 {
+                if not left_predicate or not right_predicate {
                     return failed(instruction.source_start)
                 }
-                let mut selected: Quantity = left
-                if (opcode == 7 and right.value < left.value) or
-                   (opcode == 8 and right.value > left.value) {
-                    selected = right
+                let left_true: bool = left.value != 0.0
+                let right_true: bool = right.value != 0.0
+                let mut truth: bool = left_true and right_true
+                if opcode == 17 { truth = left_true or right_true }
+                let mut numeric: f64 = 0.0
+                if truth { numeric = 1.0 }
+                result = CheckedQuantity { valid: true, quantity: quantity(numeric, dimensionless()) }
+                result_predicate = true
+            } elif opcode >= 10 and opcode <= 15 {
+                if left_predicate or right_predicate or
+                   not same_dimension(left.dimension, right.dimension) {
+                    return failed(instruction.source_start)
                 }
-                result = CheckedQuantity { valid: true, quantity: selected }
+                let mut truth: bool = false
+                if opcode == 10 { truth = left.value < right.value }
+                if opcode == 11 { truth = left.value <= right.value }
+                if opcode == 12 { truth = left.value > right.value }
+                if opcode == 13 { truth = left.value >= right.value }
+                if opcode == 14 { truth = left.value == right.value }
+                if opcode == 15 { truth = left.value != right.value }
+                let mut numeric: f64 = 0.0
+                if truth { numeric = 1.0 }
+                result = CheckedQuantity { valid: true, quantity: quantity(numeric, dimensionless()) }
+                result_predicate = true
+            } else {
+                if left_predicate or right_predicate {
+                    return failed(instruction.source_start)
+                }
+                if opcode == 1 { result = quantity_add(left, right) }
+                if opcode == 2 { result = quantity_subtract(left, right) }
+                if opcode == 3 {
+                    result = CheckedQuantity { valid: true, quantity: quantity_multiply(left, right) }
+                }
+                if opcode == 4 { result = quantity_divide(left, right) }
+                if opcode == 7 or opcode == 8 {
+                    if not same_dimension(left.dimension, right.dimension) {
+                        return failed(instruction.source_start)
+                    }
+                    let mut selected: Quantity = left
+                    if (opcode == 7 and right.value < left.value) or
+                       (opcode == 8 and right.value > left.value) {
+                        selected = right
+                    }
+                    result = CheckedQuantity { valid: true, quantity: selected }
+                }
             }
             if not result.valid or not bounded_value(result.quantity.value) or
                not bounded_dimension(result.quantity.dimension) {
@@ -153,26 +207,40 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
             }
             depth = depth - 1
             stack[depth - 1] = result.quantity
-        } elif opcode == 9 {
+            predicate[depth - 1] = result_predicate
+        } elif opcode == 9 or opcode == 19 {
             if depth < 3 { return failed(instruction.source_start) }
-            let upper: Quantity = stack[depth - 1]
-            let lower: Quantity = stack[depth - 2]
-            let input: Quantity = stack[depth - 3]
-            if not same_dimension(input.dimension, lower.dimension) or
-               not same_dimension(input.dimension, upper.dimension) or
-               lower.value > upper.value {
-                return failed(instruction.source_start)
+            let third: Quantity = stack[depth - 1]
+            let second: Quantity = stack[depth - 2]
+            let first: Quantity = stack[depth - 3]
+            let mut selected: Quantity = first
+            if opcode == 9 {
+                if predicate[depth - 3] or predicate[depth - 2] or predicate[depth - 1] or
+                   not same_dimension(first.dimension, second.dimension) or
+                   not same_dimension(first.dimension, third.dimension) or
+                   second.value > third.value {
+                    return failed(instruction.source_start)
+                }
+                if selected.value < second.value { selected = second }
+                if selected.value > third.value { selected = third }
+            } else {
+                if not predicate[depth - 3] or predicate[depth - 2] or predicate[depth - 1] or
+                   not same_dimension(second.dimension, third.dimension) {
+                    return failed(instruction.source_start)
+                }
+                selected = third
+                if first.value != 0.0 { selected = second }
             }
-            let mut clipped: Quantity = input
-            if clipped.value < lower.value { clipped = lower }
-            if clipped.value > upper.value { clipped = upper }
             depth = depth - 2
-            stack[depth - 1] = clipped
+            stack[depth - 1] = selected
+            predicate[depth - 1] = false
         } else {
             return failed(instruction.source_start)
         }
         index = index + 1
     }
     if depth != 1 { return failed(program.source_length) }
-    return MathResult { valid: true, result: stack[0], failed_at: -1 }
+    return MathResult {
+        valid: true, result: stack[0], failed_at: -1, is_predicate: predicate[0]
+    }
 }

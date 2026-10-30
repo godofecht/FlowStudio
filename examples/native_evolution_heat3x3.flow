@@ -38,6 +38,44 @@ flow PeriodicHeat3x3 {
     south evolves as diffusivity_x * (southwest + southeast - 2.0 * south) / (spacing_x * spacing_x) + diffusivity_y * (center + north - 2.0 * south) / (spacing_y * spacing_y)
     southeast evolves as diffusivity_x * (south + southwest - 2.0 * southeast) / (spacing_x * spacing_x) + diffusivity_y * (east + northeast - 2.0 * southeast) / (spacing_y * spacing_y)
 }
+# Additional nine-state, genuinely non-reversible 2D directed transport.
+# The native compiler generates RK4; the reference is a product of two
+# independent three-state Fourier/Poisson Markov transition kernels.
+# Each directed axis has a complex-conjugate Fourier eigenvalue pair.
+flow DirectedTransport3x3 {
+    state northwest: f64 = 1.0
+    state north: f64 = 0.0
+    state northeast: f64 = 0.0
+    state west: f64 = 0.0
+    state center: f64 = 0.0
+    state east: f64 = 0.0
+    state southwest: f64 = 0.0
+    state south: f64 = 0.0
+    state southeast: f64 = 0.0
+
+    param drift_x: f64 = 0.7
+    param drift_y: f64 = 0.35
+    param diffusion_x: f64 = 0.12
+    param diffusion_y: f64 = 0.08
+
+    solver { dt 1 ms method rk4 }
+
+    northwest evolves as drift_x * (northeast - northwest) + drift_y * (southwest - northwest) + diffusion_x * (northeast + north - 2.0 * northwest) + diffusion_y * (southwest + west - 2.0 * northwest)
+    north evolves as drift_x * (northwest - north) + drift_y * (south - north) + diffusion_x * (northwest + northeast - 2.0 * north) + diffusion_y * (south + center - 2.0 * north)
+    northeast evolves as drift_x * (north - northeast) + drift_y * (southeast - northeast) + diffusion_x * (north + northwest - 2.0 * northeast) + diffusion_y * (southeast + east - 2.0 * northeast)
+    west evolves as drift_x * (east - west) + drift_y * (northwest - west) + diffusion_x * (east + center - 2.0 * west) + diffusion_y * (northwest + southwest - 2.0 * west)
+    center evolves as drift_x * (west - center) + drift_y * (north - center) + diffusion_x * (west + east - 2.0 * center) + diffusion_y * (north + south - 2.0 * center)
+    east evolves as drift_x * (center - east) + drift_y * (northeast - east) + diffusion_x * (center + west - 2.0 * east) + diffusion_y * (northeast + southeast - 2.0 * east)
+    southwest evolves as drift_x * (southeast - southwest) + drift_y * (west - southwest) + diffusion_x * (southeast + south - 2.0 * southwest) + diffusion_y * (west + northwest - 2.0 * southwest)
+    south evolves as drift_x * (southwest - south) + drift_y * (center - south) + diffusion_x * (southwest + southeast - 2.0 * south) + diffusion_y * (center + north - 2.0 * south)
+    southeast evolves as drift_x * (south - southeast) + drift_y * (east - southeast) + diffusion_x * (south + southwest - 2.0 * southeast) + diffusion_y * (east + northeast - 2.0 * southeast)
+}
+
+struct DirectedRun3x3 {
+    valid: bool,
+    state: DirectedTransport3x3
+}
+
 struct HeatRun3x3 {
     valid: bool,
     state: PeriodicHeat3x3
@@ -113,6 +151,165 @@ function analyticReference() -> PeriodicHeat3x3 {
     reference.south = 3.077742398048838
     reference.southeast = 2.9234992195898974
     return reference
+}
+
+function directedDifference(first: DirectedTransport3x3, second: DirectedTransport3x3) -> f64 {
+    let mut error: f64 = 0.0
+    error = maximum(error, absolute(first.northwest - second.northwest))
+    error = maximum(error, absolute(first.north - second.north))
+    error = maximum(error, absolute(first.northeast - second.northeast))
+    error = maximum(error, absolute(first.west - second.west))
+    error = maximum(error, absolute(first.center - second.center))
+    error = maximum(error, absolute(first.east - second.east))
+    error = maximum(error, absolute(first.southwest - second.southwest))
+    error = maximum(error, absolute(first.south - second.south))
+    error = maximum(error, absolute(first.southeast - second.southeast))
+    return error
+}
+
+function directedTotal(state: DirectedTransport3x3) -> f64 {
+    return state.northwest + state.north + state.northeast + state.west + state.center + state.east + state.southwest + state.south + state.southeast
+}
+
+function directedValid(state: DirectedTransport3x3, duration: f64, steps: i32) -> bool {
+    if steps <= 0 or steps > 2048 { return false }
+    if not (duration >= 0.0 and duration <= 10.0) { return false }
+    if not (state.drift_x >= 0.0 and state.drift_x <= 10.0) { return false }
+    if not (state.drift_y >= 0.0 and state.drift_y <= 10.0) { return false }
+    if not (state.diffusion_x >= 0.0 and state.diffusion_x <= 10.0) { return false }
+    if not (state.diffusion_y >= 0.0 and state.diffusion_y <= 10.0) { return false }
+    let rate: f64 = state.drift_x + state.drift_y + 4.0 * state.diffusion_x + 4.0 * state.diffusion_y
+    return duration * rate / (steps as f64) <= 0.75
+}
+
+function directedRunFrom(initial: DirectedTransport3x3, duration: f64, steps: i32) -> DirectedRun3x3 {
+    if not directedValid(initial, duration, steps) {
+        return DirectedRun3x3 { valid: false, state: initial }
+    }
+    let mut state: DirectedTransport3x3 = initial
+    let dt: f64 = duration / (steps as f64)
+    for index in 0 to steps {
+        DirectedTransport3x3_step(&state, dt)
+    }
+    return DirectedRun3x3 { valid: true, state: state }
+}
+
+function directedIntegrate(duration: f64, steps: i32) -> DirectedRun3x3 {
+    return directedRunFrom(DirectedTransport3x3_new(), duration, steps)
+}
+
+function directedReference() -> DirectedTransport3x3 {
+    # Exact semidiscrete solution at t=1.3; all nine cells are asserted.
+    # P_j(t) = (1 + 2 exp(-(3*a/2+3*d)t) cos(sqrt(3)*a*t/2-2*pi*j/3))/3.
+    # The 2D kernel is P_x(x,t) * P_y(y,t), not continuum advection.
+    let mut reference: DirectedTransport3x3 = DirectedTransport3x3_new()
+    reference.northwest = 0.22919830244593897
+    reference.north = 0.20265086984055189
+    reference.northeast = 0.12919110089793504
+    reference.west = 0.12315893802007188
+    reference.center = 0.10889376427337671
+    reference.east = 0.069420404158475710
+    reference.southwest = 0.056166556132449370
+    reference.south = 0.049660932627866076
+    reference.southeast = 0.031659131603334292
+    return reference
+}
+
+function directedAcceptance() -> i32 {
+    let expected: DirectedTransport3x3 = directedReference()
+    let coarse: DirectedRun3x3 = directedIntegrate(1.3, 4)
+    let medium: DirectedRun3x3 = directedIntegrate(1.3, 8)
+    let fine: DirectedRun3x3 = directedIntegrate(1.3, 16)
+    let finest: DirectedRun3x3 = directedIntegrate(1.3, 64)
+    if not coarse.valid or not medium.valid or not fine.valid or not finest.valid { return 101 }
+    let error4: f64 = directedDifference(coarse.state, expected)
+    let error8: f64 = directedDifference(medium.state, expected)
+    let error16: f64 = directedDifference(fine.state, expected)
+    let error64: f64 = directedDifference(finest.state, expected)
+    if error4 < 0.0001 or error64 > 0.000000005 { return 102 }
+    if error8 >= error4 * 0.08 or error16 >= error8 * 0.08 or error64 >= error16 * 0.01 { return 103 }
+    if absolute(directedTotal(finest.state) - 1.0) > 0.000000000001 { return 104 }
+    if finest.state.northwest <= 0.0 or
+       finest.state.north <= 0.0 or
+       finest.state.northeast <= 0.0 or
+       finest.state.west <= 0.0 or
+       finest.state.center <= 0.0 or
+       finest.state.east <= 0.0 or
+       finest.state.southwest <= 0.0 or
+       finest.state.south <= 0.0 or
+       finest.state.southeast <= 0.0 { return 105 }
+    if finest.state.north <= finest.state.northeast + 0.05 or
+       finest.state.west <= finest.state.southwest + 0.05 { return 106 }
+    let replay: DirectedRun3x3 = directedIntegrate(1.3, 64)
+    if not replay.valid or directedDifference(replay.state, finest.state) > 0.000000000001 { return 107 }
+    let half: DirectedRun3x3 = directedIntegrate(0.65, 32)
+    if not half.valid { return 108 }
+    let composed: DirectedRun3x3 = directedRunFrom(half.state, 0.65, 32)
+    if not composed.valid or directedDifference(composed.state, finest.state) > 0.000000000001 { return 109 }
+
+    # Periodic translation by one column must commute with the native solver.
+    let mut shiftedInitial: DirectedTransport3x3 = DirectedTransport3x3_new()
+    shiftedInitial.northwest = 0.0
+    shiftedInitial.north = 1.0
+    let shifted: DirectedRun3x3 = directedRunFrom(shiftedInitial, 1.3, 64)
+    let mut shiftedExpected: DirectedTransport3x3 = finest.state
+    shiftedExpected.northwest = finest.state.northeast
+    shiftedExpected.north = finest.state.northwest
+    shiftedExpected.northeast = finest.state.north
+    shiftedExpected.west = finest.state.east
+    shiftedExpected.center = finest.state.west
+    shiftedExpected.east = finest.state.center
+    shiftedExpected.southwest = finest.state.southeast
+    shiftedExpected.south = finest.state.southwest
+    shiftedExpected.southeast = finest.state.south
+    if not shifted.valid or directedDifference(shifted.state, shiftedExpected) > 0.000000000001 { return 110 }
+
+    # Scaling every rate by 1/2 and time by 2 leaves the trajectory unchanged.
+    let mut scaledInitial: DirectedTransport3x3 = DirectedTransport3x3_new()
+    scaledInitial.drift_x = 0.35
+    scaledInitial.drift_y = 0.175
+    scaledInitial.diffusion_x = 0.06
+    scaledInitial.diffusion_y = 0.04
+    let scaled: DirectedRun3x3 = directedRunFrom(scaledInitial, 2.6, 64)
+    if not scaled.valid or directedDifference(scaled.state, finest.state) > 0.000000000001 { return 111 }
+
+    let mut uniform: DirectedTransport3x3 = DirectedTransport3x3_new()
+    uniform.northwest = 1.0 / 9.0
+    uniform.north = 1.0 / 9.0
+    uniform.northeast = 1.0 / 9.0
+    uniform.west = 1.0 / 9.0
+    uniform.center = 1.0 / 9.0
+    uniform.east = 1.0 / 9.0
+    uniform.southwest = 1.0 / 9.0
+    uniform.south = 1.0 / 9.0
+    uniform.southeast = 1.0 / 9.0
+    let equilibrium: DirectedRun3x3 = directedRunFrom(uniform, 1.3, 64)
+    if not equilibrium.valid or directedDifference(equilibrium.state, uniform) > 0.000000000001 { return 112 }
+    let zeroDuration: DirectedRun3x3 = directedIntegrate(0.0, 8)
+    if not zeroDuration.valid or directedDifference(zeroDuration.state, DirectedTransport3x3_new()) > 0.000000000001 { return 113 }
+    let mut frozen: DirectedTransport3x3 = DirectedTransport3x3_new()
+    frozen.drift_x = 0.0
+    frozen.drift_y = 0.0
+    frozen.diffusion_x = 0.0
+    frozen.diffusion_y = 0.0
+    let stationary: DirectedRun3x3 = directedRunFrom(frozen, 1.3, 8)
+    if not stationary.valid or directedDifference(stationary.state, frozen) > 0.000000000001 { return 114 }
+
+    if directedIntegrate(1.3, 0).valid or directedIntegrate(1.3, 2049).valid { return 115 }
+    if directedIntegrate(-1.0, 64).valid or directedIntegrate(10.1, 64).valid { return 116 }
+    if directedIntegrate(1.3, 1).valid { return 117 }
+    let mut invalid: DirectedTransport3x3 = DirectedTransport3x3_new()
+    invalid.drift_x = -0.01
+    if directedRunFrom(invalid, 1.3, 64).valid { return 118 }
+    invalid = DirectedTransport3x3_new()
+    invalid.diffusion_y = -0.01
+    if directedRunFrom(invalid, 1.3, 64).valid { return 119 }
+    invalid = DirectedTransport3x3_new()
+    invalid.drift_y = 10.1
+    if directedRunFrom(invalid, 1.3, 64).valid { return 120 }
+
+    println("native-directed-transport3x3-ok")
+    return 0
 }
 
 function main() -> i32 {
@@ -196,6 +393,8 @@ function main() -> i32 {
     invalid.diffusivity_x = 1.0
     if runFrom(invalid, 1.0, 1).valid { return 20 }
 
+    let directedStatus: i32 = directedAcceptance()
+    if directedStatus != 0 { return directedStatus }
     println("native-evolution-heat3x3-ok")
     return 0
 }

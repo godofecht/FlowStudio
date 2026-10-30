@@ -195,6 +195,23 @@ def main() -> None:
     assert status == 422 and body.strip(), (
         "native nonlinear SIR malformed evolution rejection", status, body)
 
+    # Twelve-state nonlinear periodic SIR on four spatial cells. The upstream
+    # Flow compiler generates RK4 and checks every state against an independent
+    # high-precision reference, fourth-order refinement and negative cases.
+    sir4_source = (Path(__file__).resolve().parents[1] /
+                   "examples/native_spatial_sir4.flow").read_text(encoding="utf-8")
+    status, body = request("POST", "/api/check/flow", sir4_source, accepted_headers)
+    assert status == 200, ("native twelve-state spatial SIR compile", status, body)
+    status, body = request("POST", "/api/run/flow", sir4_source, accepted_headers)
+    assert status == 200 and "native-spatial-sir4-ok" in body, (
+        "native twelve-state nonlinear spatial SIR numerical acceptance", status, body)
+    malformed_sir4 = sir4_source.replace(
+        "infectedSouth evolves as", "infectedSouth evolves invalid as", 1)
+    assert malformed_sir4 != sir4_source
+    status, body = request("POST", "/api/check/flow", malformed_sir4, accepted_headers)
+    assert status == 422 and body.strip(), (
+        "native twelve-state malformed evolution rejection", status, body)
+
     # Negative compiler acceptance: malformed evolution syntax must be
     # rejected by the real compiler rather than accepted by a lexical scan.
     invalid_ring = ring_source.replace(

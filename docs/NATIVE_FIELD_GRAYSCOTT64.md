@@ -36,4 +36,4 @@ malformed second-field syntax must return HTTP 422. No mocked interpreter is
 used for these native gates. Oracle-only success does not establish native
 compiler, HTTP or browser execution. This example does **not** claim general
 cross-field PDE grammar, multidimensional fields, computed spatial plotting,
-or RStudio parity. Record actual Linux/macOS results before marking verified.
+or RStudio parity. Verified in [six-job Linux/macOS PR CI #41093934670](https://github.com/godofecht/FlowStudio/actions/runs/41093934670): 1,143 JavaScript tests passed (12 skipped) and 380 Python tests passed (13 skipped) per source/transport platform; native Flow compiler, production HTTP, actual Ubuntu Chromium Monaco Run, and R/C FlowJIT passed on their applicable platforms. Independent macOS physical-browser acceptance and local native Flow/R/HTTP remain unexecuted.

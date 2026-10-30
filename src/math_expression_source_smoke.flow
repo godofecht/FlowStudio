@@ -180,7 +180,9 @@ function main() -> i32 {
     if not result.valid or not near(result.result.value, 0.5) or
        not same_dimension(result.result.dimension, length) { return 60 }
     result = evaluate_math_expression("2m⁴")
-    if result.valid or result.failed_at != 2 { return 61 }
+    let fourth_power: Dimension = product_dimension(area, area)
+    if not result.valid or not near(result.result.value, 16.0) or
+       not same_dimension(result.result.dimension, fourth_power) { return 61 }
 
     # Original UTF-8 byte spans survive both ASCII and superscript lowering.
     let powered: ParsedMathExpression = parse_math_expression("2m^-2")

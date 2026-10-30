@@ -1,3 +1,31 @@
+## 2026-10-30: upstream native `field` / `laplacian` / Dirichlet PDE (PR #247)
+
+`examples/native_field_heat1d.flow` exercises the actual pinned upstream Flow
+2.0.0 `field T : f64[32] on Line`, `T evolves as laplacian(T)`, and
+`boundary T { left = 0.0 right = 0.0 }` syntax. Unlike the manually
+enumerated spatial evolution examples, this uses compiler-generated
+`T_field_step` with the upstream PDE standard-library stencil. A two-mode
+Dirichlet rod is checked cell-by-cell against independent discrete sine-mode
+Euler eigenvalues after 16 and 64 steps. Native assertions cover all 32
+cells, energy decay, positivity, semigroup, deterministic replay, zero
+dynamics, invalid boundaries/inputs, a 4096-step cap, and explicit stability
+ratio 0..0.5. The independent standard-library Python oracle also executes
+a separate direct-stencil solver and mutation test.
+
+**Verified:** [PR CI #41058389793](https://github.com/godofecht/FlowStudio/actions/runs/41058389793)
+passed all six Linux/macOS jobs on head `b2f465533f321ebf1112c5a5f4bf849c3637a9c5`.
+Both source/transport platforms passed 1,143 JavaScript tests (12 skipped)
+and 362 Python tests (13 skipped), including all five new independent oracle
+tests. Both native platforms compiled and ran the exact checked-in source
+through production HTTP, rejected malformed field syntax with HTTP 422,
+and passed the existing real R/C FlowJIT acceptance. Ubuntu Chromium
+executed the same source through the actual Monaco Run control.
+**Unexecuted:** local native compiler/R/HTTP and independent macOS physical
+browser interaction. **Pending:** post-merge main CI. No hosted CI
+configuration changed. This is a genuine 1D field lowering path, not
+arbitrary multidimensional coupled PDEs, computed spatial plots or full
+RStudio parity.
+
 ## 2026-10-30: twelve-state nonlinear periodic SIR evolution (verification pending)
 
 `examples/native_spatial_sir4.flow` is a four-cell periodic ring with

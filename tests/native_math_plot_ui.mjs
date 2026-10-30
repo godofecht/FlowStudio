@@ -229,6 +229,16 @@ try {
     null, { timeout: 80000 });
   assert.match(await page.locator('#console').textContent(), /native-tensor-grid-ok/);
 
+  // Upstream field/boundary/laplacian syntax: physical Chromium Monaco Run,
+  // native HTTP and compiler-generated 32-cell Dirichlet Euler solver.
+  await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
+    readFileSync('examples/native_field_heat1d.flow', 'utf8'));
+  await page.locator('#run').click();
+  await page.waitForFunction(() =>
+    document.querySelector('#console')?.textContent?.includes('native-field-heat1d-ok'),
+    null, { timeout: 80000 });
+  assert.match(await page.locator('#console').textContent(), /native-field-heat1d-ok/);
+
   // Six-state nonlinear spatial SIR evolution: Monaco -> native Flow HTTP
   // -> compiler-generated RK4. The checked-in Flow main() verifies the
   // independent numerical reference and exact nonlinear limiting cases.

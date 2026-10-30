@@ -140,6 +140,22 @@ def main() -> None:
     assert status == 200, ("native periodic heat compile", status, body)
     status, body = request("POST", "/api/run/flow", heat_native_source, accepted_headers)
     assert status == 200, ("native periodic heat analytic execution", status, body)
+    # Upstream Flow 2.0 field/boundary/laplacian grammar, not enumerated states.
+    # All 32 Dirichlet cells and two independent sine modes are asserted by
+    # compiler-generated T_field_step in the actual native executable.
+    field_source = (Path(__file__).resolve().parents[1] /
+                    "examples/native_field_heat1d.flow").read_text(encoding="utf-8")
+    status, body = request("POST", "/api/check/flow", field_source, accepted_headers)
+    assert status == 200, ("native field heat compile", status, body)
+    status, body = request("POST", "/api/run/flow", field_source, accepted_headers)
+    assert status == 200 and "native-field-heat1d-ok" in body, (
+        "native field heat numerical execution", status, body)
+    malformed_field = field_source.replace(
+        "T evolves as laplacian(T)", "T evolves as laplacian(", 1)
+    assert malformed_field != field_source
+    status, body = request("POST", "/api/check/flow", malformed_field, accepted_headers)
+    assert status == 422 and body.strip(), (
+        "native field malformed operator rejection", status, body)
     # The same native Flow 2.0 wave PDE runs through the production compiler
     # and HTTP execution route; main() checks analytic modes and invalid input.
     wave_native_source = (Path(__file__).resolve().parents[1] /

@@ -156,6 +156,22 @@ def main() -> None:
     status, body = request("POST", "/api/check/flow", malformed_field, accepted_headers)
     assert status == 422 and body.strip(), (
         "native field malformed operator rejection", status, body)
+    # Compiler-generated 64-cell field with unequal nonzero Dirichlet boundaries.
+    # Every cell is checked against two independent discrete eigenmodes plus
+    # the affine steady state, including 16/64/128-step numerical assertions.
+    affine_source = (Path(__file__).resolve().parents[1] /
+                     "examples/native_field_affine64.flow").read_text(encoding="utf-8")
+    status, body = request("POST", "/api/check/flow", affine_source, accepted_headers)
+    assert status == 200, ("native affine field compile", status, body)
+    status, body = request("POST", "/api/run/flow", affine_source, accepted_headers)
+    assert status == 200 and "native-field-affine64-ok" in body, (
+        "native affine field numerical execution", status, body)
+    malformed_affine = affine_source.replace(
+        "U evolves as laplacian(U)", "U evolves as laplacian(", 1)
+    assert malformed_affine != affine_source
+    status, body = request("POST", "/api/check/flow", malformed_affine, accepted_headers)
+    assert status == 422 and body.strip(), (
+        "native affine field malformed evolution rejection", status, body)
     # The same native Flow 2.0 wave PDE runs through the production compiler
     # and HTTP execution route; main() checks analytic modes and invalid input.
     wave_native_source = (Path(__file__).resolve().parents[1] /

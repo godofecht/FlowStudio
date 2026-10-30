@@ -202,7 +202,7 @@ function main() -> i32 {
     inferred = infer_math_ir(program)
     if not inferred.valid or not same_dimension(inferred.dimension, dimensionless()) { return 68 }
     instructions[1] = MathInstruction {
-        opcode: 38, literal: quantity(0.0, dimensionless()),
+        opcode: 41, literal: quantity(0.0, dimensionless()),
         exponent: 0, source_start: 1, source_end: 2
     }
     program = MathProgram { instructions: instructions, count: 2, source_length: 2 }

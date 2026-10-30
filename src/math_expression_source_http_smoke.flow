@@ -47,6 +47,12 @@ function main() -> i32 {
        parsed.program.instructions[1].source_start != 0 or
        parsed.program.instructions[1].source_end != 4 { return 14 }
     if parse_math_expression("sinh(1,2)").valid { return 15 }
+    result = evaluate_math_expression("asinh(1)+acosh(2)+atanh(0.5)")
+    if not result.valid or not close(result.result.value, 2.7476376282784144) { return 16 }
+    result = evaluate_math_expression("atanh(1)")
+    if result.valid or result.failed_at != 0 { return 17 }
+    result = evaluate_math_expression("acosh(1m)")
+    if result.valid or result.failed_at != 0 { return 18 }
     println("native-math-source-ok")
     return 0
 }

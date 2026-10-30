@@ -1,0 +1,228 @@
+# Native Flow 2.0 inverse hyperbolic acceptance: actual parser, IR, static inference, equations.
+# flow run src/math_inverse_hyperbolic_smoke.flow
+import .math_dimensions { Quantity, dimensionless, length_dimension, quantity, same_dimension }
+import .math_expression_ir { MathInstruction, MathProgram, MathResult, evaluate_math_ir }
+import .math_expression_source { ParsedMathExpression, evaluate_math_expression, parse_math_expression }
+import .math_static { MathInferredType, infer_math_ir, infer_math_expression_source, infer_math_equation_source }
+import .math_equation { MathEquationResult, evaluate_math_equation_source }
+
+function near(actual: f64, expected: f64) -> bool {
+    let mut difference: f64 = actual - expected
+    if difference < 0.0 { difference = -difference }
+    let mut scale: f64 = expected
+    if scale < 0.0 { scale = -scale }
+    if scale < 1.0 { scale = 1.0 }
+    return difference <= 0.00000000001 * scale
+}
+
+function main() -> i32 {
+    let mut result: MathResult = evaluate_math_expression("asinh(0)")
+    result = evaluate_math_expression("asinh(0)")
+    if not result.valid or not near(result.result.value, 0) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 1 }
+    result = evaluate_math_expression("asinh(0.000000000001)")
+    if not result.valid or not near(result.result.value, 0.000000000001) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 2 }
+    result = evaluate_math_expression("asinh(0.5)")
+    if not result.valid or not near(result.result.value, 0.48121182505960347) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 3 }
+    result = evaluate_math_expression("asinh(-0.5)")
+    if not result.valid or not near(result.result.value, -0.48121182505960347) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 4 }
+    result = evaluate_math_expression("asinh(1)")
+    if not result.valid or not near(result.result.value, 0.881373587019543) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 5 }
+    result = evaluate_math_expression("asinh(-1)")
+    if not result.valid or not near(result.result.value, -0.881373587019543) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 6 }
+    result = evaluate_math_expression("asinh(2)")
+    if not result.valid or not near(result.result.value, 1.4436354751788103) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 7 }
+    result = evaluate_math_expression("asinh(100000000000000)")
+    if not result.valid or not near(result.result.value, 32.92933848247659) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 8 }
+    result = evaluate_math_expression("asinh(-100000000000000)")
+    if not result.valid or not near(result.result.value, -32.92933848247659) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 9 }
+    result = evaluate_math_expression("acosh(1)")
+    if not result.valid or not near(result.result.value, 0) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 10 }
+    result = evaluate_math_expression("acosh(1.000000000001)")
+    if not result.valid or not near(result.result.value, 0.0000014142764231805424) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 11 }
+    result = evaluate_math_expression("acosh(2)")
+    if not result.valid or not near(result.result.value, 1.3169578969248166) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 12 }
+    result = evaluate_math_expression("acosh(10)")
+    if not result.valid or not near(result.result.value, 2.993222846126381) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 13 }
+    result = evaluate_math_expression("acosh(100000000000000)")
+    if not result.valid or not near(result.result.value, 32.92933848247659) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 14 }
+    result = evaluate_math_expression("atanh(0)")
+    if not result.valid or not near(result.result.value, 0) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 15 }
+    result = evaluate_math_expression("atanh(0.000000000001)")
+    if not result.valid or not near(result.result.value, 0.000000000001) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 16 }
+    result = evaluate_math_expression("atanh(0.5)")
+    if not result.valid or not near(result.result.value, 0.5493061443340548) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 17 }
+    result = evaluate_math_expression("atanh(-0.5)")
+    if not result.valid or not near(result.result.value, -0.5493061443340548) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 18 }
+    result = evaluate_math_expression("atanh(0.9)")
+    if not result.valid or not near(result.result.value, 1.4722194895832204) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 19 }
+    result = evaluate_math_expression("atanh(-0.9)")
+    if not result.valid or not near(result.result.value, -1.4722194895832204) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 20 }
+    result = evaluate_math_expression("atanh(0.999999999999)")
+    if not result.valid or not near(result.result.value, 14.162095209226402) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 21 }
+    result = evaluate_math_expression("asinh(sinh(1))")
+    if not result.valid or not near(result.result.value, 1) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 22 }
+    result = evaluate_math_expression("acosh(cosh(1))")
+    if not result.valid or not near(result.result.value, 1) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 23 }
+    result = evaluate_math_expression("atanh(tanh(1))")
+    if not result.valid or not near(result.result.value, 1) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 24 }
+    result = evaluate_math_expression("asinh(1m/1m)")
+    if not result.valid or not near(result.result.value, 0.881373587019543) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 25 }
+    result = evaluate_math_expression("asinh(1)+asinh(-1)")
+    if not result.valid or not near(result.result.value, 0) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 26 }
+    result = evaluate_math_expression("atanh(0.5)-atanh(-0.5)")
+    if not result.valid or not near(result.result.value, 1.0986122886681096) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 27 }
+    result = evaluate_math_expression("asinh(1m)")
+    if result.valid or result.failed_at != 0 { return 28 }
+    result = evaluate_math_expression("acosh(1s)")
+    if result.valid or result.failed_at != 0 { return 29 }
+    result = evaluate_math_expression("atanh(1kg)")
+    if result.valid or result.failed_at != 0 { return 30 }
+    result = evaluate_math_expression("asinh(true)")
+    if result.valid or result.failed_at != 0 { return 31 }
+    result = evaluate_math_expression("acosh(false)")
+    if result.valid or result.failed_at != 0 { return 32 }
+    result = evaluate_math_expression("atanh(1<2)")
+    if result.valid or result.failed_at != 0 { return 33 }
+    result = evaluate_math_expression("acosh(0.999999999999)")
+    if result.valid or result.failed_at != 0 { return 34 }
+    result = evaluate_math_expression("acosh(-1)")
+    if result.valid or result.failed_at != 0 { return 35 }
+    result = evaluate_math_expression("atanh(1)")
+    if result.valid or result.failed_at != 0 { return 36 }
+    result = evaluate_math_expression("atanh(-1)")
+    if result.valid or result.failed_at != 0 { return 37 }
+    result = evaluate_math_expression("atanh(1.0001)")
+    if result.valid or result.failed_at != 0 { return 38 }
+    result = evaluate_math_expression("asinh(100000000000001)")
+    if result.valid or result.failed_at != 0 { return 39 }
+    result = evaluate_math_expression("acosh(100000000000001)")
+    if result.valid or result.failed_at != 0 { return 40 }
+    if parse_math_expression("asinh()").valid { return 41 }
+    if parse_math_expression("acosh(1,2)").valid { return 42 }
+    if parse_math_expression("atanh (0)").valid { return 43 }
+    if parse_math_expression("asinh(1").valid { return 44 }
+    if parse_math_expression("atanh(1,2,3)").valid { return 45 }
+    let parsed_asinh: ParsedMathExpression = parse_math_expression("asinh(1)")
+    if not parsed_asinh.valid or parsed_asinh.program.count != 2 or
+       parsed_asinh.program.instructions[1].opcode != 38 or
+       parsed_asinh.program.instructions[1].source_start != 0 or
+       parsed_asinh.program.instructions[1].source_end != 5 { return 46 }
+    let parsed_acosh: ParsedMathExpression = parse_math_expression("acosh(1)")
+    if not parsed_acosh.valid or parsed_acosh.program.count != 2 or
+       parsed_acosh.program.instructions[1].opcode != 39 or
+       parsed_acosh.program.instructions[1].source_start != 0 or
+       parsed_acosh.program.instructions[1].source_end != 5 { return 47 }
+    let parsed_atanh: ParsedMathExpression = parse_math_expression("atanh(1)")
+    if not parsed_atanh.valid or parsed_atanh.program.count != 2 or
+       parsed_atanh.program.instructions[1].opcode != 40 or
+       parsed_atanh.program.instructions[1].source_start != 0 or
+       parsed_atanh.program.instructions[1].source_end != 5 { return 48 }
+    let inferred_49: MathInferredType = infer_math_expression_source("asinh(1)")
+    if not inferred_49.valid or inferred_49.is_predicate or
+       not same_dimension(inferred_49.dimension, dimensionless()) { return 49 }
+    let inferred_50: MathInferredType = infer_math_expression_source("acosh(1)")
+    if not inferred_50.valid or inferred_50.is_predicate or
+       not same_dimension(inferred_50.dimension, dimensionless()) { return 50 }
+    let inferred_51: MathInferredType = infer_math_expression_source("atanh(1)")
+    if not inferred_51.valid or inferred_51.is_predicate or
+       not same_dimension(inferred_51.dimension, dimensionless()) { return 51 }
+    let inferred_52: MathInferredType = infer_math_expression_source("asinh(1m)")
+    if inferred_52.valid or inferred_52.failed_at != 0 { return 52 }
+    let inferred_53: MathInferredType = infer_math_expression_source("acosh(true)")
+    if inferred_53.valid or inferred_53.failed_at != 0 { return 53 }
+    let inferred_54: MathInferredType = infer_math_expression_source("atanh(1s)")
+    if inferred_54.valid or inferred_54.failed_at != 0 { return 54 }
+    let tolerance: Quantity = quantity(0.00000000001, dimensionless())
+    let equation_55: MathEquationResult = evaluate_math_equation_source("asinh(1) = 0.881373587019543", tolerance)
+    if not equation_55.valid or not equation_55.satisfied { return 55 }
+    let equation_56: MathEquationResult = evaluate_math_equation_source("acosh(2) = 1.3169578969248166", tolerance)
+    if not equation_56.valid or not equation_56.satisfied { return 56 }
+    let equation_57: MathEquationResult = evaluate_math_equation_source("atanh(0.5) = 0.5493061443340548", tolerance)
+    if not equation_57.valid or not equation_57.satisfied { return 57 }
+    let inferred_equation: MathInferredType = infer_math_equation_source("atanh(0.5) = 0.5493061443340548")
+    if not inferred_equation.valid or not same_dimension(inferred_equation.dimension, dimensionless()) { return 58 }
+    let invalid_equation: MathEquationResult = evaluate_math_equation_source("acosh(0) = 0", tolerance)
+    if invalid_equation.valid { return 59 }
+    let blank: MathInstruction = MathInstruction {
+        opcode: 0, literal: quantity(0.0, dimensionless()),
+        exponent: 0, source_start: 0, source_end: 0
+    }
+    let mut instructions: array<MathInstruction, 64> = [blank]
+    instructions[0] = MathInstruction {
+        opcode: 0, literal: quantity(0.5, dimensionless()),
+        exponent: 0, source_start: 0, source_end: 1
+    }
+    instructions[1] = MathInstruction {
+        opcode: 38, literal: quantity(0.0, dimensionless()),
+        exponent: 0, source_start: 1, source_end: 2
+    }
+    let program_asinh: MathProgram = MathProgram { instructions: instructions, count: 2, source_length: 2 }
+    result = evaluate_math_ir(program_asinh)
+    if not result.valid or not near(result.result.value, 0.48121182505960347) { return 60 }
+    let inferred_asinh: MathInferredType = infer_math_ir(program_asinh)
+    if not inferred_asinh.valid or not same_dimension(inferred_asinh.dimension, dimensionless()) { return 61 }
+    instructions[0] = MathInstruction {
+        opcode: 0, literal: quantity(1.0, dimensionless()),
+        exponent: 0, source_start: 0, source_end: 1
+    }
+    instructions[1] = MathInstruction {
+        opcode: 39, literal: quantity(0.0, dimensionless()),
+        exponent: 0, source_start: 1, source_end: 2
+    }
+    let program_acosh: MathProgram = MathProgram { instructions: instructions, count: 2, source_length: 2 }
+    result = evaluate_math_ir(program_acosh)
+    if not result.valid or not near(result.result.value, 0) { return 62 }
+    let inferred_acosh: MathInferredType = infer_math_ir(program_acosh)
+    if not inferred_acosh.valid or not same_dimension(inferred_acosh.dimension, dimensionless()) { return 63 }
+    instructions[0] = MathInstruction {
+        opcode: 0, literal: quantity(0.5, dimensionless()),
+        exponent: 0, source_start: 0, source_end: 1
+    }
+    instructions[1] = MathInstruction {
+        opcode: 40, literal: quantity(0.0, dimensionless()),
+        exponent: 0, source_start: 1, source_end: 2
+    }
+    let program_atanh: MathProgram = MathProgram { instructions: instructions, count: 2, source_length: 2 }
+    result = evaluate_math_ir(program_atanh)
+    if not result.valid or not near(result.result.value, 0.5493061443340548) { return 64 }
+    let inferred_atanh: MathInferredType = infer_math_ir(program_atanh)
+    if not inferred_atanh.valid or not same_dimension(inferred_atanh.dimension, dimensionless()) { return 65 }
+    instructions[0] = MathInstruction {
+        opcode: 0, literal: quantity(0.5, length_dimension()),
+        exponent: 0, source_start: 0, source_end: 1
+    }
+    let bad_program: MathProgram = MathProgram { instructions: instructions, count: 2, source_length: 2 }
+    result = evaluate_math_ir(bad_program)
+    if result.valid or result.failed_at != 1 { return 66 }
+    let inferred_bad: MathInferredType = infer_math_ir(bad_program)
+    if inferred_bad.valid or inferred_bad.failed_at != 1 { return 67 }
+    println("native-math-inverse-hyperbolic-ok")
+    return 0
+}

@@ -187,6 +187,23 @@ def main() -> None:
     status, body = request("POST", "/api/check/flow", malformed_dual, accepted_headers)
     assert status == 422 and body.strip(), (
         "native dual field malformed second evolution rejection", status, body)
+    # Two compiler-generated 64-cell fields with nonlinear Gray-Scott
+    # cross-field kinetics. All 384 cell checkpoints and negative cases run
+    # through the real Flow compiler and production HTTP execution route.
+    grayscott_source = (Path(__file__).resolve().parents[1] /
+                        "examples/native_field_grayscott64.flow").read_text(encoding="utf-8")
+    status, body = request("POST", "/api/check/flow", grayscott_source, accepted_headers)
+    assert status == 200, ("native Gray-Scott field compile", status, body)
+    status, body = request("POST", "/api/run/flow", grayscott_source, accepted_headers)
+    assert status == 200 and "native-field-grayscott64-ok" in body, (
+        "native Gray-Scott coupled numerical execution", status, body)
+    malformed_grayscott = grayscott_source.replace(
+        "V evolves as laplacian(V)", "V evolves as laplacian(", 1)
+    assert malformed_grayscott != grayscott_source
+    status, body = request("POST", "/api/check/flow",
+                           malformed_grayscott, accepted_headers)
+    assert status == 422 and body.strip(), (
+        "native Gray-Scott malformed second field rejection", status, body)
     # The same native Flow 2.0 wave PDE runs through the production compiler
     # and HTTP execution route; main() checks analytic modes and invalid input.
     wave_native_source = (Path(__file__).resolve().parents[1] /

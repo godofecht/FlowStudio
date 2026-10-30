@@ -712,3 +712,15 @@ resolution or a full mathematical-language compiler.
 This is **not** a replacement for the Python-backed Navier–Stokes frontend,
 upstream Unicode mathematical grammar, static dimensional inference, general
 equation AST lowering, arbitrary PDEs, or computed spatial visualization.
+
+
+### Native scalar expression capacity (64 instructions)
+
+The native typed expression IR and its actual Flow 2.0 source-to-postfix parser
+now accept at most **64 instructions** and **64 pending operators** per
+expression, with a maximum UTF-8 source length of 512 bytes. The native
+acceptance programs execute a 32-term scalar sum (63 postfix instructions),
+64-instruction physical negation, and 64 nested parentheses. They reject
+65-instruction programs and 65 nested parentheses without silently truncating
+expressions. This remains a bounded scalar dialect, not upstream mathematical
+grammar integration, static dimensional inference, or general PDE execution.

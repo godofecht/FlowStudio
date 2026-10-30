@@ -144,6 +144,18 @@ function main() -> i32 {
     result = evaluate_math_equation_source("2⁻⁹ = 1", quantity(0.0, dimensionless()))
     if result.valid { return 49 }
 
+    # Executable exponential equations retain scalar residuals and units.
+    result = evaluate_math_equation_source("exp(0) = 1", quantity(0.0, dimensionless()))
+    if not result.valid or not result.satisfied or not near(result.residual.value, 0.0) { return 50 }
+    result = evaluate_math_equation_source(
+        "exp(1) = 2.718281828459045", quantity(0.00000000001, dimensionless()))
+    if not result.valid or not result.satisfied or
+       not near(result.residual.value, 0.0) { return 51 }
+    result = evaluate_math_equation_source("exp(1m) = 1", quantity(0.0, dimensionless()))
+    if result.valid { return 52 }
+    result = evaluate_math_equation_source("exp(61) = 1", quantity(0.0, dimensionless()))
+    if result.valid { return 53 }
+
     println("native-math-equation-ok")
     return 0
 }

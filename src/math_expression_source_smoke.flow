@@ -982,6 +982,36 @@ function main() -> i32 {
     result = evaluate_math_expression("1m·2s+3m")
     if result.valid or result.failed_at != 6 { return 350 }
 
+    # exp() is native parsed source, not a workbench-only editor token.
+    result = evaluate_math_expression("exp(0)")
+    if not result.valid or not near(result.result.value, 1.0) { return 351 }
+    result = evaluate_math_expression("exp(1)")
+    if not result.valid or not near(result.result.value, 2.718281828459045) { return 352 }
+    result = evaluate_math_expression("exp(-1)")
+    if not result.valid or not near(result.result.value, 0.36787944117144233) { return 353 }
+    result = evaluate_math_expression("exp(1)+exp(-1)")
+    if not result.valid or not near(result.result.value, 3.0861612696304874) { return 354 }
+    result = evaluate_math_expression("exp(1m)")
+    if result.valid or result.failed_at != 0 { return 355 }
+    result = evaluate_math_expression("exp(61)")
+    if result.valid or result.failed_at != 0 { return 356 }
+    result = evaluate_math_expression("exp(true)")
+    if result.valid or result.failed_at != 0 { return 357 }
+    result = evaluate_math_expression("exp(1m/1m)")
+    if not result.valid or not near(result.result.value, 2.718281828459045) { return 358 }
+    result = evaluate_math_expression("exp(1)^2")
+    if not result.valid or not near(result.result.value, 7.38905609893065) { return 359 }
+    let exp_ast: ParsedMathExpression = parse_math_expression("exp(1)")
+    if not exp_ast.valid or exp_ast.program.count != 2 or
+       exp_ast.program.instructions[1].opcode != 25 or
+       exp_ast.program.instructions[1].source_start != 0 or
+       exp_ast.program.instructions[1].source_end != 3 { return 360 }
+    result = evaluate_math_expression("1+exp(1m)")
+    if result.valid or result.failed_at != 2 { return 361 }
+    if parse_math_expression("exp()").valid { return 362 }
+    if parse_math_expression("exp(1,2)").valid { return 363 }
+    if parse_math_expression("exp  (1)").valid { return 364 }
+
     println("native-math-source-ok")
     return 0
 }

@@ -33,6 +33,7 @@ The result exposes `is_predicate` alongside `valid`, `result`, and
 | 21 | square root | nonnegative numerical operand; every physical dimension exponent must be even |
 | 22 | hypot | two numerical operands with identical dimensions; scaled two-component Euclidean norm |
 | 24 | Boolean literal | dimensionless 0 or 1, exponent zero; produces a typed predicate |
+| 25 | exponential | dimensionless numeric operand, finite input in [-60,60]; returns dimensionless numeric |
 
 Evaluation is **eager**, including both branches of `where` and both
 operands of logical operations. An invalid unselected branch still fails.
@@ -368,3 +369,22 @@ numeric values, dimensional propagation, invalid cases and diagnostics.
 Linux/macOS native CI and real HTTP acceptance must pass before this
 subset is considered verified. General tensor/PDE ASTs and native
 Navier–Stokes remain outside its scope.
+
+## Native dimension-checked exponential (2026-10-30)
+
+The actual Flow 2.0 source parser lowers `exp(expression)` to typed postfix
+opcode 25. The runtime requires a numeric dimensionless operand, rejects
+magnitudes above 60, and returns a dimensionless value. It computes the
+exponential without Python, NumPy or platform-specific math-library calls:
+halving to [0,0.5], a 24-term Taylor expansion, repeated squaring and a
+reciprocal for negative inputs. The finite result remains subject to the
+existing 1e30 magnitude bound. Static dimensional inference accepts
+`exp(61)` as *well-typed* but the runtime rejects it as out of range.
+
+The checked-in native IR, source, equation and static smoke programs test
+analytic values at -60, -1, 0, 1 and 60, source-byte diagnostics, physical
+unit rejection, predicate rejection, arity, nested arithmetic and scalar
+equation residuals. The existing Linux/macOS native CI and Flow-owned
+HTTP acceptance compile and execute those exact programs. This does not
+add upstream Flow grammar syntax, general symbolic functions, arbitrary
+precision, native Navier–Stokes or automatic editor imports.

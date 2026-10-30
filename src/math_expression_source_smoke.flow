@@ -281,6 +281,16 @@ function main() -> i32 {
        absolute.program.instructions[2].source_start != 0 or
        absolute.program.instructions[2].source_end != 3 { return 95 }
 
+    result = evaluate_math_expression("√9m²+2m")
+    if not result.valid or not near(result.result.value, 11.0) or
+       not same_dimension(result.result.dimension, length) { return 96 }
+    result = evaluate_math_expression("√9m²*2")
+    if not result.valid or not near(result.result.value, 18.0) or
+       not same_dimension(result.result.dimension, length) { return 97 }
+    result = evaluate_math_expression("√9m²/3")
+    if not result.valid or not near(result.result.value, 3.0) or
+       not same_dimension(result.result.dimension, length) { return 98 }
+
     println("native-math-source-ok")
     return 0
 }

@@ -1012,6 +1012,78 @@ function main() -> i32 {
     if parse_math_expression("exp(1,2)").valid { return 363 }
     if parse_math_expression("exp  (1)").valid { return 364 }
 
+
+    # Source-to-IR logarithms execute natively and retain function byte spans.
+    result = evaluate_math_expression("ln(1)")
+    if not result.valid or not near(result.result.value, 0.0) { return 365 }
+    result = evaluate_math_expression("ln(2.718281828459045)")
+    if not result.valid or not near(result.result.value, 1.0) { return 366 }
+    result = evaluate_math_expression("log(2.718281828459045)")
+    if not result.valid or not near(result.result.value, 1.0) { return 367 }
+    result = evaluate_math_expression("log10(1000)")
+    if not result.valid or not near(result.result.value, 3.0) { return 368 }
+    result = evaluate_math_expression("log10(1e-30)")
+    if not result.valid or not near(result.result.value, -30.0) { return 369 }
+    result = evaluate_math_expression("ln(1e30)")
+    if not result.valid or not near(result.result.value, 69.07755278982137) { return 370 }
+    result = evaluate_math_expression("ln(1e-30)")
+    if not result.valid or not near(result.result.value, -69.07755278982137) { return 371 }
+    result = evaluate_math_expression("ln(exp(2))")
+    if not result.valid or not near(result.result.value, 2.0) { return 372 }
+    result = evaluate_math_expression("exp(ln(2))")
+    if not result.valid or not near(result.result.value, 2.0) { return 373 }
+    result = evaluate_math_expression("log10(100m/1m)")
+    if not result.valid or not near(result.result.value, 2.0) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 374 }
+    result = evaluate_math_expression("ln(1m)")
+    if result.valid or result.failed_at != 0 { return 375 }
+    result = evaluate_math_expression("log10(2s)")
+    if result.valid or result.failed_at != 0 { return 376 }
+    result = evaluate_math_expression("ln(true)")
+    if result.valid or result.failed_at != 0 { return 377 }
+    result = evaluate_math_expression("ln(0)")
+    if result.valid or result.failed_at != 0 { return 378 }
+    result = evaluate_math_expression("log(-1)")
+    if result.valid or result.failed_at != 0 { return 379 }
+    result = evaluate_math_expression("log10(1e-31)")
+    if result.valid or result.failed_at != 0 { return 380 }
+    result = evaluate_math_expression("ln(1e31)")
+    if result.valid { return 381 }
+    result = evaluate_math_expression("ln(1+2)")
+    if not result.valid or not near(result.result.value, 1.0986122886681098) { return 382 }
+    result = evaluate_math_expression("log10(1+9)")
+    if not result.valid or not near(result.result.value, 1.0) { return 383 }
+    if parse_math_expression("ln()").valid { return 384 }
+    if parse_math_expression("log(1,2)").valid { return 385 }
+    if parse_math_expression("log10(1,2)").valid { return 386 }
+    if parse_math_expression("ln (1)").valid { return 387 }
+    result = evaluate_math_expression("1+ln(0)")
+    if result.valid or result.failed_at != 2 { return 388 }
+    let ln_ast: ParsedMathExpression = parse_math_expression("ln(2)")
+    if not ln_ast.valid or ln_ast.program.count != 2 or
+       ln_ast.program.instructions[1].opcode != 26 or
+       ln_ast.program.instructions[1].source_start != 0 or
+       ln_ast.program.instructions[1].source_end != 2 { return 389 }
+    let log_ast: ParsedMathExpression = parse_math_expression("log(2)")
+    if not log_ast.valid or log_ast.program.instructions[1].opcode != 26 or
+       log_ast.program.instructions[1].source_end != 3 { return 390 }
+    let log10_ast: ParsedMathExpression = parse_math_expression("log10(2)")
+    if not log10_ast.valid or log10_ast.program.count != 2 or
+       log10_ast.program.instructions[1].opcode != 27 or
+       log10_ast.program.instructions[1].source_end != 5 { return 391 }
+    result = evaluate_math_expression("ln(2)^2")
+    if not result.valid or not near(result.result.value, 0.4804530139182014) { return 392 }
+    result = evaluate_math_expression("ln(1m/1m)")
+    if not result.valid or not near(result.result.value, 0.0) { return 393 }
+    result = evaluate_math_expression("ln(2m/1m)")
+    if not result.valid or not near(result.result.value, 0.6931471805599453) { return 394 }
+    result = evaluate_math_expression("log10(0.1)")
+    if not result.valid or not near(result.result.value, -1.0) { return 395 }
+    result = evaluate_math_expression("log10(true)")
+    if result.valid or result.failed_at != 0 { return 396 }
+    result = evaluate_math_expression("where(true,ln(2),ln(0))")
+    if result.valid { return 397 }
+
     println("native-math-source-ok")
     return 0
 }

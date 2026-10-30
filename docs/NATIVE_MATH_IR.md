@@ -388,3 +388,28 @@ equation residuals. The existing Linux/macOS native CI and Flow-owned
 HTTP acceptance compile and execute those exact programs. This does not
 add upstream Flow grammar syntax, general symbolic functions, arbitrary
 precision, native Navier–Stokes or automatic editor imports.
+
+## Native dimension-checked logarithms (2026-10-30)
+
+The executable native scalar source parser lowers `ln(x)` and `log(x)`
+to natural-log opcode 26, and `log10(x)` to base-10 opcode 27.
+The same instructions run in the native postfix evaluator, static SI
+dimensional analysis and scalar equation residual compiler. Each accepts
+only numeric **dimensionless** inputs; runtime inputs must be within
+`[1e-30, 1e30]`, excluding zero and negative values. Static inference
+checks types without executing domain checks, so `ln(0)` is statically
+well-typed but fails at runtime. No arbitrary-base log or complex logarithm
+is implied.
+
+The numerical implementation is native Flow arithmetic: bounded binary
+range reduction to a mantissa in `[1,2)`, 25 odd terms of the convergent
+`atanh` series, and fixed `ln(2)` / `ln(10)` constants. The range
+reduction uses at most 100 shifts for accepted inputs. Checked-in native
+smokes cover analytic values, exp/log inverse identities, edge magnitudes,
+unit/predicate rejection, invalid domains, arity, UTF-8 source spans,
+static-vs-runtime separation and dimensioned scalar equations. CI runs
+the real Flow compiler and these programs on Linux/macOS along with
+Navier–Stokes, HTTP execution and browser acceptance.
+
+This is a bounded native scalar extension, not upstream Flow grammar
+integration, symbolic tensor/PDE lowering or general visualization.

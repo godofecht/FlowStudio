@@ -156,6 +156,28 @@ function main() -> i32 {
     result = evaluate_math_equation_source("exp(61) = 1", quantity(0.0, dimensionless()))
     if result.valid { return 53 }
 
+
+    # Logarithmic scalar equations share the actual native IR evaluator.
+    let logarithm_tolerance: Quantity = quantity(0.0000000001, dimensionless())
+    result = evaluate_math_equation_source("ln(1) = 0", logarithm_tolerance)
+    if not result.valid or not result.satisfied { return 54 }
+    result = evaluate_math_equation_source("log10(100) = 2", logarithm_tolerance)
+    if not result.valid or not result.satisfied { return 55 }
+    result = evaluate_math_equation_source("ln(exp(1)) = 1", logarithm_tolerance)
+    if not result.valid or not result.satisfied { return 56 }
+    result = evaluate_math_equation_source("log(2) = 0.6931471805599453", logarithm_tolerance)
+    if not result.valid or not result.satisfied { return 57 }
+    result = evaluate_math_equation_source("ln(1m) = 0", logarithm_tolerance)
+    if result.valid { return 58 }
+    result = evaluate_math_equation_source("log10(0) = 0", logarithm_tolerance)
+    if result.valid { return 59 }
+    result = evaluate_math_equation_source("ln(1e-30) = -69.07755278982137", logarithm_tolerance)
+    if not result.valid or not result.satisfied { return 60 }
+    result = evaluate_math_equation_source("log10(1e30) = 30", logarithm_tolerance)
+    if not result.valid or not result.satisfied { return 61 }
+    result = evaluate_math_equation_source("ln(2m/1m) = 0.6931471805599453", logarithm_tolerance)
+    if not result.valid or not result.satisfied { return 62 }
+
     println("native-math-equation-ok")
     return 0
 }

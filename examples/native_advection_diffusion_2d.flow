@@ -170,35 +170,35 @@ function maxDifference(first: TransportGrid, second: TransportGrid, count: i32) 
 }
 
 function diagonalFourier4() -> TransportGrid {
-    let mut grid: TransportGrid = blankGrid()
+    let mut values: array<f64, 64> = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     let mut y: i32 = 0
     while y < 4 {
         let mut x: i32 = 0
         while x < 4 {
             let phase: i32 = x + y
-            if phase == 0 or phase == 4 { grid.values[y * 4 + x] = 1.0 }
-            if phase == 2 or phase == 6 { grid.values[y * 4 + x] = -1.0 }
+            if phase == 0 or phase == 4 { values[y * 4 + x] = 1.0 }
+            if phase == 2 or phase == 6 { values[y * 4 + x] = -1.0 }
             x = x + 1
         }
         y = y + 1
     }
-    return grid
+    return TransportGrid { values: values }
 }
 
 function shiftRight4(grid: TransportGrid) -> TransportGrid {
-    let mut shifted: TransportGrid = blankGrid()
+    let mut values: array<f64, 64> = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     let mut y: i32 = 0
     while y < 4 {
         let mut x: i32 = 0
         while x < 4 {
             let mut previous: i32 = x - 1
             if previous < 0 { previous = 3 }
-            shifted.values[y * 4 + x] = grid.values[y * 4 + previous]
+            values[y * 4 + x] = grid.values[y * 4 + previous]
             x = x + 1
         }
         y = y + 1
     }
-    return shifted
+    return TransportGrid { values: values }
 }
 
 function main() -> i32 {
@@ -270,8 +270,9 @@ function main() -> i32 {
     invalid = equation
     invalid.velocity_y = 1001.0
     if integrateTransport(invalid, initial, 0.5, 8).valid { return 23 }
-    let mut invalidGrid: TransportGrid = initial
-    invalidGrid.values[0] = 1000000001.0
+    let mut invalidValues: array<f64, 64> = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    invalidValues[0] = 1000000001.0
+    let invalidGrid: TransportGrid = TransportGrid { values: invalidValues }
     if integrateTransport(equation, invalidGrid, 0.5, 8).valid { return 24 }
 
     println("native-advection-diffusion2d-ok")

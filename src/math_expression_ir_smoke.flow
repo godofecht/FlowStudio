@@ -109,5 +109,6 @@ function main() -> i32 {
     result = evaluate_math_ir(program)
     if not result.valid or not close(result.result.value, -7.0) { return 16 }
     if not same_dimension(result.result.dimension, length_time) { return 17 }
+    println("native-math-ir-ok")
     return 0
 }

@@ -93,7 +93,7 @@ class Tensor16Oracle(unittest.TestCase):
     def test_checked_in_native_acceptance_contract(self):
         path = Path(__file__).resolve().parents[1] / "examples/native_tensor_grid.flow"
         source = path.read_text(encoding="utf-8")
-        for required in ("array<f64, 256>", "function diagonalFourier16()",
+        for required in ("array<f64, 1024>", "function diagonalFourier16()",
                          "width: 16, height: 16", "native-tensor-grid-ok",
                          "0.17538004044805672", "gridMean(fine16.grid, 256)"):
             self.assertIn(required, source)

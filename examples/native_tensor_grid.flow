@@ -1,12 +1,12 @@
 # Native Flow 2.0 bounded tensor-diffusion PDE on a configurable periodic
-# Cartesian grid (3..16 cells per axis, at most 256 cells total).
+# Cartesian grid (3..32 cells per axis, at most 1024 cells total).
 # Executed by the production Flow compiler; Python is not a runtime dependency.
 # dT/dt = Dxx * dxx(T) + 2*Dxy * dxy(T) + Dyy * dyy(T).
 # Mixed derivative uses the symmetric four-corner centered stencil.
 # This is a native numerical kernel, NOT a general equation parser.
 
 struct TensorGrid {
-    values: array<f64, 256>
+    values: array<f64, 1024>
 }
 
 struct TensorEquation {
@@ -30,14 +30,14 @@ function absolute(value: f64) -> f64 {
 }
 
 function blankGrid() -> TensorGrid {
-    let values: array<f64, 256> = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    let values: array<f64, 1024> = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     return TensorGrid { values: values }
 }
 
 function validEquation(equation: TensorEquation) -> bool {
     if equation.width < 3 or equation.height < 3 { return false }
-    if equation.width > 16 or equation.height > 16 { return false }
-    if equation.width * equation.height > 256 { return false }
+    if equation.width > 32 or equation.height > 32 { return false }
+    if equation.width * equation.height > 1024 { return false }
     # Bounded comparisons reject NaN and infinities as well as invalid values.
     if not (equation.spacing_x > 0.0 and equation.spacing_x < 1000.0) { return false }
     if not (equation.spacing_y > 0.0 and equation.spacing_y < 1000.0) { return false }
@@ -51,7 +51,7 @@ function validEquation(equation: TensorEquation) -> bool {
 }
 
 function tensorDerivative(equation: TensorEquation, grid: TensorGrid) -> TensorGrid {
-    let mut output: array<f64, 256> = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    let mut output: array<f64, 1024> = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     let width: i32 = equation.width
     let height: i32 = equation.height
     let inverse_xx: f64 = 1.0 / (equation.spacing_x * equation.spacing_x)
@@ -90,7 +90,7 @@ function tensorDerivative(equation: TensorEquation, grid: TensorGrid) -> TensorG
 
 function addScaledGrid(base: TensorGrid, slope: TensorGrid,
                        scale: f64, count: i32) -> TensorGrid {
-    let mut output: array<f64, 256> = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    let mut output: array<f64, 1024> = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     let mut index: i32 = 0
     while index < count {
         output[index] = base.values[index] + scale * slope.values[index]
@@ -171,7 +171,7 @@ function maxGridDifference(first: TensorGrid, second: TensorGrid,
 }
 
 function diagonalFourier4() -> TensorGrid {
-    let mut values: array<f64, 256> = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    let mut values: array<f64, 1024> = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     let mut y: i32 = 0
     while y < 4 {
         let mut x: i32 = 0
@@ -187,7 +187,7 @@ function diagonalFourier4() -> TensorGrid {
 }
 
 function stripeFourier8() -> TensorGrid {
-    let mut values: array<f64, 256> = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    let mut values: array<f64, 1024> = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     let mut y: i32 = 0
     while y < 8 {
         let mut x: i32 = 0
@@ -204,7 +204,7 @@ function stripeFourier8() -> TensorGrid {
 # The 16x16 mode cos(pi*(x+y)/2) uses only exact 0,+1,-1 values.
 # Its mixed derivative is nonzero and therefore checks Dxy, not just Dxx/Dyy.
 function diagonalFourier16() -> TensorGrid {
-    let mut values: array<f64, 256> = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    let mut values: array<f64, 1024> = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     let mut y: i32 = 0
     while y < 16 {
         let mut x: i32 = 0
@@ -222,7 +222,7 @@ function diagonalFourier16() -> TensorGrid {
 }
 
 function shiftRight16(grid: TensorGrid) -> TensorGrid {
-    let mut values: array<f64, 256> = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    let mut values: array<f64, 1024> = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     let mut y: i32 = 0
     while y < 16 {
         let mut x: i32 = 0
@@ -230,6 +230,50 @@ function shiftRight16(grid: TensorGrid) -> TensorGrid {
             let mut previous: i32 = x - 1
             if previous < 0 { previous = 15 }
             values[y * 16 + x] = grid.values[y * 16 + previous]
+            x = x + 1
+        }
+        y = y + 1
+    }
+    return TensorGrid { values: values }
+}
+
+
+# Two independent diagonal Fourier modes on 32x32. The plus and minus
+# orientations have distinct exact semidiscrete eigenvalues when Dxy != 0.
+# Integer quarter-turn phases avoid depending on native trigonometric APIs.
+function quarterMode(phaseInput: i32) -> f64 {
+    let mut phase: i32 = phaseInput
+    while phase < 0 { phase = phase + 4 }
+    while phase >= 4 { phase = phase - 4 }
+    if phase == 0 { return 1.0 }
+    if phase == 2 { return -1.0 }
+    return 0.0
+}
+
+function diagonalFourier32() -> TensorGrid {
+    let mut values: array<f64, 1024> = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    let mut y: i32 = 0
+    while y < 32 {
+        let mut x: i32 = 0
+        while x < 32 {
+            values[y * 32 + x] = 300.0 +
+                7.0 * quarterMode(x + y) + 3.0 * quarterMode(x - y)
+            x = x + 1
+        }
+        y = y + 1
+    }
+    return TensorGrid { values: values }
+}
+
+function shiftRight32(grid: TensorGrid) -> TensorGrid {
+    let mut values: array<f64, 1024> = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    let mut y: i32 = 0
+    while y < 32 {
+        let mut x: i32 = 0
+        while x < 32 {
+            let mut previous: i32 = x - 1
+            if previous < 0 { previous = 31 }
+            values[y * 32 + x] = grid.values[y * 32 + previous]
             x = x + 1
         }
         y = y + 1
@@ -302,7 +346,7 @@ function main() -> i32 {
     if maxGridDifference(unchanged.grid, uniform, 16) > 0.000000000001 { return 19 }
 
     let invalidWidth: TensorEquation = TensorEquation {
-        width: 17, height: 4, spacing_x: 0.25, spacing_y: 0.25,
+        width: 33, height: 4, spacing_x: 0.25, spacing_y: 0.25,
         diffusion_xx: 0.01, diffusion_xy: 0.005, diffusion_yy: 0.02
     }
     if integrateTensor(invalidWidth, initial, 0.5, 40).valid { return 20 }
@@ -370,7 +414,7 @@ function main() -> i32 {
     let zero16: TensorResult = integrateTensor(wide, initial16, 0.0, 128)
     if not zero16.valid or maxGridDifference(zero16.grid, initial16, 256) > 0.0 { return 37 }
     let tooWide: TensorEquation = TensorEquation {
-        width: 17, height: 16, spacing_x: 0.0625, spacing_y: 0.0625,
+        width: 33, height: 16, spacing_x: 0.0625, spacing_y: 0.0625,
         diffusion_xx: 0.012, diffusion_xy: 0.004, diffusion_yy: 0.018
     }
     if integrateTensor(tooWide, initial16, 0.1, 128).valid { return 38 }
@@ -378,6 +422,92 @@ function main() -> i32 {
     let mut unbounded16: TensorGrid = initial16
     unbounded16.values[10] = 10000000000.0
     if integrateTensor(wide, unbounded16, 0.1, 128).valid { return 40 }
+
+    # 1024-cell, two-mode anisotropic diffusion. The semidiscrete Fourier
+    # eigenvalues are -69.632 for cos(pi*(x+y)/2) and -53.248 for
+    # cos(pi*(x-y)/2); Dxy shifts the two decay rates in opposite directions.
+    # Reference amplitudes are independent of the native RK2 integrator.
+    let largest: TensorEquation = TensorEquation {
+        width: 32, height: 32, spacing_x: 0.03125, spacing_y: 0.03125,
+        diffusion_xx: 0.012, diffusion_xy: 0.004, diffusion_yy: 0.018
+    }
+    let initial32: TensorGrid = diagonalFourier32()
+    let coarse32: TensorResult = integrateTensor(largest, initial32, 0.025, 32)
+    let medium32: TensorResult = integrateTensor(largest, initial32, 0.025, 64)
+    let fine32: TensorResult = integrateTensor(largest, initial32, 0.025, 128)
+    if not coarse32.valid or not medium32.valid or not fine32.valid { return 41 }
+    let mut expected32: TensorGrid = blankGrid()
+    let mut y32: i32 = 0
+    while y32 < 32 {
+        let mut x32: i32 = 0
+        while x32 < 32 {
+            expected32.values[y32 * 32 + x32] = 300.0 +
+                7.0 * 0.17538004044805675 * quarterMode(x32 + y32) +
+                3.0 * 0.2641600789337457 * quarterMode(x32 - y32)
+            x32 = x32 + 1
+        }
+        y32 = y32 + 1
+    }
+    let coarseError32: f64 = maxGridDifference(coarse32.grid, expected32, 1024)
+    let mediumError32: f64 = maxGridDifference(medium32.grid, expected32, 1024)
+    let fineError32: f64 = maxGridDifference(fine32.grid, expected32, 1024)
+    if not (coarseError32 > 0.001 and mediumError32 > 0.0002) { return 42 }
+    if fineError32 > 0.0001 { return 43 }
+    if mediumError32 >= 0.30 * coarseError32 { return 44 }
+    if fineError32 >= 0.30 * mediumError32 { return 45 }
+    if absolute(gridMean(fine32.grid, 1024) - 300.0) > 0.00000000002 {
+        return 46
+    }
+    let half32: TensorResult = integrateTensor(largest, initial32, 0.0125, 64)
+    let second32: TensorResult = integrateTensor(largest, half32.grid, 0.0125, 64)
+    if not half32.valid or not second32.valid or
+       maxGridDifference(second32.grid, fine32.grid, 1024) > 0.00000000002 {
+        return 47
+    }
+    let replay32: TensorResult = integrateTensor(largest, initial32, 0.025, 128)
+    if not replay32.valid or
+       maxGridDifference(replay32.grid, fine32.grid, 1024) > 0.0 { return 48 }
+    let shifted32: TensorResult = integrateTensor(
+        largest, shiftRight32(initial32), 0.025, 128)
+    if not shifted32.valid or
+       maxGridDifference(shifted32.grid, shiftRight32(fine32.grid), 1024) >
+           0.00000000002 { return 49 }
+    let opposite32: TensorEquation = TensorEquation {
+        width: 32, height: 32, spacing_x: 0.03125, spacing_y: 0.03125,
+        diffusion_xx: 0.012, diffusion_xy: -0.004, diffusion_yy: 0.018
+    }
+    let reversed32: TensorResult = integrateTensor(opposite32, initial32, 0.025, 128)
+    if not reversed32.valid or
+       maxGridDifference(reversed32.grid, fine32.grid, 1024) < 0.3 { return 50 }
+    let zero32: TensorResult = integrateTensor(largest, initial32, 0.0, 32)
+    if not zero32.valid or
+       maxGridDifference(zero32.grid, initial32, 1024) > 0.0 { return 51 }
+    let mut uniform32: TensorGrid = blankGrid()
+    let mut cell32: i32 = 0
+    while cell32 < 1024 {
+        uniform32.values[cell32] = 300.0
+        cell32 = cell32 + 1
+    }
+    let unchanged32: TensorResult = integrateTensor(largest, uniform32, 0.025, 32)
+    if not unchanged32.valid or
+       maxGridDifference(unchanged32.grid, uniform32, 1024) > 0.0 { return 52 }
+    let tooWide32: TensorEquation = TensorEquation {
+        width: 33, height: 32, spacing_x: 0.03125, spacing_y: 0.03125,
+        diffusion_xx: 0.012, diffusion_xy: 0.004, diffusion_yy: 0.018
+    }
+    if integrateTensor(tooWide32, initial32, 0.025, 128).valid { return 53 }
+    let tooTall32: TensorEquation = TensorEquation {
+        width: 32, height: 33, spacing_x: 0.03125, spacing_y: 0.03125,
+        diffusion_xx: 0.012, diffusion_xy: 0.004, diffusion_yy: 0.018
+    }
+    if integrateTensor(tooTall32, initial32, 0.025, 128).valid { return 54 }
+    # 2000 * 1024 > the two-million-cell-step work budget.
+    if integrateTensor(largest, initial32, 0.025, 2000).valid { return 55 }
+    let mut unbounded32: TensorGrid = initial32
+    unbounded32.values[511] = 10000000000.0
+    if integrateTensor(largest, unbounded32, 0.025, 128).valid { return 56 }
+    if integrateTensor(largest, initial32, 100.0, 1).valid { return 57 }
+
     println("native-tensor-grid-ok")
     return 0
 }

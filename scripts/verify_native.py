@@ -265,6 +265,18 @@ def verify(root: Path, port: int = 8751, build_timeout: int = 180,
                 print(smoke_result.stderr, end="", file=sys.stderr, flush=True)
             if smoke_result.returncode != 0:
                 raise VerificationError(f"HTTP smoke failed with exit code {smoke_result.returncode}")
+            trigonometry_smoke = root / "tests/http_trigonometry_smoke.py"
+            if not trigonometry_smoke.is_file():
+                raise VerificationError("Missing native trigonometry HTTP acceptance")
+            trigonometry_result = _command(
+                [sys.executable, str(trigonometry_smoke)], root, 120)
+            if trigonometry_result.stdout:
+                print(trigonometry_result.stdout, end="", flush=True)
+            if trigonometry_result.stderr:
+                print(trigonometry_result.stderr, end="", file=sys.stderr, flush=True)
+            if trigonometry_result.returncode != 0:
+                raise VerificationError(
+                    f"Native trigonometry HTTP failed with exit code {trigonometry_result.returncode}")
             if proc.poll() is not None:
                 raise VerificationError(f"Server exited during HTTP smoke (code {proc.returncode})")
             print("PASS: native build, live health and HTTP smoke", flush=True)

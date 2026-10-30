@@ -1,3 +1,23 @@
+## 2026-10-30: two independently computed 32×32 native PDE species (qualification pending)
+
+The production Flow tensor solver now computes **two separate 1,024-cell
+anisotropic diffusion fields**, with distinct Fourier modes, mixed-derivative
+coefficients and baselines. Both are emitted in a single bounded
+`FLOWSTUDIO_GRID_V1 32 32 2` frame. The checked-in Flow main checks
+full-grid analytical errors, RK2 convergence, conservation, deterministic
+replay, semigroup consistency, sign sensitivity and invalid inputs/work
+budgets before emitting either field. The independent Python oracle checks
+both discrete spatial operators and Fourier references. Production HTTP
+acceptance asserts all 2,048 numeric cells; Chromium Monaco acceptance
+checks 2,048 actual DOM cells and fourteen Fourier samples, including
+independent color scaling. See [reproducibility](NATIVE_TENSOR_HEATMAP.md).
+
+**Status:** tests and production-path assertions are checked in, but
+Linux/macOS CI for this revision has not yet qualified. This tests two
+**independent** 2D species, not cross-coupled multidimensional field
+declarations. Independent macOS physical-browser acceptance, local native
+Flow/R execution and full RStudio parity remain unexecuted/unestablished.
+
 ## 2026-10-30: compiler-executed 32×32 tensor heatmap (CI pending)
 
 The native 1,024-cell anisotropic RK2 tensor example now emits its **computed**

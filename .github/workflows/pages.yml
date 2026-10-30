@@ -40,3 +40,23 @@ jobs:
           path: docs
       - id: deployment
         uses: actions/deploy-pages@v4
+      - name: Verify the public site serves the expected HTML
+        shell: bash
+        run: |
+          set -euo pipefail
+          # GitHub Pages can take a short interval to publish a completed deployment.
+          # A successful deploy-pages API call is not, by itself, public HTTP acceptance.
+          site="https://godofecht.github.io/FlowStudio/"
+          for attempt in $(seq 1 12); do
+            if curl --fail --silent --show-error --location \
+                --connect-timeout 10 --max-time 20 \
+                "$site" --output /tmp/flowstudio-pages.html &&
+               grep -Fq '<title>FlowStudio: Flow-first scientific IDE</title>' /tmp/flowstudio-pages.html; then
+              echo "Verified public FlowStudio documentation: $site"
+              exit 0
+            fi
+            echo "Pages endpoint not ready (attempt $attempt/12)"
+            sleep 5
+          done
+          echo "::error::GitHub Pages deployed but the public FlowStudio HTML was not verified"
+          exit 1

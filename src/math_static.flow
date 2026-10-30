@@ -114,7 +114,7 @@ export function infer_math_ir(program: MathProgram) -> MathInferredType {
                 return static_error(instruction.source_start)
             }
         } elif (opcode >= 1 and opcode <= 4) or opcode == 7 or opcode == 8 or
-             (opcode >= 10 and opcode <= 17) or opcode == 22 {
+             (opcode >= 10 and opcode <= 17) or opcode == 22 or opcode == 32 {
             if depth < 2 { return static_error(instruction.source_start) }
             let left: Dimension = dimensions[depth - 2]
             let right: Dimension = dimensions[depth - 1]
@@ -122,7 +122,14 @@ export function infer_math_ir(program: MathProgram) -> MathInferredType {
             let right_predicate: bool = predicates[depth - 1]
             let mut result: Dimension = left
             let mut result_predicate: bool = false
-            if opcode == 16 or opcode == 17 {
+            if opcode == 32 {
+                # atan2(y, x) is an angle; its inputs must have equal units.
+                # The zero/zero domain error is deliberately runtime-only.
+                if left_predicate or right_predicate or not same_dimension(left, right) {
+                    return static_error(instruction.source_start)
+                }
+                result = dimensionless()
+            } elif opcode == 16 or opcode == 17 {
                 if not left_predicate or not right_predicate {
                     return static_error(instruction.source_start)
                 }

@@ -780,7 +780,10 @@ function main() -> i32 {
     if not result.valid or not near(result.result.value, 32.0) { return 270 }
     # 33 terms require 65 instructions and must fail before writing past capacity.
     if parse_math_expression("1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1").valid { return 271 }
-    if not evaluate_math_expression("(((((((((((((((((1)))))))))))))))))").valid { return 80 }
+    if not evaluate_math_expression("((((((((1))))))))").valid { return 86 }
+    if not evaluate_math_expression("((((((((((((((((1))))))))))))))))").valid { return 87 }
+    let deep_failure: MathResult = evaluate_math_expression("(((((((((((((((((1)))))))))))))))))")
+    if not deep_failure.valid { return 100 + deep_failure.failed_at }
     if not evaluate_math_expression("((((((((((((((((((((((((1))))))))))))))))))))))))").valid { return 81 }
     if not evaluate_math_expression("(((((((((((((((((((((((((((((((1)))))))))))))))))))))))))))))))").valid { return 82 }
     if not evaluate_math_expression("1                                                                ").valid { return 85 }

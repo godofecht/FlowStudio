@@ -304,6 +304,19 @@ try {
     }
   }
 
+  // A rejected Flow buffer must not leave the previous PDE's curves
+  // visible. Both checks use Monaco's real Run control and UI preflight.
+  await page.evaluate(() => globalThis.FlowStudioEditor.editor.setValue('   '));
+  await page.locator('#run').click();
+  assert.equal(await page.locator('#mathFlowPlot svg[data-native-flow-field]').count(), 0,
+    'Empty Flow preflight must discard stale native PDE curves');
+  assert.equal(await page.locator('#mathFlowPlot').isHidden(), true);
+  await page.evaluate(() => globalThis.FlowStudioEditor.editor.setValue('x'.repeat(131073)));
+  await page.locator('#run').click();
+  assert.equal(await page.locator('#mathFlowPlot svg[data-native-flow-field]').count(), 0,
+    'Oversized Flow preflight must not resurrect a previous PDE plot');
+  assert.equal(await page.locator('#mathFlowPlot').isHidden(), true);
+
   // Six-state nonlinear spatial SIR evolution: Monaco -> native Flow HTTP
   // -> compiler-generated RK4. The checked-in Flow main() verifies the
   // independent numerical reference and exact nonlinear limiting cases.

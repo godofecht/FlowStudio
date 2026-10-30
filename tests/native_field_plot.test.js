@@ -12,6 +12,12 @@ const good = frame([1, .5, .75, 1], [0, .25, .125, 0]);
 
 test("real native field protocol parses exact species and cells", () => {
   assert.equal(parse("ordinary Flow output\n"), null);
+  assert.equal(parse("ordinary output\n".repeat(10000)), null);
+  assert.equal(parse("FLOWSTUDIO_FIELD_V1not-a-frame\n"), null);
+  assert.deepEqual(parse(good.replace(" 4 2", "\t4\t2")), {count:4, fields:[
+    {name:"U", values:[1,.5,.75,1]},
+    {name:"V", values:[0,.25,.125,0]}
+  ]});
   assert.deepEqual(parse(good), {count:4, fields:[
     {name:"U", values:[1,.5,.75,1]},
     {name:"V", values:[0,.25,.125,0]}
@@ -33,7 +39,8 @@ test("fail closed on malformed, spoofed, nonfinite and oversized field blocks", 
     good + "FLOWSTUDIO_FIELD_END\n",
     "FLOWSTUDIO_FIELD_V1 4 2\nU 1 2 3 4\n"
   ]) assert.throws(() => parse(bad), undefined, bad);
-  assert.throws(() => parse("x".repeat(131073)), /limit/);
+  assert.throws(() => parse(good + "x".repeat(131073)), /limit/);
+  assert.throws(() => parse("FLOWSTUDIO_FIELD_V1\n"), /header/);
 });
 
 test("render creates bounded, finite, escaped SVG paths without HTML injection", () => {
@@ -56,6 +63,12 @@ test("render creates bounded, finite, escaped SVG paths without HTML injection",
   const paths = svg.children.filter(child => child.tag === "path" &&
     child.attributes["data-field-name"]);
   assert.equal(paths.length, 2);
+  const ticks = svg.children.filter(child =>
+    Object.hasOwn(child.attributes, "data-native-flow-axis-value"));
+  assert.deepEqual(ticks.map(tick => Number(tick.attributes["data-native-flow-axis-value"])),
+    [1, 0]);
+  assert.equal(svg.children.filter(child =>
+    child.attributes["data-native-flow-zero-axis"]).length, 0);
   for (const path of paths) {
     assert.equal((path.attributes.d.match(/[ML]/g) || []).length, 4);
     assert.doesNotMatch(path.attributes.d, /NaN|Infinity|<|>/);
@@ -117,4 +130,28 @@ test("all bounded seeded fields render finite, in-range SVG coordinates", () => 
       }
     }
   }
+});
+
+test("computed zero baseline follows signed field extrema", () => {
+  class Element {
+    constructor(tag) { this.tag = tag; this.attributes = {}; this.children = []; }
+    setAttribute(name, value) { this.attributes[name] = value; }
+    append(child) { this.children.push(child); }
+    replaceChildren(...children) { this.children = children; }
+  }
+  const doc = {createElement: tag => new Element(tag),
+    createElementNS: (_namespace, tag) => new Element(tag)};
+  const container = new Element("div");
+  assert.equal(render(doc, container, frame([-1, 0, 1, 2], [0, 0, 0, 0])), true);
+  const svg = container.children[1];
+  const zero = svg.children.filter(child =>
+    child.attributes["data-native-flow-zero-axis"] === "true");
+  assert.equal(zero.length, 1);
+  assert.equal(zero[0].tag, "line");
+  assert.equal(Number(zero[0].attributes.y1), Number(zero[0].attributes.y2));
+  assert.ok(Math.abs(Number(zero[0].attributes.y1) - (214 - 190 / 3)) < 1e-10);
+  const ticks = svg.children.filter(child =>
+    Object.hasOwn(child.attributes, "data-native-flow-axis-value"));
+  assert.deepEqual(ticks.map(tick => Number(tick.attributes["data-native-flow-axis-value"])),
+    [2, -1]);
 });

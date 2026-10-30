@@ -129,6 +129,21 @@ function main() -> i32 {
         "u₁ + ρ = 7m/1s", greek, quantity(0.0, speed))
     if result.valid { return 44 }
 
+    # Native equation parsing shares the signed Unicode power lowering.
+    let inverse_area: Dimension = Dimension {
+        length: -2, mass: 0, time: 0, temperature: 0
+    }
+    result = evaluate_math_equation_source("3m⁻² = 1m⁻²/9", quantity(0.0, inverse_area))
+    if not result.valid or not result.satisfied { return 45 }
+    result = evaluate_math_equation_source("2m⁻¹*4m = 2", quantity(0.0, dimensionless()))
+    if not result.valid or not result.satisfied { return 46 }
+    result = evaluate_math_equation_source("3m⁻² = 2m⁻²", quantity(0.0, inverse_area))
+    if not result.valid or result.satisfied { return 47 }
+    result = evaluate_math_equation_source("3m⁻² = 1m", quantity(0.0, inverse_area))
+    if result.valid { return 48 }
+    result = evaluate_math_equation_source("2⁻⁹ = 1", quantity(0.0, dimensionless()))
+    if result.valid { return 49 }
+
     println("native-math-equation-ok")
     return 0
 }

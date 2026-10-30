@@ -211,6 +211,19 @@ function main() -> i32 {
     inferred = infer_math_expression_source_with_bindings("u₃", greek)
     if inferred.valid or inferred.failed_at != 0 { return 58 }
 
+    # Static dimensions recognize Unicode signed exponents without evaluating.
+    inferred = infer_math_expression_source("0m⁻²")
+    if not inferred.valid or not same_dimension(inferred.dimension, inverse_area) { return 59 }
+    if evaluate_math_expression("0m⁻²").valid { return 60 }
+    inferred = infer_math_expression_source("2m⁻¹*4m")
+    if not inferred.valid or not same_dimension(inferred.dimension, dimensionless()) { return 61 }
+    inferred = infer_math_expression_source("3m⁻²+2m⁻²")
+    if not inferred.valid or not same_dimension(inferred.dimension, inverse_area) { return 62 }
+    inferred = infer_math_expression_source("3m⁻²+1m")
+    if inferred.valid { return 63 }
+    inferred = infer_math_expression_source("2⁻⁹")
+    if inferred.valid { return 64 }
+
     println("native-math-static-ok")
     return 0
 }

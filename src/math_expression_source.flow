@@ -301,7 +301,7 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
                 continue
             }
             if not expect_operand { return source_error(start, length) }
-            let mut found: bool
+            let mut found: bool = false
             let mut value: Quantity = quantity(0.0, dimensionless())
             let mut symbol_index: i32 = 0
             while symbol_index < bindings.count {

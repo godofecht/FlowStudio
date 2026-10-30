@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 import socket
 import shutil
 import subprocess
@@ -206,7 +207,6 @@ def main() -> None:
         "native Gray-Scott coupled numerical execution", status, body)
     # Actual Flow stdout must carry the computed 256-step fields, not a
     # browser fixture or a copy of the checked-in reference arrays.
-    import re
     lines = body.splitlines()
     markers = [i for i, line in enumerate(lines)
                if line == "FLOWSTUDIO_FIELD_V1 64 2"]

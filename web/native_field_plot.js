@@ -15,7 +15,7 @@
     if (output.length > 131072) {
       // The marker must begin a logical line and end at a header separator.
       // Substrings inside ordinary large stdout must not become plot errors.
-      if (!/(?:^|\\r?\\n)[^\\S\\r\\n]*FLOWSTUDIO_FIELD_V1(?=[ \\t\\r\\n]|$)/.test(output))
+      if (!/(?:^|\r?\n)[^\S\r\n]*FLOWSTUDIO_FIELD_V1(?=[ \t\r\n]|$)/.test(output))
         return null;
       throw new TypeError("Native Flow output exceeds the field plot limit.");
     }

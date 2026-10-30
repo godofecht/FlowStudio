@@ -220,8 +220,8 @@ def main() -> None:
             "src/math_expression_ir_smoke.flow",
         )
     ]
-    native_math_ir = "\\n".join(
-        "\\n".join(
+    native_math_ir = "\n".join(
+        "\n".join(
             line.removeprefix("export ")
             for line in source.splitlines()
             if not line.startswith("import .math_dimensions {")

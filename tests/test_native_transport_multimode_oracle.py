@@ -145,10 +145,11 @@ class NativeTransportMultimodeOracle(unittest.TestCase):
     def test_oracle_rejects_mutated_source_reference(self):
         source = SOURCE.read_text(encoding="utf-8")
         original = embedded_grid(source, "referenceMultimode5x7")
-        altered = source.replace(
-            f"values[17] = {original[17]:.17g}",
-            f"values[17] = {original[17] + 0.01:.17g}", 1)
-        self.assertNotEqual(altered, source)
+        altered, count = re.subn(
+            r"(values\\[17\\] = )([0-9.eE+-]+)",
+            lambda match: match.group(1) + str(float(match.group(2)) + 0.01),
+            source, count=1)
+        self.assertEqual(count, 1)
         changed = embedded_grid(altered, "referenceMultimode5x7")
         self.assertGreater(maximum_error(changed, exact_field(DURATION)), 0.009)
 

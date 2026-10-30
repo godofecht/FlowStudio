@@ -201,6 +201,21 @@ function shiftRight4(grid: TransportGrid) -> TransportGrid {
     return TransportGrid { values: values }
 }
 
+function stripeFourier8() -> TransportGrid {
+    let mut values: array<f64, 64> = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    let mut y: i32 = 0
+    while y < 8 {
+        let mut x: i32 = 0
+        while x < 8 {
+            if x == 0 or x == 4 { values[y * 8 + x] = 1.0 }
+            if x == 2 or x == 6 { values[y * 8 + x] = -1.0 }
+            x = x + 1
+        }
+        y = y + 1
+    }
+    return TransportGrid { values: values }
+}
+
 function main() -> i32 {
     let equation: TransportEquation = TransportEquation {
         width: 4, height: 4, spacing_x: 0.25, spacing_y: 0.25,
@@ -274,6 +289,22 @@ function main() -> i32 {
     invalidValues[0] = 1000000001.0
     let invalidGrid: TransportGrid = TransportGrid { values: invalidValues }
     if integrateTransport(equation, invalidGrid, 0.5, 8).valid { return 24 }
+
+    # An independent 8x8 Fourier stripe: distinct y-axis geometry and
+    # travelling x-mode, with a different complex semidiscrete eigenvalue.
+    # lambda = -0.64 - 0.8i; t=0.5 gives exp(-0.32)*cos/sin(0.4).
+    let larger: TransportEquation = TransportEquation {
+        width: 8, height: 8, spacing_x: 0.125, spacing_y: 0.125,
+        velocity_x: 0.1, velocity_y: 0.0,
+        diffusivity_x: 0.005, diffusivity_y: 0.01
+    }
+    let stripe: TransportGrid = stripeFourier8()
+    let largeRun: TransportResult = integrateTransport(larger, stripe, 0.5, 32)
+    if not largeRun.valid { return 25 }
+    if absolute(largeRun.grid.values[0] - 0.6688275538813316) > 0.000000001 { return 26 }
+    if absolute(largeRun.grid.values[1] - 0.28277575428625956) > 0.000000001 { return 27 }
+    if absolute(largeRun.grid.values[8] - largeRun.grid.values[0]) > 0.000000000001 { return 28 }
+    if absolute(gridMean(largeRun.grid, 64)) > 0.000000000001 { return 29 }
 
     println("native-advection-diffusion2d-ok")
     return 0

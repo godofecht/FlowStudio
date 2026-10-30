@@ -78,6 +78,7 @@ export function parse_math_expression(source: string) -> ParsedMathExpression {
     let mut count: i32 = 0
     let mut operators: array<i32, 16> = [0]
     let mut positions: array<i32, 16> = [0]
+    let mut widths: array<i32, 16> = [1]
     let mut top: i32 = 0
     let mut index: i32 = 0
     let mut expect_operand: bool = true
@@ -119,6 +120,7 @@ export function parse_math_expression(source: string) -> ParsedMathExpression {
             if not expect_operand or top >= 16 { return source_error(index, length) }
             operators[top] = -1
             positions[top] = index
+            widths[top] = 1
             top = top + 1
             index = index + 1
             continue
@@ -133,7 +135,7 @@ export function parse_math_expression(source: string) -> ParsedMathExpression {
                     break
                 }
                 if count >= 16 { return source_error(index, length) }
-                instructions[count] = make_instruction(operators[top], quantity(0.0, dimensionless()), positions[top], positions[top] + 1)
+                instructions[count] = make_instruction(operators[top], quantity(0.0, dimensionless()), positions[top], positions[top] + widths[top])
                 count = count + 1
             }
             if not found { return source_error(index, length) }
@@ -150,6 +152,7 @@ export function parse_math_expression(source: string) -> ParsedMathExpression {
                 if top >= 16 { return source_error(index, length) }
                 operators[top] = 5
                 positions[top] = index
+                widths[top] = width
                 top = top + 1
             }
         } else {
@@ -157,12 +160,13 @@ export function parse_math_expression(source: string) -> ParsedMathExpression {
                   precedence(operators[top - 1]) >= precedence(opcode) {
                 top = top - 1
                 if count >= 16 { return source_error(index, length) }
-                instructions[count] = make_instruction(operators[top], quantity(0.0, dimensionless()), positions[top], positions[top] + 1)
+                instructions[count] = make_instruction(operators[top], quantity(0.0, dimensionless()), positions[top], positions[top] + widths[top])
                 count = count + 1
             }
             if top >= 16 { return source_error(index, length) }
             operators[top] = opcode
             positions[top] = index
+            widths[top] = width
             top = top + 1
             expect_operand = true
         }
@@ -173,7 +177,7 @@ export function parse_math_expression(source: string) -> ParsedMathExpression {
         top = top - 1
         if operators[top] == -1 { return source_error(positions[top], length) }
         if count >= 16 { return source_error(positions[top], length) }
-        instructions[count] = make_instruction(operators[top], quantity(0.0, dimensionless()), positions[top], positions[top] + 1)
+        instructions[count] = make_instruction(operators[top], quantity(0.0, dimensionless()), positions[top], positions[top] + widths[top])
         count = count + 1
     }
     return ParsedMathExpression {

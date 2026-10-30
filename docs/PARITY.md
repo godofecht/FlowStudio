@@ -1,4 +1,4 @@
-## 2026-10-30: native 16x16 anisotropic tensor diffusion (CI pending)
+## 2026-10-30: native 16x16 anisotropic tensor diffusion (Linux/macOS CI verified)
 
 The existing production-compiled `examples/native_tensor_grid.flow` now
 supports configurable 3..16-cell axes with a bounded 256-cell periodic grid.
@@ -19,10 +19,22 @@ not compile Flow. The unchanged native CI workflow already runs
 `tests/http_smoke.py` executes that exact checked-in source through the
 production `/api/check/flow` and `/api/run/flow` routes.
 
-**Pending:** exact-commit Linux/macOS CI, native Flow and HTTP execution,
-independent physical-browser acceptance and post-merge main CI. This remains
-a bounded array-based numerical kernel, not general PDE grammar or RStudio
-parity. No hosted CI configuration was changed.
+**Verified:** all six PR CI jobs passed in
+[CI #41022162472](https://github.com/godofecht/FlowStudio/actions/runs/41022162472).
+Both Linux/macOS source jobs passed 348 Python tests (13 skipped, zero
+failed), including four independent tensor-oracle tests; 1,143 JavaScript
+tests passed per platform (12 skipped, zero failed). Both native Flow jobs
+compiled and executed the 256-cell program through the real Flow 2.0
+compiler, then passed production HTTP acceptance. Ubuntu Chromium executed
+the exact source through Monaco's Run control. Both native R/C FlowJIT
+jobs passed. Merged in
+[ebbfda8](https://github.com/godofecht/FlowStudio/commit/ebbfda8d9820db5703d54bc99b6802dfb8b53bad)
+via [PR #235](https://github.com/godofecht/FlowStudio/pull/235).
+
+**Unexecuted:** independent macOS physical-browser acceptance and
+post-merge main CI. This remains a bounded array-based numerical kernel,
+not general PDE grammar or RStudio parity. No hosted CI configuration
+was changed.
 
 ## 2026-10-30: native typed multi-argument source functions (Linux/macOS CI verified)
 

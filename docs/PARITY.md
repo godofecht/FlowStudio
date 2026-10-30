@@ -1,3 +1,30 @@
+## 2026-10-30: coupled nonlinear Gray-Scott native fields (verification pending)
+
+`examples/native_field_grayscott64.flow` uses two compiler-generated 64-cell
+`field` / `laplacian` / Dirichlet steppers and an explicitly coupled
+nonlinear Gray-Scott reaction update. The Flow main checks all 384 U/V
+checkpoint values at 32/128/256 steps against independent double-precision
+references, positivity, semigroup, deterministic replay, mutation sensitivity,
+invalid inputs, output nonmutation and a 131072-cell-step resource ceiling.
+`tests/test_native_field_grayscott64_oracle.py` independently reconstructs
+the nonlinear spatial stencil and includes six numerical/negative tests.
+The production native HTTP check/run acceptance and actual Chromium Monaco
+Run acceptance are wired to the exact checked-in source.
+
+**Verified:** [PR CI #41093934670](https://github.com/godofecht/FlowStudio/actions/runs/41093934670)
+passed all six Linux/macOS jobs. Each source/transport platform passed
+1,143 JavaScript tests (12 skipped) and 380 Python tests (13 skipped),
+including all six new independent nonlinear Gray-Scott oracle tests.
+Both native Flow compilers executed the checked-in source through production
+HTTP check/run and rejected malformed second-field syntax. Ubuntu Chromium
+executed the same source through Monaco's real Run button; both native R/C
+FlowJIT jobs passed. Independent JavaScript cross-check of all 384 expected
+values differed by at most 1.9e-15. **Unexecuted:** independent macOS
+physical-browser interaction and local native Flow/R/HTTP. **Pending:**
+post-merge main CI. This establishes nonlinear coupling of existing 1D field
+steppers, not general coupled PDE grammar, multidimensional operators or
+RStudio parity. No hosted CI workflow configuration changed.
+
 ## 2026-10-30: two independent compiler-backed 48-cell fields (Linux/macOS CI verified)
 
 `examples/native_field_dual48.flow` declares two separate upstream Flow 2.0

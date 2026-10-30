@@ -155,7 +155,8 @@ function main() -> i32 {
     result = evaluate_math_expression("2^2^3")
     if result.valid or result.failed_at != 3 { return 51 }
     result = evaluate_math_expression("2²³")
-    if result.valid or result.failed_at != 3 { return 52 }
+    # Adjacent superscript digits now form one bounded integer exponent (23).
+    if result.valid or result.failed_at != 1 { return 52 }
     result = evaluate_math_expression("2^2.5")
     if result.valid or result.failed_at != 3 { return 53 }
     result = evaluate_math_expression("2m^2 + 3m")

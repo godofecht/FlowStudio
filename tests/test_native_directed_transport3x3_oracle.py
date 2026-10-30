@@ -80,7 +80,7 @@ class NativeDirectedTransport3x3Oracle(unittest.TestCase):
         names = ("northwest", "north", "northeast", "west", "center", "east",
                  "southwest", "south", "southeast")
         for name, value in zip(names, expected):
-            match = re.search(r"reference\\." + name + r"\\s*=\\s*([0-9.]+)", reference)
+            match = re.search(r"reference\." + name + r"\s*=\s*([0-9.]+)", reference)
             self.assertIsNotNone(match, name)
             self.assertAlmostEqual(float(match.group(1)), value, delta=1e-14)
 

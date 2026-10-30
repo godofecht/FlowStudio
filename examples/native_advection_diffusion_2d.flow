@@ -216,6 +216,39 @@ function stripeFourier8() -> TransportGrid {
     return TransportGrid { values: values }
 }
 
+
+# Four-phase real Fourier basis: phase is in quarter-turns, with both
+# negative and positive wave numbers. No runtime trigonometry is required.
+function fourPhase(phase: i32, cosineCoefficient: f64, sineCoefficient: f64) -> f64 {
+    let mut index: i32 = phase
+    while index < 0 { index = index + 4 }
+    while index >= 4 { index = index - 4 }
+    if index == 0 { return cosineCoefficient }
+    if index == 1 { return sineCoefficient }
+    if index == 2 { return -cosineCoefficient }
+    return -sineCoefficient
+}
+
+# Independent travelling modes (kx,ky) = (2,2), (2,-2), (2,0)
+# on an 8x8 periodic grid. The signed diagonal waves exercise both axes.
+function multimodeFourier8(firstAmplitude: f64, secondAmplitude: f64,
+                           thirdAmplitude: f64) -> TransportGrid {
+    let mut values: array<f64, 64> = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    let mut y: i32 = 0
+    while y < 8 {
+        let mut x: i32 = 0
+        while x < 8 {
+            values[y * 8 + x] =
+                fourPhase(x + y, firstAmplitude, 0.0) +
+                fourPhase(x - y, secondAmplitude, 0.0) +
+                fourPhase(x, thirdAmplitude, 0.0)
+            x = x + 1
+        }
+        y = y + 1
+    }
+    return TransportGrid { values: values }
+}
+
 function main() -> i32 {
     let equation: TransportEquation = TransportEquation {
         width: 4, height: 4, spacing_x: 0.25, spacing_y: 0.25,
@@ -305,6 +338,89 @@ function main() -> i32 {
     if absolute(largeRun.grid.values[1] - 0.28277575428625956) > 0.000000001 { return 27 }
     if absolute(largeRun.grid.values[8] - largeRun.grid.values[0]) > 0.000000000001 { return 28 }
     if absolute(gridMean(largeRun.grid, 64)) > 0.000000000001 { return 29 }
+
+
+    # Three independently propagating 2D Fourier modes with nonzero x/y
+    # velocities, unequal diffusivities, and signed diagonal wavevectors.
+    # Check every one of 64 cells against the exact SEMIDISCRETE solution,
+    # not against a continuum PDE or a second numerical implementation.
+    let multimodeEquation: TransportEquation = TransportEquation {
+        width: 8, height: 8, spacing_x: 0.125, spacing_y: 0.125,
+        velocity_x: 0.11, velocity_y: -0.07,
+        diffusivity_x: 0.003, diffusivity_y: 0.006
+    }
+    let multimodeInitial: TransportGrid = multimodeFourier8(1.2, 0.7, 0.5)
+    let multimodeFour: TransportResult = integrateTransport(multimodeEquation, multimodeInitial, 0.4, 4)
+    let multimodeEight: TransportResult = integrateTransport(multimodeEquation, multimodeInitial, 0.4, 8)
+    let multimodeSixteen: TransportResult = integrateTransport(multimodeEquation, multimodeInitial, 0.4, 16)
+    let multimodeThirtyTwo: TransportResult = integrateTransport(multimodeEquation, multimodeInitial, 0.4, 32)
+    if not multimodeFour.valid or not multimodeEight.valid or
+       not multimodeSixteen.valid or not multimodeThirtyTwo.valid { return 30 }
+
+    # Each coefficient is amplitude * exp(real(lambda)*0.4) *
+    # cos(imag(lambda)*0.4) or sin(imag(lambda)*0.4).
+    # lambda = -1.152 - 0.32i, -1.152 - 1.44i, -0.384 - 0.88i.
+    let exactFirstCosine: f64 = 0.7507422380871157
+    let exactFirstSine: f64 = 0.096623275672496
+    let exactSecondCosine: f64 = 0.3703009986552596
+    let exactSecondSine: f64 = 0.24049804867401264
+    let exactThirdCosine: f64 = 0.4025151840914567
+    let exactThirdSine: f64 = 0.1478424768143327
+    let mut errors: array<f64, 4> = [0.0, 0.0, 0.0, 0.0]
+    let mut y: i32 = 0
+    while y < 8 {
+        let mut x: i32 = 0
+        while x < 8 {
+            let index: i32 = y * 8 + x
+            let expected: f64 =
+                fourPhase(x + y, exactFirstCosine, exactFirstSine) +
+                fourPhase(x - y, exactSecondCosine, exactSecondSine) +
+                fourPhase(x, exactThirdCosine, exactThirdSine)
+            let differenceFour: f64 = absolute(multimodeFour.grid.values[index] - expected)
+            let differenceEight: f64 = absolute(multimodeEight.grid.values[index] - expected)
+            let differenceSixteen: f64 = absolute(multimodeSixteen.grid.values[index] - expected)
+            let differenceThirtyTwo: f64 = absolute(multimodeThirtyTwo.grid.values[index] - expected)
+            if differenceFour > errors[0] { errors[0] = differenceFour }
+            if differenceEight > errors[1] { errors[1] = differenceEight }
+            if differenceSixteen > errors[2] { errors[2] = differenceSixteen }
+            if differenceThirtyTwo > errors[3] { errors[3] = differenceThirtyTwo }
+            x = x + 1
+        }
+        y = y + 1
+    }
+    if errors[0] < 0.000001 or errors[3] > 0.000000002 { return 31 }
+    if errors[1] >= 0.09 * errors[0] or errors[2] >= 0.09 * errors[1] or
+       errors[3] >= 0.09 * errors[2] { return 32 }
+    if absolute(gridMean(multimodeThirtyTwo.grid, 64)) > 0.000000000001 { return 33 }
+
+    # Linearity is a separate metamorphic oracle: the numerical integrator
+    # must evolve the superposition identically to three isolated modes.
+    let firstMode: TransportResult = integrateTransport(
+        multimodeEquation, multimodeFourier8(1.2, 0.0, 0.0), 0.4, 32)
+    let secondMode: TransportResult = integrateTransport(
+        multimodeEquation, multimodeFourier8(0.0, 0.7, 0.0), 0.4, 32)
+    let thirdMode: TransportResult = integrateTransport(
+        multimodeEquation, multimodeFourier8(0.0, 0.0, 0.5), 0.4, 32)
+    if not firstMode.valid or not secondMode.valid or not thirdMode.valid { return 34 }
+    let mut index: i32 = 0
+    while index < 64 {
+        let combined: f64 = firstMode.grid.values[index] +
+            secondMode.grid.values[index] + thirdMode.grid.values[index]
+        if absolute(combined - multimodeThirtyTwo.grid.values[index]) > 0.000000000001 {
+            return 35
+        }
+        index = index + 1
+    }
+    let multimodeReplay: TransportResult = integrateTransport(
+        multimodeEquation, multimodeInitial, 0.4, 32)
+    if not multimodeReplay.valid or
+       maxDifference(multimodeReplay.grid, multimodeThirtyTwo.grid, 64) > 0.000000000001 {
+        return 36
+    }
+    let mut invalidMultimode: TransportEquation = multimodeEquation
+    invalidMultimode.width = 9
+    if integrateTransport(invalidMultimode, multimodeInitial, 0.4, 32).valid { return 37 }
+    if integrateTransport(multimodeEquation, multimodeInitial, 0.4, 1).valid { return 38 }
 
     println("native-advection-diffusion2d-ok")
     return 0

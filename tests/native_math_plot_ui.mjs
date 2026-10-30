@@ -207,6 +207,17 @@ try {
     null, { timeout: 80000 });
   assert.match(await page.locator('#console').textContent(), /native-coupled-evolution3x3-ok/);
 
+  // Full 35-cell, three-Fourier-mode 5x7 native advection-diffusion gate:
+  // exercise actual Monaco Run -> Flow-owned HTTP -> upstream flowc, not a
+  // mocked fetch or the separate NumPy mathematical frontend.
+  await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
+    readFileSync('examples/native_advection_diffusion_2d.flow', 'utf8'));
+  await page.locator('#run').click();
+  await page.waitForFunction(() =>
+    document.querySelector('#console')?.textContent?.includes('native-advection-diffusion2d-ok'),
+    null, { timeout: 80000 });
+  assert.match(await page.locator('#console').textContent(), /native-advection-diffusion2d-ok/);
+
   assert.deepEqual(errors, [], errors.join('\n'));
   console.log('PASS: native mathematical Flow HTTP, linear/nonlinear NumPy PDEs and actual SVG plots in Chromium');
 } finally {

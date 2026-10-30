@@ -206,7 +206,7 @@ Navier–Stokes regression and production HTTP/Chromium acceptance. This is
 not compiler-wide Flow grammar integration, lazy conditional execution,
 general equation syntax, static unit inference or native PDE lowering.
 
-## Native multi-argument mathematical calls (2026-10-30; CI pending)
+## Native multi-argument mathematical calls (2026-10-30; Linux/macOS CI verified)
 
 The bounded native source parser now lowers `min(left,right)`,
 `max(left,right)`, `norm(first,second)`, `clamp(value,lower,upper)`
@@ -224,5 +224,9 @@ The native smoke adds 39 executable cases for numerical values, physical
 dimensions, nesting, precedence, source spans, missing and excess arguments,
 comma rejection, unit mismatches, reversed clamp bounds, overflow and eager
 branch failure. This does **not** implement arbitrary functions, general
-source equations, PDE compilation or RStudio parity. Native compiler,
-HTTP and physical-browser verification remain pending CI.
+source equations, PDE compilation or RStudio parity. All six Linux/macOS jobs passed in
+[CI #41010755420](https://github.com/godofecht/FlowStudio/actions/runs/41010755420).
+The actual Flow 2.0 compiler and production HTTP routes executed the source
+smoke on both platforms. Ubuntu Chromium executed the concatenated checked-in
+source through Monaco's real Run control and observed the success marker.
+Independent macOS browser acceptance and post-merge main CI remain unverified.

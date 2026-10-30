@@ -97,8 +97,10 @@ function main() -> i32 {
     if not result.valid or not near(result.result.value, 14.0) { return 31 }
     result = evaluate_math_expression("2 + (3 × 4")
     if result.valid or result.failed_at != 4 { return 32 }
+    let area: Dimension = product_dimension(length, length)
     result = evaluate_math_expression("2m²")
-    if result.valid or result.failed_at != 2 { return 33 }
+    if not result.valid or not near(result.result.value, 4.0) or
+       not same_dimension(result.result.dimension, area) { return 33 }
 
     let unicode: ParsedMathExpression = parse_math_expression("2×3−1")
     if not unicode.valid or unicode.program.count != 5 or
@@ -108,6 +110,105 @@ function main() -> i32 {
        unicode.program.instructions[4].source_end != 7 { return 34 }
     result = evaluate_math_expression("2×3−1")
     if not result.valid or not near(result.result.value, 5.0) { return 35 }
+
+    # Powers are executed by the same typed native postfix IR. The
+    # exponent belongs to the preceding primary, not the pending unary sign.
+    result = evaluate_math_expression("2m^2")
+    if not result.valid or not near(result.result.value, 4.0) or
+       not same_dimension(result.result.dimension, area) { return 36 }
+    let inverse_area: Dimension = quotient_dimension(dimensionless(), area)
+    result = evaluate_math_expression("2m^-2")
+    if not result.valid or not near(result.result.value, 0.25) or
+       not same_dimension(result.result.dimension, inverse_area) { return 37 }
+    result = evaluate_math_expression("-2m^2")
+    if not result.valid or not near(result.result.value, -4.0) or
+       not same_dimension(result.result.dimension, area) { return 38 }
+    result = evaluate_math_expression("(-2m)^2")
+    if not result.valid or not near(result.result.value, 4.0) or
+       not same_dimension(result.result.dimension, area) { return 39 }
+    result = evaluate_math_expression("3²+4²")
+    if not result.valid or not near(result.result.value, 25.0) { return 40 }
+    result = evaluate_math_expression("2³")
+    if not result.valid or not near(result.result.value, 8.0) { return 41 }
+    result = evaluate_math_expression("2^3*4^2")
+    if not result.valid or not near(result.result.value, 128.0) { return 42 }
+    result = evaluate_math_expression("2^0+3^1")
+    if not result.valid or not near(result.result.value, 4.0) { return 43 }
+    result = evaluate_math_expression("2^-3")
+    if not result.valid or not near(result.result.value, 0.125) { return 44 }
+    result = evaluate_math_expression("2^+3")
+    if not result.valid or not near(result.result.value, 8.0) { return 45 }
+
+    # Invalid exponents fail at their source byte offset. No unbounded
+    # integer parsing, implicit products, chained powers or zero inversion.
+    result = evaluate_math_expression("0^-1")
+    if result.valid or result.failed_at != 1 { return 46 }
+    result = evaluate_math_expression("2^9")
+    if result.valid or result.failed_at != 1 { return 47 }
+    result = evaluate_math_expression("2^-9")
+    if result.valid or result.failed_at != 1 { return 48 }
+    result = evaluate_math_expression("2^")
+    if result.valid or result.failed_at != 1 { return 49 }
+    result = evaluate_math_expression("2^+")
+    if result.valid or result.failed_at != 1 { return 50 }
+    result = evaluate_math_expression("2^2^3")
+    if result.valid or result.failed_at != 3 { return 51 }
+    result = evaluate_math_expression("2²³")
+    if result.valid or result.failed_at != 3 { return 52 }
+    result = evaluate_math_expression("2^2.5")
+    if result.valid or result.failed_at != 3 { return 53 }
+    result = evaluate_math_expression("2m^2 + 3m")
+    if result.valid or result.failed_at != 5 { return 54 }
+    result = evaluate_math_expression("2^3m")
+    if result.valid or result.failed_at != 3 { return 55 }
+
+    result = evaluate_math_expression("2m² + 3m²")
+    if not result.valid or not near(result.result.value, 13.0) or
+       not same_dimension(result.result.dimension, area) { return 56 }
+    result = evaluate_math_expression("2m^-2 * 4m^2")
+    if not result.valid or not near(result.result.value, 1.0) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 57 }
+    result = evaluate_math_expression("(-2m)^3")
+    let volume: Dimension = product_dimension(area, length)
+    if not result.valid or not near(result.result.value, -8.0) or
+       not same_dimension(result.result.dimension, volume) { return 58 }
+    result = evaluate_math_expression("1e20^2")
+    if result.valid or result.failed_at != 4 { return 59 }
+    result = evaluate_math_expression("2m³ / 4m²")
+    if not result.valid or not near(result.result.value, 0.5) or
+       not same_dimension(result.result.dimension, length) { return 60 }
+    result = evaluate_math_expression("2m⁴")
+    if result.valid or result.failed_at != 2 { return 61 }
+
+    # Original UTF-8 byte spans survive both ASCII and superscript lowering.
+    let powered: ParsedMathExpression = parse_math_expression("2m^-2")
+    if not powered.valid or powered.program.count != 2 or
+       powered.program.instructions[1].opcode != 6 or
+       powered.program.instructions[1].exponent != -2 or
+       powered.program.instructions[1].source_start != 2 or
+       powered.program.instructions[1].source_end != 5 { return 62 }
+    let superscript: ParsedMathExpression = parse_math_expression("3²")
+    if not superscript.valid or superscript.program.count != 2 or
+       superscript.program.instructions[1].opcode != 6 or
+       superscript.program.instructions[1].exponent != 2 or
+       superscript.program.instructions[1].source_start != 1 or
+       superscript.program.instructions[1].source_end != 3 { return 63 }
+
+    result = evaluate_math_expression("2m²+3s²")
+    if result.valid or result.failed_at != 4 { return 64 }
+    result = evaluate_math_expression("2^ 3")
+    if result.valid or result.failed_at != 1 { return 65 }
+    result = evaluate_math_expression("2³^2")
+    if result.valid or result.failed_at != 3 { return 66 }
+    result = evaluate_math_expression("2²*3²")
+    if not result.valid or not near(result.result.value, 36.0) { return 67 }
+    result = evaluate_math_expression("2^-2*4")
+    if not result.valid or not near(result.result.value, 1.0) { return 68 }
+    result = evaluate_math_expression("((2m²+3m²)/(5s²))*4s²")
+    if not result.valid or not near(result.result.value, 4.0) or
+       not same_dimension(result.result.dimension, area) { return 69 }
+    result = evaluate_math_expression("2^00000000000000000000000009")
+    if result.valid or result.failed_at != 1 { return 70 }
 
     println("native-math-source-ok")
     return 0

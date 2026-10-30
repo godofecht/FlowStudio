@@ -268,6 +268,68 @@ try {
     document.querySelector('#console')?.textContent?.includes('native-field-grayscott64-ok'),
     null, { timeout: 80000 });
   assert.match(await page.locator('#console').textContent(), /native-field-grayscott64-ok/);
+  // The plotted curves must come from the compiler-executed Flow stdout,
+  // not the separate NumPy MathFlow interpreter or a canned browser figure.
+  await page.locator('#mathFlowPlot svg[data-native-flow-field="true"]')
+    .waitFor({timeout:30000});
+  assert.equal(await page.locator('#mathFlowPlot path[data-field-name]').count(), 2);
+  assert.equal(await page.locator('#tab-plots').getAttribute('aria-selected'), 'true');
+  const grayscottSource = readFileSync('examples/native_field_grayscott64.flow', 'utf8');
+  const references = {};
+  for (const name of ['U', 'V']) {
+    const expectedMatch = new RegExp(
+      'let expected' + name + '256: array<f64, 64> = \\[([\\s\\S]*?)\\]'
+    ).exec(grayscottSource);
+    assert.ok(expectedMatch, 'Missing checked-in independent numerical reference');
+    references[name] = expectedMatch[1].split(',')
+      .filter(value => value.trim()).map(Number);
+    assert.equal(references[name].length, 64);
+  }
+  const allValues = [...references.U, ...references.V];
+  const minimum = Math.min(...allValues), maximum = Math.max(...allValues);
+  // Verify browser-rendered axes reflect the compiler's computed field
+  // values, rather than static chart labels or a MathFlow fixture.
+  const nativeAxes = await page.locator(
+    '#mathFlowPlot svg[data-native-flow-field] text[data-native-flow-axis-value]'
+  ).evaluateAll(nodes => nodes.map(node =>
+    Number(node.getAttribute('data-native-flow-axis-value'))));
+  assert.equal(nativeAxes.length, 2);
+  assert.ok(Math.abs(nativeAxes[0] - maximum) < 1e-4,
+    'Native field maximum axis must match executed numerical output');
+  assert.ok(Math.abs(nativeAxes[1] - minimum) < 1e-4,
+    'Native field minimum axis must match executed numerical output');
+  assert.equal(await page.locator(
+    '#mathFlowPlot svg[data-native-flow-field] [data-native-flow-zero-axis]'
+  ).count(), 0, 'Nonnegative Gray-Scott concentrations have no zero-crossing axis');
+  const scale = Math.max(1, Math.abs(minimum), Math.abs(maximum));
+  const span = maximum / scale - minimum / scale || 1;
+  for (const name of ['U', 'V']) {
+    const path = await page.locator(
+      '#mathFlowPlot path[data-field-name="' + name + '"]').getAttribute('d');
+    const points = [...path.matchAll(/[ML]([0-9.]+),([0-9.]+)/g)];
+    assert.equal(points.length, 64, 'Every native Flow cell must be plotted');
+    for (const [index, match] of points.entries()) {
+      const expectedX = 48 + 568 * index / 63;
+      const expectedY = 214 - 190 * (references[name][index] / scale -
+        minimum / scale) / span;
+      assert.ok(Math.abs(Number(match[1]) - expectedX) < 0.001);
+      assert.ok(Math.abs(Number(match[2]) - expectedY) < 0.02,
+        'Native SVG profile differs from independent PDE reference');
+    }
+  }
+
+  // A rejected Flow buffer must not leave the previous PDE's curves
+  // visible. Both checks use Monaco's real Run control and UI preflight.
+  await page.evaluate(() => globalThis.FlowStudioEditor.editor.setValue('   '));
+  await page.locator('#run').click();
+  assert.equal(await page.locator('#mathFlowPlot svg[data-native-flow-field]').count(), 0,
+    'Empty Flow preflight must discard stale native PDE curves');
+  assert.equal(await page.locator('#mathFlowPlot').isHidden(), true);
+  await page.evaluate(() => globalThis.FlowStudioEditor.editor.setValue('x'.repeat(131073)));
+  await page.locator('#run').click();
+  assert.equal(await page.locator('#mathFlowPlot svg[data-native-flow-field]').count(), 0,
+    'Oversized Flow preflight must not resurrect a previous PDE plot');
+  assert.equal(await page.locator('#mathFlowPlot').isHidden(), true);
 
   // Six-state nonlinear spatial SIR evolution: Monaco -> native Flow HTTP
   // -> compiler-generated RK4. The checked-in Flow main() verifies the
@@ -279,6 +341,9 @@ try {
     document.querySelector('#console')?.textContent?.includes('native-spatial-sir2-ok'),
     null, { timeout: 80000 });
   assert.match(await page.locator('#console').textContent(), /native-spatial-sir2-ok/);
+  assert.equal(await page.locator('#mathFlowPlot svg[data-native-flow-field]').count(), 0,
+    'Successful ordinary Flow execution must not retain Gray-Scott curves');
+  assert.equal(await page.locator('#mathFlowPlot').isHidden(), true);
 
   // Twelve-state nonlinear periodic SIR: actual Monaco Run -> native HTTP ->
   // compiler-generated RK4 and twelve independent numerical assertions.

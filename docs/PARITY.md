@@ -1,3 +1,17 @@
+## 2026-10-30: computed plots from compiler-executed native Flow fields (verification pending)
+
+The native Gray–Scott example now emits a bounded `FLOWSTUDIO_FIELD_V1`
+frame containing both computed 64-cell U/V states after 256 steps. The native
+workbench validates the real Flow stdout and renders two SVG spatial profiles,
+without the separate Python MathFlow interpreter. Node tests reject malformed
+headers, duplicate names, nonfinite/oversized data, missing framing and
+non-numeric values. Production HTTP acceptance compares all 128 transmitted
+cells with the independent numerical reference; physical Chromium Monaco
+acceptance verifies that actual Flow execution produces two displayed curves.
+**Pending:** Linux/macOS PR CI, post-merge CI, independent macOS physical
+browser and local native Flow/R. This is computed 1D field visualization,
+not general compiler spatial visualization or RStudio parity.
+
 ## 2026-10-30: coupled nonlinear Gray-Scott native fields (verification pending)
 
 `examples/native_field_grayscott64.flow` uses two compiler-generated 64-cell

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 import socket
 import shutil
 import subprocess
@@ -82,6 +83,13 @@ def main() -> None:
     assert '<script src="/source_cells.js"></script>' in html
     status, source_cells = request("GET", "/source_cells.js")
     assert status == 200 and "function scanLine(line, state)" in source_cells, (status, source_cells[:100])
+    assert '<script src="/native_field_plot.js"></script>' in html
+    status, native_field_plot = request("GET", "/native_field_plot.js")
+    assert status == 200 and "FLOWSTUDIO_FIELD_V1" in native_field_plot, (
+        "native Flow computed plot module", status)
+    status, _ = request("GET", "/native_field_plot.js/extra")
+    assert status == 404, "native field plot path traversal must fail closed"
+
 
     status, _ = request("POST", "/api/run/python", 'print("bad")')
     assert status == 404, status
@@ -197,6 +205,27 @@ def main() -> None:
     status, body = request("POST", "/api/run/flow", grayscott_source, accepted_headers)
     assert status == 200 and "native-field-grayscott64-ok" in body, (
         "native Gray-Scott coupled numerical execution", status, body)
+    # Actual Flow stdout must carry the computed 256-step fields, not a
+    # browser fixture or a copy of the checked-in reference arrays.
+    lines = body.splitlines()
+    markers = [i for i, line in enumerate(lines)
+               if line == "FLOWSTUDIO_FIELD_V1 64 2"]
+    assert len(markers) == 1, ("native field plot header", body[-300:])
+    start = markers[0]
+    assert lines[start + 3] == "FLOWSTUDIO_FIELD_END"
+    for row, field in ((1, "U"), (2, "V")):
+        tokens = lines[start + row].split()
+        assert tokens[0] == field and len(tokens) == 65, (field, tokens[:4], len(tokens))
+        values = [float(value) for value in tokens[1:]]
+        assert all(math.isfinite(value) and 0 <= value <= 1.5 for value in values)
+        expected_match = re.search(
+            rf"let expected{field}256: array<f64, 64> = \[(.*?)\]",
+            grayscott_source, re.S)
+        assert expected_match is not None, field
+        reference = [float(value.strip()) for value in
+                     expected_match.group(1).split(",") if value.strip()]
+        assert len(reference) == 64
+        assert max(abs(x - y) for x, y in zip(values, reference)) < 1e-4, field
     malformed_grayscott = grayscott_source.replace(
         "V evolves as laplacian(V)", "V evolves as laplacian(", 1)
     assert malformed_grayscott != grayscott_source

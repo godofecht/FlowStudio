@@ -2,10 +2,13 @@
 from __future__ import annotations
 
 import importlib.util
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 import socket
 import tempfile
+import threading
 import unittest
+from unittest.mock import patch
 
 MODULE = Path(__file__).resolve().parents[1] / "scripts/verify_native.py"
 spec = importlib.util.spec_from_file_location("verify_native", MODULE)
@@ -33,6 +36,35 @@ class NativeGateTest(unittest.TestCase):
         (self.root / "tests/http_smoke.py").write_text(smoke)
         # A successful fake gate must also supply the new independent HTTP gate.
         (self.root / "tests/http_trigonometry_smoke.py").write_text("pass\n")
+
+    def test_real_loopback_health_probe_rejects_wrong_body(self):
+        class HealthHandler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                body = self.server.health_body if self.path == "/health" else b"missing"
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *_args):
+                pass
+
+        class RunningProcess:
+            def poll(self):
+                return None
+
+        with HTTPServer(("127.0.0.1", 0), HealthHandler) as server:
+            server.health_body = b"FlowStudio ready"
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            try:
+                native._wait_health(RunningProcess(), server.server_address[1], 2)
+                server.health_body = b"not ready"
+                with self.assertRaisesRegex(native.VerificationError, "unexpected health body"):
+                    native._wait_health(RunningProcess(), server.server_address[1], 0.3)
+            finally:
+                server.shutdown()
+                thread.join(timeout=2)
 
     def test_missing_files_fail_closed(self):
         with self.assertRaisesRegex(native.VerificationError, "Missing"):
@@ -95,8 +127,11 @@ HTTPServer(("127.0.0.1", int(sys.argv[1])) , Handler).serve_forever()
         self.fixture("cp fake_runner.sh build/flowstudio\nchmod +x build/flowstudio\n", "print('fake smoke ran')\n")
         # A fake health endpoint and fake smoke script cannot satisfy the
         # new real-Git acceptance gate; a fixture test is mandatory.
-        with self.assertRaisesRegex(native.VerificationError, "requires git and its fixture script"):
-            native.verify(self.root, self.port, startup_timeout=8)
+        # This is an orchestration fixture, not a second network acceptance.
+        # Actual HTTP readiness is tested separately and in native CI.
+        with patch.object(native, "_wait_health", return_value=None):
+            with self.assertRaisesRegex(native.VerificationError, "requires git and its fixture script"):
+                native.verify(self.root, self.port, startup_timeout=8)
 
     def test_failed_smoke_is_not_pass(self):
         # The server is healthy but the acceptance script fails.
@@ -115,8 +150,9 @@ HTTPServer(("127.0.0.1", int(sys.argv[1])), Handler).serve_forever()
         (self.root / "fake_runner.sh").write_text(
             "#!/bin/sh\nexec python3 " + str(self.root / "fake_server.py") + " " + str(self.port) + "\n")
         self.fixture("cp fake_runner.sh build/flowstudio\nchmod +x build/flowstudio\n", "raise SystemExit(42)\n")
-        with self.assertRaisesRegex(native.VerificationError, "HTTP smoke failed with exit code 42"):
-            native.verify(self.root, self.port, startup_timeout=8)
+        with patch.object(native, "_wait_health", return_value=None):
+            with self.assertRaisesRegex(native.VerificationError, "HTTP smoke failed with exit code 42"):
+                native.verify(self.root, self.port, startup_timeout=8)
 
 
 if __name__ == "__main__":

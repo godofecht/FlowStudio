@@ -48,18 +48,25 @@ def _free_port(port: int) -> None:
 
 def _wait_health(proc: subprocess.Popen[bytes], port: int, seconds: float) -> None:
     url = f"http://127.0.0.1:{port}/health"
+    # Never route a loopback readiness probe through macOS system proxies or
+    # CI HTTP(S)_PROXY settings; only the actual local server may qualify.
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     deadline = time.monotonic() + seconds
+    last_probe = "not attempted"
     while time.monotonic() < deadline:
         if proc.poll() is not None:
             raise VerificationError(f"Native server exited before readiness (code {proc.returncode})")
         try:
-            with urllib.request.urlopen(url, timeout=0.5) as reply:
-                if reply.status == 200 and reply.read(128) == b"FlowStudio ready":
+            with opener.open(url, timeout=0.5) as reply:
+                body = reply.read(128)
+                if reply.status == 200 and body == b"FlowStudio ready":
                     return
-        except (urllib.error.URLError, TimeoutError, ConnectionError, OSError):
-            pass
+                last_probe = f"HTTP {reply.status}, unexpected health body {body[:64]!r}"
+        except (urllib.error.URLError, TimeoutError, ConnectionError, OSError) as exc:
+            last_probe = f"{type(exc).__name__}: {exc}"
         time.sleep(0.1)
-    raise VerificationError(f"Native server did not become healthy within {seconds}s")
+    raise VerificationError(
+        f"Native server did not become healthy within {seconds}s; last probe: {last_probe}")
 
 
 def _stop_process_group(proc: subprocess.Popen[bytes]) -> None:

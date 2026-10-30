@@ -122,6 +122,10 @@ class NativeGrayScott64Oracle(unittest.TestCase):
         self.assertIn("ratioV > 0.5", source)
         self.assertIn("sentinelU[i] != 777.0 or sentinelV[i] != 777.0", source)
         self.assertIn("native-field-grayscott64-ok", source)
+        self.assertIn('println("FLOWSTUDIO_FIELD_V1 64 2")', source)
+        self.assertIn('print(afterU256[i])', source)
+        self.assertIn('print(afterV256[i])', source)
+        self.assertIn('println("FLOWSTUDIO_FIELD_END")', source)
 
 
 if __name__ == "__main__":

@@ -1616,6 +1616,13 @@ async function refreshPythonEnvironment() {
 async function executeCode(code, label, languageOverride = null, options = {}) {
   const executionLanguage = languageOverride || language.value;
   if (el("run").disabled && !options.forceRunGate) return false;
+  // Invalidate computed PDE plots even when preflight rejects the source.
+  // Otherwise an empty or oversized Flow buffer leaves a previous run's
+  // spatial result visible as though it belonged to the rejected source.
+  if (executionLanguage === "mathflow" || executionLanguage === "flow") {
+    el("mathFlowPlot").replaceChildren();
+    el("mathFlowPlot").hidden = true;
+  }
   if (!code.trim()) { status("Current cell is empty.", "error"); return false; }
   if (new Blob([code]).size > 131072) {
     status("Execution exceeds the server's 128 KiB request limit.", "error");
@@ -1624,10 +1631,6 @@ async function executeCode(code, label, languageOverride = null, options = {}) {
   el("run").disabled = true;
   el("runCell").disabled = true;
   status("Running " + executionLanguage + " …");
-  if (executionLanguage === "mathflow") {
-    el("mathFlowPlot").replaceChildren();
-    el("mathFlowPlot").hidden = true;
-  }
   writeConsole("\n> " + label + " (" + executionLanguage + ")\n", executionLanguage, "cmd");
   const startedAt = Date.now();
   let ok = false;
@@ -1648,6 +1651,14 @@ async function executeCode(code, label, languageOverride = null, options = {}) {
         el("tab-plots").click();
       } catch (plotError) {
         writeConsole("Numerical plot unavailable: " + plotError.message + "\n", "mathflow");
+      }
+    }
+    if (executionLanguage === "flow" && response.ok) {
+      try {
+        if (FlowStudioNativeFieldPlots.render(document, el("mathFlowPlot"), output))
+          el("tab-plots").click();
+      } catch (plotError) {
+        writeConsole("Native field plot rejected: " + plotError.message + "\n", "flow");
       }
     }
     const message = response.ok ? "Finished" :
@@ -2300,6 +2311,7 @@ renderTabs();
 </script>
 <script src="/editor_recovery.js"></script>
 <script src="/math_flow_plot.js"></script>
+<script src="/native_field_plot.js"></script>
 <script src="/workspace_tabs.js"></script>
 <script>FlowStudioWorkspaceTabs.mount();</script>
 <script src="/terminal_render.js"></script>

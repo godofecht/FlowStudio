@@ -13,7 +13,8 @@
 #          32 atan2(y, x), including matching physical dimensions,
 #          33 asin(x), 34 acos(x), principal angles with |x| <= 1,
 #          35 sinh(x), 36 cosh(x), 37 tanh(x), dimensionless |x| <= 60,
-#          38 asinh(x), 39 acosh(x), 40 atanh(x), dimensionless with domain guards.
+#          38 asinh(x), 39 acosh(x), 40 atanh(x), dimensionless with domain guards,
+#          42 log1p(x), stable natural logarithm of 1+x for x > -1.
 # Predicate values are dimensionless 0/1 with a separate runtime type bit.
 # where and logical operators evaluate operands eagerly (no short circuit).
 # Unsupported instructions and type mismatches fail closed.
@@ -235,6 +236,26 @@ function bounded_natural_log(value: f64) -> f64 {
     return 2.0 * sum + (binary_exponent as f64) * 0.69314718055994530942
 }
 
+# Preserve small increments in ln(1+x) without rounding 1+x to 1.
+# For |x| <= 0.5, z=x/(2+x) has |z| <= 1/3 and the odd atanh
+# series converges rapidly. Larger valid inputs use the native ln kernel.
+function bounded_log_one_plus(value: f64) -> f64 {
+    if magnitude(value) > 0.5 {
+        return bounded_natural_log(1.0 + value)
+    }
+    let z: f64 = value / (2.0 + value)
+    let z_squared: f64 = z * z
+    let mut term: f64 = z
+    let mut sum: f64 = 0.0
+    let mut n: i32 = 1
+    while n <= 25 {
+        sum = sum + term / ((2 * n - 1) as f64)
+        term = term * z_squared
+        n = n + 1
+    }
+    return 2.0 * sum
+}
+
 # Inverse hyperbolic functions use the same bounded native logarithm and
 # square-root kernels. Small inputs use convergent series to avoid loss of
 # significance; atanh rejects its singular endpoints and exterior domain.
@@ -418,7 +439,7 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
         } elif opcode == 5 or opcode == 6 or opcode == 18 or opcode == 20 or opcode == 21 or opcode == 25 or
              opcode == 26 or opcode == 27 or opcode == 28 or opcode == 29 or opcode == 30 or opcode == 31 or
              opcode == 33 or opcode == 34 or opcode == 35 or opcode == 36 or opcode == 37 or
-             opcode == 38 or opcode == 39 or opcode == 40 {
+             opcode == 38 or opcode == 39 or opcode == 40 or opcode == 42 {
             if depth < 1 { return failed(instruction.source_start) }
             let input: Quantity = stack[depth - 1]
             if opcode == 18 {
@@ -452,6 +473,12 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
                     let mut logged: f64 = bounded_natural_log(input.value)
                     if opcode == 27 { logged = logged / 2.30258509299404568402 }
                     stack[depth - 1] = quantity(logged, dimensionless())
+                } elif opcode == 42 {
+                    if not same_dimension(input.dimension, dimensionless()) or
+                       input.value <= -1.0 or input.value > 1e30 {
+                        return failed(instruction.source_start)
+                    }
+                    stack[depth - 1] = quantity(bounded_log_one_plus(input.value), dimensionless())
                 } elif opcode == 38 or opcode == 39 or opcode == 40 {
                     if not same_dimension(input.dimension, dimensionless()) {
                         return failed(instruction.source_start)

@@ -437,3 +437,16 @@ CI success must be verified before treating this as a qualified release.
 This is still a bounded native scalar-expression dialect, **not** upstream
 Flow 2.0 grammar integration, unbound symbolic inference, a tensor/PDE AST
 or a general PDE compiler.
+
+## Native cancellation-safe log1p (2026-10-30)
+
+Native Flow scalar source now accepts `log1p(x)` as opcode 42 through the
+actual parser, typed postfix IR, runtime, static dimensional inference and
+equation residual evaluation. It requires a numerical, dimensionless operand,
+rejects `x <= -1` and `x > 1e30` at runtime, and preserves the distinction
+between well-typed expressions and runtime domain errors. For `|x| <= 0.5`,
+the native kernel evaluates the 25-term odd series with `z=x/(2+x)` to avoid
+cancellation in `ln(1+x)`; outside this interval it reuses the native
+bounded natural logarithm. No upstream grammar modification, arbitrary
+precision, or general symbolic differentiation is claimed. The checked-in
+`src/math_log1p_smoke.flow` and compact HTTP source fixture run in native CI.

@@ -349,3 +349,22 @@ checked-in Navier–Stokes dialect and production HTTP/Chromium acceptance.
 This does **not** add Unicode identifiers to the upstream Flow 2.0 grammar
 or implement unbound symbolic inference, tensor/PDE ASTs, native
 Navier–Stokes, or computed spatial visualization.
+
+## Signed Unicode superscript powers (native parser; CI validation required)
+
+The executable native Flow source parser recognizes `⁰ ¹ ² ³ ⁴ ⁵ ⁶ ⁷ ⁸`
+as postfix integer powers, and `⁺`/`⁻` as optional superscript signs
+immediately preceding one or more superscript digits. For example,
+`3m⁻²` evaluates to 1/9 m⁻², `2⁺³` evaluates to 8, and
+`2m⁻¹*4m` is dimensionless. These forms lower to the same bounded
+integer-power opcode as `^n`; they are **not** arbitrary exponent
+expressions or changes to the upstream Flow 2.0 grammar.
+
+UTF-8 byte spans cover the complete exponent (including any sign). A
+superscript sign without a digit, exponents outside -8 through 8,
+unsupported superscript sequences, and chained powers fail closed.
+The source, equation and static-inference native smoke programs exercise
+numeric values, dimensional propagation, invalid cases and diagnostics.
+Linux/macOS native CI and real HTTP acceptance must pass before this
+subset is considered verified. General tensor/PDE ASTs and native
+Navier–Stokes remain outside its scope.

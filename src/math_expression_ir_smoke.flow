@@ -18,7 +18,7 @@ function close(first: f64, second: f64) -> bool {
 
 function main() -> i32 {
     let blank: MathInstruction = instruction(0, quantity(0.0, dimensionless()), 0, 0)
-    let mut operations: array<MathInstruction, 16> = [blank]
+    let mut operations: array<MathInstruction, 64> = [blank]
     let length: Dimension = length_dimension()
     let time: Dimension = time_dimension()
     let speed: Dimension = quotient_dimension(length, time)
@@ -89,7 +89,7 @@ function main() -> i32 {
 
     program = MathProgram { instructions: operations, count: 2, source_length: 1 }
     if evaluate_math_ir(program).valid { return 13 }
-    program = MathProgram { instructions: operations, count: 17, source_length: 17 }
+    program = MathProgram { instructions: operations, count: 65, source_length: 65 }
     if evaluate_math_ir(program).valid { return 14 }
 
     # Unary negation, multiplication and subtraction on a nested expression.
@@ -415,6 +415,30 @@ function main() -> i32 {
     program = MathProgram { instructions: operations, count: 1, source_length: 1 }
     result = evaluate_math_ir(program)
     if result.valid or result.failed_at != 0 { return 67 }
+
+
+    # The full 64-slot IR executes a 32-component physical sum in postfix form.
+    let mut cursor: i32 = 0
+    while cursor < 32 {
+        operations[cursor] = instruction(0, quantity(1.0, length), 0, cursor)
+        cursor = cursor + 1
+    }
+    while cursor < 63 {
+        operations[cursor] = instruction(1, quantity(0.0, dimensionless()), 0, cursor)
+        cursor = cursor + 1
+    }
+    program = MathProgram { instructions: operations, count: 63, source_length: 63 }
+    result = evaluate_math_ir(program)
+    if not result.valid or not close(result.result.value, 32.0) or
+       not same_dimension(result.result.dimension, length) { return 68 }
+    operations[63] = instruction(5, quantity(0.0, dimensionless()), 0, 63)
+    program = MathProgram { instructions: operations, count: 64, source_length: 64 }
+    result = evaluate_math_ir(program)
+    if not result.valid or not close(result.result.value, -32.0) or
+       not same_dimension(result.result.dimension, length) { return 69 }
+    program = MathProgram { instructions: operations, count: 65, source_length: 65 }
+    result = evaluate_math_ir(program)
+    if result.valid or result.failed_at != 0 { return 70 }
 
     println("native-math-ir-ok")
     return 0

@@ -192,12 +192,12 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
     }
     let bytes: ptr<u8> = source as ptr<u8>
     let blank: MathInstruction = blank_instruction()
-    let mut instructions: array<MathInstruction, 16> = [blank]
+    let mut instructions: array<MathInstruction, 64> = [blank]
     let mut count: i32 = 0
-    let mut operators: array<i32, 16> = [0]
-    let mut positions: array<i32, 16> = [0]
-    let mut widths: array<i32, 16> = [1]
-    let mut argument_counts: array<i32, 16> = [0]
+    let mut operators: array<i32, 64> = [0]
+    let mut positions: array<i32, 64> = [0]
+    let mut widths: array<i32, 64> = [1]
+    let mut argument_counts: array<i32, 64> = [0]
     let mut top: i32 = 0
     let mut index: i32 = 0
     let mut expect_operand: bool = true
@@ -241,7 +241,7 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
                 }
                 exponent = sign * exponent
             }
-            if count >= 16 { return source_error(start, length) }
+            if count >= 64 { return source_error(start, length) }
             instructions[count] = MathInstruction {
                 opcode: 6, literal: quantity(0.0, dimensionless()),
                 exponent: exponent, source_start: start, source_end: index
@@ -254,7 +254,7 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
         # U+00AC logical negation uses the same typed predicate IR as 'not'.
         # It is a prefix operator and must not be accepted after an operand.
         if expect_operand and c == 194 and index + 1 < length and bytes[index + 1] == 172 {
-            if top >= 16 { return source_error(index, length) }
+            if top >= 64 { return source_error(index, length) }
             operators[top] = 18
             positions[top] = index
             widths[top] = 2
@@ -304,7 +304,7 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
                 unary_width = 5
             }
             if unary_opcode != 0 {
-                if top >= 16 { return source_error(index, length) }
+                if top >= 64 { return source_error(index, length) }
                 operators[top] = unary_opcode
                 positions[top] = index
                 widths[top] = unary_width
@@ -322,7 +322,7 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
             # Keywords lower directly to the existing native predicate IR.
             # They are reserved and cannot be shadowed by caller bindings.
             if identifier_matches(bytes, start, index, "not") {
-                if not expect_operand or top >= 16 { return source_error(start, length) }
+                if not expect_operand or top >= 64 { return source_error(start, length) }
                 operators[top] = 18
                 positions[top] = start
                 widths[top] = index - start
@@ -337,12 +337,12 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
                 while top > 0 and operators[top - 1] != -1 and
                       precedence(operators[top - 1]) >= precedence(logical) {
                     top = top - 1
-                    if count >= 16 { return source_error(start, length) }
+                    if count >= 64 { return source_error(start, length) }
                     instructions[count] = make_instruction(operators[top],
                         quantity(0.0, dimensionless()), positions[top], positions[top] + widths[top])
                     count = count + 1
                 }
-                if top >= 16 { return source_error(start, length) }
+                if top >= 64 { return source_error(start, length) }
                 operators[top] = logical
                 positions[top] = start
                 widths[top] = index - start
@@ -363,7 +363,7 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
                 symbol_index = symbol_index + 1
             }
             if not found { return source_error(start, length) }
-            if count >= 16 { return source_error(start, length) }
+            if count >= 64 { return source_error(start, length) }
             instructions[count] = make_instruction(0, value, start, index)
             count = count + 1
             expect_operand = false
@@ -391,14 +391,14 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
                     index = index + 2
                 }
             }
-            if count >= 16 { return source_error(start, length) }
+            if count >= 64 { return source_error(start, length) }
             instructions[count] = make_instruction(0, quantity(number.value, unit), start, index)
             count = count + 1
             expect_operand = false
             continue
         }
         if c == 40 { # (
-            if not expect_operand or top >= 16 { return source_error(index, length) }
+            if not expect_operand or top >= 64 { return source_error(index, length) }
             operators[top] = -1
             positions[top] = index
             widths[top] = 1
@@ -420,7 +420,7 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
             }
             while top > opening + 1 {
                 top = top - 1
-                if count >= 16 { return source_error(index, length) }
+                if count >= 64 { return source_error(index, length) }
                 instructions[count] = make_instruction(operators[top],
                     quantity(0.0, dimensionless()), positions[top], positions[top] + widths[top])
                 count = count + 1
@@ -439,7 +439,7 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
                     found = true
                     break
                 }
-                if count >= 16 { return source_error(index, length) }
+                if count >= 64 { return source_error(index, length) }
                 instructions[count] = make_instruction(operators[top], quantity(0.0, dimensionless()), positions[top], positions[top] + widths[top])
                 count = count + 1
             }
@@ -450,7 +450,7 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
                 let arity: i32 = function_arity(operators[top - 1])
                 if argument_counts[top] != arity - 1 { return source_error(index, length) }
                 top = top - 1
-                if count >= 16 { return source_error(positions[top], length) }
+                if count >= 64 { return source_error(positions[top], length) }
                 instructions[count] = make_instruction(operators[top],
                     quantity(0.0, dimensionless()), positions[top], positions[top] + widths[top])
                 count = count + 1
@@ -465,7 +465,7 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
         if expect_operand {
             if opcode != 1 and opcode != 2 { return source_error(index, length) }
             if opcode == 2 {
-                if top >= 16 { return source_error(index, length) }
+                if top >= 64 { return source_error(index, length) }
                 operators[top] = 5
                 positions[top] = index
                 widths[top] = width
@@ -475,11 +475,11 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
             while top > 0 and operators[top - 1] != -1 and
                   precedence(operators[top - 1]) >= precedence(opcode) {
                 top = top - 1
-                if count >= 16 { return source_error(index, length) }
+                if count >= 64 { return source_error(index, length) }
                 instructions[count] = make_instruction(operators[top], quantity(0.0, dimensionless()), positions[top], positions[top] + widths[top])
                 count = count + 1
             }
-            if top >= 16 { return source_error(index, length) }
+            if top >= 64 { return source_error(index, length) }
             operators[top] = opcode
             positions[top] = index
             widths[top] = width
@@ -492,7 +492,7 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
     while top > 0 {
         top = top - 1
         if operators[top] == -1 { return source_error(positions[top], length) }
-        if count >= 16 { return source_error(positions[top], length) }
+        if count >= 64 { return source_error(positions[top], length) }
         instructions[count] = make_instruction(operators[top], quantity(0.0, dimensionless()), positions[top], positions[top] + widths[top])
         count = count + 1
     }

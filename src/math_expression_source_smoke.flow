@@ -771,6 +771,26 @@ function main() -> i32 {
     result = evaluate_math_expression("2⋅3∕4")
     if not result.valid or not near(result.result.value, 1.5) { return 268 }
 
+
+    # Source compilation now executes a 63-instruction, 32-term sum.
+    let expanded: ParsedMathExpression = parse_math_expression("1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1")
+    if not expanded.valid or expanded.program.count != 63 or
+       expanded.program.instructions[62].opcode != 1 { return 269 }
+    result = evaluate_math_expression("1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1")
+    if not result.valid or not near(result.result.value, 32.0) { return 270 }
+    # 33 terms require 65 instructions and must fail before writing past capacity.
+    if parse_math_expression("1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1").valid { return 271 }
+    if not evaluate_math_expression("(((((((((((((((((1)))))))))))))))))").valid { return 274 }
+    if not evaluate_math_expression("((((((((((((((((((((((((1))))))))))))))))))))))))").valid { return 275 }
+    if not evaluate_math_expression("(((((((((((((((((((((((((((((((1)))))))))))))))))))))))))))))))").valid { return 276 }
+    if not evaluate_math_expression("((((((((((((((((((((((((((((((((1))))))))))))))))))))))))))))))))").valid { return 277 }
+    if not evaluate_math_expression("((((((((((((((((((((((((((((((((((((((((((((((((1))))))))))))))))))))))))))))))))))))))))))))))))").valid { return 278 }
+    if not evaluate_math_expression("(((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((1)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))").valid { return 279 }
+    if not evaluate_math_expression("1                                                                ").valid { return 280 }
+    result = evaluate_math_expression("((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((1))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))")
+    if not result.valid or not near(result.result.value, 1.0) { return 272 }
+    if parse_math_expression("(((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((1)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))").valid { return 273 }
+
     println("native-math-source-ok")
     return 0
 }

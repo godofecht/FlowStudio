@@ -466,6 +466,49 @@ function main() -> i32 {
     program = MathProgram { instructions: operations, count: 1, source_length: 1 }
     if evaluate_math_ir(program).valid { return 76 }
 
+    # Dimensionless exponential: numerical oracle, bounds and typed rejection.
+    operations[0] = instruction(0, quantity(1.0, dimensionless()), 0, 0)
+    operations[1] = instruction(25, quantity(0.0, dimensionless()), 0, 1)
+    program = MathProgram { instructions: operations, count: 2, source_length: 2 }
+    result = evaluate_math_ir(program)
+    if not result.valid or result.is_predicate or
+       not close(result.result.value, 2.718281828459045) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 77 }
+    operations[0] = instruction(0, quantity(-1.0, dimensionless()), 0, 0)
+    program = MathProgram { instructions: operations, count: 2, source_length: 2 }
+    result = evaluate_math_ir(program)
+    if not result.valid or not close(result.result.value, 0.36787944117144233) { return 78 }
+    operations[0] = instruction(0, quantity(0.0, dimensionless()), 0, 0)
+    program = MathProgram { instructions: operations, count: 2, source_length: 2 }
+    result = evaluate_math_ir(program)
+    if not result.valid or result.result.value != 1.0 { return 79 }
+    operations[0] = instruction(0, quantity(60.0, dimensionless()), 0, 0)
+    program = MathProgram { instructions: operations, count: 2, source_length: 2 }
+    result = evaluate_math_ir(program)
+    if not result.valid or result.result.value < 1e26 or
+       result.result.value > 1.2e26 { return 80 }
+    operations[0] = instruction(0, quantity(-60.0, dimensionless()), 0, 0)
+    program = MathProgram { instructions: operations, count: 2, source_length: 2 }
+    result = evaluate_math_ir(program)
+    if not result.valid or result.result.value <= 0.0 or
+       result.result.value >= 1e-25 { return 81 }
+    operations[0] = instruction(0, quantity(61.0, dimensionless()), 0, 0)
+    program = MathProgram { instructions: operations, count: 2, source_length: 2 }
+    result = evaluate_math_ir(program)
+    if result.valid or result.failed_at != 1 { return 82 }
+    operations[0] = instruction(0, quantity(-61.0, dimensionless()), 0, 0)
+    program = MathProgram { instructions: operations, count: 2, source_length: 2 }
+    result = evaluate_math_ir(program)
+    if result.valid or result.failed_at != 1 { return 83 }
+    operations[0] = instruction(0, quantity(1.0, length), 0, 0)
+    program = MathProgram { instructions: operations, count: 2, source_length: 2 }
+    result = evaluate_math_ir(program)
+    if result.valid or result.failed_at != 1 { return 84 }
+    operations[0] = instruction(24, quantity(1.0, dimensionless()), 0, 0)
+    program = MathProgram { instructions: operations, count: 2, source_length: 2 }
+    result = evaluate_math_ir(program)
+    if result.valid or result.failed_at != 1 { return 85 }
+
     println("native-math-ir-ok")
     return 0
 }

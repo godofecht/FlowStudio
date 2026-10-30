@@ -118,6 +118,38 @@ function positive_square_root(value: f64) -> f64 {
     return estimate
 }
 
+# Dimensionless exponential, bounded to [-60, 60]. Range reduction to
+# [0, 0.5] and a 24-term Taylor series avoid platform libm dependencies.
+# Squaring reconstructs the positive exponential; reciprocal handles negatives.
+function bounded_exponential(value: f64) -> f64 {
+    let mut reduced: f64 = value
+    let mut negative: bool = false
+    if reduced < 0.0 {
+        reduced = -reduced
+        negative = true
+    }
+    let mut halvings: i32 = 0
+    while reduced > 0.5 {
+        reduced = reduced * 0.5
+        halvings = halvings + 1
+    }
+    let mut sum: f64 = 1.0
+    let mut term: f64 = 1.0
+    let mut n: i32 = 1
+    while n <= 24 {
+        term = term * reduced / (n as f64)
+        sum = sum + term
+        n = n + 1
+    }
+    let mut i: i32 = 0
+    while i < halvings {
+        sum = sum * sum
+        i = i + 1
+    }
+    if negative { return 1.0 / sum }
+    return sum
+}
+
 function even_dimension(dimension: Dimension) -> bool {
     return dimension.length == (dimension.length / 2) * 2 and
         dimension.mass == (dimension.mass / 2) * 2 and
@@ -167,7 +199,7 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
             stack[depth] = quantity(instruction.literal.value, dimensionless())
             predicate[depth] = true
             depth = depth + 1
-        } elif opcode == 5 or opcode == 6 or opcode == 18 or opcode == 20 or opcode == 21 {
+        } elif opcode == 5 or opcode == 6 or opcode == 18 or opcode == 20 or opcode == 21 or opcode == 25 {
             if depth < 1 { return failed(instruction.source_start) }
             let input: Quantity = stack[depth - 1]
             if opcode == 18 {
@@ -187,6 +219,12 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
                     }
                     stack[depth - 1] = quantity(
                         positive_square_root(input.value), half_dimension(input.dimension))
+                } elif opcode == 25 {
+                    if not same_dimension(input.dimension, dimensionless()) or
+                       magnitude(input.value) > 60.0 {
+                        return failed(instruction.source_start)
+                    }
+                    stack[depth - 1] = quantity(bounded_exponential(input.value), dimensionless())
                 } else {
                     let powered: CheckedQuantity = integer_power(input, instruction.exponent)
                     if not powered.valid { return failed(instruction.source_start) }

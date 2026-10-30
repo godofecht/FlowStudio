@@ -224,6 +224,23 @@ function main() -> i32 {
     inferred = infer_math_expression_source("2⁻⁹")
     if inferred.valid { return 64 }
 
+    # exp() is dimensionless, and static typing does not execute its domain.
+    inferred = infer_math_expression_source("exp(1)")
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension, dimensionless()) { return 65 }
+    inferred = infer_math_expression_source("exp(1m)")
+    if inferred.valid or inferred.failed_at != 0 { return 66 }
+    inferred = infer_math_expression_source("exp(true)")
+    if inferred.valid or inferred.failed_at != 0 { return 67 }
+    inferred = infer_math_expression_source("exp(61)")
+    if not inferred.valid or evaluate_math_expression("exp(61)").valid { return 68 }
+    inferred = infer_math_expression_source("exp(1m/1m)")
+    if not inferred.valid or not same_dimension(inferred.dimension, dimensionless()) { return 69 }
+    inferred = infer_math_equation_source("exp(0) = 1")
+    if not inferred.valid or not same_dimension(inferred.dimension, dimensionless()) { return 70 }
+    inferred = infer_math_equation_source("exp(1m) = 1")
+    if inferred.valid or inferred.failed_at != 0 { return 71 }
+
     println("native-math-static-ok")
     return 0
 }

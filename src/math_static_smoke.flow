@@ -192,6 +192,25 @@ function main() -> i32 {
     program = MathProgram { instructions: instructions, count: 1, source_length: 4 }
     if infer_math_ir(program).valid { return 53 }
 
+    # Unicode-bound variables participate in the same static dimensional
+    # inference as ASCII symbols, without executing numerical expressions.
+    let mut greek: MathBindings = empty_math_bindings()
+    greek.count = 3
+    greek.symbols[0] = MathSymbol { name: "ρ", value: quantity(2.0, metres) }
+    greek.symbols[1] = MathSymbol { name: "u₁", value: quantity(3.0, speed) }
+    greek.symbols[2] = MathSymbol { name: "u₂", value: quantity(4.0, speed) }
+    inferred = infer_math_expression_source_with_bindings("u₁+u₂", greek)
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension, speed) { return 54 }
+    inferred = infer_math_expression_source_with_bindings("ρ/u₁", greek)
+    if not inferred.valid or not same_dimension(inferred.dimension, seconds) { return 55 }
+    inferred = infer_math_expression_source_with_bindings("u₁< u₂", greek)
+    if not inferred.valid or not inferred.is_predicate { return 56 }
+    inferred = infer_math_expression_source_with_bindings("ρ+u₁", greek)
+    if inferred.valid or inferred.failed_at != 2 { return 57 }
+    inferred = infer_math_expression_source_with_bindings("u₃", greek)
+    if inferred.valid or inferred.failed_at != 0 { return 58 }
+
     println("native-math-static-ok")
     return 0
 }

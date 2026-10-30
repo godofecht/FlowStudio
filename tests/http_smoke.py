@@ -383,7 +383,7 @@ def main() -> None:
         "src/math_dimensions.flow",
         "src/math_expression_ir.flow",
         "src/math_expression_source.flow",
-        "src/math_expression_source_smoke.flow",
+        "src/math_expression_source_http_smoke.flow",
     )
     native_math_source = "\n".join(
         "\n".join(

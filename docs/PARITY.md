@@ -1,3 +1,20 @@
+## 2026-10-30: native typed symbol binding acceptance (CI pending)
+
+The bounded Flow 2.0 source-to-IR parser now resolves up to eight explicitly
+provided, dimensioned scalar identifiers, preserving source byte spans and
+routing all arithmetic through the existing checked native postfix evaluator.
+The expanded `src/math_expression_source_smoke.flow` tests coupled physical
+quantities (mass, distance, duration, speed), integer powers, Unicode radicals,
+analytical values, unit mismatches, unknown and duplicate identifiers,
+malformed names, bounds, division by zero and overflow. The existing native
+Flow `flow run` and production HTTP compile/execute acceptance run this exact
+source on Linux/macOS; hosted CI workflow definitions are unchanged.
+
+**Verification pending:** this change has not yet passed native CI. The local
+host lacks the pinned Flow 2.0 compiler and R. Browser interaction for this
+new feature, generalized symbol inference, PDE grammar and full RStudio parity
+remain unverified or incomplete.
+
 ## 2026-10-30: nonsquare 5x7 three-mode native transport acceptance (CI pending)
 
 The existing `examples/native_advection_diffusion_2d.flow` now checks a

@@ -31,6 +31,8 @@ class NativeGateTest(unittest.TestCase):
     def fixture(self, build: str, smoke: str = "pass\n"):
         (self.root / "scripts/build.sh").write_text(build)
         (self.root / "tests/http_smoke.py").write_text(smoke)
+        # A successful fake gate must also supply the new independent HTTP gate.
+        (self.root / "tests/http_trigonometry_smoke.py").write_text("pass\n")
 
     def test_missing_files_fail_closed(self):
         with self.assertRaisesRegex(native.VerificationError, "Missing"):

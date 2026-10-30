@@ -1,3 +1,29 @@
+## 2026-10-30: twelve-state nonlinear periodic SIR evolution (verification pending)
+
+`examples/native_spatial_sir4.flow` is a four-cell periodic ring with
+12 mutually coupled susceptible/infected/recovered states, nonlinear infection,
+unequal species diffusion, and compiler-generated RK4. Every state is checked
+against an independently integrated 32768-step reference cross-checked at
+65536 steps. Native assertions cover fourth-order refinement, mass,
+positivity, deterministic replay, semigroup consistency, cyclic equivariance,
+rate/time scaling, exact nonlinear logistic limits and fail-closed input/work
+bounds. `tests/test_native_spatial_sir4_oracle.py` independently reconstructs
+the 12-dimensional stencil and analytical limits. Production `http_smoke.py`
+compiles and runs the exact checked-in Flow source and rejects malformed
+evolution syntax; Ubuntu Chromium Monaco acceptance clicks Run on that source.
+
+**Verified:** local independent Python numerical reference cross-check
+maximum difference 7.8e-15. All six Linux/macOS PR CI jobs passed in
+[CI #41050488896](https://github.com/godofecht/FlowStudio/actions/runs/41050488896).
+Each platform passed 1,143 Node tests (12 skipped) and 357 Python tests
+(13 skipped), including six new independent SIR oracle tests. Both upstream
+Flow 2.0 compilers executed the exact 12-state source through production
+HTTP; Ubuntu physical Chromium executed it through Monaco's Run button.
+Both native R/C FlowJIT jobs passed. **Unexecuted:** local native Flow/R/HTTP,
+independent macOS physical-browser acceptance, and post-merge main CI.
+No hosted CI configuration changed. This does not establish general PDE
+grammar, computed spatial visualization or RStudio parity.
+
 ## 2026-10-30: native 32x32 two-mode tensor diffusion (Linux/macOS CI verified)
 
 The production-compiled `examples/native_tensor_grid.flow` now supports

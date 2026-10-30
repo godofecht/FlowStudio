@@ -1,14 +1,27 @@
-## 2026-10-30: native typed multi-argument source functions (CI pending)
+## 2026-10-30: native typed multi-argument source functions (Linux/macOS CI verified)
 
 Native Flow mathematical source lowering now recognizes typed `min`,
 `max`, `norm`, `clamp` and eager `where` calls, with strict argument
 counts, nested calls, physical-unit checks and source offsets. The checked-in
 `src/math_expression_source_smoke.flow` contains 39 additional executable
 numerical, malformed-source and dimensional assertions, including eager
-unselected-branch failure. Existing Linux/macOS native Flow compiler and
-production HTTP gates execute this smoke without CI workflow changes.
-**Pending:** PR CI, post-merge main CI, dedicated browser execution of the
-new source calls, general PDE grammar and full RStudio parity.
+unselected-branch failure.
+
+**Verified:** all six Linux/macOS PR jobs passed in
+[CI #41010755420](https://github.com/godofecht/FlowStudio/actions/runs/41010755420).
+Each platform's source/transport job recorded 1,143 JavaScript passes
+(12 skipped, zero failed) and 326 Python passes (13 skipped, zero failed).
+Both native jobs compiled and executed the exact mathematical smoke using
+Flow 2.0, then passed production HTTP acceptance. Ubuntu Chromium additionally
+loaded the concatenated checked-in source into Monaco and clicked the actual
+Run control, requiring the `native-math-source-ok` marker. Both FlowJIT jobs
+passed. No hosted CI workflow was modified. Merged as
+[1d9273f](https://github.com/godofecht/FlowStudio/commit/1d9273f07c95e381f912830c98cb46ed42028f53)
+through [PR #230](https://github.com/godofecht/FlowStudio/pull/230).
+
+**Unexecuted / incomplete:** post-merge `main` CI, independent macOS
+physical-browser interaction, generalized source equation/PDE grammar,
+remote multi-user isolation and full RStudio parity.
 
 ## 2026-10-30: native typed symbol binding acceptance (Linux/macOS CI verified)
 

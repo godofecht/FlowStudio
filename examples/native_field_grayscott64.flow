@@ -576,5 +576,21 @@ function main() -> i32 {
         if sentinelU[i] != 777.0 or sentinelV[i] != 777.0 { return 27 }
     }
     println("native-field-grayscott64-ok")
+    # Machine-readable data from the actual compiler-executed PDE state.
+    # The browser validates count, finite values and complete framing.
+    println("FLOWSTUDIO_FIELD_V1 64 2")
+    print("U")
+    for i in 0 to N {
+        print(" ")
+        print(afterU256[i])
+    }
+    println("")
+    print("V")
+    for i in 0 to N {
+        print(" ")
+        print(afterV256[i])
+    }
+    println("")
+    println("FLOWSTUDIO_FIELD_END")
     return 0
 }

@@ -322,7 +322,7 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
             # Keywords lower directly to the existing native predicate IR.
             # They are reserved and cannot be shadowed by caller bindings.
             if identifier_matches(bytes, start, index, "not") {
-                if not expect_operand or top >= 16 { return source_error(start, length) }
+                if not expect_operand or top >= 64 { return source_error(start, length) }
                 operators[top] = 18
                 positions[top] = start
                 widths[top] = index - start
@@ -398,7 +398,7 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
             continue
         }
         if c == 40 { # (
-            if not expect_operand or top >= 16 { return source_error(index, length) }
+            if not expect_operand or top >= 64 { return source_error(index, length) }
             operators[top] = -1
             positions[top] = index
             widths[top] = 1

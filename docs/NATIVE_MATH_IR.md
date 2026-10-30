@@ -74,8 +74,8 @@ literals, optional immediate SI suffixes `m`, `s`, `kg`, `K`, ASCII
 multiplication/division precedence and left associativity.
 
 Inputs are limited to 512 UTF-8 bytes and 16 emitted instructions; unknown
-identifiers, implicit multiplication, exponent syntax, unsupported Unicode,
-malformed numbers, invalid units and incomplete expressions fail closed.
+identifiers, implicit multiplication, unsupported Unicode, malformed numbers,
+invalid units and incomplete expressions fail closed.
 Runtime dimensional errors and division by zero retain the operator's
 original source byte offset. No identifiers, symbolic calculus, static
 inference, arbitrary function calls, general equation ASTs or PDE syntax
@@ -86,3 +86,24 @@ upstream Flow 2.0 grammar.
 unit-bearing arithmetic, Unicode lowering, numerical magnitudes and
 diagnostic offsets. Both Linux and macOS CI run it through `flow run`;
 the production HTTP acceptance also checks and runs the exact modules.
+
+## Native integer-power lowering (2026-10-30; verification pending)
+
+The native source parser lowers immediate signed integer exponents `^n` and
+UTF-8 postfix `²`/`³` into opcode 6 of the existing dimension-checked Flow
+IR. The exponent range is -8 through +8; a sign and digits must follow `^`
+without intervening whitespace. Powers bind to the preceding primary before
+pending unary signs: `-2m^2` evaluates to -4 m², while `(-2m)^2` is +4 m².
+`2m^-2` carries inverse-area dimensions. Chained powers such as `2^3^2`
+fail closed instead of silently assuming associativity. All power instruction
+spans retain the exact original UTF-8 byte offsets, including the two-byte
+superscripts, and overflow, dimensional mismatch, zero to a negative power,
+unsupported superscripts and instruction limits remain failures.
+
+The executable `src/math_expression_source_smoke.flow` checks 35 additional
+positive, numerical, dimensional, source-span and negative paths, including
+a nested dimensioned rational expression. The existing Linux/macOS native
+CI and production HTTP acceptance compile and execute this exact smoke
+program; a successful CI run is required before claiming verification.
+This does not yet support arbitrary exponent expressions, symbolic functions,
+general source-to-IR lowering or native PDE declarations.

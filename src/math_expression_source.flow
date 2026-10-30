@@ -82,12 +82,56 @@ export function parse_math_expression(source: string) -> ParsedMathExpression {
     let mut top: i32 = 0
     let mut index: i32 = 0
     let mut expect_operand: bool = true
+    let mut previous_was_power: bool = false
     while index < length {
         let c: u8 = bytes[index]
         if str_is_ascii_ws(c) {
             index = index + 1
             continue
         }
+        # Integer powers bind to the preceding primary before any pending
+        # unary sign. Exponents are immediate signed ASCII integers or the
+        # UTF-8 superscripts ²/³. Chained powers are rejected as ambiguous.
+        if c == 94 or (c == 194 and index + 1 < length and
+                       (bytes[index + 1] == 178 or bytes[index + 1] == 179)) {
+            if expect_operand or previous_was_power { return source_error(index, length) }
+            let start: i32 = index
+            let mut exponent: i32 = 0
+            if c == 194 {
+                exponent = 2
+                if bytes[index + 1] == 179 { exponent = 3 }
+                index = index + 2
+            } else {
+                index = index + 1
+                let mut sign: i32 = 1
+                if index < length {
+                    if bytes[index] == 45 { sign = -1; index = index + 1 }
+                    elif bytes[index] == 43 { index = index + 1 }
+                }
+                if index >= length { return source_error(start, length) }
+                if not str_is_ascii_digit(bytes[index]) { return source_error(start, length) }
+                let mut scanning: bool = true
+                while index < length and scanning {
+                    if str_is_ascii_digit(bytes[index]) {
+                        exponent = exponent * 10 + (bytes[index] as i32 - 48)
+                        if exponent > 8 { return source_error(start, length) }
+                        index = index + 1
+                    } else {
+                        scanning = false
+                    }
+                }
+                exponent = sign * exponent
+            }
+            if count >= 16 { return source_error(start, length) }
+            instructions[count] = MathInstruction {
+                opcode: 6, literal: quantity(0.0, dimensionless()),
+                exponent: exponent, source_start: start, source_end: index
+            }
+            count = count + 1
+            previous_was_power = true
+            continue
+        }
+        previous_was_power = false
         if (c >= 48 and c <= 57) or c == 46 {
             if not expect_operand { return source_error(index, length) }
             let number: ParseF64 = str_parse_f64_at(source, index)

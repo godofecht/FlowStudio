@@ -1,0 +1,94 @@
+# Executable native scalar equation AST, source spans and dimensional residuals.
+# flow run src/math_equation_smoke.flow
+import .math_dimensions { Dimension, Quantity, dimensionless, length_dimension, time_dimension, quotient_dimension, quantity, same_dimension }
+import .math_expression_source { MathSymbol, MathBindings, empty_math_bindings }
+import .math_equation { MathEquation, MathEquationResult, parse_math_equation, parse_math_equation_with_bindings, evaluate_math_equation, evaluate_math_equation_source, evaluate_math_equation_source_with_bindings }
+
+function near(a: f64, b: f64) -> bool {
+    let mut difference: f64 = a - b
+    if difference < 0.0 { difference = -difference }
+    return difference < 0.00000000001
+}
+
+function main() -> i32 {
+    let metres: Dimension = length_dimension()
+    let seconds: Dimension = time_dimension()
+    let speed: Dimension = quotient_dimension(metres, seconds)
+    let exact_m: Quantity = quantity(0.0, metres)
+    let close_m: Quantity = quantity(0.0001, metres)
+    let exact: MathEquation = parse_math_equation("3m + 2m = 5m")
+    if not exact.valid or exact.equality_at != 8 or exact.left.count != 3 or exact.right.count != 1 { return 1 }
+    if exact.left.instructions[2].source_start != 3 or exact.right.instructions[0].source_start != 10 { return 2 }
+    let mut result: MathEquationResult = evaluate_math_equation(exact, exact_m)
+    if not result.valid or not result.satisfied or not near(result.residual.value, 0.0) or
+       not same_dimension(result.residual.dimension, metres) { return 3 }
+
+    result = evaluate_math_equation_source("3m + 2m = 4m", exact_m)
+    if not result.valid or result.satisfied or not near(result.residual.value, 1.0) { return 4 }
+    result = evaluate_math_equation_source("3m + 2m = 4m", quantity(1.0, metres))
+    if not result.valid or not result.satisfied { return 5 }
+    result = evaluate_math_equation_source("3m + 2m = 4m", quantity(0.9999, metres))
+    if not result.valid or result.satisfied { return 6 }
+    result = evaluate_math_equation_source("2m/4s = 0.5m/1s", quantity(0.0, speed))
+    if not result.valid or not result.satisfied or not same_dimension(result.residual.dimension, speed) { return 7 }
+    result = evaluate_math_equation_source("sqrt(9m²) = 3m", exact_m)
+    if not result.valid or not result.satisfied { return 8 }
+    result = evaluate_math_equation_source("2×(3m−1m) = 4m", exact_m)
+    if not result.valid or not result.satisfied { return 9 }
+    result = evaluate_math_equation_source("1e-6m + 2e-6m = 3.01e-6m", close_m)
+    if not result.valid or not result.satisfied or not near(result.residual.value, -0.00000001) { return 10 }
+    result = evaluate_math_equation_source("1e-6m + 2e-6m = 3.01e-6m", exact_m)
+    if not result.valid or result.satisfied { return 11 }
+
+    let mut bindings: MathBindings = empty_math_bindings()
+    bindings.count = 2
+    bindings.symbols[0] = MathSymbol { name: "distance", value: quantity(6.0, metres) }
+    bindings.symbols[1] = MathSymbol { name: "duration", value: quantity(2.0, seconds) }
+    result = evaluate_math_equation_source_with_bindings(
+        "distance / duration = 3m/1s", bindings, quantity(0.0, speed))
+    if not result.valid or not result.satisfied { return 12 }
+    result = evaluate_math_equation_source_with_bindings(
+        "distance / duration = 2m/1s", bindings, quantity(0.0, speed))
+    if not result.valid or result.satisfied or not near(result.residual.value, 1.0) { return 13 }
+    result = evaluate_math_equation_source_with_bindings(
+        "distance / duration = 3m/1s", bindings, exact_m)
+    if result.valid or result.failed_at != 20 { return 14 }
+
+    result = evaluate_math_equation_source("2m = 2s", exact_m)
+    if result.valid or result.failed_at != 3 { return 15 }
+    result = evaluate_math_equation_source("1<2 = 1", quantity(0.0, dimensionless()))
+    if result.valid or result.failed_at != 4 { return 16 }
+    result = evaluate_math_equation_source("1 = 1<2", quantity(0.0, dimensionless()))
+    if result.valid or result.failed_at != 2 { return 17 }
+    result = evaluate_math_equation_source("1m = 1m", quantity(0.0, seconds))
+    if result.valid or result.failed_at != 3 { return 18 }
+    result = evaluate_math_equation_source("1m = 1m", quantity(-1.0, metres))
+    if result.valid or result.failed_at != 3 { return 19 }
+    result = evaluate_math_equation_source("1m = 1m", quantity(1e31, metres))
+    if result.valid or result.failed_at != 3 { return 20 }
+
+    let malformed: MathEquation = parse_math_equation("1m = 2m = 3m")
+    if malformed.valid or malformed.failed_at != 8 { return 21 }
+    if parse_math_equation("1m+2m").valid { return 22 }
+    if parse_math_equation("1m == 1m").valid { return 23 }
+    if parse_math_equation("= 1m").valid { return 24 }
+    if parse_math_equation("1m =").valid { return 25 }
+    if parse_math_equation("1m = (2m").valid { return 26 }
+    if parse_math_equation("1m) = 1m").valid { return 27 }
+    if parse_math_equation("1m = 1m +").valid { return 28 }
+    if parse_math_equation("1m = 1m + unknown").valid { return 29 }
+    if parse_math_equation("1m = 1m = 1m").valid == false { } # Already covered duplicate delimiter.
+
+    let invalid_right: MathEquation = parse_math_equation("3m = 2m + foo")
+    if invalid_right.valid or invalid_right.failed_at != 10 { return 30 }
+    let divide_zero: MathEquationResult = evaluate_math_equation_source("1m = 2m/0", exact_m)
+    if divide_zero.valid or divide_zero.failed_at != 7 { return 31 }
+    let overflow: MathEquationResult = evaluate_math_equation_source("1e30m = -1e30m", exact_m)
+    if overflow.valid or overflow.failed_at != 6 { return 32 }
+    let nested_comparison: MathEquationResult = evaluate_math_equation_source(
+        "where(1==1,3m,4m) = 3m", exact_m)
+    if not nested_comparison.valid or not nested_comparison.satisfied { return 33 }
+
+    println("native-math-equation-ok")
+    return 0
+}

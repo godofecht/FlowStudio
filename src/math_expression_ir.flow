@@ -9,7 +9,7 @@
 #          20 absolute, 21 physical square root, 22 stable two-component norm,
 #          24 typed Boolean literal (0 or 1, dimensionless),
 #          25 exponential, 26 natural logarithm, 27 base-10 logarithm,
-#          28 sine, 29 cosine (dimensionless radians).
+#          28 sine, 29 cosine, 30 tangent (dimensionless radians).
 # Predicate values are dimensionless 0/1 with a separate runtime type bit.
 # where and logical operators evaluate operands eagerly (no short circuit).
 # Unsupported instructions and type mismatches fail closed.
@@ -264,7 +264,7 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
             predicate[depth] = true
             depth = depth + 1
         } elif opcode == 5 or opcode == 6 or opcode == 18 or opcode == 20 or opcode == 21 or opcode == 25 or
-             opcode == 26 or opcode == 27 or opcode == 28 or opcode == 29 {
+             opcode == 26 or opcode == 27 or opcode == 28 or opcode == 29 or opcode == 30 {
             if depth < 1 { return failed(instruction.source_start) }
             let input: Quantity = stack[depth - 1]
             if opcode == 18 {
@@ -298,13 +298,22 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
                     let mut logged: f64 = bounded_natural_log(input.value)
                     if opcode == 27 { logged = logged / 2.30258509299404568402 }
                     stack[depth - 1] = quantity(logged, dimensionless())
-                } elif opcode == 28 or opcode == 29 {
+                } elif opcode == 28 or opcode == 29 or opcode == 30 {
                     if not same_dimension(input.dimension, dimensionless()) or
                        magnitude(input.value) > 60.0 {
                         return failed(instruction.source_start)
                     }
-                    stack[depth - 1] = quantity(
-                        bounded_trigonometric(input.value, opcode == 29), dimensionless())
+                    let mut trigonometric: f64 = bounded_trigonometric(input.value, opcode == 29)
+                    if opcode == 30 {
+                        # Tangent has poles at odd multiples of pi/2. Reject
+                        # near-pole inputs rather than return unstable magnitudes.
+                        let denominator: f64 = bounded_trigonometric(input.value, true)
+                        if magnitude(denominator) <= 0.000000000001 {
+                            return failed(instruction.source_start)
+                        }
+                        trigonometric = bounded_trigonometric(input.value, false) / denominator
+                    }
+                    stack[depth - 1] = quantity(trigonometric, dimensionless())
                 } else {
                     let powered: CheckedQuantity = integer_power(input, instruction.exponent)
                     if not powered.valid { return failed(instruction.source_start) }

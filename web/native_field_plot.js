@@ -47,19 +47,23 @@
   }
 
   function renderGrid(doc, container, data) {
-    const values = data.fields.flatMap(field => field.values);
-    const minimum = Math.min(...values), maximum = Math.max(...values);
-    const span = maximum - minimum;
-    const fraction = value => span === 0 ? 0.5 : (value - minimum) / span;
     const svg = doc.createElementNS(NS, "svg");
     svg.setAttribute("viewBox", "0 0 640 " + (data.fields.length * 286 + 24));
     svg.setAttribute("width", "100%");
     svg.setAttribute("role", "img");
     svg.setAttribute("data-native-flow-grid", "true");
-    svg.setAttribute("aria-label", "Native Flow computed 2D grids: " +
+    svg.setAttribute("data-native-flow-grid-scale", "per-field");
+    svg.setAttribute("aria-label", "Native Flow computed 2D grids (per-field scales): " +
       data.fields.map(field => field.name).join(", "));
     const cellWidth = 512 / data.width, cellHeight = 240 / data.height;
     for (const [index, field] of data.fields.entries()) {
+      // Independent reaction species can differ by orders of magnitude.
+      // Normalize each field against its own computed extrema, rather than
+      // making a small but nonconstant species appear uniformly colored.
+      const minimum = Math.min(...field.values);
+      const maximum = Math.max(...field.values);
+      const span = maximum - minimum;
+      const fraction = value => span === 0 ? 0.5 : (value - minimum) / span;
       const top = 32 + index * 286;
       const label = doc.createElementNS(NS, "text");
       label.setAttribute("x", "48");

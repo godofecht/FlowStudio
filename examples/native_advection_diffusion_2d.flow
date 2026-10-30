@@ -1,0 +1,311 @@
+# Native Flow 2.0 periodic 2D advection-diffusion on a 3..8 by 3..8 grid.
+# dT/dt = -u*dT/dx - v*dT/dy + Dx*dxx(T) + Dy*dyy(T).
+# Centered differences in space, classical RK4 in time, bounded stability gate.
+# This is executable Flow, not a Python-backed dialect or general PDE parser.
+# flow run examples/native_advection_diffusion_2d.flow
+
+struct TransportGrid {
+    values: array<f64, 64>
+}
+
+struct TransportEquation {
+    width: i32,
+    height: i32,
+    spacing_x: f64,
+    spacing_y: f64,
+    velocity_x: f64,
+    velocity_y: f64,
+    diffusivity_x: f64,
+    diffusivity_y: f64
+}
+
+struct TransportResult {
+    valid: bool,
+    grid: TransportGrid
+}
+
+function absolute(value: f64) -> f64 {
+    if value < 0.0 { return -value }
+    return value
+}
+
+function blankGrid() -> TransportGrid {
+    let values: array<f64, 64> = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    return TransportGrid { values: values }
+}
+
+function validEquation(equation: TransportEquation) -> bool {
+    if equation.width < 3 or equation.height < 3 { return false }
+    if equation.width > 8 or equation.height > 8 { return false }
+    if equation.width * equation.height > 64 { return false }
+    if not (equation.spacing_x > 0.0 and equation.spacing_x <= 1000.0) { return false }
+    if not (equation.spacing_y > 0.0 and equation.spacing_y <= 1000.0) { return false }
+    if not (absolute(equation.velocity_x) <= 1000.0) { return false }
+    if not (absolute(equation.velocity_y) <= 1000.0) { return false }
+    if not (equation.diffusivity_x >= 0.0 and equation.diffusivity_x <= 1000.0) { return false }
+    if not (equation.diffusivity_y >= 0.0 and equation.diffusivity_y <= 1000.0) { return false }
+    return true
+}
+
+function transportDerivative(equation: TransportEquation, grid: TransportGrid) -> TransportGrid {
+    let mut values: array<f64, 64> = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    let width: i32 = equation.width
+    let height: i32 = equation.height
+    let inverse_x: f64 = 0.5 / equation.spacing_x
+    let inverse_y: f64 = 0.5 / equation.spacing_y
+    let inverse_xx: f64 = 1.0 / (equation.spacing_x * equation.spacing_x)
+    let inverse_yy: f64 = 1.0 / (equation.spacing_y * equation.spacing_y)
+    let mut y: i32 = 0
+    while y < height {
+        let mut down: i32 = y - 1
+        let mut up: i32 = y + 1
+        if down < 0 { down = height - 1 }
+        if up == height { up = 0 }
+        let mut x: i32 = 0
+        while x < width {
+            let mut left: i32 = x - 1
+            let mut right: i32 = x + 1
+            if left < 0 { left = width - 1 }
+            if right == width { right = 0 }
+            let center: f64 = grid.values[y * width + x]
+            let leftValue: f64 = grid.values[y * width + left]
+            let rightValue: f64 = grid.values[y * width + right]
+            let downValue: f64 = grid.values[down * width + x]
+            let upValue: f64 = grid.values[up * width + x]
+            values[y * width + x] =
+                -equation.velocity_x * (rightValue - leftValue) * inverse_x -
+                equation.velocity_y * (upValue - downValue) * inverse_y +
+                equation.diffusivity_x * (leftValue - 2.0 * center + rightValue) * inverse_xx +
+                equation.diffusivity_y * (downValue - 2.0 * center + upValue) * inverse_yy
+            x = x + 1
+        }
+        y = y + 1
+    }
+    return TransportGrid { values: values }
+}
+
+function addScaled(base: TransportGrid, slope: TransportGrid,
+                   scale: f64, count: i32) -> TransportGrid {
+    let mut values: array<f64, 64> = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    let mut index: i32 = 0
+    while index < count {
+        values[index] = base.values[index] + scale * slope.values[index]
+        index = index + 1
+    }
+    return TransportGrid { values: values }
+}
+
+function rk4Step(equation: TransportEquation, grid: TransportGrid, step: f64) -> TransportGrid {
+    let count: i32 = equation.width * equation.height
+    let first: TransportGrid = transportDerivative(equation, grid)
+    let second: TransportGrid = transportDerivative(equation, addScaled(grid, first, 0.5 * step, count))
+    let third: TransportGrid = transportDerivative(equation, addScaled(grid, second, 0.5 * step, count))
+    let fourth: TransportGrid = transportDerivative(equation, addScaled(grid, third, step, count))
+    let mut values: array<f64, 64> = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    let mut index: i32 = 0
+    while index < count {
+        values[index] = grid.values[index] + step * (
+            first.values[index] + 2.0 * second.values[index] +
+            2.0 * third.values[index] + fourth.values[index]) / 6.0
+        index = index + 1
+    }
+    return TransportGrid { values: values }
+}
+
+function integrateTransport(equation: TransportEquation, initial: TransportGrid,
+                            duration: f64, steps: i32) -> TransportResult {
+    if not validEquation(equation) or steps <= 0 or steps > 100000 {
+        return TransportResult { valid: false, grid: initial }
+    }
+    if not (duration >= 0.0 and duration <= 1000.0) {
+        return TransportResult { valid: false, grid: initial }
+    }
+    let count: i32 = equation.width * equation.height
+    let mut cell: i32 = 0
+    while cell < count {
+        if not (absolute(initial.values[cell]) <= 1000000000.0) {
+            return TransportResult { valid: false, grid: initial }
+        }
+        cell = cell + 1
+    }
+    let step: f64 = duration / (steps as f64)
+    # Sufficient conservative RK4 gate for the centered Fourier symbol.
+    # Not a claim of positivity: centered advection can produce undershoots.
+    let maximum_rate: f64 =
+        absolute(equation.velocity_x) / equation.spacing_x +
+        absolute(equation.velocity_y) / equation.spacing_y +
+        4.0 * equation.diffusivity_x / (equation.spacing_x * equation.spacing_x) +
+        4.0 * equation.diffusivity_y / (equation.spacing_y * equation.spacing_y)
+    if not (step * maximum_rate <= 0.5) {
+        return TransportResult { valid: false, grid: initial }
+    }
+    let mut grid: TransportGrid = initial
+    let mut index: i32 = 0
+    while index < steps {
+        grid = rk4Step(equation, grid, step)
+        index = index + 1
+    }
+    return TransportResult { valid: true, grid: grid }
+}
+
+function gridMean(grid: TransportGrid, count: i32) -> f64 {
+    let mut total: f64 = 0.0
+    let mut index: i32 = 0
+    while index < count {
+        total = total + grid.values[index]
+        index = index + 1
+    }
+    return total / (count as f64)
+}
+
+function maxDifference(first: TransportGrid, second: TransportGrid, count: i32) -> f64 {
+    let mut maximum: f64 = 0.0
+    let mut index: i32 = 0
+    while index < count {
+        let difference: f64 = absolute(first.values[index] - second.values[index])
+        if difference > maximum { maximum = difference }
+        index = index + 1
+    }
+    return maximum
+}
+
+function diagonalFourier4() -> TransportGrid {
+    let mut values: array<f64, 64> = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    let mut y: i32 = 0
+    while y < 4 {
+        let mut x: i32 = 0
+        while x < 4 {
+            let phase: i32 = x + y
+            if phase == 0 or phase == 4 { values[y * 4 + x] = 1.0 }
+            if phase == 2 or phase == 6 { values[y * 4 + x] = -1.0 }
+            x = x + 1
+        }
+        y = y + 1
+    }
+    return TransportGrid { values: values }
+}
+
+function shiftRight4(grid: TransportGrid) -> TransportGrid {
+    let mut values: array<f64, 64> = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    let mut y: i32 = 0
+    while y < 4 {
+        let mut x: i32 = 0
+        while x < 4 {
+            let mut previous: i32 = x - 1
+            if previous < 0 { previous = 3 }
+            values[y * 4 + x] = grid.values[y * 4 + previous]
+            x = x + 1
+        }
+        y = y + 1
+    }
+    return TransportGrid { values: values }
+}
+
+function stripeFourier8() -> TransportGrid {
+    let mut values: array<f64, 64> = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    let mut y: i32 = 0
+    while y < 8 {
+        let mut x: i32 = 0
+        while x < 8 {
+            if x == 0 or x == 4 { values[y * 8 + x] = 1.0 }
+            if x == 2 or x == 6 { values[y * 8 + x] = -1.0 }
+            x = x + 1
+        }
+        y = y + 1
+    }
+    return TransportGrid { values: values }
+}
+
+function main() -> i32 {
+    let equation: TransportEquation = TransportEquation {
+        width: 4, height: 4, spacing_x: 0.25, spacing_y: 0.25,
+        velocity_x: 0.3, velocity_y: -0.2,
+        diffusivity_x: 0.01, diffusivity_y: 0.02
+    }
+    let initial: TransportGrid = diagonalFourier4()
+    let coarse: TransportResult = integrateTransport(equation, initial, 0.5, 4)
+    let medium: TransportResult = integrateTransport(equation, initial, 0.5, 8)
+    let fine: TransportResult = integrateTransport(equation, initial, 0.5, 16)
+    let finest: TransportResult = integrateTransport(equation, initial, 0.5, 32)
+    if not coarse.valid or not medium.valid or not fine.valid or not finest.valid { return 1 }
+
+    # Exact SEMIDISCRETE Fourier solution, not the continuum PDE:
+    # lambda = -0.96 - 0.4i, T(0,0,t) = exp(-0.96*t)*cos(0.4*t).
+    # T(1,0,t) = exp(-0.96*t)*sin(0.4*t).
+    let exactCosine: f64 = 0.6064489212324407
+    let exactSine: f64 = 0.12293328235722417
+    let coarseError: f64 = absolute(coarse.grid.values[1] - exactSine)
+    let mediumError: f64 = absolute(medium.grid.values[1] - exactSine)
+    let fineError: f64 = absolute(fine.grid.values[1] - exactSine)
+    let finestError: f64 = absolute(finest.grid.values[1] - exactSine)
+    if coarseError < 0.0000001 { return 2 }
+    if finestError > 0.000000001 { return 3 }
+    if mediumError >= 0.09 * coarseError { return 4 }
+    if fineError >= 0.09 * mediumError { return 5 }
+    if finestError >= 0.09 * fineError { return 6 }
+    if absolute(finest.grid.values[0] - exactCosine) > 0.000000001 { return 7 }
+    if absolute(finest.grid.values[4] - exactSine) > 0.000000001 { return 8 }
+    if absolute(finest.grid.values[2] + finest.grid.values[0]) > 0.000000000001 { return 9 }
+    if absolute(gridMean(finest.grid, 16)) > 0.000000000001 { return 10 }
+
+    let replay: TransportResult = integrateTransport(equation, initial, 0.5, 32)
+    if not replay.valid or maxDifference(replay.grid, finest.grid, 16) > 0.000000000001 { return 11 }
+    let half: TransportResult = integrateTransport(equation, initial, 0.25, 16)
+    if not half.valid { return 12 }
+    let secondHalf: TransportResult = integrateTransport(equation, half.grid, 0.25, 16)
+    if not secondHalf.valid or maxDifference(secondHalf.grid, finest.grid, 16) > 0.000000000001 { return 13 }
+
+    let shiftedInitial: TransportGrid = shiftRight4(initial)
+    let shiftedResult: TransportResult = integrateTransport(equation, shiftedInitial, 0.5, 32)
+    if not shiftedResult.valid or
+       maxDifference(shiftedResult.grid, shiftRight4(finest.grid), 16) > 0.000000000001 { return 14 }
+
+    let frozenEquation: TransportEquation = TransportEquation {
+        width: 4, height: 4, spacing_x: 0.25, spacing_y: 0.25,
+        velocity_x: 0.0, velocity_y: 0.0,
+        diffusivity_x: 0.0, diffusivity_y: 0.0
+    }
+    let frozen: TransportResult = integrateTransport(frozenEquation, initial, 1.0, 4)
+    if not frozen.valid or maxDifference(frozen.grid, initial, 16) > 0.000000000001 { return 15 }
+    let zeroTime: TransportResult = integrateTransport(equation, initial, 0.0, 4)
+    if not zeroTime.valid or maxDifference(zeroTime.grid, initial, 16) > 0.000000000001 { return 16 }
+
+    if integrateTransport(equation, initial, 0.5, 0).valid { return 17 }
+    if integrateTransport(equation, initial, -1.0, 8).valid { return 18 }
+    if integrateTransport(equation, initial, 0.5, 1).valid { return 19 }
+    let mut invalid: TransportEquation = equation
+    invalid.width = 2
+    if integrateTransport(invalid, initial, 0.5, 8).valid { return 20 }
+    invalid = equation
+    invalid.spacing_y = 0.0
+    if integrateTransport(invalid, initial, 0.5, 8).valid { return 21 }
+    invalid = equation
+    invalid.diffusivity_x = -0.01
+    if integrateTransport(invalid, initial, 0.5, 8).valid { return 22 }
+    invalid = equation
+    invalid.velocity_y = 1001.0
+    if integrateTransport(invalid, initial, 0.5, 8).valid { return 23 }
+    let mut invalidValues: array<f64, 64> = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    invalidValues[0] = 1000000001.0
+    let invalidGrid: TransportGrid = TransportGrid { values: invalidValues }
+    if integrateTransport(equation, invalidGrid, 0.5, 8).valid { return 24 }
+
+    # An independent 8x8 Fourier stripe: distinct y-axis geometry and
+    # travelling x-mode, with a different complex semidiscrete eigenvalue.
+    # lambda = -0.64 - 0.8i; t=0.5 gives exp(-0.32)*cos/sin(0.4).
+    let larger: TransportEquation = TransportEquation {
+        width: 8, height: 8, spacing_x: 0.125, spacing_y: 0.125,
+        velocity_x: 0.1, velocity_y: 0.0,
+        diffusivity_x: 0.005, diffusivity_y: 0.01
+    }
+    let stripe: TransportGrid = stripeFourier8()
+    let largeRun: TransportResult = integrateTransport(larger, stripe, 0.5, 32)
+    if not largeRun.valid { return 25 }
+    if absolute(largeRun.grid.values[0] - 0.6688275538813316) > 0.000000001 { return 26 }
+    if absolute(largeRun.grid.values[1] - 0.28277575428625956) > 0.000000001 { return 27 }
+    if absolute(largeRun.grid.values[8] - largeRun.grid.values[0]) > 0.000000000001 { return 28 }
+    if absolute(gridMean(largeRun.grid, 64)) > 0.000000000001 { return 29 }
+
+    println("native-advection-diffusion2d-ok")
+    return 0
+}

@@ -1,0 +1,216 @@
+# Real native Flow 2.0 hyperbolic source, typed IR, static inference and equation acceptance.
+# flow run src/math_hyperbolic_smoke.flow
+import .math_dimensions { Quantity, dimensionless, length_dimension, quantity, same_dimension }
+import .math_expression_ir { MathInstruction, MathProgram, MathResult, evaluate_math_ir }
+import .math_expression_source { MathSymbol, MathBindings, ParsedMathExpression, empty_math_bindings, evaluate_math_expression, evaluate_math_expression_with_bindings, parse_math_expression }
+import .math_static { MathInferredType, infer_math_ir, infer_math_expression_source, infer_math_expression_source_with_bindings, infer_math_equation_source }
+import .math_equation { MathEquationResult, evaluate_math_equation_source }
+
+function near(actual: f64, expected: f64) -> bool {
+    let mut difference: f64 = actual - expected
+    if difference < 0.0 { difference = -difference }
+    let mut scale: f64 = expected
+    if scale < 0.0 { scale = -scale }
+    if scale < 1.0 { scale = 1.0 }
+    return difference <= 0.00000000001 * scale
+}
+
+function main() -> i32 {
+    let mut result: MathResult = evaluate_math_expression("sinh(0)")
+    if not result.valid or not near(result.result.value, 0.0) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 1 }
+    result = evaluate_math_expression("cosh(0)")
+    if not result.valid or not near(result.result.value, 1.0) { return 2 }
+    result = evaluate_math_expression("tanh(0)")
+    if not result.valid or not near(result.result.value, 0.0) { return 3 }
+    result = evaluate_math_expression("sinh(0.1)")
+    if not result.valid or not near(result.result.value, 0.10016675001984403) { return 4 }
+    result = evaluate_math_expression("cosh(0.1)")
+    if not result.valid or not near(result.result.value, 1.0050041680558035) { return 5 }
+    result = evaluate_math_expression("tanh(0.1)")
+    if not result.valid or not near(result.result.value, 0.09966799462495582) { return 6 }
+    result = evaluate_math_expression("sinh(0.5)")
+    if not result.valid or not near(result.result.value, 0.5210953054937474) { return 7 }
+    result = evaluate_math_expression("cosh(0.5)")
+    if not result.valid or not near(result.result.value, 1.1276259652063807) { return 8 }
+    result = evaluate_math_expression("tanh(0.5)")
+    if not result.valid or not near(result.result.value, 0.46211715726000974) { return 9 }
+    result = evaluate_math_expression("sinh(1)")
+    if not result.valid or not near(result.result.value, 1.1752011936438014) { return 10 }
+    result = evaluate_math_expression("cosh(1)")
+    if not result.valid or not near(result.result.value, 1.5430806348152437) { return 11 }
+    result = evaluate_math_expression("tanh(1)")
+    if not result.valid or not near(result.result.value, 0.7615941559557649) { return 12 }
+    result = evaluate_math_expression("sinh(-1)")
+    if not result.valid or not near(result.result.value, -1.1752011936438014) { return 13 }
+    result = evaluate_math_expression("cosh(-1)")
+    if not result.valid or not near(result.result.value, 1.5430806348152437) { return 14 }
+    result = evaluate_math_expression("tanh(-1)")
+    if not result.valid or not near(result.result.value, -0.7615941559557649) { return 15 }
+    result = evaluate_math_expression("sinh(2)")
+    if not result.valid or not near(result.result.value, 3.626860407847019) { return 16 }
+    result = evaluate_math_expression("cosh(2)")
+    if not result.valid or not near(result.result.value, 3.7621956910836314) { return 17 }
+    result = evaluate_math_expression("tanh(2)")
+    if not result.valid or not near(result.result.value, 0.9640275800758169) { return 18 }
+    result = evaluate_math_expression("sinh(10)")
+    if not result.valid or not near(result.result.value, 11013.232874703393) { return 19 }
+    result = evaluate_math_expression("cosh(10)")
+    if not result.valid or not near(result.result.value, 11013.232920103324) { return 20 }
+    result = evaluate_math_expression("tanh(10)")
+    if not result.valid or not near(result.result.value, 0.9999999958776927) { return 21 }
+    result = evaluate_math_expression("sinh(60)")
+    if not result.valid or not near(result.result.value, 5.710036949078421e25) { return 22 }
+    result = evaluate_math_expression("cosh(-60)")
+    if not result.valid or not near(result.result.value, 5.710036949078421e25) { return 23 }
+    result = evaluate_math_expression("tanh(-60)")
+    if not result.valid or not near(result.result.value, -1.0) { return 24 }
+    result = evaluate_math_expression("sinh(0.000000000001)")
+    if not result.valid or not near(result.result.value, 0.000000000001) { return 25 }
+    result = evaluate_math_expression("tanh(0.000000000001)")
+    if not result.valid or not near(result.result.value, 0.000000000001) { return 26 }
+    result = evaluate_math_expression("cosh(1)^2-sinh(1)^2")
+    if not result.valid or not near(result.result.value, 1.0) { return 27 }
+    result = evaluate_math_expression("tanh(1)-sinh(1)/cosh(1)")
+    if not result.valid or not near(result.result.value, 0.0) { return 28 }
+    result = evaluate_math_expression("sinh(1m/1m)")
+    if not result.valid or not near(result.result.value, 1.1752011936438014) { return 29 }
+    result = evaluate_math_expression("cosh(sinh(0))")
+    if not result.valid or not near(result.result.value, 1.0) { return 30 }
+
+    result = evaluate_math_expression("sinh(1m)")
+    if result.valid or result.failed_at != 0 { return 31 }
+    result = evaluate_math_expression("cosh(1s)")
+    if result.valid or result.failed_at != 0 { return 32 }
+    result = evaluate_math_expression("tanh(1kg)")
+    if result.valid or result.failed_at != 0 { return 33 }
+    result = evaluate_math_expression("sinh(true)")
+    if result.valid or result.failed_at != 0 { return 34 }
+    result = evaluate_math_expression("cosh(false)")
+    if result.valid or result.failed_at != 0 { return 35 }
+    result = evaluate_math_expression("tanh(1<2)")
+    if result.valid or result.failed_at != 0 { return 36 }
+    result = evaluate_math_expression("sinh(61)")
+    if result.valid or result.failed_at != 0 { return 37 }
+    result = evaluate_math_expression("cosh(-61)")
+    if result.valid or result.failed_at != 0 { return 38 }
+    result = evaluate_math_expression("tanh(61)")
+    if result.valid or result.failed_at != 0 { return 39 }
+    if parse_math_expression("sinh()").valid { return 40 }
+    if parse_math_expression("cosh(1,2)").valid { return 41 }
+    if parse_math_expression("tanh (0)").valid { return 42 }
+    if parse_math_expression("sinh(1").valid { return 43 }
+    if parse_math_expression("tanh(1,2,3)").valid { return 44 }
+
+    let parsed_sinh: ParsedMathExpression = parse_math_expression("sinh(0)")
+    if not parsed_sinh.valid or parsed_sinh.program.count != 2 or
+       parsed_sinh.program.instructions[1].opcode != 35 or
+       parsed_sinh.program.instructions[1].source_start != 0 or
+       parsed_sinh.program.instructions[1].source_end != 4 { return 45 }
+    let parsed_cosh: ParsedMathExpression = parse_math_expression("cosh(0)")
+    if not parsed_cosh.valid or parsed_cosh.program.instructions[1].opcode != 36 or
+       parsed_cosh.program.instructions[1].source_end != 4 { return 46 }
+    let parsed_tanh: ParsedMathExpression = parse_math_expression("tanh(0)")
+    if not parsed_tanh.valid or parsed_tanh.program.instructions[1].opcode != 37 or
+       parsed_tanh.program.instructions[1].source_end != 4 { return 47 }
+
+    let mut inferred: MathInferredType = infer_math_expression_source("sinh(61)")
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension, dimensionless()) { return 48 }
+    inferred = infer_math_expression_source("cosh(-61)")
+    if not inferred.valid or inferred.is_predicate { return 49 }
+    inferred = infer_math_expression_source("tanh(1m)")
+    if inferred.valid or inferred.failed_at != 0 { return 50 }
+    inferred = infer_math_expression_source("sinh(true)")
+    if inferred.valid or inferred.failed_at != 0 { return 51 }
+    inferred = infer_math_equation_source("cosh(0) = 1")
+    if not inferred.valid or not same_dimension(inferred.dimension, dimensionless()) { return 52 }
+    inferred = infer_math_equation_source("tanh(1m) = 0")
+    if inferred.valid or inferred.failed_at != 0 { return 53 }
+
+    let tolerance: Quantity = quantity(0.00000000001, dimensionless())
+    let mut equation: MathEquationResult = evaluate_math_equation_source("sinh(0) = 0", tolerance)
+    if not equation.valid or not equation.satisfied { return 54 }
+    equation = evaluate_math_equation_source("cosh(0) = 1", tolerance)
+    if not equation.valid or not equation.satisfied { return 55 }
+    equation = evaluate_math_equation_source("tanh(1) = 0.7615941559557649", tolerance)
+    if not equation.valid or not equation.satisfied { return 56 }
+    equation = evaluate_math_equation_source("sinh(1m) = 0", tolerance)
+    if equation.valid or equation.failed_at != 0 { return 57 }
+
+    let mut bindings: MathBindings = empty_math_bindings()
+    bindings.count = 2
+    bindings.symbols[0] = MathSymbol { name: "x", value: quantity(1.0, dimensionless()) }
+    bindings.symbols[1] = MathSymbol { name: "distance", value: quantity(2.0, length_dimension()) }
+    result = evaluate_math_expression_with_bindings("sinh(x)", bindings)
+    if not result.valid or not near(result.result.value, 1.1752011936438014) { return 58 }
+    inferred = infer_math_expression_source_with_bindings("cosh(x)", bindings)
+    if not inferred.valid or not same_dimension(inferred.dimension, dimensionless()) { return 59 }
+    inferred = infer_math_expression_source_with_bindings("tanh(distance)", bindings)
+    if inferred.valid or inferred.failed_at != 0 { return 60 }
+
+    let blank: MathInstruction = MathInstruction {
+        opcode: 0, literal: quantity(0.0, dimensionless()),
+        exponent: 0, source_start: 0, source_end: 0
+    }
+    let mut instructions: array<MathInstruction, 64> = [blank]
+    instructions[0] = MathInstruction {
+        opcode: 0, literal: quantity(1.0, dimensionless()),
+        exponent: 0, source_start: 0, source_end: 1
+    }
+    instructions[1] = MathInstruction {
+        opcode: 35, literal: quantity(0.0, dimensionless()),
+        exponent: 0, source_start: 1, source_end: 2
+    }
+    let mut program: MathProgram = MathProgram {
+        instructions: instructions, count: 2, source_length: 2
+    }
+    result = evaluate_math_ir(program)
+    if not result.valid or not near(result.result.value, 1.1752011936438014) { return 61 }
+    inferred = infer_math_ir(program)
+    if not inferred.valid or not same_dimension(inferred.dimension, dimensionless()) { return 62 }
+    instructions[1] = MathInstruction {
+        opcode: 36, literal: quantity(0.0, dimensionless()),
+        exponent: 0, source_start: 1, source_end: 2
+    }
+    program = MathProgram { instructions: instructions, count: 2, source_length: 2 }
+    result = evaluate_math_ir(program)
+    if not result.valid or not near(result.result.value, 1.5430806348152437) { return 63 }
+    instructions[1] = MathInstruction {
+        opcode: 37, literal: quantity(0.0, dimensionless()),
+        exponent: 0, source_start: 1, source_end: 2
+    }
+    program = MathProgram { instructions: instructions, count: 2, source_length: 2 }
+    result = evaluate_math_ir(program)
+    if not result.valid or not near(result.result.value, 0.7615941559557649) { return 64 }
+    instructions[0] = MathInstruction {
+        opcode: 0, literal: quantity(1.0, length_dimension()),
+        exponent: 0, source_start: 0, source_end: 1
+    }
+    program = MathProgram { instructions: instructions, count: 2, source_length: 2 }
+    result = evaluate_math_ir(program)
+    if result.valid or result.failed_at != 1 { return 65 }
+    inferred = infer_math_ir(program)
+    if inferred.valid or inferred.failed_at != 1 { return 66 }
+    instructions[0] = MathInstruction {
+        opcode: 0, literal: quantity(61.0, dimensionless()),
+        exponent: 0, source_start: 0, source_end: 1
+    }
+    program = MathProgram { instructions: instructions, count: 2, source_length: 2 }
+    result = evaluate_math_ir(program)
+    if result.valid or result.failed_at != 1 { return 67 }
+    inferred = infer_math_ir(program)
+    if not inferred.valid or not same_dimension(inferred.dimension, dimensionless()) { return 68 }
+    instructions[1] = MathInstruction {
+        opcode: 38, literal: quantity(0.0, dimensionless()),
+        exponent: 0, source_start: 1, source_end: 2
+    }
+    program = MathProgram { instructions: instructions, count: 2, source_length: 2 }
+    result = evaluate_math_ir(program)
+    if result.valid or result.failed_at != 1 { return 69 }
+    inferred = infer_math_ir(program)
+    if inferred.valid or inferred.failed_at != 1 { return 70 }
+
+    println("native-math-hyperbolic-ok")
+    return 0
+}

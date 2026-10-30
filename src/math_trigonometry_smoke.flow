@@ -140,6 +140,69 @@ function main() -> i32 {
     inferred = infer_math_ir(program)
     if inferred.valid or inferred.failed_at != 1 { return 43 }
 
+    # Tangent uses the same native source, typed IR, static inference and
+    # equation execution paths as sine and cosine, with explicit pole rejection.
+    result = evaluate_math_expression("tan(0)")
+    if not result.valid or not close(result.result.value, 0.0) { return 44 }
+    result = evaluate_math_expression("tan(0.7853981633974483)")
+    if not result.valid or not close(result.result.value, 1.0) { return 45 }
+    result = evaluate_math_expression("tan(-0.7853981633974483)")
+    if not result.valid or not close(result.result.value, -1.0) { return 46 }
+    result = evaluate_math_expression("tan(1)")
+    if not result.valid or not close(result.result.value, 1.5574077246549023) { return 47 }
+    result = evaluate_math_expression("tan(10)")
+    if not result.valid or not close(result.result.value, 0.6483608274590866) { return 48 }
+    result = evaluate_math_expression("tan(60)")
+    if not result.valid or not close(result.result.value, 0.320040389379563) { return 49 }
+    result = evaluate_math_expression("tan(1m/1m)")
+    if not result.valid or not close(result.result.value, 1.5574077246549023) { return 50 }
+    result = evaluate_math_expression("tan(1m)")
+    if result.valid or result.failed_at != 0 { return 51 }
+    result = evaluate_math_expression("tan(true)")
+    if result.valid or result.failed_at != 0 { return 52 }
+    result = evaluate_math_expression("tan(61)")
+    if result.valid or result.failed_at != 0 { return 53 }
+    result = evaluate_math_expression("tan(1.5707963267948966)")
+    if result.valid or result.failed_at != 0 { return 54 }
+    if parse_math_expression("tan(1,2)").valid { return 55 }
+    if parse_math_expression("tan()").valid { return 56 }
+    if parse_math_expression("tan (0)").valid { return 57 }
+    let tangent_parsed: ParsedMathExpression = parse_math_expression("tan(0)")
+    if not tangent_parsed.valid or tangent_parsed.program.count != 2 or
+       tangent_parsed.program.instructions[1].opcode != 30 or
+       tangent_parsed.program.instructions[1].source_start != 0 or
+       tangent_parsed.program.instructions[1].source_end != 3 { return 58 }
+    inferred = infer_math_expression_source("tan(61)")
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension, dimensionless()) { return 59 }
+    inferred = infer_math_expression_source("tan(1m)")
+    if inferred.valid or inferred.failed_at != 0 { return 60 }
+    inferred = infer_math_equation_source("tan(0) = 0")
+    if not inferred.valid or not same_dimension(inferred.dimension, dimensionless()) { return 61 }
+    equation = evaluate_math_equation_source(
+        "tan(0.7853981633974483) = 1", tolerance)
+    if not equation.valid or not equation.satisfied { return 62 }
+    instructions[0] = MathInstruction {
+        opcode: 0, literal: quantity(half_pi, dimensionless()),
+        exponent: 0, source_start: 0, source_end: 1
+    }
+    instructions[1] = MathInstruction {
+        opcode: 30, literal: quantity(0.0, dimensionless()),
+        exponent: 0, source_start: 1, source_end: 2
+    }
+    program = MathProgram { instructions: instructions, count: 2, source_length: 2 }
+    result = evaluate_math_ir(program)
+    if result.valid or result.failed_at != 1 { return 63 }
+    inferred = infer_math_ir(program)
+    if not inferred.valid or not same_dimension(inferred.dimension, dimensionless()) { return 64 }
+    instructions[0] = MathInstruction {
+        opcode: 0, literal: quantity(1.0, dimensionless()),
+        exponent: 0, source_start: 0, source_end: 1
+    }
+    program = MathProgram { instructions: instructions, count: 2, source_length: 2 }
+    result = evaluate_math_ir(program)
+    if not result.valid or not close(result.result.value, 1.5574077246549023) { return 65 }
+
     println("native-math-trigonometry-ok")
     return 0
 }

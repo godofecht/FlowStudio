@@ -1,3 +1,31 @@
+## 2026-10-30: nonsquare 5x7 three-mode native transport acceptance (CI pending)
+
+The existing `examples/native_advection_diffusion_2d.flow` now checks a
+second, substantially harder native Flow 2.0 periodic advection–diffusion
+case: a nonsquare 5x7 grid with nonzero advection in both axes, unequal
+diffusivities, and three independent travelling Fourier modes with nonzero
+sine and cosine amplitudes. The compiled Flow RK4 solver must match all 35
+precomputed **semidiscrete**, rather than continuum, Fourier values at
+t=0.7. The executable asserts fourth-order temporal refinement at
+16/32/64/128 steps, conservation, deterministic replay, semigroup
+consistency, and fail-closed grid/parameter/timestep bounds.
+
+`tests/test_native_transport_multimode_oracle.py` derives the 35 initial
+and final constants independently using Python's standard library,
+compares a separate direct-stencil RK4 solver against the analytical
+reference, and checks derivative signs, periodic translation, conservation,
+convergence and reference-mutation detection. This oracle is not itself
+Flow execution. The existing production `tests/http_smoke.py` checks and
+executes the now-expanded exact source using the real upstream compiler,
+while `tests/native_math_plot_ui.mjs` adds an actual Monaco Run interaction
+through the native Flow HTTP backend in Ubuntu Chromium. The existing
+six-job Linux/macOS CI configuration is unchanged.
+
+**Status: pending independent PR CI.** No native compiler, HTTP, browser,
+or platform pass is claimed until the exact branch is verified. General
+native PDE grammar, scalable grids beyond 8x8, live Flow/R debugging,
+remote-session isolation and RStudio parity remain incomplete.
+
 ## 2026-10-29: 18-state native coupled 3x3 PDE acceptance (verification pending)
 
 `examples/native_coupled_evolution3x3.flow` uses **actual upstream Flow 2.0

@@ -685,7 +685,12 @@ Navier–Stokes implementation, or a spatial visualization pipeline.
 representation with `MathInstruction`, `MathProgram`, and `MathResult`.
 The IR preserves byte-offset source spans and propagates the existing native
 `Dimension` exponents through literal, addition, subtraction, multiplication,
-division, unary negation and bounded integer-power instructions. It rejects
+division, unary negation, bounded integer powers, dimension-preserving minimum,
+maximum, and a three-operand clamp. Piecewise operations enforce matching
+physical dimensions, ordered clamp bounds, bounded intermediate values and
+source-owned failure locations. The native smoke exercises nested arithmetic,
+positive/negative clipping, ties, mismatched units, reversed bounds, stack
+underflow, malformed spans and overflow. It rejects
 mismatched units, zero division, invalid powers, non-finite or excessively
 large intermediates, dimension exponent overflow, malformed spans, stack
 underflow, residual stack entries and unknown instructions. Errors report

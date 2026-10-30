@@ -282,10 +282,10 @@ try {
   const grayscottSource = readFileSync('examples/native_field_grayscott64.flow', 'utf8');
   for (const field of fieldData.fields) {
     const expectedMatch = new RegExp(
-      'let expected' + field.name + '256: array<f64, 64> = \\\\[([\\\\s\\\\S]*?)\\\\]'
+      'let expected' + field.name + '256: array<f64, 64> = \\[([\\s\\S]*?)\\]'
     ).exec(grayscottSource);
     assert.ok(expectedMatch, 'Missing checked-in independent numerical reference');
-    const reference = expectedMatch[1].split(',').map(Number).filter(Number.isFinite);
+    const reference = expectedMatch[1].split(',').filter(value => value.trim()).map(Number);
     assert.equal(reference.length, 64);
     assert.ok(Math.max(...field.values.map((value, i) =>
       Math.abs(value - reference[i]))) < 1e-4, 'Plot must reflect computed field');

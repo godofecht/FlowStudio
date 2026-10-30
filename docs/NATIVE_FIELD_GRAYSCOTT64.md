@@ -37,3 +37,21 @@ used for these native gates. Oracle-only success does not establish native
 compiler, HTTP or browser execution. This example does **not** claim general
 cross-field PDE grammar, multidimensional fields, computed spatial plotting,
 or RStudio parity. Verified in [six-job Linux/macOS PR CI #41093934670](https://github.com/godofecht/FlowStudio/actions/runs/41093934670): 1,143 JavaScript tests passed (12 skipped) and 380 Python tests passed (13 skipped) per source/transport platform; native Flow compiler, production HTTP, actual Ubuntu Chromium Monaco Run, and R/C FlowJIT passed on their applicable platforms. Independent macOS physical-browser acceptance and local native Flow/R/HTTP remain unexecuted.
+
+## Native Flow computed spatial plot
+
+The compiled Flow `main()` now prints a bounded, versioned
+`FLOWSTUDIO_FIELD_V1 64 2` block containing the **actual 256-step U and V
+states**, after all numerical and negative assertions pass. The native
+localhost workbench reads this stdout through its existing real
+`/api/run/flow` route. `web/native_field_plot.js` validates field names,
+exact cell counts, finite bounded values, complete framing and resource
+limits, then constructs SVG curves with DOM APIs; it never interprets the
+output as HTML. Ordinary Flow stdout without a field block is unchanged.
+
+The production HTTP acceptance compares all 128 transmitted cells with
+the independent checked-in 256-step reference (tolerance accounts for
+native text formatting). Chromium Monaco acceptance runs the same source
+and checks that the plot is displayed and its values agree with the
+reference. These gates require actual Flow execution; the Node parser
+tests alone do not establish native plotting.

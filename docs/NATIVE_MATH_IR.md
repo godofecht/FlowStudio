@@ -166,3 +166,23 @@ including the real native Flow compiler, this source smoke, production HTTP
 compile/run acceptance, both R/C FlowJIT jobs and existing Ubuntu Chromium
 workflows. No dedicated physical-browser interaction with the new symbol
 binding API was performed; post-merge main CI remains pending.
+
+## Native source-level dimension-checked comparisons (2026-10-30; CI pending)
+
+The executable `src/math_expression_source.flow` now lowers ASCII
+`< <= > >= == !=` and UTF-8 `≤ ≥ ≠` into the existing native typed
+IR comparison opcodes 10–15. Comparison precedence is below addition,
+subtraction, multiplication and division. Results carry a separate
+`is_predicate` type bit and dimensionless 0/1 value; operands must be
+numeric quantities with exactly matching SI dimensions. A predicate
+cannot be silently used in arithmetic or a second comparison.
+Source errors retain the original operator byte span, including three-byte
+Unicode symbols. Lone `=`, `!`, incomplete and malformed operators
+fail closed. This does not add logical source operators, implicit truthiness,
+general equations, static inference, or upstream Flow grammar integration.
+
+The native `math_expression_source_smoke.flow` adds 28 positive and
+negative acceptance cases for comparison truth values, arithmetic
+precedence, explicit typed symbol bindings, SI unit mismatch, chained
+comparison rejection, invalid syntax and UTF-8 spans. Linux/macOS native
+CI and production HTTP acceptance must pass before this change is merged.

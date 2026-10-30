@@ -417,6 +417,75 @@ function main() -> i32 {
     result = evaluate_math_expression_with_bindings("overflow", overflow_binding)
     if result.valid or result.failed_at != 0 { return 132 }
 
+
+    # Comparisons compile from source to the existing typed predicate IR,
+    # including dimensional rejection and UTF-8 source byte diagnostics.
+    result = evaluate_math_expression("3m<4m")
+    if not result.valid or not result.is_predicate or not near(result.result.value, 1.0) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 133 }
+    result = evaluate_math_expression("4m<=4m")
+    if not result.valid or not result.is_predicate or not near(result.result.value, 1.0) { return 134 }
+    result = evaluate_math_expression("4m>3m")
+    if not result.valid or not result.is_predicate or not near(result.result.value, 1.0) { return 135 }
+    result = evaluate_math_expression("4m>=4m")
+    if not result.valid or not result.is_predicate or not near(result.result.value, 1.0) { return 136 }
+    result = evaluate_math_expression("4m==4m")
+    if not result.valid or not result.is_predicate or not near(result.result.value, 1.0) { return 137 }
+    result = evaluate_math_expression("4m!=4m")
+    if not result.valid or not result.is_predicate or not near(result.result.value, 0.0) { return 138 }
+    result = evaluate_math_expression("2m≤3m")
+    if not result.valid or not result.is_predicate or not near(result.result.value, 1.0) { return 139 }
+    result = evaluate_math_expression("2m≥3m")
+    if not result.valid or not result.is_predicate or not near(result.result.value, 0.0) { return 140 }
+    result = evaluate_math_expression("2m≠3m")
+    if not result.valid or not result.is_predicate or not near(result.result.value, 1.0) { return 141 }
+    result = evaluate_math_expression("2m+3m<=6m")
+    if not result.valid or not result.is_predicate or not near(result.result.value, 1.0) { return 142 }
+    result = evaluate_math_expression("1+2<2*2")
+    if not result.valid or not result.is_predicate or not near(result.result.value, 1.0) { return 143 }
+    result = evaluate_math_expression("(2m<3m)")
+    if not result.valid or not result.is_predicate or not near(result.result.value, 1.0) { return 144 }
+    result = evaluate_math_expression_with_bindings("distance/duration>speed", bindings)
+    if not result.valid or not result.is_predicate or not near(result.result.value, 1.0) { return 145 }
+    result = evaluate_math_expression_with_bindings("distance==distance", bindings)
+    if not result.valid or not result.is_predicate or not near(result.result.value, 1.0) { return 146 }
+
+    let comparison: ParsedMathExpression = parse_math_expression("2m≠3m")
+    if not comparison.valid or comparison.program.count != 3 or
+       comparison.program.instructions[2].opcode != 15 or
+       comparison.program.instructions[2].source_start != 2 or
+       comparison.program.instructions[2].source_end != 5 { return 147 }
+    let less_equal: ParsedMathExpression = parse_math_expression("2m<=3m")
+    if not less_equal.valid or less_equal.program.count != 3 or
+       less_equal.program.instructions[2].opcode != 11 or
+       less_equal.program.instructions[2].source_start != 2 or
+       less_equal.program.instructions[2].source_end != 4 { return 148 }
+
+    result = evaluate_math_expression("2m<3s")
+    if result.valid or result.failed_at != 2 { return 149 }
+    result = evaluate_math_expression("2m==3s")
+    if result.valid or result.failed_at != 2 { return 150 }
+    result = evaluate_math_expression("1<2<3")
+    if result.valid or result.failed_at != 3 { return 151 }
+    result = evaluate_math_expression("1<2+3m")
+    if result.valid or result.failed_at != 3 { return 152 }
+    result = evaluate_math_expression("1=1")
+    if result.valid or result.failed_at != 1 { return 153 }
+    result = evaluate_math_expression("1!1")
+    if result.valid or result.failed_at != 1 { return 154 }
+    result = evaluate_math_expression("1<=")
+    if result.valid or result.failed_at != 3 { return 155 }
+    result = evaluate_math_expression("<=2")
+    if result.valid or result.failed_at != 0 { return 156 }
+    result = evaluate_math_expression("1<>2")
+    if result.valid or result.failed_at != 2 { return 157 }
+    result = evaluate_math_expression("1<2+")
+    if result.valid or result.failed_at != 4 { return 158 }
+    result = evaluate_math_expression("1==1+1")
+    if not result.valid or not result.is_predicate or not near(result.result.value, 0.0) { return 159 }
+    result = evaluate_math_expression("2m≠2m")
+    if not result.valid or not result.is_predicate or not near(result.result.value, 0.0) { return 160 }
+
     println("native-math-source-ok")
     return 0
 }

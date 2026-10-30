@@ -1,5 +1,5 @@
 # Native Flow 2.0 source-to-postfix lowering for a deliberately bounded
-# physical scalar expression subset. This is executable code, not editor text.
+# physical scalar expression and typed comparison subset. This is executable code, not editor text.
 # Full Flow 2.0 grammar integration and PDE equations remain pending.
 # UTF-8 source offsets are retained for runtime dimension diagnostics.
 import std.string { ParseF64, str_parse_f64_at, str_is_ascii_ws, str_is_ascii_digit }
@@ -107,6 +107,8 @@ function precedence(opcode: i32) -> i32 {
     if opcode == 5 or opcode == 20 or opcode == 21 { return 3 }
     if opcode == 3 or opcode == 4 { return 2 }
     if opcode == 1 or opcode == 2 { return 1 }
+    # Comparisons bind below arithmetic and lower to typed predicate IR.
+    if opcode >= 10 and opcode <= 15 { return 0 }
     return 0
 }
 
@@ -125,12 +127,27 @@ function source_operator(bytes: ptr<u8>, position: i32, length: i32) -> i32 {
     if c == 45 { return 2 }
     if c == 42 { return 3 }
     if c == 47 { return 4 }
+    if c == 60 { # < or <=
+        if position + 1 < length and bytes[position + 1] == 61 { return 11 }
+        return 10
+    }
+    if c == 62 { # > or >=
+        if position + 1 < length and bytes[position + 1] == 61 { return 13 }
+        return 12
+    }
+    if c == 61 and position + 1 < length and bytes[position + 1] == 61 { return 14 }
+    if c == 33 and position + 1 < length and bytes[position + 1] == 61 { return 15 }
     if c == 195 and position + 1 < length {
         if bytes[position + 1] == 151 { return 3 } # ×
         if bytes[position + 1] == 183 { return 4 } # ÷
     }
     if c == 226 and position + 2 < length {
         if bytes[position + 1] == 136 and bytes[position + 2] == 146 { return 2 } # −
+        if bytes[position + 1] == 137 {
+            if bytes[position + 2] == 164 { return 11 } # ≤
+            if bytes[position + 2] == 165 { return 13 } # ≥
+            if bytes[position + 2] == 160 { return 15 } # ≠
+        }
     }
     return 0
 }
@@ -138,6 +155,8 @@ function source_operator(bytes: ptr<u8>, position: i32, length: i32) -> i32 {
 function operator_bytes(bytes: ptr<u8>, position: i32) -> i32 {
     if bytes[position] == 195 { return 2 }
     if bytes[position] == 226 { return 3 }
+    if bytes[position] == 61 or bytes[position] == 33 { return 2 }
+    if (bytes[position] == 60 or bytes[position] == 62) and bytes[position + 1] == 61 { return 2 }
     return 1
 }
 

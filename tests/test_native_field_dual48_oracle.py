@@ -17,10 +17,11 @@ SPECS = {
 
 def source_array(name):
     text = SOURCE.read_text(encoding="utf-8")
-    match = re.search(rf"let {name}: array<f64, 48> = \\[([^\\]]+)\\]", text, re.MULTILINE)
-    if match is None:
+    needle = f"let {name}: array<f64, 48> = ["
+    if needle not in text:
         raise AssertionError(f"Missing {name} array")
-    values = [float(value.strip()) for value in match.group(1).split(",") if value.strip()]
+    body = text.split(needle, 1)[1].split("]", 1)[0]
+    values = [float(value.strip()) for value in body.split(",") if value.strip()]
     if len(values) != N:
         raise AssertionError(f"{name}: expected {N} values, got {len(values)}")
     return values

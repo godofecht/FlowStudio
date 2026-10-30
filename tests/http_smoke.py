@@ -82,6 +82,13 @@ def main() -> None:
     assert '<script src="/source_cells.js"></script>' in html
     status, source_cells = request("GET", "/source_cells.js")
     assert status == 200 and "function scanLine(line, state)" in source_cells, (status, source_cells[:100])
+    assert '<script src="/native_field_plot.js"></script>' in html
+    status, native_field_plot = request("GET", "/native_field_plot.js")
+    assert status == 200 and "FLOWSTUDIO_FIELD_V1" in native_field_plot, (
+        "native Flow computed plot module", status)
+    status, _ = request("GET", "/native_field_plot.js/extra")
+    assert status == 404, "native field plot path traversal must fail closed"
+
 
     status, _ = request("POST", "/api/run/python", 'print("bad")')
     assert status == 404, status

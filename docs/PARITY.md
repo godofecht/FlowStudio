@@ -1,4 +1,4 @@
-## 2026-10-30: native 32x32 two-mode tensor diffusion (verification pending)
+## 2026-10-30: native 32x32 two-mode tensor diffusion (Linux/macOS CI verified)
 
 The production-compiled `examples/native_tensor_grid.flow` now supports
 3..32 cells per axis and at most 1,024 cells. Its new 32x32 case combines
@@ -15,11 +15,16 @@ initial values and the two-million-cell-step resource limit.
 all 1,024 stencil derivatives and analytical states with standard-library
 Python. The existing native Flow compiler, real HTTP and Ubuntu Chromium
 Monaco Run acceptance already execute the checked-in tensor program.
-**Local:** five independent Python oracle tests passed; native Flow/R/HTTP
-and physical-browser tests are unavailable locally. **CI:** pending;
-no claims of Linux/macOS or browser acceptance until recorded checks pass.
-This is a bounded array kernel, not general PDE grammar or RStudio parity.
-No hosted CI workflow was modified.
+**Verified:** five independent Python oracle tests passed locally. All six
+Linux/macOS jobs passed in [PR CI #41029318752](https://github.com/godofecht/FlowStudio/actions/runs/41029318752):
+each source/transport platform passed 1,143 JavaScript tests (12 skipped)
+and 340 Python tests (13 skipped), both native Flow 2.0 builds compiled and
+executed the 1,024-cell source, both production HTTP suites ran the exact
+source, Ubuntu Chromium executed it through Monaco's Run button, and both
+FlowJIT R/C jobs passed. **Unexecuted:** local native Flow/R/HTTP and
+independent macOS physical-browser acceptance. Post-merge main CI is not yet
+verified. This is a bounded array kernel, not general PDE grammar or
+RStudio parity. No hosted CI workflow was modified.
 
 ## 2026-10-30: native 16x16 anisotropic tensor diffusion (Linux/macOS CI verified)
 

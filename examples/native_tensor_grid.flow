@@ -346,7 +346,7 @@ function main() -> i32 {
     if maxGridDifference(unchanged.grid, uniform, 16) > 0.000000000001 { return 19 }
 
     let invalidWidth: TensorEquation = TensorEquation {
-        width: 17, height: 4, spacing_x: 0.25, spacing_y: 0.25,
+        width: 33, height: 4, spacing_x: 0.25, spacing_y: 0.25,
         diffusion_xx: 0.01, diffusion_xy: 0.005, diffusion_yy: 0.02
     }
     if integrateTensor(invalidWidth, initial, 0.5, 40).valid { return 20 }
@@ -414,7 +414,7 @@ function main() -> i32 {
     let zero16: TensorResult = integrateTensor(wide, initial16, 0.0, 128)
     if not zero16.valid or maxGridDifference(zero16.grid, initial16, 256) > 0.0 { return 37 }
     let tooWide: TensorEquation = TensorEquation {
-        width: 17, height: 16, spacing_x: 0.0625, spacing_y: 0.0625,
+        width: 33, height: 16, spacing_x: 0.0625, spacing_y: 0.0625,
         diffusion_xx: 0.012, diffusion_xy: 0.004, diffusion_yy: 0.018
     }
     if integrateTensor(tooWide, initial16, 0.1, 128).valid { return 38 }

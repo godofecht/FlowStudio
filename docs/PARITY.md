@@ -1,3 +1,29 @@
+## 2026-10-30: native 16x16 anisotropic tensor diffusion (CI pending)
+
+The existing production-compiled `examples/native_tensor_grid.flow` now
+supports configurable 3..16-cell axes with a bounded 256-cell periodic grid.
+The 16x16 case evolves all 256 cells under a positive-definite anisotropic
+tensor with a nonzero mixed derivative, using the native Flow midpoint RK2
+integrator. Each output cell is asserted against the independent semidiscrete
+Fourier solution (eigenvalue -17.408 at t=0.1); refinement at 32/64/128 steps
+must demonstrate second-order convergence. Native assertions additionally
+check conservation, deterministic replay, semigroup consistency, translation
+equivariance, sensitivity to the mixed tensor sign, zero duration, oversized
+grid, unbounded initial values, and a 2-million-cell-step resource ceiling.
+
+`tests/test_native_tensor16_oracle.py` independently reconstructs the full
+16x16 stencil and Fourier eigenvalue in standard-library Python, including
+all 256 cells, convergence, symmetry and cross-diffusion sensitivity. It does
+not compile Flow. The unchanged native CI workflow already runs
+`flow run examples/native_tensor_grid.flow` on Linux and macOS; the unchanged
+`tests/http_smoke.py` executes that exact checked-in source through the
+production `/api/check/flow` and `/api/run/flow` routes.
+
+**Pending:** exact-commit Linux/macOS CI, native Flow and HTTP execution,
+independent physical-browser acceptance and post-merge main CI. This remains
+a bounded array-based numerical kernel, not general PDE grammar or RStudio
+parity. No hosted CI configuration was changed.
+
 ## 2026-10-30: native typed multi-argument source functions (Linux/macOS CI verified)
 
 Native Flow mathematical source lowering now recognizes typed `min`,

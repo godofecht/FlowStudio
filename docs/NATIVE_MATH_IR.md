@@ -321,3 +321,31 @@ static type pass reject malformed Boolean literal values, units and exponents.
 This is a bounded native scalar language extension, not upstream Flow 2.0
 grammar integration, general symbolic equations, native Navier–Stokes, or
 computed workbench PDE visualization.
+
+## Bound Greek and subscripted physical identifiers (2026-10-30)
+
+The executable native scalar source parser accepts **explicitly bound**
+Greek uppercase/lowercase letters (U+0391–U+03A9 except U+03A2, and
+U+03B1–U+03C9), as well as ASCII letters/underscores. Continuations may
+also contain ASCII digits and Unicode subscript digits U+2080–U+2089.
+For example, callers may bind `ρ`, `u₁`, `u₂`, `θ₀` and `Ω` through
+`MathBindings` and compile `ρ*norm(u₁,u₂)` or `√(u₁²+u₂²)` into
+the **existing native dimension-checked IR**. The same source compiler
+is used by scalar equations and static dimensional analysis.
+
+Each name must be 1–32 **UTF-8 bytes**, and the binding table holds at
+most eight unique names. Identifier comparisons are exact byte comparisons;
+no Unicode normalization, implicit symbol discovery, built-in π constant,
+general Greek alphabet extension, superscript identifier components or
+arbitrary Unicode letter categories are implied. Unbound and malformed
+names fail closed with byte-based source diagnostics. Subscript digits
+cannot begin a name; superscript ²/³ remains a power operator.
+
+Native regression entry points are
+`flow run src/math_expression_source_smoke.flow`,
+`flow run src/math_equation_smoke.flow`, and
+`flow run src/math_static_smoke.flow`. Linux/macOS CI also runs the
+checked-in Navier–Stokes dialect and production HTTP/Chromium acceptance.
+This does **not** add Unicode identifiers to the upstream Flow 2.0 grammar
+or implement unbound symbolic inference, tensor/PDE ASTs, native
+Navier–Stokes, or computed spatial visualization.

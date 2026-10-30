@@ -834,6 +834,62 @@ function main() -> i32 {
     reserved.symbols[0] = MathSymbol { name: "false", value: quantity(0.0, dimensionless()) }
     if parse_math_expression_with_bindings("false", reserved).valid { return 297 }
 
+    # Greek physical symbols and Unicode subscript digits are real source
+    # identifiers, not editor snippets. They lower to the same native typed IR.
+    let mut greek_symbols: array<MathSymbol, 8> = [blank_symbol]
+    greek_symbols[0] = MathSymbol { name: "ρ", value: quantity(2.0, mass_dimension()) }
+    greek_symbols[1] = MathSymbol { name: "u₁", value: quantity(3.0, speed) }
+    greek_symbols[2] = MathSymbol { name: "u₂", value: quantity(4.0, speed) }
+    greek_symbols[3] = MathSymbol { name: "Ω", value: quantity(2.0, dimensionless()) }
+    greek_symbols[4] = MathSymbol { name: "θ₀", value: quantity(5.0, temperature_dimension()) }
+    greek_symbols[5] = MathSymbol { name: "α₂", value: quantity(6.0, dimensionless()) }
+    greek_symbols[6] = MathSymbol { name: "π", value: quantity(3.0, dimensionless()) }
+    let greek_bindings: MathBindings = MathBindings { symbols: greek_symbols, count: 7 }
+    let momentum_dimension: Dimension = product_dimension(mass_dimension(), speed)
+
+    result = evaluate_math_expression_with_bindings("ρ*norm(u₁,u₂)", greek_bindings)
+    if not result.valid or not near(result.result.value, 10.0) or
+       not same_dimension(result.result.dimension, momentum_dimension) { return 298 }
+    result = evaluate_math_expression_with_bindings("√(u₁²+u₂²)", greek_bindings)
+    if not result.valid or not near(result.result.value, 5.0) or
+       not same_dimension(result.result.dimension, speed) { return 299 }
+    result = evaluate_math_expression_with_bindings("where(Ω>1,θ₀,θ₀)", greek_bindings)
+    if not result.valid or not near(result.result.value, 5.0) or
+       not same_dimension(result.result.dimension, temperature_dimension()) { return 300 }
+    result = evaluate_math_expression_with_bindings("α₂+π", greek_bindings)
+    if not result.valid or not near(result.result.value, 9.0) { return 301 }
+    result = evaluate_math_expression_with_bindings("ρ×u₁", greek_bindings)
+    if not result.valid or not near(result.result.value, 6.0) or
+       not same_dimension(result.result.dimension, momentum_dimension) { return 302 }
+
+    let greek_parsed: ParsedMathExpression =
+        parse_math_expression_with_bindings("ρ×u₁", greek_bindings)
+    if not greek_parsed.valid or greek_parsed.program.count != 3 or
+       greek_parsed.program.instructions[0].source_start != 0 or
+       greek_parsed.program.instructions[0].source_end != 2 or
+       greek_parsed.program.instructions[1].source_start != 4 or
+       greek_parsed.program.instructions[1].source_end != 8 or
+       greek_parsed.program.instructions[2].source_start != 2 or
+       greek_parsed.program.instructions[2].source_end != 4 { return 303 }
+
+    result = evaluate_math_expression_with_bindings("ρ+u₁", greek_bindings)
+    if result.valid or result.failed_at != 2 { return 304 }
+    result = evaluate_math_expression_with_bindings("u₁+missing", greek_bindings)
+    if result.valid or result.failed_at != 5 { return 305 }
+    result = evaluate_math_expression_with_bindings("u₁₁", greek_bindings)
+    if result.valid or result.failed_at != 0 { return 306 }
+    result = evaluate_math_expression_with_bindings("₁u", greek_bindings)
+    if result.valid or result.failed_at != 0 { return 307 }
+    result = evaluate_math_expression_with_bindings("∂u₁", greek_bindings)
+    if result.valid or result.failed_at != 0 { return 308 }
+
+    greek_symbols[7] = MathSymbol { name: "ρ", value: quantity(3.0, mass_dimension()) }
+    let greek_duplicate: MathBindings = MathBindings { symbols: greek_symbols, count: 8 }
+    if parse_math_expression_with_bindings("ρ", greek_duplicate).valid { return 309 }
+    greek_symbols[7] = MathSymbol { name: "₁u", value: quantity(1.0, speed) }
+    let greek_bad_start: MathBindings = MathBindings { symbols: greek_symbols, count: 8 }
+    if parse_math_expression_with_bindings("u₁", greek_bad_start).valid { return 310 }
+
     println("native-math-source-ok")
     return 0
 }

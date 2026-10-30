@@ -890,6 +890,66 @@ function main() -> i32 {
     let greek_bad_start: MathBindings = MathBindings { symbols: greek_symbols, count: 8 }
     if parse_math_expression_with_bindings("u₁", greek_bad_start).valid { return 310 }
 
+    # Signed Unicode superscripts are parsed by native Flow, preserving
+    # physical units and exact UTF-8 byte spans in the postfix IR.
+    result = evaluate_math_expression("2⁰")
+    if not result.valid or not near(result.result.value, 1.0) { return 311 }
+    result = evaluate_math_expression("2¹")
+    if not result.valid or not near(result.result.value, 2.0) { return 312 }
+    result = evaluate_math_expression("2⁴")
+    if not result.valid or not near(result.result.value, 16.0) { return 313 }
+    result = evaluate_math_expression("2⁵")
+    if not result.valid or not near(result.result.value, 32.0) { return 314 }
+    result = evaluate_math_expression("2⁶")
+    if not result.valid or not near(result.result.value, 64.0) { return 315 }
+    result = evaluate_math_expression("2⁷")
+    if not result.valid or not near(result.result.value, 128.0) { return 316 }
+    result = evaluate_math_expression("2⁸")
+    if not result.valid or not near(result.result.value, 256.0) { return 317 }
+    result = evaluate_math_expression("2⁺³")
+    if not result.valid or not near(result.result.value, 8.0) { return 318 }
+    result = evaluate_math_expression("2⁻³")
+    if not result.valid or not near(result.result.value, 0.125) { return 319 }
+    result = evaluate_math_expression("2⁻⁸")
+    if not result.valid or not near(result.result.value, 0.00390625) { return 320 }
+    result = evaluate_math_expression("2⁻⁰")
+    if not result.valid or not near(result.result.value, 1.0) { return 321 }
+    let inverse_area: Dimension = Dimension {
+        length: -2, mass: 0, time: 0, temperature: 0
+    }
+    result = evaluate_math_expression("3m⁻²")
+    if not result.valid or not near(result.result.value, 1.0 / 9.0) or
+       not same_dimension(result.result.dimension, inverse_area) { return 322 }
+    result = evaluate_math_expression("2m⁻¹*4m")
+    if not result.valid or not near(result.result.value, 2.0) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 323 }
+    result = evaluate_math_expression("-2²")
+    if not result.valid or not near(result.result.value, -4.0) { return 324 }
+    result = evaluate_math_expression("(-2)²")
+    if not result.valid or not near(result.result.value, 4.0) { return 325 }
+    result = evaluate_math_expression("2⁻³+1")
+    if not result.valid or not near(result.result.value, 1.125) { return 326 }
+    let superscript_parsed: ParsedMathExpression = parse_math_expression("3m⁻²")
+    if not superscript_parsed.valid or superscript_parsed.program.count != 2 or
+       superscript_parsed.program.instructions[1].opcode != 6 or
+       superscript_parsed.program.instructions[1].exponent != -2 or
+       superscript_parsed.program.instructions[1].source_start != 2 or
+       superscript_parsed.program.instructions[1].source_end != 7 { return 327 }
+    if parse_math_expression("2⁹").valid { return 328 }
+    if parse_math_expression("2⁻⁹").valid { return 329 }
+    if parse_math_expression("2⁴⁰").valid { return 330 }
+    if parse_math_expression("2⁻").valid { return 331 }
+    if parse_math_expression("2⁺").valid { return 332 }
+    if parse_math_expression("2⁻2").valid { return 333 }
+    if parse_math_expression("2⁻⁻²").valid { return 334 }
+    if parse_math_expression("2²³").valid { return 335 }
+    if parse_math_expression("2^2⁴").valid { return 336 }
+    if parse_math_expression("2⁻³^2").valid { return 337 }
+    if parse_math_expression("⁻²").valid { return 338 }
+    if parse_math_expression("2⁻³⁺¹").valid { return 339 }
+    result = evaluate_math_expression("0m⁻²")
+    if result.valid or result.failed_at != 2 { return 340 }
+
     println("native-math-source-ok")
     return 0
 }

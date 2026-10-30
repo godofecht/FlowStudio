@@ -1,0 +1,52 @@
+# Compact HTTP acceptance fixture for the real native mathematical source parser.
+# The comprehensive 70KB+ source regression runs separately via flow run.
+# flow run src/math_expression_source_http_smoke.flow
+import .math_dimensions { dimensionless, length_dimension, time_dimension, quotient_dimension, same_dimension }
+import .math_expression_ir { MathResult }
+import .math_expression_source { ParsedMathExpression, parse_math_expression, evaluate_math_expression }
+
+function close(actual: f64, expected: f64) -> bool {
+    let mut difference: f64 = actual - expected
+    if difference < 0.0 { difference = -difference }
+    return difference < 0.00000000001
+}
+
+function main() -> i32 {
+    let mut result: MathResult = evaluate_math_expression("3m/2s+4m/1s")
+    if not result.valid or not close(result.result.value, 5.5) or
+       not same_dimension(result.result.dimension,
+           quotient_dimension(length_dimension(), time_dimension())) { return 1 }
+    result = evaluate_math_expression("2×(3−1)÷2")
+    if not result.valid or not close(result.result.value, 2.0) { return 2 }
+    result = evaluate_math_expression("2m²/2m")
+    if not result.valid or not close(result.result.value, 2.0) or
+       not same_dimension(result.result.dimension, length_dimension()) { return 3 }
+    result = evaluate_math_expression("sin(0)+cos(0)")
+    if not result.valid or not close(result.result.value, 1.0) { return 4 }
+    result = evaluate_math_expression("tan(0)")
+    if not result.valid or not close(result.result.value, 0.0) { return 5 }
+    result = evaluate_math_expression("atan(1)")
+    if not result.valid or not close(result.result.value, 0.7853981633974483) { return 6 }
+    result = evaluate_math_expression("asin(0)+acos(1)")
+    if not result.valid or not close(result.result.value, 0.0) { return 7 }
+    result = evaluate_math_expression("atan2(1,1)")
+    if not result.valid or not close(result.result.value, 0.7853981633974483) { return 8 }
+    result = evaluate_math_expression("sinh(0)+cosh(0)+tanh(0)")
+    if not result.valid or not close(result.result.value, 1.0) { return 9 }
+    result = evaluate_math_expression("sinh(1m)")
+    if result.valid or result.failed_at != 0 { return 10 }
+    result = evaluate_math_expression("3m+2s")
+    if result.valid or result.failed_at != 2 { return 11 }
+    result = evaluate_math_expression("1/0")
+    if result.valid or result.failed_at != 1 { return 12 }
+    result = evaluate_math_expression("tanh(true)")
+    if result.valid or result.failed_at != 0 { return 13 }
+    let parsed: ParsedMathExpression = parse_math_expression("cosh(0)")
+    if not parsed.valid or parsed.program.count != 2 or
+       parsed.program.instructions[1].opcode != 36 or
+       parsed.program.instructions[1].source_start != 0 or
+       parsed.program.instructions[1].source_end != 4 { return 14 }
+    if parse_math_expression("sinh(1,2)").valid { return 15 }
+    println("native-math-source-ok")
+    return 0
+}

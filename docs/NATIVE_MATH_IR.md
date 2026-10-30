@@ -413,3 +413,27 @@ Navier–Stokes, HTTP execution and browser acceptance.
 
 This is a bounded native scalar extension, not upstream Flow grammar
 integration, symbolic tensor/PDE lowering or general visualization.
+
+
+## Native hyperbolic functions (2026-10-30; CI verification pending)
+
+The actual native Flow source parser, typed postfix IR, runtime evaluator,
+static dimensional inference and scalar equation compiler now support
+`sinh(x)`, `cosh(x)` and `tanh(x)` (opcodes 35, 36 and 37).
+Inputs must be dimensionless numeric values in [-60,60]. Static inference
+checks physical types without evaluating numeric ranges; runtime evaluation
+rejects out-of-range inputs and predicates with the function's source span.
+
+A cancellation-resistant Taylor series handles small arguments, native
+range-reduced exponential handles larger magnitudes, and `tanh` uses
+a negative-exponent ratio or saturated result rather than overflowing.
+No external numerical library or Python evaluator is used for these functions.
+The executable `src/math_hyperbolic_smoke.flow` covers 70 numerical,
+algebraic, source-position, invalid-input, static-type and equation assertions.
+The Linux/macOS CI gate runs this exact Flow program, and the production
+HTTP gate compiles and executes the same checked-in modules. Cross-platform
+CI success must be verified before treating this as a qualified release.
+
+This is still a bounded native scalar-expression dialect, **not** upstream
+Flow 2.0 grammar integration, unbound symbolic inference, a tensor/PDE AST
+or a general PDE compiler.

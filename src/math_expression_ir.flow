@@ -11,7 +11,8 @@
 #          25 exponential, 26 natural logarithm, 27 base-10 logarithm,
 #          28 sine, 29 cosine, 30 tangent, 31 arctangent,
 #          32 atan2(y, x), including matching physical dimensions,
-#          33 asin(x), 34 acos(x), principal angles with |x| <= 1.
+#          33 asin(x), 34 acos(x), principal angles with |x| <= 1,
+#          35 sinh(x), 36 cosh(x), 37 tanh(x), dimensionless |x| <= 60.
 # Predicate values are dimensionless 0/1 with a separate runtime type bit.
 # where and logical operators evaluate operands eagerly (no short circuit).
 # Unsupported instructions and type mismatches fail closed.
@@ -152,6 +153,57 @@ function bounded_exponential(value: f64) -> f64 {
     }
     if negative { return 1.0 / sum }
     return sum
+}
+
+# Dimensionless hyperbolic functions. Small arguments use direct Taylor
+# series to avoid cancellation in sinh and tanh. For larger arguments,
+# range-reduced native exp evaluates positive magnitudes only; tanh uses
+# exp(-2|x|), avoiding overflow and saturating correctly for |x| >= 20.
+# The evaluator enforces the same [-60,60] input range as exp and trig.
+function bounded_hyperbolic_series(value: f64, cosine: bool) -> f64 {
+    let mut term: f64 = value
+    if cosine { term = 1.0 }
+    let mut sum: f64 = term
+    let mut n: i32 = 1
+    while n <= 16 {
+        if cosine {
+            term = term * value * value / (((2 * n - 1) * (2 * n)) as f64)
+        } else {
+            term = term * value * value / (((2 * n) * (2 * n + 1)) as f64)
+        }
+        sum = sum + term
+        n = n + 1
+    }
+    return sum
+}
+
+function bounded_hyperbolic(value: f64, opcode: i32) -> f64 {
+    let absolute: f64 = magnitude(value)
+    if absolute <= 0.5 {
+        let sine: f64 = bounded_hyperbolic_series(value, false)
+        if opcode == 35 { return sine }
+        let cosine: f64 = bounded_hyperbolic_series(value, true)
+        if opcode == 36 { return cosine }
+        return sine / cosine
+    }
+    if opcode == 37 {
+        if absolute >= 20.0 {
+            if value < 0.0 { return -1.0 }
+            return 1.0
+        }
+        let decay: f64 = bounded_exponential(-2.0 * absolute)
+        let mut result: f64 = (1.0 - decay) / (1.0 + decay)
+        if value < 0.0 { result = -result }
+        return result
+    }
+    let exponential: f64 = bounded_exponential(absolute)
+    let reciprocal: f64 = 1.0 / exponential
+    if opcode == 35 {
+        let mut result: f64 = 0.5 * (exponential - reciprocal)
+        if value < 0.0 { result = -result }
+        return result
+    }
+    return 0.5 * (exponential + reciprocal)
 }
 
 # The logarithm accepts positive finite dimensionless inputs <= 1e30. Repeated
@@ -318,7 +370,7 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
             depth = depth + 1
         } elif opcode == 5 or opcode == 6 or opcode == 18 or opcode == 20 or opcode == 21 or opcode == 25 or
              opcode == 26 or opcode == 27 or opcode == 28 or opcode == 29 or opcode == 30 or opcode == 31 or
-             opcode == 33 or opcode == 34 {
+             opcode == 33 or opcode == 34 or opcode == 35 or opcode == 36 or opcode == 37 {
             if depth < 1 { return failed(instruction.source_start) }
             let input: Quantity = stack[depth - 1]
             if opcode == 18 {
@@ -352,6 +404,13 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
                     let mut logged: f64 = bounded_natural_log(input.value)
                     if opcode == 27 { logged = logged / 2.30258509299404568402 }
                     stack[depth - 1] = quantity(logged, dimensionless())
+                } elif opcode == 35 or opcode == 36 or opcode == 37 {
+                    if not same_dimension(input.dimension, dimensionless()) or
+                       magnitude(input.value) > 60.0 {
+                        return failed(instruction.source_start)
+                    }
+                    stack[depth - 1] = quantity(
+                        bounded_hyperbolic(input.value, opcode), dimensionless())
                 } elif opcode == 31 {
                     if not same_dimension(input.dimension, dimensionless()) {
                         return failed(instruction.source_start)

@@ -383,7 +383,7 @@ def main() -> None:
         "src/math_dimensions.flow",
         "src/math_expression_ir.flow",
         "src/math_expression_source.flow",
-        "src/math_expression_source_smoke.flow",
+        "src/math_expression_source_http_smoke.flow",
     )
     native_math_source = "\n".join(
         "\n".join(
@@ -491,6 +491,41 @@ def main() -> None:
     status, body = request("POST", "/api/check/flow", broken_static, accepted_headers)
     assert status == 422 and body.strip(), (
         "native mathematical static inference invalid compiler syntax", status, body)
+
+    # Native hyperbolic source lowering, typed IR, static dimensions and
+    # scalar equation residuals through the real Flow compiler and HTTP runner.
+    # The temporary HTTP source is built from the checked-in native modules,
+    # not a Python implementation or editor-only syntax highlighting.
+    hyperbolic_files = static_files[:-1] + ("src/math_hyperbolic_smoke.flow",)
+    native_hyperbolic = "\n".join(
+        "\n".join(
+            line.removeprefix("export ")
+            for line in (Path(__file__).resolve().parents[1] / path)
+                .read_text(encoding="utf-8").splitlines()
+            if not line.startswith("import .math_dimensions {")
+            and not line.startswith("import .math_expression_ir {")
+            and not line.startswith("import .math_expression_source {")
+            and not line.startswith("import .math_equation {")
+            and not line.startswith("import .math_static {")
+        )
+        for path in hyperbolic_files
+    )
+    assert "function bounded_hyperbolic(" in native_hyperbolic
+    assert "native-math-hyperbolic-ok" in native_hyperbolic
+    status, body = request("POST", "/api/check/flow", native_hyperbolic, accepted_headers)
+    assert status == 200, ("native hyperbolic HTTP compile", status, body)
+    status, body = request("POST", "/api/run/flow", native_hyperbolic, accepted_headers)
+    assert status == 200 and "native-math-hyperbolic-ok" in body, (
+        "native hyperbolic HTTP execution", status, body)
+    broken_hyperbolic = native_hyperbolic.replace(
+        "function bounded_hyperbolic(value: f64, opcode: i32) -> f64 {",
+        "function bounded_hyperbolic(value: f64, opcode: i32 -> f64 {",
+        1,
+    )
+    assert broken_hyperbolic != native_hyperbolic
+    status, body = request("POST", "/api/check/flow", broken_hyperbolic, accepted_headers)
+    assert status == 422 and body.strip(), (
+        "native hyperbolic malformed compiler rejection", status, body)
 
     # Native bounded 2D advection-diffusion, including nonzero transport
     # velocities and a complex Fourier eigenvalue. Real compiler and execution.

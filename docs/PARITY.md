@@ -1,3 +1,22 @@
+## 2026-10-30: twelve-state nonlinear periodic SIR evolution (verification pending)
+
+`examples/native_spatial_sir4.flow` is a four-cell periodic ring with
+12 mutually coupled susceptible/infected/recovered states, nonlinear infection,
+unequal species diffusion, and compiler-generated RK4. Every state is checked
+against an independently integrated 32768-step reference cross-checked at
+65536 steps. Native assertions cover fourth-order refinement, mass,
+positivity, deterministic replay, semigroup consistency, cyclic equivariance,
+rate/time scaling, exact nonlinear logistic limits and fail-closed input/work
+bounds. `tests/test_native_spatial_sir4_oracle.py` independently reconstructs
+the 12-dimensional stencil and analytical limits. Production `http_smoke.py`
+compiles and runs the exact checked-in Flow source and rejects malformed
+evolution syntax; Ubuntu Chromium Monaco acceptance clicks Run on that source.
+
+**Status:** proposed; local independent Python numerical calculation passed
+(reference cross-check maximum difference 7.8e-15). Native Flow compilation,
+HTTP and physical browser execution are pending Linux/macOS CI. No claim of
+general PDE grammar, computed spatial visualization or RStudio parity.
+
 ## 2026-10-30: native 32x32 two-mode tensor diffusion (Linux/macOS CI verified)
 
 The production-compiled `examples/native_tensor_grid.flow` now supports

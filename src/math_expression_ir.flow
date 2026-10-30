@@ -151,10 +151,10 @@ function bounded_exponential(value: f64) -> f64 {
     return sum
 }
 
-# The logarithm accepts dimensionless [1e-30, 1e30] inputs. Repeated
+# The logarithm accepts positive finite dimensionless inputs <= 1e30. Repeated
 # binary scaling reduces the mantissa to [1,2); then |z| <= 1/3 in
 # ln(m) = 2*(z + z^3/3 + z^5/5 + ...). Twenty-five odd terms are enough
-# for double precision; the bounded domain needs at most 100 shifts.
+# for double precision; finite f64 inputs need at most 1074 shifts.
 function bounded_natural_log(value: f64) -> f64 {
     let mut mantissa: f64 = value
     let mut binary_exponent: i32 = 0
@@ -257,7 +257,7 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
                     stack[depth - 1] = quantity(bounded_exponential(input.value), dimensionless())
                 } elif opcode == 26 or opcode == 27 {
                     if not same_dimension(input.dimension, dimensionless()) or
-                       input.value < 1e-30 or input.value > 1e30 {
+                       input.value <= 0.0 or input.value > 1e30 {
                         return failed(instruction.source_start)
                     }
                     let mut logged: f64 = bounded_natural_log(input.value)

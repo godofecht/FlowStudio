@@ -261,7 +261,7 @@ function main() -> i32 {
     inferred = infer_math_expression_source("log10(-1)")
     if not inferred.valid or evaluate_math_expression("log10(-1)").valid { return 79 }
     inferred = infer_math_expression_source("ln(1e-31)")
-    if not inferred.valid or evaluate_math_expression("ln(1e-31)").valid { return 80 }
+    if not inferred.valid or not evaluate_math_expression("ln(1e-31)").valid { return 80 }
     inferred = infer_math_equation_source("log10(100) = 2")
     if not inferred.valid or not same_dimension(inferred.dimension, dimensionless()) { return 81 }
     inferred = infer_math_equation_source("ln(1m) = 0")

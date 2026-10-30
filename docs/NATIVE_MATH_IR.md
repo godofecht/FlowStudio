@@ -9,7 +9,7 @@ production `/api/check/flow` and `/api/run/flow` routes by
 `tests/http_smoke.py`. This does not imply the editor can import relative
 modules from its anonymous temporary source files.
 
-`MathProgram` contains at most 16 instructions with validated source-byte
+`MathProgram` contains at most 64 instructions with validated source-byte
 spans. Each instruction has an integer opcode, a literal quantity, and an
 integer exponent. The native evaluator maintains a physical dimension and
 a **separate predicate type bit** for every stack value. Boolean predicates
@@ -73,7 +73,7 @@ literals, optional immediate SI suffixes `m`, `s`, `kg`, `K`, ASCII
 `+ - * /`, Unicode `× ÷ −`, unary signs and parentheses, with conventional
 multiplication/division precedence and left associativity.
 
-Inputs are limited to 512 UTF-8 bytes and 16 emitted instructions; unknown
+Inputs are limited to 512 UTF-8 bytes and 64 emitted instructions; unknown
 identifiers, implicit multiplication, unsupported Unicode, malformed numbers,
 invalid units and incomplete expressions fail closed.
 Runtime dimensional errors and division by zero retain the operator's
@@ -277,3 +277,31 @@ program and the production HTTP/Chromium acceptance suites.
 This remains a deliberately bounded scalar parser, not full upstream
 Flow grammar integration, general Unicode normalization, static
 dimensional inference, symbolic PDE lowering, or native Navier–Stokes.
+
+## Native value-independent static dimensional inference (2026-10-30)
+
+`src/math_static.flow` traverses the **actual executable native postfix IR**
+and checks operand types, SI exponents, predicate compatibility, stack
+balance, instruction spans, integer-power limits, and scalar equation
+dimensions **without evaluating numerical values**. The entry points
+`infer_math_ir`, `infer_math_expression_source`,
+`infer_math_expression_source_with_bindings`, `infer_math_equation`,
+and their source/bindings variants return a dimension, predicate flag,
+validity, and UTF-8 error position. This is a native Flow 2.0 type-analysis
+pass over the bounded scalar AST/IR, not editor-only highlighting.
+
+This deliberately distinguishes **well-typed** from **numerically defined**:
+`1m / 0s`, `sqrt(-9m²)`, `0m^-2` and a clamp with reversed numeric bounds
+pass dimensional analysis but fail the numerical evaluator. No symbolic
+constant propagation, numeric range analysis, unit-scale conversion,
+automatic dimension inference for unbound symbols, compiler-wide Flow 2.0
+type checking, vector/tensor equations, or general PDE lowering is claimed.
+Caller-supplied symbols retain their explicitly declared dimensions; their
+values are lowered as IR literals by the existing source parser.
+
+`src/math_static_smoke.flow` tests source spans, physical predicates,
+invalid dimensions, equations, the distinction from runtime-domain checks,
+and a real 64-instruction program. Both native Linux/macOS CI and production
+HTTP check/run acceptance are wired to execute the exact module. Their
+success must be confirmed from GitHub Actions before claiming verification.
+

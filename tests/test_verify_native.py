@@ -40,7 +40,7 @@ class NativeGateTest(unittest.TestCase):
     def test_real_loopback_health_probe_rejects_wrong_body(self):
         class HealthHandler(BaseHTTPRequestHandler):
             def do_GET(self):
-                body = b"FlowStudio ready" if self.path == "/health" else b"missing"
+                body = self.server.health_body if self.path == "/health" else b"missing"
                 self.send_response(200)
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
@@ -54,10 +54,14 @@ class NativeGateTest(unittest.TestCase):
                 return None
 
         with HTTPServer(("127.0.0.1", 0), HealthHandler) as server:
+            server.health_body = b"FlowStudio ready"
             thread = threading.Thread(target=server.serve_forever, daemon=True)
             thread.start()
             try:
                 native._wait_health(RunningProcess(), server.server_address[1], 2)
+                server.health_body = b"not ready"
+                with self.assertRaisesRegex(native.VerificationError, "unexpected health body"):
+                    native._wait_health(RunningProcess(), server.server_address[1], 0.3)
             finally:
                 server.shutdown()
                 thread.join(timeout=2)

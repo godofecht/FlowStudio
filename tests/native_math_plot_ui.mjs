@@ -249,6 +249,16 @@ try {
     null, { timeout: 80000 });
   assert.match(await page.locator('#console').textContent(), /native-field-affine64-ok/);
 
+  // Two separate compiler-generated fields with unequal boundaries and
+  // diffusion rates. Actual Monaco Run -> native HTTP -> pinned Flow 2.0.
+  await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
+    readFileSync('examples/native_field_dual48.flow', 'utf8'));
+  await page.locator('#run').click();
+  await page.waitForFunction(() =>
+    document.querySelector('#console')?.textContent?.includes('native-field-dual48-ok'),
+    null, { timeout: 80000 });
+  assert.match(await page.locator('#console').textContent(), /native-field-dual48-ok/);
+
   // Six-state nonlinear spatial SIR evolution: Monaco -> native Flow HTTP
   // -> compiler-generated RK4. The checked-in Flow main() verifies the
   // independent numerical reference and exact nonlinear limiting cases.

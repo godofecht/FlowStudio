@@ -216,6 +216,132 @@ function stripeFourier8() -> TransportGrid {
     return TransportGrid { values: values }
 }
 
+# Three independently travelling Fourier modes on a NONSQUARE 5x7 grid.
+# All 35 cells are checked, not merely a selected phase or scalar summary.
+# Initial amplitudes (cos,sin): (1,1)=(.65,.18), (2,3)=(-.24,.31),
+# (1,2)=(.17,-.13); mean 2.75. Values are precomputed from the exact
+# semidiscrete Fourier formula by an independent standard-library oracle.
+# This tests simultaneous x/y transport, unequal diffusion and mode coupling
+# by superposition without relying on a continuum-PDE approximation.
+function initialMultimode5x7() -> TransportGrid {
+    let mut values: array<f64, 64> = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    values[0] = 3.3300000000000001
+    values[1] = 3.4273242680628688
+    values[2] = 1.7470037285256816
+    values[3] = 2.2778802433994292
+    values[4] = 2.9677917600120201
+    values[5] = 3.4821653381192350
+    values[6] = 1.9744583137202223
+    values[7] = 2.4032403057480378
+    values[8] = 2.6963619198578614
+    values[9] = 3.1937741225546428
+    values[10] = 2.2920832836518104
+    values[11] = 2.5908503186364764
+    values[12] = 2.3929967236461791
+    values[13] = 2.9713775622239114
+    values[14] = 3.5026921118416219
+    values[15] = 2.8057333448672970
+    values[16] = 2.0934598016537795
+    values[17] = 2.7149823805946602
+    values[18] = 3.4900580137298234
+    values[19] = 2.6457664591544385
+    values[20] = 1.8418037077905582
+    values[21] = 2.4799575090330648
+    values[22] = 3.4393707399295201
+    values[23] = 2.9737374173721669
+    values[24] = 3.0151306258746899
+    values[25] = 2.3130349822259664
+    values[26] = 3.3410321923192803
+    values[27] = 3.2193379509145283
+    values[28] = 3.1950373464242636
+    values[29] = 1.6815575281159629
+    values[30] = 3.1851793433451330
+    values[31] = 3.3429175965743076
+    values[32] = 3.3330681706413920
+    values[33] = 1.6455474969925450
+    values[34] = 2.2432873924466232
+    return TransportGrid { values: values }
+}
+
+function referenceMultimode5x7() -> TransportGrid {
+    let mut values: array<f64, 64> = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    values[0] = 3.1349001172568856
+    values[1] = 2.8013300161794383
+    values[2] = 2.3103592313787740
+    values[3] = 2.5226970226701955
+    values[4] = 2.9807136125147076
+    values[5] = 2.9231468493309372
+    values[6] = 2.4230573220661316
+    values[7] = 2.4717296290730975
+    values[8] = 2.8253535971278780
+    values[9] = 3.1067126024019571
+    values[10] = 2.5759735383470095
+    values[11] = 2.4520687536632888
+    values[12] = 2.6516826322258562
+    values[13] = 3.0348774152959663
+    values[14] = 3.0353976604678792
+    values[15] = 2.4649649440691759
+    values[16] = 2.4850755536216260
+    values[17] = 2.9333174569875058
+    values[18] = 3.1218595912831186
+    values[19] = 2.7447824540385741
+    values[20] = 2.3510454231426032
+    values[21] = 2.8177584012701029
+    values[22] = 3.1672971125509033
+    values[23] = 2.9038983738748305
+    values[24] = 2.5100006891615605
+    values[25] = 2.7031239955806861
+    values[26] = 3.1604487224182334
+    values[27] = 3.0309401824745374
+    values[28] = 2.5848580134309200
+    values[29] = 2.2706290860956231
+    values[30] = 3.0968451322727026
+    values[31] = 3.1102612307811786
+    values[32] = 2.6846737553093263
+    values[33] = 2.2564559863170937
+    values[34] = 2.6017638953196989
+    return TransportGrid { values: values }
+}
+
+function verifyMultimode5x7() -> bool {
+    let equation: TransportEquation = TransportEquation {
+        width: 5, height: 7, spacing_x: 0.2, spacing_y: 1.0 / 7.0,
+        velocity_x: 0.23, velocity_y: -0.31,
+        diffusivity_x: 0.008, diffusivity_y: 0.013
+    }
+    let initial: TransportGrid = initialMultimode5x7()
+    let reference: TransportGrid = referenceMultimode5x7()
+    let coarse: TransportResult = integrateTransport(equation, initial, 0.7, 16)
+    let medium: TransportResult = integrateTransport(equation, initial, 0.7, 32)
+    let fine: TransportResult = integrateTransport(equation, initial, 0.7, 64)
+    let finest: TransportResult = integrateTransport(equation, initial, 0.7, 128)
+    if not coarse.valid or not medium.valid or not fine.valid or not finest.valid { return false }
+    let error16: f64 = maxDifference(coarse.grid, reference, 35)
+    let error32: f64 = maxDifference(medium.grid, reference, 35)
+    let error64: f64 = maxDifference(fine.grid, reference, 35)
+    let error128: f64 = maxDifference(finest.grid, reference, 35)
+    if error16 < 0.0000001 or error128 > 0.0000000002 { return false }
+    if error32 >= 0.09 * error16 or error64 >= 0.09 * error32 or error128 >= 0.09 * error64 { return false }
+    if absolute(gridMean(finest.grid, 35) - 2.75) > 0.000000000001 { return false }
+    let replay: TransportResult = integrateTransport(equation, initial, 0.7, 128)
+    if not replay.valid or maxDifference(replay.grid, finest.grid, 35) > 0.000000000001 { return false }
+    let firstHalf: TransportResult = integrateTransport(equation, initial, 0.35, 64)
+    if not firstHalf.valid { return false }
+    let secondHalf: TransportResult = integrateTransport(equation, firstHalf.grid, 0.35, 64)
+    if not secondHalf.valid or maxDifference(secondHalf.grid, finest.grid, 35) > 0.000000000001 { return false }
+    let mut invalid: TransportEquation = equation
+    invalid.width = 9
+    if integrateTransport(invalid, initial, 0.7, 128).valid { return false }
+    invalid = equation
+    invalid.height = 9
+    if integrateTransport(invalid, initial, 0.7, 128).valid { return false }
+    invalid = equation
+    invalid.diffusivity_y = -0.013
+    if integrateTransport(invalid, initial, 0.7, 128).valid { return false }
+    if integrateTransport(equation, initial, 0.7, 1).valid { return false }
+    return true
+}
+
 function main() -> i32 {
     let equation: TransportEquation = TransportEquation {
         width: 4, height: 4, spacing_x: 0.25, spacing_y: 0.25,
@@ -306,6 +432,7 @@ function main() -> i32 {
     if absolute(largeRun.grid.values[8] - largeRun.grid.values[0]) > 0.000000000001 { return 28 }
     if absolute(gridMean(largeRun.grid, 64)) > 0.000000000001 { return 29 }
 
+    if not verifyMultimode5x7() { return 30 }
     println("native-advection-diffusion2d-ok")
     return 0
 }

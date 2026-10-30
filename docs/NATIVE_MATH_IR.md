@@ -107,3 +107,31 @@ CI and production HTTP acceptance compile and execute this exact smoke
 program; a successful CI run is required before claiming verification.
 This does not yet support arbitrary exponent expressions, symbolic functions,
 general source-to-IR lowering or native PDE declarations.
+
+
+## Native source-level absolute value and square root (2026-10-30)
+
+The actual Flow 2.0 source parser now lowers `abs(expression)`,
+`sqrt(expression)`, and the Unicode prefix radical `√expression` to
+existing typed postfix IR opcodes 20 and 21. The ASCII function names require
+an immediate opening parenthesis. The Unicode radical is a prefix operator
+that may also precede parentheses. These operations are evaluated by the
+native runtime rather than an editor-only completion or the Python dialect.
+
+Absolute value preserves physical units. Square root rejects negative
+radicands and odd SI dimension exponents, halving even exponents. The parser
+emits function calls when their closing parenthesis is consumed, ensuring
+`sqrt(9m²)^2` applies the outer power **after** the square root.
+The Unicode radical retains its three-byte UTF-8 source span; native
+dimensional failures point to the function/radical position.
+
+The native source smoke adds 28 executable cases covering nested functions,
+signed quantities, dimensional composition, postfix powers, source offsets,
+invalid radicands and unsupported syntax. Existing Linux/macOS native CI
+executes `src/math_expression_source_smoke.flow`, and the production HTTP
+acceptance compiles and runs the exact module. CI results must be checked
+before this feature is treated as verified.
+
+This is still a bounded scalar parser. It does not accept symbolic
+variables, general functions, arbitrary exponent expressions, equations,
+spatial derivatives, upstream Flow grammar extensions or general PDEs.

@@ -112,6 +112,23 @@ function main() -> i32 {
     result = evaluate_math_equation_source("true = false", quantity(0.0, dimensionless()))
     if result.valid { return 41 }
 
+    # The scalar equation compiler uses the same Unicode identifier lexer
+    # and checks dimensional residuals after actual native evaluation.
+    let mut greek: MathBindings = empty_math_bindings()
+    greek.count = 3
+    greek.symbols[0] = MathSymbol { name: "u₁", value: quantity(3.0, speed) }
+    greek.symbols[1] = MathSymbol { name: "u₂", value: quantity(4.0, speed) }
+    greek.symbols[2] = MathSymbol { name: "ρ", value: quantity(2.0, metres) }
+    result = evaluate_math_equation_source_with_bindings(
+        "u₁ + u₂ = 7m/1s", greek, quantity(0.0, speed))
+    if not result.valid or not result.satisfied or not near(result.residual.value, 0.0) { return 42 }
+    result = evaluate_math_equation_source_with_bindings(
+        "ρ/u₁ = 2s/3", greek, quantity(0.0, seconds))
+    if not result.valid or not result.satisfied { return 43 }
+    result = evaluate_math_equation_source_with_bindings(
+        "u₁ + ρ = 7m/1s", greek, quantity(0.0, speed))
+    if result.valid { return 44 }
+
     println("native-math-equation-ok")
     return 0
 }

@@ -16,7 +16,7 @@ RATIO = 0.4
 def source_array(name):
     source = SOURCE.read_text(encoding="utf-8")
     match = re.search(
-        rf"let {name}: array<f64, 32> = \\[([^\\]]+)\\]",
+        rf"let {name}: array<f64, 32> = \[([^\]]+)\]",
         source, re.MULTILINE)
     if match is None:
         raise AssertionError(f"Missing checked-in {name} array")

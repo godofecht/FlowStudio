@@ -327,6 +327,9 @@ try {
     document.querySelector('#console')?.textContent?.includes('native-spatial-sir2-ok'),
     null, { timeout: 80000 });
   assert.match(await page.locator('#console').textContent(), /native-spatial-sir2-ok/);
+  assert.equal(await page.locator('#mathFlowPlot svg[data-native-flow-field]').count(), 0,
+    'Successful ordinary Flow execution must not retain Gray-Scott curves');
+  assert.equal(await page.locator('#mathFlowPlot').isHidden(), true);
 
   // Twelve-state nonlinear periodic SIR: actual Monaco Run -> native HTTP ->
   // compiler-generated RK4 and twelve independent numerical assertions.

@@ -125,7 +125,7 @@ emits function calls when their closing parenthesis is consumed, ensuring
 The Unicode radical retains its three-byte UTF-8 source span; native
 dimensional failures point to the function/radical position.
 
-The native source smoke adds 25 executable cases covering nested functions,
+The native source smoke adds 28 executable cases covering nested functions,
 signed quantities, dimensional composition, postfix powers, source offsets,
 invalid radicands and unsupported syntax. Existing Linux/macOS native CI
 executes `src/math_expression_source_smoke.flow`, and the production HTTP

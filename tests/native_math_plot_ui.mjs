@@ -268,6 +268,28 @@ try {
     document.querySelector('#console')?.textContent?.includes('native-field-grayscott64-ok'),
     null, { timeout: 80000 });
   assert.match(await page.locator('#console').textContent(), /native-field-grayscott64-ok/);
+  // The plotted curves must come from the compiler-executed Flow stdout,
+  // not the separate NumPy MathFlow interpreter or a canned browser figure.
+  await page.locator('#mathFlowPlot svg[data-native-flow-field="true"]')
+    .waitFor({timeout:30000});
+  assert.equal(await page.locator('#mathFlowPlot path[data-field-name]').count(), 2);
+  assert.equal(await page.locator('#tab-plots').getAttribute('aria-selected'), 'true');
+  const fieldData = await page.evaluate(() =>
+    globalThis.FlowStudioNativeFieldPlots.parse(
+      document.getElementById('console').textContent));
+  assert.equal(fieldData.count, 64);
+  assert.deepEqual(fieldData.fields.map(field => field.name), ['U', 'V']);
+  const grayscottSource = readFileSync('examples/native_field_grayscott64.flow', 'utf8');
+  for (const field of fieldData.fields) {
+    const expectedMatch = new RegExp(
+      'let expected' + field.name + '256: array<f64, 64> = \\\\[([\\\\s\\\\S]*?)\\\\]'
+    ).exec(grayscottSource);
+    assert.ok(expectedMatch, 'Missing checked-in independent numerical reference');
+    const reference = expectedMatch[1].split(',').map(Number).filter(Number.isFinite);
+    assert.equal(reference.length, 64);
+    assert.ok(Math.max(...field.values.map((value, i) =>
+      Math.abs(value - reference[i]))) < 1e-4, 'Plot must reflect computed field');
+  }
 
   // Six-state nonlinear spatial SIR evolution: Monaco -> native Flow HTTP
   // -> compiler-generated RK4. The checked-in Flow main() verifies the

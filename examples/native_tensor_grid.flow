@@ -265,6 +265,23 @@ function diagonalFourier32() -> TensorGrid {
     return TensorGrid { values: values }
 }
 
+# A second independently evolved 2D species, with a different baseline,
+# Fourier amplitudes and positive-definite anisotropic diffusion tensor.
+function diagonalFourier32SpeciesV() -> TensorGrid {
+    let mut values: array<f64, 1024> = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    let mut y: i32 = 0
+    while y < 32 {
+        let mut x: i32 = 0
+        while x < 32 {
+            values[y * 32 + x] = 5.0 +
+                0.8 * quarterMode(x + y) - 0.3 * quarterMode(x - y)
+            x = x + 1
+        }
+        y = y + 1
+    }
+    return TensorGrid { values: values }
+}
+
 function shiftRight32(grid: TensorGrid) -> TensorGrid {
     let mut values: array<f64, 1024> = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     let mut y: i32 = 0
@@ -508,14 +525,104 @@ function main() -> i32 {
     if integrateTensor(largest, unbounded32, 0.025, 128).valid { return 56 }
     if integrateTensor(largest, initial32, 100.0, 1).valid { return 57 }
 
+    # Independently evolved second 32x32 species with negative mixed
+    # diffusion and different Fourier amplitudes. Its eigenvalues are
+    # -32.768 and -40.96, unlike T's -69.632 and -53.248.
+    let speciesVEquation: TensorEquation = TensorEquation {
+        width: 32, height: 32, spacing_x: 0.03125, spacing_y: 0.03125,
+        diffusion_xx: 0.008, diffusion_xy: -0.002, diffusion_yy: 0.010
+    }
+    let speciesVInitial: TensorGrid = diagonalFourier32SpeciesV()
+    let speciesVCoarse: TensorResult = integrateTensor(
+        speciesVEquation, speciesVInitial, 0.025, 32)
+    let speciesVMedium: TensorResult = integrateTensor(
+        speciesVEquation, speciesVInitial, 0.025, 64)
+    let speciesVFine: TensorResult = integrateTensor(
+        speciesVEquation, speciesVInitial, 0.025, 128)
+    if not speciesVCoarse.valid or not speciesVMedium.valid or
+       not speciesVFine.valid { return 58 }
+    let mut speciesVReference: TensorGrid = blankGrid()
+    let mut speciesVY: i32 = 0
+    while speciesVY < 32 {
+        let mut speciesVX: i32 = 0
+        while speciesVX < 32 {
+            speciesVReference.values[speciesVY * 32 + speciesVX] = 5.0 +
+                0.8 * 0.4407841408053245 * quarterMode(speciesVX + speciesVY) -
+                0.3 * 0.3591554413294045 * quarterMode(speciesVX - speciesVY)
+            speciesVX = speciesVX + 1
+        }
+        speciesVY = speciesVY + 1
+    }
+    let speciesVCoarseError: f64 = maxGridDifference(
+        speciesVCoarse.grid, speciesVReference, 1024)
+    let speciesVMediumError: f64 = maxGridDifference(
+        speciesVMedium.grid, speciesVReference, 1024)
+    let speciesVFineError: f64 = maxGridDifference(
+        speciesVFine.grid, speciesVReference, 1024)
+    if speciesVCoarseError < 0.00004 or speciesVMediumError < 0.00001 {
+        return 59
+    }
+    if speciesVFineError > 0.00001 { return 60 }
+    if speciesVMediumError >= 0.30 * speciesVCoarseError or
+       speciesVFineError >= 0.30 * speciesVMediumError { return 61 }
+    if absolute(gridMean(speciesVFine.grid, 1024) - 5.0) > 0.00000000002 {
+        return 62
+    }
+    let speciesVHalf: TensorResult = integrateTensor(
+        speciesVEquation, speciesVInitial, 0.0125, 64)
+    let speciesVComposed: TensorResult = integrateTensor(
+        speciesVEquation, speciesVHalf.grid, 0.0125, 64)
+    if not speciesVHalf.valid or not speciesVComposed.valid or
+       maxGridDifference(speciesVComposed.grid, speciesVFine.grid, 1024) >
+           0.00000000002 { return 63 }
+    let speciesVReplay: TensorResult = integrateTensor(
+        speciesVEquation, speciesVInitial, 0.025, 128)
+    if not speciesVReplay.valid or
+       maxGridDifference(speciesVReplay.grid, speciesVFine.grid, 1024) > 0.0 {
+        return 64
+    }
+    let speciesVZero: TensorResult = integrateTensor(
+        speciesVEquation, speciesVInitial, 0.0, 128)
+    if not speciesVZero.valid or
+       maxGridDifference(speciesVZero.grid, speciesVInitial, 1024) > 0.0 {
+        return 65
+    }
+    let speciesVReverse: TensorEquation = TensorEquation {
+        width: 32, height: 32, spacing_x: 0.03125, spacing_y: 0.03125,
+        diffusion_xx: 0.008, diffusion_xy: 0.002, diffusion_yy: 0.010
+    }
+    let speciesVMutation: TensorResult = integrateTensor(
+        speciesVReverse, speciesVInitial, 0.025, 128)
+    if not speciesVMutation.valid or
+       maxGridDifference(speciesVMutation.grid, speciesVFine.grid, 1024) < 0.05 {
+        return 66
+    }
+    if integrateTensor(speciesVEquation, speciesVInitial, 0.025, 2000).valid {
+        return 67
+    }
+    let mut speciesVInvalid: TensorGrid = speciesVInitial
+    speciesVInvalid.values[511] = 10000000000.0
+    if integrateTensor(speciesVEquation, speciesVInvalid, 0.025, 128).valid {
+        return 68
+    }
+    if integrateTensor(speciesVEquation, speciesVInitial, 100.0, 1).valid {
+        return 69
+    }
+
     println("native-tensor-grid-ok")
-    # The 1024 displayed cells come from the independently asserted native
-    # RK2 state, not from the analytical reference or a browser fixture.
-    println("FLOWSTUDIO_GRID_V1 32 32 1")
+    # Both 1024-cell species are emitted from the independently asserted
+    # compiler-executed RK2 states, never from precomputed reference values.
+    println("FLOWSTUDIO_GRID_V1 32 32 2")
     print("T")
     for cell in 0 to 1024 {
         print(" ")
         print(fine32.grid.values[cell])
+    }
+    println("")
+    print("V")
+    for cell in 0 to 1024 {
+        print(" ")
+        print(speciesVFine.grid.values[cell])
     }
     println("")
     println("FLOWSTUDIO_GRID_END")

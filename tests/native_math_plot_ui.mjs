@@ -259,6 +259,16 @@ try {
     null, { timeout: 80000 });
   assert.match(await page.locator('#console').textContent(), /native-field-dual48-ok/);
 
+  // Actual Chromium Monaco Run of two compiler-backed PDE fields with
+  // nonlinear Gray-Scott cross-coupling and 384 numerical cell assertions.
+  await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
+    readFileSync('examples/native_field_grayscott64.flow', 'utf8'));
+  await page.locator('#run').click();
+  await page.waitForFunction(() =>
+    document.querySelector('#console')?.textContent?.includes('native-field-grayscott64-ok'),
+    null, { timeout: 80000 });
+  assert.match(await page.locator('#console').textContent(), /native-field-grayscott64-ok/);
+
   // Six-state nonlinear spatial SIR evolution: Monaco -> native Flow HTTP
   // -> compiler-generated RK4. The checked-in Flow main() verifies the
   // independent numerical reference and exact nonlinear limiting cases.

@@ -32,7 +32,7 @@ function source_error(position: i32, length: i32) -> ParsedMathExpression {
 }
 
 function precedence(opcode: i32) -> i32 {
-    if opcode == 5 { return 3 }
+    if opcode == 5 or opcode == 20 or opcode == 21 { return 3 }
     if opcode == 3 or opcode == 4 { return 2 }
     if opcode == 1 or opcode == 2 { return 1 }
     return 0

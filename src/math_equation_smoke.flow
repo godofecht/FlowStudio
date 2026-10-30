@@ -96,7 +96,7 @@ function main() -> i32 {
         "where(1<2 ∧ 3>4,3m,4m) = 4m", exact_m)
     if not result.valid or not result.satisfied { return 35 }
     let area: Dimension = product_dimension(metres, metres)
-    result = evaluate_math_equation_source("2m⋅3m = 6m^2", quantity(0.0, area))
+    result = evaluate_math_equation_source("2m⋅3m = 3m⋅2m", quantity(0.0, area))
     if not result.valid or not result.satisfied or
        not same_dimension(result.residual.dimension, area) { return 36 }
     result = evaluate_math_equation_source("9m∕3s = 3m/1s", quantity(0.0, speed))

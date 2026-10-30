@@ -61,3 +61,22 @@ test("render creates bounded, finite, escaped SVG paths without HTML injection",
     assert.doesNotMatch(path.attributes.d, /NaN|Infinity|<|>/);
   }
 });
+
+test("deterministic bounded 1D fields survive 120 seeded sizes and species counts", () => {
+  for (let seed = 1; seed <= 120; seed++) {
+    let state = seed;
+    const random = () => {
+      state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+      return state / 4294967296;
+    };
+    const count = 3 + seed % 510, species = 1 + seed % 4;
+    const rows = Array.from({length:species}, (_, j) => "F" + j + " " +
+      Array.from({length:count}, () => ((random() - .5) * 2).toExponential(9)).join(" "));
+    const data = parse(["FLOWSTUDIO_FIELD_V1 " + count + " " + species,
+      ...rows, "FLOWSTUDIO_FIELD_END"].join("\n"));
+    assert.equal(data.count, count);
+    assert.equal(data.fields.length, species);
+    assert.ok(data.fields.every(field => field.values.length === count &&
+      field.values.every(Number.isFinite)));
+  }
+});

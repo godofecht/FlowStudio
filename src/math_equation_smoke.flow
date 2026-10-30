@@ -104,6 +104,14 @@ function main() -> i32 {
     result = evaluate_math_equation_source("1m⋅2s = 2m", exact_m)
     if result.valid { return 38 }
 
+    # Boolean predicates can select dimensioned equation terms but are not residuals.
+    result = evaluate_math_equation_source("where(true,3m,4m) = 3m", exact_m)
+    if not result.valid or not result.satisfied { return 39 }
+    result = evaluate_math_equation_source("where(false,3m,4m) = 4m", exact_m)
+    if not result.valid or not result.satisfied { return 40 }
+    result = evaluate_math_equation_source("true = false", quantity(0.0, dimensionless()))
+    if result.valid { return 41 }
+
     println("native-math-equation-ok")
     return 0
 }

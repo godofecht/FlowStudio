@@ -172,6 +172,21 @@ def main() -> None:
     status, body = request("POST", "/api/check/flow", malformed_affine, accepted_headers)
     assert status == 422 and body.strip(), (
         "native affine field malformed evolution rejection", status, body)
+    # Two independent upstream field declarations: different Dirichlet
+    # endpoints and diffusion ratios, 288 compiler-executed cell assertions.
+    dual_source = (Path(__file__).resolve().parents[1] /
+                   "examples/native_field_dual48.flow").read_text(encoding="utf-8")
+    status, body = request("POST", "/api/check/flow", dual_source, accepted_headers)
+    assert status == 200, ("native dual field compile", status, body)
+    status, body = request("POST", "/api/run/flow", dual_source, accepted_headers)
+    assert status == 200 and "native-field-dual48-ok" in body, (
+        "native dual field numerical execution", status, body)
+    malformed_dual = dual_source.replace(
+        "B evolves as laplacian(B)", "B evolves as laplacian(", 1)
+    assert malformed_dual != dual_source
+    status, body = request("POST", "/api/check/flow", malformed_dual, accepted_headers)
+    assert status == 422 and body.strip(), (
+        "native dual field malformed second evolution rejection", status, body)
     # The same native Flow 2.0 wave PDE runs through the production compiler
     # and HTTP execution route; main() checks analytic modes and invalid input.
     wave_native_source = (Path(__file__).resolve().parents[1] /

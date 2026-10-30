@@ -1,3 +1,31 @@
+## 2026-10-30: two independent compiler-backed 48-cell fields (Linux/macOS CI verified)
+
+`examples/native_field_dual48.flow` declares two separate upstream Flow 2.0
+`field` / `laplacian` / Dirichlet systems. They use distinct fixed endpoints
+and independent stable diffusion ratios, testing multiple compiler-generated
+field functions in one translation unit. All 96 initial cells and 288 evolved
+values at 16/64/128 steps have independent discrete sine-mode references.
+The native main checks both fields, separate residual-energy decay, affine
+fixed points, semigroup composition, replay, boundary and rate mutation,
+invalid parameters, nonmutation on rejection and a 196608-cell-step limit.
+
+The checked-in Python direct-stencil/analytical oracle, real native compiler
+HTTP check/run acceptance, malformed second-field rejection and Ubuntu
+Chromium Monaco Run acceptance are wired into the existing test suites.
+**Verified:** [PR CI #41075130293](https://github.com/godofecht/FlowStudio/actions/runs/41075130293)
+passed all six jobs: Linux/macOS source/transport, Linux/macOS native
+Flow+HTTP, and Linux/macOS real R/C FlowJIT. Each source platform passed
+1,143 JavaScript tests (12 skipped) and 374 Python tests (13 skipped),
+including all six new independent dual-field oracle tests. Both native
+platforms compiled and executed the exact checked-in Flow source through
+the production HTTP check/run routes and rejected malformed second-field
+syntax. Ubuntu Chromium executed it through the actual Monaco Run control.
+**Unexecuted:** local native Flow/R/HTTP and independent macOS physical-browser
+acceptance. **Pending:** post-merge main CI. This tests two *independent*
+1D fields, not coupled or multidimensional PDE lowering. General PDE
+operators, computed spatial plots, Flow/R debugging and multi-user isolation
+remain incomplete. Hosted CI configuration is unchanged.
+
 ## 2026-10-30: upstream native `field` / `laplacian` / Dirichlet PDE (PR #247)
 
 `examples/native_field_heat1d.flow` exercises the actual pinned upstream Flow

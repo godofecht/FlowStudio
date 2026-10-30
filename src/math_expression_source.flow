@@ -224,6 +224,33 @@ function operator_bytes(bytes: ptr<u8>, position: i32) -> i32 {
     return 1
 }
 
+# Superscript integer powers are lexed as complete UTF-8 code points.
+# U+00B9/B2/B3 and U+2070/2074..2079 are digits; U+207A/B are signs.
+# The same bounded [-8, 8] power IR is used by ASCII ^ and Unicode.
+function superscript_digit(bytes: ptr<u8>, position: i32, length: i32) -> i32 {
+    if position + 1 < length and bytes[position] == 194 {
+        if bytes[position + 1] == 185 { return 1 } # ¹
+        if bytes[position + 1] == 178 { return 2 } # ²
+        if bytes[position + 1] == 179 { return 3 } # ³
+    }
+    if position + 2 < length and bytes[position] == 226 and
+       bytes[position + 1] == 129 {
+        let last: u8 = bytes[position + 2]
+        if last == 176 { return 0 } # ⁰
+        if last >= 180 and last <= 185 { return last as i32 - 176 } # ⁴..⁹
+    }
+    return -1
+}
+
+function superscript_sign(bytes: ptr<u8>, position: i32, length: i32) -> i32 {
+    if position + 2 < length and bytes[position] == 226 and
+       bytes[position + 1] == 129 {
+        if bytes[position + 2] == 186 { return 1 } # ⁺
+        if bytes[position + 2] == 187 { return -1 } # ⁻
+    }
+    return 0
+}
+
 export function parse_math_expression_with_bindings(source: string, bindings: MathBindings) -> ParsedMathExpression {
     let length: i32 = strlen(source) as i32
     if length < 1 or length > 512 or not valid_bindings(bindings) {
@@ -247,39 +274,50 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
             index = index + 1
             continue
         }
-        # Integer powers bind to the preceding primary before any pending
-        # unary sign. Exponents are immediate signed ASCII integers or the
-        # UTF-8 superscripts ²/³. Chained powers are rejected as ambiguous.
-        if c == 94 or (c == 194 and index + 1 < length and
-                       (bytes[index + 1] == 178 or bytes[index + 1] == 179)) {
+        # Integer powers bind to the preceding primary before pending
+        # unary signs. ASCII ^ accepts immediate signed decimal integers.
+        # Unicode superscript digits and optional superscript signs are
+        # consumed as one exponent, never as separate numeric operands.
+        # Chained powers and exponents outside [-8, 8] fail closed.
+        if c == 94 or superscript_digit(bytes, index, length) >= 0 or
+           superscript_sign(bytes, index, length) != 0 {
             if expect_operand or previous_was_power { return source_error(index, length) }
             let start: i32 = index
             let mut exponent: i32 = 0
-            if c == 194 {
-                exponent = 2
-                if bytes[index + 1] == 179 { exponent = 3 }
-                index = index + 2
-            } else {
+            let mut sign: i32 = 1
+            if c == 94 {
                 index = index + 1
-                let mut sign: i32 = 1
                 if index < length {
                     if bytes[index] == 45 { sign = -1; index = index + 1 }
                     elif bytes[index] == 43 { index = index + 1 }
                 }
-                if index >= length { return source_error(start, length) }
-                if not str_is_ascii_digit(bytes[index]) { return source_error(start, length) }
-                let mut scanning: bool = true
-                while index < length and scanning {
-                    if str_is_ascii_digit(bytes[index]) {
-                        exponent = exponent * 10 + (bytes[index] as i32 - 48)
-                        if exponent > 8 { return source_error(start, length) }
-                        index = index + 1
-                    } else {
-                        scanning = false
-                    }
+                if index >= length or not str_is_ascii_digit(bytes[index]) {
+                    return source_error(start, length)
                 }
-                exponent = sign * exponent
+                while index < length and str_is_ascii_digit(bytes[index]) {
+                    exponent = exponent * 10 + (bytes[index] as i32 - 48)
+                    if exponent > 8 { return source_error(start, length) }
+                    index = index + 1
+                }
+            } else {
+                let unicode_sign: i32 = superscript_sign(bytes, index, length)
+                if unicode_sign != 0 {
+                    sign = unicode_sign
+                    index = index + 3
+                }
+                if superscript_digit(bytes, index, length) < 0 {
+                    return source_error(start, length)
+                }
+                let mut digit: i32 = superscript_digit(bytes, index, length)
+                while digit >= 0 {
+                    exponent = exponent * 10 + digit
+                    if exponent > 8 { return source_error(start, length) }
+                    if bytes[index] == 194 { index = index + 2 }
+                    else { index = index + 3 }
+                    digit = superscript_digit(bytes, index, length)
+                }
             }
+            exponent = sign * exponent
             if count >= 64 { return source_error(start, length) }
             instructions[count] = MathInstruction {
                 opcode: 6, literal: quantity(0.0, dimensionless()),

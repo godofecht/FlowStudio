@@ -147,7 +147,7 @@ function source_error(position: i32, length: i32) -> ParsedMathExpression {
 
 function precedence(opcode: i32) -> i32 {
     if opcode == 5 or opcode == 20 or opcode == 21 or opcode == 25 or
-       opcode == 26 or opcode == 27 or opcode == 28 or opcode == 29 { return 3 }
+       opcode == 26 or opcode == 27 or opcode == 28 or opcode == 29 or opcode == 30 { return 3 }
     if opcode == 3 or opcode == 4 { return 2 }
     if opcode == 1 or opcode == 2 { return 1 }
     # Comparisons bind below arithmetic and lower to typed predicate IR.
@@ -163,7 +163,7 @@ function precedence(opcode: i32) -> i32 {
 # All operands are eagerly evaluated by the existing typed postfix IR.
 function function_arity(opcode: i32) -> i32 {
     if opcode == 20 or opcode == 21 or opcode == 25 or
-       opcode == 26 or opcode == 27 or opcode == 28 or opcode == 29 { return 1 }
+       opcode == 26 or opcode == 27 or opcode == 28 or opcode == 29 or opcode == 30 { return 1 }
     if opcode == 7 or opcode == 8 or opcode == 22 { return 2 }
     if opcode == 9 or opcode == 19 { return 3 }
     return 0
@@ -375,6 +375,10 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
             } elif index + 3 < length and bytes[index + 3] == 40 and
                    identifier_matches(bytes, index, index + 3, "cos") {
                 unary_opcode = 29
+                unary_width = 3
+            } elif index + 3 < length and bytes[index + 3] == 40 and
+                   identifier_matches(bytes, index, index + 3, "tan") {
+                unary_opcode = 30
                 unary_width = 3
             } elif index + 2 < length and bytes[index + 2] == 40 and
                    identifier_matches(bytes, index, index + 2, "ln") {

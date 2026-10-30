@@ -9,10 +9,19 @@
   const COLORS = ["#73c8f0", "#f4b978", "#b3dc9b", "#d4a8ee"];
 
   function parse(output) {
-    if (typeof output !== "string" || output.length > 131072)
+    if (typeof output !== "string")
+      throw new TypeError("Native Flow output must be text.");
+    // Ordinary Flow programs may print large outputs without a plot frame.
+    if (output.length > 131072) {
+      if (!output.includes(START)) return null;
       throw new TypeError("Native Flow output exceeds the field plot limit.");
+    }
     const lines = output.split(/\r?\n/).map(line => line.trim());
-    const starts = lines.flatMap((line, i) => line.startsWith(START) ? [i] : []);
+    // A similarly prefixed user message is not a protocol frame.
+    // Accept whitespace (including tabs) between the exact marker and sizes.
+    const starts = lines.flatMap((line, i) =>
+      (line === START || line.startsWith(START + " ") ||
+       line.startsWith(START + "\t")) ? [i] : []);
     if (!starts.length) return null;
     if (starts.length !== 1) throw new TypeError("Multiple native field plot blocks.");
     const at = starts[0];
@@ -66,6 +75,31 @@
     axis.setAttribute("stroke", "#8897a8");
     axis.setAttribute("fill", "none");
     svg.append(axis);
+    // Numeric labels and the zero line are derived from executed field data,
+    // not from a static example or an assumed [0, 1] concentration range.
+    for (const [value, y] of [[maximum, 24], [minimum, 214]]) {
+      const tick = doc.createElementNS(NS, "text");
+      tick.setAttribute("x", "44");
+      tick.setAttribute("y", String(y));
+      tick.setAttribute("text-anchor", "end");
+      tick.setAttribute("fill", "#aab6c6");
+      tick.setAttribute("font-size", "11");
+      tick.setAttribute("data-native-flow-axis-value", String(value));
+      tick.textContent = value.toPrecision(5);
+      svg.append(tick);
+    }
+    if (minimum < 0 && maximum > 0) {
+      const zero = doc.createElementNS(NS, "line");
+      zero.setAttribute("x1", "48");
+      zero.setAttribute("x2", "616");
+      const zeroY = String(214 - 190 * ((-lo) / span));
+      zero.setAttribute("y1", zeroY);
+      zero.setAttribute("y2", zeroY);
+      zero.setAttribute("stroke", "#8897a8");
+      zero.setAttribute("stroke-dasharray", "4 4");
+      zero.setAttribute("data-native-flow-zero-axis", "true");
+      svg.append(zero);
+    }
     for (const [index, field] of data.fields.entries()) {
       const path = doc.createElementNS(NS, "path");
       const points = field.values.map((value, i) => {

@@ -1,0 +1,199 @@
+# Native Flow 2.0 source-to-postfix lowering for a deliberately bounded
+# physical scalar expression subset. This is executable code, not editor text.
+# Full Flow 2.0 grammar integration, variables and PDE equations remain pending.
+# UTF-8 source offsets are retained for runtime dimension diagnostics.
+import std.string { ParseF64, str_parse_f64_at, str_is_ascii_ws, str_is_ascii_digit }
+import .math_dimensions { Dimension, Quantity, dimensionless, length_dimension, mass_dimension, time_dimension, temperature_dimension, quantity }
+import .math_expression_ir { MathInstruction, MathProgram, MathResult, evaluate_math_ir }
+
+extern {
+    function strlen(source: string) -> i64
+}
+
+export struct ParsedMathExpression {
+    valid: bool,
+    program: MathProgram,
+    failed_at: i32
+}
+
+function blank_instruction() -> MathInstruction {
+    return MathInstruction {
+        opcode: 0, literal: quantity(0.0, dimensionless()),
+        exponent: 0, source_start: 0, source_end: 0
+    }
+}
+
+function source_error(position: i32, length: i32) -> ParsedMathExpression {
+    return ParsedMathExpression {
+        valid: false,
+        program: MathProgram { instructions: [blank_instruction()], count: 0, source_length: length },
+        failed_at: position
+    }
+}
+
+function precedence(opcode: i32) -> i32 {
+    if opcode == 5 { return 3 }
+    if opcode == 3 or opcode == 4 { return 2 }
+    if opcode == 1 or opcode == 2 { return 1 }
+    return 0
+}
+
+function make_instruction(opcode: i32, value: Quantity, start: i32, end: i32) -> MathInstruction {
+    return MathInstruction {
+        opcode: opcode, literal: value, exponent: 0,
+        source_start: start, source_end: end
+    }
+}
+
+# Operators are recognized only at exact byte sequences. Unsupported Unicode
+# cannot be silently normalized to a different mathematical operation.
+function source_operator(bytes: ptr<u8>, position: i32, length: i32) -> i32 {
+    let c: u8 = bytes[position]
+    if c == 43 { return 1 }
+    if c == 45 { return 2 }
+    if c == 42 { return 3 }
+    if c == 47 { return 4 }
+    if c == 195 and position + 1 < length {
+        if bytes[position + 1] == 151 { return 3 } # ×
+        if bytes[position + 1] == 183 { return 4 } # ÷
+    }
+    if c == 226 and position + 2 < length {
+        if bytes[position + 1] == 136 and bytes[position + 2] == 146 { return 2 } # −
+    }
+    return 0
+}
+
+function operator_bytes(bytes: ptr<u8>, position: i32) -> i32 {
+    if bytes[position] == 195 { return 2 }
+    if bytes[position] == 226 { return 3 }
+    return 1
+}
+
+export function parse_math_expression(source: string) -> ParsedMathExpression {
+    let length: i32 = strlen(source) as i32
+    if length < 1 or length > 512 { return source_error(0, length) }
+    let bytes: ptr<u8> = source as ptr<u8>
+    let blank: MathInstruction = blank_instruction()
+    let mut instructions: array<MathInstruction, 16> = [blank]
+    let mut count: i32 = 0
+    let mut operators: array<i32, 16> = [0]
+    let mut positions: array<i32, 16> = [0]
+    let mut widths: array<i32, 16> = [1]
+    let mut top: i32 = 0
+    let mut index: i32 = 0
+    let mut expect_operand: bool = true
+    while index < length {
+        let c: u8 = bytes[index]
+        if str_is_ascii_ws(c) {
+            index = index + 1
+            continue
+        }
+        if (c >= 48 and c <= 57) or c == 46 {
+            if not expect_operand { return source_error(index, length) }
+            let number: ParseF64 = str_parse_f64_at(source, index)
+            if not number.ok or number.end <= index { return source_error(index, length) }
+            let start: i32 = index
+            index = number.end
+            let mut unit: Dimension = dimensionless()
+            if index < length {
+                if bytes[index] == 109 { # m
+                    unit = length_dimension()
+                    index = index + 1
+                } elif bytes[index] == 115 { # s
+                    unit = time_dimension()
+                    index = index + 1
+                } elif bytes[index] == 75 { # K
+                    unit = temperature_dimension()
+                    index = index + 1
+                } elif bytes[index] == 107 and index + 1 < length and bytes[index + 1] == 103 { # kg
+                    unit = mass_dimension()
+                    index = index + 2
+                }
+            }
+            if count >= 16 { return source_error(start, length) }
+            instructions[count] = make_instruction(0, quantity(number.value, unit), start, index)
+            count = count + 1
+            expect_operand = false
+            continue
+        }
+        if c == 40 { # (
+            if not expect_operand or top >= 16 { return source_error(index, length) }
+            operators[top] = -1
+            positions[top] = index
+            widths[top] = 1
+            top = top + 1
+            index = index + 1
+            continue
+        }
+        if c == 41 { # )
+            if expect_operand { return source_error(index, length) }
+            let mut found: bool = false
+            while top > 0 {
+                top = top - 1
+                if operators[top] == -1 {
+                    found = true
+                    break
+                }
+                if count >= 16 { return source_error(index, length) }
+                instructions[count] = make_instruction(operators[top], quantity(0.0, dimensionless()), positions[top], positions[top] + widths[top])
+                count = count + 1
+            }
+            if not found { return source_error(index, length) }
+            index = index + 1
+            expect_operand = false
+            continue
+        }
+        let opcode: i32 = source_operator(bytes, index, length)
+        if opcode == 0 { return source_error(index, length) }
+        let width: i32 = operator_bytes(bytes, index)
+        if expect_operand {
+            if opcode != 1 and opcode != 2 { return source_error(index, length) }
+            if opcode == 2 {
+                if top >= 16 { return source_error(index, length) }
+                operators[top] = 5
+                positions[top] = index
+                widths[top] = width
+                top = top + 1
+            }
+        } else {
+            while top > 0 and operators[top - 1] != -1 and
+                  precedence(operators[top - 1]) >= precedence(opcode) {
+                top = top - 1
+                if count >= 16 { return source_error(index, length) }
+                instructions[count] = make_instruction(operators[top], quantity(0.0, dimensionless()), positions[top], positions[top] + widths[top])
+                count = count + 1
+            }
+            if top >= 16 { return source_error(index, length) }
+            operators[top] = opcode
+            positions[top] = index
+            widths[top] = width
+            top = top + 1
+            expect_operand = true
+        }
+        index = index + width
+    }
+    if expect_operand { return source_error(length, length) }
+    while top > 0 {
+        top = top - 1
+        if operators[top] == -1 { return source_error(positions[top], length) }
+        if count >= 16 { return source_error(positions[top], length) }
+        instructions[count] = make_instruction(operators[top], quantity(0.0, dimensionless()), positions[top], positions[top] + widths[top])
+        count = count + 1
+    }
+    return ParsedMathExpression {
+        valid: true,
+        program: MathProgram { instructions: instructions, count: count, source_length: length },
+        failed_at: -1
+    }
+}
+
+export function evaluate_math_expression(source: string) -> MathResult {
+    let parsed: ParsedMathExpression = parse_math_expression(source)
+    if not parsed.valid {
+        return MathResult {
+            valid: false, result: quantity(0.0, dimensionless()),
+            failed_at: parsed.failed_at, is_predicate: false
+        }
+    }
+    return evaluate_math_ir(parsed.program)
+}

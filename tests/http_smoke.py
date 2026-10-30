@@ -246,6 +246,43 @@ def main() -> None:
     assert status == 422 and body.strip(), (
         "native typed mathematical IR malformed source rejection", status, body)
 
+    # Native source-to-IR lowering: concatenate the exact checked-in Flow
+    # modules into a temporary executable because HTTP staging has no
+    # relative-module import root. This tests the real compiler and runtime.
+    math_source_files = (
+        "src/math_dimensions.flow",
+        "src/math_expression_ir.flow",
+        "src/math_expression_source.flow",
+        "src/math_expression_source_smoke.flow",
+    )
+    native_math_source = "\n".join(
+        "\n".join(
+            line.removeprefix("export ")
+            for line in (Path(__file__).resolve().parents[1] / path)
+                .read_text(encoding="utf-8").splitlines()
+            if not line.startswith("import .math_dimensions {")
+            and not line.startswith("import .math_expression_ir {")
+            and not line.startswith("import .math_expression_source {")
+        )
+        for path in math_source_files
+    )
+    assert "function parse_math_expression(" in native_math_source
+    assert "native-math-source-ok" in native_math_source
+    status, body = request("POST", "/api/check/flow", native_math_source, accepted_headers)
+    assert status == 200, ("native mathematical source compile", status, body)
+    status, body = request("POST", "/api/run/flow", native_math_source, accepted_headers)
+    assert status == 200 and "native-math-source-ok" in body, (
+        "native mathematical source execution", status, body)
+    broken_math_source = native_math_source.replace(
+        "function parse_math_expression(source: string) -> ParsedMathExpression {",
+        "function parse_math_expression(source: string -> ParsedMathExpression {",
+        1,
+    )
+    assert broken_math_source != native_math_source
+    status, body = request("POST", "/api/check/flow", broken_math_source, accepted_headers)
+    assert status == 422 and body.strip(), (
+        "native mathematical source invalid compiler syntax", status, body)
+
     # Native bounded 2D advection-diffusion, including nonzero transport
     # velocities and a complex Fourier eigenvalue. Real compiler and execution.
     transport_source = (Path(__file__).resolve().parents[1] /

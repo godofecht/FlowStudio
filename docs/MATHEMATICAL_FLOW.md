@@ -678,3 +678,32 @@ source through `/api/check/flow` and `/api/run/flow`; a nonzero assertion
 exit must fail the request. This is a second *bounded* native PDE family,
 not a general equation parser, a dynamically sized grid, a native
 Navier–Stokes implementation, or a spatial visualization pipeline.
+
+## Native typed scalar expression IR (Flow 2.0; bounded execution)
+
+`src/math_expression_ir.flow` introduces an executable postfix instruction
+representation with `MathInstruction`, `MathProgram`, and `MathResult`.
+The IR preserves byte-offset source spans and propagates the existing native
+`Dimension` exponents through literal, addition, subtraction, multiplication,
+division, unary negation and bounded integer-power instructions. It rejects
+mismatched units, zero division, invalid powers, non-finite or excessively
+large intermediates, dimension exponent overflow, malformed spans, stack
+underflow, residual stack entries and unknown instructions. Errors report
+the instruction's original source byte offset; the IR does **not** yet
+construct source spans by parsing mathematical text.
+
+```sh
+flow run src/math_expression_ir_smoke.flow
+```
+
+The native Linux/macOS CI jobs run this exact `.flow` program. The production
+HTTP smoke test compiles and executes the same three native source bodies
+(`math_dimensions.flow`, `math_expression_ir.flow`, and
+`math_expression_ir_smoke.flow`) concatenated without relative imports,
+because the current HTTP compiler stages anonymous source outside the
+repository. That acceptance does not demonstrate source-module import
+resolution or a full mathematical-language compiler.
+
+This is **not** a replacement for the Python-backed Navier–Stokes frontend,
+upstream Unicode mathematical grammar, static dimensional inference, general
+equation AST lowering, arbitrary PDEs, or computed spatial visualization.

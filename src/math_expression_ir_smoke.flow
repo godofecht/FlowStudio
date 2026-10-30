@@ -218,20 +218,27 @@ function main() -> i32 {
     if not result.valid or not result.is_predicate or result.result.value != 1.0 or
        not same_dimension(result.result.dimension, dimensionless()) { return 33 }
     operations[2] = instruction(11, quantity(0.0, dimensionless()), 0, 2)
+    program = MathProgram { instructions: operations, count: 3, source_length: 3 }
     if evaluate_math_ir(program).result.value != 1.0 { return 34 }
     program = MathProgram { instructions: operations, count: 3, source_length: 3 }
     operations[2] = instruction(12, quantity(0.0, dimensionless()), 0, 2)
+    program = MathProgram { instructions: operations, count: 3, source_length: 3 }
     if evaluate_math_ir(program).result.value != 0.0 { return 35 }
     operations[2] = instruction(13, quantity(0.0, dimensionless()), 0, 2)
+    program = MathProgram { instructions: operations, count: 3, source_length: 3 }
     if evaluate_math_ir(program).result.value != 0.0 { return 36 }
     operations[2] = instruction(14, quantity(0.0, dimensionless()), 0, 2)
+    program = MathProgram { instructions: operations, count: 3, source_length: 3 }
     if evaluate_math_ir(program).result.value != 0.0 { return 37 }
     operations[2] = instruction(15, quantity(0.0, dimensionless()), 0, 2)
+    program = MathProgram { instructions: operations, count: 3, source_length: 3 }
     if evaluate_math_ir(program).result.value != 1.0 { return 38 }
     operations[1] = instruction(0, quantity(2.0, length), 0, 1)
     operations[2] = instruction(14, quantity(0.0, dimensionless()), 0, 2)
+    program = MathProgram { instructions: operations, count: 3, source_length: 3 }
     if evaluate_math_ir(program).result.value != 1.0 { return 39 }
     operations[1] = instruction(0, quantity(3.0, time), 0, 1)
+    program = MathProgram { instructions: operations, count: 3, source_length: 3 }
     result = evaluate_math_ir(program)
     if result.valid or result.failed_at != 2 { return 40 }
 
@@ -247,9 +254,11 @@ function main() -> i32 {
     result = evaluate_math_ir(program)
     if not result.valid or not result.is_predicate or result.result.value != 1.0 { return 41 }
     operations[5] = instruction(10, quantity(0.0, dimensionless()), 0, 5)
+    program = MathProgram { instructions: operations, count: 7, source_length: 7 }
     result = evaluate_math_ir(program)
     if not result.valid or result.result.value != 0.0 { return 42 }
     operations[6] = instruction(17, quantity(0.0, dimensionless()), 0, 6)
+    program = MathProgram { instructions: operations, count: 7, source_length: 7 }
     result = evaluate_math_ir(program)
     if not result.valid or result.result.value != 1.0 { return 43 }
     operations[7] = instruction(18, quantity(0.0, dimensionless()), 0, 7)
@@ -271,13 +280,16 @@ function main() -> i32 {
     if not result.valid or result.is_predicate or result.result.value != 5.0 or
        not same_dimension(result.result.dimension, length) { return 45 }
     operations[2] = instruction(12, quantity(0.0, dimensionless()), 0, 2)
+    program = MathProgram { instructions: operations, count: 8, source_length: 8 }
     result = evaluate_math_ir(program)
     if not result.valid or result.result.value != 3.0 { return 46 }
     operations[6] = instruction(0, quantity(3.0, time), 0, 6)
+    program = MathProgram { instructions: operations, count: 8, source_length: 8 }
     result = evaluate_math_ir(program)
     if result.valid or result.failed_at != 7 { return 47 }
     operations[6] = instruction(0, quantity(3.0, length), 0, 6)
     operations[2] = instruction(1, quantity(0.0, dimensionless()), 0, 2)
+    program = MathProgram { instructions: operations, count: 8, source_length: 8 }
     result = evaluate_math_ir(program)
     if result.valid or result.failed_at != 7 { return 48 }
 
@@ -291,9 +303,11 @@ function main() -> i32 {
     result = evaluate_math_ir(program)
     if result.valid or result.failed_at != 4 { return 49 }
     operations[4] = instruction(16, quantity(0.0, dimensionless()), 0, 4)
+    program = MathProgram { instructions: operations, count: 5, source_length: 5 }
     result = evaluate_math_ir(program)
     if result.valid or result.failed_at != 4 { return 50 }
     operations[4] = instruction(10, quantity(0.0, dimensionless()), 0, 4)
+    program = MathProgram { instructions: operations, count: 5, source_length: 5 }
     result = evaluate_math_ir(program)
     if result.valid or result.failed_at != 4 { return 51 }
     operations[0] = instruction(18, quantity(0.0, dimensionless()), 0, 0)
@@ -301,6 +315,7 @@ function main() -> i32 {
     result = evaluate_math_ir(program)
     if result.valid or result.failed_at != 0 { return 52 }
     operations[0] = instruction(19, quantity(0.0, dimensionless()), 0, 0)
+    program = MathProgram { instructions: operations, count: 1, source_length: 1 }
     result = evaluate_math_ir(program)
     if result.valid or result.failed_at != 0 { return 53 }
     println("native-math-ir-ok")

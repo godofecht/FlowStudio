@@ -12,10 +12,17 @@ the 12-dimensional stencil and analytical limits. Production `http_smoke.py`
 compiles and runs the exact checked-in Flow source and rejects malformed
 evolution syntax; Ubuntu Chromium Monaco acceptance clicks Run on that source.
 
-**Status:** proposed; local independent Python numerical calculation passed
-(reference cross-check maximum difference 7.8e-15). Native Flow compilation,
-HTTP and physical browser execution are pending Linux/macOS CI. No claim of
-general PDE grammar, computed spatial visualization or RStudio parity.
+**Verified:** local independent Python numerical reference cross-check
+maximum difference 7.8e-15. All six Linux/macOS PR CI jobs passed in
+[CI #41050488896](https://github.com/godofecht/FlowStudio/actions/runs/41050488896).
+Each platform passed 1,143 Node tests (12 skipped) and 357 Python tests
+(13 skipped), including six new independent SIR oracle tests. Both upstream
+Flow 2.0 compilers executed the exact 12-state source through production
+HTTP; Ubuntu physical Chromium executed it through Monaco's Run button.
+Both native R/C FlowJIT jobs passed. **Unexecuted:** local native Flow/R/HTTP,
+independent macOS physical-browser acceptance, and post-merge main CI.
+No hosted CI configuration changed. This does not establish general PDE
+grammar, computed spatial visualization or RStudio parity.
 
 ## 2026-10-30: native 32x32 two-mode tensor diffusion (Linux/macOS CI verified)
 

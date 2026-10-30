@@ -192,9 +192,22 @@ test("constant and near-equal fields retain truthful finite axis geometry", () =
     const output = ["FLOWSTUDIO_FIELD_V1 3 1",
       "C " + values.join(" "), "FLOWSTUDIO_FIELD_END"].join("\n");
     assert.equal(render(doc, container, output), true);
-    const path = container.children[1].children.find(child =>
-      child.attributes["data-field-name"] === "C");
+    const svg = container.children[1];
+    const path = svg.children.find(child => child.attributes["data-field-name"] === "C");
     const points = [...path.attributes.d.matchAll(/([ML])([0-9.]+),([0-9.]+)/g)];
     assert.deepEqual(points.map(point => Number(point[3])), [214, 119, 24]);
+    const ticks = svg.children.filter(child =>
+      Object.hasOwn(child.attributes, "data-native-flow-axis-value"));
+    assert.equal(ticks.length, 2);
+    assert.notEqual(ticks[0].textContent, ticks[1].textContent,
+      "distinct computed extrema must never display identical axis labels");
+    assert.equal(Number(ticks[0].attributes["data-native-flow-axis-value"]), values[2]);
+    assert.equal(Number(ticks[1].attributes["data-native-flow-axis-value"]), values[0]);
+    if (values[2] === 1000000) {
+      assert.equal(ticks[0].textContent, "1000000");
+      assert.equal(ticks[1].textContent, "999999.9999999998");
+      assert.equal(svg.attributes.viewBox, "-100 0 740 260",
+        "expanded gutter must keep full-precision axis labels visible");
+    }
   }
 });

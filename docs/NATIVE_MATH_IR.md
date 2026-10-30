@@ -136,7 +136,7 @@ This is still a bounded scalar parser. It does not accept symbolic
 variables, general functions, arbitrary exponent expressions, equations,
 spatial derivatives, upstream Flow grammar extensions or general PDEs.
 
-## Explicit typed native symbol bindings (2026-10-30; verification pending)
+## Explicit typed native symbol bindings (2026-10-30; Linux/macOS CI verified)
 
 The native Flow 2.0 expression parser now accepts caller-provided, **explicitly
 bound** ASCII identifiers through `MathSymbol`, `MathBindings`,
@@ -160,5 +160,9 @@ compiler/run acceptance in the unchanged Linux/macOS CI pipeline.
 
 This is **not** a general compiler symbol table, static unit inference,
 upstream grammar extension, function definitions, spatial derivatives or
-PDE compiler. Native CI and browser execution of this new feature must be
-verified before treating it as qualified.
+PDE compiler. All six Linux/macOS jobs passed in
+[CI #41005093641](https://github.com/godofecht/FlowStudio/actions/runs/41005093641),
+including the real native Flow compiler, this source smoke, production HTTP
+compile/run acceptance, both R/C FlowJIT jobs and existing Ubuntu Chromium
+workflows. No dedicated physical-browser interaction with the new symbol
+binding API was performed; post-merge main CI remains pending.

@@ -1624,7 +1624,7 @@ async function executeCode(code, label, languageOverride = null, options = {}) {
   el("run").disabled = true;
   el("runCell").disabled = true;
   status("Running " + executionLanguage + " …");
-  if (executionLanguage === "mathflow") {
+  if (executionLanguage === "mathflow" || executionLanguage === "flow") {
     el("mathFlowPlot").replaceChildren();
     el("mathFlowPlot").hidden = true;
   }

@@ -13,7 +13,10 @@
       throw new TypeError("Native Flow output must be text.");
     // Ordinary Flow programs may print large outputs without a plot frame.
     if (output.length > 131072) {
-      if (!output.includes(START)) return null;
+      // The marker must begin a logical line and end at a header separator.
+      // Substrings inside ordinary large stdout must not become plot errors.
+      if (!/(?:^|\\r?\\n)[^\\S\\r\\n]*FLOWSTUDIO_FIELD_V1(?=[ \\t\\r\\n]|$)/.test(output))
+        return null;
       throw new TypeError("Native Flow output exceeds the field plot limit.");
     }
     const lines = output.split(/\r?\n/).map(line => line.trim());

@@ -229,28 +229,34 @@ try {
     null, { timeout: 80000 });
   assert.match(await page.locator('#console').textContent(), /native-tensor-grid-ok/);
 
-  // Real compiler-executed 32x32 tensor state must produce 1024 DOM cells,
-  // not a fixture, with all sampled values matching independent Fourier modes.
+  // Both 32x32 species must be independently computed by the real Flow
+  // compiler and HTTP runtime, with 2048 actual DOM cells and per-field scales.
   await page.locator('#mathFlowPlot svg[data-native-flow-grid="true"]')
     .waitFor({timeout: 30000});
   assert.equal(await page.locator('#tab-plots').getAttribute('aria-selected'), 'true');
+  const nativeGridSvg = page.locator('#mathFlowPlot svg[data-native-flow-grid="true"]');
+  assert.equal(await nativeGridSvg.getAttribute('data-native-flow-grid-scale'), 'per-field');
   const nativeGridCells = page.locator('#mathFlowPlot rect[data-grid-value]');
-  assert.equal(await nativeGridCells.count(), 1024);
+  assert.equal(await nativeGridCells.count(), 2048);
   const quarterMode = phase => {
     const remainder = ((phase % 4) + 4) % 4;
     return remainder === 0 ? 1 : remainder === 2 ? -1 : 0;
   };
   for (const [x, y] of [[0, 0], [1, 0], [2, 0], [7, 11],
                          [16, 16], [23, 19], [31, 31]]) {
-    const cell = page.locator('#mathFlowPlot rect[data-grid-x="' + x +
-      '"][data-grid-y="' + y + '"]');
-    assert.equal(await cell.count(), 1);
-    const actual = Number(await cell.getAttribute('data-grid-value'));
-    const expected = 300 +
-      7 * Math.exp(-69.632 * .025) * quarterMode(x + y) +
-      3 * Math.exp(-53.248 * .025) * quarterMode(x - y);
-    assert.ok(Math.abs(actual - expected) < .002,
-      'Real native 2D heatmap cell differs from Fourier oracle at ' + x + ',' + y);
+    for (const field of ['T', 'V']) {
+      const cell = page.locator('#mathFlowPlot rect[data-field-name="' + field +
+        '"][data-grid-x="' + x + '"][data-grid-y="' + y + '"]');
+      assert.equal(await cell.count(), 1);
+      const actual = Number(await cell.getAttribute('data-grid-value'));
+      const expected = field === 'T' ?
+        300 + 7 * Math.exp(-69.632 * .025) * quarterMode(x + y) +
+              3 * Math.exp(-53.248 * .025) * quarterMode(x - y) :
+        5 + .8 * Math.exp(-32.768 * .025) * quarterMode(x + y) -
+            .3 * Math.exp(-40.96 * .025) * quarterMode(x - y);
+      assert.ok(Math.abs(actual - expected) < (field === 'T' ? .002 : .00002),
+        'Real native 2D ' + field + ' heatmap differs at ' + x + ',' + y);
+    }
   }
 
   // Upstream field/boundary/laplacian syntax: physical Chromium Monaco Run,

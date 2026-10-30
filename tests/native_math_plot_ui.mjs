@@ -240,6 +240,16 @@ try {
     null, { timeout: 80000 });
   assert.match(await page.locator('#console').textContent(), /native-spatial-sir2-ok/);
 
+  // Twelve-state nonlinear periodic SIR: actual Monaco Run -> native HTTP ->
+  // compiler-generated RK4 and twelve independent numerical assertions.
+  await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
+    readFileSync('examples/native_spatial_sir4.flow', 'utf8'));
+  await page.locator('#run').click();
+  await page.waitForFunction(() =>
+    document.querySelector('#console')?.textContent?.includes('native-spatial-sir4-ok'),
+    null, { timeout: 80000 });
+  assert.match(await page.locator('#console').textContent(), /native-spatial-sir4-ok/);
+
   // Real Monaco Run -> native Flow HTTP -> upstream Flow 2.0 compiler.
   // HTTP stages sources without a relative import root, so concatenate
   // exactly the checked-in modules as the production HTTP smoke does.

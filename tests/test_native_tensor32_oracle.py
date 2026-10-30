@@ -5,6 +5,7 @@ implementation; the Flow compiler and HTTP routes are exercised by CI.
 """
 import math
 import unittest
+from pathlib import Path
 
 WIDTH = 32
 DIFFUSION_XX = 0.012
@@ -124,6 +125,15 @@ class NativeTensor32Oracle(unittest.TestCase):
         self.assertGreater(maximum_error(evolved, opposite), 0.3)
         self.assertLess(maximum_error(opposite, exact_grid(cross=-DIFFUSION_XY)),
                         0.00009)
+
+    def test_compiler_computed_grid_frame_is_not_the_reference(self):
+        source = (Path(__file__).resolve().parents[1] /
+                  "examples/native_tensor_grid.flow").read_text(encoding="utf-8")
+        self.assertIn('println("FLOWSTUDIO_GRID_V1 32 32 1")', source)
+        self.assertIn("print(fine32.grid.values[cell])", source)
+        self.assertIn('println("FLOWSTUDIO_GRID_END")', source)
+        self.assertLess(source.index('if integrateTensor(largest, initial32, 100.0, 1).valid'),
+                        source.index('println("FLOWSTUDIO_GRID_V1 32 32 1")'))
 
     def test_zero_duration_uniform_equilibrium_and_mode_mutation(self):
         initial = initial_grid()

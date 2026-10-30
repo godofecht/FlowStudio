@@ -1,3 +1,18 @@
+## 2026-10-30: compiler-executed 32×32 tensor heatmap (CI pending)
+
+The native 1,024-cell anisotropic RK2 tensor example now emits its **computed**
+32×32 state as a versioned bounded grid frame after its numerical assertions.
+The workbench renders all cells into an SVG heatmap, while real HTTP acceptance
+checks all transmitted values against an independent semidiscrete Fourier
+reference and Chromium Monaco acceptance checks actual DOM cells and sampled
+values. Seeded JavaScript protocol tests exercise rectangular grids, multiple
+fields, malformed frames, finite geometry and resource limits. See
+[reproducibility](NATIVE_TENSOR_HEATMAP.md).
+
+**Status:** local V8 parser/renderer regression executed; native compiler,
+production HTTP and physical Chromium tests for this change await CI. Neither
+general multidimensional `field` lowering nor RStudio parity is established.
+
 ## 2026-10-30: computed plots from compiler-executed native Flow fields (verification pending)
 
 The native Gray–Scott example now emits a bounded `FLOWSTUDIO_FIELD_V1`

@@ -8,6 +8,102 @@
   const NAME = /^[A-Za-z][A-Za-z0-9_]{0,31}$/;
   const COLORS = ["#73c8f0", "#f4b978", "#b3dc9b", "#d4a8ee"];
 
+  const GRID_START = "FLOWSTUDIO_GRID_V1";
+  const GRID_END = "FLOWSTUDIO_GRID_END";
+
+  function parseGridLines(lines, at) {
+    const header = lines[at].split(/\s+/);
+    if (header.length !== 4 || header[0] !== GRID_START ||
+        !header.slice(1).every(token => /^[1-9]\d*$/.test(token)))
+      throw new TypeError("Invalid native grid plot header.");
+    const width = Number(header[1]), height = Number(header[2]);
+    const species = Number(header[3]);
+    if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) ||
+        !Number.isSafeInteger(species) || width < 3 || height < 3 ||
+        width > 32 || height > 32 || width * height > 1024 ||
+        species < 1 || species > 2)
+      throw new RangeError("Native grid plot dimensions exceed limits.");
+    if (lines[at + species + 1] !== GRID_END ||
+        lines.slice(at + species + 2).includes(GRID_END))
+      throw new TypeError("Incomplete or repeated native grid plot block.");
+    const fields = [];
+    const names = new Set();
+    for (let i = 0; i < species; i++) {
+      const row = lines[at + i + 1]?.split(/\s+/) || [];
+      if (row.length !== width * height + 1 ||
+          !NAME.test(row[0]) || names.has(row[0]))
+        throw new TypeError("Invalid native grid field name or cell count.");
+      names.add(row[0]);
+      const values = row.slice(1).map(token => {
+        if (!NUMBER.test(token)) throw new TypeError("Invalid native grid value.");
+        const value = Number(token);
+        if (!Number.isFinite(value) || Math.abs(value) > 1e6)
+          throw new RangeError("Native grid value exceeds finite plotting limits.");
+        return value;
+      });
+      fields.push({name: row[0], values});
+    }
+    return Object.freeze({width, height, fields});
+  }
+
+  function renderGrid(doc, container, data) {
+    const values = data.fields.flatMap(field => field.values);
+    const minimum = Math.min(...values), maximum = Math.max(...values);
+    const span = maximum - minimum;
+    const fraction = value => span === 0 ? 0.5 : (value - minimum) / span;
+    const svg = doc.createElementNS(NS, "svg");
+    svg.setAttribute("viewBox", "0 0 640 " + (data.fields.length * 286 + 24));
+    svg.setAttribute("width", "100%");
+    svg.setAttribute("role", "img");
+    svg.setAttribute("data-native-flow-grid", "true");
+    svg.setAttribute("aria-label", "Native Flow computed 2D grids: " +
+      data.fields.map(field => field.name).join(", "));
+    const cellWidth = 512 / data.width, cellHeight = 240 / data.height;
+    for (const [index, field] of data.fields.entries()) {
+      const top = 32 + index * 286;
+      const label = doc.createElementNS(NS, "text");
+      label.setAttribute("x", "48");
+      label.setAttribute("y", String(top - 10));
+      label.setAttribute("fill", "#aab6c6");
+      label.textContent = field.name;
+      svg.append(label);
+      for (let y = 0; y < data.height; y++) {
+        for (let x = 0; x < data.width; x++) {
+          const value = field.values[y * data.width + x];
+          const t = fraction(value);
+          const rect = doc.createElementNS(NS, "rect");
+          rect.setAttribute("x", String(48 + x * cellWidth));
+          rect.setAttribute("y", String(top + y * cellHeight));
+          rect.setAttribute("width", String(cellWidth));
+          rect.setAttribute("height", String(cellHeight));
+          rect.setAttribute("fill", "hsl(" + Math.round(220 - 200 * t) +
+            ",65%," + Math.round(40 + 10 * t) + "%)");
+          rect.setAttribute("data-field-name", field.name);
+          rect.setAttribute("data-grid-x", String(x));
+          rect.setAttribute("data-grid-y", String(y));
+          rect.setAttribute("data-grid-value", String(value));
+          svg.append(rect);
+        }
+      }
+      for (const [value, y] of [[minimum, top + 12], [maximum, top + 238]]) {
+        const tick = doc.createElementNS(NS, "text");
+        tick.setAttribute("x", "566");
+        tick.setAttribute("y", String(y));
+        tick.setAttribute("fill", "#aab6c6");
+        tick.setAttribute("font-size", "11");
+        tick.setAttribute("data-native-flow-grid-extreme", String(value));
+        tick.textContent = String(value);
+        svg.append(tick);
+      }
+    }
+    const title = doc.createElement("h3");
+    title.textContent = "Native Flow grids · " + data.width + "×" +
+      data.height + " cells";
+    container.replaceChildren(title, svg);
+    container.hidden = false;
+    return true;
+  }
+
   function parse(output) {
     if (typeof output !== "string")
       throw new TypeError("Native Flow output must be text.");
@@ -15,7 +111,7 @@
     if (output.length > 131072) {
       // The marker must begin a logical line and end at a header separator.
       // Substrings inside ordinary large stdout must not become plot errors.
-      if (!/(?:^|\r?\n)[^\S\r\n]*FLOWSTUDIO_FIELD_V1(?=[ \t\r\n]|$)/.test(output))
+      if (!/(?:^|\r?\n)[^\S\r\n]*(?:FLOWSTUDIO_FIELD_V1|FLOWSTUDIO_GRID_V1)(?=[ \t\r\n]|$)/.test(output))
         return null;
       throw new TypeError("Native Flow output exceeds the field plot limit.");
     }
@@ -25,6 +121,14 @@
     const starts = lines.flatMap((line, i) =>
       (line === START || line.startsWith(START + " ") ||
        line.startsWith(START + "\t")) ? [i] : []);
+    const grids = lines.flatMap((line, i) =>
+      (line === GRID_START || line.startsWith(GRID_START + " ") ||
+       line.startsWith(GRID_START + "\t")) ? [i] : []);
+    if (grids.length) {
+      if (grids.length !== 1 || starts.length)
+        throw new TypeError("Multiple native spatial plot blocks.");
+      return parseGridLines(lines, grids[0]);
+    }
     if (!starts.length) return null;
     if (starts.length !== 1) throw new TypeError("Multiple native field plot blocks.");
     const at = starts[0];
@@ -61,6 +165,7 @@
   function render(doc, container, output) {
     const data = parse(output);
     if (!data) return false;
+    if (data.width) return renderGrid(doc, container, data);
     const values = data.fields.flatMap(field => field.values);
     const minimum = Math.min(...values), maximum = Math.max(...values);
     // Equal-valued fields need a genuine axis range; otherwise the plotted

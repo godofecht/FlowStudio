@@ -509,5 +509,15 @@ function main() -> i32 {
     if integrateTensor(largest, initial32, 100.0, 1).valid { return 57 }
 
     println("native-tensor-grid-ok")
+    # The 1024 displayed cells come from the independently asserted native
+    # RK2 state, not from the analytical reference or a browser fixture.
+    println("FLOWSTUDIO_GRID_V1 32 32 1")
+    print("T")
+    for cell in 0 to 1024 {
+        print(" ")
+        print(fine32.grid.values[cell])
+    }
+    println("")
+    println("FLOWSTUDIO_GRID_END")
     return 0
 }

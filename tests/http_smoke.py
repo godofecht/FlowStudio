@@ -258,6 +258,30 @@ def main() -> None:
     status, body = request("POST", "/api/run/flow", tensor_source, accepted_headers)
     assert status == 200 and "native-tensor-grid-ok" in body, (
         "native tensor grid analytic execution", status, body)
+    # The heatmap frame is emitted from the actual 32x32 RK2 state, after
+    # its numerical assertions, through the production native HTTP route.
+    tensor_lines = body.splitlines()
+    tensor_headers = [i for i, line in enumerate(tensor_lines)
+                      if line == "FLOWSTUDIO_GRID_V1 32 32 1"]
+    assert len(tensor_headers) == 1, ("native 2D frame", body[-250:])
+    tensor_at = tensor_headers[0]
+    assert tensor_lines[tensor_at + 2] == "FLOWSTUDIO_GRID_END"
+    tensor_tokens = tensor_lines[tensor_at + 1].split()
+    assert len(tensor_tokens) == 1025 and tensor_tokens[0] == "T"
+    tensor_values = [float(value) for value in tensor_tokens[1:]]
+    assert all(math.isfinite(value) and abs(value) <= 1e6
+               for value in tensor_values)
+    def quarter_mode(phase):
+        remainder = phase % 4
+        return 1.0 if remainder == 0 else -1.0 if remainder == 2 else 0.0
+    tensor_reference = [
+        300.0 + 7.0 * math.exp(-69.632 * 0.025) * quarter_mode(x + y)
+        + 3.0 * math.exp(-53.248 * 0.025) * quarter_mode(x - y)
+        for y in range(32) for x in range(32)
+    ]
+    assert max(abs(actual - expected) for actual, expected in
+               zip(tensor_values, tensor_reference)) < 0.002, (
+                   "native 1024-cell heatmap differs from independent Fourier reference")
     # Actual upstream Flow evolution DSL, not a hand-coded ODE or Python
     # interpreter: four coupled states with compiler-generated RK4, checked
     # against a discrete Fourier/Poisson oracle and fourth-order refinement.

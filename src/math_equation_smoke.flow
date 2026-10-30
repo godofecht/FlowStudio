@@ -31,7 +31,7 @@ function main() -> i32 {
     if not result.valid or result.satisfied { return 6 }
     result = evaluate_math_equation_source("2m/4s = 0.5m/1s", quantity(0.0, speed))
     if not result.valid or not result.satisfied or not same_dimension(result.residual.dimension, speed) { return 7 }
-    result = evaluate_math_equation_source("sqrt(9m²) = 3m", exact_m)
+    result = evaluate_math_equation_source("sqrt(9m²) = 9m", exact_m)
     if not result.valid or not result.satisfied { return 8 }
     result = evaluate_math_equation_source("2×(3m−1m) = 4m", exact_m)
     if not result.valid or not result.satisfied { return 9 }

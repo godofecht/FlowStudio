@@ -1,3 +1,41 @@
+## 2026-10-30: native 16x16 anisotropic tensor diffusion (Linux/macOS CI verified)
+
+The existing production-compiled `examples/native_tensor_grid.flow` now
+supports configurable 3..16-cell axes with a bounded 256-cell periodic grid.
+The 16x16 case evolves all 256 cells under a positive-definite anisotropic
+tensor with a nonzero mixed derivative, using the native Flow midpoint RK2
+integrator. Each output cell is asserted against the independent semidiscrete
+Fourier solution (eigenvalue -17.408 at t=0.1); refinement at 32/64/128 steps
+must demonstrate second-order convergence. Native assertions additionally
+check conservation, deterministic replay, semigroup consistency, translation
+equivariance, sensitivity to the mixed tensor sign, zero duration, oversized
+grid, unbounded initial values, and a 2-million-cell-step resource ceiling.
+
+`tests/test_native_tensor16_oracle.py` independently reconstructs the full
+16x16 stencil and Fourier eigenvalue in standard-library Python, including
+all 256 cells, convergence, symmetry and cross-diffusion sensitivity. It does
+not compile Flow. The unchanged native CI workflow already runs
+`flow run examples/native_tensor_grid.flow` on Linux and macOS; the unchanged
+`tests/http_smoke.py` executes that exact checked-in source through the
+production `/api/check/flow` and `/api/run/flow` routes.
+
+**Verified:** all six PR CI jobs passed in
+[CI #41022162472](https://github.com/godofecht/FlowStudio/actions/runs/41022162472).
+Both Linux/macOS source jobs passed 348 Python tests (13 skipped, zero
+failed), including four independent tensor-oracle tests; 1,143 JavaScript
+tests passed per platform (12 skipped, zero failed). Both native Flow jobs
+compiled and executed the 256-cell program through the real Flow 2.0
+compiler, then passed production HTTP acceptance. Ubuntu Chromium executed
+the exact source through Monaco's Run control. Both native R/C FlowJIT
+jobs passed. Merged in
+[ebbfda8](https://github.com/godofecht/FlowStudio/commit/ebbfda8d9820db5703d54bc99b6802dfb8b53bad)
+via [PR #235](https://github.com/godofecht/FlowStudio/pull/235).
+
+**Unexecuted:** independent macOS physical-browser acceptance and
+post-merge main CI. This remains a bounded array-based numerical kernel,
+not general PDE grammar or RStudio parity. No hosted CI configuration
+was changed.
+
 ## 2026-10-30: native typed multi-argument source functions (Linux/macOS CI verified)
 
 Native Flow mathematical source lowering now recognizes typed `min`,

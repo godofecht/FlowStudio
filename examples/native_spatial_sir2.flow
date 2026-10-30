@@ -20,24 +20,12 @@ flow SpatialSIR2 {
 
     solver { dt 1 ms method rk4 }
 
-    susceptibleLeft evolves as
-        -infectionRate * susceptibleLeft * infectedLeft
-        + 2.0 * diffusionSusceptible * (susceptibleRight - susceptibleLeft)
-    infectedLeft evolves as
-        infectionRate * susceptibleLeft * infectedLeft - recoveryRate * infectedLeft
-        + 2.0 * diffusionInfected * (infectedRight - infectedLeft)
-    recoveredLeft evolves as
-        recoveryRate * infectedLeft
-        + 2.0 * diffusionRecovered * (recoveredRight - recoveredLeft)
-    susceptibleRight evolves as
-        -infectionRate * susceptibleRight * infectedRight
-        + 2.0 * diffusionSusceptible * (susceptibleLeft - susceptibleRight)
-    infectedRight evolves as
-        infectionRate * susceptibleRight * infectedRight - recoveryRate * infectedRight
-        + 2.0 * diffusionInfected * (infectedLeft - infectedRight)
-    recoveredRight evolves as
-        recoveryRate * infectedRight
-        + 2.0 * diffusionRecovered * (recoveredLeft - recoveredRight)
+    susceptibleLeft evolves as -infectionRate * susceptibleLeft * infectedLeft + 2.0 * diffusionSusceptible * (susceptibleRight - susceptibleLeft)
+    infectedLeft evolves as infectionRate * susceptibleLeft * infectedLeft - recoveryRate * infectedLeft + 2.0 * diffusionInfected * (infectedRight - infectedLeft)
+    recoveredLeft evolves as recoveryRate * infectedLeft + 2.0 * diffusionRecovered * (recoveredRight - recoveredLeft)
+    susceptibleRight evolves as -infectionRate * susceptibleRight * infectedRight + 2.0 * diffusionSusceptible * (susceptibleLeft - susceptibleRight)
+    infectedRight evolves as infectionRate * susceptibleRight * infectedRight - recoveryRate * infectedRight + 2.0 * diffusionInfected * (infectedLeft - infectedRight)
+    recoveredRight evolves as recoveryRate * infectedRight + 2.0 * diffusionRecovered * (recoveredLeft - recoveredRight)
 }
 
 struct SpatialSIRRun {

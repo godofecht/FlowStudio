@@ -119,6 +119,15 @@ function precedence(opcode: i32) -> i32 {
     return 0
 }
 
+# Arity is explicit: commas are only legal inside a recognized function call.
+# All operands are eagerly evaluated by the existing typed postfix IR.
+function function_arity(opcode: i32) -> i32 {
+    if opcode == 20 or opcode == 21 { return 1 }
+    if opcode == 7 or opcode == 8 or opcode == 22 { return 2 }
+    if opcode == 9 or opcode == 19 { return 3 }
+    return 0
+}
+
 function make_instruction(opcode: i32, value: Quantity, start: i32, end: i32) -> MathInstruction {
     return MathInstruction {
         opcode: opcode, literal: value, exponent: 0,
@@ -179,6 +188,7 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
     let mut operators: array<i32, 16> = [0]
     let mut positions: array<i32, 16> = [0]
     let mut widths: array<i32, 16> = [1]
+    let mut argument_counts: array<i32, 16> = [0]
     let mut top: i32 = 0
     let mut index: i32 = 0
     let mut expect_operand: bool = true
@@ -252,6 +262,26 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
                    bytes[index + 3] == 116 and bytes[index + 4] == 40 { # sqrt(
                 unary_opcode = 21
                 unary_width = 4
+            } elif index + 3 < length and bytes[index + 3] == 40 and
+                   identifier_matches(bytes, index, index + 3, "min") {
+                unary_opcode = 7
+                unary_width = 3
+            } elif index + 3 < length and bytes[index + 3] == 40 and
+                   identifier_matches(bytes, index, index + 3, "max") {
+                unary_opcode = 8
+                unary_width = 3
+            } elif index + 4 < length and bytes[index + 4] == 40 and
+                   identifier_matches(bytes, index, index + 4, "norm") {
+                unary_opcode = 22
+                unary_width = 4
+            } elif index + 5 < length and bytes[index + 5] == 40 and
+                   identifier_matches(bytes, index, index + 5, "clamp") {
+                unary_opcode = 9
+                unary_width = 5
+            } elif index + 5 < length and bytes[index + 5] == 40 and
+                   identifier_matches(bytes, index, index + 5, "where") {
+                unary_opcode = 19
+                unary_width = 5
             }
             if unary_opcode != 0 {
                 if top >= 16 { return source_error(index, length) }
@@ -352,7 +382,31 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
             operators[top] = -1
             positions[top] = index
             widths[top] = 1
+            argument_counts[top] = 0
             top = top + 1
+            index = index + 1
+            continue
+        }
+        if c == 44 { # , separates arguments of recognized calls only
+            if expect_operand { return source_error(index, length) }
+            let mut opening: i32 = top - 1
+            while opening >= 0 and operators[opening] != -1 {
+                opening = opening - 1
+            }
+            if opening < 1 { return source_error(index, length) }
+            let arity: i32 = function_arity(operators[opening - 1])
+            if arity < 2 or argument_counts[opening] >= arity - 1 {
+                return source_error(index, length)
+            }
+            while top > opening + 1 {
+                top = top - 1
+                if count >= 16 { return source_error(index, length) }
+                instructions[count] = make_instruction(operators[top],
+                    quantity(0.0, dimensionless()), positions[top], positions[top] + widths[top])
+                count = count + 1
+            }
+            argument_counts[opening] = argument_counts[opening] + 1
+            expect_operand = true
             index = index + 1
             continue
         }
@@ -370,13 +424,15 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
                 count = count + 1
             }
             if not found { return source_error(index, length) }
-            # A completed function call is one primary. Emit its unary
-            # instruction now, before a following postfix power, so
-            # sqrt(9)^2 means (sqrt(9))^2 rather than sqrt(9^2).
-            if top > 0 and (operators[top - 1] == 20 or operators[top - 1] == 21) {
+            # A completed function call is one primary, before a postfix
+            # power. A function with missing or extra arguments fails closed.
+            if top > 0 and function_arity(operators[top - 1]) > 0 {
+                let arity: i32 = function_arity(operators[top - 1])
+                if argument_counts[top] != arity - 1 { return source_error(index, length) }
                 top = top - 1
                 if count >= 16 { return source_error(positions[top], length) }
-                instructions[count] = make_instruction(operators[top], quantity(0.0, dimensionless()), positions[top], positions[top] + widths[top])
+                instructions[count] = make_instruction(operators[top],
+                    quantity(0.0, dimensionless()), positions[top], positions[top] + widths[top])
                 count = count + 1
             }
             index = index + 1

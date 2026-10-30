@@ -1,3 +1,15 @@
+## 2026-10-30: native typed multi-argument source functions (CI pending)
+
+Native Flow mathematical source lowering now recognizes typed `min`,
+`max`, `norm`, `clamp` and eager `where` calls, with strict argument
+counts, nested calls, physical-unit checks and source offsets. The checked-in
+`src/math_expression_source_smoke.flow` contains 39 additional executable
+numerical, malformed-source and dimensional assertions, including eager
+unselected-branch failure. Existing Linux/macOS native Flow compiler and
+production HTTP gates execute this smoke without CI workflow changes.
+**Pending:** PR CI, post-merge main CI, dedicated browser execution of the
+new source calls, general PDE grammar and full RStudio parity.
+
 ## 2026-10-30: native typed symbol binding acceptance (Linux/macOS CI verified)
 
 The bounded Flow 2.0 source-to-IR parser now resolves up to eight explicitly

@@ -579,6 +579,105 @@ function main() -> i32 {
     result = evaluate_math_expression_with_bindings("distance", invalid_not)
     if result.valid or result.failed_at != 0 { return 196 }
 
+
+    # Typed, eager multi-argument source calls lower through the production IR.
+    result = evaluate_math_expression("min(3m,2m)")
+    if not result.valid or not near(result.result.value, 2.0) or
+       not same_dimension(result.result.dimension, length) { return 197 }
+    result = evaluate_math_expression("max(-3m,-2m)")
+    if not result.valid or not near(result.result.value, -2.0) or
+       not same_dimension(result.result.dimension, length) { return 198 }
+    result = evaluate_math_expression("norm(3m,4m)")
+    if not result.valid or not near(result.result.value, 5.0) or
+       not same_dimension(result.result.dimension, length) { return 199 }
+    result = evaluate_math_expression("norm(0m,0m)")
+    if not result.valid or not near(result.result.value, 0.0) or
+       not same_dimension(result.result.dimension, length) { return 200 }
+    result = evaluate_math_expression("clamp(5m,2m,4m)")
+    if not result.valid or not near(result.result.value, 4.0) or
+       not same_dimension(result.result.dimension, length) { return 201 }
+    result = evaluate_math_expression("clamp(-1m,2m,4m)")
+    if not result.valid or not near(result.result.value, 2.0) { return 202 }
+    result = evaluate_math_expression("where(1<2,3m,4m)")
+    if not result.valid or not near(result.result.value, 3.0) or
+       not same_dimension(result.result.dimension, length) { return 203 }
+    result = evaluate_math_expression("where(1>2,3m,4m)")
+    if not result.valid or not near(result.result.value, 4.0) { return 204 }
+    result = evaluate_math_expression("where(1<2 and 2<3,2m,3m)")
+    if not result.valid or not near(result.result.value, 2.0) { return 205 }
+    result = evaluate_math_expression("where(not 1<2,2m,3m)")
+    if not result.valid or not near(result.result.value, 3.0) { return 206 }
+    result = evaluate_math_expression("where(1<2,where(3<2,1m,2m),4m)")
+    if not result.valid or not near(result.result.value, 2.0) { return 207 }
+    result = evaluate_math_expression("clamp(max(5m,3m),2m,4m)")
+    if not result.valid or not near(result.result.value, 4.0) { return 208 }
+    result = evaluate_math_expression("min(1+2,3*4)")
+    if not result.valid or not near(result.result.value, 3.0) { return 209 }
+    result = evaluate_math_expression("max(1,2)+min(3,4)")
+    if not result.valid or not near(result.result.value, 5.0) { return 210 }
+    result = evaluate_math_expression("norm(3m,4m)^2")
+    if not result.valid or not near(result.result.value, 25.0) or
+       not same_dimension(result.result.dimension, area) { return 211 }
+    result = evaluate_math_expression("where(1<2,3m,4m)^2")
+    if not result.valid or not near(result.result.value, 9.0) or
+       not same_dimension(result.result.dimension, area) { return 212 }
+    result = evaluate_math_expression("norm(3m,4m)/5s")
+    if not result.valid or not near(result.result.value, 1.0) or
+       not same_dimension(result.result.dimension, speed) { return 213 }
+    result = evaluate_math_expression_with_bindings("clamp(distance,2m,4m)", bindings)
+    if not result.valid or not near(result.result.value, 4.0) or
+       not same_dimension(result.result.dimension, length) { return 214 }
+
+    let binary_call: ParsedMathExpression = parse_math_expression("min(1m,2m)")
+    if not binary_call.valid or binary_call.program.count != 3 or
+       binary_call.program.instructions[2].opcode != 7 or
+       binary_call.program.instructions[2].source_start != 0 or
+       binary_call.program.instructions[2].source_end != 3 { return 215 }
+    let ternary_call: ParsedMathExpression = parse_math_expression("where(1<2,3m,4m)")
+    if not ternary_call.valid or ternary_call.program.count != 6 or
+       ternary_call.program.instructions[5].opcode != 19 or
+       ternary_call.program.instructions[5].source_start != 0 or
+       ternary_call.program.instructions[5].source_end != 5 { return 216 }
+
+    result = evaluate_math_expression("min(3m,2s)")
+    if result.valid or result.failed_at != 0 { return 217 }
+    result = evaluate_math_expression("norm(3m,4s)")
+    if result.valid or result.failed_at != 0 { return 218 }
+    result = evaluate_math_expression("clamp(3m,2s,4m)")
+    if result.valid or result.failed_at != 0 { return 219 }
+    result = evaluate_math_expression("clamp(3m,4m,2m)")
+    if result.valid or result.failed_at != 0 { return 220 }
+    result = evaluate_math_expression("where(1,3m,4m)")
+    if result.valid or result.failed_at != 0 { return 221 }
+    result = evaluate_math_expression("where(1<2,3m,4s)")
+    if result.valid or result.failed_at != 0 { return 222 }
+    result = evaluate_math_expression("where(1<2,1/0,4)")
+    if result.valid or result.failed_at != 11 { return 223 }
+    result = evaluate_math_expression("min(1)")
+    if result.valid or result.failed_at != 5 { return 224 }
+    result = evaluate_math_expression("max(1,2,3)")
+    if result.valid or result.failed_at != 7 { return 225 }
+    result = evaluate_math_expression("clamp(1,2)")
+    if result.valid or result.failed_at != 9 { return 226 }
+    result = evaluate_math_expression("where(1<2,3)")
+    if result.valid or result.failed_at != 11 { return 227 }
+    result = evaluate_math_expression("min(,1)")
+    if result.valid or result.failed_at != 4 { return 228 }
+    result = evaluate_math_expression("min(1,)")
+    if result.valid or result.failed_at != 6 { return 229 }
+    result = evaluate_math_expression("abs(1,2)")
+    if result.valid or result.failed_at != 5 { return 230 }
+    result = evaluate_math_expression("(1,2)")
+    if result.valid or result.failed_at != 2 { return 231 }
+    result = evaluate_math_expression("min(1,(2,3))")
+    if result.valid or result.failed_at != 8 { return 232 }
+    result = evaluate_math_expression("min(1,2")
+    if result.valid or result.failed_at != 3 { return 233 }
+    result = evaluate_math_expression("where(1<2,3m,4m,5m)")
+    if result.valid or result.failed_at != 16 { return 234 }
+    result = evaluate_math_expression("norm(1e30,1e30)")
+    if result.valid or result.failed_at != 0 { return 235 }
+
     println("native-math-source-ok")
     return 0
 }

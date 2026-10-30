@@ -318,6 +318,104 @@ function main() -> i32 {
     program = MathProgram { instructions: operations, count: 1, source_length: 1 }
     result = evaluate_math_ir(program)
     if result.valid or result.failed_at != 0 { return 53 }
+
+    # Unit-preserving absolute and exact square roots of physical areas.
+    let area: Dimension = Dimension { length: 2, mass: 0, time: 0, temperature: 0 }
+    operations[0] = instruction(0, quantity(-9.0, area), 0, 0)
+    operations[1] = instruction(20, quantity(0.0, dimensionless()), 0, 1)
+    operations[2] = instruction(21, quantity(0.0, dimensionless()), 0, 2)
+    program = MathProgram { instructions: operations, count: 3, source_length: 3 }
+    result = evaluate_math_ir(program)
+    if not result.valid or result.is_predicate or not close(result.result.value, 3.0) or
+       not same_dimension(result.result.dimension, length) { return 54 }
+
+    # A negative radicand, odd dimensions and predicate operands fail closed.
+    operations[1] = instruction(21, quantity(0.0, dimensionless()), 0, 1)
+    program = MathProgram { instructions: operations, count: 2, source_length: 2 }
+    result = evaluate_math_ir(program)
+    if result.valid or result.failed_at != 1 { return 55 }
+    operations[0] = instruction(0, quantity(9.0, length), 0, 0)
+    program = MathProgram { instructions: operations, count: 2, source_length: 2 }
+    result = evaluate_math_ir(program)
+    if result.valid or result.failed_at != 1 { return 56 }
+    operations[0] = instruction(0, quantity(2.0, length), 0, 0)
+    operations[1] = instruction(0, quantity(3.0, length), 0, 1)
+    operations[2] = instruction(10, quantity(0.0, dimensionless()), 0, 2)
+    operations[3] = instruction(21, quantity(0.0, dimensionless()), 0, 3)
+    program = MathProgram { instructions: operations, count: 4, source_length: 4 }
+    result = evaluate_math_ir(program)
+    if result.valid or result.failed_at != 3 { return 57 }
+
+    # Hypotenuse is dimension-checked and scaled to avoid squaring overflow.
+    operations[0] = instruction(0, quantity(-3.0, length), 0, 0)
+    operations[1] = instruction(0, quantity(4.0, length), 0, 1)
+    operations[2] = instruction(22, quantity(0.0, dimensionless()), 0, 2)
+    program = MathProgram { instructions: operations, count: 3, source_length: 3 }
+    result = evaluate_math_ir(program)
+    if not result.valid or result.is_predicate or not close(result.result.value, 5.0) or
+       not same_dimension(result.result.dimension, length) { return 58 }
+    operations[1] = instruction(0, quantity(4.0, time), 0, 1)
+    program = MathProgram { instructions: operations, count: 3, source_length: 3 }
+    result = evaluate_math_ir(program)
+    if result.valid or result.failed_at != 2 { return 59 }
+    operations[1] = instruction(0, quantity(4.0, length), 0, 1)
+    operations[2] = instruction(10, quantity(0.0, dimensionless()), 0, 2)
+    operations[3] = instruction(0, quantity(5.0, length), 0, 3)
+    operations[4] = instruction(22, quantity(0.0, dimensionless()), 0, 4)
+    program = MathProgram { instructions: operations, count: 5, source_length: 5 }
+    result = evaluate_math_ir(program)
+    if result.valid or result.failed_at != 4 { return 60 }
+
+    # Dimensioned Pythagorean identity: hypot(3m,4m) - sqrt(25m²) == 0m.
+    operations[0] = instruction(0, quantity(3.0, length), 0, 0)
+    operations[1] = instruction(0, quantity(4.0, length), 0, 1)
+    operations[2] = instruction(22, quantity(0.0, dimensionless()), 0, 2)
+    operations[3] = instruction(0, quantity(25.0, area), 0, 3)
+    operations[4] = instruction(21, quantity(0.0, dimensionless()), 0, 4)
+    operations[5] = instruction(2, quantity(0.0, dimensionless()), 0, 5)
+    program = MathProgram { instructions: operations, count: 6, source_length: 6 }
+    result = evaluate_math_ir(program)
+    if not result.valid or not close(result.result.value, 0.0) or
+       not same_dimension(result.result.dimension, length) { return 61 }
+
+    # Small and large roots must remain accurate and bounded.
+    operations[0] = instruction(0, quantity(0.000000000000000000000000000001, area), 0, 0)
+    operations[1] = instruction(21, quantity(0.0, dimensionless()), 0, 1)
+    program = MathProgram { instructions: operations, count: 2, source_length: 2 }
+    result = evaluate_math_ir(program)
+    if not result.valid or result.result.value < 0.000000000000000999 or
+       result.result.value > 0.000000000000001001 { return 62 }
+    operations[0] = instruction(0, quantity(1000000000000000000000000000000.0, area), 0, 0)
+    program = MathProgram { instructions: operations, count: 2, source_length: 2 }
+    result = evaluate_math_ir(program)
+    if not result.valid or result.result.value < 999999999999000.0 or
+       result.result.value > 1000000000001000.0 { return 63 }
+    operations[0] = instruction(0, quantity(1000000000000000000000000000000.0, length), 0, 0)
+    operations[1] = instruction(0, quantity(1000000000000000000000000000000.0, length), 0, 1)
+    operations[2] = instruction(22, quantity(0.0, dimensionless()), 0, 2)
+    program = MathProgram { instructions: operations, count: 3, source_length: 3 }
+    result = evaluate_math_ir(program)
+    if result.valid or result.failed_at != 2 { return 64 }
+
+    # Empty norm and zero root retain dimensions; invalid opcodes still fail.
+    operations[0] = instruction(0, quantity(0.0, length), 0, 0)
+    operations[1] = instruction(0, quantity(0.0, length), 0, 1)
+    operations[2] = instruction(22, quantity(0.0, dimensionless()), 0, 2)
+    program = MathProgram { instructions: operations, count: 3, source_length: 3 }
+    result = evaluate_math_ir(program)
+    if not result.valid or result.result.value != 0.0 or
+       not same_dimension(result.result.dimension, length) { return 65 }
+    operations[0] = instruction(0, quantity(0.0, area), 0, 0)
+    operations[1] = instruction(21, quantity(0.0, dimensionless()), 0, 1)
+    program = MathProgram { instructions: operations, count: 2, source_length: 2 }
+    result = evaluate_math_ir(program)
+    if not result.valid or result.result.value != 0.0 or
+       not same_dimension(result.result.dimension, length) { return 66 }
+    operations[0] = instruction(23, quantity(0.0, dimensionless()), 0, 0)
+    program = MathProgram { instructions: operations, count: 1, source_length: 1 }
+    result = evaluate_math_ir(program)
+    if result.valid or result.failed_at != 0 { return 67 }
+
     println("native-math-ir-ok")
     return 0
 }

@@ -5,7 +5,8 @@
 #          5 negate, 6 integer power, 7 minimum, 8 maximum,
 #          9 clamp (value, lower, upper), 10-15 ordered/equality comparisons,
 #          16 logical and, 17 logical or, 18 logical not,
-#          19 where(predicate, true_branch, false_branch).
+#          19 where(predicate, true_branch, false_branch),
+#          20 absolute, 21 physical square root, 22 stable two-component norm.
 # Predicate values are dimensionless 0/1 with a separate runtime type bit.
 # where and logical operators evaluate operands eagerly (no short circuit).
 # Unsupported instructions and type mismatches fail closed.
@@ -101,6 +102,37 @@ function integer_power(base: Quantity, exponent: i32) -> CheckedQuantity {
     }
 }
 
+# Bounded Newton iteration avoids an external math library dependency. All
+# inputs are nonnegative and <= 1e30. The iteration budget covers both
+# 1e-30 and 1e30 without a tolerance-dependent termination path.
+function positive_square_root(value: f64) -> f64 {
+    if value == 0.0 { return 0.0 }
+    let mut estimate: f64 = 1.0
+    if value > 1.0 { estimate = value }
+    let mut iteration: i32 = 0
+    while iteration < 72 {
+        estimate = 0.5 * (estimate + value / estimate)
+        iteration = iteration + 1
+    }
+    return estimate
+}
+
+function even_dimension(dimension: Dimension) -> bool {
+    return dimension.length == (dimension.length / 2) * 2 and
+        dimension.mass == (dimension.mass / 2) * 2 and
+        dimension.time == (dimension.time / 2) * 2 and
+        dimension.temperature == (dimension.temperature / 2) * 2
+}
+
+function half_dimension(dimension: Dimension) -> Dimension {
+    return Dimension {
+        length: dimension.length / 2,
+        mass: dimension.mass / 2,
+        time: dimension.time / 2,
+        temperature: dimension.temperature / 2
+    }
+}
+
 export function evaluate_math_ir(program: MathProgram) -> MathResult {
     if program.count < 1 or program.count > 16 or program.source_length < 0 {
         return failed(0)
@@ -124,7 +156,7 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
             stack[depth] = instruction.literal
             predicate[depth] = false
             depth = depth + 1
-        } elif opcode == 5 or opcode == 6 or opcode == 18 {
+        } elif opcode == 5 or opcode == 6 or opcode == 18 or opcode == 20 or opcode == 21 {
             if depth < 1 { return failed(instruction.source_start) }
             let input: Quantity = stack[depth - 1]
             if opcode == 18 {
@@ -136,14 +168,26 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
                 if predicate[depth - 1] { return failed(instruction.source_start) }
                 if opcode == 5 {
                     stack[depth - 1] = quantity(-input.value, input.dimension)
+                } elif opcode == 20 {
+                    stack[depth - 1] = quantity(magnitude(input.value), input.dimension)
+                } elif opcode == 21 {
+                    if input.value < 0.0 or not even_dimension(input.dimension) {
+                        return failed(instruction.source_start)
+                    }
+                    stack[depth - 1] = quantity(
+                        positive_square_root(input.value), half_dimension(input.dimension))
                 } else {
                     let powered: CheckedQuantity = integer_power(input, instruction.exponent)
                     if not powered.valid { return failed(instruction.source_start) }
                     stack[depth - 1] = powered.quantity
                 }
             }
+            if not bounded_value(stack[depth - 1].value) or
+               not bounded_dimension(stack[depth - 1].dimension) {
+                return failed(instruction.source_start)
+            }
         } elif (opcode >= 1 and opcode <= 4) or opcode == 7 or opcode == 8 or
-             (opcode >= 10 and opcode <= 17) {
+             (opcode >= 10 and opcode <= 17) or opcode == 22 {
             if depth < 2 { return failed(instruction.source_start) }
             let right: Quantity = stack[depth - 1]
             let left: Quantity = stack[depth - 2]
@@ -182,6 +226,25 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
             } else {
                 if left_predicate or right_predicate {
                     return failed(instruction.source_start)
+                }
+                if opcode == 22 {
+                    if not same_dimension(left.dimension, right.dimension) {
+                        return failed(instruction.source_start)
+                    }
+                    let first: f64 = magnitude(left.value)
+                    let second: f64 = magnitude(right.value)
+                    let mut largest: f64 = first
+                    let mut smallest: f64 = second
+                    if second > first {
+                        largest = second
+                        smallest = first
+                    }
+                    let mut norm: f64 = 0.0
+                    if largest > 0.0 {
+                        let ratio: f64 = smallest / largest
+                        norm = largest * positive_square_root(1.0 + ratio * ratio)
+                    }
+                    result = CheckedQuantity { valid: true, quantity: quantity(norm, left.dimension) }
                 }
                 if opcode == 1 { result = quantity_add(left, right) }
                 if opcode == 2 { result = quantity_subtract(left, right) }

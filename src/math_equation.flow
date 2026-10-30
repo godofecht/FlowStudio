@@ -1,7 +1,6 @@
 # Native, dimension-checked scalar equation AST and residual evaluator.
 # This is a bounded source parser using the actual Flow 2.0 expression compiler.
 # It is not upstream Flow grammar integration or symbolic equation solving.
-import std.string { str_is_ascii_ws }
 import .math_dimensions { Dimension, Quantity, CheckedQuantity, dimensionless, quantity, same_dimension, quantity_subtract }
 import .math_expression_ir { MathInstruction, MathProgram, MathResult, evaluate_math_ir }
 import .math_expression_source { MathBindings, ParsedMathExpression, parse_math_expression_with_bindings, empty_math_bindings }

@@ -16,7 +16,9 @@ export struct ParsedMathExpression {
     failed_at: i32
 }
 
-# Explicit, bounded symbol bindings are supplied by the caller. Values are
+# Explicit, bounded symbol bindings are supplied by the caller. Names may
+# contain validated Greek letters and subscript digits, but are not inferred.
+# Values are
 # lowered to typed IR literals; no implicit global state or name inference.
 export struct MathSymbol {
     name: string,
@@ -43,6 +45,40 @@ function identifier_part(c: u8) -> bool {
     return identifier_start(c) or (c >= 48 and c <= 57)
 }
 
+# A deliberately bounded UTF-8 identifier alphabet: ASCII names, Greek
+# uppercase/lowercase letters (excluding the unassigned U+03A2), and
+# U+2080..U+2089 subscript digits after the first letter. Match full code
+# points, never continuation bytes. Names are compared byte-for-byte; no
+# normalization, confusable folding or implicit symbol creation occurs.
+function greek_letter_width(bytes: ptr<u8>, index: i32, length: i32) -> i32 {
+    if index + 1 >= length { return 0 }
+    if bytes[index] == 206 {
+        let following: u8 = bytes[index + 1]
+        if (following >= 145 and following <= 161) or
+           (following >= 163 and following <= 169) or
+           (following >= 177 and following <= 191) { return 2 }
+    } elif bytes[index] == 207 {
+        let following: u8 = bytes[index + 1]
+        if following >= 128 and following <= 137 { return 2 }
+    }
+    return 0
+}
+
+function identifier_start_width(bytes: ptr<u8>, index: i32, length: i32) -> i32 {
+    if index >= length { return 0 }
+    if identifier_start(bytes[index]) { return 1 }
+    return greek_letter_width(bytes, index, length)
+}
+
+function identifier_part_width(bytes: ptr<u8>, index: i32, length: i32) -> i32 {
+    if index >= length { return 0 }
+    if identifier_part(bytes[index]) { return 1 }
+    if bytes[index] == 226 and index + 2 < length and
+       bytes[index + 1] == 130 and
+       bytes[index + 2] >= 128 and bytes[index + 2] <= 137 { return 3 }
+    return greek_letter_width(bytes, index, length)
+}
+
 function identifier_matches(bytes: ptr<u8>, start: i32, end: i32, name: string) -> bool {
     let length: i32 = strlen(name) as i32
     if length != end - start { return false }
@@ -59,16 +95,17 @@ function valid_symbol_name(name: string) -> bool {
     let length: i32 = strlen(name) as i32
     if length < 1 or length > 32 { return false }
     let bytes: ptr<u8> = name as ptr<u8>
-    if not identifier_start(bytes[0]) { return false }
+    let mut i: i32 = identifier_start_width(bytes, 0, length)
+    if i == 0 { return false }
     if identifier_matches(bytes, 0, length, "and") or
        identifier_matches(bytes, 0, length, "or") or
        identifier_matches(bytes, 0, length, "not") or
        identifier_matches(bytes, 0, length, "true") or
        identifier_matches(bytes, 0, length, "false") { return false }
-    let mut i: i32 = 1
     while i < length {
-        if not identifier_part(bytes[i]) { return false }
-        i = i + 1
+        let width: i32 = identifier_part_width(bytes, i, length)
+        if width == 0 { return false }
+        i = i + width
     }
     return true
 }
@@ -315,11 +352,18 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
                 continue
             }
         }
-        if identifier_start(c) {
+        let initial_width: i32 = identifier_start_width(bytes, index, length)
+        if initial_width > 0 {
             let start: i32 = index
-            index = index + 1
-            while index < length and identifier_part(bytes[index]) {
-                index = index + 1
+            index = index + initial_width
+            let mut scanning_identifier: bool = true
+            while index < length and scanning_identifier {
+                let width: i32 = identifier_part_width(bytes, index, length)
+                if width == 0 {
+                    scanning_identifier = false
+                } else {
+                    index = index + width
+                }
             }
             # Keywords lower directly to the existing native predicate IR.
             # They are reserved and cannot be shadowed by caller bindings.

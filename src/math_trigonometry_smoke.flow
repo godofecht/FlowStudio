@@ -1,0 +1,145 @@
+# Executable native Flow 2.0 trigonometric source, IR, static type and equation acceptance.
+# flow run src/math_trigonometry_smoke.flow
+import .math_dimensions { dimensionless, length_dimension, quantity, same_dimension }
+import .math_expression_ir { MathInstruction, MathProgram, MathResult, evaluate_math_ir }
+import .math_expression_source { ParsedMathExpression, evaluate_math_expression, parse_math_expression }
+import .math_static { MathInferredType, infer_math_ir, infer_math_expression_source, infer_math_equation_source }
+import .math_equation { MathEquationResult, evaluate_math_equation_source }
+
+function close(actual: f64, expected: f64) -> bool {
+    let mut difference: f64 = actual - expected
+    if difference < 0.0 { difference = -difference }
+    return difference < 0.00000000001
+}
+
+function main() -> i32 {
+    let pi: f64 = 3.141592653589793
+    let half_pi: f64 = 1.5707963267948966
+    let mut result: MathResult = evaluate_math_expression("sin(0)")
+    if not result.valid or not close(result.result.value, 0.0) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 1 }
+    result = evaluate_math_expression("cos(0)")
+    if not result.valid or not close(result.result.value, 1.0) { return 2 }
+    result = evaluate_math_expression("sin(1.5707963267948966)")
+    if not result.valid or not close(result.result.value, 1.0) { return 3 }
+    result = evaluate_math_expression("cos(1.5707963267948966)")
+    if not result.valid or not close(result.result.value, 0.0) { return 4 }
+    result = evaluate_math_expression("sin(3.141592653589793)")
+    if not result.valid or not close(result.result.value, 0.0) { return 5 }
+    result = evaluate_math_expression("cos(3.141592653589793)")
+    if not result.valid or not close(result.result.value, -1.0) { return 6 }
+    result = evaluate_math_expression("sin(-1.5707963267948966)")
+    if not result.valid or not close(result.result.value, -1.0) { return 7 }
+    result = evaluate_math_expression("cos(-3.141592653589793)")
+    if not result.valid or not close(result.result.value, -1.0) { return 8 }
+    result = evaluate_math_expression("sin(1)")
+    if not result.valid or not close(result.result.value, 0.8414709848078965) { return 9 }
+    result = evaluate_math_expression("cos(1)")
+    if not result.valid or not close(result.result.value, 0.5403023058681398) { return 10 }
+    result = evaluate_math_expression("sin(10)")
+    if not result.valid or not close(result.result.value, -0.5440211108893698) { return 11 }
+    result = evaluate_math_expression("cos(10)")
+    if not result.valid or not close(result.result.value, -0.8390715290764524) { return 12 }
+    result = evaluate_math_expression("sin(60)")
+    if not result.valid or not close(result.result.value, -0.3048106211022167) { return 13 }
+    result = evaluate_math_expression("cos(60)")
+    if not result.valid or not close(result.result.value, -0.9524129804151563) { return 14 }
+    result = evaluate_math_expression("sin(-60)")
+    if not result.valid or not close(result.result.value, 0.3048106211022167) { return 15 }
+    result = evaluate_math_expression("cos(-60)")
+    if not result.valid or not close(result.result.value, -0.9524129804151563) { return 16 }
+    result = evaluate_math_expression("sin(1)^2+cos(1)^2")
+    if not result.valid or not close(result.result.value, 1.0) { return 17 }
+    result = evaluate_math_expression("sin(cos(0))")
+    if not result.valid or not close(result.result.value, 0.8414709848078965) { return 18 }
+    result = evaluate_math_expression("sin(1m/1m)")
+    if not result.valid or not close(result.result.value, 0.8414709848078965) { return 19 }
+    result = evaluate_math_expression("cos(2m/2m)")
+    if not result.valid or not close(result.result.value, 0.5403023058681398) { return 20 }
+
+    result = evaluate_math_expression("sin(1m)")
+    if result.valid or result.failed_at != 0 { return 21 }
+    result = evaluate_math_expression("cos(true)")
+    if result.valid or result.failed_at != 0 { return 22 }
+    result = evaluate_math_expression("sin(61)")
+    if result.valid or result.failed_at != 0 { return 23 }
+    result = evaluate_math_expression("cos(-61)")
+    if result.valid or result.failed_at != 0 { return 24 }
+    if parse_math_expression("sin(1,2)").valid { return 25 }
+    if parse_math_expression("cos()").valid { return 26 }
+    if parse_math_expression("sin (0)").valid { return 27 }
+    let parsed: ParsedMathExpression = parse_math_expression("sin(0)")
+    if not parsed.valid or parsed.program.count != 2 or
+       parsed.program.instructions[1].opcode != 28 or
+       parsed.program.instructions[1].source_start != 0 or
+       parsed.program.instructions[1].source_end != 3 { return 28 }
+    let parsed_cos: ParsedMathExpression = parse_math_expression("cos(0)")
+    if not parsed_cos.valid or parsed_cos.program.count != 2 or
+       parsed_cos.program.instructions[1].opcode != 29 or
+       parsed_cos.program.instructions[1].source_end != 3 { return 29 }
+
+    let mut inferred: MathInferredType = infer_math_expression_source("sin(61)")
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension, dimensionless()) { return 30 }
+    inferred = infer_math_expression_source("cos(1m)")
+    if inferred.valid or inferred.failed_at != 0 { return 31 }
+    inferred = infer_math_expression_source("sin(true)")
+    if inferred.valid or inferred.failed_at != 0 { return 32 }
+    inferred = infer_math_equation_source("sin(0) = 0")
+    if not inferred.valid or not same_dimension(inferred.dimension, dimensionless()) { return 33 }
+    inferred = infer_math_equation_source("sin(1m) = 0")
+    if inferred.valid or inferred.failed_at != 0 { return 34 }
+
+    let tolerance = quantity(0.00000000001, dimensionless())
+    let mut equation: MathEquationResult = evaluate_math_equation_source(
+        "sin(0) = 0", tolerance)
+    if not equation.valid or not equation.satisfied { return 35 }
+    equation = evaluate_math_equation_source(
+        "cos(3.141592653589793) = -1", tolerance)
+    if not equation.valid or not equation.satisfied { return 36 }
+    equation = evaluate_math_equation_source(
+        "sin(1)^2 + cos(1)^2 = 1", tolerance)
+    if not equation.valid or not equation.satisfied { return 37 }
+    equation = evaluate_math_equation_source("sin(1m) = 0", tolerance)
+    if equation.valid { return 38 }
+
+    let blank: MathInstruction = MathInstruction {
+        opcode: 0, literal: quantity(0.0, dimensionless()),
+        exponent: 0, source_start: 0, source_end: 0
+    }
+    let mut instructions: array<MathInstruction, 64> = [blank]
+    instructions[0] = MathInstruction {
+        opcode: 0, literal: quantity(half_pi, dimensionless()),
+        exponent: 0, source_start: 0, source_end: 1
+    }
+    instructions[1] = MathInstruction {
+        opcode: 28, literal: quantity(0.0, dimensionless()),
+        exponent: 0, source_start: 1, source_end: 2
+    }
+    let mut program: MathProgram = MathProgram {
+        instructions: instructions, count: 2, source_length: 2
+    }
+    result = evaluate_math_ir(program)
+    if not result.valid or not close(result.result.value, 1.0) { return 39 }
+    inferred = infer_math_ir(program)
+    if not inferred.valid or not same_dimension(inferred.dimension, dimensionless()) { return 40 }
+    instructions[1] = MathInstruction {
+        opcode: 29, literal: quantity(0.0, dimensionless()),
+        exponent: 0, source_start: 1, source_end: 2
+    }
+    program = MathProgram { instructions: instructions, count: 2, source_length: 2 }
+    result = evaluate_math_ir(program)
+    if not result.valid or not close(result.result.value, 0.0) { return 41 }
+    instructions[0] = MathInstruction {
+        opcode: 0, literal: quantity(pi, length_dimension()),
+        exponent: 0, source_start: 0, source_end: 1
+    }
+    program = MathProgram { instructions: instructions, count: 2, source_length: 2 }
+    result = evaluate_math_ir(program)
+    if result.valid or result.failed_at != 1 { return 42 }
+    inferred = infer_math_ir(program)
+    if inferred.valid or inferred.failed_at != 1 { return 43 }
+
+    println("native-math-trigonometry-ok")
+    return 0
+}

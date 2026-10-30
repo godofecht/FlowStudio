@@ -39,6 +39,9 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/plot_history.js" {
         return StaticAsset { path: "web/plot_history.js", mime: "text/javascript; charset=utf-8", found: true }
     }
+    if url == "/native_field_plot.js" {
+        return StaticAsset { path: "web/native_field_plot.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
     if url == "/math_flow_plot.js" {
         return StaticAsset { path: "web/math_flow_plot.js", mime: "text/javascript; charset=utf-8", found: true }
     }

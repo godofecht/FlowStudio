@@ -1,3 +1,30 @@
+## Native inverse hyperbolic functions (pending Linux/macOS qualification)
+
+The real Flow 2.0 mathematical source parser now lowers `asinh(x)`,
+`acosh(x)` and `atanh(x)` to typed native IR opcodes 38–40, with runtime
+execution, static dimensional inference and scalar equation support.
+All inputs must be dimensionless; `acosh` requires x >= 1 and
+`atanh` requires -1 < x < 1. The bounded implementation accepts
+`|x| <= 1e14` for `asinh`, `1 <= x <= 1e14` for `acosh` and the
+open unit interval for `atanh`. Small inputs use stable Taylor
+series; larger inputs use the existing native logarithm and square root
+kernels. Unsupported domains and predicates fail closed.
+
+`src/math_inverse_hyperbolic_smoke.flow` contains 67 executable
+analytical, source-span, dimension, invalid-domain, IR and equation
+assertions. The compact native HTTP source acceptance also exercises
+these operators. Both are wired into the existing six-job Linux/macOS
+CI; do not claim qualification before that CI actually completes.
+
+```sh
+flow run src/math_inverse_hyperbolic_smoke.flow
+flow run src/math_expression_source_http_smoke.flow
+```
+
+This is an extension of the bounded native scalar expression compiler,
+**not** general Flow grammar integration, symbolic dimensional inference,
+general PDE compilation or universal mathematical function coverage.
+
 ## Native three-species conservative cyclic network (six CI jobs passed)
 
 `examples/native_cyclic_network.flow` is a standalone Flow 2.0 program, with

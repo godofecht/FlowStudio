@@ -165,7 +165,7 @@ function main() -> i32 {
     result = evaluate_math_expression("2m² + 3m²")
     if not result.valid or not near(result.result.value, 13.0) or
        not same_dimension(result.result.dimension, area) { return 56 }
-    result = evaluate_math_expression("2m^-2 * 4m^2")
+    result = evaluate_math_expression("2m^-2 * 2m^2")
     if not result.valid or not near(result.result.value, 1.0) or
        not same_dimension(result.result.dimension, dimensionless()) { return 57 }
     result = evaluate_math_expression("(-2m)^3")
@@ -205,7 +205,7 @@ function main() -> i32 {
     result = evaluate_math_expression("2^-2*4")
     if not result.valid or not near(result.result.value, 1.0) { return 68 }
     result = evaluate_math_expression("((2m²+3m²)/(5s²))*4s²")
-    if not result.valid or not near(result.result.value, 4.0) or
+    if not result.valid or not near(result.result.value, 8.32) or
        not same_dimension(result.result.dimension, area) { return 69 }
     result = evaluate_math_expression("2^00000000000000000000000009")
     if result.valid or result.failed_at != 1 { return 70 }

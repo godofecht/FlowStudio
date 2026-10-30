@@ -1,3 +1,26 @@
+## 2026-10-30: native 32x32 two-mode tensor diffusion (verification pending)
+
+The production-compiled `examples/native_tensor_grid.flow` now supports
+3..32 cells per axis and at most 1,024 cells. Its new 32x32 case combines
+two diagonal Fourier modes with distinct semidiscrete eigenvalues
+-69.632 and -53.248, exercising both signs of the anisotropic mixed
+derivative simultaneously. Every cell is checked against independent
+matrix-free Fourier decay at 32/64/128 midpoint RK2 steps, with
+second-order refinement, conservation, deterministic replay, semigroup
+consistency, translation equivariance, mixed-tensor sign mutation,
+uniform equilibrium, zero duration, 33-cell-axis rejection, invalid
+initial values and the two-million-cell-step resource limit.
+
+`tests/test_native_tensor32_oracle.py` independently reconstructs
+all 1,024 stencil derivatives and analytical states with standard-library
+Python. The existing native Flow compiler, real HTTP and Ubuntu Chromium
+Monaco Run acceptance already execute the checked-in tensor program.
+**Local:** five independent Python oracle tests passed; native Flow/R/HTTP
+and physical-browser tests are unavailable locally. **CI:** pending;
+no claims of Linux/macOS or browser acceptance until recorded checks pass.
+This is a bounded array kernel, not general PDE grammar or RStudio parity.
+No hosted CI workflow was modified.
+
 ## 2026-10-30: native 16x16 anisotropic tensor diffusion (Linux/macOS CI verified)
 
 The existing production-compiled `examples/native_tensor_grid.flow` now

@@ -791,6 +791,49 @@ function main() -> i32 {
     if not result.valid or not near(result.result.value, 1.0) { return 272 }
     if parse_math_expression("(((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((1)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))").valid { return 273 }
 
+    # Native typed Boolean literals retain spans and reject numeric coercion.
+    result = evaluate_math_expression("true")
+    if not result.valid or not result.is_predicate or result.result.value != 1.0 { return 281 }
+    result = evaluate_math_expression("false")
+    if not result.valid or not result.is_predicate or result.result.value != 0.0 { return 282 }
+    result = evaluate_math_expression("not false and true")
+    if not result.valid or not result.is_predicate or result.result.value != 1.0 { return 283 }
+    result = evaluate_math_expression("false or 2m<3m")
+    if not result.valid or not result.is_predicate or result.result.value != 1.0 { return 284 }
+    result = evaluate_math_expression("where(true,3m,4m)")
+    if not result.valid or result.is_predicate or result.result.value != 3.0 or
+       not same_dimension(result.result.dimension, length) { return 285 }
+    result = evaluate_math_expression("where(false,3m,4m)")
+    if not result.valid or result.is_predicate or result.result.value != 4.0 or
+       not same_dimension(result.result.dimension, length) { return 286 }
+    let boolean_parsed: ParsedMathExpression = parse_math_expression("true and false")
+    if not boolean_parsed.valid or boolean_parsed.program.count != 3 or
+       boolean_parsed.program.instructions[0].opcode != 24 or
+       boolean_parsed.program.instructions[0].source_start != 0 or
+       boolean_parsed.program.instructions[0].source_end != 4 or
+       boolean_parsed.program.instructions[1].opcode != 24 or
+       boolean_parsed.program.instructions[1].source_start != 9 or
+       boolean_parsed.program.instructions[1].source_end != 14 { return 287 }
+    result = evaluate_math_expression("true+1")
+    if result.valid or result.failed_at != 4 { return 288 }
+    result = evaluate_math_expression("true==false")
+    if result.valid or result.failed_at != 4 { return 289 }
+    result = evaluate_math_expression("true and 1")
+    if result.valid or result.failed_at != 5 { return 290 }
+    result = evaluate_math_expression("true or 1/0==0")
+    if result.valid or result.failed_at != 9 { return 291 }
+    result = evaluate_math_expression("true^2")
+    if result.valid or result.failed_at != 4 { return 292 }
+    if parse_math_expression("True").valid { return 293 }
+    if parse_math_expression("falsehood").valid { return 294 }
+    if parse_math_expression("true false").valid { return 295 }
+    let mut reserved: MathBindings = empty_math_bindings()
+    reserved.count = 1
+    reserved.symbols[0] = MathSymbol { name: "true", value: quantity(1.0, dimensionless()) }
+    if parse_math_expression_with_bindings("true", reserved).valid { return 296 }
+    reserved.symbols[0] = MathSymbol { name: "false", value: quantity(0.0, dimensionless()) }
+    if parse_math_expression_with_bindings("false", reserved).valid { return 297 }
+
     println("native-math-source-ok")
     return 0
 }

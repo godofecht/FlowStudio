@@ -62,7 +62,9 @@ function valid_symbol_name(name: string) -> bool {
     if not identifier_start(bytes[0]) { return false }
     if identifier_matches(bytes, 0, length, "and") or
        identifier_matches(bytes, 0, length, "or") or
-       identifier_matches(bytes, 0, length, "not") { return false }
+       identifier_matches(bytes, 0, length, "not") or
+       identifier_matches(bytes, 0, length, "true") or
+       identifier_matches(bytes, 0, length, "false") { return false }
     let mut i: i32 = 1
     while i < length {
         if not identifier_part(bytes[i]) { return false }
@@ -348,6 +350,21 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
                 widths[top] = index - start
                 top = top + 1
                 expect_operand = true
+                continue
+            }
+            # Boolean keywords are typed predicate literals in the native IR.
+            # They cannot be shadowed by caller-supplied numeric symbols.
+            if identifier_matches(bytes, start, index, "true") or
+               identifier_matches(bytes, start, index, "false") {
+                if not expect_operand or count >= 64 { return source_error(start, length) }
+                let mut boolean_value: f64 = 0.0
+                if identifier_matches(bytes, start, index, "true") {
+                    boolean_value = 1.0
+                }
+                instructions[count] = make_instruction(24,
+                    quantity(boolean_value, dimensionless()), start, index)
+                count = count + 1
+                expect_operand = false
                 continue
             }
             if not expect_operand { return source_error(start, length) }

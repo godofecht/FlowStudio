@@ -74,6 +74,16 @@ export function infer_math_ir(program: MathProgram) -> MathInferredType {
             dimensions[depth] = instruction.literal.dimension
             predicates[depth] = false
             depth = depth + 1
+        } elif opcode == 24 {
+            # Validate the typed literal representation without evaluating expressions.
+            if depth >= 64 or instruction.exponent != 0 or
+               not same_dimension(instruction.literal.dimension, dimensionless()) or
+               (instruction.literal.value != 0.0 and instruction.literal.value != 1.0) {
+                return static_error(instruction.source_start)
+            }
+            dimensions[depth] = dimensionless()
+            predicates[depth] = true
+            depth = depth + 1
         } elif opcode == 5 or opcode == 6 or opcode == 18 or opcode == 20 or opcode == 21 {
             if depth < 1 { return static_error(instruction.source_start) }
             let input: Dimension = dimensions[depth - 1]

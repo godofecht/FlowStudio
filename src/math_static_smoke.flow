@@ -161,6 +161,37 @@ function main() -> i32 {
     program = MathProgram { instructions: instructions, count: 2, source_length: 2 }
     if infer_math_ir(program).valid { return 44 }
 
+    # Boolean literals are statically predicates, never numeric quantities.
+    inferred = infer_math_expression_source("true and not false")
+    if not inferred.valid or not inferred.is_predicate or
+       not same_dimension(inferred.dimension, dimensionless()) { return 45 }
+    inferred = infer_math_expression_source("where(true,3m,4m)")
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension, metres) { return 46 }
+    inferred = infer_math_expression_source("true + 1")
+    if inferred.valid or inferred.failed_at != 5 { return 47 }
+    inferred = infer_math_expression_source("true == false")
+    if inferred.valid or inferred.failed_at != 5 { return 48 }
+    inferred = infer_math_expression_source("false and 1m<2s")
+    if inferred.valid or inferred.failed_at != 12 { return 49 }
+    instructions[0] = MathInstruction {
+        opcode: 24, literal: quantity(1.0, dimensionless()), exponent: 0,
+        source_start: 0, source_end: 4
+    }
+    program = MathProgram { instructions: instructions, count: 1, source_length: 4 }
+    inferred = infer_math_ir(program)
+    if not inferred.valid or not inferred.is_predicate { return 50 }
+    instructions[0].literal = quantity(2.0, dimensionless())
+    program = MathProgram { instructions: instructions, count: 1, source_length: 4 }
+    if infer_math_ir(program).valid { return 51 }
+    instructions[0].literal = quantity(1.0, metres)
+    program = MathProgram { instructions: instructions, count: 1, source_length: 4 }
+    if infer_math_ir(program).valid { return 52 }
+    instructions[0].literal = quantity(1.0, dimensionless())
+    instructions[0].exponent = 1
+    program = MathProgram { instructions: instructions, count: 1, source_length: 4 }
+    if infer_math_ir(program).valid { return 53 }
+
     println("native-math-static-ok")
     return 0
 }

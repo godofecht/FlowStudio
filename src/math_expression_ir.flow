@@ -6,7 +6,8 @@
 #          9 clamp (value, lower, upper), 10-15 ordered/equality comparisons,
 #          16 logical and, 17 logical or, 18 logical not,
 #          19 where(predicate, true_branch, false_branch),
-#          20 absolute, 21 physical square root, 22 stable two-component norm.
+#          20 absolute, 21 physical square root, 22 stable two-component norm,
+#          24 typed Boolean literal (0 or 1, dimensionless).
 # Predicate values are dimensionless 0/1 with a separate runtime type bit.
 # where and logical operators evaluate operands eagerly (no short circuit).
 # Unsupported instructions and type mismatches fail closed.
@@ -155,6 +156,16 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
             }
             stack[depth] = instruction.literal
             predicate[depth] = false
+            depth = depth + 1
+        } elif opcode == 24 {
+            # A Boolean is a distinct predicate type, not a numeric 0/1.
+            if depth >= 64 or instruction.exponent != 0 or
+               not same_dimension(instruction.literal.dimension, dimensionless()) or
+               (instruction.literal.value != 0.0 and instruction.literal.value != 1.0) {
+                return failed(instruction.source_start)
+            }
+            stack[depth] = quantity(instruction.literal.value, dimensionless())
+            predicate[depth] = true
             depth = depth + 1
         } elif opcode == 5 or opcode == 6 or opcode == 18 or opcode == 20 or opcode == 21 {
             if depth < 1 { return failed(instruction.source_start) }

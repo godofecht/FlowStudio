@@ -1,0 +1,221 @@
+# Native Flow 2.0 static physical-type inference for bounded mathematical postfix IR.
+# Operates on opcode structure and SI exponents without evaluating numeric values.
+# It does not perform value-range analysis, symbolic algebra, or PDE inference.
+import .math_dimensions { Dimension, dimensionless, same_dimension }
+import .math_expression_ir { MathInstruction, MathProgram }
+import .math_expression_source { MathBindings, ParsedMathExpression, parse_math_expression_with_bindings, empty_math_bindings }
+import .math_equation { MathEquation, parse_math_equation_with_bindings }
+
+export struct MathInferredType {
+    valid: bool,
+    dimension: Dimension,
+    is_predicate: bool,
+    failed_at: i32
+}
+
+function static_error(position: i32) -> MathInferredType {
+    return MathInferredType {
+        valid: false, dimension: dimensionless(),
+        is_predicate: false, failed_at: position
+    }
+}
+
+function static_bounded_dimension(d: Dimension) -> bool {
+    return d.length >= -32 and d.length <= 32 and
+        d.mass >= -32 and d.mass <= 32 and
+        d.time >= -32 and d.time <= 32 and
+        d.temperature >= -32 and d.temperature <= 32
+}
+
+function static_even_dimension(d: Dimension) -> bool {
+    return d.length == (d.length / 2) * 2 and
+        d.mass == (d.mass / 2) * 2 and
+        d.time == (d.time / 2) * 2 and
+        d.temperature == (d.temperature / 2) * 2
+}
+
+function static_half_dimension(d: Dimension) -> Dimension {
+    return Dimension {
+        length: d.length / 2, mass: d.mass / 2,
+        time: d.time / 2, temperature: d.temperature / 2
+    }
+}
+
+function static_powered_dimension(d: Dimension, exponent: i32) -> Dimension {
+    return Dimension {
+        length: d.length * exponent, mass: d.mass * exponent,
+        time: d.time * exponent, temperature: d.temperature * exponent
+    }
+}
+
+# Unlike evaluate_math_ir, this checks every operand's physical type
+# without dividing, taking a square root, comparing values or selecting a
+# branch. Thus it can accept well-typed expressions with runtime domain errors.
+export function infer_math_ir(program: MathProgram) -> MathInferredType {
+    if program.count < 1 or program.count > 64 or program.source_length < 0 {
+        return static_error(0)
+    }
+    let mut dimensions: array<Dimension, 64> = [dimensionless()]
+    let mut predicates: array<bool, 64> = [false]
+    let mut depth: i32 = 0
+    let mut index: i32 = 0
+    while index < program.count {
+        let instruction: MathInstruction = program.instructions[index]
+        if instruction.source_start < 0 or
+           instruction.source_end < instruction.source_start or
+           instruction.source_end > program.source_length {
+            return static_error(index)
+        }
+        let opcode: i32 = instruction.opcode
+        if opcode == 0 {
+            if depth >= 64 or not static_bounded_dimension(instruction.literal.dimension) {
+                return static_error(instruction.source_start)
+            }
+            dimensions[depth] = instruction.literal.dimension
+            predicates[depth] = false
+            depth = depth + 1
+        } elif opcode == 5 or opcode == 6 or opcode == 18 or opcode == 20 or opcode == 21 {
+            if depth < 1 { return static_error(instruction.source_start) }
+            let input: Dimension = dimensions[depth - 1]
+            if opcode == 18 {
+                if not predicates[depth - 1] { return static_error(instruction.source_start) }
+                dimensions[depth - 1] = dimensionless()
+            } else {
+                if predicates[depth - 1] { return static_error(instruction.source_start) }
+                if opcode == 6 {
+                    if instruction.exponent < -8 or instruction.exponent > 8 {
+                        return static_error(instruction.source_start)
+                    }
+                    dimensions[depth - 1] = static_powered_dimension(input, instruction.exponent)
+                } elif opcode == 21 {
+                    if not static_even_dimension(input) {
+                        return static_error(instruction.source_start)
+                    }
+                    dimensions[depth - 1] = static_half_dimension(input)
+                }
+            }
+            if not static_bounded_dimension(dimensions[depth - 1]) {
+                return static_error(instruction.source_start)
+            }
+        } elif (opcode >= 1 and opcode <= 4) or opcode == 7 or opcode == 8 or
+             (opcode >= 10 and opcode <= 17) or opcode == 22 {
+            if depth < 2 { return static_error(instruction.source_start) }
+            let left: Dimension = dimensions[depth - 2]
+            let right: Dimension = dimensions[depth - 1]
+            let left_predicate: bool = predicates[depth - 2]
+            let right_predicate: bool = predicates[depth - 1]
+            let mut result: Dimension = left
+            let mut result_predicate: bool = false
+            if opcode == 16 or opcode == 17 {
+                if not left_predicate or not right_predicate {
+                    return static_error(instruction.source_start)
+                }
+                result = dimensionless()
+                result_predicate = true
+            } elif opcode >= 10 and opcode <= 15 {
+                if left_predicate or right_predicate or not same_dimension(left, right) {
+                    return static_error(instruction.source_start)
+                }
+                result = dimensionless()
+                result_predicate = true
+            } else {
+                if left_predicate or right_predicate {
+                    return static_error(instruction.source_start)
+                }
+                if opcode == 3 {
+                    result = Dimension {
+                        length: left.length + right.length,
+                        mass: left.mass + right.mass,
+                        time: left.time + right.time,
+                        temperature: left.temperature + right.temperature
+                    }
+                } elif opcode == 4 {
+                    result = Dimension {
+                        length: left.length - right.length,
+                        mass: left.mass - right.mass,
+                        time: left.time - right.time,
+                        temperature: left.temperature - right.temperature
+                    }
+                } else {
+                    if not same_dimension(left, right) {
+                        return static_error(instruction.source_start)
+                    }
+                }
+            }
+            if not static_bounded_dimension(result) {
+                return static_error(instruction.source_start)
+            }
+            depth = depth - 1
+            dimensions[depth - 1] = result
+            predicates[depth - 1] = result_predicate
+        } elif opcode == 9 or opcode == 19 {
+            if depth < 3 { return static_error(instruction.source_start) }
+            let first: Dimension = dimensions[depth - 3]
+            let second: Dimension = dimensions[depth - 2]
+            let third: Dimension = dimensions[depth - 1]
+            let mut result: Dimension = first
+            if opcode == 9 {
+                if predicates[depth - 3] or predicates[depth - 2] or
+                   predicates[depth - 1] or not same_dimension(first, second) or
+                   not same_dimension(first, third) {
+                    return static_error(instruction.source_start)
+                }
+            } else {
+                if not predicates[depth - 3] or predicates[depth - 2] or
+                   predicates[depth - 1] or not same_dimension(second, third) {
+                    return static_error(instruction.source_start)
+                }
+                result = second
+            }
+            depth = depth - 2
+            dimensions[depth - 1] = result
+            predicates[depth - 1] = false
+        } else {
+            return static_error(instruction.source_start)
+        }
+        index = index + 1
+    }
+    if depth != 1 { return static_error(program.source_length) }
+    return MathInferredType {
+        valid: true, dimension: dimensions[0],
+        is_predicate: predicates[0], failed_at: -1
+    }
+}
+
+export function infer_math_expression_source_with_bindings(source: string, bindings: MathBindings) -> MathInferredType {
+    let parsed: ParsedMathExpression = parse_math_expression_with_bindings(source, bindings)
+    if not parsed.valid { return static_error(parsed.failed_at) }
+    return infer_math_ir(parsed.program)
+}
+
+export function infer_math_expression_source(source: string) -> MathInferredType {
+    return infer_math_expression_source_with_bindings(source, empty_math_bindings())
+}
+
+export function infer_math_equation(equation: MathEquation) -> MathInferredType {
+    if not equation.valid { return static_error(equation.failed_at) }
+    if equation.equality_at < 0 or equation.equality_at >= equation.left.source_length or
+       equation.left.source_length != equation.right.source_length {
+        return static_error(0)
+    }
+    let left: MathInferredType = infer_math_ir(equation.left)
+    if not left.valid { return left }
+    let right: MathInferredType = infer_math_ir(equation.right)
+    if not right.valid { return right }
+    if left.is_predicate or right.is_predicate or
+       not same_dimension(left.dimension, right.dimension) {
+        return static_error(equation.equality_at)
+    }
+    return MathInferredType {
+        valid: true, dimension: left.dimension,
+        is_predicate: false, failed_at: -1
+    }
+}
+
+export function infer_math_equation_source_with_bindings(source: string, bindings: MathBindings) -> MathInferredType {
+    return infer_math_equation(parse_math_equation_with_bindings(source, bindings))
+}
+
+export function infer_math_equation_source(source: string) -> MathInferredType {
+    return infer_math_equation_source_with_bindings(source, empty_math_bindings())
+}

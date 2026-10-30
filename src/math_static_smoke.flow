@@ -1,0 +1,166 @@
+# Real native Flow 2.0 static dimensional inference acceptance.
+# flow run src/math_static_smoke.flow
+import .math_dimensions { Dimension, Quantity, dimensionless, length_dimension, time_dimension, quotient_dimension, same_dimension, quantity }
+import .math_expression_ir { MathInstruction, MathProgram, MathResult, evaluate_math_ir }
+import .math_expression_source { MathSymbol, MathBindings, ParsedMathExpression, empty_math_bindings, parse_math_expression_with_bindings, evaluate_math_expression }
+import .math_equation { MathEquation, parse_math_equation_with_bindings, evaluate_math_equation_source }
+import .math_static { MathInferredType, infer_math_ir, infer_math_expression_source, infer_math_expression_source_with_bindings, infer_math_equation, infer_math_equation_source, infer_math_equation_source_with_bindings }
+
+function main() -> i32 {
+    let metres: Dimension = length_dimension()
+    let seconds: Dimension = time_dimension()
+    let speed: Dimension = quotient_dimension(metres, seconds)
+    let inverse_area: Dimension = Dimension {
+        length: -2, mass: 0, time: 0, temperature: 0
+    }
+    let mut bindings: MathBindings = empty_math_bindings()
+    bindings.count = 2
+    bindings.symbols[0] = MathSymbol { name: "distance", value: quantity(6.0, metres) }
+    bindings.symbols[1] = MathSymbol { name: "duration", value: quantity(2.0, seconds) }
+
+    let parsed: ParsedMathExpression = parse_math_expression_with_bindings(
+        "distance / duration + 3m/1s", bindings)
+    if not parsed.valid { return 1 }
+    let mut inferred: MathInferredType = infer_math_ir(parsed.program)
+    if not inferred.valid or inferred.is_predicate or inferred.failed_at != -1 or
+       not same_dimension(inferred.dimension, speed) { return 2 }
+    inferred = infer_math_expression_source_with_bindings("distance/duration", bindings)
+    if not inferred.valid or not same_dimension(inferred.dimension, speed) { return 3 }
+    inferred = infer_math_expression_source_with_bindings("distance+duration", bindings)
+    if inferred.valid or inferred.failed_at != 8 { return 4 }
+    inferred = infer_math_expression_source_with_bindings("missing+1m", bindings)
+    if inferred.valid or inferred.failed_at != 0 { return 5 }
+
+    # Static inference does not evaluate a denominator or radicand.
+    inferred = infer_math_expression_source("1m / 0s")
+    if not inferred.valid or not same_dimension(inferred.dimension, speed) { return 6 }
+    if evaluate_math_expression("1m / 0s").valid { return 7 }
+    inferred = infer_math_expression_source("sqrt(-9m²)")
+    if not inferred.valid or not same_dimension(inferred.dimension, metres) { return 8 }
+    if evaluate_math_expression("sqrt(-9m²)").valid { return 9 }
+    inferred = infer_math_expression_source("0m^-2")
+    if not inferred.valid or not same_dimension(inferred.dimension, inverse_area) { return 10 }
+    if evaluate_math_expression("0m^-2").valid { return 11 }
+    inferred = infer_math_expression_source("clamp(2m,3m,1m)")
+    if not inferred.valid or not same_dimension(inferred.dimension, metres) { return 12 }
+    if evaluate_math_expression("clamp(2m,3m,1m)").valid { return 13 }
+
+    inferred = infer_math_expression_source("sqrt(9m²)")
+    if not inferred.valid or not same_dimension(inferred.dimension, metres) { return 14 }
+    inferred = infer_math_expression_source("sqrt(9m)")
+    if inferred.valid or inferred.failed_at != 0 { return 15 }
+    inferred = infer_math_expression_source("norm(3m,4m)")
+    if not inferred.valid or not same_dimension(inferred.dimension, metres) { return 16 }
+    inferred = infer_math_expression_source("norm(3m,4s)")
+    if inferred.valid or inferred.failed_at != 0 { return 17 }
+    inferred = infer_math_expression_source("min(3m,4s)")
+    if inferred.valid or inferred.failed_at != 0 { return 18 }
+    inferred = infer_math_expression_source("1m + 2s")
+    if inferred.valid or inferred.failed_at != 3 { return 19 }
+    inferred = infer_math_expression_source("1m / 2s + 3m")
+    if inferred.valid or inferred.failed_at != 8 { return 20 }
+    inferred = infer_math_expression_source("where(1<2,3m,4m)")
+    if not inferred.valid or not same_dimension(inferred.dimension, metres) { return 21 }
+    inferred = infer_math_expression_source("where(1<2,3m,4s)")
+    if inferred.valid or inferred.failed_at != 0 { return 22 }
+    inferred = infer_math_expression_source("where(1m<2s,3m,4m)")
+    if inferred.valid or inferred.failed_at != 8 { return 23 }
+    inferred = infer_math_expression_source("1m < 2m")
+    if not inferred.valid or not inferred.is_predicate or
+       not same_dimension(inferred.dimension, dimensionless()) { return 24 }
+    inferred = infer_math_expression_source("not (1m < 2m) or 3m >= 2m")
+    if not inferred.valid or not inferred.is_predicate { return 25 }
+    inferred = infer_math_expression_source("1m and 2m")
+    if inferred.valid or inferred.failed_at != 3 { return 26 }
+    inferred = infer_math_expression_source("(1m<2m)+1")
+    if inferred.valid or inferred.failed_at != 7 { return 27 }
+
+    let equation: MathEquation = parse_math_equation_with_bindings(
+        "distance / duration = 3m/1s", bindings)
+    inferred = infer_math_equation(equation)
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension, speed) { return 28 }
+    inferred = infer_math_equation_source_with_bindings(
+        "distance = duration", bindings)
+    if inferred.valid or inferred.failed_at != 9 { return 29 }
+    inferred = infer_math_equation_source("1m = 2s")
+    if inferred.valid or inferred.failed_at != 3 { return 30 }
+    inferred = infer_math_equation_source("1<2 = 1")
+    if inferred.valid or inferred.failed_at != 4 { return 31 }
+    inferred = infer_math_equation_source("1m / 0s = 2m/1s")
+    if not inferred.valid or not same_dimension(inferred.dimension, speed) { return 32 }
+    if evaluate_math_equation_source("1m / 0s = 2m/1s", quantity(0.0, speed)).valid {
+        return 33
+    }
+    inferred = infer_math_equation_source("sqrt(-9m²) = 3m")
+    if not inferred.valid or not same_dimension(inferred.dimension, metres) { return 34 }
+    inferred = infer_math_equation_source("1m = 1m = 1m")
+    if inferred.valid { return 35 }
+
+    let blank: MathInstruction = MathInstruction {
+        opcode: 0, literal: quantity(1.0, metres), exponent: 0,
+        source_start: 0, source_end: 1
+    }
+    let mut instructions: array<MathInstruction, 64> = [blank]
+    let mut program: MathProgram = MathProgram {
+        instructions: instructions, count: 0, source_length: 1
+    }
+    if infer_math_ir(program).valid { return 36 }
+    program.count = 65
+    if infer_math_ir(program).valid { return 37 }
+    instructions[0].opcode = 1
+    program = MathProgram { instructions: instructions, count: 1, source_length: 1 }
+    if infer_math_ir(program).valid { return 38 }
+    instructions[0].opcode = 23
+    program = MathProgram { instructions: instructions, count: 1, source_length: 1 }
+    if infer_math_ir(program).valid { return 39 }
+    instructions[0].opcode = 0
+    instructions[0].source_start = 2
+    instructions[0].source_end = 3
+    program = MathProgram { instructions: instructions, count: 1, source_length: 1 }
+    if infer_math_ir(program).valid { return 40 }
+
+    # A valid maximum-capacity 64-instruction postfix program: 32 metres
+    # added together, followed by negation. Static and numerical paths agree.
+    instructions[0] = blank
+    let mut index: i32 = 1
+    while index < 63 {
+        instructions[index] = MathInstruction {
+            opcode: 0, literal: quantity(1.0, metres), exponent: 0,
+            source_start: index, source_end: index + 1
+        }
+        instructions[index + 1] = MathInstruction {
+            opcode: 1, literal: quantity(0.0, dimensionless()), exponent: 0,
+            source_start: index + 1, source_end: index + 2
+        }
+        index = index + 2
+    }
+    instructions[63] = MathInstruction {
+        opcode: 5, literal: quantity(0.0, dimensionless()), exponent: 0,
+        source_start: 63, source_end: 64
+    }
+    program = MathProgram { instructions: instructions, count: 64, source_length: 64 }
+    inferred = infer_math_ir(program)
+    if not inferred.valid or not same_dimension(inferred.dimension, metres) { return 41 }
+    let runtime: MathResult = evaluate_math_ir(program)
+    if not runtime.valid or runtime.result.value != -32.0 { return 42 }
+
+    instructions[0] = MathInstruction {
+        opcode: 0, literal: quantity(1.0, Dimension {
+            length: 5, mass: 0, time: 0, temperature: 0
+        }), exponent: 0, source_start: 0, source_end: 1
+    }
+    instructions[1] = MathInstruction {
+        opcode: 6, literal: quantity(0.0, dimensionless()), exponent: 8,
+        source_start: 1, source_end: 2
+    }
+    program = MathProgram { instructions: instructions, count: 2, source_length: 2 }
+    inferred = infer_math_ir(program)
+    if inferred.valid or inferred.failed_at != 1 { return 43 }
+    instructions[1].exponent = 9
+    program = MathProgram { instructions: instructions, count: 2, source_length: 2 }
+    if infer_math_ir(program).valid { return 44 }
+
+    println("native-math-static-ok")
+    return 0
+}

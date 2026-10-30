@@ -211,6 +211,76 @@ function main() -> i32 {
     result = evaluate_math_expression("2^00000000000000000000000009")
     if result.valid or result.failed_at != 1 { return 70 }
 
+    # Native source functions use IR opcodes 20/21, preserving physical
+    # units, source byte offsets and the primary/power precedence boundary.
+    result = evaluate_math_expression("abs(-3m)")
+    if not result.valid or not near(result.result.value, 3.0) or
+       not same_dimension(result.result.dimension, length) { return 71 }
+    result = evaluate_math_expression("sqrt(9m²)")
+    if not result.valid or not near(result.result.value, 9.0) or
+       not same_dimension(result.result.dimension, length) { return 72 }
+    result = evaluate_math_expression("√9m²")
+    if not result.valid or not near(result.result.value, 9.0) or
+       not same_dimension(result.result.dimension, length) { return 73 }
+    result = evaluate_math_expression("√(9m²)^2")
+    if not result.valid or not near(result.result.value, 81.0) or
+       not same_dimension(result.result.dimension, area) { return 74 }
+    result = evaluate_math_expression("-sqrt(9m²)^2")
+    if not result.valid or not near(result.result.value, -81.0) or
+       not same_dimension(result.result.dimension, area) { return 75 }
+    result = evaluate_math_expression("abs(-3m)+sqrt(16m²)")
+    if not result.valid or not near(result.result.value, 7.0) or
+       not same_dimension(result.result.dimension, length) { return 76 }
+    result = evaluate_math_expression("abs(-3m)/sqrt(9s²)")
+    if not result.valid or not near(result.result.value, 1.0) or
+       not same_dimension(result.result.dimension, speed) { return 77 }
+    result = evaluate_math_expression("abs(-2m)^-1")
+    if not result.valid or not near(result.result.value, 0.5) or
+       not same_dimension(result.result.dimension, quotient_dimension(dimensionless(), length)) { return 78 }
+    result = evaluate_math_expression("sqrt(0)+abs(-2)^2")
+    if not result.valid or not near(result.result.value, 4.0) { return 79 }
+    result = evaluate_math_expression("√(4m²)+2m")
+    if not result.valid or not near(result.result.value, 6.0) or
+       not same_dimension(result.result.dimension, length) { return 80 }
+    result = evaluate_math_expression("sqrt(1e20)")
+    if not result.valid or not near(result.result.value, 10000000000.0) { return 81 }
+    result = evaluate_math_expression("abs(-1e20)")
+    if not result.valid or not near(result.result.value, 1e20) { return 82 }
+    result = evaluate_math_expression("sqrt(-1)")
+    if result.valid or result.failed_at != 0 { return 83 }
+    result = evaluate_math_expression("√(-1)")
+    if result.valid or result.failed_at != 0 { return 84 }
+    result = evaluate_math_expression("sqrt(3m)")
+    if result.valid or result.failed_at != 0 { return 85 }
+    result = evaluate_math_expression("sqrt(9m^3)")
+    if result.valid or result.failed_at != 0 { return 86 }
+    result = evaluate_math_expression("abs(2m)+3s")
+    if result.valid or result.failed_at != 7 { return 87 }
+    result = evaluate_math_expression("abs()")
+    if result.valid or result.failed_at != 4 { return 88 }
+    result = evaluate_math_expression("sqrt()")
+    if result.valid or result.failed_at != 5 { return 89 }
+    result = evaluate_math_expression("abs  (3)")
+    if result.valid or result.failed_at != 0 { return 90 }
+    result = evaluate_math_expression("sqrt  (4)")
+    if result.valid or result.failed_at != 0 { return 91 }
+    result = evaluate_math_expression("abs(-3m")
+    if result.valid or result.failed_at != 3 { return 92 }
+    result = evaluate_math_expression("√")
+    if result.valid or result.failed_at != 3 { return 93 }
+    let root: ParsedMathExpression = parse_math_expression("√(9m²)^2")
+    if not root.valid or root.program.count != 4 or
+       root.program.instructions[2].opcode != 21 or
+       root.program.instructions[2].source_start != 0 or
+       root.program.instructions[2].source_end != 3 or
+       root.program.instructions[3].opcode != 6 or
+       root.program.instructions[3].source_start != 9 { return 94 }
+    let absolute: ParsedMathExpression = parse_math_expression("abs(-3m)")
+    if not absolute.valid or absolute.program.count != 3 or
+       absolute.program.instructions[2].opcode != 20 or
+       absolute.program.instructions[2].source_start != 0 or
+       absolute.program.instructions[2].source_end != 3 { return 95 }
+
     println("native-math-source-ok")
     return 0
 }

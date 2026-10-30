@@ -1,0 +1,163 @@
+# Real native Flow 2.0 atan2 acceptance: source -> postfix IR -> execution,
+# static dimensional analysis and scalar equations. Not an editor fixture.
+# flow run src/math_atan2_smoke.flow
+import .math_dimensions { Quantity, dimensionless, length_dimension, time_dimension, quantity, same_dimension }
+import .math_expression_ir { MathInstruction, MathProgram, MathResult, evaluate_math_ir }
+import .math_expression_source { ParsedMathExpression, parse_math_expression, evaluate_math_expression }
+import .math_static { MathInferredType, infer_math_ir, infer_math_expression_source, infer_math_equation_source }
+import .math_equation { MathEquationResult, evaluate_math_equation_source }
+
+function near(actual: f64, expected: f64) -> bool {
+    let mut delta: f64 = actual - expected
+    if delta < 0.0 { delta = -delta }
+    return delta < 0.00000000001
+}
+
+function main() -> i32 {
+    let pi: f64 = 3.141592653589793
+    let half_pi: f64 = 1.5707963267948966
+    let quarter_pi: f64 = 0.7853981633974483
+    let mut result: MathResult = evaluate_math_expression("atan2(1,1)")
+    if not result.valid or not near(result.result.value, quarter_pi) { return 1 }
+    result = evaluate_math_expression("atan2(1,-1)")
+    if not result.valid or not near(result.result.value, 3.0 * quarter_pi) { return 2 }
+    result = evaluate_math_expression("atan2(-1,-1)")
+    if not result.valid or not near(result.result.value, -3.0 * quarter_pi) { return 3 }
+    result = evaluate_math_expression("atan2(-1,1)")
+    if not result.valid or not near(result.result.value, -quarter_pi) { return 4 }
+    result = evaluate_math_expression("atan2(0,1)")
+    if not result.valid or not near(result.result.value, 0.0) { return 5 }
+    result = evaluate_math_expression("atan2(1,0)")
+    if not result.valid or not near(result.result.value, half_pi) { return 6 }
+    result = evaluate_math_expression("atan2(-1,0)")
+    if not result.valid or not near(result.result.value, -half_pi) { return 7 }
+    result = evaluate_math_expression("atan2(0,-1)")
+    if not result.valid or not near(result.result.value, pi) { return 8 }
+    result = evaluate_math_expression("atan2(3,4)")
+    if not result.valid or not near(result.result.value, 0.6435011087932844) { return 9 }
+    result = evaluate_math_expression("atan2(4,3)")
+    if not result.valid or not near(result.result.value, 0.9272952180016122) { return 10 }
+    result = evaluate_math_expression("atan2(1,100000000000000000000)")
+    if not result.valid or not near(result.result.value, 0.0) { return 11 }
+    result = evaluate_math_expression("atan2(100000000000000000000,1)")
+    if not result.valid or not near(result.result.value, half_pi) { return 12 }
+    result = evaluate_math_expression("atan2(-100000000000000000000,-1)")
+    if not result.valid or not near(result.result.value, -half_pi) { return 13 }
+    result = evaluate_math_expression("atan2(1m,1m)")
+    if not result.valid or not near(result.result.value, quarter_pi) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 14 }
+    result = evaluate_math_expression("atan2(2s,2s)")
+    if not result.valid or not near(result.result.value, quarter_pi) { return 15 }
+    result = evaluate_math_expression("atan2(sin(1),cos(1))")
+    if not result.valid or not near(result.result.value, 1.0) { return 16 }
+    result = evaluate_math_expression("atan2(1,1)+atan2(-1,1)")
+    if not result.valid or not near(result.result.value, 0.0) { return 17 }
+    result = evaluate_math_expression("atan2(1m,1s)")
+    if result.valid or result.failed_at != 0 { return 18 }
+    result = evaluate_math_expression("atan2(true,1)")
+    if result.valid or result.failed_at != 0 { return 19 }
+    result = evaluate_math_expression("atan2(1,false)")
+    if result.valid or result.failed_at != 0 { return 20 }
+    result = evaluate_math_expression("atan2(0,0)")
+    if result.valid or result.failed_at != 0 { return 21 }
+    result = evaluate_math_expression("atan2(1m,0m)")
+    if not result.valid or not near(result.result.value, half_pi) { return 22 }
+    result = evaluate_math_expression("atan2(0m,0m)")
+    if result.valid { return 23 }
+    if parse_math_expression("atan2(1)").valid { return 24 }
+    if parse_math_expression("atan2(1,2,3)").valid { return 25 }
+    if parse_math_expression("atan2()").valid { return 26 }
+    if parse_math_expression("atan2(1,)").valid { return 27 }
+    if parse_math_expression("atan2(,1)").valid { return 28 }
+    if parse_math_expression("atan2 (1,1)").valid { return 29 }
+    if parse_math_expression("atan2(1,1").valid { return 30 }
+    let parsed: ParsedMathExpression = parse_math_expression("atan2(1,1)")
+    if not parsed.valid or parsed.program.count != 3 or
+       parsed.program.instructions[2].opcode != 32 or
+       parsed.program.instructions[2].source_start != 0 or
+       parsed.program.instructions[2].source_end != 5 { return 31 }
+
+    let mut inferred: MathInferredType = infer_math_expression_source("atan2(1m,1m)")
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension, dimensionless()) { return 32 }
+    inferred = infer_math_expression_source("atan2(1m,1s)")
+    if inferred.valid or inferred.failed_at != 0 { return 33 }
+    inferred = infer_math_expression_source("atan2(true,1)")
+    if inferred.valid or inferred.failed_at != 0 { return 34 }
+    inferred = infer_math_expression_source("atan2(0,0)")
+    if not inferred.valid { return 35 }
+    inferred = infer_math_equation_source("atan2(1,1) = 0.7853981633974483")
+    if not inferred.valid or not same_dimension(inferred.dimension, dimensionless()) { return 36 }
+    inferred = infer_math_equation_source("atan2(1m,1s) = 0")
+    if inferred.valid { return 37 }
+
+    let tolerance: Quantity = quantity(0.00000000001, dimensionless())
+    let mut equation: MathEquationResult = evaluate_math_equation_source(
+        "atan2(1,1) = 0.7853981633974483", tolerance)
+    if not equation.valid or not equation.satisfied { return 38 }
+    equation = evaluate_math_equation_source(
+        "atan2(1m,1m) = 0.7853981633974483", tolerance)
+    if not equation.valid or not equation.satisfied { return 39 }
+    equation = evaluate_math_equation_source("atan2(0,0) = 0", tolerance)
+    if equation.valid { return 40 }
+
+    let blank: MathInstruction = MathInstruction {
+        opcode: 0, literal: quantity(0.0, dimensionless()),
+        exponent: 0, source_start: 0, source_end: 0
+    }
+    let mut instructions: array<MathInstruction, 64> = [blank]
+    instructions[0] = MathInstruction {
+        opcode: 0, literal: quantity(1.0, length_dimension()),
+        exponent: 0, source_start: 0, source_end: 1
+    }
+    instructions[1] = MathInstruction {
+        opcode: 0, literal: quantity(-1.0, length_dimension()),
+        exponent: 0, source_start: 1, source_end: 2
+    }
+    instructions[2] = MathInstruction {
+        opcode: 32, literal: quantity(0.0, dimensionless()),
+        exponent: 0, source_start: 2, source_end: 3
+    }
+    let mut program: MathProgram = MathProgram {
+        instructions: instructions, count: 3, source_length: 3
+    }
+    result = evaluate_math_ir(program)
+    if not result.valid or not near(result.result.value, 3.0 * quarter_pi) { return 41 }
+    inferred = infer_math_ir(program)
+    if not inferred.valid or not same_dimension(inferred.dimension, dimensionless()) { return 42 }
+    instructions[1] = MathInstruction {
+        opcode: 0, literal: quantity(-1.0, time_dimension()),
+        exponent: 0, source_start: 1, source_end: 2
+    }
+    program = MathProgram { instructions: instructions, count: 3, source_length: 3 }
+    result = evaluate_math_ir(program)
+    if result.valid or result.failed_at != 2 { return 43 }
+    inferred = infer_math_ir(program)
+    if inferred.valid or inferred.failed_at != 2 { return 44 }
+    instructions[1] = MathInstruction {
+        opcode: 0, literal: quantity(0.0, length_dimension()),
+        exponent: 0, source_start: 1, source_end: 2
+    }
+    instructions[0] = MathInstruction {
+        opcode: 0, literal: quantity(0.0, length_dimension()),
+        exponent: 0, source_start: 0, source_end: 1
+    }
+    program = MathProgram { instructions: instructions, count: 3, source_length: 3 }
+    result = evaluate_math_ir(program)
+    if result.valid or result.failed_at != 2 { return 45 }
+    inferred = infer_math_ir(program)
+    if not inferred.valid { return 46 }
+    program = MathProgram { instructions: instructions, count: 1, source_length: 3 }
+    instructions[0] = MathInstruction {
+        opcode: 32, literal: quantity(0.0, dimensionless()),
+        exponent: 0, source_start: 0, source_end: 1
+    }
+    program = MathProgram { instructions: instructions, count: 1, source_length: 3 }
+    result = evaluate_math_ir(program)
+    if result.valid { return 47 }
+    inferred = infer_math_ir(program)
+    if inferred.valid { return 48 }
+
+    println("native-math-atan2-ok")
+    return 0
+}

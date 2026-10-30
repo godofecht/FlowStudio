@@ -1,3 +1,23 @@
+## 2026-10-30: two independent compiler-backed 48-cell fields (verification pending)
+
+`examples/native_field_dual48.flow` declares two separate upstream Flow 2.0
+`field` / `laplacian` / Dirichlet systems. They use distinct fixed endpoints
+and independent stable diffusion ratios, testing multiple compiler-generated
+field functions in one translation unit. All 96 initial cells and 288 evolved
+values at 16/64/128 steps have independent discrete sine-mode references.
+The native main checks both fields, separate residual-energy decay, affine
+fixed points, semigroup composition, replay, boundary and rate mutation,
+invalid parameters, nonmutation on rejection and a 196608-cell-step limit.
+
+The checked-in Python direct-stencil/analytical oracle, real native compiler
+HTTP check/run acceptance, malformed second-field rejection and Ubuntu
+Chromium Monaco Run acceptance are wired into the existing test suites.
+**Status:** new PR CI pending; no native compiler or browser run has been
+claimed for this revision. This is two *independent* 1D fields, not coupled
+or multidimensional PDE lowering. General PDE operators, computed spatial
+plots, Flow/R debugging and multi-user isolation remain incomplete. Hosted
+CI configuration is unchanged.
+
 ## 2026-10-30: upstream native `field` / `laplacian` / Dirichlet PDE (PR #247)
 
 `examples/native_field_heat1d.flow` exercises the actual pinned upstream Flow

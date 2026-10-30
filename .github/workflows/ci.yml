@@ -92,6 +92,7 @@ jobs:
           flow run src/math_dimensions_smoke.flow
           flow run src/math_expression_ir_smoke.flow
           flow run src/math_expression_source_smoke.flow
+          flow run src/math_expression_source_http_smoke.flow
           flow run src/math_equation_smoke.flow
           flow run src/math_static_smoke.flow
           flow run src/math_trigonometry_smoke.flow

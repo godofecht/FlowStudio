@@ -287,6 +287,20 @@ try {
   }
   const allValues = [...references.U, ...references.V];
   const minimum = Math.min(...allValues), maximum = Math.max(...allValues);
+  // Verify browser-rendered axes reflect the compiler's computed field
+  // values, rather than static chart labels or a MathFlow fixture.
+  const nativeAxes = await page.locator(
+    '#mathFlowPlot svg[data-native-flow-field] text[data-native-flow-axis-value]'
+  ).evaluateAll(nodes => nodes.map(node =>
+    Number(node.getAttribute('data-native-flow-axis-value'))));
+  assert.equal(nativeAxes.length, 2);
+  assert.ok(Math.abs(nativeAxes[0] - maximum) < 1e-4,
+    'Native field maximum axis must match executed numerical output');
+  assert.ok(Math.abs(nativeAxes[1] - minimum) < 1e-4,
+    'Native field minimum axis must match executed numerical output');
+  assert.equal(await page.locator(
+    '#mathFlowPlot svg[data-native-flow-field] [data-native-flow-zero-axis]'
+  ).count(), 0, 'Nonnegative Gray-Scott concentrations have no zero-crossing axis');
   const scale = Math.max(1, Math.abs(minimum), Math.abs(maximum));
   const span = maximum / scale - minimum / scale || 1;
   for (const name of ['U', 'V']) {

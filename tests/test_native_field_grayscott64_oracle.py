@@ -43,7 +43,7 @@ def reference(u, v, steps, ratio_u=RATIO_U, ratio_v=RATIO_V,
 def expected(name):
     source = SOURCE.read_text(encoding="utf-8")
     match = re.search(
-        rf"let {re.escape(name)}: array<f64, 64> = \\[(.*?)\\]", source, re.S)
+        rf"let {re.escape(name)}: array<f64, 64> = \[(.*?)\]", source, re.S)
     if match is None:
         raise AssertionError(f"missing checked-in {name} oracle")
     values = [float(value.strip()) for value in match.group(1).split(",")

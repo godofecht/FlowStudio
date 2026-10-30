@@ -487,6 +487,7 @@ function main() -> i32 {
     if not result.valid or not result.is_predicate or not near(result.result.value, 0.0) { return 160 }
 
 
+    println("passed-native-math-source-legacy")
     # Native logical source operators retain predicate types and are eager.
     # Precedence: arithmetic > comparison > not > and > or.
     result = evaluate_math_expression("1<2 and 2<3")
@@ -520,6 +521,7 @@ function main() -> i32 {
     if not result.valid or not result.is_predicate or not near(result.result.value, 1.0) { return 174 }
     result = evaluate_math_expression_with_bindings("not (distance<3m)", bindings)
     if not result.valid or not result.is_predicate or not near(result.result.value, 1.0) { return 175 }
+    println("passed-native-logical-175")
     result = evaluate_math_expression("1<2 and 2<3 and 3<4")
     if not result.valid or not result.is_predicate or not near(result.result.value, 1.0) { return 176 }
     result = evaluate_math_expression("1<2 or 2<3 and 3<4")

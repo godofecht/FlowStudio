@@ -1,0 +1,151 @@
+# Executable, bounded mathematical expression IR for the native Flow 2.0 runtime.
+# The upstream Flow grammar does not yet lower source expressions to this IR.
+# Instructions are postfix; source spans are UTF-8 byte offsets into original source.
+# Opcodes: 0 literal, 1 add, 2 subtract, 3 multiply, 4 divide,
+#          5 negate, 6 integer power. Unsupported instructions fail closed.
+import .math_dimensions { Dimension, Quantity, CheckedQuantity, dimensionless, quantity, quantity_add, quantity_subtract, quantity_multiply, quantity_divide, same_dimension }
+
+export struct MathInstruction {
+    opcode: i32,
+    literal: Quantity,
+    exponent: i32,
+    source_start: i32,
+    source_end: i32
+}
+
+export struct MathProgram {
+    instructions: array<MathInstruction, 16>,
+    count: i32,
+    source_length: i32
+}
+
+export struct MathResult {
+    valid: bool,
+    result: Quantity,
+    failed_at: i32
+}
+
+function magnitude(value: f64) -> f64 {
+    if value < 0.0 { return -value }
+    return value
+}
+
+function bounded_value(value: f64) -> bool {
+    # Reject NaN, infinity and runaway arithmetic, including intermediate results.
+    return magnitude(value) <= 1000000000000000000000000000000.0
+}
+
+function bounded_dimension(dimension: Dimension) -> bool {
+    return dimension.length >= -32 and dimension.length <= 32 and
+        dimension.mass >= -32 and dimension.mass <= 32 and
+        dimension.time >= -32 and dimension.time <= 32 and
+        dimension.temperature >= -32 and dimension.temperature <= 32
+}
+
+function failed(position: i32) -> MathResult {
+    return MathResult {
+        valid: false,
+        result: quantity(0.0, dimensionless()),
+        failed_at: position
+    }
+}
+
+function powered_dimension(dimension: Dimension, exponent: i32) -> Dimension {
+    return Dimension {
+        length: dimension.length * exponent,
+        mass: dimension.mass * exponent,
+        time: dimension.time * exponent,
+        temperature: dimension.temperature * exponent
+    }
+}
+
+function integer_power(base: Quantity, exponent: i32) -> CheckedQuantity {
+    if exponent < -8 or exponent > 8 or not bounded_value(base.value) {
+        return CheckedQuantity { valid: false, quantity: base }
+    }
+    if exponent < 0 and base.value == 0.0 {
+        return CheckedQuantity { valid: false, quantity: base }
+    }
+    let dimension: Dimension = powered_dimension(base.dimension, exponent)
+    if not bounded_dimension(dimension) {
+        return CheckedQuantity { valid: false, quantity: base }
+    }
+    let mut power: i32 = exponent
+    if power < 0 { power = -power }
+    let mut value: f64 = 1.0
+    let mut index: i32 = 0
+    while index < power {
+        value = value * base.value
+        if not bounded_value(value) {
+            return CheckedQuantity { valid: false, quantity: base }
+        }
+        index = index + 1
+    }
+    if exponent < 0 {
+        value = 1.0 / value
+        if not bounded_value(value) {
+            return CheckedQuantity { valid: false, quantity: base }
+        }
+    }
+    return CheckedQuantity {
+        valid: true,
+        quantity: quantity(value, dimension)
+    }
+}
+
+export function evaluate_math_ir(program: MathProgram) -> MathResult {
+    if program.count < 1 or program.count > 16 or program.source_length < 0 {
+        return failed(0)
+    }
+    let mut stack: array<Quantity, 16> = [quantity(0.0, dimensionless())]
+    let mut depth: i32 = 0
+    let mut index: i32 = 0
+    while index < program.count {
+        let instruction: MathInstruction = program.instructions[index]
+        if instruction.source_start < 0 or instruction.source_end < instruction.source_start or
+           instruction.source_end > program.source_length {
+            return failed(index)
+        }
+        let opcode: i32 = instruction.opcode
+        if opcode == 0 {
+            if depth >= 16 or not bounded_value(instruction.literal.value) or
+               not bounded_dimension(instruction.literal.dimension) {
+                return failed(instruction.source_start)
+            }
+            stack[depth] = instruction.literal
+            depth = depth + 1
+        } else if opcode == 5 or opcode == 6 {
+            if depth < 1 { return failed(instruction.source_start) }
+            let input: Quantity = stack[depth - 1]
+            if opcode == 5 {
+                stack[depth - 1] = quantity(-input.value, input.dimension)
+            } else {
+                let result: CheckedQuantity = integer_power(input, instruction.exponent)
+                if not result.valid { return failed(instruction.source_start) }
+                stack[depth - 1] = result.quantity
+            }
+        } else if opcode >= 1 and opcode <= 4 {
+            if depth < 2 { return failed(instruction.source_start) }
+            let right: Quantity = stack[depth - 1]
+            let left: Quantity = stack[depth - 2]
+            let mut result: CheckedQuantity = CheckedQuantity { valid: false, quantity: left }
+            if opcode == 1 { result = quantity_add(left, right) }
+            if opcode == 2 { result = quantity_subtract(left, right) }
+            if opcode == 3 {
+                result = CheckedQuantity { valid: true, quantity: quantity_multiply(left, right) }
+            }
+            if opcode == 4 { result = quantity_divide(left, right) }
+            if not result.valid or not bounded_value(result.quantity.value) or
+               not bounded_dimension(result.quantity.dimension) {
+                return failed(instruction.source_start)
+            }
+            depth = depth - 1
+            stack[depth - 1] = result.quantity
+        } else {
+            return failed(instruction.source_start)
+        }
+        index = index + 1
+    }
+    if depth != 1 { return failed(program.source_length) }
+    return MathResult { valid: true, result: stack[0], failed_at: -1 }
+}

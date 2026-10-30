@@ -15,7 +15,7 @@ RATIO = 0.4
 
 def source_array(name):
     text = SOURCE.read_text(encoding="utf-8")
-    match = re.search(rf"let {name}: array<f64, 64> = \\[([^\\]]+)\\]", text, re.MULTILINE)
+    match = re.search(rf"let {name}: array<f64, 64> = \[([^\]]+)\]", text, re.MULTILINE)
     if match is None:
         raise AssertionError(f"Missing {name} reference array")
     values = [float(value.strip()) for value in match.group(1).split(",")]

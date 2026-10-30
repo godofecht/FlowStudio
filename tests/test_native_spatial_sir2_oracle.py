@@ -60,7 +60,7 @@ class SpatialSIR2Oracle(unittest.TestCase):
         reference = rk4(steps=32768)
         self.assertLess(max_error(reference, rk4(steps=65536)), 2e-13)
         for name, value in zip(fields, reference):
-            match = re.search(r"expected\\." + name + r"\\s*=\\s*([0-9.]+)", block)
+            match = re.search(r"expected\." + name + r"\s*=\s*([0-9.]+)", block)
             self.assertIsNotNone(match, name)
             self.assertAlmostEqual(float(match.group(1)), value, delta=3e-13)
 

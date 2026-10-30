@@ -155,3 +155,43 @@ test("computed zero baseline follows signed field extrema", () => {
   assert.deepEqual(ticks.map(tick => Number(tick.attributes["data-native-flow-axis-value"])),
     [2, -1]);
 });
+
+test("constant and near-equal fields retain truthful finite axis geometry", () => {
+  class Element {
+    constructor(tag) { this.tag = tag; this.attributes = {}; this.children = []; }
+    setAttribute(name, value) { this.attributes[name] = value; }
+    append(child) { this.children.push(child); }
+    replaceChildren(...children) { this.children = children; }
+  }
+  const doc = {createElement: tag => new Element(tag),
+    createElementNS: (_namespace, tag) => new Element(tag)};
+  const container = new Element("div");
+  for (const value of [0, 1, -1, 1000000, -1000000]) {
+    const output = ["FLOWSTUDIO_FIELD_V1 3 1",
+      "C " + [value, value, value].join(" "), "FLOWSTUDIO_FIELD_END"].join("\n");
+    assert.equal(render(doc, container, output), true);
+    const svg = container.children[1];
+    const path = svg.children.find(child => child.attributes["data-field-name"] === "C");
+    const points = [...path.attributes.d.matchAll(/([ML])([0-9.]+),([0-9.]+)/g)];
+    assert.deepEqual(points.map(point => Number(point[3])), [119, 119, 119]);
+    const ticks = svg.children.filter(child =>
+      Object.hasOwn(child.attributes, "data-native-flow-axis-value"));
+    const [top, bottom] = ticks.map(tick =>
+      Number(tick.attributes["data-native-flow-axis-value"]));
+    assert.ok(top > value && bottom < value);
+    assert.equal(svg.children.filter(child =>
+      child.attributes["data-native-flow-zero-axis"]).length, 0);
+  }
+  for (const values of [
+    [999999.9999999998, 999999.9999999999, 1000000],
+    [-Number.MIN_VALUE, 0, Number.MIN_VALUE]
+  ]) {
+    const output = ["FLOWSTUDIO_FIELD_V1 3 1",
+      "C " + values.join(" "), "FLOWSTUDIO_FIELD_END"].join("\n");
+    assert.equal(render(doc, container, output), true);
+    const path = container.children[1].children.find(child =>
+      child.attributes["data-field-name"] === "C");
+    const points = [...path.attributes.d.matchAll(/([ML])([0-9.]+),([0-9.]+)/g)];
+    assert.deepEqual(points.map(point => Number(point[3])), [214, 119, 24]);
+  }
+});

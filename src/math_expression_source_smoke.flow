@@ -1,0 +1,105 @@
+# Native compiler execution of actual mathematical source -> typed postfix IR.
+# Run: flow run src/math_expression_source_smoke.flow
+import .math_dimensions { Dimension, dimensionless, length_dimension, mass_dimension, time_dimension, temperature_dimension, quotient_dimension, product_dimension, same_dimension }
+import .math_expression_ir { MathResult }
+import .math_expression_source { ParsedMathExpression, parse_math_expression, evaluate_math_expression }
+
+function near(a: f64, b: f64) -> bool {
+    let mut error: f64 = a - b
+    if error < 0.0 { error = -error }
+    return error < 0.00000000001
+}
+
+function main() -> i32 {
+    let length: Dimension = length_dimension()
+    let time: Dimension = time_dimension()
+    let speed: Dimension = quotient_dimension(length, time)
+    let mut result: MathResult = evaluate_math_expression("3m / 2s + 4m/1s")
+    if not result.valid or not near(result.result.value, 5.5) or
+       not same_dimension(result.result.dimension, speed) { return 1 }
+
+    result = evaluate_math_expression("2*(3+4)")
+    if not result.valid or not near(result.result.value, 14.0) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 2 }
+
+    result = evaluate_math_expression("-(2+3)*4")
+    if not result.valid or not near(result.result.value, -20.0) { return 3 }
+    result = evaluate_math_expression("2--3")
+    if not result.valid or not near(result.result.value, 5.0) { return 4 }
+    result = evaluate_math_expression("2×(3−1)÷2")
+    if not result.valid or not near(result.result.value, 2.0) { return 5 }
+
+    let momentum: Dimension = quotient_dimension(product_dimension(mass_dimension(), length), time)
+    result = evaluate_math_expression("3kg * 2m / 6s")
+    if not result.valid or not near(result.result.value, 1.0) or
+       not same_dimension(result.result.dimension, momentum) { return 6 }
+
+    result = evaluate_math_expression("2K+3K")
+    if not result.valid or not near(result.result.value, 5.0) or
+       not same_dimension(result.result.dimension, temperature_dimension()) { return 7 }
+
+    result = evaluate_math_expression("3m + 2s")
+    if result.valid or result.failed_at != 3 { return 8 }
+    result = evaluate_math_expression("2m / 0s")
+    if result.valid or result.failed_at != 3 { return 9 }
+    result = evaluate_math_expression("3+")
+    if result.valid or result.failed_at != 2 { return 10 }
+    result = evaluate_math_expression("3(4)")
+    if result.valid or result.failed_at != 1 { return 11 }
+    result = evaluate_math_expression("(3+4")
+    if result.valid or result.failed_at != 0 { return 12 }
+    result = evaluate_math_expression("3+4)")
+    if result.valid or result.failed_at != 3 { return 13 }
+    result = evaluate_math_expression("3**2")
+    if result.valid or result.failed_at != 2 { return 14 }
+    result = evaluate_math_expression("3^2")
+    if result.valid or result.failed_at != 1 { return 15 }
+    result = evaluate_math_expression("foo")
+    if result.valid or result.failed_at != 0 { return 16 }
+    result = evaluate_math_expression("1e+")
+    if result.valid or result.failed_at != 0 { return 17 }
+    result = evaluate_math_expression("1m2")
+    if result.valid or result.failed_at != 2 { return 18 }
+    result = evaluate_math_expression("1e999")
+    if result.valid or result.failed_at != 0 { return 19 }
+
+    result = evaluate_math_expression("-(-3m)")
+    if not result.valid or not near(result.result.value, 3.0) or
+       not same_dimension(result.result.dimension, length) { return 20 }
+    result = evaluate_math_expression("1/0")
+    if result.valid or result.failed_at != 1 { return 21 }
+    result = evaluate_math_expression("1e20 * 1e20")
+    if result.valid or result.failed_at != 5 { return 22 }
+    result = evaluate_math_expression("1e-12/2e-12")
+    if not result.valid or not near(result.result.value, 0.5) { return 23 }
+    result = evaluate_math_expression("3.5+0.5")
+    if not result.valid or not near(result.result.value, 4.0) { return 24 }
+    result = evaluate_math_expression("1 + (2 * 3) - 4")
+    if not result.valid or not near(result.result.value, 3.0) { return 25 }
+
+    let parsed: ParsedMathExpression = parse_math_expression("2m+3m")
+    if not parsed.valid or parsed.program.count != 3 or
+       parsed.program.instructions[0].source_start != 0 or
+       parsed.program.instructions[1].source_start != 3 or
+       parsed.program.instructions[2].source_start != 2 { return 26 }
+    result = evaluate_math_expression("2m+3m")
+    if not result.valid or not near(result.result.value, 5.0) or
+       not same_dimension(result.result.dimension, length) { return 27 }
+
+    result = evaluate_math_expression("(-2m) / (-4s)")
+    if not result.valid or not near(result.result.value, 0.5) or
+       not same_dimension(result.result.dimension, speed) { return 28 }
+    result = evaluate_math_expression("2m + 3kg")
+    if result.valid or result.failed_at != 3 { return 29 }
+    result = evaluate_math_expression("2 + 3 × 4")
+    if not result.valid or not near(result.result.value, 14.0) { return 30 }
+    result = evaluate_math_expression("2 + (3 × 4)")
+    if not result.valid or not near(result.result.value, 14.0) { return 31 }
+    result = evaluate_math_expression("2 + (3 × 4")
+    if result.valid or result.failed_at != 4 { return 32 }
+    result = evaluate_math_expression("2m²")
+    if result.valid or result.failed_at != 2 { return 33 }
+
+    println("native-math-source-ok")
+    return 0
+}

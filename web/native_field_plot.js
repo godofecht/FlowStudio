@@ -69,11 +69,17 @@
     const padding = constant ? Math.max(1, Math.abs(minimum)) * 0.05 : 0;
     const plotMinimum = minimum - padding, plotMaximum = maximum + padding;
     const span = plotMaximum - plotMinimum;
+    // Short labels can falsely make distinct near-equal extrema look identical.
+    // Preserve the full round-trip value and reserve enough left margin when
+    // the compact labels collide (e.g. 999999.9999999998 and 1000000).
+    const compactMaximum = plotMaximum.toPrecision(5);
+    const compactMinimum = plotMinimum.toPrecision(5);
+    const exactAxisLabels = compactMaximum === compactMinimum;
     // Subtract before dividing: normalizing large, nearly equal values first
     // can round both extrema to the same floating-point number.
     const fraction = value => (value - plotMinimum) / span;
     const svg = doc.createElementNS(NS, "svg");
-    svg.setAttribute("viewBox", "0 0 640 260");
+    svg.setAttribute("viewBox", exactAxisLabels ? "-100 0 740 260" : "0 0 640 260");
     svg.setAttribute("width", "100%");
     svg.setAttribute("role", "img");
     svg.setAttribute("data-native-flow-field", "true");
@@ -94,7 +100,7 @@
       tick.setAttribute("fill", "#aab6c6");
       tick.setAttribute("font-size", "11");
       tick.setAttribute("data-native-flow-axis-value", String(value));
-      tick.textContent = value.toPrecision(5);
+      tick.textContent = exactAxisLabels ? String(value) : value.toPrecision(5);
       svg.append(tick);
     }
     if (minimum < 0 && maximum > 0) {

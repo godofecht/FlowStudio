@@ -115,3 +115,53 @@ test("deterministic 32x32 Fourier-mode grids preserve all 1024 coordinates", () 
   assert.equal(container.children[1].children.filter(child => child.tag === "rect")
     .every(cell => cell.attributes.fill === "hsl(120,65%,45%)"), true);
 });
+
+test("coupled native PDE grids use independent color scales and truthful extrema", () => {
+  const container = new Element("div");
+  const u = Array.from({length:9}, (_, i) => i);
+  const v = u.map(value => 100000 + value / 8);
+  assert.equal(render(doc, container, grid(3, 3, [["U", u], ["V", v]])), true);
+  const svg = container.children[1];
+  assert.equal(svg.attributes["data-native-flow-grid-scale"], "per-field");
+  assert.match(svg.attributes["aria-label"], /per-field scales/);
+  const cells = svg.children.filter(child => child.tag === "rect");
+  assert.equal(cells.length, 18);
+  assert.deepEqual(cells.slice(0, 9).map(cell => cell.attributes.fill),
+    cells.slice(9).map(cell => cell.attributes.fill),
+    "equivalent spatial variation must remain visible at very different species magnitudes");
+  assert.notEqual(cells[0].attributes.fill, cells[8].attributes.fill);
+  assert.deepEqual(cells.slice(9).map(cell =>
+    Number(cell.attributes["data-grid-value"])), v);
+  const extrema = svg.children.filter(child =>
+    Object.hasOwn(child.attributes, "data-native-flow-grid-extreme"));
+  assert.deepEqual(extrema.map(tick =>
+    Number(tick.attributes["data-native-flow-grid-extreme"])),
+    [0, 8, 100000, 100001]);
+
+  assert.equal(render(doc, container, grid(3, 3,
+    [["U", u], ["V", Array(9).fill(100000)]])), true);
+  const constant = container.children[1].children.filter(child => child.tag === "rect");
+  assert.ok(constant.slice(9).every(cell => cell.attributes.fill === "hsl(120,65%,45%)"));
+  assert.notEqual(constant[0].attributes.fill, constant[8].attributes.fill);
+});
+
+test("32 seeded coupled grid pairs retain independent normalization across every cell", () => {
+  const container = new Element("div");
+  for (let seed = 1; seed <= 32; seed++) {
+    const width = 3 + seed % 30;
+    const height = 3 + (seed * 7) % 30;
+    const u = Array.from({length:width * height}, (_, i) =>
+      (Math.imul(i + 1, 1664525) + seed * 1013904223) >>> 0).map(value => value % 17);
+    const scale = seed % 2 ? 0.125 : 8;
+    const v = u.map(value => seed * 1000 + value * scale);
+    assert.equal(render(doc, container, grid(width, height, [["U", u], ["V", v]])), true);
+    const cells = container.children[1].children.filter(child => child.tag === "rect");
+    const count = width * height;
+    assert.equal(cells.length, count * 2);
+    assert.deepEqual(cells.slice(0, count).map(cell => cell.attributes.fill),
+      cells.slice(count).map(cell => cell.attributes.fill),
+      "seed " + seed + " must not flatten a low-amplitude field");
+    assert.deepEqual(cells.slice(count).map(cell =>
+      Number(cell.attributes["data-grid-value"])), v);
+  }
+});

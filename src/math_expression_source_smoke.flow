@@ -678,6 +678,99 @@ function main() -> i32 {
     result = evaluate_math_expression("norm(1e30,1e30)")
     if result.valid or result.failed_at != 0 { return 235 }
 
+
+    # Unicode source operators must execute through the same typed IR,
+    # preserve exact UTF-8 byte spans, and reject malformed predicates.
+    result = evaluate_math_expression("2m⋅3m")
+    if not result.valid or not near(result.result.value, 6.0) or
+       not same_dimension(result.result.dimension, area) { return 236 }
+    result = evaluate_math_expression("9m∕3s")
+    if not result.valid or not near(result.result.value, 3.0) or
+       not same_dimension(result.result.dimension, speed) { return 237 }
+    result = evaluate_math_expression("2∗(3+1)")
+    if not result.valid or not near(result.result.value, 8.0) { return 238 }
+    result = evaluate_math_expression("1<2 ∧ 3<4")
+    if not result.valid or not result.is_predicate or not near(result.result.value, 1.0) { return 239 }
+    result = evaluate_math_expression("1<2 ∧ 3>4")
+    if not result.valid or not result.is_predicate or not near(result.result.value, 0.0) { return 240 }
+    result = evaluate_math_expression("1>2 ∨ 3<4")
+    if not result.valid or not result.is_predicate or not near(result.result.value, 1.0) { return 241 }
+    result = evaluate_math_expression("1>2 ∨ 3>4")
+    if not result.valid or not result.is_predicate or not near(result.result.value, 0.0) { return 242 }
+    result = evaluate_math_expression("¬1<2")
+    if not result.valid or not result.is_predicate or not near(result.result.value, 0.0) { return 243 }
+    result = evaluate_math_expression("¬(1>2)")
+    if not result.valid or not result.is_predicate or not near(result.result.value, 1.0) { return 244 }
+    result = evaluate_math_expression("¬1<2 ∨ 2<3 ∧ 4<5")
+    if not result.valid or not result.is_predicate or not near(result.result.value, 1.0) { return 245 }
+    result = evaluate_math_expression("where(¬(2<1) ∧ 3>2,3m,4m)")
+    if not result.valid or not near(result.result.value, 3.0) or
+       not same_dimension(result.result.dimension, length) { return 246 }
+    result = evaluate_math_expression("¬¬1<2")
+    if not result.valid or not result.is_predicate or not near(result.result.value, 1.0) { return 247 }
+    let area_per_time: Dimension = quotient_dimension(area, time)
+    result = evaluate_math_expression("2m⋅3m∕2s")
+    if not result.valid or not near(result.result.value, 3.0) or
+       not same_dimension(result.result.dimension, area_per_time) { return 248 }
+    result = evaluate_math_expression("2m∗3s")
+    if not result.valid or not near(result.result.value, 6.0) or
+       not same_dimension(result.result.dimension, product_dimension(length, time)) { return 249 }
+    result = evaluate_math_expression("1<2 ∧ (3>4 ∨ 5<6)")
+    if not result.valid or not result.is_predicate or not near(result.result.value, 1.0) { return 250 }
+
+    let unicode_product: ParsedMathExpression = parse_math_expression("2m⋅3m")
+    if not unicode_product.valid or unicode_product.program.count != 3 or
+       unicode_product.program.instructions[2].opcode != 3 or
+       unicode_product.program.instructions[2].source_start != 2 or
+       unicode_product.program.instructions[2].source_end != 5 { return 251 }
+    let unicode_quotient: ParsedMathExpression = parse_math_expression("9m∕3s")
+    if not unicode_quotient.valid or unicode_quotient.program.count != 3 or
+       unicode_quotient.program.instructions[2].opcode != 4 or
+       unicode_quotient.program.instructions[2].source_start != 2 or
+       unicode_quotient.program.instructions[2].source_end != 5 { return 252 }
+    let unicode_and: ParsedMathExpression = parse_math_expression("1<2 ∧ 3<4")
+    if not unicode_and.valid or unicode_and.program.count != 7 or
+       unicode_and.program.instructions[6].opcode != 16 or
+       unicode_and.program.instructions[6].source_start != 4 or
+       unicode_and.program.instructions[6].source_end != 7 { return 253 }
+    let unicode_or: ParsedMathExpression = parse_math_expression("1<2 ∨ 3<4")
+    if not unicode_or.valid or unicode_or.program.count != 7 or
+       unicode_or.program.instructions[6].opcode != 17 or
+       unicode_or.program.instructions[6].source_start != 4 or
+       unicode_or.program.instructions[6].source_end != 7 { return 254 }
+    let unicode_not: ParsedMathExpression = parse_math_expression("¬(1<2)")
+    if not unicode_not.valid or unicode_not.program.count != 4 or
+       unicode_not.program.instructions[3].opcode != 18 or
+       unicode_not.program.instructions[3].source_start != 0 or
+       unicode_not.program.instructions[3].source_end != 2 { return 255 }
+
+    result = evaluate_math_expression("1∕0")
+    if result.valid or result.failed_at != 1 { return 256 }
+    result = evaluate_math_expression("1m⋅2s+3m")
+    if result.valid or result.failed_at != 7 { return 257 }
+    result = evaluate_math_expression("1 ∧ 2")
+    if result.valid or result.failed_at != 2 { return 258 }
+    result = evaluate_math_expression("¬1")
+    if result.valid or result.failed_at != 0 { return 259 }
+    result = evaluate_math_expression("1<2 ∨ 1/0>0")
+    if result.valid or result.failed_at != 9 { return 260 }
+    result = evaluate_math_expression("1<2 ∧")
+    if result.valid or result.failed_at != 7 { return 261 }
+    result = evaluate_math_expression("∧ 1<2")
+    if result.valid or result.failed_at != 0 { return 262 }
+    result = evaluate_math_expression("1<2 ¬ 2<3")
+    if result.valid or result.failed_at != 4 { return 263 }
+    result = evaluate_math_expression("1m∕0s")
+    if result.valid or result.failed_at != 2 { return 264 }
+    result = evaluate_math_expression("1<2 ∧ 2m<3s")
+    if result.valid or result.failed_at != 10 { return 265 }
+    result = evaluate_math_expression("1<2 ∨ 2m<3s")
+    if result.valid or result.failed_at != 10 { return 266 }
+    result = evaluate_math_expression("1<2 ⊕ 3<4")
+    if result.valid or result.failed_at != 4 { return 267 }
+    result = evaluate_math_expression("2⋅3∕4")
+    if not result.valid or not near(result.result.value, 1.5) { return 268 }
+
     println("native-math-source-ok")
     return 0
 }

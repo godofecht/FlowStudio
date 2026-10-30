@@ -10,7 +10,8 @@
 #          24 typed Boolean literal (0 or 1, dimensionless),
 #          25 exponential, 26 natural logarithm, 27 base-10 logarithm,
 #          28 sine, 29 cosine, 30 tangent, 31 arctangent,
-#          32 atan2(y, x), including matching physical dimensions.
+#          32 atan2(y, x), including matching physical dimensions,
+#          33 asin(x), 34 acos(x), principal angles with |x| <= 1.
 # Predicate values are dimensionless 0/1 with a separate runtime type bit.
 # where and logical operators evaluate operands eagerly (no short circuit).
 # Unsupported instructions and type mismatches fail closed.
@@ -316,7 +317,8 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
             predicate[depth] = true
             depth = depth + 1
         } elif opcode == 5 or opcode == 6 or opcode == 18 or opcode == 20 or opcode == 21 or opcode == 25 or
-             opcode == 26 or opcode == 27 or opcode == 28 or opcode == 29 or opcode == 30 or opcode == 31 {
+             opcode == 26 or opcode == 27 or opcode == 28 or opcode == 29 or opcode == 30 or opcode == 31 or
+             opcode == 33 or opcode == 34 {
             if depth < 1 { return failed(instruction.source_start) }
             let input: Quantity = stack[depth - 1]
             if opcode == 18 {
@@ -355,6 +357,22 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
                         return failed(instruction.source_start)
                     }
                     stack[depth - 1] = quantity(bounded_arctangent(input.value), dimensionless())
+                } elif opcode == 33 or opcode == 34 {
+                    # Stable inverse-trigonometric principal values. Compute
+                    # sqrt(1-x*x) as sqrt((1-|x|)*(1+|x|)) to retain
+                    # precision close to both endpoints. atan2 determines
+                    # the correct quadrant without subtractive cancellation.
+                    if not same_dimension(input.dimension, dimensionless()) or
+                       magnitude(input.value) > 1.0 {
+                        return failed(instruction.source_start)
+                    }
+                    let absolute: f64 = magnitude(input.value)
+                    let complement: f64 = positive_square_root((1.0 - absolute) * (1.0 + absolute))
+                    let mut angle: f64 = bounded_arctangent2(input.value, complement)
+                    if opcode == 34 {
+                        angle = bounded_arctangent2(complement, input.value)
+                    }
+                    stack[depth - 1] = quantity(angle, dimensionless())
                 } elif opcode == 28 or opcode == 29 or opcode == 30 {
                     if not same_dimension(input.dimension, dimensionless()) or
                        magnitude(input.value) > 60.0 {

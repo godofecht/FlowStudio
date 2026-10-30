@@ -1085,6 +1085,76 @@ function main() -> i32 {
     result = evaluate_math_expression("where(true,ln(2),ln(0))")
     if result.valid { return 397 }
 
+
+    # Native inverse trigonometry: principal values, domain and unit safety.
+    result = evaluate_math_expression("asin(0)")
+    if not result.valid or not near(result.result.value, 0.0) { return 398 }
+    result = evaluate_math_expression("asin(1)")
+    if not result.valid or not near(result.result.value, 1.5707963267948966) { return 399 }
+    result = evaluate_math_expression("asin(-1)")
+    if not result.valid or not near(result.result.value, -1.5707963267948966) { return 400 }
+    result = evaluate_math_expression("acos(1)")
+    if not result.valid or not near(result.result.value, 0.0) { return 401 }
+    result = evaluate_math_expression("acos(0)")
+    if not result.valid or not near(result.result.value, 1.5707963267948966) { return 402 }
+    result = evaluate_math_expression("acos(-1)")
+    if not result.valid or not near(result.result.value, 3.141592653589793) { return 403 }
+    result = evaluate_math_expression("asin(0.5)")
+    if not result.valid or not near(result.result.value, 0.5235987755982989) { return 404 }
+    result = evaluate_math_expression("acos(0.5)")
+    if not result.valid or not near(result.result.value, 1.0471975511965979) { return 405 }
+    result = evaluate_math_expression("asin(-0.5)")
+    if not result.valid or not near(result.result.value, -0.5235987755982989) { return 406 }
+    result = evaluate_math_expression("acos(-0.5)")
+    if not result.valid or not near(result.result.value, 2.0943951023931957) { return 407 }
+    result = evaluate_math_expression("asin(0.999999999999)")
+    if not result.valid or not near(result.result.value, 1.5707949125969767) { return 408 }
+    result = evaluate_math_expression("acos(-0.999999999999)")
+    if not result.valid or not near(result.result.value, 3.1415912393918735) { return 409 }
+    result = evaluate_math_expression("sin(asin(0.75))")
+    if not result.valid or not near(result.result.value, 0.75) { return 410 }
+    result = evaluate_math_expression("cos(acos(-0.75))")
+    if not result.valid or not near(result.result.value, -0.75) { return 411 }
+    result = evaluate_math_expression("asin(0.5)+acos(0.5)")
+    if not result.valid or not near(result.result.value, 1.5707963267948966) { return 412 }
+    result = evaluate_math_expression("asin(1m/2m)")
+    if not result.valid or not near(result.result.value, 0.5235987755982989) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 413 }
+    result = evaluate_math_expression("asin(1m)")
+    if result.valid or result.failed_at != 0 { return 414 }
+    result = evaluate_math_expression("acos(1s)")
+    if result.valid or result.failed_at != 0 { return 415 }
+    result = evaluate_math_expression("asin(true)")
+    if result.valid or result.failed_at != 0 { return 416 }
+    result = evaluate_math_expression("acos(false)")
+    if result.valid or result.failed_at != 0 { return 417 }
+    result = evaluate_math_expression("asin(1.000000000001)")
+    if result.valid or result.failed_at != 0 { return 418 }
+    result = evaluate_math_expression("acos(-1.000000000001)")
+    if result.valid or result.failed_at != 0 { return 419 }
+    if parse_math_expression("asin()").valid { return 420 }
+    if parse_math_expression("acos()").valid { return 421 }
+    if parse_math_expression("asin(0,1)").valid { return 422 }
+    if parse_math_expression("acos(0,1)").valid { return 423 }
+    if parse_math_expression("asin (0)").valid { return 424 }
+    if parse_math_expression("acos (0)").valid { return 425 }
+    if parse_math_expression("asin(0").valid { return 426 }
+    if parse_math_expression("acos(0").valid { return 427 }
+    let asin_source: ParsedMathExpression = parse_math_expression("asin(0.5)")
+    if not asin_source.valid or asin_source.program.count != 2 or
+       asin_source.program.instructions[1].opcode != 33 or
+       asin_source.program.instructions[1].source_start != 0 or
+       asin_source.program.instructions[1].source_end != 4 { return 428 }
+    let acos_source: ParsedMathExpression = parse_math_expression("acos(0.5)")
+    if not acos_source.valid or acos_source.program.count != 2 or
+       acos_source.program.instructions[1].opcode != 34 or
+       acos_source.program.instructions[1].source_start != 0 or
+       acos_source.program.instructions[1].source_end != 4 { return 429 }
+    result = evaluate_math_expression("-asin(0.5)^2")
+    if not result.valid or not near(result.result.value, -0.2741556778080377) { return 430 }
+    result = evaluate_math_expression("acos(1)^2")
+    if not result.valid or not near(result.result.value, 0.0) { return 431 }
+
     println("native-math-source-ok")
     return 0
 }

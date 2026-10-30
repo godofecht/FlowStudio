@@ -158,6 +158,124 @@ function main() -> i32 {
     inferred = infer_math_ir(program)
     if inferred.valid { return 48 }
 
+
+    # asin/acos use the same typed native compiler and principal-angle IR.
+    result = evaluate_math_expression("asin(0.5)")
+    if not result.valid or not near(result.result.value, 0.5235987755982989) { return 49 }
+    result = evaluate_math_expression("acos(-0.5)")
+    if not result.valid or not near(result.result.value, 2.0943951023931957) { return 50 }
+    result = evaluate_math_expression("asin(-1)")
+    if not result.valid or not near(result.result.value, -half_pi) { return 51 }
+    result = evaluate_math_expression("acos(-1)")
+    if not result.valid or not near(result.result.value, pi) { return 52 }
+    result = evaluate_math_expression("asin(0.999999999999)")
+    if not result.valid or not near(result.result.value, 1.5707949125969767) { return 53 }
+    result = evaluate_math_expression("acos(0.999999999999)")
+    if not result.valid or not near(result.result.value, 0.0000014141979198683931) { return 54 }
+    result = evaluate_math_expression("asin(1m/2m)")
+    if not result.valid or not near(result.result.value, 0.5235987755982989) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 55 }
+    result = evaluate_math_expression("acos(1s)")
+    if result.valid or result.failed_at != 0 { return 56 }
+    result = evaluate_math_expression("asin(true)")
+    if result.valid or result.failed_at != 0 { return 57 }
+    result = evaluate_math_expression("acos(1.01)")
+    if result.valid or result.failed_at != 0 { return 58 }
+    result = evaluate_math_expression("asin(-1.01)")
+    if result.valid or result.failed_at != 0 { return 59 }
+    let asin_parsed: ParsedMathExpression = parse_math_expression("asin(0.5)")
+    if not asin_parsed.valid or asin_parsed.program.count != 2 or
+       asin_parsed.program.instructions[1].opcode != 33 or
+       asin_parsed.program.instructions[1].source_start != 0 or
+       asin_parsed.program.instructions[1].source_end != 4 { return 60 }
+    let acos_parsed: ParsedMathExpression = parse_math_expression("acos(0.5)")
+    if not acos_parsed.valid or acos_parsed.program.instructions[1].opcode != 34 or
+       acos_parsed.program.instructions[1].source_end != 4 { return 61 }
+    if parse_math_expression("asin()").valid { return 62 }
+    if parse_math_expression("acos(0,1)").valid { return 63 }
+    if parse_math_expression("asin (0)").valid { return 64 }
+
+    inferred = infer_math_expression_source("asin(0.5)")
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension, dimensionless()) { return 65 }
+    inferred = infer_math_expression_source("acos(1m/2m)")
+    if not inferred.valid or not same_dimension(inferred.dimension, dimensionless()) { return 66 }
+    inferred = infer_math_expression_source("asin(1m)")
+    if inferred.valid or inferred.failed_at != 0 { return 67 }
+    inferred = infer_math_expression_source("acos(false)")
+    if inferred.valid or inferred.failed_at != 0 { return 68 }
+    inferred = infer_math_expression_source("asin(2)")
+    if not inferred.valid { return 69 }
+    inferred = infer_math_equation_source("asin(0.5) = 0.5235987755982989")
+    if not inferred.valid or not same_dimension(inferred.dimension, dimensionless()) { return 70 }
+    inferred = infer_math_equation_source("acos(1m) = 0")
+    if inferred.valid { return 71 }
+    equation = evaluate_math_equation_source("asin(0.5) = 0.5235987755982989", tolerance)
+    if not equation.valid or not equation.satisfied { return 72 }
+    equation = evaluate_math_equation_source("acos(-1) = 3.141592653589793", tolerance)
+    if not equation.valid or not equation.satisfied { return 73 }
+    equation = evaluate_math_equation_source("asin(2) = 0", tolerance)
+    if equation.valid { return 74 }
+
+    instructions[0] = MathInstruction {
+        opcode: 0, literal: quantity(0.5, dimensionless()),
+        exponent: 0, source_start: 0, source_end: 1
+    }
+    instructions[1] = MathInstruction {
+        opcode: 33, literal: quantity(0.0, dimensionless()),
+        exponent: 0, source_start: 1, source_end: 2
+    }
+    program = MathProgram { instructions: instructions, count: 2, source_length: 2 }
+    result = evaluate_math_ir(program)
+    if not result.valid or not near(result.result.value, 0.5235987755982989) { return 75 }
+    inferred = infer_math_ir(program)
+    if not inferred.valid or not same_dimension(inferred.dimension, dimensionless()) { return 76 }
+    instructions[1] = MathInstruction {
+        opcode: 34, literal: quantity(0.0, dimensionless()),
+        exponent: 0, source_start: 1, source_end: 2
+    }
+    program = MathProgram { instructions: instructions, count: 2, source_length: 2 }
+    result = evaluate_math_ir(program)
+    if not result.valid or not near(result.result.value, 1.0471975511965979) { return 77 }
+    inferred = infer_math_ir(program)
+    if not inferred.valid { return 78 }
+    instructions[0] = MathInstruction {
+        opcode: 0, literal: quantity(0.5, length_dimension()),
+        exponent: 0, source_start: 0, source_end: 1
+    }
+    program = MathProgram { instructions: instructions, count: 2, source_length: 2 }
+    result = evaluate_math_ir(program)
+    if result.valid or result.failed_at != 1 { return 79 }
+    inferred = infer_math_ir(program)
+    if inferred.valid or inferred.failed_at != 1 { return 80 }
+    instructions[0] = MathInstruction {
+        opcode: 0, literal: quantity(1.01, dimensionless()),
+        exponent: 0, source_start: 0, source_end: 1
+    }
+    program = MathProgram { instructions: instructions, count: 2, source_length: 2 }
+    result = evaluate_math_ir(program)
+    if result.valid or result.failed_at != 1 { return 81 }
+    inferred = infer_math_ir(program)
+    if not inferred.valid { return 82 }
+    instructions[0] = MathInstruction {
+        opcode: 24, literal: quantity(1.0, dimensionless()),
+        exponent: 0, source_start: 0, source_end: 1
+    }
+    program = MathProgram { instructions: instructions, count: 2, source_length: 2 }
+    result = evaluate_math_ir(program)
+    if result.valid or result.failed_at != 1 { return 83 }
+    inferred = infer_math_ir(program)
+    if inferred.valid or inferred.failed_at != 1 { return 84 }
+    instructions[0] = MathInstruction {
+        opcode: 33, literal: quantity(0.0, dimensionless()),
+        exponent: 0, source_start: 0, source_end: 1
+    }
+    program = MathProgram { instructions: instructions, count: 1, source_length: 2 }
+    result = evaluate_math_ir(program)
+    if result.valid { return 85 }
+    inferred = infer_math_ir(program)
+    if inferred.valid { return 86 }
+
     println("native-math-atan2-ok")
     return 0
 }

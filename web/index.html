@@ -1650,6 +1650,14 @@ async function executeCode(code, label, languageOverride = null, options = {}) {
         writeConsole("Numerical plot unavailable: " + plotError.message + "\n", "mathflow");
       }
     }
+    if (executionLanguage === "flow" && response.ok) {
+      try {
+        if (FlowStudioNativeFieldPlots.render(document, el("mathFlowPlot"), output))
+          el("tab-plots").click();
+      } catch (plotError) {
+        writeConsole("Native field plot rejected: " + plotError.message + "\n", "flow");
+      }
+    }
     const message = response.ok ? "Finished" :
       response.status === 422 ? "Execution failed" :
       response.status === 503 ? "Interpreter unavailable" :
@@ -2300,6 +2308,7 @@ renderTabs();
 </script>
 <script src="/editor_recovery.js"></script>
 <script src="/math_flow_plot.js"></script>
+<script src="/native_field_plot.js"></script>
 <script src="/workspace_tabs.js"></script>
 <script>FlowStudioWorkspaceTabs.mount();</script>
 <script src="/terminal_render.js"></script>

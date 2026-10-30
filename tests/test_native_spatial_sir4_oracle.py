@@ -68,7 +68,7 @@ class SpatialSIR4Oracle(unittest.TestCase):
         for name, value in zip(
             (field + cell for cell in NAMES for field in FIELDS), reference
         ):
-            match = re.search(r"expected\\." + name + r"\\s*=\\s*([0-9.]+)", block)
+            match = re.search(r"expected\." + name + r"\s*=\s*([0-9.]+)", block)
             self.assertIsNotNone(match, name)
             self.assertAlmostEqual(float(match.group(1)), value, delta=3e-13)
 

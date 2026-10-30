@@ -274,21 +274,34 @@ try {
     .waitFor({timeout:30000});
   assert.equal(await page.locator('#mathFlowPlot path[data-field-name]').count(), 2);
   assert.equal(await page.locator('#tab-plots').getAttribute('aria-selected'), 'true');
-  const fieldData = await page.evaluate(() =>
-    globalThis.FlowStudioNativeFieldPlots.parse(
-      document.getElementById('console').textContent));
-  assert.equal(fieldData.count, 64);
-  assert.deepEqual(fieldData.fields.map(field => field.name), ['U', 'V']);
   const grayscottSource = readFileSync('examples/native_field_grayscott64.flow', 'utf8');
-  for (const field of fieldData.fields) {
+  const references = {};
+  for (const name of ['U', 'V']) {
     const expectedMatch = new RegExp(
-      'let expected' + field.name + '256: array<f64, 64> = \\[([\\s\\S]*?)\\]'
+      'let expected' + name + '256: array<f64, 64> = \\[([\\s\\S]*?)\\]'
     ).exec(grayscottSource);
     assert.ok(expectedMatch, 'Missing checked-in independent numerical reference');
-    const reference = expectedMatch[1].split(',').filter(value => value.trim()).map(Number);
-    assert.equal(reference.length, 64);
-    assert.ok(Math.max(...field.values.map((value, i) =>
-      Math.abs(value - reference[i]))) < 1e-4, 'Plot must reflect computed field');
+    references[name] = expectedMatch[1].split(',')
+      .filter(value => value.trim()).map(Number);
+    assert.equal(references[name].length, 64);
+  }
+  const allValues = [...references.U, ...references.V];
+  const minimum = Math.min(...allValues), maximum = Math.max(...allValues);
+  const scale = Math.max(1, Math.abs(minimum), Math.abs(maximum));
+  const span = maximum / scale - minimum / scale || 1;
+  for (const name of ['U', 'V']) {
+    const path = await page.locator(
+      '#mathFlowPlot path[data-field-name="' + name + '"]').getAttribute('d');
+    const points = [...path.matchAll(/[ML]([0-9.]+),([0-9.]+)/g)];
+    assert.equal(points.length, 64, 'Every native Flow cell must be plotted');
+    for (const [index, match] of points.entries()) {
+      const expectedX = 48 + 568 * index / 63;
+      const expectedY = 214 - 190 * (references[name][index] / scale -
+        minimum / scale) / span;
+      assert.ok(Math.abs(Number(match[1]) - expectedX) < 0.001);
+      assert.ok(Math.abs(Number(match[2]) - expectedY) < 0.02,
+        'Native SVG profile differs from independent PDE reference');
+    }
   }
 
   // Six-state nonlinear spatial SIR evolution: Monaco -> native Flow HTTP

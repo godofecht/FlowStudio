@@ -21,7 +21,7 @@ export struct MathInstruction {
 }
 
 export struct MathProgram {
-    instructions: array<MathInstruction, 16>,
+    instructions: array<MathInstruction, 64>,
     count: i32,
     source_length: i32
 }
@@ -134,11 +134,11 @@ function half_dimension(dimension: Dimension) -> Dimension {
 }
 
 export function evaluate_math_ir(program: MathProgram) -> MathResult {
-    if program.count < 1 or program.count > 16 or program.source_length < 0 {
+    if program.count < 1 or program.count > 64 or program.source_length < 0 {
         return failed(0)
     }
-    let mut stack: array<Quantity, 16> = [quantity(0.0, dimensionless())]
-    let mut predicate: array<bool, 16> = [false]
+    let mut stack: array<Quantity, 64> = [quantity(0.0, dimensionless())]
+    let mut predicate: array<bool, 64> = [false]
     let mut depth: i32 = 0
     let mut index: i32 = 0
     while index < program.count {
@@ -149,7 +149,7 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
         }
         let opcode: i32 = instruction.opcode
         if opcode == 0 {
-            if depth >= 16 or not bounded_value(instruction.literal.value) or
+            if depth >= 64 or not bounded_value(instruction.literal.value) or
                not bounded_dimension(instruction.literal.dimension) {
                 return failed(instruction.source_start)
             }

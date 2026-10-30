@@ -230,3 +230,26 @@ The actual Flow 2.0 compiler and production HTTP routes executed the source
 smoke on both platforms. Ubuntu Chromium executed the concatenated checked-in
 source through Monaco's real Run control and observed the success marker.
 Independent macOS browser acceptance and post-merge main CI remain unverified.
+
+## Native typed scalar equation AST (2026-10-30)
+
+`src/math_equation.flow` compiles a bounded **single top-level `=`** into
+`MathEquation`, with independent typed postfix programs for the left and
+right expressions. Each expression uses the existing native Flow source parser
+and optional explicit physical symbol bindings. Both programs retain original
+UTF-8 byte offsets, including the right-hand side. The evaluator rejects
+predicates, incompatible physical dimensions, invalid numerical operations,
+negative/nonfinite/mismatched tolerance and residual overflow. A successful
+evaluation returns the dimensioned residual and whether its absolute value is
+within the caller-supplied dimensioned tolerance.
+
+`src/math_equation_smoke.flow` executes analytic dimensional identities,
+unequal equations, explicit symbols, Unicode arithmetic, scientific notation,
+comparison expressions nested inside `where`, source-span preservation and
+fail-closed cases. The native CI matrix and production HTTP compiler execute
+the same checked-in code.
+
+This is a scalar equation AST and evaluator, **not** symbolic algebra, an
+equation solver, compiler-wide static dimensional inference, a general PDE
+grammar, or native Navier–Stokes. It intentionally does not reinterpret `==`
+as an equation delimiter.

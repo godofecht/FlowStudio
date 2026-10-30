@@ -283,6 +283,44 @@ def main() -> None:
     assert status == 422 and body.strip(), (
         "native mathematical source invalid compiler syntax", status, body)
 
+    # Native typed scalar equation AST: the exact checked-in Flow modules
+    # are bundled for the anonymous HTTP compiler, preserving source spans.
+    equation_files = (
+        "src/math_dimensions.flow",
+        "src/math_expression_ir.flow",
+        "src/math_expression_source.flow",
+        "src/math_equation.flow",
+        "src/math_equation_smoke.flow",
+    )
+    native_equation = "\n".join(
+        "\n".join(
+            line.removeprefix("export ")
+            for line in (Path(__file__).resolve().parents[1] / path)
+                .read_text(encoding="utf-8").splitlines()
+            if not line.startswith("import .math_dimensions {")
+            and not line.startswith("import .math_expression_ir {")
+            and not line.startswith("import .math_expression_source {")
+            and not line.startswith("import .math_equation {")
+        )
+        for path in equation_files
+    )
+    assert "function parse_math_equation(" in native_equation
+    assert "native-math-equation-ok" in native_equation
+    status, body = request("POST", "/api/check/flow", native_equation, accepted_headers)
+    assert status == 200, ("native mathematical equation compile", status, body)
+    status, body = request("POST", "/api/run/flow", native_equation, accepted_headers)
+    assert status == 200 and "native-math-equation-ok" in body, (
+        "native mathematical equation execution", status, body)
+    malformed_equation = native_equation.replace(
+        "function parse_math_equation(source: string) -> MathEquation {",
+        "function parse_math_equation(source: string -> MathEquation {",
+        1,
+    )
+    assert malformed_equation != native_equation
+    status, body = request("POST", "/api/check/flow", malformed_equation, accepted_headers)
+    assert status == 422 and body.strip(), (
+        "native mathematical equation malformed-source rejection", status, body)
+
     # Native bounded 2D advection-diffusion, including nonzero transport
     # velocities and a complex Fourier eigenvalue. Real compiler and execution.
     transport_source = (Path(__file__).resolve().parents[1] /

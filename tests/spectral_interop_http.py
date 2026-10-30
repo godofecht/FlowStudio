@@ -9,6 +9,8 @@ import json
 import math
 from pathlib import Path
 
+from spectral_roundtrip_http import verify_spectral_roundtrip
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -65,3 +67,7 @@ def verify_spectral_interop(request, headers: dict[str, str]) -> None:
     variables = {entry["name"]: entry for entry in json.loads(body)["variables"]}
     assert "flowstudio_spectral_values" in variables, variables
     assert variables["flowstudio_spectral_values"]["size"] == 256, variables
+
+    # R independently advances the Python field, then persistent CPython
+    # validates every returned cell against a step-121 Fourier oracle.
+    verify_spectral_roundtrip(request, headers)

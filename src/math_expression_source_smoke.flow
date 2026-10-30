@@ -1,8 +1,8 @@
 # Native compiler execution of actual mathematical source -> typed postfix IR.
 # Run: flow run src/math_expression_source_smoke.flow
-import .math_dimensions { Dimension, dimensionless, length_dimension, mass_dimension, time_dimension, temperature_dimension, quotient_dimension, product_dimension, same_dimension }
+import .math_dimensions { Dimension, dimensionless, length_dimension, mass_dimension, time_dimension, temperature_dimension, quotient_dimension, product_dimension, same_dimension, quantity }
 import .math_expression_ir { MathResult }
-import .math_expression_source { ParsedMathExpression, parse_math_expression, evaluate_math_expression }
+import .math_expression_source { ParsedMathExpression, MathSymbol, MathBindings, empty_math_bindings, parse_math_expression, parse_math_expression_with_bindings, evaluate_math_expression, evaluate_math_expression_with_bindings }
 
 function near(a: f64, b: f64) -> bool {
     let mut error: f64 = a - b
@@ -290,6 +290,132 @@ function main() -> i32 {
     result = evaluate_math_expression("√9m²/3")
     if not result.valid or not near(result.result.value, 3.0) or
        not same_dimension(result.result.dimension, length) { return 98 }
+
+    # Explicit typed identifiers are lowered to the SAME bounded native IR
+    # as literals. Names have strict ASCII syntax and unique definitions.
+    let blank_symbol: MathSymbol = MathSymbol {
+        name: "", value: quantity(0.0, dimensionless())
+    }
+    let mut symbols: array<MathSymbol, 8> = [blank_symbol]
+    symbols[0] = MathSymbol { name: "distance", value: quantity(12.0, length) }
+    symbols[1] = MathSymbol { name: "duration", value: quantity(3.0, time) }
+    symbols[2] = MathSymbol { name: "speed", value: quantity(1.0, speed) }
+    symbols[3] = MathSymbol { name: "zero", value: quantity(0.0, time) }
+    symbols[4] = MathSymbol { name: "mass", value: quantity(2.0, mass_dimension()) }
+    let bindings: MathBindings = MathBindings { symbols: symbols, count: 5 }
+
+    result = evaluate_math_expression_with_bindings("distance/duration+speed", bindings)
+    if not result.valid or not near(result.result.value, 5.0) or
+       not same_dimension(result.result.dimension, speed) { return 99 }
+    result = evaluate_math_expression_with_bindings("sqrt(distance²)+distance", bindings)
+    if not result.valid or not near(result.result.value, 24.0) or
+       not same_dimension(result.result.dimension, length) { return 100 }
+    result = evaluate_math_expression_with_bindings("√distance²", bindings)
+    if not result.valid or not near(result.result.value, 12.0) or
+       not same_dimension(result.result.dimension, length) { return 101 }
+    result = evaluate_math_expression_with_bindings("distance^3/distance^2", bindings)
+    if not result.valid or not near(result.result.value, 12.0) or
+       not same_dimension(result.result.dimension, length) { return 102 }
+    result = evaluate_math_expression_with_bindings("mass*distance/duration²", bindings)
+    let force: Dimension = quotient_dimension(
+        product_dimension(mass_dimension(), length), product_dimension(time, time))
+    if not result.valid or not near(result.result.value, 24.0 / 9.0) or
+       not same_dimension(result.result.dimension, force) { return 103 }
+    result = evaluate_math_expression_with_bindings("abs(-distance)+distance", bindings)
+    if not result.valid or not near(result.result.value, 24.0) or
+       not same_dimension(result.result.dimension, length) { return 104 }
+    result = evaluate_math_expression_with_bindings("(distance/duration+speed)^2", bindings)
+    if not result.valid or not near(result.result.value, 25.0) or
+       not same_dimension(result.result.dimension, product_dimension(speed, speed)) { return 105 }
+    result = evaluate_math_expression_with_bindings("distance^-1*distance", bindings)
+    if not result.valid or not near(result.result.value, 1.0) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 106 }
+    result = evaluate_math_expression_with_bindings("distance²", bindings)
+    if not result.valid or not near(result.result.value, 144.0) or
+       not same_dimension(result.result.dimension, area) { return 107 }
+    result = evaluate_math_expression_with_bindings("distance^0", bindings)
+    if not result.valid or not near(result.result.value, 1.0) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 108 }
+    result = evaluate_math_expression_with_bindings("distance+distance", bindings)
+    if not result.valid or not near(result.result.value, 24.0) { return 109 }
+
+    let bound_source: ParsedMathExpression =
+        parse_math_expression_with_bindings("distance/duration", bindings)
+    if not bound_source.valid or bound_source.program.count != 3 or
+       bound_source.program.instructions[0].source_start != 0 or
+       bound_source.program.instructions[0].source_end != 8 or
+       bound_source.program.instructions[1].source_start != 9 or
+       bound_source.program.instructions[1].source_end != 17 or
+       bound_source.program.instructions[2].source_start != 8 or
+       bound_source.program.instructions[2].source_end != 9 { return 110 }
+    let unicode_bound: ParsedMathExpression =
+        parse_math_expression_with_bindings("√distance²", bindings)
+    if not unicode_bound.valid or unicode_bound.program.count != 3 or
+       unicode_bound.program.instructions[0].source_start != 3 or
+       unicode_bound.program.instructions[0].source_end != 11 or
+       unicode_bound.program.instructions[1].source_start != 11 or
+       unicode_bound.program.instructions[1].source_end != 13 or
+       unicode_bound.program.instructions[2].opcode != 21 or
+       unicode_bound.program.instructions[2].source_start != 0 or
+       unicode_bound.program.instructions[2].source_end != 3 { return 111 }
+
+    result = evaluate_math_expression_with_bindings("distance+duration", bindings)
+    if result.valid or result.failed_at != 8 { return 112 }
+    result = evaluate_math_expression_with_bindings("distance/zero", bindings)
+    if result.valid or result.failed_at != 8 { return 113 }
+    result = evaluate_math_expression_with_bindings("distance+missing", bindings)
+    if result.valid or result.failed_at != 9 { return 114 }
+    result = evaluate_math_expression_with_bindings("2distance", bindings)
+    if result.valid or result.failed_at != 1 { return 115 }
+    result = evaluate_math_expression_with_bindings("distance duration", bindings)
+    if result.valid or result.failed_at != 9 { return 116 }
+    result = evaluate_math_expression_with_bindings("distance^9", bindings)
+    if result.valid or result.failed_at != 8 { return 117 }
+    result = evaluate_math_expression_with_bindings("distance+π", bindings)
+    if result.valid or result.failed_at != 9 { return 118 }
+    result = evaluate_math_expression_with_bindings("distance+1e999", bindings)
+    if result.valid or result.failed_at != 9 { return 119 }
+    result = evaluate_math_expression_with_bindings("distance*1e30", bindings)
+    if result.valid or result.failed_at != 8 { return 120 }
+    result = evaluate_math_expression_with_bindings("sqrt(-distance)", bindings)
+    if result.valid or result.failed_at != 0 { return 121 }
+    result = evaluate_math_expression_with_bindings("speed+distance", bindings)
+    if result.valid or result.failed_at != 5 { return 122 }
+    result = evaluate_math_expression_with_bindings("unknown", bindings)
+    if result.valid or result.failed_at != 0 { return 123 }
+    result = evaluate_math_expression_with_bindings("distance^8*distance^8*distance^8*distance^8", bindings)
+    if result.valid { return 124 }
+
+    let mut invalid_symbols: array<MathSymbol, 8> = symbols
+    invalid_symbols[5] = MathSymbol { name: "distance", value: quantity(3.0, length) }
+    let invalid_duplicates: MathBindings = MathBindings { symbols: invalid_symbols, count: 6 }
+    result = evaluate_math_expression_with_bindings("distance", invalid_duplicates)
+    if result.valid or result.failed_at != 0 { return 125 }
+    invalid_symbols[5] = MathSymbol { name: "2invalid", value: quantity(3.0, length) }
+    let invalid_name: MathBindings = MathBindings { symbols: invalid_symbols, count: 6 }
+    result = evaluate_math_expression_with_bindings("distance", invalid_name)
+    if result.valid or result.failed_at != 0 { return 126 }
+    invalid_symbols[5] = MathSymbol {
+        name: "this_identifier_is_over_thirty_two_characters",
+        value: quantity(3.0, length)
+    }
+    let invalid_length: MathBindings = MathBindings { symbols: invalid_symbols, count: 6 }
+    result = evaluate_math_expression_with_bindings("distance", invalid_length)
+    if result.valid or result.failed_at != 0 { return 127 }
+    let invalid_count: MathBindings = MathBindings { symbols: symbols, count: 9 }
+    result = evaluate_math_expression_with_bindings("distance", invalid_count)
+    if result.valid or result.failed_at != 0 { return 128 }
+    let negative_count: MathBindings = MathBindings { symbols: symbols, count: -1 }
+    result = evaluate_math_expression_with_bindings("distance", negative_count)
+    if result.valid or result.failed_at != 0 { return 129 }
+    result = evaluate_math_expression_with_bindings("distance", empty_math_bindings())
+    if result.valid or result.failed_at != 0 { return 130 }
+    result = evaluate_math_expression("distance")
+    if result.valid or result.failed_at != 0 { return 131 }
+    invalid_symbols[5] = MathSymbol { name: "overflow", value: quantity(1e31, length) }
+    let overflow_binding: MathBindings = MathBindings { symbols: invalid_symbols, count: 6 }
+    result = evaluate_math_expression_with_bindings("overflow", overflow_binding)
+    if result.valid or result.failed_at != 0 { return 132 }
 
     println("native-math-source-ok")
     return 0

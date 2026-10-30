@@ -135,3 +135,34 @@ before this feature is treated as verified.
 This is still a bounded scalar parser. It does not accept symbolic
 variables, general functions, arbitrary exponent expressions, equations,
 spatial derivatives, upstream Flow grammar extensions or general PDEs.
+
+## Explicit typed native symbol bindings (2026-10-30; Linux/macOS CI verified)
+
+The native Flow 2.0 expression parser now accepts caller-provided, **explicitly
+bound** ASCII identifiers through `MathSymbol`, `MathBindings`,
+`parse_math_expression_with_bindings` and
+`evaluate_math_expression_with_bindings`. A binding supplies a concrete
+`Quantity`, including its length/mass/time/temperature dimensions. The parser
+lowers every resolved name to an ordinary typed literal in the existing
+`MathProgram`; the runtime therefore retains its dimensional checks,
+1e30 magnitude bound and UTF-8 source spans. Existing no-binding entry points
+remain unchanged and reject unknown identifiers.
+
+There are at most eight unique names, each 1–32 ASCII letters, digits or
+underscores, beginning with a letter or underscore. Missing, duplicate,
+malformed, out-of-range and nonfinite/unbounded bindings fail closed. Symbols
+cannot introduce implicit multiplication, execute code, define functions or
+access external/global state. The smoke program includes 34 new positive,
+negative, unit, source-span and overflow assertions, including dimensioned
+force, inverse powers, square roots, and Unicode source offsets. The exact
+smoke program is already exercised by native `flow run` and real HTTP
+compiler/run acceptance in the unchanged Linux/macOS CI pipeline.
+
+This is **not** a general compiler symbol table, static unit inference,
+upstream grammar extension, function definitions, spatial derivatives or
+PDE compiler. All six Linux/macOS jobs passed in
+[CI #41005093641](https://github.com/godofecht/FlowStudio/actions/runs/41005093641),
+including the real native Flow compiler, this source smoke, production HTTP
+compile/run acceptance, both R/C FlowJIT jobs and existing Ubuntu Chromium
+workflows. No dedicated physical-browser interaction with the new symbol
+binding API was performed; post-merge main CI remains pending.

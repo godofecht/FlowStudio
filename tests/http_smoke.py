@@ -262,15 +262,18 @@ def main() -> None:
     # its numerical assertions, through the production native HTTP route.
     tensor_lines = body.splitlines()
     tensor_headers = [i for i, line in enumerate(tensor_lines)
-                      if line == "FLOWSTUDIO_GRID_V1 32 32 1"]
+                      if line == "FLOWSTUDIO_GRID_V1 32 32 2"]
     assert len(tensor_headers) == 1, ("native 2D frame", body[-250:])
     tensor_at = tensor_headers[0]
-    assert tensor_lines[tensor_at + 2] == "FLOWSTUDIO_GRID_END"
+    assert tensor_lines[tensor_at + 3] == "FLOWSTUDIO_GRID_END"
     tensor_tokens = tensor_lines[tensor_at + 1].split()
+    species_v_tokens = tensor_lines[tensor_at + 2].split()
     assert len(tensor_tokens) == 1025 and tensor_tokens[0] == "T"
+    assert len(species_v_tokens) == 1025 and species_v_tokens[0] == "V"
     tensor_values = [float(value) for value in tensor_tokens[1:]]
+    species_v_values = [float(value) for value in species_v_tokens[1:]]
     assert all(math.isfinite(value) and abs(value) <= 1e6
-               for value in tensor_values)
+               for value in tensor_values + species_v_values)
     def quarter_mode(phase):
         remainder = phase % 4
         return 1.0 if remainder == 0 else -1.0 if remainder == 2 else 0.0
@@ -282,6 +285,19 @@ def main() -> None:
     assert max(abs(actual - expected) for actual, expected in
                zip(tensor_values, tensor_reference)) < 0.002, (
                    "native 1024-cell heatmap differs from independent Fourier reference")
+    # A second 1024-cell species is separately computed by the real Flow
+    # runtime with a different tensor, baseline and Fourier amplitudes.
+    # Check every transferred value rather than trusting the SVG renderer.
+    species_v_reference = [
+        5.0 + 0.8 * math.exp(-32.768 * 0.025) * quarter_mode(x + y)
+        - 0.3 * math.exp(-40.96 * 0.025) * quarter_mode(x - y)
+        for y in range(32) for x in range(32)
+    ]
+    assert max(abs(actual - expected) for actual, expected in
+               zip(species_v_values, species_v_reference)) < 0.00002, (
+                   "second native 1024-cell species differs from independent Fourier reference")
+    assert abs(sum(species_v_values) / 1024.0 - 5.0) < 0.00001, (
+        "second species violates periodic mass conservation")
     # Actual upstream Flow evolution DSL, not a hand-coded ODE or Python
     # interpreter: four coupled states with compiler-generated RK4, checked
     # against a discrete Fourier/Poisson oracle and fourth-order refinement.

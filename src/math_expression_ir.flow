@@ -9,7 +9,8 @@
 #          20 absolute, 21 physical square root, 22 stable two-component norm,
 #          24 typed Boolean literal (0 or 1, dimensionless),
 #          25 exponential, 26 natural logarithm, 27 base-10 logarithm,
-#          28 sine, 29 cosine, 30 tangent, 31 arctangent (dimensionless radians).
+#          28 sine, 29 cosine, 30 tangent, 31 arctangent,
+#          32 atan2(y, x), including matching physical dimensions.
 # Predicate values are dimensionless 0/1 with a separate runtime type bit.
 # where and logical operators evaluate operands eagerly (no short circuit).
 # Unsupported instructions and type mismatches fail closed.
@@ -240,6 +241,31 @@ function bounded_arctangent(value: f64) -> f64 {
     return angle
 }
 
+# Principal polar angle in (-pi, pi]. Scale by the larger magnitude before
+# dividing, so even highly unequal bounded operands cannot overflow.
+function bounded_arctangent2(y: f64, x: f64) -> f64 {
+    let half_pi: f64 = 1.57079632679489661923132169163975144
+    let pi: f64 = 3.14159265358979323846264338327950288
+    if x == 0.0 {
+        if y > 0.0 { return half_pi }
+        return -half_pi
+    }
+    let absolute_x: f64 = magnitude(x)
+    let absolute_y: f64 = magnitude(y)
+    let mut acute: f64 = 0.0
+    if absolute_x >= absolute_y {
+        acute = bounded_arctangent(absolute_y / absolute_x)
+    } else {
+        acute = half_pi - bounded_arctangent(absolute_x / absolute_y)
+    }
+    if x > 0.0 {
+        if y < 0.0 { return -acute }
+        return acute
+    }
+    if y < 0.0 { return acute - pi }
+    return pi - acute
+}
+
 function even_dimension(dimension: Dimension) -> bool {
     return dimension.length == (dimension.length / 2) * 2 and
         dimension.mass == (dimension.mass / 2) * 2 and
@@ -356,7 +382,7 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
                 return failed(instruction.source_start)
             }
         } elif (opcode >= 1 and opcode <= 4) or opcode == 7 or opcode == 8 or
-             (opcode >= 10 and opcode <= 17) or opcode == 22 {
+             (opcode >= 10 and opcode <= 17) or opcode == 22 or opcode == 32 {
             if depth < 2 { return failed(instruction.source_start) }
             let right: Quantity = stack[depth - 1]
             let left: Quantity = stack[depth - 2]
@@ -364,7 +390,19 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
             let right_predicate: bool = predicate[depth - 1]
             let mut result: CheckedQuantity = CheckedQuantity { valid: false, quantity: left }
             let mut result_predicate: bool = false
-            if opcode == 16 or opcode == 17 {
+            if opcode == 32 {
+                # atan2(y, x) accepts a matched physical pair, but the
+                # resulting angle is dimensionless. The origin is undefined.
+                if left_predicate or right_predicate or
+                   not same_dimension(left.dimension, right.dimension) or
+                   (left.value == 0.0 and right.value == 0.0) {
+                    return failed(instruction.source_start)
+                }
+                result = CheckedQuantity {
+                    valid: true,
+                    quantity: quantity(bounded_arctangent2(left.value, right.value), dimensionless())
+                }
+            } elif opcode == 16 or opcode == 17 {
                 if not left_predicate or not right_predicate {
                     return failed(instruction.source_start)
                 }

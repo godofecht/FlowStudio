@@ -21,10 +21,19 @@ while `tests/native_math_plot_ui.mjs` adds an actual Monaco Run interaction
 through the native Flow HTTP backend in Ubuntu Chromium. The existing
 six-job Linux/macOS CI configuration is unchanged.
 
-**Status: pending independent PR CI.** No native compiler, HTTP, browser,
-or platform pass is claimed until the exact branch is verified. General
-native PDE grammar, scalable grids beyond 8x8, live Flow/R debugging,
-remote-session isolation and RStudio parity remain incomplete.
+**Status: six independent Linux/macOS PR CI jobs passed** in
+[CI #40983704538](https://github.com/godofecht/FlowStudio/actions/runs/40983704538).
+Each source/transport platform passed 1,143 of 1,155 Node tests
+(12 skipped, zero failed) and 322 of 335 Python tests
+(13 skipped, zero failed), including all six new independent
+Fourier/stencil/RK4/mutation regressions. Both native Flow 2.0 builds,
+real compiler and HTTP acceptance, and both FlowJIT jobs passed.
+Ubuntu Chromium loaded the exact 5x7 program into Monaco and clicked the
+real Run control, observing the native compiler's success marker.
+Independent macOS physical-browser acceptance was not performed.
+Post-merge `main` CI has not yet been independently verified.
+General native PDE grammar, scalable grids beyond 8x8, live Flow/R
+debugging, remote-session isolation and RStudio parity remain incomplete.
 
 ## 2026-10-29: 18-state native coupled 3x3 PDE acceptance (verification pending)
 

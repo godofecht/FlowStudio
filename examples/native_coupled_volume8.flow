@@ -1,0 +1,283 @@
+# Native Flow 2.0: two genuinely coupled 8x8x8 periodic anisotropic PDE volumes.
+# The production compiler executes 1,024 species-voxels per step. A separate
+# Fourier-amplitude evolution checks the full 3D stencil at three checkpoints.
+# The plotted 8x8 grids are the computed z=0 slices, not stored reference data.
+
+struct Volume {
+    values: array<f64, 512>
+}
+
+struct State {
+    u: Volume,
+    v: Volume
+}
+
+struct Equation {
+    ux: f64,
+    uy: f64,
+    uz: f64,
+    vx: f64,
+    vy: f64,
+    vz: f64,
+    ratio: f64,
+    exchange: f64
+}
+
+struct Result {
+    valid: bool,
+    state: State
+}
+
+function absolute(value: f64) -> f64 {
+    if value < 0.0 { return -value }
+    return value
+}
+
+function blankVolume() -> Volume {
+    let values: array<f64, 512> = [0.0]
+    return Volume { values: values }
+}
+
+function index3(x: i32, y: i32, z: i32) -> i32 {
+    return x + 8 * y + 64 * z
+}
+
+function quarterMode(input: i32) -> f64 {
+    let mut phase: i32 = input
+    while phase < 0 { phase = phase + 4 }
+    while phase >= 4 { phase = phase - 4 }
+    if phase == 0 { return 1.0 }
+    if phase == 2 { return -1.0 }
+    return 0.0
+}
+
+function initialState() -> State {
+    let mut u: Volume = blankVolume()
+    let mut v: Volume = blankVolume()
+    for z in 0 to 8 {
+        for y in 0 to 8 {
+            for x in 0 to 8 {
+                let a: f64 = quarterMode(x + y)
+                let b: f64 = quarterMode(y + z)
+                let c: f64 = quarterMode(x + y + z)
+                let i: i32 = index3(x, y, z)
+                u.values[i] = 300.0 + 7.0 * a + 3.0 * b + 2.0 * c
+                v.values[i] = 5.0 + 0.8 * a - 0.5 * b + 1.1 * c
+            }
+        }
+    }
+    return State { u: u, v: v }
+}
+
+function validEquation(e: Equation, steps: i32) -> bool {
+    if steps < 0 or steps > 256 { return false }
+    if not (e.ratio >= 0.0 and e.ratio <= 0.5) { return false }
+    if not (e.exchange >= 0.0 and e.exchange <= 0.25) { return false }
+    if not (e.ux >= 0.0 and e.ux <= 1.0 and
+            e.uy >= 0.0 and e.uy <= 1.0 and
+            e.uz >= 0.0 and e.uz <= 1.0 and
+            e.vx >= 0.0 and e.vx <= 1.0 and
+            e.vy >= 0.0 and e.vy <= 1.0 and
+            e.vz >= 0.0 and e.vz <= 1.0) { return false }
+    if e.ratio * (e.ux + e.uy + e.uz) > 0.5 or
+       e.ratio * (e.vx + e.vy + e.vz) > 0.5 { return false }
+    return true
+}
+
+function advance(state: State, e: Equation) -> State {
+    let mut next: State = State { u: blankVolume(), v: blankVolume() }
+    for z in 0 to 8 {
+        let mut zm: i32 = z - 1
+        let mut zp: i32 = z + 1
+        if zm < 0 { zm = 7 }
+        if zp == 8 { zp = 0 }
+        for y in 0 to 8 {
+            let mut ym: i32 = y - 1
+            let mut yp: i32 = y + 1
+            if ym < 0 { ym = 7 }
+            if yp == 8 { yp = 0 }
+            for x in 0 to 8 {
+                let mut xm: i32 = x - 1
+                let mut xp: i32 = x + 1
+                if xm < 0 { xm = 7 }
+                if xp == 8 { xp = 0 }
+                let i: i32 = index3(x, y, z)
+                let u: f64 = state.u.values[i]
+                let v: f64 = state.v.values[i]
+                let ux: f64 = state.u.values[index3(xm, y, z)] +
+                    state.u.values[index3(xp, y, z)] - 2.0 * u
+                let uy: f64 = state.u.values[index3(x, ym, z)] +
+                    state.u.values[index3(x, yp, z)] - 2.0 * u
+                let uz: f64 = state.u.values[index3(x, y, zm)] +
+                    state.u.values[index3(x, y, zp)] - 2.0 * u
+                let vx: f64 = state.v.values[index3(xm, y, z)] +
+                    state.v.values[index3(xp, y, z)] - 2.0 * v
+                let vy: f64 = state.v.values[index3(x, ym, z)] +
+                    state.v.values[index3(x, yp, z)] - 2.0 * v
+                let vz: f64 = state.v.values[index3(x, y, zm)] +
+                    state.v.values[index3(x, y, zp)] - 2.0 * v
+                let du: f64 = u + e.ratio * (e.ux * ux + e.uy * uy + e.uz * uz)
+                let dv: f64 = v + e.ratio * (e.vx * vx + e.vy * vy + e.vz * vz)
+                next.u.values[i] = (1.0 - e.exchange) * du + e.exchange * dv
+                next.v.values[i] = e.exchange * du + (1.0 - e.exchange) * dv
+            }
+        }
+    }
+    return next
+}
+
+function integrate(initial: State, e: Equation, steps: i32) -> Result {
+    if not validEquation(e, steps) {
+        return Result { valid: false, state: initial }
+    }
+    for i in 0 to 512 {
+        if not (initial.u.values[i] >= -1000.0 and initial.u.values[i] <= 1000.0 and
+                initial.v.values[i] >= -1000.0 and initial.v.values[i] <= 1000.0) {
+            return Result { valid: false, state: initial }
+        }
+    }
+    let mut state: State = initial
+    for step in 0 to steps {
+        state = advance(state, e)
+    }
+    return Result { valid: true, state: state }
+}
+
+# Independent spectral reference: each periodic quarter-wave is an eigenvector
+# of each directional second difference, eigenvalue -2 on an active axis.
+# Diffusion and simultaneous conservative exchange act on six amplitudes.
+function reference(steps: i32, e: Equation) -> State {
+    let mut meansU: f64 = 300.0
+    let mut meansV: f64 = 5.0
+    let mut amplitudesU: array<f64, 3> = [7.0, 3.0, 2.0]
+    let mut amplitudesV: array<f64, 3> = [0.8, -0.5, 1.1]
+    let ratesU: array<f64, 3> = [
+        e.ux + e.uy, e.uy + e.uz, e.ux + e.uy + e.uz
+    ]
+    let ratesV: array<f64, 3> = [
+        e.vx + e.vy, e.vy + e.vz, e.vx + e.vy + e.vz
+    ]
+    for step in 0 to steps {
+        let oldU: f64 = meansU
+        let oldV: f64 = meansV
+        meansU = (1.0 - e.exchange) * oldU + e.exchange * oldV
+        meansV = e.exchange * oldU + (1.0 - e.exchange) * oldV
+        for mode in 0 to 3 {
+            let u: f64 = (1.0 - 2.0 * e.ratio * ratesU[mode]) * amplitudesU[mode]
+            let v: f64 = (1.0 - 2.0 * e.ratio * ratesV[mode]) * amplitudesV[mode]
+            amplitudesU[mode] = (1.0 - e.exchange) * u + e.exchange * v
+            amplitudesV[mode] = e.exchange * u + (1.0 - e.exchange) * v
+        }
+    }
+    let mut result: State = State { u: blankVolume(), v: blankVolume() }
+    for z in 0 to 8 {
+        for y in 0 to 8 {
+            for x in 0 to 8 {
+                let a: f64 = quarterMode(x + y)
+                let b: f64 = quarterMode(y + z)
+                let c: f64 = quarterMode(x + y + z)
+                let i: i32 = index3(x, y, z)
+                result.u.values[i] = meansU + amplitudesU[0] * a +
+                    amplitudesU[1] * b + amplitudesU[2] * c
+                result.v.values[i] = meansV + amplitudesV[0] * a +
+                    amplitudesV[1] * b + amplitudesV[2] * c
+            }
+        }
+    }
+    return result
+}
+
+function maxDifference(first: State, second: State) -> f64 {
+    let mut error: f64 = 0.0
+    for i in 0 to 512 {
+        let u: f64 = absolute(first.u.values[i] - second.u.values[i])
+        let v: f64 = absolute(first.v.values[i] - second.v.values[i])
+        if u > error { error = u }
+        if v > error { error = v }
+    }
+    return error
+}
+
+function totalMass(state: State) -> f64 {
+    let mut mass: f64 = 0.0
+    for i in 0 to 512 {
+        mass = mass + state.u.values[i] + state.v.values[i]
+    }
+    return mass
+}
+
+function main() -> i32 {
+    let equation: Equation = Equation {
+        ux: 0.10, uy: 0.08, uz: 0.06,
+        vx: 0.04, vy: 0.07, vz: 0.05,
+        ratio: 0.20, exchange: 0.03
+    }
+    let initial: State = initialState()
+    let tolerance: f64 = 0.000000002
+    let mass: f64 = totalMass(initial)
+    for checkpoint in 0 to 3 {
+        let mut steps: i32 = 8
+        if checkpoint == 1 { steps = 32 }
+        if checkpoint == 2 { steps = 64 }
+        let result: Result = integrate(initial, equation, steps)
+        if not result.valid { return 1 }
+        if maxDifference(result.state, reference(steps, equation)) > tolerance { return 2 }
+        if absolute(totalMass(result.state) - mass) > 0.0000001 { return 3 }
+    }
+    let first: Result = integrate(initial, equation, 64)
+    let repeat: Result = integrate(initial, equation, 64)
+    let half: Result = integrate(initial, equation, 32)
+    let composed: Result = integrate(half.state, equation, 32)
+    if not first.valid or not repeat.valid or not composed.valid { return 4 }
+    if maxDifference(first.state, repeat.state) != 0.0 { return 5 }
+    if maxDifference(first.state, composed.state) > 0.00000000001 { return 6 }
+    let zero: Result = integrate(initial, equation, 0)
+    if not zero.valid or maxDifference(zero.state, initial) != 0.0 { return 7 }
+    let mut changed: Equation = equation
+    changed.ux = 0.03
+    let other: Result = integrate(initial, changed, 32)
+    if not other.valid or maxDifference(other.state, half.state) < 0.01 { return 8 }
+    let noExchange: Equation = Equation {
+        ux: 0.10, uy: 0.08, uz: 0.06,
+        vx: 0.04, vy: 0.07, vz: 0.05,
+        ratio: 0.20, exchange: 0.0
+    }
+    if maxDifference(integrate(initial, noExchange, 32).state, half.state) < 10.0 {
+        return 9
+    }
+    let mut invalid: Equation = equation
+    invalid.exchange = 0.26
+    let rejected: Result = integrate(initial, invalid, 64)
+    if rejected.valid or maxDifference(rejected.state, initial) != 0.0 { return 10 }
+    invalid = equation
+    invalid.ratio = -0.1
+    if integrate(initial, invalid, 64).valid { return 11 }
+    invalid = equation
+    invalid.uz = 2.0
+    if integrate(initial, invalid, 64).valid { return 12 }
+    if integrate(initial, equation, 257).valid { return 13 }
+    let mut malformed: State = initial
+    malformed.u.values[511] = 1001.0
+    let bad: Result = integrate(malformed, equation, 64)
+    if bad.valid or maxDifference(bad.state, malformed) != 0.0 { return 14 }
+    println("native-coupled-volume8-ok")
+    println("FLOWSTUDIO_GRID_V1 8 8 2")
+    print("U")
+    for y in 0 to 8 {
+        for x in 0 to 8 {
+            print(" ")
+            print(first.state.u.values[index3(x, y, 0)])
+        }
+    }
+    println("")
+    print("V")
+    for y in 0 to 8 {
+        for x in 0 to 8 {
+            print(" ")
+            print(first.state.v.values[index3(x, y, 0)])
+        }
+    }
+    println("")
+    println("FLOWSTUDIO_GRID_END")
+    return 0
+}

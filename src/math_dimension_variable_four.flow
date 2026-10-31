@@ -1,0 +1,90 @@
+# Native Flow 2.0 overdetermined symbolic SI inference for four unknowns.
+# Select four independent monomial equations from a bounded constraint system,
+# solve their dimensions using the native parsed equation IR, then validate
+# every original equation through the production static dimensional typechecker.
+# Additive equations are allowed as checks, not as rank-generating constraints.
+import .math_dimensions { dimensionless }
+import .math_static { MathDimensionBindings, MathDimensionSymbol, MathInferredType, infer_math_equation_source_with_dimensions }
+import .math_dimension_four { MathFourDimensionSolution, solve_math_equations_four_unknown_dimensions }
+
+export struct MathFourConstraintSystem {
+    count: i32,
+    equations: array<string, 16>
+}
+
+export function empty_math_four_constraint_system() -> MathFourConstraintSystem {
+    return MathFourConstraintSystem { count: 0, equations: [""] }
+}
+
+function constraint_failure(index: i32, position: i32) -> MathFourDimensionSolution {
+    return MathFourDimensionSolution {
+        valid: false, first: dimensionless(), second: dimensionless(),
+        third: dimensionless(), fourth: dimensionless(),
+        failed_equation: index, failed_at: position
+    }
+}
+
+# Bounded to 4-16 equations and four unknowns with at most four known symbols.
+# O(n^4) candidate selection is exact: no approximate rank or float solver.
+# An underdetermined, inconsistent, malformed or non-integral system fails closed.
+export function solve_math_equations_variable_constraints_four_unknown_dimensions(
+    system: MathFourConstraintSystem, known: MathDimensionBindings,
+    first_unknown: string, second_unknown: string,
+    third_unknown: string, fourth_unknown: string) -> MathFourDimensionSolution {
+    if system.count < 4 or system.count > 16 or
+       known.count < 0 or known.count > 4 {
+        return constraint_failure(-1, 0)
+    }
+    let mut first_index: i32 = 0
+    while first_index < system.count - 3 {
+        let mut second_index: i32 = first_index + 1
+        while second_index < system.count - 2 {
+            let mut third_index: i32 = second_index + 1
+            while third_index < system.count - 1 {
+                let mut fourth_index: i32 = third_index + 1
+                while fourth_index < system.count {
+                    let candidate: MathFourDimensionSolution =
+                        solve_math_equations_four_unknown_dimensions(
+                            system.equations[first_index],
+                            system.equations[second_index],
+                            system.equations[third_index],
+                            system.equations[fourth_index],
+                            known, first_unknown, second_unknown,
+                            third_unknown, fourth_unknown)
+                    if candidate.valid {
+                        let mut declarations: MathDimensionBindings = known
+                        declarations.symbols[known.count] = MathDimensionSymbol {
+                            name: first_unknown, dimension: candidate.first
+                        }
+                        declarations.symbols[known.count + 1] = MathDimensionSymbol {
+                            name: second_unknown, dimension: candidate.second
+                        }
+                        declarations.symbols[known.count + 2] = MathDimensionSymbol {
+                            name: third_unknown, dimension: candidate.third
+                        }
+                        declarations.symbols[known.count + 3] = MathDimensionSymbol {
+                            name: fourth_unknown, dimension: candidate.fourth
+                        }
+                        declarations.count = known.count + 4
+                        let mut check_index: i32 = 0
+                        while check_index < system.count {
+                            let checked: MathInferredType =
+                                infer_math_equation_source_with_dimensions(
+                                    system.equations[check_index], declarations)
+                            if not checked.valid or checked.is_predicate {
+                                return constraint_failure(check_index, checked.failed_at)
+                            }
+                            check_index = check_index + 1
+                        }
+                        return candidate
+                    }
+                    fourth_index = fourth_index + 1
+                }
+                third_index = third_index + 1
+            }
+            second_index = second_index + 1
+        }
+        first_index = first_index + 1
+    }
+    return constraint_failure(-1, 0)
+}

@@ -37,7 +37,7 @@ struct TripleAnalysis {
     failed_at: i32
 }
 
-struct DimensionRow {
+struct TripleDimensionRow {
     valid: bool,
     first: i32,
     second: i32,
@@ -46,7 +46,7 @@ struct DimensionRow {
     failed_at: i32
 }
 
-struct AxisSolution {
+struct TripleAxisSolution {
     valid: bool,
     first: i32,
     second: i32,
@@ -71,8 +71,8 @@ function failed_analysis(position: i32) -> TripleAnalysis {
     return TripleAnalysis { valid: false, value: blank_affine(), failed_at: position }
 }
 
-function failed_row(position: i32) -> DimensionRow {
-    return DimensionRow {
+function failed_row(position: i32) -> TripleDimensionRow {
+    return TripleDimensionRow {
         valid: false, first: 0, second: 0, third: 0,
         target: dimensionless(), failed_at: position
     }
@@ -239,7 +239,7 @@ function analyse(program: MathProgram, source: string,
 
 function equation_row(source: string, bindings: MathBindings,
                       first_name: string, second_name: string,
-                      third_name: string) -> DimensionRow {
+                      third_name: string) -> TripleDimensionRow {
     let equation: MathEquation = parse_math_equation_with_bindings(source, bindings)
     if not equation.valid { return failed_row(equation.failed_at) }
     let left: TripleAnalysis = analyse(equation.left, source, first_name, second_name, third_name)
@@ -248,7 +248,7 @@ function equation_row(source: string, bindings: MathBindings,
     if not right.valid { return failed_row(right.failed_at) }
     let a: TripleAffine = left.value
     let b: TripleAffine = right.value
-    return DimensionRow {
+    return TripleDimensionRow {
         valid: true,
         first: a.first * b.denominator - b.first * a.denominator,
         second: a.second * b.denominator - b.second * a.denominator,
@@ -270,9 +270,9 @@ function determinant(
         a2 * (b0 * c1 - b1 * c0)
 }
 
-function solve_axis(a: DimensionRow, b: DimensionRow, c: DimensionRow,
+function solve_axis(a: TripleDimensionRow, b: TripleDimensionRow, c: TripleDimensionRow,
                     target_a: i32, target_b: i32, target_c: i32,
-                    divisor: i32) -> AxisSolution {
+                    divisor: i32) -> TripleAxisSolution {
     let numerator_first: i32 = determinant(
         target_a, a.second, a.third,
         target_b, b.second, b.third,
@@ -292,9 +292,9 @@ function solve_axis(a: DimensionRow, b: DimensionRow, c: DimensionRow,
        x * divisor != numerator_first or
        y * divisor != numerator_second or
        z * divisor != numerator_third {
-        return AxisSolution { valid: false, first: 0, second: 0, third: 0 }
+        return TripleAxisSolution { valid: false, first: 0, second: 0, third: 0 }
     }
-    return AxisSolution { valid: true, first: x, second: y, third: z }
+    return TripleAxisSolution { valid: true, first: x, second: y, third: z }
 }
 
 # Exactly three independent monomial equations and three unknown dimensions.
@@ -330,13 +330,13 @@ export function solve_math_equations_three_unknown_dimensions(
         name: third_unknown, value: quantity(1.0, dimensionless())
     }
     bindings.count = known.count + 3
-    let a: DimensionRow = equation_row(
+    let a: TripleDimensionRow = equation_row(
         first_equation, bindings, first_unknown, second_unknown, third_unknown)
     if not a.valid { return triple_failed(0, a.failed_at) }
-    let b: DimensionRow = equation_row(
+    let b: TripleDimensionRow = equation_row(
         second_equation, bindings, first_unknown, second_unknown, third_unknown)
     if not b.valid { return triple_failed(1, b.failed_at) }
-    let c: DimensionRow = equation_row(
+    let c: TripleDimensionRow = equation_row(
         third_equation, bindings, first_unknown, second_unknown, third_unknown)
     if not c.valid { return triple_failed(2, c.failed_at) }
 
@@ -345,13 +345,13 @@ export function solve_math_equations_three_unknown_dimensions(
         b.first, b.second, b.third,
         c.first, c.second, c.third)
     if divisor == 0 { return triple_failed(2, 0) }
-    let length: AxisSolution = solve_axis(
+    let length: TripleAxisSolution = solve_axis(
         a, b, c, a.target.length, b.target.length, c.target.length, divisor)
-    let mass: AxisSolution = solve_axis(
+    let mass: TripleAxisSolution = solve_axis(
         a, b, c, a.target.mass, b.target.mass, c.target.mass, divisor)
-    let time: AxisSolution = solve_axis(
+    let time: TripleAxisSolution = solve_axis(
         a, b, c, a.target.time, b.target.time, c.target.time, divisor)
-    let temperature: AxisSolution = solve_axis(
+    let temperature: TripleAxisSolution = solve_axis(
         a, b, c, a.target.temperature, b.target.temperature,
         c.target.temperature, divisor)
     if not length.valid or not mass.valid or not time.valid or

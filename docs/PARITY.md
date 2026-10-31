@@ -1,3 +1,23 @@
+## 2026-10-31: three compiler-backed directed cyclic 1D fields (qualification pending)
+
+`examples/native_field_cyclic32.flow` declares three distinct upstream
+Flow 2.0 Dirichlet `field` / `laplacian` operators and applies simultaneous
+directed interspecies exchange to their generated diffusion outputs. Its native
+main asserts 288 independent 32-cell values at 16/64/128 steps, energy decay,
+semigroup/replay, exchange mutation, bounds, rejection nonmutation and a
+98,304-cell-step ceiling. A standard-library Python oracle independently
+checks the full direct stencil against discrete sine/matrix-power solutions.
+Real production Flow HTTP check/run and corrupted-assertion/malformed-third-
+field rejection are wired into `tests/http_smoke.py`; Ubuntu Chromium Monaco
+Run verifies the computed three-curve SVG. [Reproduction](NATIVE_FIELD_CYCLIC32.md).
+
+**Verified locally:** independent direct-stencil versus spectral maximum
+error 9.33e-15. **Pending:** actual native Flow/HTTP/Chromium and exact-head
+Linux/macOS CI. **Unexecuted:** local Flow/R and independent macOS physical
+browser. This is explicit 1D field coupling, **not** generalized compiler-
+generated multidimensional fields, native Navier–Stokes or RStudio parity.
+No hosted CI workflow was modified.
+
 ## 2026-10-31: fourth-root, four-unknown, 16-constraint acceptance (PR #290; CI pending)
 
 The actual native Flow 2.0 dimensional solver now has four additional

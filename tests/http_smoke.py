@@ -195,6 +195,48 @@ def main() -> None:
     status, body = request("POST", "/api/check/flow", malformed_dual, accepted_headers)
     assert status == 422 and body.strip(), (
         "native dual field malformed second evolution rejection", status, body)
+    # Three actual upstream field declarations with directed cyclic coupling.
+    # Production compiler and HTTP must execute 288 checked-in numerical
+    # assertions, return 96 computed plot cells, and reject corrupted source.
+    cyclic_source = (Path(__file__).resolve().parents[1] /
+                     "examples/native_field_cyclic32.flow").read_text(encoding="utf-8")
+    assert len(cyclic_source.encode("utf-8")) < 128 * 1024
+    status, body = request("POST", "/api/check/flow", cyclic_source, accepted_headers)
+    assert status == 200, ("native three-field compile", status, body[:500])
+    status, body = request("POST", "/api/run/flow", cyclic_source, accepted_headers)
+    assert status == 200 and "native-field-cyclic32-ok" in body, (
+        "native three-field directed PDE execution", status, body[:500])
+    cyclic_lines = body.splitlines()
+    cyclic_markers = [i for i, line in enumerate(cyclic_lines)
+                      if line == "FLOWSTUDIO_FIELD_V1 32 3"]
+    assert len(cyclic_markers) == 1, ("native three-field frame", body[-500:])
+    cyclic_start = cyclic_markers[0]
+    assert cyclic_lines[cyclic_start + 4] == "FLOWSTUDIO_FIELD_END"
+    for offset, species in enumerate("UVW", start=1):
+        tokens = cyclic_lines[cyclic_start + offset].split()
+        assert tokens[0] == species and len(tokens) == 33, (species, tokens[:4])
+        actual = [float(value) for value in tokens[1:]]
+        assert all(math.isfinite(value) and -1e-12 <= value <= 10 for value in actual)
+        reference = re.search(
+            rf"let expected{species}128: array<f64, 32> = \[(.*?)\]",
+            cyclic_source, re.S)
+        assert reference is not None, species
+        expected = [float(value.strip()) for value in reference.group(1).split(",")
+                    if value.strip()]
+        assert len(expected) == 32
+        assert max(abs(a - b) for a, b in zip(actual, expected)) < 1e-4, species
+    malformed_cyclic = cyclic_source.replace(
+        "W evolves as laplacian(W)", "W evolves as laplacian(", 1)
+    assert malformed_cyclic != cyclic_source
+    status, body = request("POST", "/api/check/flow", malformed_cyclic, accepted_headers)
+    assert status == 422 and body.strip(), (
+        "native third-field malformed syntax rejection", status, body[:500])
+    corrupted_cyclic = cyclic_source.replace(
+        "let expectedU128: array<f64, 32> = [\n        0.0",
+        "let expectedU128: array<f64, 32> = [\n        1.0", 1)
+    assert corrupted_cyclic != cyclic_source
+    status, body = request("POST", "/api/run/flow", corrupted_cyclic, accepted_headers)
+    assert status == 422, ("native corrupted numerical oracle rejection", status, body[:500])
     # Two compiler-generated 64-cell fields with nonlinear Gray-Scott
     # cross-field kinetics. All 384 cell checkpoints and negative cases run
     # through the real Flow compiler and production HTTP execution route.

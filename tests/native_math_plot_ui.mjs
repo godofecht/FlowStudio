@@ -333,6 +333,64 @@ try {
     null, { timeout: 80000 });
   assert.match(await page.locator('#console').textContent(), /native-field-dual48-ok/);
 
+  // Real Chromium Monaco -> Flow HTTP -> upstream compiler: three distinct
+  // PDE fields with directed exchange, 288 numerical assertions and a
+  // computed three-curve SVG. No browser-side numerical substitute.
+  await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
+    readFileSync('examples/native_field_cyclic32.flow', 'utf8'));
+  await page.locator('#run').click();
+  await page.waitForFunction(() =>
+    document.querySelector('#console')?.textContent?.includes('native-field-cyclic32-ok'),
+    null, { timeout: 80000 });
+  assert.match(await page.locator('#console').textContent(),
+    /native-field-cyclic32-ok/);
+  await page.waitForFunction(() =>
+    document.querySelectorAll('#mathFlowPlot path[data-field-name]').length === 3,
+    null, { timeout: 30000 });
+  for (const name of ['U', 'V', 'W']) {
+    const path = await page.locator(
+      '#mathFlowPlot path[data-field-name="' + name + '"]').getAttribute('d');
+    assert.ok(path && path.startsWith('M'), 'Missing computed native curve ' + name);
+  }
+  assert.equal(await page.locator('#tab-plots').getAttribute('aria-selected'), 'true');
+  // Every SVG coordinate must agree with the independently checked-in
+  // 128-step spectral/matrix-power reference, not merely render three paths.
+  const cyclicSource = readFileSync('examples/native_field_cyclic32.flow', 'utf8');
+  const cyclicReferences = {};
+  for (const name of ['U', 'V', 'W']) {
+    const reference = new RegExp(
+      'let expected' + name + '128: array<f64, 32> = \\[([\\s\\S]*?)\\]'
+    ).exec(cyclicSource);
+    assert.ok(reference, 'Missing three-field spectral reference ' + name);
+    cyclicReferences[name] = reference[1].split(',')
+      .filter(value => value.trim()).map(Number);
+    assert.equal(cyclicReferences[name].length, 32);
+  }
+  const cyclicValues = Object.values(cyclicReferences).flat();
+  const cyclicMin = Math.min(...cyclicValues);
+  const cyclicMax = Math.max(...cyclicValues);
+  const cyclicAxes = await page.locator(
+    '#mathFlowPlot svg[data-native-flow-field] text[data-native-flow-axis-value]'
+  ).evaluateAll(nodes => nodes.map(node =>
+    Number(node.getAttribute('data-native-flow-axis-value'))));
+  assert.equal(cyclicAxes.length, 2);
+  assert.ok(Math.abs(cyclicAxes[0] - cyclicMax) < 1e-4);
+  assert.ok(Math.abs(cyclicAxes[1] - cyclicMin) < 1e-4);
+  for (const name of ['U', 'V', 'W']) {
+    const path = await page.locator(
+      '#mathFlowPlot path[data-field-name="' + name + '"]').getAttribute('d');
+    const points = [...path.matchAll(/[ML]([0-9.]+),([0-9.]+)/g)];
+    assert.equal(points.length, 32);
+    for (const [index, match] of points.entries()) {
+      const expectedX = 48 + 568 * index / 31;
+      const expectedY = 214 - 190 *
+        (cyclicReferences[name][index] - cyclicMin) / (cyclicMax - cyclicMin);
+      assert.ok(Math.abs(Number(match[1]) - expectedX) < 0.001);
+      assert.ok(Math.abs(Number(match[2]) - expectedY) < 0.02,
+        'Compiler-executed cyclic field differs from independent reference');
+    }
+  }
+
   // Actual Chromium Monaco Run of two compiler-backed PDE fields with
   // nonlinear Gray-Scott cross-coupling and 384 numerical cell assertions.
   await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),

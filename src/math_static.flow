@@ -41,6 +41,20 @@ function static_half_dimension(d: Dimension) -> Dimension {
     }
 }
 
+function static_divisible_by_root_degree(d: Dimension, degree: i32) -> bool {
+    return d.length == (d.length / degree) * degree and
+        d.mass == (d.mass / degree) * degree and
+        d.time == (d.time / degree) * degree and
+        d.temperature == (d.temperature / degree) * degree
+}
+
+function static_root_dimension(d: Dimension, degree: i32) -> Dimension {
+    return Dimension {
+        length: d.length / degree, mass: d.mass / degree,
+        time: d.time / degree, temperature: d.temperature / degree
+    }
+}
+
 function static_fourth_dimension(d: Dimension) -> Dimension {
     return Dimension {
         length: d.length / 4, mass: d.mass / 4,
@@ -115,7 +129,7 @@ export function infer_math_ir(program: MathProgram) -> MathInferredType {
         } elif opcode == 5 or opcode == 6 or opcode == 18 or opcode == 20 or opcode == 21 or opcode == 25 or
              opcode == 26 or opcode == 27 or opcode == 28 or opcode == 29 or opcode == 30 or opcode == 31 or
              opcode == 33 or opcode == 34 or opcode == 35 or opcode == 36 or opcode == 37 or
-             opcode == 38 or opcode == 39 or opcode == 40 or opcode == 42 or opcode == 43 or opcode == 44 or opcode == 46 {
+             opcode == 38 or opcode == 39 or opcode == 40 or opcode == 42 or opcode == 43 or opcode == 44 or opcode == 46 or (opcode >= 47 and opcode <= 50) {
             if depth < 1 { return static_error(instruction.source_start) }
             let input: Dimension = dimensions[depth - 1]
             if opcode == 18 {
@@ -133,6 +147,12 @@ export function infer_math_ir(program: MathProgram) -> MathInferredType {
                         return static_error(instruction.source_start)
                     }
                     dimensions[depth - 1] = static_half_dimension(input)
+                } elif opcode >= 47 and opcode <= 50 {
+                    let degree: i32 = opcode - 42
+                    if not static_divisible_by_root_degree(input, degree) {
+                        return static_error(instruction.source_start)
+                    }
+                    dimensions[depth - 1] = static_root_dimension(input, degree)
                 } elif opcode == 46 {
                     if not static_divisible_by_four_dimension(input) {
                         return static_error(instruction.source_start)

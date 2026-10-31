@@ -72,9 +72,14 @@ function main() -> i32 {
     inferred = infer_math_equation_source("root4(16m⁴) = 2m")
     if not inferred.valid or not same_dimension(inferred.dimension, metres) { return 20 }
 
+    result = evaluate_math_expression("root4(16m⁴)")
+    if not result.valid { return 28 }
+    if not close(result.result.value, 2.0) or
+       not same_dimension(result.result.dimension, metres) { return 29 }
     let mut equation: MathEquationResult = evaluate_math_equation_source(
         "root4(16m⁴) = 2m", quantity(1e-9, metres))
-    if not equation.valid or not equation.satisfied { return 21 }
+    if not equation.valid { return 21 }
+    if not equation.satisfied { return 30 }
     equation = evaluate_math_equation_source(
         "root4(16m⁴) = 2s", quantity(1e-9, metres))
     if equation.valid { return 22 }

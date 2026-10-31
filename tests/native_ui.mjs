@@ -312,7 +312,7 @@ try {
         const qmdInput = document.getElementById('quartoFile');
         const ipynbInput = document.getElementById('notebookFile');
         const tick = String.fromCharCode(96).repeat(3);
-        const qmd = tick + '{r}\\ncat(31)\\n' + tick + '\\n';
+        const qmd = tick + '{r}\ncat(31)\n' + tick + '\n';
         const ipynb = JSON.stringify({nbformat:4, nbformat_minor:4,
           metadata:{language_info:{name:'python'}},
           cells:[{cell_type:'code', source:'print(17)', metadata:{}, outputs:[]}]});

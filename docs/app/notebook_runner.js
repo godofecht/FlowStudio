@@ -11,6 +11,8 @@ const MAX_OUTPUT_CELL = 131072;
 const MAX_IMAGES_PER_CELL = 8;
 const MAX_TOTAL_IMAGES = 32;
 const MAX_TOTAL_PLOTS = 32;
+const MAX_TOTAL_PLOT_BYTES = 8 * 1024 * 1024;
+const MAX_PLOT_BYTES = 1398104;
 function closeImages(images) {
   if (!Array.isArray(images)) return;
   for (const image of images) {
@@ -27,6 +29,21 @@ function boundUTF8(raw, limit) {
     end += character.length;
   }
   return {output:raw.slice(0, end), bytes, truncated:end < raw.length};
+}
+// Matplotlib captures are base64 PNG snapshots, not browser bitmaps. A count
+// ceiling alone could retain 32 MiB or more in long-running notebooks.
+function boundedPlot(plot, remainingBytes) {
+  if (typeof plot === "string") {
+    if (plot.length > MAX_PLOT_BYTES) return null;
+    const bytes = new TextEncoder().encode(plot).length;
+    return bytes <= remainingBytes ? {plot, bytes} : null;
+  }
+  if (!plot || typeof plot !== "object" || Array.isArray(plot) ||
+      typeof plot.png !== "string" || plot.png.length > MAX_PLOT_BYTES ||
+      !/^iVBORw0KGgo[A-Za-z0-9+/]*={0,2}$/.test(plot.png) ||
+      plot.png.length > remainingBytes) return null;
+  // Do not retain unbounded or untrusted auxiliary fields from worker results.
+  return {plot:{png:plot.png}, bytes:plot.png.length};
 }
 function create({parseCells, execute, onCell, notice, allowNativeFlow = false}) {
   if (typeof parseCells !== "function" || typeof execute !== "function" ||
@@ -78,6 +95,7 @@ function create({parseCells, execute, onCell, notice, allowNativeFlow = false}) 
     active = true;
     let executed = 0, remaining = MAX_OUTPUT_TOTAL;
     let remainingImages = MAX_TOTAL_IMAGES, remainingPlots = MAX_TOTAL_PLOTS;
+    let remainingPlotBytes = MAX_TOTAL_PLOT_BYTES;
     try {
       for (const cell of selectedCells) {
         if (token !== generation) return {ok:false, executed, cancelled:true};
@@ -111,8 +129,15 @@ function create({parseCells, execute, onCell, notice, allowNativeFlow = false}) 
         closeImages(allImages.slice(images.length));
         remainingImages -= images.length;
         const allPlots = Array.isArray(response?.plots) ? response.plots : [];
-        const plots = allPlots.slice(0, Math.min(MAX_IMAGES_PER_CELL, remainingPlots));
-        remainingPlots -= plots.length;
+        const plots = [];
+        for (const candidate of allPlots.slice(0, MAX_IMAGES_PER_CELL)) {
+          if (!remainingPlots || !remainingPlotBytes) break;
+          const bounded = boundedPlot(candidate, remainingPlotBytes);
+          if (!bounded) continue;
+          plots.push(bounded.plot);
+          remainingPlotBytes -= bounded.bytes;
+          remainingPlots--;
+        }
         const entry = {index:cell.index, kind:"code", language:selectedLanguage, code:cell.code,
           ok:response?.ok === true, output, truncated, plots, images};
         try { onCell(entry); }

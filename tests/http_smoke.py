@@ -886,6 +886,11 @@ def main() -> None:
             and not line.startswith("import .math_static {")
             and not line.startswith("import .math_dimension_four {")
             and not line.startswith("import .math_dimension_variable_four {")
+            # The HTTP endpoint has a strict 128 KiB source budget.
+            # Remove only non-executable comments and empty lines; preserve
+            # the exact checked-in declarations, functions and assertions.
+            and line.strip()
+            and not line.lstrip().startswith("#")
         )
         for path in variable_four_files
     )

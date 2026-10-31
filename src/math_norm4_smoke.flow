@@ -1,0 +1,167 @@
+# Native Flow 2.0 four-component physical vector norm acceptance.
+# Executed by Linux/macOS CI and the production native HTTP acceptance.
+import .math_dimensions { Dimension, dimensionless, length_dimension, time_dimension, quotient_dimension, quantity, same_dimension }
+import .math_expression_ir { MathInstruction, MathProgram, MathResult, evaluate_math_ir }
+import .math_expression_source { ParsedMathExpression, parse_math_expression, evaluate_math_expression }
+import .math_static { MathInferredType, infer_math_ir, infer_math_expression_source, infer_math_equation_source, empty_math_dimension_bindings }
+import .math_equation { MathEquationResult, evaluate_math_equation_source }
+import .math_dimension_solver { MathDimensionSolution, solve_math_equation_unknown_dimension }
+
+function near(actual: f64, expected: f64) -> bool {
+    let mut difference: f64 = actual - expected
+    if difference < 0.0 { difference = -difference }
+    return difference < 0.000000001
+}
+
+function relative(actual: f64, expected: f64) -> bool {
+    if expected == 0.0 { return actual == 0.0 }
+    return near(actual / expected, 1.0)
+}
+
+function main() -> i32 {
+    let metres: Dimension = length_dimension()
+    let speed: Dimension = quotient_dimension(metres, time_dimension())
+    let mut result: MathResult = evaluate_math_expression("norm4(1,2,2,4)")
+    if not result.valid or not near(result.result.value, 5.0) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 1 }
+    result = evaluate_math_expression("norm4(-1,-2,-2,-4)")
+    if not result.valid or not near(result.result.value, 5.0) { return 2 }
+    result = evaluate_math_expression("norm4(0,0,0,0)")
+    if not result.valid or result.result.value != 0.0 { return 3 }
+    result = evaluate_math_expression("norm4(0,0,0,7)")
+    if not result.valid or not near(result.result.value, 7.0) { return 4 }
+    result = evaluate_math_expression("norm4(0,0,8,0)")
+    if not result.valid or not near(result.result.value, 8.0) { return 5 }
+    result = evaluate_math_expression("norm4(0,9,0,0)")
+    if not result.valid or not near(result.result.value, 9.0) { return 6 }
+    result = evaluate_math_expression("norm4(10,0,0,0)")
+    if not result.valid or not near(result.result.value, 10.0) { return 7 }
+    result = evaluate_math_expression("norm4(1,1,1,1)")
+    if not result.valid or not near(result.result.value, 2.0) { return 8 }
+    result = evaluate_math_expression("norm4(3,4,12,84)")
+    if not result.valid or not near(result.result.value, 85.0) { return 9 }
+    result = evaluate_math_expression("norm4(1m,2m,2m,4m)")
+    if not result.valid or not near(result.result.value, 5.0) or
+       not same_dimension(result.result.dimension, metres) { return 10 }
+    result = evaluate_math_expression("norm4(0s,0s,0s,0s)")
+    if not result.valid or result.result.value != 0.0 or
+       not same_dimension(result.result.dimension, time_dimension()) { return 11 }
+    result = evaluate_math_expression("norm4(1m/1s,2m/1s,2m/1s,4m/1s)")
+    if not result.valid or not near(result.result.value, 5.0) or
+       not same_dimension(result.result.dimension, speed) { return 12 }
+    result = evaluate_math_expression("norm4(1e20,1,1,1)")
+    if not result.valid or not relative(result.result.value, 1e20) { return 13 }
+    result = evaluate_math_expression("norm4(1e-20,1e-20,1e-20,1e-20)")
+    if not result.valid or not relative(result.result.value, 2e-20) { return 14 }
+    result = evaluate_math_expression("norm4(1e20,1e20,1e20,1e20)")
+    if not result.valid or not relative(result.result.value, 2e20) { return 15 }
+    result = evaluate_math_expression("norm4(1e-20,0,0,0)")
+    if not result.valid or not relative(result.result.value, 1e-20) { return 16 }
+    result = evaluate_math_expression("norm4(1,2,2,4)+norm4(0,0,0,7)")
+    if not result.valid or not near(result.result.value, 12.0) { return 17 }
+    result = evaluate_math_expression("norm4(norm(3,4),0,0,12)")
+    if not result.valid or not near(result.result.value, 13.0) { return 18 }
+    result = evaluate_math_expression("norm4(1m,2s,2m,4m)")
+    if result.valid or result.failed_at != 0 { return 19 }
+    result = evaluate_math_expression("norm4(1m,2m,2s,4m)")
+    if result.valid or result.failed_at != 0 { return 20 }
+    result = evaluate_math_expression("norm4(1m,2m,2m,4s)")
+    if result.valid or result.failed_at != 0 { return 21 }
+    result = evaluate_math_expression("norm4(true,2,2,4)")
+    if result.valid or result.failed_at != 0 { return 22 }
+    result = evaluate_math_expression("norm4(1,false,2,4)")
+    if result.valid or result.failed_at != 0 { return 23 }
+    result = evaluate_math_expression("norm4(1,2,true,4)")
+    if result.valid or result.failed_at != 0 { return 24 }
+    result = evaluate_math_expression("norm4(1,2,2,false)")
+    if result.valid or result.failed_at != 0 { return 25 }
+    if parse_math_expression("norm4()").valid { return 26 }
+    if parse_math_expression("norm4(1)").valid { return 27 }
+    if parse_math_expression("norm4(1,2)").valid { return 28 }
+    if parse_math_expression("norm4(1,2,3)").valid { return 29 }
+    if parse_math_expression("norm4(1,2,3,4,5)").valid { return 30 }
+    if parse_math_expression("norm4(1,2,3,)").valid { return 31 }
+    if parse_math_expression("norm4(,2,3,4)").valid { return 32 }
+    if parse_math_expression("norm4(1,,3,4)").valid { return 33 }
+    if parse_math_expression("norm4 (1,2,3,4)").valid { return 34 }
+    if parse_math_expression("norm4(1,2,3,4").valid { return 35 }
+    let parsed: ParsedMathExpression = parse_math_expression("norm4(1,2,2,4)")
+    if not parsed.valid or parsed.program.count != 5 or
+       parsed.program.instructions[4].opcode != 51 or
+       parsed.program.instructions[4].source_start != 0 or
+       parsed.program.instructions[4].source_end != 5 { return 36 }
+    let mut inferred: MathInferredType = infer_math_expression_source("norm4(1m,2m,2m,4m)")
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension, metres) { return 37 }
+    inferred = infer_math_expression_source("norm4(1m,2s,2m,4m)")
+    if inferred.valid or inferred.failed_at != 0 { return 38 }
+    inferred = infer_math_expression_source("norm4(1m,2m,2m,4s)")
+    if inferred.valid or inferred.failed_at != 0 { return 39 }
+    inferred = infer_math_expression_source("norm4(1,2,2,true)")
+    if inferred.valid or inferred.failed_at != 0 { return 40 }
+    inferred = infer_math_equation_source("norm4(1m,2m,2m,4m) = 5m")
+    if not inferred.valid or not same_dimension(inferred.dimension, metres) { return 41 }
+    inferred = infer_math_equation_source("norm4(1m,2m,2m,4s) = 5m")
+    if inferred.valid { return 42 }
+    let mut equation: MathEquationResult = evaluate_math_equation_source(
+        "norm4(1m,2m,2m,4m) = 5m", quantity(1e-10, metres))
+    if not equation.valid or not equation.satisfied { return 43 }
+    equation = evaluate_math_equation_source(
+        "norm4(1m,2m,2m,4m) = 6m", quantity(1e-10, metres))
+    if not equation.valid or equation.satisfied { return 44 }
+    let solution: MathDimensionSolution = solve_math_equation_unknown_dimension(
+        "norm4(x,2m,2m,4m) = 5m", empty_math_dimension_bindings(), "x")
+    if not solution.valid or not same_dimension(solution.dimension, metres) { return 45 }
+
+    let blank: MathInstruction = MathInstruction {
+        opcode: 0, literal: quantity(0.0, metres), exponent: 0,
+        source_start: 0, source_end: 1
+    }
+    let mut instructions: array<MathInstruction, 64> = [blank]
+    instructions[4] = MathInstruction {
+        opcode: 51, literal: quantity(0.0, dimensionless()), exponent: 0,
+        source_start: 0, source_end: 5
+    }
+    let mut i: i32 = 1
+    while i <= 200 {
+        let scale: f64 = (i as f64) * 0.125
+        instructions[0] = MathInstruction {
+            opcode: 0, literal: quantity(1.0 * scale, metres), exponent: 0,
+            source_start: 0, source_end: 1
+        }
+        instructions[1] = MathInstruction {
+            opcode: 0, literal: quantity(-2.0 * scale, metres), exponent: 0,
+            source_start: 1, source_end: 2
+        }
+        instructions[2] = MathInstruction {
+            opcode: 0, literal: quantity(2.0 * scale, metres), exponent: 0,
+            source_start: 2, source_end: 3
+        }
+        instructions[3] = MathInstruction {
+            opcode: 0, literal: quantity(-4.0 * scale, metres), exponent: 0,
+            source_start: 3, source_end: 4
+        }
+        let program: MathProgram = MathProgram {
+            instructions: instructions, count: 5, source_length: 10
+        }
+        result = evaluate_math_ir(program)
+        if not result.valid or not relative(result.result.value, 5.0 * scale) or
+           not same_dimension(result.result.dimension, metres) { return 46 }
+        inferred = infer_math_ir(program)
+        if not inferred.valid or not same_dimension(inferred.dimension, metres) { return 47 }
+        i = i + 1
+    }
+    instructions[3] = MathInstruction {
+        opcode: 0, literal: quantity(1.0, time_dimension()), exponent: 0,
+        source_start: 3, source_end: 4
+    }
+    let invalid_program: MathProgram = MathProgram {
+        instructions: instructions, count: 5, source_length: 10
+    }
+    result = evaluate_math_ir(invalid_program)
+    if result.valid or result.failed_at != 0 { return 48 }
+    inferred = infer_math_ir(invalid_program)
+    if inferred.valid or inferred.failed_at != 0 { return 49 }
+    println("native-math-norm4-ok")
+    return 0
+}

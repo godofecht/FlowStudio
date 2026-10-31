@@ -509,3 +509,34 @@ before claiming cross-platform verification.
 This remains a bounded scalar expression dialect. It does not implement
 upstream Flow 2.0 grammar integration, unbound symbolic dimensional
 inference, generalized tensor/PDE equation ASTs or native Navier–Stokes.
+
+
+## Native three-component physical norm (2026-10-31; qualification pending)
+
+`norm3(x, y, z)` lowers through the native Flow 2.0 scalar source parser
+to postfix opcode 45. It evaluates a three-component Euclidean norm
+without Python or JavaScript execution. All three arguments must be
+numeric quantities with identical SI dimensions; the result retains
+those dimensions. Predicate inputs and mismatched units fail closed.
+The parser requires exactly three comma-separated arguments and
+preserves the function's UTF-8 source span for diagnostics.
+
+The numerical kernel divides all components by their largest absolute
+magnitude before squaring and taking a square root. This avoids
+intermediate overflow and underflow when components have vastly
+different magnitudes. It rejects final values beyond the existing
+native bounded-finite-value limit. Static dimensional inference checks
+all three types without evaluating their numerical values.
+
+`src/math_norm3_smoke.flow` exercises 45 numbered checks, including
+200 independent scaled Pythagorean triples through native postfix IR
+and static inference (400 loop checks), analytical extremes,
+dimensioned equations, malformed arity, predicate rejection and
+source diagnostics. The production HTTP source fixture adds three
+additional numerical/type checks. CI executes the checked-in
+Navier–Stokes regression separately through the existing Python-backed
+dialect; `norm3` does not imply native Navier–Stokes support.
+
+Full upstream grammar integration, unbound symbolic dimensional
+constraint solving, tensor/PDE AST lowering and native Navier–Stokes
+remain outstanding. CI qualification must be checked before merging.

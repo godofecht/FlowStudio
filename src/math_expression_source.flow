@@ -188,12 +188,17 @@ function make_instruction(opcode: i32, value: Quantity, start: i32, end: i32) ->
 # Return UTF-8 byte width so source diagnostics remain byte-accurate.
 function math_space_width(bytes: ptr<u8>, position: i32, length: i32) -> i32 {
     if str_is_ascii_ws(bytes[position]) { return 1 }
-    if position + 1 < length and bytes[position] == 194 and
-       bytes[position + 1] == 160 { return 2 } # U+00A0 NBSP
+    if position + 1 < length and bytes[position] == 194 {
+        if bytes[position + 1] == 133 { return 2 } # U+0085 NEXT LINE
+        if bytes[position + 1] == 160 { return 2 } # U+00A0 NBSP
+    }
     if position + 2 < length {
         if bytes[position] == 226 and bytes[position + 1] == 128 {
             if bytes[position + 2] >= 128 and bytes[position + 2] <= 138 {
                 return 3 # U+2000..U+200A typographic spaces
+            }
+            if bytes[position + 2] == 168 or bytes[position + 2] == 169 {
+                return 3 # U+2028 LINE SEPARATOR / U+2029 PARAGRAPH SEPARATOR
             }
             if bytes[position + 2] == 175 { return 3 } # U+202F narrow NBSP
         }

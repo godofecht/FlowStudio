@@ -182,6 +182,18 @@ function main() -> i32 {
     let malformed_power: ParsedMathExpression = parse_math_expression("2m^−")
     if malformed_power.valid or malformed_power.failed_at != 2 { return 66 }
 
+    # Native HTTP compilation must consume complete Unicode line whitespace,
+    # not silently reinterpret a partial UTF-8 sequence.
+    result = evaluate_math_expression("1m + 2m")
+    if not result.valid or not close(result.result.value, 3.0) or
+       not same_dimension(result.result.dimension, length_dimension()) { return 67 }
+    result = evaluate_math_expression("4/2")
+    if not result.valid or not close(result.result.value, 2.0) { return 68 }
+    let line_spaced: ParsedMathExpression = parse_math_expression("1 + 2")
+    if not line_spaced.valid or line_spaced.program.count != 3 or
+       line_spaced.program.instructions[2].source_start != 4 or
+       line_spaced.program.instructions[2].source_end != 5 { return 69 }
+
     println("native-math-source-ok")
     return 0
 }

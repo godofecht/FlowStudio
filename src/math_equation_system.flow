@@ -85,6 +85,20 @@ function rebase_equation(equation: MathEquation, start: i32, length: i32) -> Mat
     return rebased
 }
 
+# UTF-8 mathematical line boundaries are recognized at complete code points.
+# Source positions remain byte offsets, including after multibyte separators.
+function source_line_break_width(bytes: ptr<u8>, index: i32, length: i32) -> i32 {
+    if bytes[index] == 10 or bytes[index] == 13 { return 1 }
+    if index + 1 < length and bytes[index] == 194 and
+       bytes[index + 1] == 133 { return 2 } # U+0085 NEXT LINE
+    if index + 2 < length and bytes[index] == 226 and
+       bytes[index + 1] == 128 and
+       (bytes[index + 2] == 168 or bytes[index + 2] == 169) {
+        return 3 # U+2028 LINE SEPARATOR / U+2029 PARAGRAPH SEPARATOR
+    }
+    return 0
+}
+
 export function parse_math_equation_system_with_bindings(
     source: string, bindings: MathBindings) -> MathEquationSystem {
     let length: i32 = strlen(source) as i32
@@ -101,10 +115,12 @@ export function parse_math_equation_system_with_bindings(
     while index <= length {
         let mut separator: bool = index == length
         let mut delimiter: i32 = 0 # 0: end, 1: semicolon, 2: line ending
+        let mut break_width: i32 = 0
         if index < length {
+            break_width = source_line_break_width(bytes, index, length)
             if comment_at >= 0 {
                 # Parentheses and semicolons inside a comment are inert.
-                if bytes[index] == 10 or bytes[index] == 13 {
+                if break_width > 0 {
                     separator = true
                     delimiter = 2
                 }
@@ -121,7 +137,7 @@ export function parse_math_equation_system_with_bindings(
                     separator = true
                     delimiter = 1
                 }
-                if depth == 0 and (bytes[index] == 10 or bytes[index] == 13) {
+                if depth == 0 and break_width > 0 {
                     separator = true
                     delimiter = 2
                 }
@@ -166,9 +182,13 @@ export function parse_math_equation_system_with_bindings(
             if delimiter == 1 { last_semicolon = true }
             comment_at = -1
             # CRLF is one separator, preserving both original source bytes.
-            if delimiter == 2 and bytes[index] == 13 and
-               index + 1 < length and bytes[index + 1] == 10 {
-                index = index + 1
+            if delimiter == 2 {
+                if bytes[index] == 13 and index + 1 < length and
+                   bytes[index + 1] == 10 {
+                    index = index + 1
+                } elif break_width > 1 {
+                    index = index + break_width - 1
+                }
             }
             start = index + 1
         }

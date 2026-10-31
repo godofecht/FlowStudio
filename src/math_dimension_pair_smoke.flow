@@ -1,0 +1,166 @@
+# Executable two-unknown dimensional constraint acceptance.
+# flow run src/math_dimension_pair_smoke.flow
+import .math_dimensions { Dimension, dimensionless, length_dimension, time_dimension, mass_dimension, product_dimension, quotient_dimension, same_dimension }
+import .math_static { MathDimensionBindings, MathDimensionSymbol, empty_math_dimension_bindings }
+import .math_dimension_pair { MathTwoDimensionSolution, solve_math_equations_two_unknown_dimensions }
+
+function main() -> i32 {
+    let length: Dimension = length_dimension()
+    let time: Dimension = time_dimension()
+    let mass: Dimension = mass_dimension()
+    let area: Dimension = product_dimension(length, length)
+    let volume: Dimension = product_dimension(area, length)
+    let speed: Dimension = quotient_dimension(length, time)
+    let length_time: Dimension = product_dimension(length, time)
+    let mut known: MathDimensionBindings = empty_math_dimension_bindings()
+    let mut result: MathTwoDimensionSolution = solve_math_equations_two_unknown_dimensions(
+        "x*y = 1m²", "x/y = 1s²", known, "x", "y")
+    if not result.valid or result.failed_at != -1 or
+       result.failed_equation != -1 or
+       not same_dimension(result.first, length_time) or
+       not same_dimension(result.second, speed) { return 1 }
+
+    result = solve_math_equations_two_unknown_dimensions(
+        "x*y = 1m²", "x = 1m", known, "x", "y")
+    if not result.valid or not same_dimension(result.first, length) or
+       not same_dimension(result.second, length) { return 2 }
+
+    result = solve_math_equations_two_unknown_dimensions(
+        "x²*y = 1m³", "x*y² = 1m³", known, "x", "y")
+    if not result.valid or not same_dimension(result.first, length) or
+       not same_dimension(result.second, length) { return 3 }
+
+    result = solve_math_equations_two_unknown_dimensions(
+        "sqrt(x)*y = 1m²", "x/y = 1m", known, "x", "y")
+    if not result.valid or not same_dimension(result.first, area) or
+       not same_dimension(result.second, length) { return 4 }
+
+    result = solve_math_equations_two_unknown_dimensions(
+        "cbrt(x)*y = 1m²", "x/y = 1m²", known, "x", "y")
+    if not result.valid or not same_dimension(result.first, volume) or
+       not same_dimension(result.second, length) { return 5 }
+
+    result = solve_math_equations_two_unknown_dimensions(
+        "sqrt(x)*cbrt(y) = 1m⁵", "x/y = 1", known, "x", "y")
+    let sixth_length: Dimension = product_dimension(volume, volume)
+    if not result.valid or not same_dimension(result.first, sixth_length) or
+       not same_dimension(result.second, sixth_length) { return 6 }
+
+    result = solve_math_equations_two_unknown_dimensions(
+        "x/y = 1m/1s", "x*y = 1m/1s", known, "x", "y")
+    if not result.valid or not same_dimension(result.first, speed) or
+       not same_dimension(result.second, dimensionless()) { return 7 }
+
+    result = solve_math_equations_two_unknown_dimensions(
+        "x^-1*y = 1s", "x*y = 1m²/1s", known, "x", "y")
+    if not result.valid or not same_dimension(result.first, speed) or
+       not same_dimension(result.second, length) { return 8 }
+
+    result = solve_math_equations_two_unknown_dimensions(
+        "δ₀*ρ = 1m²", "δ₀/ρ = 1", known, "δ₀", "ρ")
+    if not result.valid or not same_dimension(result.first, length) or
+       not same_dimension(result.second, length) { return 9 }
+
+    result = solve_math_equations_two_unknown_dimensions(
+        "π*x = 1m²", "π/x = 1", known, "π", "x")
+    if not result.valid or not same_dimension(result.first, length) or
+       not same_dimension(result.second, length) { return 10 }
+
+    result = solve_math_equations_two_unknown_dimensions(
+        "abs(-x)*y = 1m²", "x/y = 1", known, "x", "y")
+    if not result.valid or not same_dimension(result.first, length) or
+       not same_dimension(result.second, length) { return 11 }
+
+    result = solve_math_equations_two_unknown_dimensions(
+        "x³*y² = 1m⁸", "x/y = 1m", known, "x", "y")
+    if not result.valid or not same_dimension(result.first, area) or
+       not same_dimension(result.second, length) { return 12 }
+
+    let square_mass: Dimension = product_dimension(mass, mass)
+    let square_speed: Dimension = product_dimension(speed, speed)
+    let square_force: Dimension = product_dimension(square_mass,
+        product_dimension(square_speed, square_speed))
+    result = solve_math_equations_two_unknown_dimensions(
+        "x*y = 1kg²*1m²/1s⁴", "x/y = 1m²/1s²", known, "x", "y")
+    let first_expected: Dimension = quotient_dimension(
+        product_dimension(mass, area), volume)
+    # The first unknown is kg*m²/s³; the second is kg/s.
+    let first_mixed: Dimension = quotient_dimension(
+        product_dimension(mass, area),
+        product_dimension(time, product_dimension(time, time)))
+    let second_mixed: Dimension = quotient_dimension(mass, time)
+    if not result.valid or not same_dimension(result.first, first_mixed) or
+       not same_dimension(result.second, second_mixed) { return 13 }
+
+    known.count = 2
+    known.symbols[0] = MathDimensionSymbol { name: "duration", dimension: time }
+    known.symbols[1] = MathDimensionSymbol { name: "δ₀", dimension: speed }
+    result = solve_math_equations_two_unknown_dimensions(
+        "x*y = duration", "x/y = duration", known, "x", "y")
+    if not result.valid or not same_dimension(result.first, time) or
+       not same_dimension(result.second, dimensionless()) { return 14 }
+    result = solve_math_equations_two_unknown_dimensions(
+        "x*y = δ₀", "x/y = δ₀", known, "x", "y")
+    if not result.valid or not same_dimension(result.first, speed) or
+       not same_dimension(result.second, dimensionless()) { return 15 }
+
+    result = solve_math_equations_two_unknown_dimensions(
+        "x*y = 1m²", "x/y = 1m", known, "x", "y")
+    if result.valid { return 16 }
+    result = solve_math_equations_two_unknown_dimensions(
+        "sqrt(x)*y = 1m²", "x/y = 1", known, "x", "y")
+    if result.valid { return 17 }
+    result = solve_math_equations_two_unknown_dimensions(
+        "sqrt(x)*cbrt(y) = 1m²", "x/y = 1", known, "x", "y")
+    if result.valid { return 18 }
+    result = solve_math_equations_two_unknown_dimensions(
+        "x*y = 1m²", "x*y = 1m²", known, "x", "y")
+    if result.valid { return 19 }
+    result = solve_math_equations_two_unknown_dimensions(
+        "x*y = 1m²", "x*y = 1s²", known, "x", "y")
+    if result.valid { return 20 }
+    result = solve_math_equations_two_unknown_dimensions(
+        "x+y = 1m", "x/y = 1", known, "x", "y")
+    if result.valid or result.failed_equation != 0 { return 21 }
+    result = solve_math_equations_two_unknown_dimensions(
+        "x*y = 1m²", "sin(x) = 1", known, "x", "y")
+    if result.valid or result.failed_equation != 1 { return 22 }
+    result = solve_math_equations_two_unknown_dimensions(
+        "where(true,x,y) = 1m", "x/y = 1", known, "x", "y")
+    if result.valid { return 23 }
+    result = solve_math_equations_two_unknown_dimensions(
+        "x*y = 1m²", "x = missing", known, "x", "y")
+    if result.valid or result.failed_equation != 1 { return 24 }
+    result = solve_math_equations_two_unknown_dimensions(
+        "x*y = 1m²", "x/y = 1", known, "x", "x")
+    if result.valid { return 25 }
+    result = solve_math_equations_two_unknown_dimensions(
+        "x*y = 1m²", "x/y = 1", known, "bad-name", "y")
+    if result.valid { return 26 }
+    result = solve_math_equations_two_unknown_dimensions(
+        "x*y = 1m²", "x/y = 1", known, "", "y")
+    if result.valid { return 27 }
+    result = solve_math_equations_two_unknown_dimensions(
+        "x*y = 1m²", "x/y = 1", known, "x", "duration")
+    if result.valid { return 28 }
+    result = solve_math_equations_two_unknown_dimensions(
+        "x*y = 1m² = 1m", "x/y = 1", known, "x", "y")
+    if result.valid or result.failed_equation != 0 { return 29 }
+    result = solve_math_equations_two_unknown_dimensions(
+        "x*y = 1m²", "x/y = 1m + 1s", known, "x", "y")
+    if result.valid { return 30 }
+    result = solve_math_equations_two_unknown_dimensions(
+        "x*y = 1m²", "x/y = 1", known, "x", "₀")
+    if result.valid { return 31 }
+    known.count = 7
+    result = solve_math_equations_two_unknown_dimensions(
+        "x*y = 1m²", "x/y = 1", known, "x", "y")
+    if result.valid { return 32 }
+    known.count = -1
+    result = solve_math_equations_two_unknown_dimensions(
+        "x*y = 1m²", "x/y = 1", known, "x", "y")
+    if result.valid { return 33 }
+
+    println("native-math-two-unknown-dimension-constraints-ok")
+    return 0
+}

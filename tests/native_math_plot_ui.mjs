@@ -646,7 +646,6 @@ try {
       // Keep the complete executable program within the HTTP 128 KiB budget.
       // Only comments and empty lines are removed from checked-in source.
       .filter(line => line.trim() && !line.trimStart().startsWith('#'))
-      .filter(line => line.trim() && !line.trimStart().startsWith('#'))
       .map(line => line.replace(/^export /, '')).join('\n')
   ).join('\n');
   assert.ok(Buffer.byteLength(nativeVariableFourSource, 'utf8') < 128 * 1024);

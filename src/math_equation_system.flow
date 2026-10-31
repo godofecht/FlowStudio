@@ -12,7 +12,7 @@ extern {
 
 export struct MathEquationSystem {
     valid: bool,
-    equations: array<MathEquation, 8>,
+    equations: array<MathEquation, 16>,
     count: i32,
     source_length: i32,
     failed_equation: i32,
@@ -20,14 +20,14 @@ export struct MathEquationSystem {
 }
 
 export struct MathEquationTolerances {
-    values: array<Quantity, 8>,
+    values: array<Quantity, 16>,
     count: i32
 }
 
 export struct MathEquationSystemResult {
     valid: bool,
     satisfied: bool,
-    results: array<MathEquationResult, 8>,
+    results: array<MathEquationResult, 16>,
     count: i32,
     failed_equation: i32,
     failed_at: i32
@@ -89,7 +89,7 @@ export function parse_math_equation_system_with_bindings(
     if length < 3 or length > 512 { return system_error(0, length, 0) }
     let bytes: ptr<u8> = source as ptr<u8>
     let blank: MathEquation = parse_math_equation("0=0")
-    let mut equations: array<MathEquation, 8> = [blank]
+    let mut equations: array<MathEquation, 16> = [blank]
     let mut count: i32 = 0
     let mut start: i32 = 0
     let mut depth: i32 = 0
@@ -108,7 +108,7 @@ export function parse_math_equation_system_with_bindings(
             }
         }
         if separator {
-            if count >= 8 or index <= start {
+            if count >= 16 or index <= start {
                 return system_error(start, length, count)
             }
             let mut fragment: array<u8, 513> = []
@@ -143,12 +143,12 @@ export function parse_math_equation_system(source: string) -> MathEquationSystem
 export function evaluate_math_equation_system(
     system: MathEquationSystem, tolerances: MathEquationTolerances) -> MathEquationSystemResult {
     if not system.valid { return evaluation_error(system.failed_at, system.failed_equation) }
-    if system.count < 1 or system.count > 8 or tolerances.count != system.count {
+    if system.count < 1 or system.count > 16 or tolerances.count != system.count {
         return evaluation_error(0, -1)
     }
     let blank: MathEquationResult = evaluate_math_equation(
         parse_math_equation("0=0"), quantity(0.0, dimensionless()))
-    let mut results: array<MathEquationResult, 8> = [blank]
+    let mut results: array<MathEquationResult, 16> = [blank]
     let mut all_satisfied: bool = true
     let mut i: i32 = 0
     while i < system.count {

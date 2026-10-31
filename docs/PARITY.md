@@ -1,3 +1,16 @@
+## 2026-10-31: fourth-root, four-unknown, 16-constraint acceptance (PR #290; CI pending)
+
+The actual native Flow 2.0 dimensional solver now has four additional
+executable assertions for a full-rank sixteen-equation system involving
+`root4(x)`, Unicode `∜(x)`, late contradictory dimensions, nonintegral
+fourth-root dimensions and rank deficiency. The existing native Flow,
+production HTTP and Ubuntu physical Chromium gates execute the same
+checked-in `src/math_dimension_variable_four_smoke.flow` with a 128 KiB
+HTTP source limit. **Pending:** exact-head Linux/macOS CI, post-merge CI.
+**Unexecuted:** local native Flow/R and independent macOS physical-browser
+interaction. This is not general multidimensional PDE lowering or full
+RStudio parity. See [fourth-root acceptance](NATIVE_FOURTH_ROOT.md).
+
 ## 2026-10-31: four-unknown SI solver production HTTP/Chromium acceptance (PR #286)
 
 The bounded four-unknown, four-equation native Flow 2.0 SI solver introduced

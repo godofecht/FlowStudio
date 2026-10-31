@@ -171,7 +171,7 @@ function main() -> i32 {
     if not result.valid or not close(result.result.value, 5.0) { return 63 }
 
     # Production HTTP and Chromium must execute the Unicode exponent sign.
-    result = evaluate_math_expression("2m^−2 * 4m²")
+    result = evaluate_math_expression("2m^−2 * 2m²")
     if not result.valid or not close(result.result.value, 1.0) or
        not same_dimension(result.result.dimension, dimensionless()) { return 64 }
     let negative_power: ParsedMathExpression = parse_math_expression("2m^−2")

@@ -12,10 +12,10 @@ function near(a: f64, b: f64) -> bool {
 
 function main() -> i32 {
     let mut system: MathEquationSystem = parse_math_equation_system("3m+2m=5m;2s=2s;3K=3K")
-    if not system.valid or system.count != 3 or system.source_length != 23 or
-       system.equations[1].equality_at != 12 or
-       system.equations[1].right.instructions[0].source_start != 13 or
-       system.equations[2].left.instructions[0].source_start != 16 { return 1 }
+    if not system.valid or system.count != 3 or system.source_length != 20 or
+       system.equations[1].equality_at != 11 or
+       system.equations[1].right.instructions[0].source_start != 12 or
+       system.equations[2].left.instructions[0].source_start != 15 { return 1 }
     let mut tolerances: MathEquationTolerances = empty_math_equation_tolerances()
     tolerances.count = 3
     tolerances.values[0] = quantity(0.0, length_dimension())
@@ -35,20 +35,21 @@ function main() -> i32 {
     if not result.valid or not result.satisfied { return 4 }
     tolerances.values[1] = quantity(0.0, time_dimension())
 
+    tolerances.count = 2
     system = parse_math_equation_system("1m+2m=3m;4s/0=2s")
     result = evaluate_math_equation_system(system, tolerances)
-    if result.valid or result.failed_equation != 1 or result.failed_at != 12 { return 5 }
+    if result.valid or result.failed_equation != 1 or result.failed_at != 11 { return 5 }
     system = parse_math_equation_system("1m+2m=3m;1m+1s=2m")
     result = evaluate_math_equation_system(system, tolerances)
-    if result.valid or result.failed_equation != 1 or result.failed_at != 12 { return 6 }
+    if result.valid or result.failed_equation != 1 or result.failed_at != 11 { return 6 }
     system = parse_math_equation_system("1m+2m=3m;2s=2m")
     result = evaluate_math_equation_system(system, tolerances)
-    if result.valid or result.failed_equation != 1 or result.failed_at != 12 { return 7 }
+    if result.valid or result.failed_equation != 1 or result.failed_at != 11 { return 7 }
 
     system = parse_math_equation_system("1m+2m=3m;;2s=2s")
-    if system.valid or system.failed_equation != 1 or system.failed_at != 10 { return 8 }
+    if system.valid or system.failed_equation != 1 or system.failed_at != 9 { return 8 }
     system = parse_math_equation_system("1m+2m=3m;")
-    if system.valid or system.failed_equation != 1 or system.failed_at != 10 { return 9 }
+    if system.valid or system.failed_equation != 1 or system.failed_at != 9 { return 9 }
     system = parse_math_equation_system("1=(2;3)")
     if system.valid or system.failed_at != 4 { return 10 }
     system = parse_math_equation_system("1m=1m;1m=1m;1m=1m;1m=1m;1m=1m;1m=1m;1m=1m;1m=1m;1m=1m")

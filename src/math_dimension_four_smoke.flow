@@ -1,0 +1,86 @@
+# Native execution tests for exact four-unknown dimensional inference.
+import .math_dimensions { Dimension, dimensionless, length_dimension, time_dimension, product_dimension, same_dimension }
+import .math_static { MathDimensionBindings, MathDimensionSymbol, empty_math_dimension_bindings }
+import .math_dimension_four { MathFourDimensionSolution, solve_math_equations_four_unknown_dimensions }
+
+function main() -> i32 {
+    let length: Dimension = length_dimension()
+    let time: Dimension = time_dimension()
+    let area: Dimension = product_dimension(length, length)
+    let mut known: MathDimensionBindings = empty_math_dimension_bindings()
+    let mut result: MathFourDimensionSolution =
+        solve_math_equations_four_unknown_dimensions(
+            "x*y*z*w = 1m*1m*1m*1m", "x/y = 1", "y/z = 1", "z/w = 1",
+            known, "x", "y", "z", "w")
+    if not result.valid or result.failed_equation != -1 or
+       not same_dimension(result.first, length) or
+       not same_dimension(result.second, length) or
+       not same_dimension(result.third, length) or
+       not same_dimension(result.fourth, length) { return 1 }
+
+    result = solve_math_equations_four_unknown_dimensions(
+        "sqrt(x)*y*z*w = 1m*1m*1m*1m",
+        "x/y = 1m", "y/z = 1", "z/w = 1",
+        known, "x", "y", "z", "w")
+    if not result.valid or not same_dimension(result.first, area) or
+       not same_dimension(result.second, length) or
+       not same_dimension(result.third, length) or
+       not same_dimension(result.fourth, length) { return 2 }
+
+    result = solve_math_equations_four_unknown_dimensions(
+        "δ₀*ρ*ζ*ω = 1m*1m*1m*1m", "δ₀/ρ = 1",
+        "ρ/ζ = 1", "ζ/ω = 1", known, "δ₀", "ρ", "ζ", "ω")
+    if not result.valid or not same_dimension(result.first, length) or
+       not same_dimension(result.fourth, length) { return 3 }
+
+    result = solve_math_equations_four_unknown_dimensions(
+        "x*y*z*w = 1m³", "x/y = 1", "y/z = 1", "z/w = 1",
+        known, "x", "y", "z", "w")
+    if result.valid { return 4 }
+
+    result = solve_math_equations_four_unknown_dimensions(
+        "x*y*z*w = 1m*1m*1m*1m", "x/y = 1", "y/z = 1", "y/z = 1",
+        known, "x", "y", "z", "w")
+    if result.valid { return 5 }
+
+    result = solve_math_equations_four_unknown_dimensions(
+        "x+y = 2m", "x/y = 1", "y/z = 1", "z/w = 1",
+        known, "x", "y", "z", "w")
+    if result.valid or result.failed_equation != 0 { return 6 }
+
+    result = solve_math_equations_four_unknown_dimensions(
+        "x*y*z*w = 1m*1m*1m*1m", "x/y = 1", "y/z = 1", "z/w = missing",
+        known, "x", "y", "z", "w")
+    if result.valid or result.failed_equation != 3 { return 7 }
+
+    result = solve_math_equations_four_unknown_dimensions(
+        "x*y*z*w = 1m*1m*1m*1m", "x/y = 1", "y/z = 1", "z/w = 1",
+        known, "x", "x", "z", "w")
+    if result.valid { return 8 }
+
+    known.count = 1
+    known.symbols[0] = MathDimensionSymbol { name: "duration", dimension: time }
+    result = solve_math_equations_four_unknown_dimensions(
+        "x*y*z*w = duration³*duration*1m³*1m",
+        "x/y = 1", "y/z = 1", "z/w = 1",
+        known, "x", "y", "z", "w")
+    let length_time: Dimension = product_dimension(length, time)
+    if not result.valid or not same_dimension(result.first, length_time) or
+       not same_dimension(result.second, length_time) or
+       not same_dimension(result.third, length_time) or
+       not same_dimension(result.fourth, length_time) { return 9 }
+
+    result = solve_math_equations_four_unknown_dimensions(
+        "x*y*z*w = 1m*1m*1m*1m", "x/y = 1", "y/z = 1", "z/w = 1",
+        known, "x", "y", "z", "duration")
+    if result.valid { return 10 }
+
+    known.count = 5
+    result = solve_math_equations_four_unknown_dimensions(
+        "x*y*z*w = 1m*1m*1m*1m", "x/y = 1", "y/z = 1", "z/w = 1",
+        known, "x", "y", "z", "w")
+    if result.valid { return 11 }
+
+    print("native-math-dimension-four-ok")
+    return 0
+}

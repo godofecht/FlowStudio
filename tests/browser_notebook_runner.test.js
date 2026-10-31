@@ -137,7 +137,7 @@ test("aggregate notebook media budgets release excess bitmaps and cap plot snaps
     return {ok:true, output:"media-ok", images:batches[cell],
       plots:Array.from({length:8}, (_, index) => "plot-" + cell + "-" + index)};
   });
-  const source = Array.from({length:6}, () => "# %% [r]\\nplot(1)").join("\\n");
+  const source = Array.from({length:6}, () => "# %% [r]\nplot(1)").join("\n");
   assert.deepEqual(await f.runner.run(source, "r"), {ok:true, executed:6});
   assert.deepEqual(f.entries.map(entry => entry.images.length), [8,8,8,8,0,0]);
   assert.deepEqual(f.entries.map(entry => entry.plots.length), [8,8,8,8,0,0]);

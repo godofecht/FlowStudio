@@ -16,7 +16,8 @@
 #          38 asinh(x), 39 acosh(x), 40 atanh(x), dimensionless with domain guards,
 #          42 log1p(x), stable natural logarithm of 1+x for x > -1,
 #          43 expm1(x), stable exp(x)-1 for dimensionless |x| <= 60,
-#          44 cbrt(x), signed physical cube root with SI exponents divisible by 3.
+#          44 cbrt(x), signed physical cube root with SI exponents divisible by 3,
+#          45 norm3(x, y, z), stable three-component Euclidean norm with matched units.
 # Predicate values are dimensionless 0/1 with a separate runtime type bit.
 # where and logical operators evaluate operands eagerly (no short circuit).
 # Unsupported instructions and type mismatches fail closed.
@@ -712,6 +713,33 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
             depth = depth - 1
             stack[depth - 1] = result.quantity
             predicate[depth - 1] = result_predicate
+        } elif opcode == 45 {
+            if depth < 3 { return failed(instruction.source_start) }
+            let first: Quantity = stack[depth - 3]
+            let second: Quantity = stack[depth - 2]
+            let third: Quantity = stack[depth - 1]
+            if predicate[depth - 3] or predicate[depth - 2] or predicate[depth - 1] or
+               not same_dimension(first.dimension, second.dimension) or
+               not same_dimension(first.dimension, third.dimension) {
+                return failed(instruction.source_start)
+            }
+            let a: f64 = magnitude(first.value)
+            let b: f64 = magnitude(second.value)
+            let c: f64 = magnitude(third.value)
+            let mut scale: f64 = a
+            if b > scale { scale = b }
+            if c > scale { scale = c }
+            let mut norm: f64 = 0.0
+            if scale > 0.0 {
+                let x: f64 = a / scale
+                let y: f64 = b / scale
+                let z: f64 = c / scale
+                norm = scale * positive_square_root(x * x + y * y + z * z)
+            }
+            if not bounded_value(norm) { return failed(instruction.source_start) }
+            depth = depth - 2
+            stack[depth - 1] = quantity(norm, first.dimension)
+            predicate[depth - 1] = false
         } elif opcode == 9 or opcode == 19 {
             if depth < 3 { return failed(instruction.source_start) }
             let third: Quantity = stack[depth - 1]

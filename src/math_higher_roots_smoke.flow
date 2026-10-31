@@ -1,0 +1,150 @@
+# Executable native source, typed postfix IR, static SI, equation and
+# one-through-four unknown dimension solver acceptance for roots 5..8.
+import .math_dimensions { Dimension, dimensionless, length_dimension, time_dimension, same_dimension, quantity }
+import .math_expression_ir { MathResult }
+import .math_expression_source { ParsedMathExpression, parse_math_expression, evaluate_math_expression }
+import .math_static { MathInferredType, MathDimensionBindings, empty_math_dimension_bindings, infer_math_expression_source, infer_math_equation_source }
+import .math_equation { MathEquationResult, evaluate_math_equation_source }
+import .math_dimension_solver { MathDimensionSolution, solve_math_equation_unknown_dimension }
+import .math_dimension_pair { MathTwoDimensionSolution, solve_math_equations_two_unknown_dimensions }
+import .math_dimension_triple { MathThreeDimensionSolution, solve_math_equations_three_unknown_dimensions }
+import .math_dimension_four { MathFourDimensionSolution, solve_math_equations_four_unknown_dimensions }
+
+function close_relative(actual: f64, expected: f64) -> bool {
+    if expected == 0.0 { return actual == 0.0 }
+    let mut delta: f64 = actual / expected - 1.0
+    if delta < 0.0 { delta = -delta }
+    return delta < 0.00000001
+}
+
+function main() -> i32 {
+    let metres: Dimension = length_dimension()
+    let seconds: Dimension = time_dimension()
+    let known: MathDimensionBindings = empty_math_dimension_bindings()
+    let mut result: MathResult = evaluate_math_expression("root5(32*1m⁵)")
+    if not result.valid or not close_relative(result.result.value, 2.0) or
+       not same_dimension(result.result.dimension, metres) { return 1 }
+    result = evaluate_math_expression("root6(64*1m⁶)")
+    if not result.valid or not close_relative(result.result.value, 2.0) or
+       not same_dimension(result.result.dimension, metres) { return 2 }
+    result = evaluate_math_expression("root7(128*1m⁷)")
+    if not result.valid or not close_relative(result.result.value, 2.0) or
+       not same_dimension(result.result.dimension, metres) { return 3 }
+    result = evaluate_math_expression("root8(256*1m⁸)")
+    if not result.valid or not close_relative(result.result.value, 2.0) or
+       not same_dimension(result.result.dimension, metres) { return 4 }
+    result = evaluate_math_expression("root5(-32)")
+    if not result.valid or not close_relative(result.result.value, -2.0) { return 5 }
+    result = evaluate_math_expression("root7(-128)")
+    if not result.valid or not close_relative(result.result.value, -2.0) { return 6 }
+    result = evaluate_math_expression("root6(-64)")
+    if result.valid or result.failed_at != 0 { return 7 }
+    result = evaluate_math_expression("root8(-256)")
+    if result.valid or result.failed_at != 0 { return 8 }
+    result = evaluate_math_expression("root5(1m⁴)")
+    if result.valid or result.failed_at != 0 { return 9 }
+    result = evaluate_math_expression("root6(1m⁵)")
+    if result.valid or result.failed_at != 0 { return 10 }
+    result = evaluate_math_expression("root7(1m⁶)")
+    if result.valid or result.failed_at != 0 { return 11 }
+    result = evaluate_math_expression("root8(1m⁷)")
+    if result.valid or result.failed_at != 0 { return 12 }
+    result = evaluate_math_expression("root5(true)")
+    if result.valid or result.failed_at != 0 { return 13 }
+    result = evaluate_math_expression("root6(true)")
+    if result.valid or result.failed_at != 0 { return 14 }
+    result = evaluate_math_expression("root7(true)")
+    if result.valid or result.failed_at != 0 { return 15 }
+    result = evaluate_math_expression("root8(true)")
+    if result.valid or result.failed_at != 0 { return 16 }
+    result = evaluate_math_expression("root5(1e-25)")
+    if not result.valid or not close_relative(result.result.value, 1e-5) { return 17 }
+    result = evaluate_math_expression("root6(1e24)")
+    if not result.valid or not close_relative(result.result.value, 1e4) { return 18 }
+    result = evaluate_math_expression("root7(1e21)")
+    if not result.valid or not close_relative(result.result.value, 1e3) { return 19 }
+    result = evaluate_math_expression("root8(1e-24)")
+    if not result.valid or not close_relative(result.result.value, 1e-3) { return 20 }
+    if parse_math_expression("root5()").valid { return 21 }
+    if parse_math_expression("root5(1,2)").valid { return 22 }
+    if parse_math_expression("root5 (32)").valid { return 23 }
+    if parse_math_expression("root6()").valid { return 24 }
+    if parse_math_expression("root6(1,2)").valid { return 25 }
+    if parse_math_expression("root6 (32)").valid { return 26 }
+    if parse_math_expression("root7()").valid { return 27 }
+    if parse_math_expression("root7(1,2)").valid { return 28 }
+    if parse_math_expression("root7 (32)").valid { return 29 }
+    if parse_math_expression("root8()").valid { return 30 }
+    if parse_math_expression("root8(1,2)").valid { return 31 }
+    if parse_math_expression("root8 (32)").valid { return 32 }
+    let mut parsed: ParsedMathExpression = parse_math_expression("root5(32)")
+    if not parsed.valid or parsed.program.count != 2 or
+       parsed.program.instructions[1].opcode != 47 or
+       parsed.program.instructions[1].source_start != 0 or
+       parsed.program.instructions[1].source_end != 5 { return 33 }
+    parsed = parse_math_expression("root6(32)")
+    if not parsed.valid or parsed.program.instructions[1].opcode != 48 { return 34 }
+    parsed = parse_math_expression("root7(32)")
+    if not parsed.valid or parsed.program.instructions[1].opcode != 49 { return 35 }
+    parsed = parse_math_expression("root8(32)")
+    if not parsed.valid or parsed.program.instructions[1].opcode != 50 { return 36 }
+    let inferred_5: MathInferredType = infer_math_expression_source("root5(1m⁵)")
+    if not inferred_5.valid or inferred_5.is_predicate or
+       not same_dimension(inferred_5.dimension, metres) { return 37 }
+    let inferred_6: MathInferredType = infer_math_expression_source("root6(1m⁶)")
+    if not inferred_6.valid or inferred_6.is_predicate or
+       not same_dimension(inferred_6.dimension, metres) { return 38 }
+    let inferred_7: MathInferredType = infer_math_expression_source("root7(1m⁷)")
+    if not inferred_7.valid or inferred_7.is_predicate or
+       not same_dimension(inferred_7.dimension, metres) { return 39 }
+    let inferred_8: MathInferredType = infer_math_expression_source("root8(1m⁸)")
+    if not inferred_8.valid or inferred_8.is_predicate or
+       not same_dimension(inferred_8.dimension, metres) { return 40 }
+    let invalid_5: MathInferredType = infer_math_expression_source("root5(1m⁴)")
+    if invalid_5.valid or invalid_5.failed_at != 0 { return 41 }
+    let invalid_6: MathInferredType = infer_math_expression_source("root6(1m⁵)")
+    if invalid_6.valid or invalid_6.failed_at != 0 { return 42 }
+    let invalid_7: MathInferredType = infer_math_expression_source("root7(1m⁶)")
+    if invalid_7.valid or invalid_7.failed_at != 0 { return 43 }
+    let invalid_8: MathInferredType = infer_math_expression_source("root8(1m⁷)")
+    if invalid_8.valid or invalid_8.failed_at != 0 { return 44 }
+    let equation_type: MathInferredType = infer_math_equation_source("root5(32*1m⁵) = 2m")
+    if not equation_type.valid or not same_dimension(equation_type.dimension, metres) { return 45 }
+    let equation: MathEquationResult = evaluate_math_equation_source(
+        "root5(32*1m⁵) = 2m", quantity(1e-9, metres))
+    if not equation.valid or not equation.satisfied { return 46 }
+    equation = evaluate_math_equation_source(
+        "root8(256*1m⁸) = 2s", quantity(1e-9, metres))
+    if equation.valid { return 47 }
+    result = evaluate_math_expression("root8(root5(32*1m⁵)^8)")
+    if not result.valid or not close_relative(result.result.value, 2.0) or
+       not same_dimension(result.result.dimension, metres) { return 48 }
+    let one: MathDimensionSolution =
+        solve_math_equation_unknown_dimension("root5(x) = 1m", known, "x")
+    let fifth_length: Dimension = Dimension { length: 5, mass: 0, time: 0, temperature: 0 }
+    if not one.valid or not same_dimension(one.dimension, fifth_length) { return 49 }
+    one = solve_math_equation_unknown_dimension("root8(x) = 1m", known, "x")
+    let eighth_length: Dimension = Dimension { length: 8, mass: 0, time: 0, temperature: 0 }
+    if not one.valid or not same_dimension(one.dimension, eighth_length) { return 50 }
+    let two: MathTwoDimensionSolution = solve_math_equations_two_unknown_dimensions(
+        "root6(x) = 1m", "y = 1s", known, "x", "y")
+    let sixth_length: Dimension = Dimension { length: 6, mass: 0, time: 0, temperature: 0 }
+    if not two.valid or not same_dimension(two.first, sixth_length) or
+       not same_dimension(two.second, seconds) { return 51 }
+    let three: MathThreeDimensionSolution = solve_math_equations_three_unknown_dimensions(
+        "root7(x) = 1m", "y = 1s", "z = 1m", known, "x", "y", "z")
+    let seventh_length: Dimension = Dimension { length: 7, mass: 0, time: 0, temperature: 0 }
+    if not three.valid or not same_dimension(three.first, seventh_length) or
+       not same_dimension(three.third, metres) { return 52 }
+    let four: MathFourDimensionSolution = solve_math_equations_four_unknown_dimensions(
+        "root8(x) = 1m", "y = 1s", "z = 1m", "w = 1m",
+        known, "x", "y", "z", "w")
+    if not four.valid or not same_dimension(four.first, eighth_length) or
+       not same_dimension(four.fourth, metres) { return 53 }
+    four = solve_math_equations_four_unknown_dimensions(
+        "root8(x) = 1m", "y = 1s", "z = 1m", "w = 1m",
+        known, "x", "y", "z", "x")
+    if four.valid { return 54 }
+    print("native-math-higher-roots-ok")
+    return 0
+}

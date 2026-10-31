@@ -1,3 +1,21 @@
+## Native fifth-through-eighth roots (executable)
+
+The native Flow mathematical source parser lowers `root5(x)`, `root6(x)`,
+`root7(x)` and `root8(x)` into typed postfix IR instructions. The numerical
+runtime uses power-of-two range reduction and bounded Newton iteration for
+real roots of finite quantities, including tiny and large magnitudes. Odd roots
+preserve the sign of negative radicands; even roots reject negative inputs.
+Static physical-type inference requires all SI exponents to be exactly divisible
+by the root degree. The same operators propagate rational-affine constraints
+through one-, two-, three- and four-unknown symbolic dimensional solvers.
+
+`src/math_higher_roots_smoke.flow` contains 54 executable numbered acceptance
+assertions covering real numerical domains, typed units, malformed source,
+source spans, nested expressions, equation execution and dimensional inference.
+CI runs this suite on Linux and macOS alongside the checked-in Navier–Stokes
+regression and native HTTP tests. These functions do not imply general
+upstream Flow grammar integration or arbitrary-rank dimensional solving.
+
 ## Native one-unknown dimensional constraint inference (experimental)
 
 `src/math_dimension_solver.flow` extends the **actual Flow 2.0 native

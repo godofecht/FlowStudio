@@ -17,7 +17,7 @@
 #          42 log1p(x), stable natural logarithm of 1+x for x > -1,
 #          43 expm1(x), stable exp(x)-1 for dimensionless |x| <= 60,
 #          44 cbrt(x), signed physical cube root with SI exponents divisible by 3,
-#          45 norm3(x, y, z), stable three-component Euclidean norm with matched units,\n#          46 root4(x), real fourth root with SI exponents divisible by 4.
+#          45 norm3(x, y, z), stable three-component Euclidean norm with matched units,\n#          46 root4(x), real fourth root with SI exponents divisible by 4.\n#          47-50 root5(x)..root8(x), real nth roots with exact SI divisibility.
 # Predicate values are dimensionless 0/1 with a separate runtime type bit.
 # where and logical operators evaluate operands eagerly (no short circuit).
 # Unsupported instructions and type mismatches fail closed.
@@ -154,6 +154,44 @@ function real_fourth_root(value: f64) -> f64 {
         iteration = iteration + 1
     }
     return estimate * scale
+}
+
+# General real fifth-through-eighth roots. Power-of-two range reduction keeps
+# Newton iterates bounded even for 1e-30 and 1e30 inputs. Odd roots are signed.
+function real_high_root(value: f64, degree: i32) -> f64 {
+    if value == 0.0 { return 0.0 }
+    let mut base: f64 = 1.0
+    let mut power_index: i32 = 0
+    while power_index < degree {
+        base = base * 2.0
+        power_index = power_index + 1
+    }
+    let mut normalized: f64 = magnitude(value)
+    let mut scale: f64 = 1.0
+    while normalized > base {
+        normalized = normalized / base
+        scale = scale * 2.0
+    }
+    while normalized < 1.0 / base {
+        normalized = normalized * base
+        scale = scale * 0.5
+    }
+    let mut estimate: f64 = 1.0
+    let mut iteration: i32 = 0
+    while iteration < 64 {
+        let mut denominator: f64 = 1.0
+        let mut j: i32 = 1
+        while j < degree {
+            denominator = denominator * estimate
+            j = j + 1
+        }
+        estimate = (((degree - 1) as f64) * estimate +
+            normalized / denominator) / (degree as f64)
+        iteration = iteration + 1
+    }
+    let root: f64 = estimate * scale
+    if value < 0.0 { return -root }
+    return root
 }
 
 function real_cube_root(value: f64) -> f64 {
@@ -465,6 +503,20 @@ function even_dimension(dimension: Dimension) -> bool {
         dimension.temperature == (dimension.temperature / 2) * 2
 }
 
+function divisible_by_root_degree(d: Dimension, degree: i32) -> bool {
+    return d.length == (d.length / degree) * degree and
+        d.mass == (d.mass / degree) * degree and
+        d.time == (d.time / degree) * degree and
+        d.temperature == (d.temperature / degree) * degree
+}
+
+function root_dimension(d: Dimension, degree: i32) -> Dimension {
+    return Dimension {
+        length: d.length / degree, mass: d.mass / degree,
+        time: d.time / degree, temperature: d.temperature / degree
+    }
+}
+
 function fourth_dimension(dimension: Dimension) -> Dimension {
     return Dimension {
         length: dimension.length / 4, mass: dimension.mass / 4,
@@ -538,7 +590,7 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
         } elif opcode == 5 or opcode == 6 or opcode == 18 or opcode == 20 or opcode == 21 or opcode == 25 or
              opcode == 26 or opcode == 27 or opcode == 28 or opcode == 29 or opcode == 30 or opcode == 31 or
              opcode == 33 or opcode == 34 or opcode == 35 or opcode == 36 or opcode == 37 or
-             opcode == 38 or opcode == 39 or opcode == 40 or opcode == 42 or opcode == 43 or opcode == 44 or opcode == 46 {
+             opcode == 38 or opcode == 39 or opcode == 40 or opcode == 42 or opcode == 43 or opcode == 44 or opcode == 46 or (opcode >= 47 and opcode <= 50) {
             if depth < 1 { return failed(instruction.source_start) }
             let input: Quantity = stack[depth - 1]
             if opcode == 18 {
@@ -558,6 +610,15 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
                     }
                     stack[depth - 1] = quantity(
                         positive_square_root(input.value), half_dimension(input.dimension))
+                } elif opcode >= 47 and opcode <= 50 {
+                    let degree: i32 = opcode - 42
+                    if (degree % 2 == 0 and input.value < 0.0) or
+                       not divisible_by_root_degree(input.dimension, degree) {
+                        return failed(instruction.source_start)
+                    }
+                    stack[depth - 1] = quantity(
+                        real_high_root(input.value, degree),
+                        root_dimension(input.dimension, degree))
                 } elif opcode == 46 {
                     if input.value < 0.0 or not divisible_by_four_dimension(input.dimension) {
                         return failed(instruction.source_start)

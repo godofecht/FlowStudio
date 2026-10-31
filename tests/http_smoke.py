@@ -706,8 +706,8 @@ def main() -> None:
     status, body = request("POST", "/api/run/flow", corrupted_pair, accepted_headers)
     assert status == 422, ("native paired SI corrupted assertion", status, body)
     malformed_pair = native_pair.replace(
-        "function solve_axis(first: DimensionRow, second: DimensionRow,",
-        "function solve_axis(first: DimensionRow, second: DimensionRow",
+        "function solve_axis(first: PairDimensionRow, second: PairDimensionRow,",
+        "function solve_axis(first: PairDimensionRow, second: PairDimensionRow",
         1,
     )
     assert malformed_pair != native_pair
@@ -856,8 +856,8 @@ def main() -> None:
     status, body = request("POST", "/api/run/flow", corrupted_four, accepted_headers)
     assert status == 422, ("native four-unknown corrupted assertion", status, body)
     malformed_four = native_four.replace(
-        "function determinant4(a: DimensionRow, b: DimensionRow,",
-        "function determinant4(a: DimensionRow, b: DimensionRow",
+        "function determinant4(a: FourDimensionRow, b: FourDimensionRow,",
+        "function determinant4(a: FourDimensionRow, b: FourDimensionRow",
         1,
     )
     assert malformed_four != native_four

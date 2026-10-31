@@ -39,7 +39,7 @@ struct QuadAnalysis {
     failed_at: i32
 }
 
-struct DimensionRow {
+struct FourDimensionRow {
     valid: bool,
     first: i32,
     second: i32,
@@ -67,8 +67,8 @@ function failed_analysis(position: i32) -> QuadAnalysis {
     return QuadAnalysis { valid: false, value: blank_affine(), failed_at: position }
 }
 
-function failed_row(position: i32) -> DimensionRow {
-    return DimensionRow {
+function failed_row(position: i32) -> FourDimensionRow {
+    return FourDimensionRow {
         valid: false, first: 0, second: 0, third: 0, fourth: 0,
         target: dimensionless(), failed_at: position
     }
@@ -196,7 +196,7 @@ function analyse(program: MathProgram, source: string,
             stack[depth] = value
             depth = depth + 1
         } elif opcode == 5 or opcode == 6 or opcode == 20 or
-             opcode == 21 or opcode == 44 or opcode == 46 {
+             opcode == 21 or opcode == 44 or opcode == 46 or (opcode >= 47 and opcode <= 50) {
             if depth < 1 { return failed_analysis(position) }
             let mut value: QuadAffine = stack[depth - 1]
             if opcode == 6 {
@@ -214,6 +214,8 @@ function analyse(program: MathProgram, source: string,
                 value.denominator = value.denominator * 3
             } elif opcode == 46 {
                 value.denominator = value.denominator * 4
+            } elif opcode >= 47 and opcode <= 50 {
+                value.denominator = value.denominator * (opcode - 42)
             }
             value = normalise(value)
             if not bounded_affine(value) { return failed_analysis(position) }
@@ -238,7 +240,7 @@ function analyse(program: MathProgram, source: string,
 
 function equation_row(source: string, bindings: MathBindings,
                       first_name: string, second_name: string,
-                      third_name: string, fourth_name: string) -> DimensionRow {
+                      third_name: string, fourth_name: string) -> FourDimensionRow {
     let equation: MathEquation = parse_math_equation_with_bindings(source, bindings)
     if not equation.valid { return failed_row(equation.failed_at) }
     let left: QuadAnalysis = analyse(equation.left, source, first_name, second_name, third_name, fourth_name)
@@ -247,7 +249,7 @@ function equation_row(source: string, bindings: MathBindings,
     if not right.valid { return failed_row(right.failed_at) }
     let a: QuadAffine = left.value
     let b: QuadAffine = right.value
-    return DimensionRow {
+    return FourDimensionRow {
         valid: true,
         first: a.first * b.denominator - b.first * a.denominator,
         second: a.second * b.denominator - b.second * a.denominator,
@@ -273,8 +275,8 @@ function determinant3(
         (a2 as i64) * ((b0 as i64) * (c1 as i64) - (b1 as i64) * (c0 as i64))
 }
 
-function determinant4(a: DimensionRow, b: DimensionRow,
-                      c: DimensionRow, d: DimensionRow) -> i64 {
+function determinant4(a: FourDimensionRow, b: FourDimensionRow,
+                      c: FourDimensionRow, d: FourDimensionRow) -> i64 {
     let first: i64 = determinant3(
         b.second, b.third, b.fourth,
         c.second, c.third, c.fourth,
@@ -295,8 +297,8 @@ function determinant4(a: DimensionRow, b: DimensionRow,
         (a.third as i64) * third - (a.fourth as i64) * fourth
 }
 
-function replaced(row: DimensionRow, column: i32, value: i32) -> DimensionRow {
-    let mut result: DimensionRow = row
+function replaced(row: FourDimensionRow, column: i32, value: i32) -> FourDimensionRow {
+    let mut result: FourDimensionRow = row
     if column == 0 { result.first = value }
     elif column == 1 { result.second = value }
     elif column == 2 { result.third = value }
@@ -312,8 +314,8 @@ struct FourAxisSolution {
     fourth: i32
 }
 
-function solve_axis(a: DimensionRow, b: DimensionRow,
-                    c: DimensionRow, d: DimensionRow,
+function solve_axis(a: FourDimensionRow, b: FourDimensionRow,
+                    c: FourDimensionRow, d: FourDimensionRow,
                     target_a: i32, target_b: i32,
                     target_c: i32, target_d: i32,
                     divisor: i64) -> FourAxisSolution {
@@ -379,19 +381,19 @@ export function solve_math_equations_four_unknown_dimensions(
         name: fourth_unknown, value: quantity(1.0, dimensionless())
     }
     bindings.count = known.count + 4
-    let a: DimensionRow = equation_row(
+    let a: FourDimensionRow = equation_row(
         first_equation, bindings, first_unknown, second_unknown,
         third_unknown, fourth_unknown)
     if not a.valid { return quad_failed(0, a.failed_at) }
-    let b: DimensionRow = equation_row(
+    let b: FourDimensionRow = equation_row(
         second_equation, bindings, first_unknown, second_unknown,
         third_unknown, fourth_unknown)
     if not b.valid { return quad_failed(1, b.failed_at) }
-    let c: DimensionRow = equation_row(
+    let c: FourDimensionRow = equation_row(
         third_equation, bindings, first_unknown, second_unknown,
         third_unknown, fourth_unknown)
     if not c.valid { return quad_failed(2, c.failed_at) }
-    let d: DimensionRow = equation_row(
+    let d: FourDimensionRow = equation_row(
         fourth_equation, bindings, first_unknown, second_unknown,
         third_unknown, fourth_unknown)
     if not d.valid { return quad_failed(3, d.failed_at) }

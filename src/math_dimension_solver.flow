@@ -1,0 +1,324 @@
+# Native Flow 2.0 dimensional constraint solver for one unbound symbol.
+# This operates on the real parsed equation IR, not editor text or Python.
+# Integer-affine dimensions support products, quotients, powers, arithmetic,
+# comparisons and dimensional functions. Fractional unknown exponents are
+# deliberately rejected; underdetermined and inconsistent systems fail closed.
+import .math_dimensions { Dimension, dimensionless, quantity, same_dimension, product_dimension, quotient_dimension }
+import .math_expression_ir { MathInstruction, MathProgram }
+import .math_expression_source { MathBindings, MathSymbol, empty_math_bindings }
+import .math_equation { MathEquation, parse_math_equation_with_bindings }
+import .math_static { MathDimensionBindings, MathDimensionSymbol, MathInferredType, infer_math_equation_source_with_dimensions }
+
+extern {
+    function strlen(source: string) -> i64
+}
+
+export struct MathDimensionSolution {
+    valid: bool,
+    dimension: Dimension,
+    failed_at: i32
+}
+
+struct AffineDimension {
+    coefficient: i32,
+    offset: Dimension,
+    predicate: bool
+}
+
+struct ConstraintState {
+    valid: bool,
+    determined: bool,
+    solution: Dimension,
+    failed_at: i32
+}
+
+struct AffineAnalysis {
+    valid: bool,
+    value: AffineDimension,
+    state: ConstraintState,
+    failed_at: i32
+}
+
+function zero_affine() -> AffineDimension {
+    return AffineDimension {
+        coefficient: 0, offset: dimensionless(), predicate: false
+    }
+}
+
+function error_solution(position: i32) -> MathDimensionSolution {
+    return MathDimensionSolution {
+        valid: false, dimension: dimensionless(), failed_at: position
+    }
+}
+
+function error_analysis(position: i32, state: ConstraintState) -> AffineAnalysis {
+    return AffineAnalysis {
+        valid: false, value: zero_affine(), state: state, failed_at: position
+    }
+}
+
+function scaled(d: Dimension, n: i32) -> Dimension {
+    return Dimension {
+        length: d.length * n, mass: d.mass * n,
+        time: d.time * n, temperature: d.temperature * n
+    }
+}
+
+function bounded(d: Dimension, limit: i32) -> bool {
+    return d.length >= -limit and d.length <= limit and
+        d.mass >= -limit and d.mass <= limit and
+        d.time >= -limit and d.time <= limit and
+        d.temperature >= -limit and d.temperature <= limit
+}
+
+function bounded_affine(a: AffineDimension) -> bool {
+    return a.coefficient >= -1024 and a.coefficient <= 1024 and
+        bounded(a.offset, 1024)
+}
+
+function same_symbol(source: string, instruction: MathInstruction, unknown: string) -> bool {
+    let size: i32 = strlen(unknown) as i32
+    if instruction.source_end - instruction.source_start != size { return false }
+    let bytes: ptr<u8> = source as ptr<u8>
+    let name: ptr<u8> = unknown as ptr<u8>
+    let mut i: i32 = 0
+    while i < size {
+        if bytes[instruction.source_start + i] != name[i] { return false }
+        i = i + 1
+    }
+    return true
+}
+
+function invalid_constraint(state: ConstraintState, position: i32) -> ConstraintState {
+    return ConstraintState {
+        valid: false, determined: state.determined,
+        solution: state.solution, failed_at: position
+    }
+}
+
+# Enforce a.coefficient * unknown + a.offset =
+#         b.coefficient * unknown + b.offset independently on all SI axes.
+# A nonzero coefficient determines a unique integer-exponent dimension.
+function constrain(state: ConstraintState, a: AffineDimension,
+                   b: AffineDimension, position: i32) -> ConstraintState {
+    if not state.valid { return state }
+    let coefficient: i32 = a.coefficient - b.coefficient
+    let delta: Dimension = quotient_dimension(b.offset, a.offset)
+    if coefficient == 0 {
+        if not same_dimension(delta, dimensionless()) {
+            return invalid_constraint(state, position)
+        }
+        return state
+    }
+    let candidate: Dimension = Dimension {
+        length: delta.length / coefficient,
+        mass: delta.mass / coefficient,
+        time: delta.time / coefficient,
+        temperature: delta.temperature / coefficient
+    }
+    if not same_dimension(scaled(candidate, coefficient), delta) or
+       not bounded(candidate, 32) {
+        return invalid_constraint(state, position)
+    }
+    if state.determined and not same_dimension(state.solution, candidate) {
+        return invalid_constraint(state, position)
+    }
+    return ConstraintState {
+        valid: true, determined: true, solution: candidate, failed_at: -1
+    }
+}
+
+function analyse(program: MathProgram, source: string, unknown: string,
+                 initial: ConstraintState) -> AffineAnalysis {
+    let blank: AffineDimension = zero_affine()
+    let mut stack: array<AffineDimension, 64> = [blank]
+    let mut depth: i32 = 0
+    let mut state: ConstraintState = initial
+    let mut i: i32 = 0
+    while i < program.count {
+        let op: MathInstruction = program.instructions[i]
+        let opcode: i32 = op.opcode
+        let position: i32 = op.source_start
+        if opcode == 0 or opcode == 24 {
+            if depth >= 64 { return error_analysis(position, state) }
+            let mut value: AffineDimension = zero_affine()
+            if opcode == 24 {
+                value.predicate = true
+            } elif same_symbol(source, op, unknown) {
+                value.coefficient = 1
+            } else {
+                value.offset = op.literal.dimension
+            }
+            stack[depth] = value
+            depth = depth + 1
+        } elif opcode == 5 or opcode == 6 or opcode == 18 or opcode == 20 or
+             opcode == 21 or opcode == 25 or opcode == 26 or opcode == 27 or
+             opcode == 28 or opcode == 29 or opcode == 30 or opcode == 31 or
+             opcode == 33 or opcode == 34 or opcode == 35 or opcode == 36 or
+             opcode == 37 or opcode == 38 or opcode == 39 or opcode == 40 or
+             opcode == 42 or opcode == 43 or opcode == 44 {
+            if depth < 1 { return error_analysis(position, state) }
+            let mut a: AffineDimension = stack[depth - 1]
+            if opcode == 18 {
+                if not a.predicate { return error_analysis(position, state) }
+            } else {
+                if a.predicate { return error_analysis(position, state) }
+                if opcode == 6 {
+                    if op.exponent < -8 or op.exponent > 8 or
+                       not bounded(a.offset, 128) or
+                       a.coefficient < -128 or a.coefficient > 128 {
+                        return error_analysis(position, state)
+                    }
+                    a.coefficient = a.coefficient * op.exponent
+                    a.offset = scaled(a.offset, op.exponent)
+                } elif opcode == 21 or opcode == 44 {
+                    let mut divisor: i32 = 2
+                    if opcode == 44 { divisor = 3 }
+                    if a.coefficient != (a.coefficient / divisor) * divisor or
+                       not same_dimension(scaled(Dimension {
+                           length: a.offset.length / divisor,
+                           mass: a.offset.mass / divisor,
+                           time: a.offset.time / divisor,
+                           temperature: a.offset.temperature / divisor
+                       }, divisor), a.offset) {
+                        return error_analysis(position, state)
+                    }
+                    a.coefficient = a.coefficient / divisor
+                    a.offset = Dimension {
+                        length: a.offset.length / divisor,
+                        mass: a.offset.mass / divisor,
+                        time: a.offset.time / divisor,
+                        temperature: a.offset.temperature / divisor
+                    }
+                } elif opcode != 5 and opcode != 20 {
+                    state = constrain(state, a, zero_affine(), position)
+                    a = zero_affine()
+                }
+            }
+            if not state.valid or not bounded_affine(a) {
+                return error_analysis(position, state)
+            }
+            stack[depth - 1] = a
+        } elif (opcode >= 1 and opcode <= 4) or opcode == 7 or opcode == 8 or
+             (opcode >= 10 and opcode <= 17) or opcode == 22 or opcode == 32 {
+            if depth < 2 { return error_analysis(position, state) }
+            let a: AffineDimension = stack[depth - 2]
+            let b: AffineDimension = stack[depth - 1]
+            let mut result: AffineDimension = zero_affine()
+            if opcode == 16 or opcode == 17 {
+                if not a.predicate or not b.predicate {
+                    return error_analysis(position, state)
+                }
+                result.predicate = true
+            } else {
+                if a.predicate or b.predicate { return error_analysis(position, state) }
+                if opcode == 3 {
+                    result.coefficient = a.coefficient + b.coefficient
+                    result.offset = product_dimension(a.offset, b.offset)
+                } elif opcode == 4 {
+                    result.coefficient = a.coefficient - b.coefficient
+                    result.offset = quotient_dimension(a.offset, b.offset)
+                } else {
+                    state = constrain(state, a, b, position)
+                    result = a
+                    if opcode >= 10 and opcode <= 15 or opcode == 32 {
+                        result = zero_affine()
+                        if opcode != 32 { result.predicate = true }
+                    }
+                }
+            }
+            if not state.valid or not bounded_affine(result) {
+                return error_analysis(position, state)
+            }
+            depth = depth - 1
+            stack[depth - 1] = result
+        } elif opcode == 9 or opcode == 19 or opcode == 45 {
+            if depth < 3 { return error_analysis(position, state) }
+            let a: AffineDimension = stack[depth - 3]
+            let b: AffineDimension = stack[depth - 2]
+            let c: AffineDimension = stack[depth - 1]
+            let mut result: AffineDimension = a
+            if opcode == 19 {
+                if not a.predicate or b.predicate or c.predicate {
+                    return error_analysis(position, state)
+                }
+                state = constrain(state, b, c, position)
+                result = b
+            } else {
+                if a.predicate or b.predicate or c.predicate {
+                    return error_analysis(position, state)
+                }
+                state = constrain(state, a, b, position)
+                state = constrain(state, a, c, position)
+            }
+            if not state.valid or not bounded_affine(result) {
+                return error_analysis(position, state)
+            }
+            depth = depth - 2
+            stack[depth - 1] = result
+        } else {
+            return error_analysis(position, state)
+        }
+        i = i + 1
+    }
+    if depth != 1 { return error_analysis(program.source_length, state) }
+    return AffineAnalysis {
+        valid: state.valid, value: stack[0], state: state, failed_at: -1
+    }
+}
+
+# Solve the physical dimension of exactly one unbound symbol in a scalar
+# equation. Known symbols have types but need no numerical values. The
+# final solution is checked again by the ordinary native static type checker,
+# including all operator-specific dimension and predicate restrictions.
+export function solve_math_equation_unknown_dimension(
+    source: string, known: MathDimensionBindings,
+    unknown: string) -> MathDimensionSolution {
+    if known.count < 0 or known.count > 7 or strlen(unknown) < 1 or
+       strlen(unknown) > 32 {
+        return error_solution(0)
+    }
+    let mut bindings: MathBindings = empty_math_bindings()
+    let mut i: i32 = 0
+    while i < known.count {
+        bindings.symbols[i] = MathSymbol {
+            name: known.symbols[i].name,
+            value: quantity(1.0, known.symbols[i].dimension)
+        }
+        i = i + 1
+    }
+    bindings.symbols[known.count] = MathSymbol {
+        name: unknown, value: quantity(1.0, dimensionless())
+    }
+    bindings.count = known.count + 1
+    let equation: MathEquation = parse_math_equation_with_bindings(source, bindings)
+    if not equation.valid { return error_solution(equation.failed_at) }
+    let initial: ConstraintState = ConstraintState {
+        valid: true, determined: false,
+        solution: dimensionless(), failed_at: -1
+    }
+    let left: AffineAnalysis = analyse(equation.left, source, unknown, initial)
+    if not left.valid { return error_solution(left.failed_at) }
+    let right: AffineAnalysis = analyse(equation.right, source, unknown, left.state)
+    if not right.valid { return error_solution(right.failed_at) }
+    if left.value.predicate or right.value.predicate {
+        return error_solution(equation.equality_at)
+    }
+    let solved: ConstraintState = constrain(
+        right.state, left.value, right.value, equation.equality_at)
+    if not solved.valid { return error_solution(solved.failed_at) }
+    if not solved.determined { return error_solution(equation.equality_at) }
+    let mut declarations: MathDimensionBindings = known
+    declarations.symbols[known.count] = MathDimensionSymbol {
+        name: unknown, dimension: solved.solution
+    }
+    declarations.count = known.count + 1
+    let verified: MathInferredType = infer_math_equation_source_with_dimensions(
+        source, declarations)
+    if not verified.valid or verified.is_predicate {
+        return error_solution(verified.failed_at)
+    }
+    return MathDimensionSolution {
+        valid: true, dimension: solved.solution, failed_at: -1
+    }
+}

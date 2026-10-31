@@ -3,7 +3,8 @@
  */
 (function (global) {
 "use strict";
-const MAX_PNG = 1398104;
+// Match .fsnb's per-plot limit so a captured image is always exportable.
+const MAX_PNG = 524288;
 const MAX_SVG_BYTES = 60000;
 const MAX_DIMENSION = 2048;
 const MAX_PIXELS = 2048 * 2048;

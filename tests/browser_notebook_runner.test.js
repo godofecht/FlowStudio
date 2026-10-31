@@ -125,3 +125,24 @@ test("failed notebook renderer releases untransferred R bitmaps",async()=>{
   assert.equal(bitmap.closed,true);
   assert.equal(runner.isRunning(),false);
 });
+
+test("aggregate notebook media budgets release excess bitmaps and cap plot snapshots", async () => {
+  const batches = Array.from({length:6}, (_, cell) =>
+    Array.from({length:8}, (_, item) => ({
+      cell, item, closed:false, close() { this.closed = true; }
+    })));
+  let next = 0;
+  const f = fixture(async () => {
+    const cell = next++;
+    return {ok:true, output:"media-ok", images:batches[cell],
+      plots:Array.from({length:8}, (_, index) => "plot-" + cell + "-" + index)};
+  });
+  const source = Array.from({length:6}, () => "# %% [r]\nplot(1)").join("\n");
+  assert.deepEqual(await f.runner.run(source, "r"), {ok:true, executed:6});
+  assert.deepEqual(f.entries.map(entry => entry.images.length), [8,8,8,8,0,0]);
+  assert.deepEqual(f.entries.map(entry => entry.plots.length), [8,8,8,8,0,0]);
+  assert.equal(batches.flat().filter(bitmap => bitmap.closed).length, 16);
+  assert.ok(batches.slice(0,4).flat().every(bitmap => !bitmap.closed));
+  assert.ok(batches.slice(4).flat().every(bitmap => bitmap.closed));
+  assert.equal(f.runner.isRunning(), false);
+});

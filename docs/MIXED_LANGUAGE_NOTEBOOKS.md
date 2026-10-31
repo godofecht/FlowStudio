@@ -79,3 +79,10 @@ large multibyte sources, malformed Unicode, mixed-language dispatch and
 renderer failure against the production notebook runner. Native HTTP and
 physical-browser acceptance remain separate gates; controller tests alone
 do not establish RStudio parity.
+
+Across a notebook run, retained image bitmaps and plot snapshots are each
+capped at 32, in addition to the eight-per-cell limit. Excess bitmaps are
+closed immediately rather than accumulating through 128 executable cells.
+The deterministic controller suite verifies retained media counts and closure;
+production browser plotting is qualified separately by the native Chromium
+acceptance suite.

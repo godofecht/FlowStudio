@@ -1,6 +1,6 @@
 # Executable native Flow 2.0 bounded equation-system parsing and residuals.
 # flow run src/math_equation_system_smoke.flow
-import .math_dimensions { dimensionless, length_dimension, time_dimension, temperature_dimension, quantity, same_dimension }
+import .math_dimensions { dimensionless, length_dimension, time_dimension, temperature_dimension, quotient_dimension, product_dimension, quantity, same_dimension }
 import .math_expression_source { MathBindings, MathSymbol, empty_math_bindings }
 import .math_equation_system { MathEquationSystem, MathEquationSystemResult, MathEquationTolerances, empty_math_equation_tolerances, parse_math_equation_system, parse_math_equation_system_with_bindings, evaluate_math_equation_system }
 
@@ -80,6 +80,57 @@ function main() -> i32 {
     tolerances.values[1] = quantity(0.0, length_dimension())
     result = evaluate_math_equation_system(system, tolerances)
     if not result.valid or not result.satisfied { return 16 }
+
+    # Eight heterogeneous equations exercise the production compiler's
+    # Unicode byte spans, nested functions, unit algebra and tolerance vector.
+    # The source is 122 UTF-8 bytes; all positions below are byte offsets.
+    let mixed_source: string = "2×(3m−1m)=4m;9m∕3s=3m/1s;where(1<2,5K,6K)=5K;ln(exp(1))=1;2m³/4m²=0.5m;3m⁻²=1m⁻²/9;exp(0)=1;1e-6m+2e-6m=3e-6m"
+    system = parse_math_equation_system(mixed_source)
+    if not system.valid or system.count != 8 or system.source_length != 122 or
+       system.equations[0].equality_at != 12 or
+       system.equations[1].equality_at != 23 or
+       system.equations[5].equality_at != 85 or
+       system.equations[7].equality_at != 116 or
+       system.equations[7].right.instructions[0].source_start != 117 { return 17 }
+    let speed = quotient_dimension(length_dimension(), time_dimension())
+    let inverse_area = quotient_dimension(
+        dimensionless(), product_dimension(length_dimension(), length_dimension()))
+    tolerances.count = 8
+    tolerances.values[0] = quantity(0.0, length_dimension())
+    tolerances.values[1] = quantity(0.0, speed)
+    tolerances.values[2] = quantity(0.0, temperature_dimension())
+    tolerances.values[3] = quantity(0.0000000001, dimensionless())
+    tolerances.values[4] = quantity(0.0, length_dimension())
+    tolerances.values[5] = quantity(0.0000000001, inverse_area)
+    tolerances.values[6] = quantity(0.0, dimensionless())
+    tolerances.values[7] = quantity(0.000000000001, length_dimension())
+    result = evaluate_math_equation_system(system, tolerances)
+    if not result.valid or not result.satisfied or result.count != 8 or
+       not same_dimension(result.results[1].residual.dimension, speed) or
+       not same_dimension(result.results[5].residual.dimension, inverse_area) or
+       not near(result.results[7].residual.value, 0.0) { return 18 }
+
+    # A late numerical disagreement must be distinct from a compiler/runtime
+    # failure, and changing only its physical tolerance changes satisfaction.
+    system = parse_math_equation_system(
+        "2×(3m−1m)=4m;9m∕3s=3m/1s;where(1<2,5K,6K)=5K;ln(exp(1))=1;2m³/4m²=0.5m;3m⁻²=1m⁻²/9;exp(0)=1;1e-6m+2e-6m=4e-6m")
+    tolerances.values[7] = quantity(0.0000009, length_dimension())
+    result = evaluate_math_equation_system(system, tolerances)
+    if not result.valid or result.satisfied or result.results[7].satisfied or
+       not near(result.results[7].residual.value, -0.000001) { return 19 }
+    tolerances.values[7] = quantity(0.0000011, length_dimension())
+    result = evaluate_math_equation_system(system, tolerances)
+    if not result.valid or not result.satisfied { return 20 }
+
+    # A dimension error in equation eight must preserve its global source
+    # byte offset, rather than returning an offset relative to the fragment.
+    system = parse_math_equation_system(
+        "2×(3m−1m)=4m;9m∕3s=3m/1s;where(1<2,5K,6K)=5K;ln(exp(1))=1;2m³/4m²=0.5m;3m⁻²=1m⁻²/9;exp(0)=1;1e-6m+2e-6m=3e-6s")
+    if not system.valid { return 21 }
+    result = evaluate_math_equation_system(system, tolerances)
+    if result.valid or result.failed_equation != 7 or result.failed_at != 116 { return 22 }
+    system = parse_math_equation_system("1m=1m;1m=1m;foo=1m")
+    if system.valid or system.failed_equation != 2 or system.failed_at != 12 { return 23 }
 
     println("native-math-equation-system-ok")
     return 0

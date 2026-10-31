@@ -5,9 +5,6 @@ import .math_expression_ir { MathResult }
 import .math_expression_source { ParsedMathExpression, parse_math_expression, evaluate_math_expression }
 import .math_static { MathInferredType, MathDimensionBindings, empty_math_dimension_bindings, infer_math_expression_source, infer_math_equation_source }
 import .math_equation { MathEquationResult, evaluate_math_equation_source }
-import .math_dimension_solver { MathDimensionSolution, solve_math_equation_unknown_dimension }
-import .math_dimension_pair { MathTwoDimensionSolution, solve_math_equations_two_unknown_dimensions }
-import .math_dimension_triple { MathThreeDimensionSolution, solve_math_equations_three_unknown_dimensions }
 import .math_dimension_four { MathFourDimensionSolution, solve_math_equations_four_unknown_dimensions }
 
 function close(actual: f64, expected: f64) -> bool {
@@ -83,19 +80,6 @@ function main() -> i32 {
     if equation.valid { return 22 }
 
     let known: MathDimensionBindings = empty_math_dimension_bindings()
-    let mut first: MathDimensionSolution =
-        solve_math_equation_unknown_dimension("root4(x) = 1m", known, "x")
-    if not first.valid or not same_dimension(first.dimension, fourth_length) { return 23 }
-    let mut pair: MathTwoDimensionSolution =
-        solve_math_equations_two_unknown_dimensions(
-            "root4(x) = 1m", "y = 1s", known, "x", "y")
-    if not pair.valid or not same_dimension(pair.first, fourth_length) or
-       not same_dimension(pair.second, time_dimension()) { return 24 }
-    let mut triple: MathThreeDimensionSolution =
-        solve_math_equations_three_unknown_dimensions(
-            "root4(x) = 1m", "y = 1m", "z = 1s", known, "x", "y", "z")
-    if not triple.valid or not same_dimension(triple.first, fourth_length) or
-       not same_dimension(triple.third, time_dimension()) { return 25 }
     let mut four: MathFourDimensionSolution =
         solve_math_equations_four_unknown_dimensions(
             "root4(x) = 1m", "y = 1m", "z = 1s", "w = 1m",

@@ -1,0 +1,148 @@
+# Executable native Flow overdetermined SI dimensional inference.
+import .math_dimensions { Dimension, dimensionless, length_dimension, time_dimension, product_dimension, same_dimension }
+import .math_static { MathDimensionBindings, MathDimensionSymbol, empty_math_dimension_bindings }
+import .math_dimension_overdetermined { solve_math_equations_four_constraints_three_unknown_dimensions }
+import .math_dimension_triple { MathThreeDimensionSolution }
+
+function main() -> i32 {
+    let length: Dimension = length_dimension()
+    let time: Dimension = time_dimension()
+    let area: Dimension = product_dimension(length, length)
+    let mut known: MathDimensionBindings = empty_math_dimension_bindings()
+    let mut result: MathThreeDimensionSolution =
+        solve_math_equations_four_constraints_three_unknown_dimensions(
+            "x*y*z = 1m³", "x/y = 1", "y/z = 1", "x = 1m",
+            known, "x", "y", "z")
+    if not result.valid or result.failed_equation != -1 or
+       not same_dimension(result.first, length) or
+       not same_dimension(result.second, length) or
+       not same_dimension(result.third, length) { return 1 }
+
+    # The first three equations have rank two; pivot on the fourth.
+    result = solve_math_equations_four_constraints_three_unknown_dimensions(
+        "x/y = 1", "x/y = 1", "y/z = 1", "x*y*z = 1m³",
+        known, "x", "y", "z")
+    if not result.valid or not same_dimension(result.first, length) or
+       not same_dimension(result.second, length) or
+       not same_dimension(result.third, length) { return 2 }
+
+    result = solve_math_equations_four_constraints_three_unknown_dimensions(
+        "x*y = 1m²", "x/y = 1", "x*y = 1m²", "z = 1s",
+        known, "x", "y", "z")
+    if not result.valid or not same_dimension(result.first, length) or
+       not same_dimension(result.second, length) or
+       not same_dimension(result.third, time) { return 3 }
+
+    # Additive constraints can validate a solved candidate, not serve as pivots.
+    result = solve_math_equations_four_constraints_three_unknown_dimensions(
+        "x*y*z = 1m³", "x/y = 1", "y/z = 1", "x+y = 2m",
+        known, "x", "y", "z")
+    if not result.valid { return 4 }
+
+    result = solve_math_equations_four_constraints_three_unknown_dimensions(
+        "x*y*z = 1m³", "x/y = 1", "y/z = 1", "x+y = 1s",
+        known, "x", "y", "z")
+    if result.valid or result.failed_equation != 3 { return 5 }
+
+    result = solve_math_equations_four_constraints_three_unknown_dimensions(
+        "x*y*z = 1m³", "x/y = 1", "y/z = 1", "x+=1m",
+        known, "x", "y", "z")
+    if result.valid or result.failed_equation != 3 { return 6 }
+
+    result = solve_math_equations_four_constraints_three_unknown_dimensions(
+        "x*y*z = 1m³", "x/y = 1", "y/z = 1", "x = 1s",
+        known, "x", "y", "z")
+    if result.valid or result.failed_equation != 3 { return 7 }
+
+    result = solve_math_equations_four_constraints_three_unknown_dimensions(
+        "x/y = 1", "x/y = 1", "y/z = 1", "y/z = 1",
+        known, "x", "y", "z")
+    if result.valid { return 8 }
+
+    result = solve_math_equations_four_constraints_three_unknown_dimensions(
+        "x*y*z = 1m²", "x/y = 1", "y/z = 1", "x/y = 1",
+        known, "x", "y", "z")
+    if result.valid { return 9 }
+
+    result = solve_math_equations_four_constraints_three_unknown_dimensions(
+        "x*y*z = 1m³", "x/y = 1", "y/z = 1", "x = 1m",
+        known, "x", "x", "z")
+    if result.valid { return 10 }
+
+    known.count = 1
+    known.symbols[0] = MathDimensionSymbol { name: "duration", dimension: time }
+    result = solve_math_equations_four_constraints_three_unknown_dimensions(
+        "x*y*z = duration³*1m³", "x/y = 1", "y/z = 1",
+        "x = duration*1m", known, "x", "y", "z")
+    let length_time: Dimension = product_dimension(length, time)
+    if not result.valid or not same_dimension(result.first, length_time) or
+       not same_dimension(result.second, length_time) or
+       not same_dimension(result.third, length_time) { return 11 }
+
+    known.count = 6
+    result = solve_math_equations_four_constraints_three_unknown_dimensions(
+        "x*y*z = 1m³", "x/y = 1", "y/z = 1", "x = 1m",
+        known, "x", "y", "z")
+    if result.valid { return 12 }
+
+    known.count = -1
+    result = solve_math_equations_four_constraints_three_unknown_dimensions(
+        "x*y*z = 1m³", "x/y = 1", "y/z = 1", "x = 1m",
+        known, "x", "y", "z")
+    if result.valid { return 13 }
+
+    known = empty_math_dimension_bindings()
+    result = solve_math_equations_four_constraints_three_unknown_dimensions(
+        "δ₀*ρ*ζ = 1m³", "δ₀/ρ = 1", "ρ/ζ = 1", "δ₀ = 1m",
+        known, "δ₀", "ρ", "ζ")
+    if not result.valid or not same_dimension(result.first, length) or
+       not same_dimension(result.second, length) or
+       not same_dimension(result.third, length) { return 14 }
+
+    result = solve_math_equations_four_constraints_three_unknown_dimensions(
+        "sqrt(x)*y*z = 1m³", "x/y = 1m", "y/z = 1", "x = 1m²",
+        known, "x", "y", "z")
+    if not result.valid or not same_dimension(result.first, area) or
+       not same_dimension(result.second, length) or
+       not same_dimension(result.third, length) { return 15 }
+
+    # A malformed first constraint must be checked after pivoting on 2,3,4.
+    result = solve_math_equations_four_constraints_three_unknown_dimensions(
+        "x+=1m", "x/y = 1", "y/z = 1", "x*y*z = 1m³",
+        known, "x", "y", "z")
+    if result.valid or result.failed_equation != 0 { return 16 }
+
+    # These are dimension constraints, not numerical-value constraints.
+    result = solve_math_equations_four_constraints_three_unknown_dimensions(
+        "x*y*z = 1m³", "x/y = 1", "y/z = 1", "x = 2m",
+        known, "x", "y", "z")
+    if not result.valid { return 17 }
+
+    result = solve_math_equations_four_constraints_three_unknown_dimensions(
+        "x*y*z = 1m³", "x/y = 1", "y/z = 1", "sin(z) = 1",
+        known, "x", "y", "z")
+    if result.valid or result.failed_equation != 3 { return 18 }
+
+    result = solve_math_equations_four_constraints_three_unknown_dimensions(
+        "x*y*z = 1m³", "x/y = 1", "y/z = 1", "x = missing",
+        known, "x", "y", "z")
+    if result.valid or result.failed_equation != 3 { return 19 }
+
+    result = solve_math_equations_four_constraints_three_unknown_dimensions(
+        "x*y*z = 1m³", "x/y = 1", "y/z = 1", "x/y = 1m",
+        known, "x", "y", "z")
+    if result.valid or result.failed_equation != 3 { return 20 }
+
+    result = solve_math_equations_four_constraints_three_unknown_dimensions(
+        "x/y = 1", "x/y = 1", "x/y = 1", "x/y = 1",
+        known, "x", "y", "z")
+    if result.valid { return 21 }
+
+    result = solve_math_equations_four_constraints_three_unknown_dimensions(
+        "x/y = 1", "y/z = 1", "x = missing", "x*y*z = 1m³",
+        known, "x", "y", "z")
+    if result.valid or result.failed_equation != 2 { return 22 }
+
+    print("native-math-three-unknown-four-constraints-ok")
+    return 0
+}

@@ -1,0 +1,84 @@
+# Native Flow 2.0 overdetermined three-unknown SI inference from four equations.
+# Choose any full-rank triple of actual parsed monomial equation IR, then
+# independently typecheck the remaining equation. This solves dimensions,
+# not numerical values, and never treats an editor expression as executable.
+import .math_dimensions { dimensionless }
+import .math_static { MathDimensionBindings, MathDimensionSymbol, MathInferredType, infer_math_equation_source_with_dimensions }
+import .math_dimension_triple { MathThreeDimensionSolution, solve_math_equations_three_unknown_dimensions }
+
+function four_constraint_failed(index: i32, position: i32) -> MathThreeDimensionSolution {
+    return MathThreeDimensionSolution {
+        valid: false, first: dimensionless(), second: dimensionless(),
+        third: dimensionless(), failed_equation: index, failed_at: position
+    }
+}
+
+function verify_remaining_three_unknown_constraint(
+    candidate: MathThreeDimensionSolution, equation: string,
+    known: MathDimensionBindings,
+    first_unknown: string, second_unknown: string, third_unknown: string,
+    equation_index: i32) -> MathThreeDimensionSolution {
+    if not candidate.valid { return candidate }
+    let mut declarations: MathDimensionBindings = known
+    declarations.symbols[known.count] = MathDimensionSymbol {
+        name: first_unknown, dimension: candidate.first
+    }
+    declarations.symbols[known.count + 1] = MathDimensionSymbol {
+        name: second_unknown, dimension: candidate.second
+    }
+    declarations.symbols[known.count + 2] = MathDimensionSymbol {
+        name: third_unknown, dimension: candidate.third
+    }
+    declarations.count = known.count + 3
+    let checked: MathInferredType =
+        infer_math_equation_source_with_dimensions(equation, declarations)
+    if not checked.valid or checked.is_predicate {
+        return four_constraint_failed(equation_index, checked.failed_at)
+    }
+    return candidate
+}
+
+# Supports a redundant constraint, a non-monomial final consistency check,
+# or a full-rank pivot appearing in any three of the four positions.
+# A unique exact integer SI-exponent solution is mandatory.
+export function solve_math_equations_four_constraints_three_unknown_dimensions(
+    first_equation: string, second_equation: string,
+    third_equation: string, fourth_equation: string,
+    known: MathDimensionBindings,
+    first_unknown: string, second_unknown: string,
+    third_unknown: string) -> MathThreeDimensionSolution {
+    let mut candidate: MathThreeDimensionSolution =
+        solve_math_equations_three_unknown_dimensions(
+            first_equation, second_equation, third_equation, known,
+            first_unknown, second_unknown, third_unknown)
+    if candidate.valid {
+        return verify_remaining_three_unknown_constraint(
+            candidate, fourth_equation, known,
+            first_unknown, second_unknown, third_unknown, 3)
+    }
+    candidate = solve_math_equations_three_unknown_dimensions(
+        first_equation, second_equation, fourth_equation, known,
+        first_unknown, second_unknown, third_unknown)
+    if candidate.valid {
+        return verify_remaining_three_unknown_constraint(
+            candidate, third_equation, known,
+            first_unknown, second_unknown, third_unknown, 2)
+    }
+    candidate = solve_math_equations_three_unknown_dimensions(
+        first_equation, third_equation, fourth_equation, known,
+        first_unknown, second_unknown, third_unknown)
+    if candidate.valid {
+        return verify_remaining_three_unknown_constraint(
+            candidate, second_equation, known,
+            first_unknown, second_unknown, third_unknown, 1)
+    }
+    candidate = solve_math_equations_three_unknown_dimensions(
+        second_equation, third_equation, fourth_equation, known,
+        first_unknown, second_unknown, third_unknown)
+    if candidate.valid {
+        return verify_remaining_three_unknown_constraint(
+            candidate, first_equation, known,
+            first_unknown, second_unknown, third_unknown, 0)
+    }
+    return four_constraint_failed(-1, 0)
+}

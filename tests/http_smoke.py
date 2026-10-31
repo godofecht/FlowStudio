@@ -715,6 +715,54 @@ def main() -> None:
     assert status == 422 and body.strip(), (
         "native paired SI invalid compiler syntax", status, body)
 
+    # Four equations, three unknown SI dimensions: compile the exact checked-in
+    # native source, select a full-rank triple, and typecheck the fourth.
+    # The HTTP endpoint must execute, not merely highlight, the source.
+    overdetermined_files = static_files[:-1] + (
+        "src/math_dimension_triple.flow",
+        "src/math_dimension_overdetermined.flow",
+        "src/math_dimension_overdetermined_smoke.flow",
+    )
+    native_overdetermined = "\n".join(
+        "\n".join(
+            line.removeprefix("export ")
+            for line in (Path(__file__).resolve().parents[1] / path)
+                .read_text(encoding="utf-8").splitlines()
+            if not line.startswith("import .math_dimensions {")
+            and not line.startswith("import .math_expression_ir {")
+            and not line.startswith("import .math_expression_source {")
+            and not line.startswith("import .math_equation {")
+            and not line.startswith("import .math_static {")
+            and not line.startswith("import .math_dimension_triple {")
+            and not line.startswith("import .math_dimension_overdetermined {")
+        )
+        for path in overdetermined_files
+    )
+    assert "function solve_math_equations_four_constraints_three_unknown_dimensions(" in native_overdetermined
+    assert len(native_overdetermined.encode("utf-8")) < 128 * 1024
+    status, body = request("POST", "/api/check/flow", native_overdetermined, accepted_headers)
+    assert status == 200, ("native overdetermined SI compiler", status, body)
+    status, body = request("POST", "/api/run/flow", native_overdetermined, accepted_headers)
+    assert status == 200 and "native-math-three-unknown-four-constraints-ok" in body, (
+        "native overdetermined SI execution", status, body)
+    corrupted_overdetermined = native_overdetermined.replace(
+        '"x*y*z = 1m³", "x/y = 1", "y/z = 1", "x = 1m",',
+        '"x*y*z = 1m³", "x/y = 1", "y/z = 1", "x = 1s",',
+        1,
+    )
+    assert corrupted_overdetermined != native_overdetermined
+    status, body = request("POST", "/api/run/flow", corrupted_overdetermined, accepted_headers)
+    assert status == 422, ("native overdetermined corrupted assertion", status, body)
+    malformed_overdetermined = native_overdetermined.replace(
+        "function verify_remaining_three_unknown_constraint(",
+        "function verify_remaining_three_unknown_constraint",
+        1,
+    )
+    assert malformed_overdetermined != native_overdetermined
+    status, body = request("POST", "/api/check/flow", malformed_overdetermined, accepted_headers)
+    assert status == 422 and body.strip(), (
+        "native overdetermined malformed compiler rejection", status, body)
+
     # Native hyperbolic source lowering, typed IR, static dimensions and
     # scalar equation residuals through the real Flow compiler and HTTP runner.
     # The temporary HTTP source is built from the checked-in native modules,

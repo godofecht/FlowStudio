@@ -1,3 +1,18 @@
+## 2026-10-31: aggregate notebook media retention limits (qualification pending)
+
+The production mixed-language notebook runner now retains at most 32 image
+bitmaps and 32 plot snapshots per run, in addition to eight of each per cell.
+Any excess bitmap is closed immediately; earlier cells' retained bitmaps are
+left for the UI. The deterministic six-cell controller regression returns 48
+bitmaps and 48 plot snapshots, asserting 32 retained of each and 16 bitmap
+closures. This addresses long-notebook browser resource retention, not native
+Flow multidimensional field lowering or full RStudio parity.
+
+**Pending:** exact-head Linux/macOS CI, real native Flow/HTTP and Ubuntu
+Chromium qualification. **Unexecuted:** independent macOS physical-browser
+interaction, local native Flow/R and a physical-browser 48-image stress case.
+No hosted CI workflow was changed. [PR #300](https://github.com/godofecht/FlowStudio/pull/300).
+
 ## 2026-10-31: native two-species 8×8×8 anisotropic volume PDE (six CI jobs passed)
 
 `examples/native_coupled_volume8.flow` computes two distinct 512-voxel

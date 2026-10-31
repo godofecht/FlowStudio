@@ -146,3 +146,36 @@ test("aggregate notebook media budgets release excess bitmaps and cap plot snaps
   assert.ok(batches.slice(4).flat().every(bitmap => bitmap.closed));
   assert.equal(f.runner.isRunning(), false);
 });
+
+test("exact 1 MiB aggregate UTF-8 output succeeds on final cell and renders trailing markdown", async () => {
+  const f = fixture(async () => ({ok:true, output:"λ".repeat(65536)}));
+  const source = Array.from({length:8}, () => "# %% [python]\nprint('λ')").join("\n") +
+    "\n# %% [markdown]\n# Complete";
+  const result = await f.runner.run(source, "python");
+  assert.deepEqual(result, {ok:true, executed:8});
+  assert.equal(f.entries.filter(entry => entry.kind === "code").length, 8);
+  assert.equal(f.entries.at(-1).kind, "markdown");
+  assert.equal(f.entries.some(entry => entry.truncated), false);
+  assert.equal(f.entries.reduce((bytes, entry) =>
+    bytes + (entry.kind === "code" ? new TextEncoder().encode(entry.output).length : 0), 0), 1048576);
+  assert.equal(f.runner.isRunning(), false);
+});
+
+test("exhausted aggregate output rejects ninth executable cell without dispatching it", async () => {
+  let calls = 0;
+  const f = fixture(async () => { calls++; return {ok:true, output:"x".repeat(131072)}; });
+  const source = Array.from({length:9}, () => "# %% [r]\ncat(1)").join("\n");
+  const result = await f.runner.run(source, "r");
+  assert.deepEqual(result, {ok:false, executed:8, error:"Notebook output limit of 1 MiB reached."});
+  assert.equal(calls, 8);
+  assert.equal(f.entries.length, 8);
+  assert.equal(f.runner.isRunning(), false);
+});
+
+test("final cell exceeding the aggregate budget still fails when its snapshot is truncated", async () => {
+  const f = fixture(async () => ({ok:true, output:"z".repeat(131073)}));
+  const source = Array.from({length:8}, () => "# %% [python]\nprint(1)").join("\n");
+  const result = await f.runner.run(source, "python");
+  assert.deepEqual(result, {ok:false, executed:8, error:"Notebook output limit of 1 MiB reached."});
+  assert.equal(f.entries.at(-1).truncated, true);
+});

@@ -1,0 +1,112 @@
+# Native fourth-root acceptance: executable Flow parser, typed IR, dimensional
+# inference, equation evaluation and one-through-four unknown solvers.
+import .math_dimensions { Dimension, dimensionless, length_dimension, time_dimension, same_dimension, quantity }
+import .math_expression_ir { MathResult }
+import .math_expression_source { ParsedMathExpression, parse_math_expression, evaluate_math_expression }
+import .math_static { MathInferredType, MathDimensionBindings, empty_math_dimension_bindings, infer_math_expression_source, infer_math_equation_source }
+import .math_equation { MathEquationResult, evaluate_math_equation_source }
+import .math_dimension_solver { MathDimensionSolution, solve_math_equation_unknown_dimension }
+import .math_dimension_pair { MathTwoDimensionSolution, solve_math_equations_two_unknown_dimensions }
+import .math_dimension_triple { MathThreeDimensionSolution, solve_math_equations_three_unknown_dimensions }
+import .math_dimension_four { MathFourDimensionSolution, solve_math_equations_four_unknown_dimensions }
+
+function close(actual: f64, expected: f64) -> bool {
+    let mut difference: f64 = actual - expected
+    if difference < 0.0 { difference = -difference }
+    return difference < 0.0000000001
+}
+
+function close_relative(actual: f64, expected: f64) -> bool {
+    if expected == 0.0 { return actual == 0.0 }
+    return close(actual / expected, 1.0)
+}
+
+function main() -> i32 {
+    let metres: Dimension = length_dimension()
+    let fourth_length: Dimension = Dimension {
+        length: 4, mass: 0, time: 0, temperature: 0
+    }
+    let mut result: MathResult = evaluate_math_expression("root4(81*1m⁴)")
+    if not result.valid or not close(result.result.value, 3.0) or
+       not same_dimension(result.result.dimension, metres) { return 1 }
+    result = evaluate_math_expression("∜(16*1m⁴)")
+    if not result.valid or not close(result.result.value, 2.0) or
+       not same_dimension(result.result.dimension, metres) { return 2 }
+    result = evaluate_math_expression("∜256")
+    if not result.valid or not close(result.result.value, 4.0) { return 3 }
+    result = evaluate_math_expression("root4(0m⁴)")
+    if not result.valid or result.result.value != 0.0 or
+       not same_dimension(result.result.dimension, metres) { return 4 }
+    result = evaluate_math_expression("root4(1e-24*1m⁴)")
+    if not result.valid or not close_relative(result.result.value, 1e-6) { return 5 }
+    result = evaluate_math_expression("root4(1e24*1m⁴)")
+    if not result.valid or not close_relative(result.result.value, 1e6) { return 6 }
+    result = evaluate_math_expression("root4(-16)")
+    if result.valid or result.failed_at != 0 { return 7 }
+    result = evaluate_math_expression("root4(16m³)")
+    if result.valid or result.failed_at != 0 { return 8 }
+    result = evaluate_math_expression("root4(true)")
+    if result.valid or result.failed_at != 0 { return 9 }
+    if parse_math_expression("root4()").valid { return 10 }
+    if parse_math_expression("root4(1,2)").valid { return 11 }
+    if parse_math_expression("root4 (16)").valid { return 12 }
+    if parse_math_expression("∜").valid { return 13 }
+
+    let mut parsed: ParsedMathExpression = parse_math_expression("root4(16)")
+    if not parsed.valid or parsed.program.count != 2 or
+       parsed.program.instructions[1].opcode != 45 or
+       parsed.program.instructions[1].source_start != 0 or
+       parsed.program.instructions[1].source_end != 5 { return 14 }
+    parsed = parse_math_expression("∜(16)")
+    if not parsed.valid or parsed.program.count != 2 or
+       parsed.program.instructions[1].opcode != 45 or
+       parsed.program.instructions[1].source_start != 0 or
+       parsed.program.instructions[1].source_end != 3 { return 15 }
+
+    let mut inferred: MathInferredType = infer_math_expression_source("root4(16m⁴)")
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension, metres) { return 16 }
+    inferred = infer_math_expression_source("root4(-16m⁴)")
+    if not inferred.valid or not same_dimension(inferred.dimension, metres) { return 17 }
+    inferred = infer_math_expression_source("root4(16m³)")
+    if inferred.valid or inferred.failed_at != 0 { return 18 }
+    inferred = infer_math_expression_source("∜true")
+    if inferred.valid or inferred.failed_at != 0 { return 19 }
+    inferred = infer_math_equation_source("root4(16m⁴) = 2m")
+    if not inferred.valid or not same_dimension(inferred.dimension, metres) { return 20 }
+
+    let mut equation: MathEquationResult = evaluate_math_equation_source(
+        "root4(16m⁴) = 2m", quantity(1e-9, metres))
+    if not equation.valid or not equation.satisfied { return 21 }
+    equation = evaluate_math_equation_source(
+        "root4(16m⁴) = 2s", quantity(1e-9, metres))
+    if equation.valid { return 22 }
+
+    let known: MathDimensionBindings = empty_math_dimension_bindings()
+    let mut first: MathDimensionSolution =
+        solve_math_equation_unknown_dimension("root4(x) = 1m", known, "x")
+    if not first.valid or not same_dimension(first.dimension, fourth_length) { return 23 }
+    let mut pair: MathTwoDimensionSolution =
+        solve_math_equations_two_unknown_dimensions(
+            "root4(x) = 1m", "y = 1s", known, "x", "y")
+    if not pair.valid or not same_dimension(pair.first, fourth_length) or
+       not same_dimension(pair.second, time_dimension()) { return 24 }
+    let mut triple: MathThreeDimensionSolution =
+        solve_math_equations_three_unknown_dimensions(
+            "root4(x) = 1m", "y = 1m", "z = 1s", known, "x", "y", "z")
+    if not triple.valid or not same_dimension(triple.first, fourth_length) or
+       not same_dimension(triple.third, time_dimension()) { return 25 }
+    let mut four: MathFourDimensionSolution =
+        solve_math_equations_four_unknown_dimensions(
+            "root4(x) = 1m", "y = 1m", "z = 1s", "w = 1m",
+            known, "x", "y", "z", "w")
+    if not four.valid or not same_dimension(four.first, fourth_length) or
+       not same_dimension(four.third, time_dimension()) { return 26 }
+    four = solve_math_equations_four_unknown_dimensions(
+        "root4(x) = 1m", "y = 1m", "z = 1s", "w = 1m",
+        known, "x", "y", "z", "x")
+    if four.valid { return 27 }
+
+    print("native-math-fourth-root-ok")
+    return 0
+}

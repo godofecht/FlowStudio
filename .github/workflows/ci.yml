@@ -100,6 +100,7 @@ jobs:
           flow run src/math_dimension_pair_smoke.flow
           flow run src/math_dimension_triple_smoke.flow
           flow run src/math_dimension_overdetermined_smoke.flow
+          flow run src/math_dimension_variable_smoke.flow
           flow run src/math_trigonometry_smoke.flow
           flow run src/math_hyperbolic_smoke.flow
           flow run src/math_inverse_hyperbolic_smoke.flow

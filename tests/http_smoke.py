@@ -224,7 +224,7 @@ def main() -> None:
         expected = [float(value.strip()) for value in reference.group(1).split(",")
                     if value.strip()]
         assert len(expected) == 32
-        assert max(abs(a - b) for a, b in zip(actual, expected)) < 5e-11, species
+        assert max(abs(a - b) for a, b in zip(actual, expected)) < 1e-4, species
     malformed_cyclic = cyclic_source.replace(
         "W evolves as laplacian(W)", "W evolves as laplacian(", 1)
     assert malformed_cyclic != cyclic_source

@@ -49,13 +49,6 @@ struct DimensionRow {
     failed_at: i32
 }
 
-struct AxisSolution {
-    valid: bool,
-    first: i32,
-    second: i32,
-    third: i32
-}
-
 function blank_affine() -> QuadAffine {
     return QuadAffine {
         first: 0, second: 0, third: 0, fourth: 0, offset: dimensionless(), denominator: 1

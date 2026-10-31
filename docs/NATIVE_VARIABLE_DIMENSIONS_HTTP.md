@@ -5,7 +5,7 @@ This qualification executes the actual Flow 2.0 implementation in
 `src/math_dimension_variable_smoke.flow` program. The program exercises
 three unknown physical dimensions over 3–16 equations, including
 rank-deficient prefixes, late independent constraints, Unicode identifiers,
-nested roots, additive consistency checks, contradictory equations, malformed
+square-root constraints, additive consistency checks, contradictory equations, malformed
 equations, nonintegral SI exponents and bounded equation counts.
 
 The production HTTP smoke in `tests/http_smoke.py` stages the eight

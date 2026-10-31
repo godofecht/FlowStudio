@@ -81,8 +81,10 @@ function main() -> i32 {
     declarations.symbols[3] = MathDimensionSymbol { name: "bad-name", dimension: length }
     if infer_math_expression_source_with_dimensions("distance", declarations).valid { return 16 }
     declarations.symbols[3] = MathDimensionSymbol { name: "mass", dimension: mass_dimension() }
-    declarations.symbols[3].dimension = Dimension {
-        length: 33, mass: 0, time: 0, temperature: 0
+    declarations.symbols[3] = MathDimensionSymbol {
+        name: "mass", dimension: Dimension {
+            length: 33, mass: 0, time: 0, temperature: 0
+        }
     }
     if infer_math_expression_source_with_dimensions("mass", declarations).valid { return 17 }
     declarations.count = 9

@@ -459,8 +459,8 @@ The native source-to-postfix compiler recognizes `pi`, `π`, `tau` and
 executable native Flow 2.0 lowering, not editor substitution or the Python
 mathematical dialect. UTF-8 byte spans are retained for both Greek spellings,
 and existing dimensional, trigonometric, equation-residual and static type
-checks apply unchanged. Caller-provided `MathBindings` cannot shadow these
-four reserved names. Multiplication remains explicit: `2*π` is accepted;
+checks apply unchanged. Explicit caller-provided `MathBindings` take precedence over these
+four fallback constants, preserving existing Greek symbolic variables. Multiplication remains explicit: `2*π` is accepted;
 `2π` is rejected.
 
 The checked-in native source, static inference, equation and compact HTTP

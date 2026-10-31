@@ -163,6 +163,17 @@ function main() -> i32 {
     if not result.valid or not close_relative(result.result.value, -1e-100) { return 49 }
     inferred = infer_math_expression_source("cbrt(-8m³) = 2m")
     if inferred.valid { return 50 }
+    # Independent analytical references from the real-valued cube-root function.
+    result = evaluate_math_expression("cbrt(2)")
+    if not result.valid or not close_relative(result.result.value, 1.2599210498948734) { return 51 }
+    result = evaluate_math_expression("cbrt(-3)")
+    if not result.valid or not close_relative(result.result.value, -1.4422495703074083) { return 52 }
+    result = evaluate_math_expression("∛123456789")
+    if not result.valid or not close_relative(result.result.value, 497.93385921817446) { return 53 }
+    result = evaluate_math_expression("cbrt(-987654321)")
+    if not result.valid or not close_relative(result.result.value, -995.8677214612972) { return 54 }
+    result = evaluate_math_expression("cbrt(0.001)")
+    if not result.valid or not close_relative(result.result.value, 0.1) { return 55 }
     println("native-math-cuberoot-ok")
     return 0
 }

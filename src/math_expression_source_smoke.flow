@@ -1238,7 +1238,7 @@ function main() -> i32 {
     if not result.valid or not near(result.result.value, 0.25) or
        not same_dimension(result.result.dimension,
            quotient_dimension(dimensionless(), product_dimension(length, length))) { return 459 }
-    result = evaluate_math_expression("2m^−2 * 4m²")
+    result = evaluate_math_expression("2m^−2 * 2m²")
     if not result.valid or not near(result.result.value, 1.0) or
        not same_dimension(result.result.dimension, dimensionless()) { return 460 }
     result = evaluate_math_expression("-2m^−2")

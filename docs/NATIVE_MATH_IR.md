@@ -470,3 +470,40 @@ compiles and executes these programs, as well as the Python-backed
 Navier–Stokes fixture. Full upstream grammar integration, symbolic
 dimensional constraint solving, native Navier–Stokes and generalized tensor
 PDE lowering remain outstanding.
+
+
+## Native signed physical cube roots (2026-10-31; qualification pending)
+
+The native Flow 2.0 scalar source parser lowers `cbrt(expression)` and
+Unicode prefix `∛expression` (U+221B) to typed postfix opcode 44.
+Both execute through `src/math_expression_ir.flow`, not Python, editor
+snippets or an external math library. The three-byte UTF-8 radical span
+is preserved for diagnostics. A parenthesized function call consumes
+its argument before an outer postfix integer power.
+
+The real-valued cube root supports negative and zero radicands. Its
+physical dimensions must have exponents divisible by three in **each**
+supported SI axis (length, mass, time and temperature); the result
+divides those exponents by three. For example,
+`cbrt(-8m³) = -2m` and `∛(27m³/8s³) = 1.5m/s`, while
+`cbrt(8m²)` is a type error. Static inference checks dimensional
+divisibility without executing the numerical root, so negative inputs
+remain statically well-typed. Predicate operands fail closed.
+
+The native numerical kernel rescales positive magnitudes by powers of
+eight into a well-conditioned interval, performs 30 Newton updates,
+then restores the scale and sign. This avoids an `exp(log(x)/3)`
+implementation and handles very small nonzero inputs. Existing
+finite-value and bounded-physical-dimension guards remain active.
+
+`src/math_cuberoot_smoke.flow` contains 55 native assertions covering
+signed analytical values, SI dimensions, UTF-8 source spans, direct
+postfix IR, parser arity, equations, symbolic bindings and static
+inference. `src/math_expression_source_http_smoke.flow` adds four
+production HTTP acceptance checks. CI compiles and executes these
+programs on Linux x86-64 and macOS arm64; the results must be inspected
+before claiming cross-platform verification.
+
+This remains a bounded scalar expression dialect. It does not implement
+upstream Flow 2.0 grammar integration, unbound symbolic dimensional
+inference, generalized tensor/PDE equation ASTs or native Navier–Stokes.

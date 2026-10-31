@@ -185,7 +185,7 @@ test("aggregate PNG snapshots are bounded by eight MiB across a twelve-cell note
   const png = "iVBORw0KGgo" + "A".repeat(1048576 - 12);
   const f = fixture(async () => ({ok:true, output:"computed", plots:[{number:17, png}]}));
   const source = Array.from({length:12}, (_, index) =>
-    "# %% [python]\\nprint(" + index + ")").join("\\n").replaceAll("\\n", "\n");
+    "# %% [python]\nprint(" + index + ")").join("\n");
   assert.deepEqual(await f.runner.run(source, "python"), {ok:true, executed:12});
   assert.deepEqual(f.entries.map(entry => entry.plots.length),
     [1,1,1,1,1,1,1,1,0,0,0,0]);
@@ -214,8 +214,7 @@ test("plot payload budget is independent of aggregate text and bitmap limits", a
     return {ok:true, output:"λ", plots:[{png}],
       images:[{close() { throw Error("unexpected bitmap close"); }}]};
   });
-  const source = Array.from({length:10}, () => "# %% [python]\\nprint(1)").join("\\n")
-    .replaceAll("\\n", "\n");
+  const source = Array.from({length:10}, () => "# %% [python]\nprint(1)").join("\n");
   assert.deepEqual(await f.runner.run(source, "python"), {ok:true, executed:10});
   assert.equal(calls, 10);
   assert.deepEqual(f.entries.map(entry => entry.plots.length), [1,1,1,1,1,1,1,1,0,0]);

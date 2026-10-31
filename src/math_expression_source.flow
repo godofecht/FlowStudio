@@ -101,11 +101,7 @@ function valid_symbol_name(name: string) -> bool {
        identifier_matches(bytes, 0, length, "or") or
        identifier_matches(bytes, 0, length, "not") or
        identifier_matches(bytes, 0, length, "true") or
-       identifier_matches(bytes, 0, length, "false") or
-       identifier_matches(bytes, 0, length, "pi") or
-       identifier_matches(bytes, 0, length, "tau") or
-       identifier_matches(bytes, 0, length, "π") or
-       identifier_matches(bytes, 0, length, "τ") { return false }
+       identifier_matches(bytes, 0, length, "false") { return false }
     while i < length {
         let width: i32 = identifier_part_width(bytes, i, length)
         if width == 0 { return false }
@@ -538,26 +534,6 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
                 expect_operand = false
                 continue
             }
-            # Mathematical constants are typed dimensionless IR literals,
-            # never free variables or editor-only substitutions. Both ASCII
-            # and Greek spellings retain their original UTF-8 byte spans.
-            # Reserved constants cannot be shadowed by caller bindings.
-            if identifier_matches(bytes, start, index, "pi") or
-               identifier_matches(bytes, start, index, "π") or
-               identifier_matches(bytes, start, index, "tau") or
-               identifier_matches(bytes, start, index, "τ") {
-                if not expect_operand or count >= 64 { return source_error(start, length) }
-                let mut constant: f64 = 3.14159265358979323846
-                if identifier_matches(bytes, start, index, "tau") or
-                   identifier_matches(bytes, start, index, "τ") {
-                    constant = 6.28318530717958647692
-                }
-                instructions[count] = make_instruction(0,
-                    quantity(constant, dimensionless()), start, index)
-                count = count + 1
-                expect_operand = false
-                continue
-            }
             if not expect_operand { return source_error(start, length) }
             let mut found: bool = false
             let mut value: Quantity = quantity(0.0, dimensionless())
@@ -569,6 +545,21 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
                     break
                 }
                 symbol_index = symbol_index + 1
+            }
+            # Explicit caller bindings take precedence over the four
+            # dimensionless mathematical constants. This preserves existing
+            # Greek symbolic variables (including physical τ and π) while
+            # making unbound pi/π and tau/τ useful in numeric expressions.
+            if not found {
+                if identifier_matches(bytes, start, index, "pi") or
+                   identifier_matches(bytes, start, index, "π") {
+                    value = quantity(3.14159265358979323846, dimensionless())
+                    found = true
+                } elif identifier_matches(bytes, start, index, "tau") or
+                     identifier_matches(bytes, start, index, "τ") {
+                    value = quantity(6.28318530717958647692, dimensionless())
+                    found = true
+                }
             }
             if not found { return source_error(start, length) }
             if count >= 64 { return source_error(start, length) }

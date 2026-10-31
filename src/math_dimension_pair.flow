@@ -344,3 +344,62 @@ export function solve_math_equations_two_unknown_dimensions(
         failed_equation: -1, failed_at: -1
     }
 }
+
+
+# Three constraints may contain redundant or inconsistent equations. Choose
+# any full-rank monomial pair, then validate *all three* through the ordinary
+# native static checker. This permits an additive consistency constraint
+# without pretending to solve arbitrary additive equations.
+function triple_satisfies(
+    first_equation: string, second_equation: string, third_equation: string,
+    known: MathDimensionBindings, first_unknown: string, second_unknown: string,
+    candidate: MathTwoDimensionSolution) -> bool {
+    if not candidate.valid { return false }
+    let mut declarations: MathDimensionBindings = known
+    declarations.symbols[known.count] = MathDimensionSymbol {
+        name: first_unknown, dimension: candidate.first
+    }
+    declarations.symbols[known.count + 1] = MathDimensionSymbol {
+        name: second_unknown, dimension: candidate.second
+    }
+    declarations.count = known.count + 2
+    let first: MathInferredType =
+        infer_math_equation_source_with_dimensions(first_equation, declarations)
+    if not first.valid or first.is_predicate { return false }
+    let second: MathInferredType =
+        infer_math_equation_source_with_dimensions(second_equation, declarations)
+    if not second.valid or second.is_predicate { return false }
+    let third: MathInferredType =
+        infer_math_equation_source_with_dimensions(third_equation, declarations)
+    return third.valid and not third.is_predicate
+}
+
+# Find a full-rank pair among three equations and reject any solution that
+# violates the remaining dimensional constraint. All paths are bounded:
+# three two-equation solves and at most nine native static equation checks.
+# Inconsistent, underdetermined and unsupported systems fail closed.
+export function solve_math_equations_three_constraints_two_unknown_dimensions(
+    first_equation: string, second_equation: string, third_equation: string,
+    known: MathDimensionBindings,
+    first_unknown: string, second_unknown: string) -> MathTwoDimensionSolution {
+    let mut candidate: MathTwoDimensionSolution =
+        solve_math_equations_two_unknown_dimensions(
+            first_equation, second_equation, known, first_unknown, second_unknown)
+    if triple_satisfies(first_equation, second_equation, third_equation,
+                        known, first_unknown, second_unknown, candidate) {
+        return candidate
+    }
+    candidate = solve_math_equations_two_unknown_dimensions(
+        first_equation, third_equation, known, first_unknown, second_unknown)
+    if triple_satisfies(first_equation, second_equation, third_equation,
+                        known, first_unknown, second_unknown, candidate) {
+        return candidate
+    }
+    candidate = solve_math_equations_two_unknown_dimensions(
+        second_equation, third_equation, known, first_unknown, second_unknown)
+    if triple_satisfies(first_equation, second_equation, third_equation,
+                        known, first_unknown, second_unknown, candidate) {
+        return candidate
+    }
+    return pair_failed(2, 0)
+}

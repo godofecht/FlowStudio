@@ -57,7 +57,7 @@ function main() -> i32 {
     if not result.valid or not relative(result.result.value, 1e-20) { return 15 }
     result = evaluate_math_expression("norm3(3,4,12)+norm3(0,0,7)")
     if not result.valid or not near(result.result.value, 20.0) { return 16 }
-    result = evaluate_math_expression("norm3(norm3(3,4),0,12)")
+    result = evaluate_math_expression("norm3(norm(3,4),0,12)")
     if not result.valid or not near(result.result.value, 13.0) { return 17 }
     result = evaluate_math_expression("norm3(3m,4s,12m)")
     if result.valid or result.failed_at != 0 { return 18 }

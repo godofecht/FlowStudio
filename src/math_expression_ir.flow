@@ -19,6 +19,7 @@
 #          44 cbrt(x), signed physical cube root with SI exponents divisible by 3,
 #          45 norm3(x, y, z), stable three-component Euclidean norm with matched units,\n#          46 root4(x), real fourth root with SI exponents divisible by 4.\n#          47-50 root5(x)..root8(x), real nth roots with exact SI divisibility.
 #          51 norm4(x, y, z, w), stable four-component Euclidean norm with matched units.
+#          52-55 norm5(x1,..,x5)..norm8(x1,..,x8), scale-stable physical vector norms.
 # Predicate values are dimensionless 0/1 with a separate runtime type bit.
 # where and logical operators evaluate operands eagerly (no short circuit).
 # Unsupported instructions and type mismatches fail closed.
@@ -820,6 +821,40 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
             depth = depth - 1
             stack[depth - 1] = result.quantity
             predicate[depth - 1] = result_predicate
+        } elif opcode >= 52 and opcode <= 55 {
+            # Bounded five-through-eight component vector norms. Scale before
+            # squaring to avoid overflow/underflow in the intermediate sum.
+            let arity: i32 = opcode - 47
+            if depth < arity { return failed(instruction.source_start) }
+            let first: Quantity = stack[depth - arity]
+            let mut scale: f64 = 0.0
+            let mut component: i32 = 0
+            while component < arity {
+                let position: i32 = depth - arity + component
+                let value: Quantity = stack[position]
+                if predicate[position] or
+                   not same_dimension(first.dimension, value.dimension) {
+                    return failed(instruction.source_start)
+                }
+                let absolute: f64 = magnitude(value.value)
+                if absolute > scale { scale = absolute }
+                component = component + 1
+            }
+            let mut norm: f64 = 0.0
+            if scale > 0.0 {
+                let mut sum: f64 = 0.0
+                component = 0
+                while component < arity {
+                    let normalized: f64 = stack[depth - arity + component].value / scale
+                    sum = sum + normalized * normalized
+                    component = component + 1
+                }
+                norm = scale * positive_square_root(sum)
+            }
+            if not bounded_value(norm) { return failed(instruction.source_start) }
+            depth = depth - arity + 1
+            stack[depth - 1] = quantity(norm, first.dimension)
+            predicate[depth - 1] = false
         } elif opcode == 51 {
             if depth < 4 { return failed(instruction.source_start) }
             let first: Quantity = stack[depth - 4]

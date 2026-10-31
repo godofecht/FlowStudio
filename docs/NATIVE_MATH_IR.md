@@ -540,3 +540,23 @@ dialect; `norm3` does not imply native Navier–Stokes support.
 Full upstream grammar integration, unbound symbolic dimensional
 constraint solving, tensor/PDE AST lowering and native Navier–Stokes
 remain outstanding. CI qualification must be checked before merging.
+
+
+## Native five-through-eight component vector norms (2026-10-31)
+
+The executable native Flow 2.0 mathematical source parser, typed postfix
+runtime and value-independent SI dimensional checker now support
+`norm5`, `norm6`, `norm7` and `norm8` with exactly five through eight
+arguments (opcodes 52–55). These compute Euclidean norms of physical
+quantities using scale-normalized sums of squares, rejecting mixed units,
+predicates, invalid arity and results outside the existing 1e30 bound.
+They preserve function-name source spans. The same executable parser and
+IR are used for scalar equation residuals and the production HTTP endpoint.
+
+The checked-in `src/math_norm_extended_smoke.flow` executes analytic,
+dimension, source-span, invalid-input and 200 scale-parameterized native
+IR tests on Linux/macOS; `src/math_expression_source_http_smoke.flow`
+exercises the same operators through production HTTP compile/run acceptance.
+These are bounded scalar vector norms, **not** general tensor ASTs,
+compiler-wide upstream Flow syntax, native Navier–Stokes or computed PDE
+visualization. CI verification is required before merging.

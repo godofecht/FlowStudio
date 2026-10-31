@@ -157,6 +157,56 @@ function main() -> i32 {
     result = solve_math_equation_unknown_dimension("∜x = 1m", empty, "x")
     if not result.valid or not same_dimension(result.dimension, fourth_length) { return 60 }
 
+    # Higher-arity native norm IR now participates in symbolic dimensional
+    # constraints; numerical magnitudes do not determine physical dimensions.
+    result = solve_math_equation_unknown_dimension(
+        "norm5(x,1m,2m,3m,4m) = 5m", empty, "x")
+    if not result.valid or not same_dimension(result.dimension, length) { return 61 }
+    result = solve_math_equation_unknown_dimension(
+        "norm8(1s,2s,3s,4s,5s,6s,7s,x) = 1s", empty, "x")
+    if not result.valid or not same_dimension(result.dimension, time) { return 62 }
+    result = solve_math_equation_unknown_dimension(
+        "norm8(sqrt(x),1m,2m,3m,4m,5m,6m,7m) = 1m", empty, "x")
+    if not result.valid or not same_dimension(result.dimension, area) { return 63 }
+    result = solve_math_equation_unknown_dimension(
+        "norm8(x,x,x,x,x,x,x,x) = 1m", empty, "x")
+    if not result.valid or not same_dimension(result.dimension, length) { return 64 }
+    result = solve_math_equation_unknown_dimension(
+        "norm5(x,1m,1s,1m,1m) = 1m", empty, "x")
+    if result.valid { return 65 }
+    result = solve_math_equation_unknown_dimension(
+        "norm8(x,1m,1m,1m,1m,1m,1m,1s) = 1m", empty, "x")
+    if result.valid { return 66 }
+    result = solve_math_equation_unknown_dimension(
+        "norm5(x,1m,1m,1m,1m) = 1s", empty, "x")
+    if result.valid { return 67 }
+    result = solve_math_equation_unknown_dimension(
+        "norm8(1m,1m,1m,1m,1m,1m,1m,1m) = 1m", empty, "x")
+    if result.valid { return 68 }
+    result = solve_math_equation_unknown_dimension(
+        "norm5(x,1m,1m,1m,true) = 1m", empty, "x")
+    if result.valid { return 69 }
+    result = solve_math_equation_unknown_dimension(
+        "norm5(x,1m,1m,1m) = 1m", empty, "x")
+    if result.valid { return 70 }
+    result = solve_math_equation_unknown_dimension(
+        "norm8(x,1m,1m,1m,1m,1m,1m,1m,1m) = 1m", empty, "x")
+    if result.valid { return 71 }
+    result = solve_math_equation_unknown_dimension(
+        "norm8(x,1m,1m,1m,1m,1m,1m,1m) = 1m²", empty, "x")
+    if result.valid { return 72 }
+    let fifth_length: Dimension = product_dimension(fourth_length, length)
+    result = solve_math_equation_unknown_dimension(
+        "norm5(root5(x),1m,2m,3m,4m) = 1m", empty, "x")
+    if not result.valid or not same_dimension(result.dimension, fifth_length) { return 73 }
+    let eighth_length: Dimension = product_dimension(fourth_length, fourth_length)
+    result = solve_math_equation_unknown_dimension(
+        "norm8(root8(x),1m,1m,1m,1m,1m,1m,1m) = 1m", empty, "x")
+    if not result.valid or not same_dimension(result.dimension, eighth_length) { return 74 }
+    result = solve_math_equation_unknown_dimension(
+        "norm5(x,1m,1m,1m,1m) = x", empty, "x")
+    if not result.valid or not same_dimension(result.dimension, length) { return 75 }
+
     println("native-math-unknown-dimension-constraints-ok")
     return 0
 }

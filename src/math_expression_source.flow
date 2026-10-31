@@ -101,7 +101,11 @@ function valid_symbol_name(name: string) -> bool {
        identifier_matches(bytes, 0, length, "or") or
        identifier_matches(bytes, 0, length, "not") or
        identifier_matches(bytes, 0, length, "true") or
-       identifier_matches(bytes, 0, length, "false") { return false }
+       identifier_matches(bytes, 0, length, "false") or
+       identifier_matches(bytes, 0, length, "pi") or
+       identifier_matches(bytes, 0, length, "tau") or
+       identifier_matches(bytes, 0, length, "π") or
+       identifier_matches(bytes, 0, length, "τ") { return false }
     while i < length {
         let width: i32 = identifier_part_width(bytes, i, length)
         if width == 0 { return false }
@@ -530,6 +534,26 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
                 }
                 instructions[count] = make_instruction(24,
                     quantity(boolean_value, dimensionless()), start, index)
+                count = count + 1
+                expect_operand = false
+                continue
+            }
+            # Mathematical constants are typed dimensionless IR literals,
+            # never free variables or editor-only substitutions. Both ASCII
+            # and Greek spellings retain their original UTF-8 byte spans.
+            # Reserved constants cannot be shadowed by caller bindings.
+            if identifier_matches(bytes, start, index, "pi") or
+               identifier_matches(bytes, start, index, "π") or
+               identifier_matches(bytes, start, index, "tau") or
+               identifier_matches(bytes, start, index, "τ") {
+                if not expect_operand or count >= 64 { return source_error(start, length) }
+                let mut constant: f64 = 3.14159265358979323846
+                if identifier_matches(bytes, start, index, "tau") or
+                   identifier_matches(bytes, start, index, "τ") {
+                    constant = 6.28318530717958647692
+                }
+                instructions[count] = make_instruction(0,
+                    quantity(constant, dimensionless()), start, index)
                 count = count + 1
                 expect_operand = false
                 continue

@@ -18,6 +18,7 @@
 #          43 expm1(x), stable exp(x)-1 for dimensionless |x| <= 60,
 #          44 cbrt(x), signed physical cube root with SI exponents divisible by 3,
 #          45 norm3(x, y, z), stable three-component Euclidean norm with matched units,\n#          46 root4(x), real fourth root with SI exponents divisible by 4.\n#          47-50 root5(x)..root8(x), real nth roots with exact SI divisibility.
+#          51 norm4(x, y, z, w), stable four-component Euclidean norm with matched units.
 # Predicate values are dimensionless 0/1 with a separate runtime type bit.
 # where and logical operators evaluate operands eagerly (no short circuit).
 # Unsupported instructions and type mismatches fail closed.
@@ -819,6 +820,39 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
             depth = depth - 1
             stack[depth - 1] = result.quantity
             predicate[depth - 1] = result_predicate
+        } elif opcode == 51 {
+            if depth < 4 { return failed(instruction.source_start) }
+            let first: Quantity = stack[depth - 4]
+            let second: Quantity = stack[depth - 3]
+            let third: Quantity = stack[depth - 2]
+            let fourth: Quantity = stack[depth - 1]
+            if predicate[depth - 4] or predicate[depth - 3] or
+               predicate[depth - 2] or predicate[depth - 1] or
+               not same_dimension(first.dimension, second.dimension) or
+               not same_dimension(first.dimension, third.dimension) or
+               not same_dimension(first.dimension, fourth.dimension) {
+                return failed(instruction.source_start)
+            }
+            let a: f64 = magnitude(first.value)
+            let b: f64 = magnitude(second.value)
+            let c: f64 = magnitude(third.value)
+            let d: f64 = magnitude(fourth.value)
+            let mut scale: f64 = a
+            if b > scale { scale = b }
+            if c > scale { scale = c }
+            if d > scale { scale = d }
+            let mut norm: f64 = 0.0
+            if scale > 0.0 {
+                let x: f64 = a / scale
+                let y: f64 = b / scale
+                let z: f64 = c / scale
+                let w: f64 = d / scale
+                norm = scale * positive_square_root(x * x + y * y + z * z + w * w)
+            }
+            if not bounded_value(norm) { return failed(instruction.source_start) }
+            depth = depth - 3
+            stack[depth - 1] = quantity(norm, first.dimension)
+            predicate[depth - 1] = false
         } elif opcode == 45 {
             if depth < 3 { return failed(instruction.source_start) }
             let first: Quantity = stack[depth - 3]

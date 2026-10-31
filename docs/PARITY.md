@@ -1,3 +1,19 @@
+## 2026-10-31: bounded aggregate notebook PNG payloads (CI pending)
+
+The production mixed-language notebook runner now retains at most 8 MiB of
+PNG base64 payload per run, alongside its existing 32-plot and 32-bitmap
+ceilings. Oversized/malformed plot payloads and untrusted auxiliary worker
+fields are discarded before DOM rendering and notebook recovery/export.
+Three deterministic controller regressions exercise twelve real percent-code
+cells, the exact eight-plot byte boundary, invalid plots, independent text
+and bitmap budgets. [Reproduction](NOTEBOOK_PLOT_BUDGET.md).
+
+**Pending:** exact-head Linux/macOS CI, native Flow/HTTP and R/C FlowJIT,
+and Ubuntu physical Chromium qualification. **Unexecuted:** physical
+Chromium specifically stressing twelve 1 MiB plot snapshots, independent
+macOS browser and local native Flow/R. No hosted CI configuration changed.
+This is a bounded persistence/resource improvement, not full RStudio parity.
+
 ## 2026-10-31: asynchronous mixed-format notebook import isolation (qualification pending)
 
 Production `docs/app/notebook_io.js` now rejects stale asynchronous file reads,

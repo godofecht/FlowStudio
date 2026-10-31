@@ -357,7 +357,7 @@ try {
         }
       });
       assert.match(importIsolation.latest, /print\\(17\\)/,
-        'late Quarto read must not overwrite newer Jupyter import');
+        'late Quarto read must not overwrite newer Jupyter import: ' + JSON.stringify(importIsolation));
       assert.equal(importIsolation.edited, 'user_edit_must_survive = 42');
       assert.match(importIsolation.notice, /editor changed during file read/);
       await notebookPage.locator('#rRuntime').selectOption('native');

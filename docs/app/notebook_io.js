@@ -3,7 +3,7 @@
 "use strict";
 function create(options) {
   const {openButton, fileInput, saveButton, source, language, format, parseCells,
-    isBusy, canReplace, onImported, onExport, getResults, getFilename, notice,
+    isBusy, canReplace, getDocumentIdentity, onImported, onExport, getResults, getFilename, notice,
     bundleOpenButton, bundleFileInput, bundleSaveButton,
     rMarkdownOpenButton, rMarkdownFileInput, rMarkdown,
     quartoOpenButton, quartoFileInput, quarto} = options;
@@ -21,10 +21,15 @@ function create(options) {
       return;
     }
     const initialSource = source.value, initialLanguage = language.value;
+    const initialDocumentIdentity = getDocumentIdentity?.();
     try {
       const text = await file.text();
       if (token !== importGeneration) return;
       if (isBusy()) { notice("Wait for notebook execution to finish."); return; }
+      if (getDocumentIdentity && getDocumentIdentity() !== initialDocumentIdentity) {
+        notice("Notebook import cancelled: active document changed during file read.");
+        return;
+      }
       if (source.value !== initialSource || language.value !== initialLanguage) {
         notice("Notebook import cancelled: editor changed during file read.");
         return;

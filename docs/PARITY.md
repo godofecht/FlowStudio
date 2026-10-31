@@ -1,3 +1,18 @@
+## 2026-10-31: asynchronous notebook imports bound to document identity (qualification pending)
+
+The production `.ipynb`, `.fsnb`, `.Rmd` and `.qmd` import controller now
+compares the active document/session identity before applying a completed
+asynchronous file read, in addition to the existing source/language snapshot
+and latest-selection generation. Switching between tabs with identical source
+and language must not import into the wrong buffer. Four deterministic
+format-specific regressions exercise the switched-document rejection and
+successful subsequent import through the real format decoders.
+
+**Pending:** exact-head Linux/macOS Node suites, existing native Flow/HTTP,
+R/C FlowJIT and Ubuntu Chromium qualification. **Unexecuted:** physical-browser
+file-selection race stress and independent macOS physical-browser interaction.
+This is a persistence correctness improvement, not complete RStudio parity.
+
 ## 2026-10-31: bounded aggregate notebook PNG payloads (CI pending)
 
 The production mixed-language notebook runner now retains at most 8 MiB of

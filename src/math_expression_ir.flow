@@ -15,7 +15,8 @@
 #          35 sinh(x), 36 cosh(x), 37 tanh(x), dimensionless |x| <= 60,
 #          38 asinh(x), 39 acosh(x), 40 atanh(x), dimensionless with domain guards,
 #          42 log1p(x), stable natural logarithm of 1+x for x > -1,
-#          43 expm1(x), stable exp(x)-1 for dimensionless |x| <= 60.
+#          43 expm1(x), stable exp(x)-1 for dimensionless |x| <= 60,
+#          44 cbrt(x), signed physical cube root with SI exponents divisible by 3.
 # Predicate values are dimensionless 0/1 with a separate runtime type bit.
 # where and logical operators evaluate operands eagerly (no short circuit).
 # Unsupported instructions and type mismatches fail closed.
@@ -124,6 +125,32 @@ function positive_square_root(value: f64) -> f64 {
         iteration = iteration + 1
     }
     return estimate
+}
+
+# Normalize by exact powers of eight so Newton iteration is well-conditioned
+# for tiny and large finite values without libm or a cancellation-prone
+# exp(log(x)/3) approximation. Negative radicands retain their real sign.
+function real_cube_root(value: f64) -> f64 {
+    if value == 0.0 { return 0.0 }
+    let mut normalized: f64 = magnitude(value)
+    let mut scale: f64 = 1.0
+    while normalized > 8.0 {
+        normalized = normalized * 0.125
+        scale = scale * 2.0
+    }
+    while normalized < 0.125 {
+        normalized = normalized * 8.0
+        scale = scale * 0.5
+    }
+    let mut estimate: f64 = 1.0
+    let mut iteration: i32 = 0
+    while iteration < 30 {
+        estimate = (2.0 * estimate + normalized / (estimate * estimate)) / 3.0
+        iteration = iteration + 1
+    }
+    let root: f64 = estimate * scale
+    if value < 0.0 { return -root }
+    return root
 }
 
 # Dimensionless exponential, bounded to [-60, 60]. Range reduction to
@@ -412,6 +439,20 @@ function even_dimension(dimension: Dimension) -> bool {
         dimension.temperature == (dimension.temperature / 2) * 2
 }
 
+function third_dimension(dimension: Dimension) -> Dimension {
+    return Dimension {
+        length: dimension.length / 3, mass: dimension.mass / 3,
+        time: dimension.time / 3, temperature: dimension.temperature / 3
+    }
+}
+
+function divisible_by_three_dimension(dimension: Dimension) -> bool {
+    return dimension.length == (dimension.length / 3) * 3 and
+        dimension.mass == (dimension.mass / 3) * 3 and
+        dimension.time == (dimension.time / 3) * 3 and
+        dimension.temperature == (dimension.temperature / 3) * 3
+}
+
 function half_dimension(dimension: Dimension) -> Dimension {
     return Dimension {
         length: dimension.length / 2,
@@ -457,7 +498,7 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
         } elif opcode == 5 or opcode == 6 or opcode == 18 or opcode == 20 or opcode == 21 or opcode == 25 or
              opcode == 26 or opcode == 27 or opcode == 28 or opcode == 29 or opcode == 30 or opcode == 31 or
              opcode == 33 or opcode == 34 or opcode == 35 or opcode == 36 or opcode == 37 or
-             opcode == 38 or opcode == 39 or opcode == 40 or opcode == 42 or opcode == 43 {
+             opcode == 38 or opcode == 39 or opcode == 40 or opcode == 42 or opcode == 43 or opcode == 44 {
             if depth < 1 { return failed(instruction.source_start) }
             let input: Quantity = stack[depth - 1]
             if opcode == 18 {
@@ -477,6 +518,12 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
                     }
                     stack[depth - 1] = quantity(
                         positive_square_root(input.value), half_dimension(input.dimension))
+                } elif opcode == 44 {
+                    if not divisible_by_three_dimension(input.dimension) {
+                        return failed(instruction.source_start)
+                    }
+                    stack[depth - 1] = quantity(
+                        real_cube_root(input.value), third_dimension(input.dimension))
                 } elif opcode == 25 {
                     if not same_dimension(input.dimension, dimensionless()) or
                        magnitude(input.value) > 60.0 {

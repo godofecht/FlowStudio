@@ -585,8 +585,9 @@ def main() -> None:
     native_math_source = "\n".join(
         "\n".join(
             line.removeprefix("export ")
+            # splitlines() would split Unicode NEL/LS/PS inside Flow strings.
             for line in (Path(__file__).resolve().parents[1] / path)
-                .read_text(encoding="utf-8").splitlines()
+                .read_text(encoding="utf-8").split("\n")
             if line.strip() and not line.lstrip().startswith("#")
             if not line.startswith("import .math_dimensions {")
             and not line.startswith("import .math_expression_ir {")
@@ -596,6 +597,7 @@ def main() -> None:
     )
     assert "function parse_math_expression(" in native_math_source
     assert "native-math-source-ok" in native_math_source
+    assert "1m + 2m" in native_math_source
     status, body = request("POST", "/api/check/flow", native_math_source, accepted_headers)
     assert status == 200, ("native mathematical source compile", status, body)
     status, body = request("POST", "/api/run/flow", native_math_source, accepted_headers)
@@ -663,8 +665,9 @@ def main() -> None:
     native_equation_system = "\n".join(
         "\n".join(
             line.removeprefix("export ")
+            # Preserve Unicode line-boundary literals during HTTP bundling.
             for line in (Path(__file__).resolve().parents[1] / path)
-                .read_text(encoding="utf-8").splitlines()
+                .read_text(encoding="utf-8").split("\n")
             if line.strip() and not line.lstrip().startswith("#")
             if not line.startswith("import .math_dimensions {")
             and not line.startswith("import .math_expression_ir {")
@@ -676,6 +679,7 @@ def main() -> None:
     )
     assert "function parse_math_equation_system(" in native_equation_system
     assert "native-math-equation-system-ok" in native_equation_system
+    assert "1m=1m 2s=2s" in native_equation_system
     status, body = request("POST", "/api/check/flow", native_equation_system, accepted_headers)
     assert status == 200, ("native equation-system compile", status, body)
     status, body = request("POST", "/api/run/flow", native_equation_system, accepted_headers)

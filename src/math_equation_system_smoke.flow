@@ -259,6 +259,54 @@ function main() -> i32 {
     result = evaluate_math_equation_system(system, tolerances)
     if not result.valid or not result.satisfied { return 51 }
 
+    # Unicode NEL, LINE SEPARATOR and PARAGRAPH SEPARATOR are executable
+    # equation boundaries, preserving original UTF-8 byte diagnostics.
+    system = parse_math_equation_system("1m=1m 2s=2s 3K=3K")
+    if not system.valid or system.count != 3 or system.source_length != 23 or
+       system.equations[1].equality_at != 10 or
+       system.equations[2].equality_at != 18 or
+       system.equations[2].right.instructions[0].source_start != 19 { return 52 }
+    tolerances.count = 3
+    tolerances.values[0] = quantity(0.0, length_dimension())
+    tolerances.values[1] = quantity(0.0, time_dimension())
+    tolerances.values[2] = quantity(0.0, temperature_dimension())
+    result = evaluate_math_equation_system(system, tolerances)
+    if not result.valid or not result.satisfied or result.count != 3 { return 53 }
+
+    # Inside parentheses, these separators remain expression whitespace.
+    system = parse_math_equation_system("1m=(1m+ 0m) 2s=2s")
+    if not system.valid or system.count != 2 or system.source_length != 21 or
+       system.equations[1].equality_at != 18 { return 54 }
+    tolerances.count = 2
+    result = evaluate_math_equation_system(system, tolerances)
+    if not result.valid or not result.satisfied { return 55 }
+
+    # A comment terminates at the same Unicode line boundaries; its
+    # semicolons and unmatched parentheses never become executable tokens.
+    system = parse_math_equation_system(
+        "# header; ) 1m=1m # tail; ) 2s=2s")
+    if not system.valid or system.count != 2 or system.source_length != 37 or
+       system.equations[0].equality_at != 16 or
+       system.equations[1].equality_at != 34 or
+       system.equations[1].right.instructions[0].source_start != 35 { return 56 }
+    result = evaluate_math_equation_system(system, tolerances)
+    if not result.valid or not result.satisfied { return 57 }
+
+    system = parse_math_equation_system("1m=1m 2s=2m")
+    if not system.valid or system.count != 2 { return 58 }
+    result = evaluate_math_equation_system(system, tolerances)
+    if result.valid or result.failed_equation != 1 or result.failed_at != 10 { return 59 }
+
+    system = parse_math_equation_system(" ")
+    if system.valid { return 60 }
+    system = parse_math_equation_system("1m=1m; ")
+    if system.valid or system.failed_equation != 1 { return 61 }
+    system = parse_math_equation_system("1m=1m2s=2s")
+    if not system.valid or system.count != 2 or system.source_length != 12 or
+       system.equations[1].equality_at != 9 { return 62 }
+    result = evaluate_math_equation_system(system, tolerances)
+    if not result.valid or not result.satisfied { return 63 }
+
     println("native-math-equation-system-ok")
     return 0
 }

@@ -865,6 +865,60 @@ def main() -> None:
     assert status == 422 and body.strip(), (
         "native four-unknown malformed compiler rejection", status, body)
 
+    # Four unknowns and up to 16 equations: execute the checked-in
+    # overdetermined native Flow solver through the production compiler,
+    # HTTP router and runtime, including all 16 native negative/positive
+    # assertions. The source must fit the real 128 KiB request budget.
+    variable_four_files = static_files[:-1] + (
+        "src/math_dimension_four.flow",
+        "src/math_dimension_variable_four.flow",
+        "src/math_dimension_variable_four_smoke.flow",
+    )
+    native_variable_four = "\n".join(
+        "\n".join(
+            line.removeprefix("export ")
+            for line in (Path(__file__).resolve().parents[1] / path)
+                .read_text(encoding="utf-8").splitlines()
+            if not line.startswith("import .math_dimensions {")
+            and not line.startswith("import .math_expression_ir {")
+            and not line.startswith("import .math_expression_source {")
+            and not line.startswith("import .math_equation {")
+            and not line.startswith("import .math_static {")
+            and not line.startswith("import .math_dimension_four {")
+            and not line.startswith("import .math_dimension_variable_four {")
+        )
+        for path in variable_four_files
+    )
+    assert "function solve_math_equations_variable_constraints_four_unknown_dimensions(" in native_variable_four
+    assert "function determinant4(" in native_variable_four
+    assert 'system.count = 16' in native_variable_four
+    assert "native-math-variable-four-constraints-ok" in native_variable_four
+    assert len(native_variable_four.encode("utf-8")) < 128 * 1024
+    status, body = request("POST", "/api/check/flow", native_variable_four, accepted_headers)
+    assert status == 200, ("native four-variable SI HTTP compile", status, body)
+    status, body = request("POST", "/api/run/flow", native_variable_four, accepted_headers)
+    assert status == 200 and "native-math-variable-four-constraints-ok" in body, (
+        "native four-variable SI HTTP execution", status, body)
+    # Convert the deliberately contradictory last equation to a valid
+    # equation: the Flow program must now return its nonzero assertion code.
+    corrupted_variable_four = native_variable_four.replace(
+        'system.equations[15] = "x+y = 2s"',
+        'system.equations[15] = "x+y = 2m"',
+        1,
+    )
+    assert corrupted_variable_four != native_variable_four
+    status, body = request("POST", "/api/run/flow", corrupted_variable_four, accepted_headers)
+    assert status == 422, ("native four-variable corrupted assertion", status, body)
+    malformed_variable_four = native_variable_four.replace(
+        "function constraint_failure(index: i32, position: i32) -> MathFourDimensionSolution {",
+        "function constraint_failure(index: i32, position: i32 -> MathFourDimensionSolution {",
+        1,
+    )
+    assert malformed_variable_four != native_variable_four
+    status, body = request("POST", "/api/check/flow", malformed_variable_four, accepted_headers)
+    assert status == 422 and body.strip(), (
+        "native four-variable malformed compiler rejection", status, body)
+
     # Native hyperbolic source lowering, typed IR, static dimensions and
     # scalar equation residuals through the real Flow compiler and HTTP runner.
     # The temporary HTTP source is built from the checked-in native modules,

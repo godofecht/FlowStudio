@@ -14,7 +14,8 @@
 #          33 asin(x), 34 acos(x), principal angles with |x| <= 1,
 #          35 sinh(x), 36 cosh(x), 37 tanh(x), dimensionless |x| <= 60,
 #          38 asinh(x), 39 acosh(x), 40 atanh(x), dimensionless with domain guards,
-#          42 log1p(x), stable natural logarithm of 1+x for x > -1.
+#          42 log1p(x), stable natural logarithm of 1+x for x > -1,
+#          43 expm1(x), stable exp(x)-1 for dimensionless |x| <= 60.
 # Predicate values are dimensionless 0/1 with a separate runtime type bit.
 # where and logical operators evaluate operands eagerly (no short circuit).
 # Unsupported instructions and type mismatches fail closed.
@@ -154,6 +155,23 @@ function bounded_exponential(value: f64) -> f64 {
         i = i + 1
     }
     if negative { return 1.0 / sum }
+    return sum
+}
+
+# Preserve small exponential increments: exp(x)-1 loses significant digits
+# if exp(x) rounds to 1. On [-0.5,0.5], the direct Taylor series has
+# truncation error below double precision after 24 terms. Larger arguments
+# reuse the bounded, range-reduced exponential kernel.
+function bounded_exponential_minus_one(value: f64) -> f64 {
+    if magnitude(value) > 0.5 { return bounded_exponential(value) - 1.0 }
+    let mut term: f64 = value
+    let mut sum: f64 = value
+    let mut n: i32 = 2
+    while n <= 24 {
+        term = term * value / (n as f64)
+        sum = sum + term
+        n = n + 1
+    }
     return sum
 }
 
@@ -439,7 +457,7 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
         } elif opcode == 5 or opcode == 6 or opcode == 18 or opcode == 20 or opcode == 21 or opcode == 25 or
              opcode == 26 or opcode == 27 or opcode == 28 or opcode == 29 or opcode == 30 or opcode == 31 or
              opcode == 33 or opcode == 34 or opcode == 35 or opcode == 36 or opcode == 37 or
-             opcode == 38 or opcode == 39 or opcode == 40 or opcode == 42 {
+             opcode == 38 or opcode == 39 or opcode == 40 or opcode == 42 or opcode == 43 {
             if depth < 1 { return failed(instruction.source_start) }
             let input: Quantity = stack[depth - 1]
             if opcode == 18 {
@@ -465,6 +483,12 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
                         return failed(instruction.source_start)
                     }
                     stack[depth - 1] = quantity(bounded_exponential(input.value), dimensionless())
+                } elif opcode == 43 {
+                    if not same_dimension(input.dimension, dimensionless()) or
+                       magnitude(input.value) > 60.0 {
+                        return failed(instruction.source_start)
+                    }
+                    stack[depth - 1] = quantity(bounded_exponential_minus_one(input.value), dimensionless())
                 } elif opcode == 26 or opcode == 27 {
                     if not same_dimension(input.dimension, dimensionless()) or
                        input.value <= 0.0 or input.value > 1e30 {

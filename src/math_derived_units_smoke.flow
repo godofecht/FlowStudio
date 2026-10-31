@@ -1,0 +1,104 @@
+# Native mathematical Flow: SI-derived unit literals are typed at source lowering.
+# Run: flow run src/math_derived_units_smoke.flow
+# These execute through the real parser, postfix IR, static inference and equation runtime.
+import .math_dimensions { Dimension, dimensionless, length_dimension, same_dimension, quantity }
+import .math_expression_ir { MathResult }
+import .math_expression_source { ParsedMathExpression, parse_math_expression, evaluate_math_expression }
+import .math_static { MathInferredType, infer_math_expression_source }
+import .math_equation_system { MathEquationSystem, MathEquationSystemResult, MathEquationTolerances, empty_math_equation_tolerances, parse_math_equation_system, evaluate_math_equation_system }
+
+function near(actual: f64, expected: f64) -> bool {
+    let mut difference: f64 = actual - expected
+    if difference < 0.0 { difference = -difference }
+    return difference < 0.00000000001
+}
+
+function main() -> i32 {
+    let pressure: Dimension = Dimension { length: -1, mass: 1, time: -2, temperature: 0 }
+    let frequency: Dimension = Dimension { length: 0, mass: 0, time: -1, temperature: 0 }
+    let force: Dimension = Dimension { length: 1, mass: 1, time: -2, temperature: 0 }
+    let energy: Dimension = Dimension { length: 2, mass: 1, time: -2, temperature: 0 }
+    let power: Dimension = Dimension { length: 2, mass: 1, time: -3, temperature: 0 }
+    let gradient: Dimension = Dimension { length: -2, mass: 1, time: -2, temperature: 0 }
+
+    let mut result: MathResult = evaluate_math_expression("2Pa")
+    if not result.valid or not near(result.result.value, 2.0) or
+       not same_dimension(result.result.dimension, pressure) { return 1 }
+    result = evaluate_math_expression("3Hz")
+    if not result.valid or not same_dimension(result.result.dimension, frequency) { return 2 }
+    result = evaluate_math_expression("4N")
+    if not result.valid or not same_dimension(result.result.dimension, force) { return 3 }
+    result = evaluate_math_expression("5J")
+    if not result.valid or not same_dimension(result.result.dimension, energy) { return 4 }
+    result = evaluate_math_expression("6W")
+    if not result.valid or not same_dimension(result.result.dimension, power) { return 5 }
+
+    result = evaluate_math_expression("2Pa*3m*1m")
+    if not result.valid or not near(result.result.value, 6.0) or
+       not same_dimension(result.result.dimension, force) { return 6 }
+    result = evaluate_math_expression("4N*2m")
+    if not result.valid or not near(result.result.value, 8.0) or
+       not same_dimension(result.result.dimension, energy) { return 7 }
+    result = evaluate_math_expression("6J/3s")
+    if not result.valid or not near(result.result.value, 2.0) or
+       not same_dimension(result.result.dimension, power) { return 8 }
+    result = evaluate_math_expression("5W*2s")
+    if not result.valid or not near(result.result.value, 10.0) or
+       not same_dimension(result.result.dimension, energy) { return 9 }
+    result = evaluate_math_expression("2Hz*3s")
+    if not result.valid or not near(result.result.value, 6.0) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 10 }
+    result = evaluate_math_expression("2Pa/1m")
+    if not result.valid or not near(result.result.value, 2.0) or
+       not same_dimension(result.result.dimension, gradient) { return 11 }
+
+    let mut inferred: MathInferredType = infer_math_expression_source("1Pa/0m")
+    if not inferred.valid or not same_dimension(inferred.dimension, gradient) { return 12 }
+    if evaluate_math_expression("1Pa/0m").valid { return 13 }
+    inferred = infer_math_expression_source("0.5*2kg*(3m/1s)^2")
+    if not inferred.valid or not same_dimension(inferred.dimension, energy) { return 14 }
+    result = evaluate_math_expression("0.5*2kg*(3m/1s)^2")
+    if not result.valid or not near(result.result.value, 9.0) { return 15 }
+
+    result = evaluate_math_expression("1Pa+1N")
+    if result.valid or result.failed_at != 3 { return 16 }
+    result = evaluate_math_expression("1Hz+1s")
+    if result.valid or result.failed_at != 3 { return 17 }
+    result = evaluate_math_expression("1N+1J")
+    if result.valid or result.failed_at != 2 { return 18 }
+    inferred = infer_math_expression_source("1J+1W")
+    if inferred.valid or inferred.failed_at != 2 { return 19 }
+    if parse_math_expression("1pa").valid { return 20 }
+    if parse_math_expression("1Joule").valid { return 21 }
+
+    let parsed: ParsedMathExpression = parse_math_expression("1Pa+2Hz")
+    if not parsed.valid or parsed.program.count != 3 or
+       parsed.program.instructions[0].source_end != 3 or
+       parsed.program.instructions[1].source_start != 4 or
+       parsed.program.instructions[1].source_end != 7 { return 22 }
+    result = evaluate_math_expression("π+1Pa")
+    if result.valid or result.failed_at != 2 { return 23 }
+
+    let system: MathEquationSystem = parse_math_equation_system(
+        "2Pa*3m*1m=6N;4N*2m=8J;6J/3s=2W;2Hz*3s=6")
+    if not system.valid or system.count != 4 { return 24 }
+    let mut tolerances: MathEquationTolerances = empty_math_equation_tolerances()
+    tolerances.count = 4
+    tolerances.values[0] = quantity(0.0, force)
+    tolerances.values[1] = quantity(0.0, energy)
+    tolerances.values[2] = quantity(0.0, power)
+    tolerances.values[3] = quantity(0.0, dimensionless())
+    let checked: MathEquationSystemResult = evaluate_math_equation_system(system, tolerances)
+    if not checked.valid or not checked.satisfied or checked.count != 4 or
+       not same_dimension(checked.results[2].residual.dimension, power) { return 25 }
+
+    let kinetic: MathEquationSystem = parse_math_equation_system(
+        "0.5*2kg*(3m/1s)^2=9J;2Pa/1m=2N/1m³")
+    if not kinetic.valid or kinetic.count != 2 { return 26 }
+    tolerances.count = 2
+    tolerances.values[0] = quantity(0.0, energy)
+    tolerances.values[1] = quantity(0.0, gradient)
+    let verified: MathEquationSystemResult = evaluate_math_equation_system(kinetic, tolerances)
+    if not verified.valid or not verified.satisfied or verified.count != 2 { return 27 }
+    return 0
+}

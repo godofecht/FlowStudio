@@ -1,7 +1,7 @@
 # Compact HTTP acceptance fixture for the real native mathematical source parser.
 # The comprehensive 70KB+ source regression runs separately via flow run.
 # flow run src/math_expression_source_http_smoke.flow
-import .math_dimensions { dimensionless, length_dimension, time_dimension, quotient_dimension, same_dimension }
+import .math_dimensions { Dimension, dimensionless, length_dimension, time_dimension, quotient_dimension, same_dimension }
 import .math_expression_ir { MathResult }
 import .math_expression_source { ParsedMathExpression, parse_math_expression, evaluate_math_expression }
 
@@ -209,6 +209,28 @@ function main() -> i32 {
        double_star.program.instructions[1].source_end != 8 { return 72 }
     let invalid_star: ParsedMathExpression = parse_math_expression("2***2")
     if invalid_star.valid or invalid_star.failed_at != 1 { return 73 }
+
+    # Derived SI units are parsed and executed by the production native compiler.
+    let force: Dimension = Dimension { length: 1, mass: 1, time: -2, temperature: 0 }
+    let energy: Dimension = Dimension { length: 2, mass: 1, time: -2, temperature: 0 }
+    let power: Dimension = Dimension { length: 2, mass: 1, time: -3, temperature: 0 }
+    result = evaluate_math_expression("2Pa*3m*1m")
+    if not result.valid or not close(result.result.value, 6.0) or
+       not same_dimension(result.result.dimension, force) { return 74 }
+    result = evaluate_math_expression("4N*2m")
+    if not result.valid or not close(result.result.value, 8.0) or
+       not same_dimension(result.result.dimension, energy) { return 75 }
+    result = evaluate_math_expression("6J/3s")
+    if not result.valid or not close(result.result.value, 2.0) or
+       not same_dimension(result.result.dimension, power) { return 76 }
+    result = evaluate_math_expression("2Hz*3s")
+    if not result.valid or not close(result.result.value, 6.0) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 77 }
+    result = evaluate_math_expression("1Pa+1N")
+    if result.valid or result.failed_at != 3 { return 78 }
+    let derived: ParsedMathExpression = parse_math_expression("1Pa")
+    if not derived.valid or derived.program.count != 1 or
+       derived.program.instructions[0].source_end != 3 { return 79 }
 
     println("native-math-source-ok")
     return 0

@@ -688,6 +688,21 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
                 } elif bytes[index] == 107 and index + 1 < length and bytes[index + 1] == 103 { # kg
                     unit = mass_dimension()
                     index = index + 2
+                } elif bytes[index] == 80 and index + 1 < length and bytes[index + 1] == 97 { # Pa = kg/(m*s²)
+                    unit = Dimension { length: -1, mass: 1, time: -2, temperature: 0 }
+                    index = index + 2
+                } elif bytes[index] == 72 and index + 1 < length and bytes[index + 1] == 122 { # Hz = 1/s
+                    unit = Dimension { length: 0, mass: 0, time: -1, temperature: 0 }
+                    index = index + 2
+                } elif bytes[index] == 78 { # N = kg*m/s²
+                    unit = Dimension { length: 1, mass: 1, time: -2, temperature: 0 }
+                    index = index + 1
+                } elif bytes[index] == 74 { # J = N*m
+                    unit = Dimension { length: 2, mass: 1, time: -2, temperature: 0 }
+                    index = index + 1
+                } elif bytes[index] == 87 { # W = J/s
+                    unit = Dimension { length: 2, mass: 1, time: -3, temperature: 0 }
+                    index = index + 1
                 }
             }
             if count >= 64 { return source_error(start, length) }

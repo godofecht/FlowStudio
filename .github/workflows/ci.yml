@@ -41,20 +41,6 @@ jobs:
         run: |
           python3 tests/transport_smoke.py
           python3 tests/embedding_headers_smoke.py
-  flowjit:
-    name: FlowJIT real R/C native / ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-24.04, macos-15]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: r-lib/actions/setup-r@v2
-        with:
-          r-version: 'release'
-      - name: Compile and execute native R arithmetic kernels
-        run: Rscript --vanilla tests/flowjit_smoke.R
   native:
     name: Native Flow compile and HTTP / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -84,6 +70,10 @@ jobs:
       - name: Expose Flow executable
         shell: bash
         run: echo "$GITHUB_WORKSPACE/.flow-toolchain" >> "$GITHUB_PATH"
+      # Execute the same real R/C FlowJIT smoke in the native job, reusing
+      # its already-installed R runtime instead of downloading R twice per OS.
+      - name: Compile and execute native R arithmetic kernels
+        run: Rscript --vanilla tests/flowjit_smoke.R
       - name: Install numerical backend for mathematical Flow integration
         run: python3 -m pip install 'numpy==2.1.3'
       - name: Compile and execute native Flow numerical kernels and analytic assertions
@@ -92,6 +82,7 @@ jobs:
           flow run src/math_dimensions_smoke.flow
           flow run src/math_expression_ir_smoke.flow
           flow run src/math_expression_source_smoke.flow
+          flow run src/math_derived_units_smoke.flow
           flow run src/math_expression_source_http_smoke.flow
           flow run src/math_equation_smoke.flow
           flow run src/math_equation_system_smoke.flow

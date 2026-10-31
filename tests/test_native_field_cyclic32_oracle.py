@@ -65,7 +65,7 @@ def spectral_solution(steps: int, ratio: float = RATIO,
 def checked_in(name: str) -> list[float]:
     source = SOURCE.read_text(encoding="utf-8")
     match = re.search(r"let " + re.escape(name)
-                      + r": array<f64, 32> = \\[(.*?)\\]", source, re.S)
+                      + r": array<f64, 32> = \[(.*?)\]", source, re.S)
     if match is None:
         raise AssertionError(f"missing native reference {name}")
     values = [float(item.strip()) for item in match.group(1).split(",")
@@ -108,8 +108,8 @@ class NativeCyclicThreeFieldOracle(unittest.TestCase):
                                    sum(without_exchange[k][i] for k in range(3)),
                                    delta=2e-12)
         # A one-way directed cycle is not symmetric pairwise exchange.
-        self.assertNotAlmostEqual(with_exchange[0][15], with_exchange[2][15],
-                                  delta=0.01)
+        early = direct_stencil(state, 16)
+        self.assertNotAlmostEqual(early[0][15], early[2][15], delta=0.01)
 
     def test_energy_decay_positivity_and_fixed_boundaries(self):
         state = initial()

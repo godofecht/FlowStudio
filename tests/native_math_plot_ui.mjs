@@ -581,6 +581,9 @@ try {
   const nativeVariableFourSource = nativeVariableFourFiles.map(path =>
     readFileSync(path, 'utf8').split(/\r?\n/)
       .filter(line => !/^import \.math_(dimensions|expression_ir|expression_source|equation|static|dimension_four|dimension_variable_four) \{/.test(line))
+      // Keep the complete executable program within the HTTP 128 KiB budget.
+      // Only comments and empty lines are removed from checked-in source.
+      .filter(line => line.trim() && !line.trimStart().startsWith('#'))
       .map(line => line.replace(/^export /, '')).join('\n')
   ).join('\n');
   assert.ok(Buffer.byteLength(nativeVariableFourSource, 'utf8') < 128 * 1024);

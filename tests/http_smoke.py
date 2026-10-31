@@ -650,6 +650,38 @@ def main() -> None:
     assert status == 422 and body.strip(), (
         "native mathematical equation malformed-source rejection", status, body)
 
+    # Compile and execute the actual native multi-equation AST and its
+    # dimensioned residual tests through the production HTTP compiler.
+    equation_system_files = (
+        "src/math_dimensions.flow",
+        "src/math_expression_ir.flow",
+        "src/math_expression_source.flow",
+        "src/math_equation.flow",
+        "src/math_equation_system.flow",
+        "src/math_equation_system_smoke.flow",
+    )
+    native_equation_system = "\n".join(
+        "\n".join(
+            line.removeprefix("export ")
+            for line in (Path(__file__).resolve().parents[1] / path)
+                .read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+            if not line.startswith("import .math_dimensions {")
+            and not line.startswith("import .math_expression_ir {")
+            and not line.startswith("import .math_expression_source {")
+            and not line.startswith("import .math_equation {")
+            and not line.startswith("import .math_equation_system {")
+        )
+        for path in equation_system_files
+    )
+    assert "function parse_math_equation_system(" in native_equation_system
+    assert "native-math-equation-system-ok" in native_equation_system
+    status, body = request("POST", "/api/check/flow", native_equation_system, accepted_headers)
+    assert status == 200, ("native equation-system compile", status, body)
+    status, body = request("POST", "/api/run/flow", native_equation_system, accepted_headers)
+    assert status == 200 and "native-math-equation-system-ok" in body, (
+        "native equation-system execution", status, body)
+
     # Native value-independent static SI inference is compiled and executed
     # using the exact checked-in Flow modules through production HTTP.
     # This is separate from runtime evaluation and never runs editor snippets.

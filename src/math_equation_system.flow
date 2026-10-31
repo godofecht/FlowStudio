@@ -1,0 +1,166 @@
+# Bounded native Flow 2.0 equation-system AST and residual evaluation.
+# A semicolon separates complete scalar equations at top level. Each equation
+# is compiled by the existing typed native expression/equation compiler.
+# This is not upstream Flow grammar integration or PDE lowering.
+import .math_dimensions { Quantity, quantity, dimensionless }
+import .math_expression_source { MathBindings, empty_math_bindings }
+import .math_equation { MathEquation, MathEquationResult, parse_math_equation, parse_math_equation_with_bindings, evaluate_math_equation }
+
+extern {
+    function strlen(source: string) -> i64
+}
+
+export struct MathEquationSystem {
+    valid: bool,
+    equations: array<MathEquation, 8>,
+    count: i32,
+    source_length: i32,
+    failed_equation: i32,
+    failed_at: i32
+}
+
+export struct MathEquationTolerances {
+    values: array<Quantity, 8>,
+    count: i32
+}
+
+export struct MathEquationSystemResult {
+    valid: bool,
+    satisfied: bool,
+    results: array<MathEquationResult, 8>,
+    count: i32,
+    failed_equation: i32,
+    failed_at: i32
+}
+
+export function empty_math_equation_tolerances() -> MathEquationTolerances {
+    return MathEquationTolerances {
+        values: [quantity(0.0, dimensionless())], count: 0
+    }
+}
+
+function system_error(position: i32, length: i32, equation_index: i32) -> MathEquationSystem {
+    let blank: MathEquation = parse_math_equation("0=0")
+    return MathEquationSystem {
+        valid: false, equations: [blank], count: 0,
+        source_length: length, failed_equation: equation_index,
+        failed_at: position
+    }
+}
+
+function evaluation_error(position: i32, equation_index: i32) -> MathEquationSystemResult {
+    let blank: MathEquationResult = evaluate_math_equation(
+        parse_math_equation("0=0"), quantity(0.0, dimensionless()))
+    return MathEquationSystemResult {
+        valid: false, satisfied: false, results: [blank], count: 0,
+        failed_equation: equation_index, failed_at: position
+    }
+}
+
+# Rebase the child expression IR to offsets in the complete UTF-8 source.
+# The native runtime then reports the original operator's byte position.
+function rebase_equation(equation: MathEquation, start: i32, length: i32) -> MathEquation {
+    let mut rebased: MathEquation = equation
+    rebased.equality_at = rebased.equality_at + start
+    rebased.left.source_length = length
+    rebased.right.source_length = length
+    let mut i: i32 = 0
+    while i < rebased.left.count {
+        rebased.left.instructions[i].source_start =
+            rebased.left.instructions[i].source_start + start
+        rebased.left.instructions[i].source_end =
+            rebased.left.instructions[i].source_end + start
+        i = i + 1
+    }
+    i = 0
+    while i < rebased.right.count {
+        rebased.right.instructions[i].source_start =
+            rebased.right.instructions[i].source_start + start
+        rebased.right.instructions[i].source_end =
+            rebased.right.instructions[i].source_end + start
+        i = i + 1
+    }
+    return rebased
+}
+
+export function parse_math_equation_system_with_bindings(
+    source: string, bindings: MathBindings) -> MathEquationSystem {
+    let length: i32 = strlen(source) as i32
+    if length < 3 or length > 512 { return system_error(0, length, 0) }
+    let bytes: ptr<u8> = source as ptr<u8>
+    let blank: MathEquation = parse_math_equation("0=0")
+    let mut equations: array<MathEquation, 8> = [blank]
+    let mut count: i32 = 0
+    let mut start: i32 = 0
+    let mut depth: i32 = 0
+    let mut index: i32 = 0
+    while index <= length {
+        let mut separator: bool = index == length
+        if index < length {
+            if bytes[index] == 40 { depth = depth + 1 }
+            if bytes[index] == 41 {
+                depth = depth - 1
+                if depth < 0 { return system_error(index, length, count) }
+            }
+            if bytes[index] == 59 {
+                if depth != 0 { return system_error(index, length, count) }
+                separator = true
+            }
+        }
+        if separator {
+            if count >= 8 or index <= start {
+                return system_error(start, length, count)
+            }
+            let mut fragment: array<u8, 513> = []
+            let mut j: i32 = 0
+            while start + j < index {
+                fragment[j] = bytes[start + j]
+                j = j + 1
+            }
+            fragment[j] = 0
+            let equation: MathEquation = parse_math_equation_with_bindings(
+                (&fragment[0]) as string, bindings)
+            if not equation.valid {
+                return system_error(start + equation.failed_at, length, count)
+            }
+            equations[count] = rebase_equation(equation, start, length)
+            count = count + 1
+            start = index + 1
+        }
+        index = index + 1
+    }
+    if depth != 0 { return system_error(length, length, count) }
+    return MathEquationSystem {
+        valid: true, equations: equations, count: count,
+        source_length: length, failed_equation: -1, failed_at: -1
+    }
+}
+
+export function parse_math_equation_system(source: string) -> MathEquationSystem {
+    return parse_math_equation_system_with_bindings(source, empty_math_bindings())
+}
+
+export function evaluate_math_equation_system(
+    system: MathEquationSystem, tolerances: MathEquationTolerances) -> MathEquationSystemResult {
+    if not system.valid { return evaluation_error(system.failed_at, system.failed_equation) }
+    if system.count < 1 or system.count > 8 or tolerances.count != system.count {
+        return evaluation_error(0, -1)
+    }
+    let blank: MathEquationResult = evaluate_math_equation(
+        parse_math_equation("0=0"), quantity(0.0, dimensionless()))
+    let mut results: array<MathEquationResult, 8> = [blank]
+    let mut all_satisfied: bool = true
+    let mut i: i32 = 0
+    while i < system.count {
+        let evaluated: MathEquationResult =
+            evaluate_math_equation(system.equations[i], tolerances.values[i])
+        if not evaluated.valid { return evaluation_error(evaluated.failed_at, i) }
+        results[i] = evaluated
+        if not evaluated.satisfied { all_satisfied = false }
+        i = i + 1
+    }
+    return MathEquationSystemResult {
+        valid: true, satisfied: all_satisfied, results: results,
+        count: system.count, failed_equation: -1, failed_at: -1
+    }
+}

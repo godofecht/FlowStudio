@@ -144,5 +144,7 @@ test("browser IDE exposes explicit R runtime selection and routes through the se
   assert.match(source, /language === "r" \? await getRSession\(\)\.run\(code\)/);
   assert.match(source, /language === "r" \? await getRSession\(\)\.checkSyntax\(code\)/);
   assert.match(source, /await session\.reset\(\)/);
-  assert.match(source, /selectedLanguage === "r" \? getRSession\(\)\.run\(code\)/);
+  assert.match(source, /const session = getRSession\(\);\s*const response = await session\.run\(code\)/);
+  assert.match(source, /const snapshot = await session\.plot\(\)/);
+  assert.match(source, /FlowStudioNotebookPlotCapture\.svgToPng\(snapshot\.svg\)/);
 });

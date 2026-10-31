@@ -1,0 +1,9 @@
+# Native four-unknown SI dimensions: production acceptance
+
+The checked-in `src/math_dimension_four.flow` implements a bounded four-unknown, four-equation dimensional constraint solver in the upstream Flow 2.0 mathematical postfix IR. The `src/math_dimension_four_smoke.flow` executable asserts 11 positive and negative cases: 4×4 full-rank constraints, nested square roots, Unicode bindings, integer exponent rejection, rank deficiency, unsupported addition, unknown symbols, duplicate unknowns, known dimension bindings, binding collision and excessive binding counts.
+
+The live native HTTP acceptance in `tests/http_smoke.py` concatenates the actual seven checked-in Flow modules (112,258 UTF-8 bytes at introduction), removes only local imports and `export` visibility, and calls `POST /api/check/flow` followed by `POST /api/run/flow`. It requires the native success marker, deliberately changes a valid 4m-dimensional constraint into an inconsistent 3m constraint and requires HTTP 422, and corrupts the real determinant function declaration and requires compiler HTTP 422. No Python dimensional solver or mock HTTP response is used.
+
+The physical Chromium acceptance in `tests/native_math_plot_ui.mjs` loads those same seven modules into Monaco and clicks the workbench's actual Run control. It requires the native Flow program's success marker in the visible console. The CI source/transport, native compiler/HTTP and R/C FlowJIT jobs on Linux/macOS must pass independently. Ubuntu Chromium is the browser platform exercised by this scenario; independent macOS physical-browser interaction is not claimed.
+
+**Status at submission:** checked-in acceptance added, Linux/macOS CI and physical-browser qualification pending. Local native Flow and R executables are not available in the authoring environment. This is a deliberately bounded four-equation SI inference feature, not a general tensor or PDE compiler, and does not establish RStudio parity.

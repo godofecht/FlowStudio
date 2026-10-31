@@ -179,6 +179,44 @@ function main() -> i32 {
     result = evaluate_math_equation_system(system, tolerances)
     if result.valid or result.failed_equation != -1 { return 30 }
 
+    # LF and CRLF are native equation separators; offsets remain UTF-8 byte positions.
+    system = parse_math_equation_system("1m=1m\n 2s=2s\r\n3K=3K\n")
+    if not system.valid or system.count != 3 or system.source_length != 20 or
+       system.equations[1].equality_at != 9 or
+       system.equations[1].left.instructions[0].source_start != 7 or
+       system.equations[2].right.instructions[0].source_start != 17 { return 31 }
+    tolerances.count = 3
+    tolerances.values[0] = quantity(0.0, length_dimension())
+    tolerances.values[1] = quantity(0.0, time_dimension())
+    tolerances.values[2] = quantity(0.0, temperature_dimension())
+    result = evaluate_math_equation_system(system, tolerances)
+    if not result.valid or not result.satisfied or result.count != 3 { return 32 }
+
+    # Blank lines, indentation, and semicolon-plus-newline are accepted.
+    system = parse_math_equation_system(" \n1m=1m\n\n 2s=2s\n")
+    if not system.valid or system.count != 2 { return 33 }
+    system = parse_math_equation_system("1m=1m;\n2s=2s")
+    if not system.valid or system.count != 2 { return 34 }
+    system = parse_math_equation_system("1m=1m;\n")
+    if system.valid or system.failed_equation != 1 { return 35 }
+    system = parse_math_equation_system("\n \r\n")
+    if system.valid { return 36 }
+
+    # Parenthesized line breaks are expression whitespace, not equation boundaries.
+    system = parse_math_equation_system("1m=(1m+\n0m)\n2s=2s")
+    if not system.valid or system.count != 2 { return 37 }
+    tolerances.count = 2
+    result = evaluate_math_equation_system(system, tolerances)
+    if not result.valid or not result.satisfied { return 38 }
+
+    # An invalid later equation reports the original complete-source position.
+    system = parse_math_equation_system("1m=1m\n2s=2m")
+    if not system.valid or system.count != 2 { return 39 }
+    result = evaluate_math_equation_system(system, tolerances)
+    if result.valid or result.failed_equation != 1 or result.failed_at != 8 { return 40 }
+    system = parse_math_equation_system("1m+\n2m=3m")
+    if system.valid or system.failed_equation != 0 { return 41 }
+
     println("native-math-equation-system-ok")
     return 0
 }

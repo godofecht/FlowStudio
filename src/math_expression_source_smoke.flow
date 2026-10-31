@@ -1186,16 +1186,16 @@ function main() -> i32 {
        pi_source.program.instructions[1].source_start != 3 or
        pi_source.program.instructions[1].source_end != 6 or
        pi_source.program.instructions[2].source_start != 2 { return 443 }
-    let mut reserved: MathBindings = empty_math_bindings()
-    reserved.count = 1
-    reserved.symbols[0] = MathSymbol { name: "pi", value: quantity(4.0, dimensionless()) }
-    if parse_math_expression_with_bindings("pi", reserved).valid { return 444 }
-    reserved.symbols[0] = MathSymbol { name: "π", value: quantity(4.0, dimensionless()) }
-    if parse_math_expression_with_bindings("π", reserved).valid { return 445 }
-    reserved.symbols[0] = MathSymbol { name: "tau", value: quantity(4.0, dimensionless()) }
-    if parse_math_expression_with_bindings("tau", reserved).valid { return 446 }
-    reserved.symbols[0] = MathSymbol { name: "τ", value: quantity(4.0, dimensionless()) }
-    if parse_math_expression_with_bindings("τ", reserved).valid { return 447 }
+    let mut constant_binding: MathBindings = empty_math_bindings()
+    constant_binding.count = 1
+    constant_binding.symbols[0] = MathSymbol { name: "pi", value: quantity(4.0, dimensionless()) }
+    if parse_math_expression_with_bindings("pi", constant_binding).valid { return 444 }
+    constant_binding.symbols[0] = MathSymbol { name: "π", value: quantity(4.0, dimensionless()) }
+    if parse_math_expression_with_bindings("π", constant_binding).valid { return 445 }
+    constant_binding.symbols[0] = MathSymbol { name: "tau", value: quantity(4.0, dimensionless()) }
+    if parse_math_expression_with_bindings("tau", constant_binding).valid { return 446 }
+    constant_binding.symbols[0] = MathSymbol { name: "τ", value: quantity(4.0, dimensionless()) }
+    if parse_math_expression_with_bindings("τ", constant_binding).valid { return 447 }
 
     println("native-math-source-ok")
     return 0

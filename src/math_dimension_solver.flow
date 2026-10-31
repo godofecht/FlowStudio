@@ -275,6 +275,23 @@ function analyse(program: MathProgram, source: string, unknown: string,
             }
             depth = depth - 1
             stack[depth - 1] = result
+        } elif opcode == 51 {
+            if depth < 4 { return error_analysis(position, state) }
+            let a: AffineDimension = stack[depth - 4]
+            let b: AffineDimension = stack[depth - 3]
+            let c: AffineDimension = stack[depth - 2]
+            let d: AffineDimension = stack[depth - 1]
+            if a.predicate or b.predicate or c.predicate or d.predicate {
+                return error_analysis(position, state)
+            }
+            state = constrain(state, a, b, position)
+            state = constrain(state, a, c, position)
+            state = constrain(state, a, d, position)
+            if not state.valid or not bounded_affine(a) {
+                return error_analysis(position, state)
+            }
+            depth = depth - 3
+            stack[depth - 1] = a
         } elif opcode == 9 or opcode == 19 or opcode == 45 {
             if depth < 3 { return error_analysis(position, state) }
             let a: AffineDimension = stack[depth - 3]

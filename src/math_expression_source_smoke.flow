@@ -1253,15 +1253,15 @@ function main() -> i32 {
        unicode_power.program.instructions[1].opcode != 6 or
        unicode_power.program.instructions[1].exponent != -2 or
        unicode_power.program.instructions[1].source_start != 2 or
-       unicode_power.program.instructions[1].source_end != 6 { return 464 }
+       unicode_power.program.instructions[1].source_end != 7 { return 464 }
     let missing_exponent: ParsedMathExpression = parse_math_expression("2m^−")
     if missing_exponent.valid or missing_exponent.failed_at != 2 { return 465 }
     let out_of_range_power: ParsedMathExpression = parse_math_expression("2m^−9")
     if out_of_range_power.valid or out_of_range_power.failed_at != 2 { return 466 }
     let chained_power: ParsedMathExpression = parse_math_expression("2m^−2^2")
-    if chained_power.valid or chained_power.failed_at != 6 { return 467 }
+    if chained_power.valid or chained_power.failed_at != 7 { return 467 }
     result = evaluate_math_expression("2m^−2 + 1m")
-    if result.valid or result.failed_at != 6 { return 468 }
+    if result.valid or result.failed_at != 8 { return 468 }
 
     println("native-math-source-ok")
     return 0

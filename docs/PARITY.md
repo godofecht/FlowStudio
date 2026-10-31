@@ -1,3 +1,25 @@
+## 2026-10-31: four-unknown SI solver production HTTP/Chromium acceptance (PR #286)
+
+The bounded four-unknown, four-equation native Flow 2.0 SI solver introduced
+by PR #285 is now exercised through real `/api/check/flow` and
+`/api/run/flow` endpoints, not merely standalone compilation. The
+112,258-byte source is assembled from seven checked-in Flow modules.
+Positive execution verifies all eleven native mathematical assertions;
+negative production HTTP requests reject a corrupted dimensional equation
+and malformed determinant declaration with HTTP 422. Ubuntu Chromium
+loads the same source into Monaco, clicks Run, and checks the native success
+marker. [Reproducibility](NATIVE_FOUR_DIMENSIONS_HTTP.md).
+
+**Verified:** [PR CI #41193965464](https://github.com/godofecht/FlowStudio/actions/runs/41193965464)
+passed all six Linux/macOS jobs on exact head `927cb638bb46196ef922ffe6fda9128fff19cbf0`.
+Each source/transport platform passed 1,170 JavaScript tests (12 skipped)
+and 399 Python tests (13 skipped). Both native Flow/HTTP and R/C FlowJIT
+platform jobs passed; Ubuntu physical Chromium Monaco Run passed.
+**Unexecuted:** local native Flow/R, independent macOS physical-browser
+interaction, and post-merge main CI. No hosted CI workflow changed.
+This is not generalized multidimensional `field` lowering, native
+Navier–Stokes or RStudio parity.
+
 ## 2026-10-31: rational-affine native SI unknown inference (qualification pending)
 
 The native Flow 2.0 scalar equation solver now propagates bounded rational

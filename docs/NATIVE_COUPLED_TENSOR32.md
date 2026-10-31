@@ -1,5 +1,29 @@
 # Cross-coupled native 32×32 tensor PDE acceptance
 
+## Periodic translation and pure-exchange full-grid acceptance (2026-10-31; qualification pending)
+
+The checked-in native Flow program now translates both directed PDE species
+by (7, 11) periodic cells, re-executes 64 simultaneous RK2 stages, and
+compares all 2,048 values against the translated unshifted solution with a
+5e-11 maximum tolerance. This probes the mixed spatial derivative and
+directed transfer together, not merely global conservation or species means.
+
+A separate zero-diffusion, nonzero directed-exchange run checks every cell's
+pointwise conservation of U+V and its independent closed-form solution
+U(t) = 0.2(U0+V0) + (U0-0.2(U0+V0)) exp(-t), at t=0.025,
+against 128-step RK2 values with 1e-6 absolute tolerance. The Python oracle
+adds three deterministic seeded periodic translations and all-cell exact
+exchange comparisons. Invalid or unstable inputs and the existing 400,000
+species-cell-step per-integration limit remain enforced. The production
+Flow HTTP and Chromium paths already execute this checked-in Flow file,
+so these assertions must pass before the existing heatmap frame is emitted.
+
+**Status:** committed for Linux/macOS qualification; independent native
+compiler, production HTTP, browser and CI results for these new assertions
+are not yet claimed. This does not implement general multidimensional
+compiler-generated `field` lowering or establish RStudio parity.
+
+
 ## Directed Lyapunov and triangular-limit regression (2026-10-31; qualification pending)
 
 The production native Flow program now checks monotone decay of the

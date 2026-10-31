@@ -180,6 +180,30 @@ function integrate(equation: Equation, initial: Species,
     return Result { valid: true, state: state }
 }
 
+# Periodic translations are an exact symmetry of both anisotropic stencils
+# and the directed pointwise exchange. Offsets are fixed within [0, 31].
+function translateState(state: Species, offsetX: i32, offsetY: i32) -> Species {
+    let mut u: Grid = blank()
+    let mut v: Grid = blank()
+    let mut y: i32 = 0
+    while y < 32 {
+        let mut sourceY: i32 = y - offsetY
+        if sourceY < 0 { sourceY = sourceY + 32 }
+        let mut x: i32 = 0
+        while x < 32 {
+            let mut sourceX: i32 = x - offsetX
+            if sourceX < 0 { sourceX = sourceX + 32 }
+            let destination: i32 = y * 32 + x
+            let source: i32 = sourceY * 32 + sourceX
+            u.values[destination] = state.u.values[source]
+            v.values[destination] = state.v.values[source]
+            x = x + 1
+        }
+        y = y + 1
+    }
+    return Species { u: u, v: v }
+}
+
 function maximumDifference(a: Species, b: Species) -> f64 {
     let mut maximum: f64 = 0.0
     let mut index: i32 = 0
@@ -429,6 +453,40 @@ function main() -> i32 {
     if maximumDifference(forwardResult.state, reverseResult.state) < 5.0 {
         return 37
     }
+
+    # Translation equivariance checks the entire 2,048-cell directed
+    # solution, including the mixed derivative, under a nontrivial 2D shift.
+    let translatedInitial: Species = translateState(initial, 7, 11)
+    let translatedRun: Result = integrate(directed, translatedInitial, 0.025, 64)
+    let translatedReference: Species = translateState(directedMedium.state, 7, 11)
+    if not translatedRun.valid or
+       maximumDifference(translatedRun.state, translatedReference) >
+       0.00000000005 { return 38 }
+
+    # With both spatial tensors zero, exchange conserves U+V at EVERY cell,
+    # not merely the spatial mean. Compare all cells to the independent
+    # closed-form directed exchange solution, exp(-(0.8+0.2)*0.025).
+    let exchangeOnly: Equation = Equation {
+        first: Tensor { xx: 0.0, xy: 0.0, yy: 0.0 },
+        second: Tensor { xx: 0.0, xy: 0.0, yy: 0.0 },
+        forward: 0.8, reverse: 0.2
+    }
+    let pure: Result = integrate(exchangeOnly, initial, 0.025, 128)
+    if not pure.valid { return 39 }
+    let mut pureIndex: i32 = 0
+    while pureIndex < 1024 {
+        let total: f64 = initial.u.values[pureIndex] +
+            initial.v.values[pureIndex]
+        let equilibriumU: f64 = 0.2 * total
+        let exactU: f64 = equilibriumU +
+            (initial.u.values[pureIndex] - equilibriumU) * 0.9753099120283326
+        if absolute(pure.state.u.values[pureIndex] - exactU) > 0.000001 or
+           absolute(pure.state.u.values[pureIndex] +
+                    pure.state.v.values[pureIndex] - total) >
+           0.00000000005 { return 40 }
+        pureIndex = pureIndex + 1
+    }
+    if maximumDifference(pure.state, initial) < 5.0 { return 41 }
 
     println("native-coupled-tensor32-ok")
     println("FLOWSTUDIO_GRID_V1 32 32 2")

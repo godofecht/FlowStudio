@@ -148,6 +148,56 @@ function main() -> i32 {
         system, known, "x", "y", "z", "w")
     if result.valid { return 16 }
 
+    # Sixteen independently checked constraints with rational fourth-root
+    # dimensions, Unicode radicals and a late contradictory equation.
+    known = empty_math_dimension_bindings()
+    system = empty_math_four_constraint_system()
+    system.count = 16
+    system.equations[0] = "root4(x) = 1m"
+    system.equations[1] = "y/root4(x) = 1"
+    system.equations[2] = "z/y = 1s/1m"
+    system.equations[3] = "w*z = 1m*1s"
+    system.equations[4] = "∜(x)+y = 2m"
+    system.equations[5] = "root4(x)*w = 1m²"
+    system.equations[6] = "x = 1m⁴"
+    system.equations[7] = "z = 1s"
+    index = 8
+    while index < 16 {
+        system.equations[index] = "root4(x)+y = 2m"
+        index = index + 1
+    }
+    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
+        system, known, "x", "y", "z", "w")
+    let fourth_length: Dimension = Dimension {
+        length: 4, mass: 0, time: 0, temperature: 0
+    }
+    if not result.valid or result.failed_equation != -1 or
+       not same_dimension(result.first, fourth_length) or
+       not same_dimension(result.second, length) or
+       not same_dimension(result.third, time) or
+       not same_dimension(result.fourth, length) { return 17 }
+
+    system.equations[15] = "root4(x)+y = 2s"
+    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
+        system, known, "x", "y", "z", "w")
+    if result.valid or result.failed_equation != 15 { return 18 }
+
+    system.equations[15] = "root4(x)+y = 2m"
+    system.equations[6] = "x = 1m³"
+    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
+        system, known, "x", "y", "z", "w")
+    if result.valid { return 19 }
+
+    system = empty_math_four_constraint_system()
+    system.count = 4
+    system.equations[0] = "root4(x)/y = 1"
+    system.equations[1] = "root4(x)/y = 1"
+    system.equations[2] = "z/w = 1"
+    system.equations[3] = "z/w = 1"
+    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
+        system, known, "x", "y", "z", "w")
+    if result.valid { return 20 }
+
     print("native-math-variable-four-constraints-ok")
     return 0
 }

@@ -76,14 +76,8 @@ function main() -> i32 {
     if not result.valid or not same_dimension(result.first, area) or
        not same_dimension(result.second, length) { return 12 }
 
-    let square_mass: Dimension = product_dimension(mass, mass)
-    let square_speed: Dimension = product_dimension(speed, speed)
-    let square_force: Dimension = product_dimension(square_mass,
-        product_dimension(square_speed, square_speed))
     result = solve_math_equations_two_unknown_dimensions(
         "x*y = 1kg²*1m²/1s⁴", "x/y = 1m²/1s²", known, "x", "y")
-    let first_expected: Dimension = quotient_dimension(
-        product_dimension(mass, area), volume)
     # The first unknown is kg*m²/s³; the second is kg/s.
     let first_mixed: Dimension = quotient_dimension(
         product_dimension(mass, area),

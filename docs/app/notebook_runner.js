@@ -9,6 +9,8 @@ const MAX_CELL_BYTES = 65536;
 const MAX_OUTPUT_TOTAL = 1048576;
 const MAX_OUTPUT_CELL = 131072;
 const MAX_IMAGES_PER_CELL = 8;
+const MAX_TOTAL_IMAGES = 32;
+const MAX_TOTAL_PLOTS = 32;
 function closeImages(images) {
   if (!Array.isArray(images)) return;
   for (const image of images) {
@@ -75,6 +77,7 @@ function create({parseCells, execute, onCell, notice, allowNativeFlow = false}) 
     activeToken = token;
     active = true;
     let executed = 0, remaining = MAX_OUTPUT_TOTAL;
+    let remainingImages = MAX_TOTAL_IMAGES, remainingPlots = MAX_TOTAL_PLOTS;
     try {
       for (const cell of selectedCells) {
         if (token !== generation) return {ok:false, executed, cancelled:true};
@@ -101,11 +104,17 @@ function create({parseCells, execute, onCell, notice, allowNativeFlow = false}) 
         const bounded = boundUTF8(raw, max);
         const {output, truncated} = bounded;
         remaining -= bounded.bytes;
-        const images = Array.isArray(response?.images) ? response.images.slice(0, MAX_IMAGES_PER_CELL) : [];
-        closeImages(Array.isArray(response?.images) ? response.images.slice(MAX_IMAGES_PER_CELL) : []);
+        // Per-cell limits alone permit 128 * 8 retained bitmaps/plots.
+        // Bound the entire run and immediately release every excess bitmap.
+        const allImages = Array.isArray(response?.images) ? response.images : [];
+        const images = allImages.slice(0, Math.min(MAX_IMAGES_PER_CELL, remainingImages));
+        closeImages(allImages.slice(images.length));
+        remainingImages -= images.length;
+        const allPlots = Array.isArray(response?.plots) ? response.plots : [];
+        const plots = allPlots.slice(0, Math.min(MAX_IMAGES_PER_CELL, remainingPlots));
+        remainingPlots -= plots.length;
         const entry = {index:cell.index, kind:"code", language:selectedLanguage, code:cell.code,
-          ok:response?.ok === true, output, truncated,
-          plots:Array.isArray(response?.plots) ? response.plots.slice(0, MAX_IMAGES_PER_CELL) : [], images};
+          ok:response?.ok === true, output, truncated, plots, images};
         try { onCell(entry); }
         catch (error) {
           closeImages(images);

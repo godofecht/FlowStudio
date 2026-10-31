@@ -16,6 +16,30 @@ function validFilename(name) {
   return true;
 }
 
+function utf8SourceBytes(source, limit = Infinity) {
+  let bytes = 0;
+  for (let i = 0; i < source.length; i++) {
+    const unit = source.charCodeAt(i);
+    if (unit >= 0xd800 && unit <= 0xdbff) {
+      const next = source.charCodeAt(++i);
+      if (!(next >= 0xdc00 && next <= 0xdfff)) {
+        const error = new Error("Project source contains invalid Unicode.");
+        error.name = "UnsafeProjectSourceError";
+        throw error;
+      }
+      bytes += 4;
+    } else if (unit >= 0xdc00 && unit <= 0xdfff) {
+      const error = new Error("Project source contains invalid Unicode.");
+      error.name = "UnsafeProjectSourceError";
+      throw error;
+    } else {
+      bytes += unit < 0x80 ? 1 : unit < 0x800 ? 2 : 3;
+    }
+    if (bytes > limit) return bytes;
+  }
+  return bytes;
+}
+
 async function readProjectText(file, limit) {
   if (file.size > limit) throw Error("Project source exceeds size limit.");
   let source;
@@ -32,7 +56,11 @@ async function readProjectText(file, limit) {
   } else {
     source = await file.text();
   }
-  if (source.length > limit) throw Error("Project source exceeds size limit.");
+  if (utf8SourceBytes(source, limit) > limit) {
+    const error = new Error("Project source exceeds UTF-8 byte limit.");
+    error.name = "OversizedProjectSourceError";
+    throw error;
+  }
   if (source.includes("\0")) {
     const error = Error("Project source contains binary NUL data.");
     error.name = "UnsafeProjectSourceError";
@@ -99,6 +127,7 @@ async function searchProject(root, query, options = {}) {
       try { source = await readProjectText(file, maxBytes); }
       catch (error) {
         if (error.name === "UnsafeProjectSourceError") { skippedUnsafe++; continue; }
+        if (error.name === "OversizedProjectSourceError") { skippedLarge++; continue; }
         throw error;
       }
       checkAbort();
@@ -181,9 +210,14 @@ async function planProjectReplace(root, query, replacement, options = {}) {
     const updated = engine.replaceAll(before, query, replacement, options);
     if (updated.count !== entry.hits.length)
       throw new Error("Replacement count changed; retry: " + entry.path);
-    budget += before.length + updated.value.length;
+    if (updated.value.includes("\0"))
+      throw new Error("Project replacement would introduce binary NUL data.");
+    const updatedBytes = utf8SourceBytes(updated.value, limit);
+    if (updatedBytes > limit)
+      throw new Error("Project replacement exceeds the per-file UTF-8 byte limit.");
+    budget += utf8SourceBytes(before, limit) + updatedBytes;
     if (budget > 8 * 1024 * 1024)
-      throw new Error("Project replacement exceeds the 8-million-character preview budget.");
+      throw new Error("Project replacement exceeds the 8 MiB UTF-8 preview budget.");
     if (updated.value !== before)
       files.push({ path: entry.path, handle: entry.handle, before, after: updated.value, count: updated.count });
   }

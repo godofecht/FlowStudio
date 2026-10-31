@@ -106,3 +106,36 @@ test("explorer exposes search only after folder selection", async () => {
   const result = await explorer.search("x <-");
   assert.equal(result.matches.length, 4);
 });
+
+const pagesProject = require("../docs/app/project.js");
+
+for (const [label, project] of [["native", {searchProject}], ["Pages", pagesProject]]) {
+  test(label + " enforces actual UTF-8 bytes when file metadata understates size", async () => {
+    const oversized = file("oversized.flow", "λ".repeat(524289), 1);
+    const invalid = file("invalid.R", "α" + String.fromCharCode(0xd800), 1);
+    const exact = file("exact.py", "λ".repeat(524285) + "needle", 1);
+    const root = directory("polyglot", [
+      ["oversized.flow", oversized], ["invalid.R", invalid], ["exact.py", exact]
+    ]);
+    const result = await project.searchProject(root, "needle");
+    assert.equal(result.scannedFiles, 1);
+    assert.equal(result.skippedLarge, 1);
+    assert.equal(result.skippedUnsafe, 1);
+    assert.equal(result.matches.length, 1);
+    assert.equal(result.matches[0].path, "polyglot/exact.py");
+    assert.equal(result.matches[0].index, 524285);
+  });
+
+  test(label + " rejects invalid UTF-8 bytes from real arrayBuffer sources", async () => {
+    const malformed = {
+      kind:"file", name:"malformed.flow",
+      async getFile() {
+        return {size:2, async arrayBuffer() {return Uint8Array.from([0xc3, 0x28]).buffer;}};
+      }
+    };
+    const result = await project.searchProject(
+      directory("polyglot", [["malformed.flow", malformed]]), "needle");
+    assert.equal(result.skippedUnsafe, 1);
+    assert.equal(result.scannedFiles, 0);
+  });
+}

@@ -23,7 +23,7 @@ test("captures bounded R ImageBitmaps as portable PNG and releases scratch canva
   assert.ok(document.canvases.every(canvas => canvas.drawn.length === 1));
 });
 test("rejects oversized, invalid, non-PNG and excessive bitmap captures", () => {
-  const document = documentWith("iVBORw0KGgo" + "A".repeat(1398105));
+  const document = documentWith("iVBORw0KGgo" + "A".repeat(524289));
   assert.deepEqual(capture.bitmapsToPng([{width:100,height:100}], document), []);
   assert.deepEqual(capture.bitmapsToPng([{width:2049,height:10},{width:10,height:0}], document), []);
   assert.equal(document.canvases.length, 1);

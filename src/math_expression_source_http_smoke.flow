@@ -194,6 +194,22 @@ function main() -> i32 {
        line_spaced.program.instructions[2].source_start != 4 or
        line_spaced.program.instructions[2].source_end != 5 { return 69 }
 
+
+    # Production HTTP compilation and Monaco Run execute the same native ** IR.
+    result = evaluate_math_expression("2m**2/2m")
+    if not result.valid or not close(result.result.value, 2.0) or
+       not same_dimension(result.result.dimension, length_dimension()) { return 70 }
+    result = evaluate_math_expression("2m**−2*2m²")
+    if not result.valid or not close(result.result.value, 1.0) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 71 }
+    let double_star: ParsedMathExpression = parse_math_expression("2m**−2")
+    if not double_star.valid or double_star.program.count != 2 or
+       double_star.program.instructions[1].exponent != -2 or
+       double_star.program.instructions[1].source_start != 2 or
+       double_star.program.instructions[1].source_end != 8 { return 72 }
+    let invalid_star: ParsedMathExpression = parse_math_expression("2***2")
+    if invalid_star.valid or invalid_star.failed_at != 1 { return 73 }
+
     println("native-math-source-ok")
     return 0
 }

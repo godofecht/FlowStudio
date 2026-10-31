@@ -307,6 +307,22 @@ function main() -> i32 {
     result = evaluate_math_equation_system(system, tolerances)
     if not result.valid or not result.satisfied { return 63 }
 
+
+    # Double-star powers are real compiled equation AST operands, not snippets.
+    system = parse_math_equation_system("2m**2=2m²\n2s=2s")
+    if not system.valid or system.count != 2 or system.source_length != 16 or
+       system.equations[0].equality_at != 5 or
+       system.equations[1].equality_at != 13 { return 64 }
+    tolerances.count = 2
+    tolerances.values[0] = quantity(0.0, product_dimension(length_dimension(), length_dimension()))
+    tolerances.values[1] = quantity(0.0, time_dimension())
+    result = evaluate_math_equation_system(system, tolerances)
+    if not result.valid or not result.satisfied or result.count != 2 { return 65 }
+    system = parse_math_equation_system("2m**2=2m²\n2s=2m")
+    if not system.valid { return 66 }
+    result = evaluate_math_equation_system(system, tolerances)
+    if result.valid or result.failed_equation != 1 or result.failed_at != 13 { return 67 }
+
     println("native-math-equation-system-ok")
     return 0
 }

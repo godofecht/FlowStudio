@@ -315,19 +315,23 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
             index = index + space_width
             continue
         }
-        # Integer powers bind to the preceding primary before pending
+        # Integer powers (^, **, and superscripts) bind to the preceding primary before pending
         # unary signs. ASCII ^ accepts immediate signed decimal integers.
         # Unicode superscript digits and optional superscript signs are
         # consumed as one exponent, never as separate numeric operands.
         # Chained powers and exponents outside [-8, 8] fail closed.
-        if c == 94 or superscript_digit(bytes, index, length) >= 0 or
+        if c == 94 or (c == 42 and index + 1 < length and bytes[index + 1] == 42) or
+           superscript_digit(bytes, index, length) >= 0 or
            superscript_sign(bytes, index, length) != 0 {
             if expect_operand or previous_was_power { return source_error(index, length) }
             let start: i32 = index
             let mut exponent: i32 = 0
             let mut sign: i32 = 1
-            if c == 94 {
-                index = index + 1
+            if c == 94 or c == 42 {
+                # ASCII ** is an alternative spelling of bounded integer ^.
+                # Both bytes belong to one power instruction and source span.
+                if c == 42 { index = index + 2 }
+                else { index = index + 1 }
                 if index < length {
                     if bytes[index] == 45 { sign = -1; index = index + 1 }
                     elif bytes[index] == 43 { index = index + 1 }

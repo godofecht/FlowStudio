@@ -511,6 +511,46 @@ try {
       await notebookPage.locator(
         "#workspace img[alt^='R plot'], #workspace embed[aria-label^='R plot']"
       ).first().waitFor({timeout:30000});
+      // The real persistent native Rscript kernel must produce a plot inside
+      // a mixed-language notebook cell, rasterize its SVG in Chromium, and
+      // preserve the actual PNG in a portable .fsnb roundtrip.
+      await setNotebookSource([
+        '# %% [r]',
+        'plot(c(1,2,3,4), c(3,1,4,2), type="l")',
+        'cat("r-notebook-plot-ok\\n")',
+        ''
+      ].join('\n'));
+      await notebookPage.locator('#runNotebook').click();
+      await notebookPage.waitForFunction(() =>
+        document.querySelector('#notice')?.textContent === 'Notebook executed 1 cells.',
+        null, {timeout:90000});
+      const nativePlotImage = notebookPage.locator('#notebookOutput .notebook-cell img').first();
+      await nativePlotImage.waitFor({timeout:15000});
+      const plotSrc = await nativePlotImage.getAttribute('src');
+      assert.match(plotSrc, /^data:image\/png;base64,iVBORw0KGgo/);
+      assert.equal(await nativePlotImage.evaluate(image => image.naturalWidth > 0 &&
+        image.naturalHeight > 0), true, 'Native R notebook plot must decode as an actual image');
+      assert.match(await notebookPage.locator('#notebookOutput').innerText(), /r-notebook-plot-ok/);
+      const plotExport = notebookPage.waitForEvent('download', {timeout:10000});
+      await notebookPage.locator('#saveFlowNotebook').click();
+      const plotBundle = JSON.parse(readFileSync(await (await plotExport).path(), 'utf8'));
+      assert.equal(plotBundle.results.length, 1);
+      assert.equal(plotBundle.results[0].plots.length, 1);
+      assert.equal(plotBundle.results[0].plots[0].png, plotSrc.slice('data:image/png;base64,'.length));
+      const requestsBeforePlotImport = notebookRequests.length;
+      await setNotebookSource(['# %% [r]', 'stop("import must not execute")', ''].join('\n'));
+      notebookPage.once('dialog', dialog => dialog.accept());
+      await notebookPage.locator('#flowNotebookFile').setInputFiles({
+        name:'native-r-plot.fsnb', mimeType:'application/json',
+        buffer:Buffer.from(JSON.stringify(plotBundle))
+      });
+      await notebookPage.waitForFunction(() =>
+        document.querySelector('#notice')?.textContent.startsWith(
+          'FlowStudio notebook imported with saved outputs; interpreter state was not restored.'),
+        null, {timeout:30000});
+      assert.equal(await notebookPage.locator('#notebookOutput .notebook-cell img').count(), 1);
+      assert.equal(notebookRequests.length, requestsBeforePlotImport,
+        'Importing the saved R plot must not run interpreter code');
       assert.deepEqual(notebookErrors, []);
       console.log('PASS: physical Chromium native Flow/R complex notebook, .fsnb roundtrip, stop-on-error and real R plot');
     } finally {

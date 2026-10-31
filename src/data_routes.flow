@@ -203,6 +203,9 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/app/notebook_report.js" {
         return StaticAsset { path: "docs/app/notebook_report.js", mime: "text/javascript; charset=utf-8", found: true }
     }
+    if url == "/app/notebook_plot_capture.js" {
+        return StaticAsset { path: "docs/app/notebook_plot_capture.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
     if url == "/app/notebook_runner.js" {
         return StaticAsset { path: "docs/app/notebook_runner.js", mime: "text/javascript; charset=utf-8", found: true }
     }

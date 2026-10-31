@@ -102,6 +102,12 @@ def main() -> None:
     assert status == 200 and '"/api/run/flow"' in client, (status, client[:100])
     status, recovery_script = request("GET", "/app/notebook_recovery.js")
     assert status == 200 and "FlowStudioNotebookRecovery" in recovery_script, (status, recovery_script[:100])
+    status, plot_capture_script = request("GET", "/app/notebook_plot_capture.js")
+    assert status == 200 and "FlowStudioNotebookPlotCapture" in plot_capture_script, (
+        status, plot_capture_script[:100])
+    status, _ = request("GET", "/app/notebook_plot_capture.js/extra")
+    assert status == 404, "Notebook plot capture route must reject suffixes"
+
     status, search_engine = request("GET", "/app/editor_find.js")
     assert status == 200 and "FlowStudioEditorFind" in search_engine, (status, search_engine[:100])
     status, search_panel = request("GET", "/app/find_panel.js")

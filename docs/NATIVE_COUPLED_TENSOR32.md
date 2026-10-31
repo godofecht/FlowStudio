@@ -1,5 +1,28 @@
 # Cross-coupled native 32×32 tensor PDE acceptance
 
+## Full directed Fourier-field acceptance (2026-10-31; CI pending)
+
+The native Flow program now checks **all 2,048 directed U/V cells**, not
+only the two species means, against an independent nonsymmetric 2×2 Fourier
+matrix exponential at 32, 64 and 128 RK2 steps. The exact t=0.025
+zero/plus/minus mode coefficients are U=(294.09906897477157,
+1.2045742437862, 0.7763731765973004) and V=(10.900931025228495,
+0.39074462095173346, -0.08888326676573649). The new Flow assertions
+require the full-grid 128-step error below 0.00012, second-order refinement,
+directed semigroup consistency and unchanged initial inputs. All assertions
+run **before** the existing 2,048-cell symmetric heatmap frame is emitted,
+so existing HTTP and Chromium acceptance continues to exercise the same
+production Flow program. The checked-in Python oracle also tests exact
+coefficient identity, directed semigroup composition and zero-rate
+triangular exchange limits.
+
+Independent local standard-library mode calculations gave maximum full-grid
+errors of 0.00143712760843 (32 steps), 0.00035220933262 (64) and
+0.00008718879974 (128). **Unexecuted at submission:** the checked-in
+Python test file, native Flow compiler/HTTP/browser and Linux/macOS CI.
+This remains array-based numerical evolution, not general compiler-backed
+multidimensional field declarations or RStudio parity.
+
 ## Directed conservative exchange extension (2026-10-31; CI pending)
 
 The same production-compiled Flow solver now accepts independent nonnegative

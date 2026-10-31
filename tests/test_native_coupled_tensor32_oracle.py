@@ -236,6 +236,52 @@ class NativeCoupledTensor32Oracle(unittest.TestCase):
             mean = directed_mode(300, 5, 0, 0, forward, reverse)
             self.assertAlmostEqual(sum(mean), 305, delta=1e-12)
 
+    def test_directed_native_full_grid_coefficients_and_semigroup(self):
+        # These coefficients come from the analytic nonsymmetric matrix
+        # exponential, not from the midpoint integrator under test.
+        modes = (
+            (300.0, 5.0, 0.0, 0.0,
+             294.09906897477157, 10.900931025228495),
+            (7.0, 0.8, 69.632, 32.768,
+             1.2045742437862, 0.39074462095173346),
+            (3.0, -0.3, 53.248, 40.96,
+             0.7763731765973004, -0.08888326676573649),
+        )
+        source = (Path(__file__).resolve().parents[1] /
+                  "examples/native_coupled_tensor32.flow").read_text()
+        self.assertIn("function expectedDirectedState() -> Species", source)
+        self.assertIn("directedFine.state, directedReference", source)
+        self.assertIn("directedMediumError >= 0.30 * directedCoarseError", source)
+        for u, v, decay_u, decay_v, expected_u, expected_v in modes:
+            actual_u, actual_v = directed_mode(
+                u, v, decay_u, decay_v, 0.8, 0.2)
+            self.assertAlmostEqual(actual_u, expected_u, delta=1e-12)
+            self.assertAlmostEqual(actual_v, expected_v, delta=1e-12)
+            self.assertIn(str(expected_u), source)
+            self.assertIn(str(abs(expected_v)), source)
+        state = initial()
+        whole = integrate(state, 128, exchange=0.8, reverse=0.2)
+        half = integrate(state, 64, duration=DURATION / 2,
+                         exchange=0.8, reverse=0.2)
+        composed = integrate(half, 64, duration=DURATION / 2,
+                             exchange=0.8, reverse=0.2)
+        self.assertLess(error(whole, composed), 5e-11)
+        self.assertEqual(state, initial())
+
+    def test_directed_zero_rate_triangular_exchange(self):
+        # Zero forward/reverse limits must not divide by zero or invent
+        # mass transfer. The exact oracle is independent of the RK2 path.
+        for forward, reverse in ((0.0, 0.0), (0.8, 0.0), (0.0, 0.2)):
+            expected = directed_mode(300.0, 5.0, 0, 0,
+                                     forward, reverse)
+            evolved = integrate(initial(), 128,
+                                exchange=forward, reverse=reverse)
+            self.assertAlmostEqual(sum(evolved[0]) / COUNT, expected[0],
+                                   delta=1e-6)
+            self.assertAlmostEqual(sum(evolved[1]) / COUNT, expected[1],
+                                   delta=1e-6)
+            self.assertAlmostEqual(sum(expected), 305.0, delta=1e-12)
+
     def test_checked_in_native_source_and_resource_guard(self):
         source = (Path(__file__).resolve().parents[1] /
                   "examples/native_coupled_tensor32.flow").read_text()

@@ -747,6 +747,8 @@ FlowStudioNotebookIO.create({
   source:$("source"), language:$("language"), format:FlowStudioNotebookFormat,
   parseCells:FlowStudioSourceCells.parseCells,
   isBusy:()=>busy || !!notebookRunner?.isRunning(),
+  getDocumentIdentity:()=> editorIdentity + ":" + sessionGeneration + ":" +
+    (globalThis.FlowStudioApp?.documents?.active?.()?.id ?? ""),
   canReplace:()=>!projectWorkspace.dirty() || window.confirm("Discard unsaved editor changes?"),
   onImported:async (imported, name)=>{
     $("source").value = imported.source;

@@ -1,4 +1,4 @@
-# Native Flow 2.0: two genuinely exchange-coupled 32x32 periodic PDE species.
+# Native Flow 2.0: two conservatively cross-coupled 32x32 periodic PDE species.
 # Each species has a distinct positive-definite anisotropic tensor and mixed
 # spatial derivative. Both derivatives use the SAME RK2 midpoint state.
 # This is a bounded numerical kernel, not general multidimensional field DSL.
@@ -22,7 +22,8 @@ struct Tensor {
 struct Equation {
     first: Tensor,
     second: Tensor,
-    exchange: f64
+    forward: f64,
+    reverse: f64
 }
 
 struct Result {
@@ -112,10 +113,10 @@ function coupledSlope(equation: Equation, state: Species) -> Species {
     let mut v: Grid = tensorSlope(equation.second, state.v)
     let mut index: i32 = 0
     while index < 1024 {
-        let transfer: f64 = equation.exchange *
-            (state.v.values[index] - state.u.values[index])
-        u.values[index] = u.values[index] + transfer
-        v.values[index] = v.values[index] - transfer
+        let transfer: f64 = equation.forward * state.u.values[index] -
+            equation.reverse * state.v.values[index]
+        u.values[index] = u.values[index] - transfer
+        v.values[index] = v.values[index] + transfer
         index = index + 1
     }
     return Species { u: u, v: v }
@@ -143,7 +144,8 @@ function midpointStep(equation: Equation, state: Species, step: f64) -> Species 
 function integrate(equation: Equation, initial: Species,
                    duration: f64, steps: i32) -> Result {
     if not validTensor(equation.first) or not validTensor(equation.second) or
-       not (equation.exchange >= 0.0 and equation.exchange < 100.0) or
+       not (equation.forward >= 0.0 and equation.forward < 100.0) or
+       not (equation.reverse >= 0.0 and equation.reverse < 100.0) or
        not (duration >= 0.0 and duration <= 1.0) or
        steps <= 0 or steps > 195 {
         return Result { valid: false, state: initial }
@@ -166,7 +168,7 @@ function integrate(equation: Equation, initial: Species,
     if secondRate > maximumRate { maximumRate = secondRate }
     # Gershgorin upper bound on the negative real spectrum, including
     # conservative interspecies exchange; explicit midpoint stability <= 2.
-    if not (step * (maximumRate + 2.0 * equation.exchange) <= 2.0) {
+    if not (step * (maximumRate + equation.forward + equation.reverse) <= 2.0) {
         return Result { valid: false, state: initial }
     }
     let mut state: Species = initial
@@ -228,7 +230,7 @@ function main() -> i32 {
     let equation: Equation = Equation {
         first: Tensor { xx: 0.012, xy: 0.004, yy: 0.018 },
         second: Tensor { xx: 0.008, xy: -0.002, yy: 0.010 },
-        exchange: 0.35
+        forward: 0.35, reverse: 0.35
     }
     let initial: Species = initialState()
     let reference: Species = expectedState()
@@ -261,7 +263,7 @@ function main() -> i32 {
     }
 
     let noExchange: Equation = Equation {
-        first: equation.first, second: equation.second, exchange: 0.0
+        first: equation.first, second: equation.second, forward: 0.0, reverse: 0.0
     }
     let uncoupled: Result = integrate(noExchange, initial, 0.025, 128)
     if not uncoupled.valid { return 10 }
@@ -277,11 +279,11 @@ function main() -> i32 {
 
     let badTensor: Equation = Equation {
         first: Tensor { xx: 0.012, xy: 0.1, yy: 0.018 },
-        second: equation.second, exchange: 0.35
+        second: equation.second, forward: 0.35, reverse: 0.35
     }
     if integrate(badTensor, initial, 0.025, 128).valid { return 14 }
     let badExchange: Equation = Equation {
-        first: equation.first, second: equation.second, exchange: -0.35
+        first: equation.first, second: equation.second, forward: -0.35, reverse: 0.35
     }
     if integrate(badExchange, initial, 0.025, 128).valid { return 15 }
     if integrate(equation, initial, -0.025, 128).valid { return 16 }
@@ -296,6 +298,34 @@ function main() -> i32 {
     }
     # The original initial state remains unchanged after all integrations.
     if maximumDifference(initial, initialState()) > 0.0 { return 21 }
+
+    # Directed conservative exchange: unequal forward/reverse rates.
+    # Fourier zero mode has exact U mean = 61 + 239 * exp(-0.025).
+    let directed: Equation = Equation {
+        first: equation.first, second: equation.second,
+        forward: 0.8, reverse: 0.2
+    }
+    let directedFine: Result = integrate(directed, initial, 0.025, 128)
+    if not directedFine.valid { return 22 }
+    if absolute(speciesMean(directedFine.state.u) - 294.0990689747715) >
+       0.000001 or
+       absolute(speciesMean(directedFine.state.v) - 10.900931025228488) >
+       0.000001 { return 23 }
+    if maximumDifference(directedFine.state, fine.state) < 3.0 { return 24 }
+    let directedReplay: Result = integrate(directed, initial, 0.025, 128)
+    if not directedReplay.valid or
+       maximumDifference(directedReplay.state, directedFine.state) > 0.0 {
+        return 25
+    }
+    let badReverse: Equation = Equation {
+        first: equation.first, second: equation.second,
+        forward: 0.8, reverse: -0.2
+    }
+    if integrate(badReverse, initial, 0.025, 128).valid { return 26 }
+    if absolute(speciesMean(directedFine.state.u) +
+       speciesMean(directedFine.state.v) - 305.0) > 0.00000000005 {
+        return 27
+    }
 
     println("native-coupled-tensor32-ok")
     println("FLOWSTUDIO_GRID_V1 32 32 2")

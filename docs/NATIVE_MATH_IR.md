@@ -580,3 +580,18 @@ truncated expressions. The compact
 typed numerical runtime through production native HTTP and Chromium
 Monaco acceptance on CI. This does not establish unified upstream Flow
 grammar, tensor/PDE ASTs or native Navier–Stokes.
+
+## Unicode mathematical minus in integer exponents
+
+The native Flow 2.0 scalar source-to-IR parser accepts U+2212 mathematical
+minus after the ASCII integer-power operator: `2m^−2` has value `0.25`
+and physical dimension `m^-2`. This is identical to `2m^-2` and
+`2m⁻²`. The typed IR retains the original UTF-8 source span (bytes 2–6
+for the exponent in `2m^−2`); the three-byte sign is not normalized away.
+Incomplete, chained and out-of-range powers are rejected. This does not
+introduce general symbolic exponents or change upstream Flow 2.0 grammar.
+
+`src/math_expression_source_smoke.flow` and the compact
+`src/math_expression_source_http_smoke.flow` test numerical evaluation,
+physical units, source spans and invalid inputs. Qualification requires
+native Linux/macOS execution and production HTTP/Chromium CI.

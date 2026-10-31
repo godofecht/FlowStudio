@@ -675,8 +675,68 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
             let start: i32 = index
             index = number.end
             let mut unit: Dimension = dimensionless()
+            let mut unit_scale: f64 = 1.0
             if index < length {
-                if bytes[index] == 109 { # m
+                # Prefixes are deliberately explicit to avoid ambiguity with
+                # bare metre (m), second (s), and kilogram (kg) literals.
+                # All numeric quantities are stored in coherent SI base units.
+                if index + 2 < length and bytes[index] == 107 and
+                   bytes[index + 1] == 80 and bytes[index + 2] == 97 { # kPa
+                    unit = Dimension { length: -1, mass: 1, time: -2, temperature: 0 }
+                    unit_scale = 1000.0
+                    index = index + 3
+                } elif index + 2 < length and bytes[index] == 107 and
+                       bytes[index + 1] == 72 and bytes[index + 2] == 122 { # kHz
+                    unit = Dimension { length: 0, mass: 0, time: -1, temperature: 0 }
+                    unit_scale = 1000.0
+                    index = index + 3
+                } elif index + 1 < length and bytes[index] == 107 and
+                       bytes[index + 1] == 109 { # km
+                    unit = length_dimension()
+                    unit_scale = 1000.0
+                    index = index + 2
+                } elif index + 1 < length and bytes[index] == 107 and
+                       bytes[index + 1] == 78 { # kN
+                    unit = Dimension { length: 1, mass: 1, time: -2, temperature: 0 }
+                    unit_scale = 1000.0
+                    index = index + 2
+                } elif index + 1 < length and bytes[index] == 107 and
+                       bytes[index + 1] == 74 { # kJ
+                    unit = Dimension { length: 2, mass: 1, time: -2, temperature: 0 }
+                    unit_scale = 1000.0
+                    index = index + 2
+                } elif index + 1 < length and bytes[index] == 107 and
+                       bytes[index + 1] == 87 { # kW
+                    unit = Dimension { length: 2, mass: 1, time: -3, temperature: 0 }
+                    unit_scale = 1000.0
+                    index = index + 2
+                } elif index + 1 < length and bytes[index] == 99 and
+                       bytes[index + 1] == 109 { # cm
+                    unit = length_dimension()
+                    unit_scale = 0.01
+                    index = index + 2
+                } elif index + 1 < length and bytes[index] == 109 and
+                       bytes[index + 1] == 109 { # mm
+                    unit = length_dimension()
+                    unit_scale = 0.001
+                    index = index + 2
+                } elif index + 1 < length and bytes[index] == 109 and
+                       bytes[index + 1] == 115 { # ms
+                    unit = time_dimension()
+                    unit_scale = 0.001
+                    index = index + 2
+                } elif index + 2 < length and
+                       ((bytes[index] == 194 and bytes[index + 1] == 181) or
+                        (bytes[index] == 206 and bytes[index + 1] == 188)) and
+                       (bytes[index + 2] == 109 or bytes[index + 2] == 115) { # µm, μm, µs, μs
+                    if bytes[index + 2] == 109 {
+                        unit = length_dimension()
+                    } else {
+                        unit = time_dimension()
+                    }
+                    unit_scale = 0.000001
+                    index = index + 3
+                } elif bytes[index] == 109 { # m
                     unit = length_dimension()
                     index = index + 1
                 } elif bytes[index] == 115 { # s
@@ -706,7 +766,7 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
                 }
             }
             if count >= 64 { return source_error(start, length) }
-            instructions[count] = make_instruction(0, quantity(number.value, unit), start, index)
+            instructions[count] = make_instruction(0, quantity(number.value * unit_scale, unit), start, index)
             count = count + 1
             expect_operand = false
             continue

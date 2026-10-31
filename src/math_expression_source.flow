@@ -169,7 +169,7 @@ function function_arity(opcode: i32) -> i32 {
        opcode == 33 or opcode == 34 or opcode == 35 or opcode == 36 or opcode == 37 or
         opcode == 38 or opcode == 39 or opcode == 40 or opcode == 42 or opcode == 43 or opcode == 44 { return 1 }
     if opcode == 7 or opcode == 8 or opcode == 22 or opcode == 32 { return 2 }
-    if opcode == 9 or opcode == 19 { return 3 }
+    if opcode == 9 or opcode == 19 or opcode == 45 { return 3 }
     return 0
 }
 
@@ -460,6 +460,10 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
                    identifier_matches(bytes, index, index + 3, "max") {
                 unary_opcode = 8
                 unary_width = 3
+            } elif index + 5 < length and bytes[index + 5] == 40 and
+                   identifier_matches(bytes, index, index + 5, "norm3") {
+                unary_opcode = 45
+                unary_width = 5
             } elif index + 4 < length and bytes[index + 4] == 40 and
                    identifier_matches(bytes, index, index + 4, "norm") {
                 unary_opcode = 22

@@ -50,10 +50,10 @@ def tensor_slope(values, tensor):
     return output
 
 
-def slope(state, exchange=EXCHANGE, reverse=None):
+def slope(state, exchange=EXCHANGE, reverse=None, first=FIRST, second=SECOND):
     u, v = state
-    du = tensor_slope(u, FIRST)
-    dv = tensor_slope(v, SECOND)
+    du = tensor_slope(u, first)
+    dv = tensor_slope(v, second)
     if reverse is None:
         reverse = exchange
     for i in range(COUNT):
@@ -68,13 +68,16 @@ def scaled(state, derivative, h):
                   for values, rates in zip(state, derivative)])
 
 
-def integrate(state, steps=128, duration=DURATION, exchange=EXCHANGE, reverse=None):
+def integrate(state, steps=128, duration=DURATION, exchange=EXCHANGE,
+              reverse=None, first=FIRST, second=SECOND):
     h = duration / steps
     u, v = (list(state[0]), list(state[1]))
     for _ in range(steps):
         current = (u, v)
-        middle = scaled(current, slope(current, exchange, reverse), h / 2)
-        u, v = scaled(current, slope(middle, exchange, reverse), h)
+        middle = scaled(current, slope(current, exchange, reverse,
+                                       first, second), h / 2)
+        u, v = scaled(current, slope(middle, exchange, reverse,
+                                     first, second), h)
     return u, v
 
 
@@ -320,6 +323,48 @@ class NativeCoupledTensor32Oracle(unittest.TestCase):
         self.assertIn("halfEnergy > fullEnergy", source)
         self.assertIn("forward: 0.8, reverse: 0.0", source)
         self.assertIn("forward: 0.0, reverse: 0.2", source)
+
+    def test_directed_periodic_translation_of_full_2d_solution(self):
+        source = (Path(__file__).resolve().parents[1] /
+                  "examples/native_coupled_tensor32.flow").read_text()
+        self.assertIn("function translateState(", source)
+        self.assertIn("translateState(initial, 7, 11)", source)
+        self.assertIn("translateState(directedMedium.state, 7, 11)", source)
+        rng = random.Random(20261031)
+        state = ([rng.uniform(-5, 5) for _ in range(COUNT)],
+                 [rng.uniform(-5, 5) for _ in range(COUNT)])
+        for dx, dy in ((7, 11), (31, 1), (0, 0)):
+            def shift(values):
+                return [values[((y - dy) % SIZE) * SIZE + (x - dx) % SIZE]
+                        for y in range(SIZE) for x in range(SIZE)]
+            shifted = tuple(shift(grid) for grid in state)
+            evolved = integrate(state, 64, exchange=0.8, reverse=0.2)
+            translated_evolved = integrate(shifted, 64, exchange=0.8,
+                                           reverse=0.2)
+            self.assertLess(error(translated_evolved,
+                                  tuple(shift(grid) for grid in evolved)),
+                            5e-11)
+
+    def test_directed_pure_exchange_exact_all_cells_and_pointwise_mass(self):
+        source = (Path(__file__).resolve().parents[1] /
+                  "examples/native_coupled_tensor32.flow").read_text()
+        self.assertIn("first: Tensor { xx: 0.0, xy: 0.0, yy: 0.0 }", source)
+        self.assertIn("pure.state.v.values[pureIndex] - total", source)
+        state = initial()
+        zeros = (0.0, 0.0, 0.0)
+        evolved = integrate(state, 128, exchange=0.8, reverse=0.2,
+                            first=zeros, second=zeros)
+        decay = math.exp(-DURATION)
+        for u0, v0, u, v in zip(*state, *evolved):
+            total = u0 + v0
+            expected_u = 0.2 * total + (u0 - 0.2 * total) * decay
+            self.assertAlmostEqual(u, expected_u, delta=1e-6)
+            self.assertAlmostEqual(v, total - expected_u, delta=1e-6)
+            self.assertAlmostEqual(u + v, total, delta=5e-11)
+        self.assertGreater(error(state, evolved), 5.0)
+        self.assertEqual(evolved, integrate(state, 128, exchange=0.8,
+                                            reverse=0.2, first=zeros,
+                                            second=zeros))
 
     def test_checked_in_native_source_and_resource_guard(self):
         source = (Path(__file__).resolve().parents[1] /

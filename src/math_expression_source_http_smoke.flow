@@ -65,6 +65,15 @@ function main() -> i32 {
     if result.valid or result.failed_at != 0 { return 23 }
     result = evaluate_math_expression("expm1(61)")
     if result.valid or result.failed_at != 0 { return 24 }
+    result = evaluate_math_expression("sin(π/2)+cos(tau/2)")
+    if not result.valid or not close(result.result.value, 0.0) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 25 }
+    result = evaluate_math_expression("π+1m")
+    if result.valid or result.failed_at != 2 { return 26 }
+    let pi_source: ParsedMathExpression = parse_math_expression("π")
+    if not pi_source.valid or pi_source.program.count != 1 or
+       pi_source.program.instructions[0].source_end != 2 { return 27 }
+
     println("native-math-source-ok")
     return 0
 }

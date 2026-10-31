@@ -152,6 +152,11 @@ function main() -> i32 {
     result = solve_math_equation_unknown_dimension("sqrt(x) = 1m²", empty, "x")
     if not result.valid or not same_dimension(result.dimension, fourth_length) { return 58 }
 
+    result = solve_math_equation_unknown_dimension("root4(x) = 1m", empty, "x")
+    if not result.valid or not same_dimension(result.dimension, fourth_length) { return 59 }
+    result = solve_math_equation_unknown_dimension("∜x = 1m", empty, "x")
+    if not result.valid or not same_dimension(result.dimension, fourth_length) { return 60 }
+
     println("native-math-unknown-dimension-constraints-ok")
     return 0
 }

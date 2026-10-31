@@ -109,6 +109,7 @@ jobs:
           flow run src/math_log1p_smoke.flow
           flow run src/math_expm1_smoke.flow
           flow run src/math_cuberoot_smoke.flow
+          flow run src/math_fourth_root_smoke.flow
           flow run src/math_atan2_smoke.flow
           flow run src/math_norm3_smoke.flow
           flow run src/math_physical_ode_smoke.flow

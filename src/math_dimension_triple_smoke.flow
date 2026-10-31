@@ -104,6 +104,13 @@ function main() -> i32 {
         "x*y*z = 1m³", "x/y = 1", "y/z = 1",
         known, "x", "y", "z")
     if result.valid { return 15 }
+    let fourth_length: Dimension = product_dimension(area, area)
+    let empty: MathDimensionBindings = empty_math_dimension_bindings()
+    result = solve_math_equations_three_unknown_dimensions(
+        "root4(x) = 1m", "y = 1m", "z = 1s", empty, "x", "y", "z")
+    if not result.valid or not same_dimension(result.first, fourth_length) or
+       not same_dimension(result.third, time) { return 16 }
+
     print("native-math-dimension-triple-ok")
     return 0
 }

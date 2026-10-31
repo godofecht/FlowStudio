@@ -122,7 +122,10 @@ function create({parseCells, execute, onCell, notice, allowNativeFlow = false}) 
         }
         executed++;
         if (!entry.ok) return {ok:false, executed, failedIndex:cell.index, error:"Cell execution failed."};
-        if (remaining === 0)
+        // Reaching the exact aggregate budget is valid only when no output
+        // was discarded and no further executable cells remain. Never launch
+        // another kernel call once the remaining output budget is exhausted.
+        if (remaining === 0 && (bounded.truncated || executed < runnable.length))
           return {ok:false, executed, error:"Notebook output limit of 1 MiB reached."};
       }
       return {ok:true, executed};

@@ -282,6 +282,45 @@ class NativeCoupledTensor32Oracle(unittest.TestCase):
                                    delta=1e-6)
             self.assertAlmostEqual(sum(expected), 305.0, delta=1e-12)
 
+    def test_directed_lyapunov_decay_and_full_grid_one_way_limits(self):
+        state = initial()
+        def weighted_fluctuation_energy(fields, forward, reverse):
+            u, v = fields
+            mean_u, mean_v = sum(u) / COUNT, sum(v) / COUNT
+            return sum(forward * (a - mean_u) ** 2 +
+                       reverse * (b - mean_v) ** 2
+                       for a, b in zip(u, v))
+
+        half = integrate(state, 64, duration=DURATION / 2,
+                         exchange=0.8, reverse=0.2)
+        final = integrate(state, 128, exchange=0.8, reverse=0.2)
+        energies = [weighted_fluctuation_energy(s, 0.8, 0.2)
+                    for s in (state, half, final)]
+        self.assertGreater(energies[0], energies[1])
+        self.assertGreater(energies[1], energies[2])
+        self.assertGreaterEqual(energies[2], 0)
+        self.assertGreater(energies[0] / energies[2], 20)
+
+        for forward, reverse in ((0.8, 0.0), (0.0, 0.2)):
+            numerical = integrate(state, 128, exchange=forward, reverse=reverse)
+            analytical = directed_exact(forward, reverse)
+            self.assertLess(error(numerical, analytical), 0.00012)
+            self.assertAlmostEqual(
+                (sum(numerical[0]) + sum(numerical[1])) / COUNT,
+                305.0, delta=5e-11)
+            expected_means = directed_mode(300, 5, 0, 0, forward, reverse)
+            for values, expected_mean in zip(numerical, expected_means):
+                self.assertAlmostEqual(sum(values) / COUNT, expected_mean,
+                                       delta=1e-6)
+
+        source = (Path(__file__).resolve().parents[1] /
+                  "examples/native_coupled_tensor32.flow").read_text()
+        self.assertIn("weightedFluctuationEnergy(", source)
+        self.assertIn("initialEnergy > halfEnergy", source)
+        self.assertIn("halfEnergy > fullEnergy", source)
+        self.assertIn("forward: 0.8, reverse: 0.0", source)
+        self.assertIn("forward: 0.0, reverse: 0.2", source)
+
     def test_checked_in_native_source_and_resource_guard(self):
         source = (Path(__file__).resolve().parents[1] /
                   "examples/native_coupled_tensor32.flow").read_text()

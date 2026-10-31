@@ -63,3 +63,19 @@ native Flow preflight, errors, output labeling, and lossy export prevention.
 These are deterministic JS/controller tests. They are not a physical-browser
 verification of the actual downloaded Pyodide/webR runtimes. The repository
 cross-platform CI supplies additional native build/HTTP acceptance.
+
+## Bounded notebook execution
+
+Run-all and selected-range execution preflight the actual UTF-8 source (2 MiB),
+reject malformed Unicode, cap the selected range at 512 total code/markdown
+cells and retain the existing 128 executable-cell and 64 KiB per-code-cell
+limits. The 512-cell limit applies to the **selected range** so a single cell
+can still be executed from a larger source. Markdown output is bounded to
+16 KiB at complete Unicode code-point boundaries; detached renderers return
+a structured failure rather than leaving a rejected notebook promise.
+These checks happen before interpreter side effects. The checked-in
+`tests/browser_notebook_preflight.test.js` exercises exact boundaries,
+large multibyte sources, malformed Unicode, mixed-language dispatch and
+renderer failure against the production notebook runner. Native HTTP and
+physical-browser acceptance remain separate gates; controller tests alone
+do not establish RStudio parity.

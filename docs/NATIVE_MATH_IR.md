@@ -560,3 +560,23 @@ exercises the same operators through production HTTP compile/run acceptance.
 These are bounded scalar vector norms, **not** general tensor ASTs,
 compiler-wide upstream Flow syntax, native Navier–Stokes or computed PDE
 visualization. CI verification is required before merging.
+
+## Unicode mathematical spacing
+
+The executable Flow 2.0 scalar mathematical source parser now accepts
+complete UTF-8 nonbreaking space (U+00A0), U+2000–U+200A typographic
+spaces, narrow nonbreaking space (U+202F), medium mathematical space
+(U+205F), and ideographic space (U+3000), in addition to ASCII whitespace.
+Each is consumed at its original byte width; typed postfix instruction
+source spans and diagnostics continue to report UTF-8 byte offsets.
+Invisible format controls, including U+200B and U+2060, are deliberately
+rejected rather than silently ignored. Truncated comparison operators
+also remain bounded by the source length.
+
+The checked-in `src/math_expression_source_smoke.flow` runs native
+arithmetic, physical units, span checks, invalid format controls and
+truncated expressions. The compact
+`src/math_expression_source_http_smoke.flow` runs the same parser and
+typed numerical runtime through production native HTTP and Chromium
+Monaco acceptance on CI. This does not establish unified upstream Flow
+grammar, tensor/PDE ASTs or native Navier–Stokes.

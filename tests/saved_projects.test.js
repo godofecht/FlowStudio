@@ -84,9 +84,9 @@ test("UTF-8 byte ceilings, exact boundaries and malformed Unicode fail closed", 
     "UTF-16 code-unit count must not bypass the byte ceiling");
   assert.equal(storeModule.validProject(source("🧪".repeat(16385))), false,
     "four-byte Unicode must obey the same bound");
-  assert.equal(storeModule.validProject(source("a\\ud800b")), false,
+  assert.equal(storeModule.validProject(source("a\ud800b")), false,
     "unpaired surrogates must not be silently replaced");
-  for (const name of ["..", ".", "bad\\n.py", "bad\\u0000.py", "bad\\udc00.py"]) {
+  for (const name of ["..", ".", "bad\n.py", "bad\u0000.py", "bad\udc00.py"]) {
     assert.equal(storeModule.validProject(project("bad-name", [
       { name, language: "python", text: "pass" }
     ])), false, name);

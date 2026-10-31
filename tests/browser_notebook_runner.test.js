@@ -179,3 +179,46 @@ test("final cell exceeding the aggregate budget still fails when its snapshot is
   assert.deepEqual(result, {ok:false, executed:8, error:"Notebook output limit of 1 MiB reached."});
   assert.equal(f.entries.at(-1).truncated, true);
 });
+
+
+test("aggregate PNG snapshots are bounded by eight MiB across a twelve-cell notebook", async () => {
+  const png = "iVBORw0KGgo" + "A".repeat(1048576 - 12);
+  const f = fixture(async () => ({ok:true, output:"computed", plots:[{number:17, png}]}));
+  const source = Array.from({length:12}, (_, index) =>
+    "# %% [python]\\nprint(" + index + ")").join("\\n").replaceAll("\\n", "\n");
+  assert.deepEqual(await f.runner.run(source, "python"), {ok:true, executed:12});
+  assert.deepEqual(f.entries.map(entry => entry.plots.length),
+    [1,1,1,1,1,1,1,1,0,0,0,0]);
+  assert.equal(f.entries.slice(0,8).every(entry => entry.plots[0].png === png), true);
+  assert.equal(f.entries[0].plots[0].number, undefined);
+  assert.equal(f.entries.length, 12);
+  assert.equal(f.runner.isRunning(), false);
+});
+
+test("oversized and malformed plot payloads are dropped without blocking later valid plots", async () => {
+  const small = "iVBORw0KGgo" + "A".repeat(1024);
+  const large = "iVBORw0KGgo" + "A".repeat(1398105 - 12);
+  const f = fixture(async () => ({ok:true, output:"ok", plots:[
+    {png:large}, {png:"<script>bad</script>"}, {png:small, auxiliary:"x".repeat(2000000)}
+  ]}));
+  assert.deepEqual(await f.runner.run("print(1)", "python"), {ok:true, executed:1});
+  assert.deepEqual(f.entries[0].plots, [{png:small}]);
+  assert.equal(f.runner.isRunning(), false);
+});
+
+test("plot payload budget is independent of aggregate text and bitmap limits", async () => {
+  const png = "iVBORw0KGgo" + "A".repeat(1048576 - 12);
+  let calls = 0;
+  const f = fixture(async () => {
+    calls++;
+    return {ok:true, output:"λ", plots:[{png}],
+      images:[{close() { throw Error("unexpected bitmap close"); }}]};
+  });
+  const source = Array.from({length:10}, () => "# %% [python]\\nprint(1)").join("\\n")
+    .replaceAll("\\n", "\n");
+  assert.deepEqual(await f.runner.run(source, "python"), {ok:true, executed:10});
+  assert.equal(calls, 10);
+  assert.deepEqual(f.entries.map(entry => entry.plots.length), [1,1,1,1,1,1,1,1,0,0]);
+  assert.equal(f.entries.reduce((total, entry) => total + entry.images.length, 0), 10);
+  assert.equal(f.entries.map(entry => entry.output).join(""), "λ".repeat(10));
+});

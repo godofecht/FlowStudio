@@ -1201,6 +1201,38 @@ function main() -> i32 {
     result = evaluate_math_expression_with_bindings("τ", constant_binding)
     if not result.valid or not near(result.result.value, 4.0) { return 447 }
 
+    # Unicode mathematical whitespace is lexed without changing source spans.
+    result = evaluate_math_expression("1m + 2m")
+    if not result.valid or not near(result.result.value, 3.0) or
+       not same_dimension(result.result.dimension, length) { return 448 }
+    result = evaluate_math_expression("2 × 3")
+    if not result.valid or not near(result.result.value, 6.0) { return 449 }
+    result = evaluate_math_expression("4 ÷ 2")
+    if not result.valid or not near(result.result.value, 2.0) { return 450 }
+    result = evaluate_math_expression("2 + 3")
+    if not result.valid or not near(result.result.value, 5.0) { return 451 }
+    result = evaluate_math_expression("2 + 3")
+    if not result.valid or not near(result.result.value, 5.0) { return 452 }
+    result = evaluate_math_expression("2　+　3")
+    if not result.valid or not near(result.result.value, 5.0) { return 453 }
+    let spaced_source: ParsedMathExpression = parse_math_expression("1 + 2")
+    if not spaced_source.valid or spaced_source.program.count != 3 or
+       spaced_source.program.instructions[0].source_start != 0 or
+       spaced_source.program.instructions[0].source_end != 1 or
+       spaced_source.program.instructions[1].source_start != 8 or
+       spaced_source.program.instructions[1].source_end != 9 or
+       spaced_source.program.instructions[2].source_start != 4 or
+       spaced_source.program.instructions[2].source_end != 5 { return 454 }
+    let rejected_zwsp: ParsedMathExpression = parse_math_expression("1​+2")
+    if rejected_zwsp.valid or rejected_zwsp.failed_at != 1 { return 455 }
+    let rejected_joiner: ParsedMathExpression = parse_math_expression("1⁠+2")
+    if rejected_joiner.valid or rejected_joiner.failed_at != 1 { return 456 }
+    if parse_math_expression("1<").valid or parse_math_expression("1>").valid {
+        return 457
+    }
+    let incomplete_space: ParsedMathExpression = parse_math_expression("1 +")
+    if incomplete_space.valid or incomplete_space.failed_at != 4 { return 458 }
+
     println("native-math-source-ok")
     return 0
 }

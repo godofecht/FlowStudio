@@ -1,0 +1,347 @@
+# Native Flow 2.0 two-unknown SI dimensional inference for two scalar equations.
+# This is an intentionally bounded monomial constraint system over the actual
+# parsed postfix equation IR. It does not solve numerical equations or accept
+# additive, conditional, predicate, or general tensor/PDE expressions.
+# Products, quotients, signed integer powers, sqrt, cbrt, unary minus and abs
+# are supported. Each SI exponent is solved by exact integer Cramer's rule.
+import .math_dimensions { Dimension, dimensionless, quantity, same_dimension }
+import .math_expression_ir { MathInstruction, MathProgram }
+import .math_expression_source { MathBindings, MathSymbol, empty_math_bindings }
+import .math_equation { MathEquation, parse_math_equation_with_bindings }
+import .math_static { MathDimensionBindings, MathDimensionSymbol, MathInferredType, infer_math_equation_source_with_dimensions }
+
+extern {
+    function strlen(source: string) -> i64
+}
+
+export struct MathTwoDimensionSolution {
+    valid: bool,
+    first: Dimension,
+    second: Dimension,
+    failed_equation: i32,
+    failed_at: i32
+}
+
+struct DualAffine {
+    first: i32,
+    second: i32,
+    offset: Dimension,
+    denominator: i32
+}
+
+struct DualAnalysis {
+    valid: bool,
+    value: DualAffine,
+    failed_at: i32
+}
+
+struct DimensionRow {
+    valid: bool,
+    first: i32,
+    second: i32,
+    target: Dimension,
+    failed_at: i32
+}
+
+struct AxisSolution {
+    valid: bool,
+    first: i32,
+    second: i32
+}
+
+function blank_affine() -> DualAffine {
+    return DualAffine {
+        first: 0, second: 0, offset: dimensionless(), denominator: 1
+    }
+}
+
+function failed(index: i32, position: i32) -> MathTwoDimensionSolution {
+    return MathTwoDimensionSolution {
+        valid: false, first: dimensionless(), second: dimensionless(),
+        failed_equation: index, failed_at: position
+    }
+}
+
+function failed_analysis(position: i32) -> DualAnalysis {
+    return DualAnalysis { valid: false, value: blank_affine(), failed_at: position }
+}
+
+function failed_row(position: i32) -> DimensionRow {
+    return DimensionRow {
+        valid: false, first: 0, second: 0,
+        target: dimensionless(), failed_at: position
+    }
+}
+
+function absolute(value: i32) -> i32 {
+    if value < 0 { return -value }
+    return value
+}
+
+function gcd(a: i32, b: i32) -> i32 {
+    let mut x: i32 = absolute(a)
+    let mut y: i32 = absolute(b)
+    while y != 0 {
+        let remainder: i32 = x - (x / y) * y
+        x = y
+        y = remainder
+    }
+    return x
+}
+
+function scaled(d: Dimension, factor: i32) -> Dimension {
+    return Dimension {
+        length: d.length * factor, mass: d.mass * factor,
+        time: d.time * factor, temperature: d.temperature * factor
+    }
+}
+
+function added(a: Dimension, b: Dimension) -> Dimension {
+    return Dimension {
+        length: a.length + b.length, mass: a.mass + b.mass,
+        time: a.time + b.time, temperature: a.temperature + b.temperature
+    }
+}
+
+function bounded_dimension(d: Dimension, limit: i32) -> bool {
+    return absolute(d.length) <= limit and absolute(d.mass) <= limit and
+        absolute(d.time) <= limit and absolute(d.temperature) <= limit
+}
+
+function normalise(a: DualAffine) -> DualAffine {
+    let mut divisor: i32 = gcd(a.denominator, a.first)
+    divisor = gcd(divisor, a.second)
+    divisor = gcd(divisor, a.offset.length)
+    divisor = gcd(divisor, a.offset.mass)
+    divisor = gcd(divisor, a.offset.time)
+    divisor = gcd(divisor, a.offset.temperature)
+    if divisor <= 1 { return a }
+    return DualAffine {
+        first: a.first / divisor, second: a.second / divisor,
+        offset: Dimension {
+            length: a.offset.length / divisor,
+            mass: a.offset.mass / divisor,
+            time: a.offset.time / divisor,
+            temperature: a.offset.temperature / divisor
+        },
+        denominator: a.denominator / divisor
+    }
+}
+
+function bounded_affine(a: DualAffine) -> bool {
+    return a.denominator >= 1 and a.denominator <= 64 and
+        absolute(a.first) <= 64 and absolute(a.second) <= 64 and
+        bounded_dimension(a.offset, 64)
+}
+
+function composed(a: DualAffine, b: DualAffine, divide: bool) -> DualAffine {
+    let mut sign: i32 = 1
+    if divide { sign = -1 }
+    return normalise(DualAffine {
+        first: a.first * b.denominator + sign * b.first * a.denominator,
+        second: a.second * b.denominator + sign * b.second * a.denominator,
+        offset: added(
+            scaled(a.offset, b.denominator),
+            scaled(b.offset, sign * a.denominator)),
+        denominator: a.denominator * b.denominator
+    })
+}
+
+function symbol_matches(source: string, op: MathInstruction, name: string) -> bool {
+    let size: i32 = strlen(name) as i32
+    if op.source_end - op.source_start != size { return false }
+    let bytes: ptr<u8> = source as ptr<u8>
+    let name_bytes: ptr<u8> = name as ptr<u8>
+    let mut index: i32 = 0
+    while index < size {
+        if bytes[op.source_start + index] != name_bytes[index] { return false }
+        index = index + 1
+    }
+    return true
+}
+
+function analyse(program: MathProgram, source: string,
+                 first_name: string, second_name: string) -> DualAnalysis {
+    let blank: DualAffine = blank_affine()
+    let mut stack: array<DualAffine, 64> = [blank]
+    let mut depth: i32 = 0
+    let mut index: i32 = 0
+    while index < program.count {
+        let op: MathInstruction = program.instructions[index]
+        let opcode: i32 = op.opcode
+        let position: i32 = op.source_start
+        if opcode == 0 {
+            if depth >= 64 { return failed_analysis(position) }
+            let mut value: DualAffine = blank_affine()
+            if symbol_matches(source, op, first_name) {
+                value.first = 1
+            } elif symbol_matches(source, op, second_name) {
+                value.second = 1
+            } else {
+                value.offset = op.literal.dimension
+            }
+            if not bounded_affine(value) { return failed_analysis(position) }
+            stack[depth] = value
+            depth = depth + 1
+        } elif opcode == 5 or opcode == 6 or opcode == 20 or
+             opcode == 21 or opcode == 44 {
+            if depth < 1 { return failed_analysis(position) }
+            let mut value: DualAffine = stack[depth - 1]
+            if opcode == 6 {
+                if op.exponent < -8 or op.exponent > 8 {
+                    return failed_analysis(position)
+                }
+                value.first = value.first * op.exponent
+                value.second = value.second * op.exponent
+                value.offset = scaled(value.offset, op.exponent)
+            } elif opcode == 21 {
+                value.denominator = value.denominator * 2
+            } elif opcode == 44 {
+                value.denominator = value.denominator * 3
+            }
+            value = normalise(value)
+            if not bounded_affine(value) { return failed_analysis(position) }
+            stack[depth - 1] = value
+        } elif opcode == 3 or opcode == 4 {
+            if depth < 2 { return failed_analysis(position) }
+            let value: DualAffine = composed(
+                stack[depth - 2], stack[depth - 1], opcode == 4)
+            if not bounded_affine(value) { return failed_analysis(position) }
+            depth = depth - 1
+            stack[depth - 1] = value
+        } else {
+            # Do not silently discard dimensional constraints of sums,
+            # comparisons, where(), or other non-monomial operations.
+            return failed_analysis(position)
+        }
+        index = index + 1
+    }
+    if depth != 1 { return failed_analysis(program.source_length) }
+    return DualAnalysis { valid: true, value: stack[0], failed_at: -1 }
+}
+
+function equation_row(source: string, bindings: MathBindings,
+                      first_name: string, second_name: string) -> DimensionRow {
+    let equation: MathEquation = parse_math_equation_with_bindings(source, bindings)
+    if not equation.valid { return failed_row(equation.failed_at) }
+    let left: DualAnalysis = analyse(equation.left, source, first_name, second_name)
+    if not left.valid { return failed_row(left.failed_at) }
+    let right: DualAnalysis = analyse(equation.right, source, first_name, second_name)
+    if not right.valid { return failed_row(right.failed_at) }
+    let a: DualAffine = left.value
+    let b: DualAffine = right.value
+    return DimensionRow {
+        valid: true,
+        first: a.first * b.denominator - b.first * a.denominator,
+        second: a.second * b.denominator - b.second * a.denominator,
+        target: added(
+            scaled(b.offset, a.denominator),
+            scaled(a.offset, -b.denominator)),
+        failed_at: -1
+    }
+}
+
+function solve_axis(first: DimensionRow, second: DimensionRow,
+                    target_first: i32, target_second: i32,
+                    determinant: i32) -> AxisSolution {
+    let first_numerator: i32 =
+        target_first * second.second - target_second * first.second
+    let second_numerator: i32 =
+        first.first * target_second - second.first * target_first
+    let x: i32 = first_numerator / determinant
+    let y: i32 = second_numerator / determinant
+    if absolute(x) > 32 or absolute(y) > 32 or
+       x * determinant != first_numerator or
+       y * determinant != second_numerator {
+        return AxisSolution { valid: false, first: 0, second: 0 }
+    }
+    return AxisSolution { valid: true, first: x, second: y }
+}
+
+# Two equations, exactly two unknown symbols and at most six known symbols.
+# Full rank and exact bounded integer SI exponents are required; rank-deficient,
+# fractional, nonlinear/non-monomial and incompatible systems fail closed.
+export function solve_math_equations_two_unknown_dimensions(
+    first_equation: string, second_equation: string,
+    known: MathDimensionBindings,
+    first_unknown: string, second_unknown: string) -> MathTwoDimensionSolution {
+    if known.count < 0 or known.count > 6 or
+       strlen(first_unknown) < 1 or strlen(first_unknown) > 32 or
+       strlen(second_unknown) < 1 or strlen(second_unknown) > 32 or
+       first_unknown == second_unknown {
+        return failed(0, 0)
+    }
+    let mut bindings: MathBindings = empty_math_bindings()
+    let mut index: i32 = 0
+    while index < known.count {
+        bindings.symbols[index] = MathSymbol {
+            name: known.symbols[index].name,
+            value: quantity(1.0, known.symbols[index].dimension)
+        }
+        index = index + 1
+    }
+    bindings.symbols[known.count] = MathSymbol {
+        name: first_unknown, value: quantity(1.0, dimensionless())
+    }
+    bindings.symbols[known.count + 1] = MathSymbol {
+        name: second_unknown, value: quantity(1.0, dimensionless())
+    }
+    bindings.count = known.count + 2
+
+    let first: DimensionRow = equation_row(
+        first_equation, bindings, first_unknown, second_unknown)
+    if not first.valid { return failed(0, first.failed_at) }
+    let second: DimensionRow = equation_row(
+        second_equation, bindings, first_unknown, second_unknown)
+    if not second.valid { return failed(1, second.failed_at) }
+
+    let determinant: i32 =
+        first.first * second.second - second.first * first.second
+    if determinant == 0 { return failed(1, 0) }
+    let length: AxisSolution = solve_axis(
+        first, second, first.target.length, second.target.length, determinant)
+    let mass: AxisSolution = solve_axis(
+        first, second, first.target.mass, second.target.mass, determinant)
+    let time: AxisSolution = solve_axis(
+        first, second, first.target.time, second.target.time, determinant)
+    let temperature: AxisSolution = solve_axis(
+        first, second, first.target.temperature, second.target.temperature,
+        determinant)
+    if not length.valid or not mass.valid or not time.valid or
+       not temperature.valid {
+        return failed(1, 0)
+    }
+    let first_dimension: Dimension = Dimension {
+        length: length.first, mass: mass.first,
+        time: time.first, temperature: temperature.first
+    }
+    let second_dimension: Dimension = Dimension {
+        length: length.second, mass: mass.second,
+        time: time.second, temperature: temperature.second
+    }
+
+    # Recheck both original equations through the ordinary native static
+    # inference path, including integer root divisibility and symbol rules.
+    let mut declarations: MathDimensionBindings = known
+    declarations.symbols[known.count] = MathDimensionSymbol {
+        name: first_unknown, dimension: first_dimension
+    }
+    declarations.symbols[known.count + 1] = MathDimensionSymbol {
+        name: second_unknown, dimension: second_dimension
+    }
+    declarations.count = known.count + 2
+    let first_verified: MathInferredType =
+        infer_math_equation_source_with_dimensions(first_equation, declarations)
+    if not first_verified.valid or first_verified.is_predicate {
+        return failed(0, first_verified.failed_at)
+    }
+    let second_verified: MathInferredType =
+        infer_math_equation_source_with_dimensions(second_equation, declarations)
+    if not second_verified.valid or second_verified.is_predicate {
+        return failed(1, second_verified.failed_at)
+    }
+    return MathTwoDimensionSolution {
+        valid: true, first: first_dimension, second: second_dimension,
+        failed_equation: -1, failed_at: -1
+    }
+}

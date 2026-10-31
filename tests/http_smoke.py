@@ -369,6 +369,16 @@ def main() -> None:
                            accepted_headers)
     assert status == 422, (
         "coupled tensor corrupted Lyapunov assertion", status, body[-500:])
+    # A changed closed-form exchange exponent must be caught by the
+    # compiler-executed full-grid invariant, not just by a Python oracle.
+    broken_pointwise_exchange = coupled_tensor_source.replace(
+        "0.9753099120283326", "0.8753099120283326", 1)
+    assert broken_pointwise_exchange != coupled_tensor_source
+    status, body = request("POST", "/api/run/flow",
+                           broken_pointwise_exchange, accepted_headers)
+    assert status == 422, (
+        "coupled tensor corrupted pointwise exchange assertion",
+        status, body[-500:])
     # Actual upstream Flow evolution DSL, not a hand-coded ODE or Python
     # interpreter: four coupled states with compiler-generated RK4, checked
     # against a discrete Fourier/Poisson oracle and fourth-order refinement.

@@ -1,3 +1,28 @@
+## Native cancellation-safe exponential increments (pending cross-platform qualification)
+
+The bounded Flow 2.0 mathematical source parser now lowers `expm1(x)` into
+native postfix IR opcode 43, executing the actual Flow numerical runtime.
+It returns `exp(x)-1` with a direct 24-term series for `|x| <= 0.5` so
+small increments are not rounded away by forming `exp(x)` first. Larger
+inputs reuse the native range-reduced exponential kernel. Runtime inputs
+must be dimensionless, non-Boolean and in the inclusive interval [-60,60];
+static inference checks dimensions but deliberately does not execute domains.
+
+`src/math_expm1_smoke.flow` contains 39 native assertions spanning analytical
+values, sub-ulp-scale increments, inverse `log1p` identities, dimension
+rejection, source offsets, malformed calls, static inference and scalar
+equation residuals. The compact HTTP fixture executes additional `expm1`
+cases through the Flow-owned compiler and workbench Run route, while the
+existing Linux/macOS CI executes the checked-in Navier–Stokes dialect
+regression separately. Qualification requires completed cross-platform CI;
+this does not establish upstream grammar integration, unbound symbolic
+dimensional inference, tensor/PDE ASTs or general native Navier–Stokes.
+
+```sh
+flow run src/math_expm1_smoke.flow
+flow run src/math_expression_source_http_smoke.flow
+```
+
 ## Native inverse hyperbolic functions (pending Linux/macOS qualification)
 
 The real Flow 2.0 mathematical source parser now lowers `asinh(x)`,

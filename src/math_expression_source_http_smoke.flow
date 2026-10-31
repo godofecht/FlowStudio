@@ -93,6 +93,19 @@ function main() -> i32 {
     result = evaluate_math_expression("norm3(1e20,1,1)")
     if not result.valid or not close(result.result.value / 1e20, 1.0) { return 34 }
 
+    result = evaluate_math_expression("root4(81*1m⁴)")
+    if not result.valid or not close(result.result.value, 3.0) or
+       not same_dimension(result.result.dimension, length_dimension()) { return 35 }
+    result = evaluate_math_expression("∜(16*1m⁴)")
+    if not result.valid or not close(result.result.value, 2.0) { return 36 }
+    result = evaluate_math_expression("root4(-16)")
+    if result.valid or result.failed_at != 0 { return 37 }
+    result = evaluate_math_expression("root4(16m³)")
+    if result.valid or result.failed_at != 0 { return 38 }
+    let fourth_source: ParsedMathExpression = parse_math_expression("∜(16)")
+    if not fourth_source.valid or fourth_source.program.instructions[1].opcode != 46 or
+       fourth_source.program.instructions[1].source_end != 3 { return 39 }
+
     println("native-math-source-ok")
     return 0
 }

@@ -688,6 +688,15 @@ def main() -> None:
     status, body = request("POST", "/api/run/flow", native_pair, accepted_headers)
     assert status == 200 and "native-math-two-unknown-dimension-constraints-ok" in body, (
         "native paired SI execution", status, body)
+    assert "function solve_math_equations_three_constraints_two_unknown_dimensions(" in native_pair
+    corrupted_triple = native_pair.replace(
+        '"x*y = 1m²", "x*y = 1m²", "x/y = 1s²", known, "x", "y"',
+        '"x*y = 1m²", "x*y = 1m²", "x/y = 1m²", known, "x", "y"',
+        1,
+    )
+    assert corrupted_triple != native_pair
+    status, body = request("POST", "/api/run/flow", corrupted_triple, accepted_headers)
+    assert status == 422, ("native overdetermined SI corrupted assertion", status, body)
     corrupted_pair = native_pair.replace(
         '"x*y = 1m²", "x/y = 1s²", known, "x", "y"',
         '"x*y = 1m²", "x/y = 1m", known, "x", "y"',

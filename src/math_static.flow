@@ -1,9 +1,9 @@
 # Native Flow 2.0 static physical-type inference for bounded mathematical postfix IR.
 # Operates on opcode structure and SI exponents without evaluating numeric values.
 # It does not perform value-range analysis, symbolic algebra, or PDE inference.
-import .math_dimensions { Dimension, dimensionless, same_dimension }
+import .math_dimensions { Dimension, dimensionless, same_dimension, quantity }
 import .math_expression_ir { MathInstruction, MathProgram }
-import .math_expression_source { MathBindings, ParsedMathExpression, parse_math_expression_with_bindings, empty_math_bindings }
+import .math_expression_source { MathSymbol, MathBindings, ParsedMathExpression, parse_math_expression_with_bindings, empty_math_bindings }
 import .math_equation { MathEquation, parse_math_equation_with_bindings }
 
 export struct MathInferredType {
@@ -276,4 +276,55 @@ export function infer_math_equation_source_with_bindings(source: string, binding
 
 export function infer_math_equation_source(source: string) -> MathInferredType {
     return infer_math_equation_source_with_bindings(source, empty_math_bindings())
+}
+
+
+# Type-only declarations are not numerical bindings. They let callers
+# validate physical dimensions before any runtime symbol values exist.
+# The source parser still validates names, duplicate declarations, UTF-8
+# positions and expression syntax. Dummy literal magnitudes are never
+# evaluated by this inference path.
+export struct MathDimensionSymbol {
+    name: string,
+    dimension: Dimension
+}
+
+export struct MathDimensionBindings {
+    symbols: array<MathDimensionSymbol, 8>,
+    count: i32
+}
+
+export function empty_math_dimension_bindings() -> MathDimensionBindings {
+    let blank: MathDimensionSymbol = MathDimensionSymbol {
+        name: "", dimension: dimensionless()
+    }
+    return MathDimensionBindings { symbols: [blank], count: 0 }
+}
+
+function declared_dimension_bindings(declarations: MathDimensionBindings) -> MathBindings {
+    let mut bindings: MathBindings = empty_math_bindings()
+    bindings.count = declarations.count
+    let mut index: i32 = 0
+    while index < declarations.count {
+        bindings.symbols[index] = MathSymbol {
+            name: declarations.symbols[index].name,
+            value: quantity(1.0, declarations.symbols[index].dimension)
+        }
+        index = index + 1
+    }
+    return bindings
+}
+
+export function infer_math_expression_source_with_dimensions(
+    source: string, declarations: MathDimensionBindings) -> MathInferredType {
+    if declarations.count < 0 or declarations.count > 8 { return static_error(0) }
+    return infer_math_expression_source_with_bindings(
+        source, declared_dimension_bindings(declarations))
+}
+
+export function infer_math_equation_source_with_dimensions(
+    source: string, declarations: MathDimensionBindings) -> MathInferredType {
+    if declarations.count < 0 or declarations.count > 8 { return static_error(0) }
+    return infer_math_equation_source_with_bindings(
+        source, declared_dimension_bindings(declarations))
 }

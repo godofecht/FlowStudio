@@ -1,0 +1,103 @@
+# Native compiler acceptance for physical dimensional inference without values.
+# flow run src/math_declared_dimensions_smoke.flow
+import .math_dimensions { Dimension, dimensionless, length_dimension, time_dimension, quotient_dimension, product_dimension, mass_dimension, same_dimension }
+import .math_static { MathInferredType, MathDimensionSymbol, MathDimensionBindings, empty_math_dimension_bindings, infer_math_expression_source_with_dimensions, infer_math_equation_source_with_dimensions }
+
+function main() -> i32 {
+    let length: Dimension = length_dimension()
+    let time: Dimension = time_dimension()
+    let speed: Dimension = quotient_dimension(length, time)
+    let force: Dimension = product_dimension(mass_dimension(),
+        quotient_dimension(length, product_dimension(time, time)))
+    let mut declarations: MathDimensionBindings = empty_math_dimension_bindings()
+    declarations.count = 4
+    declarations.symbols[0] = MathDimensionSymbol { name: "distance", dimension: length }
+    declarations.symbols[1] = MathDimensionSymbol { name: "duration", dimension: time }
+    declarations.symbols[2] = MathDimensionSymbol { name: "δ₀", dimension: speed }
+    declarations.symbols[3] = MathDimensionSymbol { name: "mass", dimension: mass_dimension() }
+
+    let mut inferred: MathInferredType = infer_math_expression_source_with_dimensions(
+        "distance/duration", declarations)
+    if not inferred.valid or inferred.is_predicate or inferred.failed_at != -1 or
+       not same_dimension(inferred.dimension, speed) { return 1 }
+
+    inferred = infer_math_expression_source_with_dimensions(
+        "δ₀ + distance/duration", declarations)
+    if not inferred.valid or not same_dimension(inferred.dimension, speed) { return 2 }
+
+    inferred = infer_math_expression_source_with_dimensions(
+        "mass * distance / duration²", declarations)
+    if not inferred.valid or not same_dimension(inferred.dimension, force) { return 3 }
+
+    inferred = infer_math_expression_source_with_dimensions(
+        "sqrt(distance²)", declarations)
+    if not inferred.valid or not same_dimension(inferred.dimension, length) { return 4 }
+
+    # This is static type checking, not evaluation: the radicand is negative
+    # and the denominator is zero, but both have valid physical types.
+    inferred = infer_math_expression_source_with_dimensions(
+        "sqrt(-distance²)", declarations)
+    if not inferred.valid or not same_dimension(inferred.dimension, length) { return 5 }
+    inferred = infer_math_expression_source_with_dimensions(
+        "distance / 0s", declarations)
+    if not inferred.valid or not same_dimension(inferred.dimension, speed) { return 6 }
+
+    inferred = infer_math_expression_source_with_dimensions(
+        "distance+duration", declarations)
+    if inferred.valid or inferred.failed_at != 8 { return 7 }
+
+    inferred = infer_math_expression_source_with_dimensions(
+        "missing+distance", declarations)
+    if inferred.valid or inferred.failed_at != 0 { return 8 }
+
+    inferred = infer_math_expression_source_with_dimensions(
+        "where(distance>2m, distance, 3m)", declarations)
+    if not inferred.valid or not same_dimension(inferred.dimension, length) { return 9 }
+
+    inferred = infer_math_expression_source_with_dimensions(
+        "distance > duration", declarations)
+    if inferred.valid { return 10 }
+
+    inferred = infer_math_expression_source_with_dimensions(
+        "distance > 2m", declarations)
+    if not inferred.valid or not inferred.is_predicate { return 11 }
+
+    inferred = infer_math_equation_source_with_dimensions(
+        "distance / duration = δ₀", declarations)
+    if not inferred.valid or not same_dimension(inferred.dimension, speed) { return 12 }
+
+    inferred = infer_math_equation_source_with_dimensions(
+        "distance = duration", declarations)
+    if inferred.valid or inferred.failed_at != 9 { return 13 }
+
+    inferred = infer_math_equation_source_with_dimensions(
+        "sqrt(-distance²) = 1m", declarations)
+    if not inferred.valid or not same_dimension(inferred.dimension, length) { return 14 }
+
+    # Symbol declarations are validated by the real source parser, including
+    # duplicate names, invalid Unicode names and out-of-range SI exponents.
+    declarations.symbols[3] = MathDimensionSymbol { name: "distance", dimension: length }
+    if infer_math_expression_source_with_dimensions("distance", declarations).valid { return 15 }
+    declarations.symbols[3] = MathDimensionSymbol { name: "bad-name", dimension: length }
+    if infer_math_expression_source_with_dimensions("distance", declarations).valid { return 16 }
+    declarations.symbols[3] = MathDimensionSymbol { name: "mass", dimension: mass_dimension() }
+    declarations.symbols[3] = MathDimensionSymbol {
+        name: "mass", dimension: Dimension {
+            length: 33, mass: 0, time: 0, temperature: 0
+        }
+    }
+    if infer_math_expression_source_with_dimensions("mass", declarations).valid { return 17 }
+    declarations.count = 9
+    if infer_math_expression_source_with_dimensions("distance", declarations).valid { return 18 }
+    if infer_math_equation_source_with_dimensions("distance=1m", declarations).valid { return 19 }
+    declarations.count = -1
+    if infer_math_expression_source_with_dimensions("distance", declarations).valid { return 20 }
+
+    # Empty declarations preserve literal-only inference and reject unknowns.
+    let empty: MathDimensionBindings = empty_math_dimension_bindings()
+    inferred = infer_math_expression_source_with_dimensions("3m/2s", empty)
+    if not inferred.valid or not same_dimension(inferred.dimension, speed) { return 21 }
+    if infer_math_expression_source_with_dimensions("distance", empty).valid { return 22 }
+    println("native-math-declared-dimensions-ok")
+    return 0
+}

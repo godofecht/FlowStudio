@@ -1,3 +1,33 @@
+## Native one-unknown dimensional constraint inference (experimental)
+
+`src/math_dimension_solver.flow` extends the **actual Flow 2.0 native
+mathematical equation parser** with integer-affine SI-dimensional constraint
+solving for one unbound symbol. Given an equation and up to seven already
+typed symbols, `solve_math_equation_unknown_dimension` derives the missing
+length/mass/time/temperature exponents without requiring any numeric values.
+For example, `x * duration = 1m` with `duration: s` infers `x: m/s`.
+Arithmetic, integer powers, equality, comparisons, dimensioned function
+arguments, and compatible ternary functions contribute constraints. A
+separate native static-inference pass validates the resulting assignment.
+
+The solver **rejects** inconsistent, nonintegral, underdetermined, excessive
+or malformed constraints; it does not infer numerical values or solve PDEs.
+It currently represents only integer-affine dimension expressions: a bare
+`sqrt(x)` is deliberately rejected even when a valid even-exponent
+assignment exists, while `sqrt(x²)` is supported. This is a bounded
+incremental constraint solver, not general symbolic dimensional inference
+or integration with the upstream Flow grammar.
+
+`src/math_dimension_solver_smoke.flow` contains 34 executable assertions.
+Both Linux and macOS CI compile and execute it alongside the existing
+Navier–Stokes dialect, analytical numerical regressions and native HTTP
+acceptance. Do not claim cross-platform qualification until the associated
+CI run passes.
+
+```sh
+flow run src/math_dimension_solver_smoke.flow
+```
+
 ## Native cancellation-safe exponential increments (pending cross-platform qualification)
 
 The bounded Flow 2.0 mathematical source parser now lowers `expm1(x)` into

@@ -100,5 +100,62 @@ function main() -> i32 {
     tolerances.values[1] = quantity(0.0, gradient)
     let verified: MathEquationSystemResult = evaluate_math_equation_system(kinetic, tolerances)
     if not verified.valid or not verified.satisfied or verified.count != 2 { return 27 }
+    # Scaled SI suffixes lower to actual SI numeric values, not display-only units.
+    result = evaluate_math_expression("1km+250m")
+    if not result.valid or not near(result.result.value, 1250.0) or
+       not same_dimension(result.result.dimension, length_dimension()) { return 28 }
+    result = evaluate_math_expression("2cm*3cm")
+    if not result.valid or not near(result.result.value, 0.0006) { return 29 }
+    result = evaluate_math_expression("5mm/1ms")
+    if not result.valid or not near(result.result.value, 5.0) { return 30 }
+    result = evaluate_math_expression("2kPa*3m*1m")
+    if not result.valid or not near(result.result.value, 6000.0) or
+       not same_dimension(result.result.dimension, force) { return 31 }
+    result = evaluate_math_expression("2kN*3m")
+    if not result.valid or not near(result.result.value, 6000.0) or
+       not same_dimension(result.result.dimension, energy) { return 32 }
+    result = evaluate_math_expression("4kJ/2s")
+    if not result.valid or not near(result.result.value, 2000.0) or
+       not same_dimension(result.result.dimension, power) { return 33 }
+    result = evaluate_math_expression("3kW*2s")
+    if not result.valid or not near(result.result.value, 6000.0) or
+       not same_dimension(result.result.dimension, energy) { return 34 }
+    result = evaluate_math_expression("2kHz*500µs")
+    if not result.valid or not near(result.result.value, 1.0) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 35 }
+    result = evaluate_math_expression("1μm+1µm")
+    if not result.valid or not near(result.result.value, 0.000002) or
+       not same_dimension(result.result.dimension, length_dimension()) { return 36 }
+    result = evaluate_math_expression("1kg")
+    if not result.valid or not near(result.result.value, 1.0) or
+       not same_dimension(result.result.dimension,
+           Dimension { length: 0, mass: 1, time: 0, temperature: 0 }) { return 37 }
+
+    let scaled: ParsedMathExpression = parse_math_expression("1kPa+2μm")
+    if not scaled.valid or scaled.program.count != 3 or
+       scaled.program.instructions[0].source_end != 4 or
+       scaled.program.instructions[1].source_start != 5 or
+       scaled.program.instructions[1].source_end != 9 { return 38 }
+    if parse_math_expression("1kpa").valid { return 39 }
+    if parse_math_expression("1µkg").valid { return 40 }
+    result = evaluate_math_expression("1ms+1m")
+    if result.valid or result.failed_at != 3 { return 41 }
+    result = evaluate_math_expression("1kPa+1kN")
+    if result.valid or result.failed_at != 4 { return 42 }
+    inferred = infer_math_expression_source("1kPa/0m")
+    if not inferred.valid or not same_dimension(inferred.dimension, gradient) { return 43 }
+    if evaluate_math_expression("1kPa/0m").valid { return 44 }
+
+    let scaled_system: MathEquationSystem = parse_math_equation_system(
+        "1km=1000m;2kPa*3m*1m=6000N;2kHz*500µs=1")
+    if not scaled_system.valid or scaled_system.count != 3 { return 45 }
+    tolerances.count = 3
+    tolerances.values[0] = quantity(0.0, length_dimension())
+    tolerances.values[1] = quantity(0.0, force)
+    tolerances.values[2] = quantity(0.0, dimensionless())
+    let scaled_checked: MathEquationSystemResult =
+        evaluate_math_equation_system(scaled_system, tolerances)
+    if not scaled_checked.valid or not scaled_checked.satisfied or
+       scaled_checked.count != 3 { return 46 }
     return 0
 }

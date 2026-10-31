@@ -1,5 +1,28 @@
 # Cross-coupled native 32×32 tensor PDE acceptance
 
+## Directed conservative exchange extension (2026-10-31; CI pending)
+
+The same production-compiled Flow solver now accepts independent nonnegative
+forward and reverse exchange rates. The cross-coupling is
+`transfer = forward*U - reverse*V`, with `dU/dt -= transfer` and
+`dV/dt += transfer`. Symmetric 0.35/0.35 preserves the previously qualified
+2,048-cell output and browser heatmaps. A new 0.8/0.2 directed case checks
+the analytic zero Fourier mode at t=0.025:
+`mean(U)=294.0990689747715`, `mean(V)=10.900931025228488`,
+with total 305 conserved. The stability guard now includes the sum of
+both exchange rates; negative reverse rates fail closed.
+
+The independent Python oracle evaluates all 2,048 directed species cells
+against the exact nonsymmetric 2×2 matrix exponential at 32, 64 and 128
+midpoint steps, and adds seeded orientation/conservation and deterministic
+replay checks. An independent local standard-library calculation obtained
+maximum analytical errors 0.00143713, 0.000352209 and 0.0000871888,
+respectively. **Unexecuted:** exact checked-in Python suite, production
+Flow compiler/HTTP/browser acceptance for this revision and Linux/macOS
+CI. The previously qualified symmetric baseline does not qualify these
+new directed assertions.
+
+
 `examples/native_coupled_tensor32.flow` is a real Flow 2.0 program, not
 a Python interpretation or a precomputed browser visualization. It integrates
 two 1,024-cell periodic fields simultaneously with explicit midpoint RK2:

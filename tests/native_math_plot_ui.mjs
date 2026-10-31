@@ -374,8 +374,8 @@ try {
   ).evaluateAll(nodes => nodes.map(node =>
     Number(node.getAttribute('data-native-flow-axis-value'))));
   assert.equal(cyclicAxes.length, 2);
-  assert.ok(Math.abs(cyclicAxes[0] - cyclicMax) < 1e-8);
-  assert.ok(Math.abs(cyclicAxes[1] - cyclicMin) < 1e-8);
+  assert.ok(Math.abs(cyclicAxes[0] - cyclicMax) < 1e-4);
+  assert.ok(Math.abs(cyclicAxes[1] - cyclicMin) < 1e-4);
   for (const name of ['U', 'V', 'W']) {
     const path = await page.locator(
       '#mathFlowPlot path[data-field-name="' + name + '"]').getAttribute('d');

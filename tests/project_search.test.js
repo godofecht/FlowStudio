@@ -112,7 +112,7 @@ const pagesProject = require("../docs/app/project.js");
 for (const [label, project] of [["native", {searchProject}], ["Pages", pagesProject]]) {
   test(label + " enforces actual UTF-8 bytes when file metadata understates size", async () => {
     const oversized = file("oversized.flow", "λ".repeat(524289), 1);
-    const invalid = file("invalid.R", "α\\uD800", 1);
+    const invalid = file("invalid.R", "α" + String.fromCharCode(0xd800), 1);
     const exact = file("exact.py", "λ".repeat(524285) + "needle", 1);
     const root = directory("polyglot", [
       ["oversized.flow", oversized], ["invalid.R", invalid], ["exact.py", exact]

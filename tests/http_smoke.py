@@ -763,6 +763,59 @@ def main() -> None:
     assert status == 422 and body.strip(), (
         "native overdetermined malformed compiler rejection", status, body)
 
+    # Real native variable-count SI HTTP compile/run, not a Python solver.
+    # Stage the checked-in parser, dimension checker, 3x3 solver and all
+    # 16 bounded constraints in a single source for the production compiler.
+    variable_files = static_files[:-1] + (
+        "src/math_dimension_triple.flow",
+        "src/math_dimension_variable.flow",
+        "src/math_dimension_variable_smoke.flow",
+    )
+    native_variable = "\n".join(
+        "\n".join(
+            line.removeprefix("export ")
+            for line in (Path(__file__).resolve().parents[1] / path)
+                .read_text(encoding="utf-8").splitlines()
+            if not line.startswith("import .math_dimensions {")
+            and not line.startswith("import .math_expression_ir {")
+            and not line.startswith("import .math_expression_source {")
+            and not line.startswith("import .math_equation {")
+            and not line.startswith("import .math_static {")
+            and not line.startswith("import .math_dimension_triple {")
+            and not line.startswith("import .math_dimension_variable {")
+        )
+        for path in variable_files
+    )
+    assert "function solve_math_equations_variable_constraints_three_unknown_dimensions(" in native_variable
+    assert 'system.count = 16' in native_variable
+    assert 'system.equations[15] = "x = 1s"' in native_variable
+    assert len(native_variable.encode("utf-8")) < 128 * 1024
+    status, body = request("POST", "/api/check/flow", native_variable, accepted_headers)
+    assert status == 200, ("native variable SI HTTP compile", status, body)
+    status, body = request("POST", "/api/run/flow", native_variable, accepted_headers)
+    assert status == 200 and "native-math-variable-constraints-ok" in body, (
+        "native variable SI HTTP execution", status, body)
+    # The checked-in native main must fail at its late contradictory equation.
+    # Change that equation to a consistent one; the negative assertion in the
+    # real Flow program must then reject execution, not silently succeed.
+    corrupted_variable = native_variable.replace(
+        'system.equations[15] = "x = 1s"',
+        'system.equations[15] = "x = 1m"',
+        1,
+    )
+    assert corrupted_variable != native_variable
+    status, body = request("POST", "/api/run/flow", corrupted_variable, accepted_headers)
+    assert status == 422, ("native variable SI corrupted assertion", status, body)
+    malformed_variable = native_variable.replace(
+        "function constraint_failure(index: i32, position: i32) -> MathThreeDimensionSolution {",
+        "function constraint_failure(index: i32, position: i32 -> MathThreeDimensionSolution {",
+        1,
+    )
+    assert malformed_variable != native_variable
+    status, body = request("POST", "/api/check/flow", malformed_variable, accepted_headers)
+    assert status == 422 and body.strip(), (
+        "native variable SI malformed compiler rejection", status, body)
+
     # Native hyperbolic source lowering, typed IR, static dimensions and
     # scalar equation residuals through the real Flow compiler and HTTP runner.
     # The temporary HTTP source is built from the checked-in native modules,

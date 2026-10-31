@@ -507,6 +507,36 @@ try {
     null, { timeout: 80000 });
   assert.match(await page.locator('#console').textContent(), /native-math-hyperbolic-ok/);
 
+  // Physical Chromium -> Monaco Run -> native HTTP -> Flow 2.0 compiler.
+  // Execute the full checked-in 16-constraint, three-unknown SI solver;
+  // it includes rank-deficient prefixes, Unicode, contradictions and
+  // bounded work. No mock interpreter or precomputed output is involved.
+  const nativeVariableFiles = [
+    'src/math_dimensions.flow',
+    'src/math_expression_ir.flow',
+    'src/math_expression_source.flow',
+    'src/math_equation.flow',
+    'src/math_static.flow',
+    'src/math_dimension_triple.flow',
+    'src/math_dimension_variable.flow',
+    'src/math_dimension_variable_smoke.flow'
+  ];
+  const nativeVariableSource = nativeVariableFiles.map(path =>
+    readFileSync(path, 'utf8').split(/\r?\n/)
+      .filter(line => !/^import \.math_(dimensions|expression_ir|expression_source|equation|static|dimension_triple|dimension_variable) \{/.test(line))
+      .map(line => line.replace(/^export /, '')).join('\n')
+  ).join('\n');
+  assert.ok(Buffer.byteLength(nativeVariableSource, 'utf8') < 128 * 1024);
+  assert.match(nativeVariableSource, /system\.count = 16/);
+  await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
+    nativeVariableSource);
+  await page.locator('#run').click();
+  await page.waitForFunction(() =>
+    document.querySelector('#console')?.textContent?.includes('native-math-variable-constraints-ok'),
+    null, { timeout: 120000 });
+  assert.match(await page.locator('#console').textContent(),
+    /native-math-variable-constraints-ok/);
+
   assert.deepEqual(errors, [], errors.join('\n'));
   console.log('PASS: native mathematical Flow HTTP, linear/nonlinear NumPy PDEs and actual SVG plots in Chromium');
 } finally {

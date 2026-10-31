@@ -149,7 +149,7 @@ function precedence(opcode: i32) -> i32 {
     if opcode == 5 or opcode == 20 or opcode == 21 or opcode == 25 or
        opcode == 26 or opcode == 27 or opcode == 28 or opcode == 29 or opcode == 30 or opcode == 31 or
        opcode == 33 or opcode == 34 or opcode == 35 or opcode == 36 or opcode == 37 or
-        opcode == 38 or opcode == 39 or opcode == 40 or opcode == 42 or opcode == 43 or opcode == 44 { return 3 }
+        opcode == 38 or opcode == 39 or opcode == 40 or opcode == 42 or opcode == 43 or opcode == 44 or opcode == 45 { return 3 }
     if opcode == 3 or opcode == 4 { return 2 }
     if opcode == 1 or opcode == 2 { return 1 }
     # Comparisons bind below arithmetic and lower to typed predicate IR.
@@ -167,7 +167,7 @@ function function_arity(opcode: i32) -> i32 {
     if opcode == 20 or opcode == 21 or opcode == 25 or
        opcode == 26 or opcode == 27 or opcode == 28 or opcode == 29 or opcode == 30 or opcode == 31 or
        opcode == 33 or opcode == 34 or opcode == 35 or opcode == 36 or opcode == 37 or
-        opcode == 38 or opcode == 39 or opcode == 40 or opcode == 42 or opcode == 43 or opcode == 44 { return 1 }
+        opcode == 38 or opcode == 39 or opcode == 40 or opcode == 42 or opcode == 43 or opcode == 44 or opcode == 45 { return 1 }
     if opcode == 7 or opcode == 8 or opcode == 22 or opcode == 32 { return 2 }
     if opcode == 9 or opcode == 19 or opcode == 45 { return 3 }
     return 0
@@ -361,6 +361,10 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
                    bytes[index + 1] == 136 and bytes[index + 2] == 155 { # ∛
                 unary_opcode = 44
                 unary_width = 3
+            } elif c == 226 and index + 2 < length and
+                   bytes[index + 1] == 136 and bytes[index + 2] == 156 { # ∜
+                unary_opcode = 45
+                unary_width = 3
             } elif c == 97 and index + 3 < length and
                    bytes[index + 1] == 98 and bytes[index + 2] == 115 and
                    bytes[index + 3] == 40 { # abs(
@@ -375,6 +379,10 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
                    identifier_matches(bytes, index, index + 4, "cbrt") {
                 unary_opcode = 44
                 unary_width = 4
+            } elif index + 5 < length and bytes[index + 5] == 40 and
+                   identifier_matches(bytes, index, index + 5, "root4") {
+                unary_opcode = 45
+                unary_width = 5
             } elif c == 101 and index + 3 < length and
                    bytes[index + 1] == 120 and bytes[index + 2] == 112 and
                    bytes[index + 3] == 40 { # exp(

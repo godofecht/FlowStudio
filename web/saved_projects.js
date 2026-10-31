@@ -12,11 +12,24 @@ const MAX_FILE_TEXT = 65536;   // bytes of source per file
 const MAX_TITLE = 200;
 const MAX_TOTAL_BYTES = 786432;
 
+function wellFormedUnicode(value) {
+  // TextEncoder replaces unpaired surrogates, silently corrupting source.
+  for (const character of value) {
+    const point = character.codePointAt(0);
+    if (point >= 0xd800 && point <= 0xdfff) return false;
+  }
+  return true;
+}
 function validFile(file) {
-  return Boolean(file) && typeof file.name === "string" && file.name.length > 0 &&
-    file.name.length <= 256 && !file.name.includes("/") && !file.name.includes("\\") &&
-    (file.language === "flow" || file.language === "r" || file.language === "python") &&
-    typeof file.text === "string" && file.text.length <= MAX_FILE_TEXT;
+  if (!file || typeof file.name !== "string" || !file.name ||
+      file.name.length > 256 || file.name === "." || file.name === ".." ||
+      file.name.includes("/") || file.name.includes("\\") ||
+      /[\u0000-\u001f\u007f]/u.test(file.name) ||
+      !wellFormedUnicode(file.name) ||
+      !["flow", "r", "python"].includes(file.language) ||
+      typeof file.text !== "string" || file.text.length > MAX_FILE_TEXT ||
+      !wellFormedUnicode(file.text)) return false;
+  return new TextEncoder().encode(file.text).byteLength <= MAX_FILE_TEXT;
 }
 function validProject(project) {
   if (!project || typeof project.id !== "string" || !project.id || project.id.length > 120)
@@ -26,8 +39,10 @@ function validProject(project) {
   if (!Number.isFinite(project.savedAt)) return false;
   if (!Array.isArray(project.files) || !project.files.length || project.files.length > MAX_FILES)
     return false;
-  return project.files.every(validFile) &&
-    new TextEncoder().encode(JSON.stringify(project)).length <= MAX_TOTAL_BYTES;
+  if (!project.files.every(validFile)) return false;
+  if (new Set(project.files.map(file => file.name)).size !== project.files.length)
+    return false;
+  return new TextEncoder().encode(JSON.stringify(sanitize(project))).byteLength <= MAX_TOTAL_BYTES;
 }
 function sanitize(project) {
   return {
@@ -61,10 +76,11 @@ function createStore(storage) {
   function persist() { store(storage, projects); }
   function indexOf(id) { return projects.findIndex(project => project.id === id); }
   return Object.freeze({
-    list: () => projects.map(project => ({ ...project, files: project.files.slice() })),
+    // Callers may edit returned buffers; never expose the in-memory snapshot.
+    list: () => projects.map(sanitize),
     find: id => {
       const index = indexOf(id);
-      return index >= 0 ? { ...projects[index], files: projects[index].files.slice() } : null;
+      return index >= 0 ? sanitize(projects[index]) : null;
     },
     upsert(project) {
       if (!validProject(project)) return null;

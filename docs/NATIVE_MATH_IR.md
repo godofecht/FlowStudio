@@ -450,3 +450,23 @@ cancellation in `ln(1+x)`; outside this interval it reuses the native
 bounded natural logarithm. No upstream grammar modification, arbitrary
 precision, or general symbolic differentiation is claimed. The checked-in
 `src/math_log1p_smoke.flow` and compact HTTP source fixture run in native CI.
+
+
+## Native mathematical constants (2026-10-31; CI qualification pending)
+
+The native source-to-postfix compiler recognizes `pi`, `π`, `tau` and
+`τ` as fixed dimensionless numeric literals. `tau = 2*pi`. This is
+executable native Flow 2.0 lowering, not editor substitution or the Python
+mathematical dialect. UTF-8 byte spans are retained for both Greek spellings,
+and existing dimensional, trigonometric, equation-residual and static type
+checks apply unchanged. Caller-provided `MathBindings` cannot shadow these
+four reserved names. Multiplication remains explicit: `2*π` is accepted;
+`2π` is rejected.
+
+The checked-in native source, static inference, equation and compact HTTP
+smoke programs exercise analytical identities, dimensional errors, byte
+offsets, shadowing rejection and negative syntax. Existing Linux/macOS CI
+compiles and executes these programs, as well as the Python-backed
+Navier–Stokes fixture. Full upstream grammar integration, symbolic
+dimensional constraint solving, native Navier–Stokes and generalized tensor
+PDE lowering remain outstanding.

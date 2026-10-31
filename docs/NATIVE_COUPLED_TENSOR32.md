@@ -1,5 +1,27 @@
 # Cross-coupled native 32×32 tensor PDE acceptance
 
+## Directed Lyapunov and triangular-limit regression (2026-10-31; qualification pending)
+
+The production native Flow program now checks monotone decay of the
+detailed-balance weighted spatial-fluctuation energy
+`0.8 Σ(U-mean(U))² + 0.2 Σ(V-mean(V))²` at t=0, 0.0125 and 0.025.
+The same executable evaluates forward-only (0.8/0) and reverse-only
+(0/0.2) exchange at 128 RK2 steps and compares the independently
+derived zero-mode exponential means with 1e-6 absolute tolerance.
+The Python oracle additionally checks all 2,048 cells of each one-way
+solution against independent nonsymmetric matrix exponentials, with
+0.00012 absolute tolerance and deterministic inputs. The real HTTP
+acceptance deliberately inverts the energy assertion and requires a 422,
+not just a successful compile. Existing 400,000 cell-step per-integration
+limit remains enforced.
+
+Local standalone numerical exploration reproduced positive energy decay
+and one-way means, but **the new checked-in test suite, native Flow compiler,
+production HTTP, browser and Linux/macOS CI have not yet passed** at
+submission. Do not count this as general multidimensional field DSL or
+RStudio parity.
+
+
 ## Full directed Fourier-field acceptance (2026-10-31; CI pending)
 
 The native Flow program now checks **all 2,048 directed U/V cells**, not

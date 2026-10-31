@@ -1,0 +1,399 @@
+# Native Flow 2.0 three-unknown SI dimensional inference for three scalar equations.
+# This is an intentionally bounded three-variable monomial constraint system over the actual
+# parsed postfix equation IR. It does not solve numerical equations or accept
+# additive, conditional, predicate, or general tensor/PDE expressions.
+# Products, quotients, signed integer powers, sqrt, cbrt, unary minus and abs
+# are supported. Each SI exponent is solved by exact integer 3x3 Cramer's rule.
+import .math_dimensions { Dimension, dimensionless, quantity }
+import .math_expression_ir { MathInstruction, MathProgram }
+import .math_expression_source { MathBindings, MathSymbol, empty_math_bindings }
+import .math_equation { MathEquation, parse_math_equation_with_bindings }
+import .math_static { MathDimensionBindings, MathDimensionSymbol, MathInferredType, infer_math_equation_source_with_dimensions }
+
+extern {
+    function strlen(source: string) -> i64
+}
+
+export struct MathThreeDimensionSolution {
+    valid: bool,
+    first: Dimension,
+    second: Dimension,
+    third: Dimension,
+    failed_equation: i32,
+    failed_at: i32
+}
+
+struct TripleAffine {
+    first: i32,
+    second: i32,
+    third: i32,
+    offset: Dimension,
+    denominator: i32
+}
+
+struct TripleAnalysis {
+    valid: bool,
+    value: TripleAffine,
+    failed_at: i32
+}
+
+struct DimensionRow {
+    valid: bool,
+    first: i32,
+    second: i32,
+    third: i32,
+    target: Dimension,
+    failed_at: i32
+}
+
+struct AxisSolution {
+    valid: bool,
+    first: i32,
+    second: i32,
+    third: i32
+}
+
+function blank_affine() -> TripleAffine {
+    return TripleAffine {
+        first: 0, second: 0, third: 0, offset: dimensionless(), denominator: 1
+    }
+}
+
+function triple_failed(index: i32, position: i32) -> MathThreeDimensionSolution {
+    return MathThreeDimensionSolution {
+        valid: false, first: dimensionless(), second: dimensionless(),
+        third: dimensionless(),
+        failed_equation: index, failed_at: position
+    }
+}
+
+function failed_analysis(position: i32) -> TripleAnalysis {
+    return TripleAnalysis { valid: false, value: blank_affine(), failed_at: position }
+}
+
+function failed_row(position: i32) -> DimensionRow {
+    return DimensionRow {
+        valid: false, first: 0, second: 0, third: 0,
+        target: dimensionless(), failed_at: position
+    }
+}
+
+function absolute(value: i32) -> i32 {
+    if value < 0 { return -value }
+    return value
+}
+
+function gcd(a: i32, b: i32) -> i32 {
+    let mut x: i32 = absolute(a)
+    let mut y: i32 = absolute(b)
+    while y != 0 {
+        let remainder: i32 = x - (x / y) * y
+        x = y
+        y = remainder
+    }
+    return x
+}
+
+function scaled(d: Dimension, factor: i32) -> Dimension {
+    return Dimension {
+        length: d.length * factor, mass: d.mass * factor,
+        time: d.time * factor, temperature: d.temperature * factor
+    }
+}
+
+function added(a: Dimension, b: Dimension) -> Dimension {
+    return Dimension {
+        length: a.length + b.length, mass: a.mass + b.mass,
+        time: a.time + b.time, temperature: a.temperature + b.temperature
+    }
+}
+
+function triple_bounded_dimension(d: Dimension, limit: i32) -> bool {
+    return absolute(d.length) <= limit and absolute(d.mass) <= limit and
+        absolute(d.time) <= limit and absolute(d.temperature) <= limit
+}
+
+function normalise(a: TripleAffine) -> TripleAffine {
+    let mut divisor: i32 = gcd(a.denominator, a.first)
+    divisor = gcd(divisor, a.second)
+    divisor = gcd(divisor, a.third)
+    divisor = gcd(divisor, a.offset.length)
+    divisor = gcd(divisor, a.offset.mass)
+    divisor = gcd(divisor, a.offset.time)
+    divisor = gcd(divisor, a.offset.temperature)
+    if divisor <= 1 { return a }
+    return TripleAffine {
+        first: a.first / divisor, second: a.second / divisor,
+        third: a.third / divisor,
+        offset: Dimension {
+            length: a.offset.length / divisor,
+            mass: a.offset.mass / divisor,
+            time: a.offset.time / divisor,
+            temperature: a.offset.temperature / divisor
+        },
+        denominator: a.denominator / divisor
+    }
+}
+
+function bounded_affine(a: TripleAffine) -> bool {
+    return a.denominator >= 1 and a.denominator <= 64 and
+        absolute(a.first) <= 64 and absolute(a.second) <= 64 and
+        absolute(a.third) <= 64 and
+        triple_bounded_dimension(a.offset, 64)
+}
+
+function composed(a: TripleAffine, b: TripleAffine, divide: bool) -> TripleAffine {
+    let mut sign: i32 = 1
+    if divide { sign = -1 }
+    return normalise(TripleAffine {
+        first: a.first * b.denominator + sign * b.first * a.denominator,
+        second: a.second * b.denominator + sign * b.second * a.denominator,
+        third: a.third * b.denominator + sign * b.third * a.denominator,
+        offset: added(
+            scaled(a.offset, b.denominator),
+            scaled(b.offset, sign * a.denominator)),
+        denominator: a.denominator * b.denominator
+    })
+}
+
+function symbol_matches(source: string, op: MathInstruction, name: string) -> bool {
+    let size: i32 = strlen(name) as i32
+    if op.source_end - op.source_start != size { return false }
+    let bytes: ptr<u8> = source as ptr<u8>
+    let name_bytes: ptr<u8> = name as ptr<u8>
+    let mut index: i32 = 0
+    while index < size {
+        if bytes[op.source_start + index] != name_bytes[index] { return false }
+        index = index + 1
+    }
+    return true
+}
+
+function analyse(program: MathProgram, source: string,
+                 first_name: string, second_name: string,
+                 third_name: string) -> TripleAnalysis {
+    let blank: TripleAffine = blank_affine()
+    let mut stack: array<TripleAffine, 64> = [blank]
+    let mut depth: i32 = 0
+    let mut index: i32 = 0
+    while index < program.count {
+        let op: MathInstruction = program.instructions[index]
+        let opcode: i32 = op.opcode
+        let position: i32 = op.source_start
+        if opcode == 0 {
+            if depth >= 64 { return failed_analysis(position) }
+            let mut value: TripleAffine = blank_affine()
+            if symbol_matches(source, op, first_name) {
+                value.first = 1
+            } elif symbol_matches(source, op, second_name) {
+                value.second = 1
+            } elif symbol_matches(source, op, third_name) {
+                value.third = 1
+            } else {
+                value.offset = op.literal.dimension
+            }
+            if not bounded_affine(value) { return failed_analysis(position) }
+            stack[depth] = value
+            depth = depth + 1
+        } elif opcode == 5 or opcode == 6 or opcode == 20 or
+             opcode == 21 or opcode == 44 {
+            if depth < 1 { return failed_analysis(position) }
+            let mut value: TripleAffine = stack[depth - 1]
+            if opcode == 6 {
+                if op.exponent < -8 or op.exponent > 8 {
+                    return failed_analysis(position)
+                }
+                value.first = value.first * op.exponent
+                value.second = value.second * op.exponent
+                value.third = value.third * op.exponent
+                value.offset = scaled(value.offset, op.exponent)
+            } elif opcode == 21 {
+                value.denominator = value.denominator * 2
+            } elif opcode == 44 {
+                value.denominator = value.denominator * 3
+            }
+            value = normalise(value)
+            if not bounded_affine(value) { return failed_analysis(position) }
+            stack[depth - 1] = value
+        } elif opcode == 3 or opcode == 4 {
+            if depth < 2 { return failed_analysis(position) }
+            let value: TripleAffine = composed(
+                stack[depth - 2], stack[depth - 1], opcode == 4)
+            if not bounded_affine(value) { return failed_analysis(position) }
+            depth = depth - 1
+            stack[depth - 1] = value
+        } else {
+            # Do not silently discard dimensional constraints of sums,
+            # comparisons, where(), or other non-monomial operations.
+            return failed_analysis(position)
+        }
+        index = index + 1
+    }
+    if depth != 1 { return failed_analysis(program.source_length) }
+    return TripleAnalysis { valid: true, value: stack[0], failed_at: -1 }
+}
+
+function equation_row(source: string, bindings: MathBindings,
+                      first_name: string, second_name: string,
+                      third_name: string) -> DimensionRow {
+    let equation: MathEquation = parse_math_equation_with_bindings(source, bindings)
+    if not equation.valid { return failed_row(equation.failed_at) }
+    let left: TripleAnalysis = analyse(equation.left, source, first_name, second_name, third_name)
+    if not left.valid { return failed_row(left.failed_at) }
+    let right: TripleAnalysis = analyse(equation.right, source, first_name, second_name, third_name)
+    if not right.valid { return failed_row(right.failed_at) }
+    let a: TripleAffine = left.value
+    let b: TripleAffine = right.value
+    return DimensionRow {
+        valid: true,
+        first: a.first * b.denominator - b.first * a.denominator,
+        second: a.second * b.denominator - b.second * a.denominator,
+        third: a.third * b.denominator - b.third * a.denominator,
+        target: added(
+            scaled(b.offset, a.denominator),
+            scaled(a.offset, -b.denominator)),
+        failed_at: -1
+    }
+}
+
+
+function determinant(
+    a0: i32, a1: i32, a2: i32,
+    b0: i32, b1: i32, b2: i32,
+    c0: i32, c1: i32, c2: i32) -> i32 {
+    return a0 * (b1 * c2 - b2 * c1) -
+        a1 * (b0 * c2 - b2 * c0) +
+        a2 * (b0 * c1 - b1 * c0)
+}
+
+function solve_axis(a: DimensionRow, b: DimensionRow, c: DimensionRow,
+                    target_a: i32, target_b: i32, target_c: i32,
+                    divisor: i32) -> AxisSolution {
+    let numerator_first: i32 = determinant(
+        target_a, a.second, a.third,
+        target_b, b.second, b.third,
+        target_c, c.second, c.third)
+    let numerator_second: i32 = determinant(
+        a.first, target_a, a.third,
+        b.first, target_b, b.third,
+        c.first, target_c, c.third)
+    let numerator_third: i32 = determinant(
+        a.first, a.second, target_a,
+        b.first, b.second, target_b,
+        c.first, c.second, target_c)
+    let x: i32 = numerator_first / divisor
+    let y: i32 = numerator_second / divisor
+    let z: i32 = numerator_third / divisor
+    if absolute(x) > 32 or absolute(y) > 32 or absolute(z) > 32 or
+       x * divisor != numerator_first or
+       y * divisor != numerator_second or
+       z * divisor != numerator_third {
+        return AxisSolution { valid: false, first: 0, second: 0, third: 0 }
+    }
+    return AxisSolution { valid: true, first: x, second: y, third: z }
+}
+
+# Exactly three independent monomial equations and three unknown dimensions.
+# Fail closed on rank deficiency, fractional exponents, malformed symbols and
+# non-monomial equations. Every result is rechecked with the static type checker.
+export function solve_math_equations_three_unknown_dimensions(
+    first_equation: string, second_equation: string, third_equation: string,
+    known: MathDimensionBindings,
+    first_unknown: string, second_unknown: string,
+    third_unknown: string) -> MathThreeDimensionSolution {
+    if known.count < 0 or known.count > 5 or
+       strlen(first_unknown) < 1 or strlen(first_unknown) > 32 or
+       strlen(second_unknown) < 1 or strlen(second_unknown) > 32 or
+       strlen(third_unknown) < 1 or strlen(third_unknown) > 32 {
+        return triple_failed(0, 0)
+    }
+    let mut bindings: MathBindings = empty_math_bindings()
+    let mut index: i32 = 0
+    while index < known.count {
+        bindings.symbols[index] = MathSymbol {
+            name: known.symbols[index].name,
+            value: quantity(1.0, known.symbols[index].dimension)
+        }
+        index = index + 1
+    }
+    bindings.symbols[known.count] = MathSymbol {
+        name: first_unknown, value: quantity(1.0, dimensionless())
+    }
+    bindings.symbols[known.count + 1] = MathSymbol {
+        name: second_unknown, value: quantity(1.0, dimensionless())
+    }
+    bindings.symbols[known.count + 2] = MathSymbol {
+        name: third_unknown, value: quantity(1.0, dimensionless())
+    }
+    bindings.count = known.count + 3
+    let a: DimensionRow = equation_row(
+        first_equation, bindings, first_unknown, second_unknown, third_unknown)
+    if not a.valid { return triple_failed(0, a.failed_at) }
+    let b: DimensionRow = equation_row(
+        second_equation, bindings, first_unknown, second_unknown, third_unknown)
+    if not b.valid { return triple_failed(1, b.failed_at) }
+    let c: DimensionRow = equation_row(
+        third_equation, bindings, first_unknown, second_unknown, third_unknown)
+    if not c.valid { return triple_failed(2, c.failed_at) }
+
+    let divisor: i32 = determinant(
+        a.first, a.second, a.third,
+        b.first, b.second, b.third,
+        c.first, c.second, c.third)
+    if divisor == 0 { return triple_failed(2, 0) }
+    let length: AxisSolution = solve_axis(
+        a, b, c, a.target.length, b.target.length, c.target.length, divisor)
+    let mass: AxisSolution = solve_axis(
+        a, b, c, a.target.mass, b.target.mass, c.target.mass, divisor)
+    let time: AxisSolution = solve_axis(
+        a, b, c, a.target.time, b.target.time, c.target.time, divisor)
+    let temperature: AxisSolution = solve_axis(
+        a, b, c, a.target.temperature, b.target.temperature,
+        c.target.temperature, divisor)
+    if not length.valid or not mass.valid or not time.valid or
+       not temperature.valid {
+        return triple_failed(2, 0)
+    }
+    let first_dimension: Dimension = Dimension {
+        length: length.first, mass: mass.first,
+        time: time.first, temperature: temperature.first
+    }
+    let second_dimension: Dimension = Dimension {
+        length: length.second, mass: mass.second,
+        time: time.second, temperature: temperature.second
+    }
+    let third_dimension: Dimension = Dimension {
+        length: length.third, mass: mass.third,
+        time: time.third, temperature: temperature.third
+    }
+    let mut declarations: MathDimensionBindings = known
+    declarations.symbols[known.count] = MathDimensionSymbol {
+        name: first_unknown, dimension: first_dimension
+    }
+    declarations.symbols[known.count + 1] = MathDimensionSymbol {
+        name: second_unknown, dimension: second_dimension
+    }
+    declarations.symbols[known.count + 2] = MathDimensionSymbol {
+        name: third_unknown, dimension: third_dimension
+    }
+    declarations.count = known.count + 3
+    let first_verified: MathInferredType =
+        infer_math_equation_source_with_dimensions(first_equation, declarations)
+    if not first_verified.valid or first_verified.is_predicate {
+        return triple_failed(0, first_verified.failed_at)
+    }
+    let second_verified: MathInferredType =
+        infer_math_equation_source_with_dimensions(second_equation, declarations)
+    if not second_verified.valid or second_verified.is_predicate {
+        return triple_failed(1, second_verified.failed_at)
+    }
+    let third_verified: MathInferredType =
+        infer_math_equation_source_with_dimensions(third_equation, declarations)
+    if not third_verified.valid or third_verified.is_predicate {
+        return triple_failed(2, third_verified.failed_at)
+    }
+    return MathThreeDimensionSolution {
+        valid: true, first: first_dimension, second: second_dimension,
+        third: third_dimension, failed_equation: -1, failed_at: -1
+    }
+}

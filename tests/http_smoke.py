@@ -298,6 +298,68 @@ def main() -> None:
                    "second native 1024-cell species differs from independent Fourier reference")
     assert abs(sum(species_v_values) / 1024.0 - 5.0) < 0.00001, (
         "second species violates periodic mass conservation")
+    # Two genuinely exchange-coupled 32x32 anisotropic PDE species.
+    # The production Flow compiler executes the same midpoint state for both
+    # species; independent matrix-exponential Fourier values verify all 2048
+    # computed cells after transport, not just the native success marker.
+    coupled_tensor_source = (Path(__file__).resolve().parents[1] /
+                             "examples/native_coupled_tensor32.flow").read_text(encoding="utf-8")
+    status, body = request("POST", "/api/check/flow", coupled_tensor_source, accepted_headers)
+    assert status == 200, ("coupled tensor32 native check", status, body)
+    status, body = request("POST", "/api/run/flow", coupled_tensor_source, accepted_headers)
+    assert status == 200 and "native-coupled-tensor32-ok" in body, (
+        "coupled tensor32 native run", status, body[-500:])
+    coupled_lines = body.splitlines()
+    coupled_headers = [i for i, line in enumerate(coupled_lines)
+                       if line == "FLOWSTUDIO_GRID_V1 32 32 2"]
+    assert len(coupled_headers) == 1, ("coupled tensor32 frame count", body[-500:])
+    coupled_at = coupled_headers[0]
+    assert coupled_lines[coupled_at + 3] == "FLOWSTUDIO_GRID_END"
+    coupled_u = coupled_lines[coupled_at + 1].split()
+    coupled_v = coupled_lines[coupled_at + 2].split()
+    assert len(coupled_u) == len(coupled_v) == 1025
+    assert coupled_u[0] == "U" and coupled_v[0] == "V"
+    coupled_values = ([float(value) for value in coupled_u[1:]],
+                      [float(value) for value in coupled_v[1:]])
+    assert all(math.isfinite(value) for field in coupled_values for value in field)
+    def coupled_exact_mode(u, v, decay_u, decay_v):
+        center = -(decay_u + decay_v) / 2.0 - 0.35
+        difference = (decay_v - decay_u) / 2.0
+        radius = math.hypot(difference, 0.35)
+        multiplier = math.exp(center * 0.025)
+        cosine = math.cosh(radius * 0.025)
+        sine = math.sinh(radius * 0.025) / radius
+        return (multiplier * (cosine * u + sine * (difference * u + 0.35 * v)),
+                multiplier * (cosine * v + sine * (0.35 * u - difference * v)))
+    base_u, base_v = coupled_exact_mode(300.0, 5.0, 0.0, 0.0)
+    plus_u, plus_v = coupled_exact_mode(7.0, 0.8, 69.632, 32.768)
+    minus_u, minus_v = coupled_exact_mode(3.0, -0.3, 53.248, 40.96)
+    reference_u = [base_u + plus_u * quarter_mode(x + y) +
+                   minus_u * quarter_mode(x - y)
+                   for y in range(32) for x in range(32)]
+    reference_v = [base_v + plus_v * quarter_mode(x + y) +
+                   minus_v * quarter_mode(x - y)
+                   for y in range(32) for x in range(32)]
+    for actual, expected in zip(coupled_values, (reference_u, reference_v)):
+        assert max(abs(a - b) for a, b in zip(actual, expected)) < 0.002, (
+            "coupled 32x32 native values differ from independent matrix exponential")
+    assert abs((sum(coupled_values[0]) + sum(coupled_values[1])) / 1024 -
+               305.0) < 0.002, "coupled PDE violates total mass conservation"
+    assert sum(coupled_values[0]) / 1024 < 298.0
+    assert sum(coupled_values[1]) / 1024 > 7.0
+    broken_coupled_source = coupled_tensor_source.replace(
+        "struct Species {", "struct Species BROKEN {", 1)
+    assert broken_coupled_source != coupled_tensor_source
+    status, body = request("POST", "/api/check/flow", broken_coupled_source,
+                           accepted_headers)
+    assert status == 422 and body.strip(), (
+        "coupled tensor malformed source must be rejected", status, body)
+    broken_coupled_assertion = coupled_tensor_source.replace(
+        "if fineError > 0.00012", "if fineError > 0.0", 1)
+    assert broken_coupled_assertion != coupled_tensor_source
+    status, body = request("POST", "/api/run/flow", broken_coupled_assertion,
+                           accepted_headers)
+    assert status == 422, ("coupled tensor corrupted numerical assertion", status, body[-500:])
     # Actual upstream Flow evolution DSL, not a hand-coded ODE or Python
     # interpreter: four coupled states with compiler-generated RK4, checked
     # against a discrete Fourier/Poisson oracle and fourth-order refinement.

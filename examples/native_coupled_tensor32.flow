@@ -1,0 +1,316 @@
+# Native Flow 2.0: two genuinely exchange-coupled 32x32 periodic PDE species.
+# Each species has a distinct positive-definite anisotropic tensor and mixed
+# spatial derivative. Both derivatives use the SAME RK2 midpoint state.
+# This is a bounded numerical kernel, not general multidimensional field DSL.
+# No Python or precomputed state is used for execution or visualization.
+
+struct Grid {
+    values: array<f64, 1024>
+}
+
+struct Species {
+    u: Grid,
+    v: Grid
+}
+
+struct Tensor {
+    xx: f64,
+    xy: f64,
+    yy: f64
+}
+
+struct Equation {
+    first: Tensor,
+    second: Tensor,
+    exchange: f64
+}
+
+struct Result {
+    valid: bool,
+    state: Species
+}
+
+function absolute(value: f64) -> f64 {
+    if value < 0.0 { return -value }
+    return value
+}
+
+function blank() -> Grid {
+    let values: array<f64, 1024> = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    return Grid { values: values }
+}
+
+function validTensor(tensor: Tensor) -> bool {
+    if not (tensor.xx >= 0.0 and tensor.xx < 100.0) { return false }
+    if not (tensor.yy >= 0.0 and tensor.yy < 100.0) { return false }
+    if not (absolute(tensor.xy) < 100.0) { return false }
+    return tensor.xy * tensor.xy <= tensor.xx * tensor.yy
+}
+
+function quarterMode(input: i32) -> f64 {
+    let mut phase: i32 = input
+    while phase < 0 { phase = phase + 4 }
+    while phase >= 4 { phase = phase - 4 }
+    if phase == 0 { return 1.0 }
+    if phase == 2 { return -1.0 }
+    return 0.0
+}
+
+function initialState() -> Species {
+    let mut u: Grid = blank()
+    let mut v: Grid = blank()
+    let mut y: i32 = 0
+    while y < 32 {
+        let mut x: i32 = 0
+        while x < 32 {
+            let plus: f64 = quarterMode(x + y)
+            let minus: f64 = quarterMode(x - y)
+            u.values[y * 32 + x] = 300.0 + 7.0 * plus + 3.0 * minus
+            v.values[y * 32 + x] = 5.0 + 0.8 * plus - 0.3 * minus
+            x = x + 1
+        }
+        y = y + 1
+    }
+    return Species { u: u, v: v }
+}
+
+function tensorSlope(tensor: Tensor, grid: Grid) -> Grid {
+    let mut slope: Grid = blank()
+    let mut y: i32 = 0
+    while y < 32 {
+        let mut up: i32 = y + 1
+        let mut down: i32 = y - 1
+        if up == 32 { up = 0 }
+        if down < 0 { down = 31 }
+        let mut x: i32 = 0
+        while x < 32 {
+            let mut right: i32 = x + 1
+            let mut left: i32 = x - 1
+            if right == 32 { right = 0 }
+            if left < 0 { left = 31 }
+            let index: i32 = y * 32 + x
+            let center: f64 = grid.values[index]
+            let xx: f64 = (grid.values[y * 32 + left] -
+                2.0 * center + grid.values[y * 32 + right]) * 1024.0
+            let yy: f64 = (grid.values[down * 32 + x] -
+                2.0 * center + grid.values[up * 32 + x]) * 1024.0
+            let xy: f64 = (grid.values[up * 32 + right] -
+                grid.values[up * 32 + left] -
+                grid.values[down * 32 + right] +
+                grid.values[down * 32 + left]) * 256.0
+            slope.values[index] = tensor.xx * xx + 2.0 * tensor.xy * xy +
+                tensor.yy * yy
+            x = x + 1
+        }
+        y = y + 1
+    }
+    return slope
+}
+
+function coupledSlope(equation: Equation, state: Species) -> Species {
+    let mut u: Grid = tensorSlope(equation.first, state.u)
+    let mut v: Grid = tensorSlope(equation.second, state.v)
+    let mut index: i32 = 0
+    while index < 1024 {
+        let transfer: f64 = equation.exchange *
+            (state.v.values[index] - state.u.values[index])
+        u.values[index] = u.values[index] + transfer
+        v.values[index] = v.values[index] - transfer
+        index = index + 1
+    }
+    return Species { u: u, v: v }
+}
+
+function addScaled(state: Species, slope: Species, scale: f64) -> Species {
+    let mut u: Grid = blank()
+    let mut v: Grid = blank()
+    let mut index: i32 = 0
+    while index < 1024 {
+        u.values[index] = state.u.values[index] + scale * slope.u.values[index]
+        v.values[index] = state.v.values[index] + scale * slope.v.values[index]
+        index = index + 1
+    }
+    return Species { u: u, v: v }
+}
+
+function midpointStep(equation: Equation, state: Species, step: f64) -> Species {
+    let first: Species = coupledSlope(equation, state)
+    let middle: Species = addScaled(state, first, 0.5 * step)
+    let second: Species = coupledSlope(equation, middle)
+    return addScaled(state, second, step)
+}
+
+function integrate(equation: Equation, initial: Species,
+                   duration: f64, steps: i32) -> Result {
+    if not validTensor(equation.first) or not validTensor(equation.second) or
+       not (equation.exchange >= 0.0 and equation.exchange < 100.0) or
+       not (duration >= 0.0 and duration <= 1.0) or
+       steps <= 0 or steps > 195 {
+        return Result { valid: false, state: initial }
+    }
+    # 195 * 2048 = 399360 updated species-cells, hard ceiling 400000.
+    let mut index: i32 = 0
+    while index < 1024 {
+        if not (absolute(initial.u.values[index]) <= 1000000.0 and
+                absolute(initial.v.values[index]) <= 1000000.0) {
+            return Result { valid: false, state: initial }
+        }
+        index = index + 1
+    }
+    let step: f64 = duration / (steps as f64)
+    let firstRate: f64 = 4096.0 * (equation.first.xx + equation.first.yy) +
+        2048.0 * absolute(equation.first.xy)
+    let secondRate: f64 = 4096.0 * (equation.second.xx + equation.second.yy) +
+        2048.0 * absolute(equation.second.xy)
+    let mut maximumRate: f64 = firstRate
+    if secondRate > maximumRate { maximumRate = secondRate }
+    # Gershgorin upper bound on the negative real spectrum, including
+    # conservative interspecies exchange; explicit midpoint stability <= 2.
+    if not (step * (maximumRate + 2.0 * equation.exchange) <= 2.0) {
+        return Result { valid: false, state: initial }
+    }
+    let mut state: Species = initial
+    let mut iteration: i32 = 0
+    while iteration < steps {
+        state = midpointStep(equation, state, step)
+        iteration = iteration + 1
+    }
+    return Result { valid: true, state: state }
+}
+
+function maximumDifference(a: Species, b: Species) -> f64 {
+    let mut maximum: f64 = 0.0
+    let mut index: i32 = 0
+    while index < 1024 {
+        let du: f64 = absolute(a.u.values[index] - b.u.values[index])
+        let dv: f64 = absolute(a.v.values[index] - b.v.values[index])
+        if du > maximum { maximum = du }
+        if dv > maximum { maximum = dv }
+        index = index + 1
+    }
+    return maximum
+}
+
+function speciesMean(grid: Grid) -> f64 {
+    let mut total: f64 = 0.0
+    let mut index: i32 = 0
+    while index < 1024 {
+        total = total + grid.values[index]
+        index = index + 1
+    }
+    return total / 1024.0
+}
+
+function expectedState() -> Species {
+    # Independent 2x2 matrix-exponential Fourier solution at t=0.025,
+    # with lambda_U = (69.632, 53.248), lambda_V = (32.768, 40.96),
+    # exchange=0.35. These are NOT the RK2 values printed below.
+    let mut u: Grid = blank()
+    let mut v: Grid = blank()
+    let mut y: i32 = 0
+    while y < 32 {
+        let mut x: i32 = 0
+        while x < 32 {
+            let plus: f64 = quarterMode(x + y)
+            let minus: f64 = quarterMode(x - y)
+            u.values[y * 32 + x] = 297.4412047605983 +
+                1.2190283628708836 * plus + 0.7848050213369989 * minus
+            v.values[y * 32 + x] = 7.55879523940171 +
+                0.36705079343263286 * plus - 0.09876499673375012 * minus
+            x = x + 1
+        }
+        y = y + 1
+    }
+    return Species { u: u, v: v }
+}
+
+function main() -> i32 {
+    let equation: Equation = Equation {
+        first: Tensor { xx: 0.012, xy: 0.004, yy: 0.018 },
+        second: Tensor { xx: 0.008, xy: -0.002, yy: 0.010 },
+        exchange: 0.35
+    }
+    let initial: Species = initialState()
+    let reference: Species = expectedState()
+    let coarse: Result = integrate(equation, initial, 0.025, 32)
+    let medium: Result = integrate(equation, initial, 0.025, 64)
+    let fine: Result = integrate(equation, initial, 0.025, 128)
+    if not coarse.valid or not medium.valid or not fine.valid { return 1 }
+    let coarseError: f64 = maximumDifference(coarse.state, reference)
+    let mediumError: f64 = maximumDifference(medium.state, reference)
+    let fineError: f64 = maximumDifference(fine.state, reference)
+    if not (coarseError > 0.001 and mediumError > 0.0002) { return 2 }
+    if fineError > 0.00012 { return 3 }
+    if mediumError >= 0.30 * coarseError { return 4 }
+    if fineError >= 0.30 * mediumError { return 5 }
+    if absolute(speciesMean(fine.state.u) + speciesMean(fine.state.v) - 305.0) >
+       0.00000000005 { return 6 }
+    # Unlike two independent PDEs, mass MUST move from U into V.
+    if speciesMean(fine.state.u) >= 298.0 or
+       speciesMean(fine.state.v) <= 7.0 { return 7 }
+
+    let replay: Result = integrate(equation, initial, 0.025, 128)
+    if not replay.valid or maximumDifference(replay.state, fine.state) > 0.0 {
+        return 8
+    }
+    let firstHalf: Result = integrate(equation, initial, 0.0125, 64)
+    let secondHalf: Result = integrate(equation, firstHalf.state, 0.0125, 64)
+    if not firstHalf.valid or not secondHalf.valid or
+       maximumDifference(secondHalf.state, fine.state) > 0.00000000005 {
+        return 9
+    }
+
+    let noExchange: Equation = Equation {
+        first: equation.first, second: equation.second, exchange: 0.0
+    }
+    let uncoupled: Result = integrate(noExchange, initial, 0.025, 128)
+    if not uncoupled.valid { return 10 }
+    if absolute(speciesMean(uncoupled.state.u) - 300.0) > 0.00000000005 or
+       absolute(speciesMean(uncoupled.state.v) - 5.0) > 0.00000000005 {
+        return 11
+    }
+    if maximumDifference(uncoupled.state, fine.state) < 2.0 { return 12 }
+    let zero: Result = integrate(equation, initial, 0.0, 32)
+    if not zero.valid or maximumDifference(zero.state, initial) > 0.0 {
+        return 13
+    }
+
+    let badTensor: Equation = Equation {
+        first: Tensor { xx: 0.012, xy: 0.1, yy: 0.018 },
+        second: equation.second, exchange: 0.35
+    }
+    if integrate(badTensor, initial, 0.025, 128).valid { return 14 }
+    let badExchange: Equation = Equation {
+        first: equation.first, second: equation.second, exchange: -0.35
+    }
+    if integrate(badExchange, initial, 0.025, 128).valid { return 15 }
+    if integrate(equation, initial, -0.025, 128).valid { return 16 }
+    if integrate(equation, initial, 0.025, 0).valid { return 17 }
+    if integrate(equation, initial, 0.025, 196).valid { return 18 }
+    if integrate(equation, initial, 1.0, 1).valid { return 19 }
+    let mut badInitial: Species = initial
+    badInitial.u.values[511] = 10000000000.0
+    let rejected: Result = integrate(equation, badInitial, 0.025, 128)
+    if rejected.valid or maximumDifference(rejected.state, badInitial) > 0.0 {
+        return 20
+    }
+    # The original initial state remains unchanged after all integrations.
+    if maximumDifference(initial, initialState()) > 0.0 { return 21 }
+
+    println("native-coupled-tensor32-ok")
+    println("FLOWSTUDIO_GRID_V1 32 32 2")
+    print("U")
+    for cell in 0 to 1024 {
+        print(" ")
+        print(fine.state.u.values[cell])
+    }
+    println("")
+    print("V")
+    for cell in 0 to 1024 {
+        print(" ")
+        print(fine.state.v.values[cell])
+    }
+    println("")
+    println("FLOWSTUDIO_GRID_END")
+    return 0
+}

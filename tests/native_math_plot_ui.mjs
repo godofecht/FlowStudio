@@ -259,6 +259,50 @@ try {
     }
   }
 
+  // Two genuinely cross-coupled 32x32 anisotropic PDE species, computed
+  // through Monaco Run -> native HTTP -> production Flow compiler. The two
+  // displayed fields are checked against a 2x2 matrix-exponential oracle.
+  await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
+    readFileSync('examples/native_coupled_tensor32.flow', 'utf8'));
+  await page.locator('#run').click();
+  await page.waitForFunction(() =>
+    document.querySelector('#console')?.textContent?.includes('native-coupled-tensor32-ok'),
+    null, { timeout: 80000 });
+  await page.waitForFunction(() =>
+    document.querySelectorAll('#mathFlowPlot rect[data-field-name="U"]').length === 1024 &&
+    document.querySelectorAll('#mathFlowPlot rect[data-field-name="V"]').length === 1024,
+    null, { timeout: 30000 });
+  const coupledSvg = page.locator('#mathFlowPlot svg[data-native-flow-grid="true"]');
+  assert.equal(await coupledSvg.getAttribute('data-native-flow-grid-scale'), 'per-field');
+  assert.equal(await page.locator('#mathFlowPlot rect[data-grid-value]').count(), 2048);
+  const exactCoupledMode = (u, v, decayU, decayV) => {
+    const center = -(decayU + decayV) / 2 - .35;
+    const difference = (decayV - decayU) / 2;
+    const radius = Math.hypot(difference, .35);
+    const factor = Math.exp(center * .025);
+    const cosine = Math.cosh(radius * .025);
+    const sine = Math.sinh(radius * .025) / radius;
+    return [factor * (cosine * u + sine * (difference * u + .35 * v)),
+            factor * (cosine * v + sine * (.35 * u - difference * v))];
+  };
+  const coupledBase = exactCoupledMode(300, 5, 0, 0);
+  const coupledPlus = exactCoupledMode(7, .8, 69.632, 32.768);
+  const coupledMinus = exactCoupledMode(3, -.3, 53.248, 40.96);
+  for (const [x, y] of [[0, 0], [1, 0], [2, 0], [7, 11],
+                         [16, 16], [23, 19], [31, 31]]) {
+    for (const [field, index] of [['U', 0], ['V', 1]]) {
+      const cell = page.locator('#mathFlowPlot rect[data-field-name="' + field +
+        '"][data-grid-x="' + x + '"][data-grid-y="' + y + '"]');
+      assert.equal(await cell.count(), 1);
+      const actual = Number(await cell.getAttribute('data-grid-value'));
+      const expected = coupledBase[index] +
+        coupledPlus[index] * quarterMode(x + y) +
+        coupledMinus[index] * quarterMode(x - y);
+      assert.ok(Number.isFinite(actual) && Math.abs(actual - expected) < .002,
+        'Coupled native 2D ' + field + ' heatmap differs at ' + x + ',' + y);
+    }
+  }
+
   // Upstream field/boundary/laplacian syntax: physical Chromium Monaco Run,
   // native HTTP and compiler-generated 32-cell Dirichlet Euler solver.
   await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),

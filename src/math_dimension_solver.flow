@@ -1,8 +1,8 @@
 # Native Flow 2.0 dimensional constraint solver for one unbound symbol.
 # This operates on the real parsed equation IR, not editor text or Python.
-# Integer-affine dimensions support products, quotients, powers, arithmetic,
-# comparisons and dimensional functions. Fractional unknown exponents are
-# deliberately rejected; underdetermined and inconsistent systems fail closed.
+# Rational-affine dimensions support products, quotients, powers, roots,
+# arithmetic, comparisons and dimensional functions. Unknown SI exponents
+# must still solve to bounded integers; ambiguous systems fail closed.
 import .math_dimensions { Dimension, dimensionless, quantity, same_dimension, product_dimension, quotient_dimension }
 import .math_expression_ir { MathInstruction, MathProgram }
 import .math_expression_source { MathBindings, MathSymbol, empty_math_bindings }
@@ -20,8 +20,10 @@ export struct MathDimensionSolution {
 }
 
 struct AffineDimension {
+    # (coefficient * unknown + offset) / denominator on each SI axis.
     coefficient: i32,
     offset: Dimension,
+    denominator: i32,
     predicate: bool
 }
 
@@ -41,7 +43,8 @@ struct AffineAnalysis {
 
 function zero_affine() -> AffineDimension {
     return AffineDimension {
-        coefficient: 0, offset: dimensionless(), predicate: false
+        coefficient: 0, offset: dimensionless(), denominator: 1,
+        predicate: false
     }
 }
 
@@ -72,8 +75,60 @@ function bounded(d: Dimension, limit: i32) -> bool {
 }
 
 function bounded_affine(a: AffineDimension) -> bool {
-    return a.coefficient >= -1024 and a.coefficient <= 1024 and
+    return a.denominator >= 1 and a.denominator <= 4096 and
+        a.coefficient >= -1024 and a.coefficient <= 1024 and
         bounded(a.offset, 1024)
+}
+
+function positive_integer(value: i32) -> i32 {
+    if value < 0 { return -value }
+    return value
+}
+
+function greatest_common_divisor(a: i32, b: i32) -> i32 {
+    let mut x: i32 = positive_integer(a)
+    let mut y: i32 = positive_integer(b)
+    while y != 0 {
+        let remainder: i32 = x - (x / y) * y
+        x = y
+        y = remainder
+    }
+    return x
+}
+
+function normalise_affine(a: AffineDimension) -> AffineDimension {
+    let mut divisor: i32 = greatest_common_divisor(a.denominator, a.coefficient)
+    divisor = greatest_common_divisor(divisor, a.offset.length)
+    divisor = greatest_common_divisor(divisor, a.offset.mass)
+    divisor = greatest_common_divisor(divisor, a.offset.time)
+    divisor = greatest_common_divisor(divisor, a.offset.temperature)
+    if divisor <= 1 { return a }
+    return AffineDimension {
+        coefficient: a.coefficient / divisor,
+        offset: Dimension {
+            length: a.offset.length / divisor,
+            mass: a.offset.mass / divisor,
+            time: a.offset.time / divisor,
+            temperature: a.offset.temperature / divisor
+        },
+        denominator: a.denominator / divisor,
+        predicate: a.predicate
+    }
+}
+
+function multiply_affine(a: AffineDimension, b: AffineDimension,
+                         divide: bool) -> AffineDimension {
+    let mut sign: i32 = 1
+    if divide { sign = -1 }
+    return normalise_affine(AffineDimension {
+        coefficient: a.coefficient * b.denominator +
+            sign * b.coefficient * a.denominator,
+        offset: product_dimension(
+            scaled(a.offset, b.denominator),
+            scaled(b.offset, sign * a.denominator)),
+        denominator: a.denominator * b.denominator,
+        predicate: false
+    })
 }
 
 function same_symbol(source: string, instruction: MathInstruction, unknown: string) -> bool {
@@ -102,8 +157,11 @@ function invalid_constraint(state: ConstraintState, position: i32) -> Constraint
 function constrain(state: ConstraintState, a: AffineDimension,
                    b: AffineDimension, position: i32) -> ConstraintState {
     if not state.valid { return state }
-    let coefficient: i32 = a.coefficient - b.coefficient
-    let delta: Dimension = quotient_dimension(b.offset, a.offset)
+    let coefficient: i32 = a.coefficient * b.denominator -
+        b.coefficient * a.denominator
+    let delta: Dimension = quotient_dimension(
+        scaled(b.offset, a.denominator),
+        scaled(a.offset, b.denominator))
     if coefficient == 0 {
         if not same_dimension(delta, dimensionless()) {
             return invalid_constraint(state, position)
@@ -174,27 +232,13 @@ function analyse(program: MathProgram, source: string, unknown: string,
                 } elif opcode == 21 or opcode == 44 {
                     let mut divisor: i32 = 2
                     if opcode == 44 { divisor = 3 }
-                    if a.coefficient != (a.coefficient / divisor) * divisor or
-                       not same_dimension(scaled(Dimension {
-                           length: a.offset.length / divisor,
-                           mass: a.offset.mass / divisor,
-                           time: a.offset.time / divisor,
-                           temperature: a.offset.temperature / divisor
-                       }, divisor), a.offset) {
-                        return error_analysis(position, state)
-                    }
-                    a.coefficient = a.coefficient / divisor
-                    a.offset = Dimension {
-                        length: a.offset.length / divisor,
-                        mass: a.offset.mass / divisor,
-                        time: a.offset.time / divisor,
-                        temperature: a.offset.temperature / divisor
-                    }
+                    a.denominator = a.denominator * divisor
                 } elif opcode != 5 and opcode != 20 {
                     state = constrain(state, a, zero_affine(), position)
                     a = zero_affine()
                 }
             }
+            a = normalise_affine(a)
             if not state.valid or not bounded_affine(a) {
                 return error_analysis(position, state)
             }
@@ -212,12 +256,8 @@ function analyse(program: MathProgram, source: string, unknown: string,
                 result.predicate = true
             } else {
                 if a.predicate or b.predicate { return error_analysis(position, state) }
-                if opcode == 3 {
-                    result.coefficient = a.coefficient + b.coefficient
-                    result.offset = product_dimension(a.offset, b.offset)
-                } elif opcode == 4 {
-                    result.coefficient = a.coefficient - b.coefficient
-                    result.offset = quotient_dimension(a.offset, b.offset)
+                if opcode == 3 or opcode == 4 {
+                    result = multiply_affine(a, b, opcode == 4)
                 } else {
                     state = constrain(state, a, b, position)
                     result = a
@@ -227,6 +267,7 @@ function analyse(program: MathProgram, source: string, unknown: string,
                     }
                 }
             }
+            result = normalise_affine(result)
             if not state.valid or not bounded_affine(result) {
                 return error_analysis(position, state)
             }

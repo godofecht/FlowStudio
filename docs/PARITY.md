@@ -1,3 +1,16 @@
+## 2026-10-31: rational-affine native SI unknown inference (qualification pending)
+
+The native Flow 2.0 scalar equation solver now propagates bounded rational
+dimension coefficients through square/cube roots, including nested roots,
+products, physical units and dimensional functions. A unique unknown must
+resolve to **integer** SI exponents and pass the existing native static
+checker. The checked-in 24-case extension, production HTTP compile/run,
+corrupted-assertion rejection and malformed-source rejection are specified in
+[NATIVE_RATIONAL_DIMENSIONS.md](NATIVE_RATIONAL_DIMENSIONS.md). No CI
+qualification has yet been observed for this branch. General multi-unknown
+equation solving, upstream compiler-integrated multidimensional field syntax,
+native Navier–Stokes and full RStudio parity remain incomplete.
+
 ## 2026-10-31: directed conservative 32×32 cross-coupling (CI pending)
 
 The compiler-executed two-species tensor kernel now accepts unequal forward

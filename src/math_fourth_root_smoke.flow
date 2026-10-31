@@ -54,12 +54,12 @@ function main() -> i32 {
 
     let mut parsed: ParsedMathExpression = parse_math_expression("root4(16)")
     if not parsed.valid or parsed.program.count != 2 or
-       parsed.program.instructions[1].opcode != 45 or
+       parsed.program.instructions[1].opcode != 46 or
        parsed.program.instructions[1].source_start != 0 or
        parsed.program.instructions[1].source_end != 5 { return 14 }
     parsed = parse_math_expression("∜(16)")
     if not parsed.valid or parsed.program.count != 2 or
-       parsed.program.instructions[1].opcode != 45 or
+       parsed.program.instructions[1].opcode != 46 or
        parsed.program.instructions[1].source_start != 0 or
        parsed.program.instructions[1].source_end != 3 { return 15 }
 

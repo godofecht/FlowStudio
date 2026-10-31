@@ -134,6 +134,23 @@ function main() -> i32 {
     if not fourth_norm_source.valid or fourth_norm_source.program.instructions[4].opcode != 51 or
        fourth_norm_source.program.instructions[4].source_end != 5 { return 50 }
 
+    result = evaluate_math_expression("norm5(3m,4m,0m,0m,12m)")
+    if not result.valid or not close(result.result.value, 13.0) or
+       not same_dimension(result.result.dimension, length_dimension()) { return 51 }
+    result = evaluate_math_expression("norm6(3,4,0,0,0,12)")
+    if not result.valid or not close(result.result.value, 13.0) { return 52 }
+    result = evaluate_math_expression("norm7(3,4,0,0,0,0,12)")
+    if not result.valid or not close(result.result.value, 13.0) { return 53 }
+    result = evaluate_math_expression("norm8(3,4,0,0,0,0,0,12)")
+    if not result.valid or not close(result.result.value, 13.0) { return 54 }
+    result = evaluate_math_expression("norm8(3m,4m,0m,0m,0m,0s,0m,12m)")
+    if result.valid or result.failed_at != 0 { return 55 }
+    let eighth_norm_source: ParsedMathExpression =
+        parse_math_expression("norm8(3,4,0,0,0,0,0,12)")
+    if not eighth_norm_source.valid or
+       eighth_norm_source.program.instructions[8].opcode != 55 or
+       eighth_norm_source.program.instructions[8].source_end != 5 { return 56 }
+
     println("native-math-source-ok")
     return 0
 }

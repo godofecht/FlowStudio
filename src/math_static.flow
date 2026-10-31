@@ -233,6 +233,22 @@ export function infer_math_ir(program: MathProgram) -> MathInferredType {
             depth = depth - 1
             dimensions[depth - 1] = result
             predicates[depth - 1] = result_predicate
+        } elif opcode >= 52 and opcode <= 55 {
+            let arity: i32 = opcode - 47
+            if depth < arity { return static_error(instruction.source_start) }
+            let first: Dimension = dimensions[depth - arity]
+            let mut component: i32 = 0
+            while component < arity {
+                let position: i32 = depth - arity + component
+                if predicates[position] or
+                   not same_dimension(first, dimensions[position]) {
+                    return static_error(instruction.source_start)
+                }
+                component = component + 1
+            }
+            depth = depth - arity + 1
+            dimensions[depth - 1] = first
+            predicates[depth - 1] = false
         } elif opcode == 51 {
             if depth < 4 { return static_error(instruction.source_start) }
             let first: Dimension = dimensions[depth - 4]

@@ -123,6 +123,17 @@ function main() -> i32 {
     if not high_root_source.valid or high_root_source.program.instructions[1].opcode != 50 or
        high_root_source.program.instructions[1].source_end != 5 { return 46 }
 
+    result = evaluate_math_expression("norm4(1m,2m,2m,4m)")
+    if not result.valid or not close(result.result.value, 5.0) or
+       not same_dimension(result.result.dimension, length_dimension()) { return 47 }
+    result = evaluate_math_expression("norm4(1m,2m,2s,4m)")
+    if result.valid or result.failed_at != 0 { return 48 }
+    result = evaluate_math_expression("norm4(1e20,1,1,1)")
+    if not result.valid or not close(result.result.value / 1e20, 1.0) { return 49 }
+    let fourth_norm_source: ParsedMathExpression = parse_math_expression("norm4(1,2,2,4)")
+    if not fourth_norm_source.valid or fourth_norm_source.program.instructions[4].opcode != 51 or
+       fourth_norm_source.program.instructions[4].source_end != 5 { return 50 }
+
     println("native-math-source-ok")
     return 0
 }

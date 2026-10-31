@@ -1,0 +1,97 @@
+# Native Flow 2.0 symbolic dimension constraint acceptance.
+# flow run src/math_dimension_solver_smoke.flow
+import .math_dimensions { Dimension, dimensionless, length_dimension, time_dimension, quotient_dimension, product_dimension, same_dimension }
+import .math_static { MathDimensionSymbol, MathDimensionBindings, empty_math_dimension_bindings }
+import .math_dimension_solver { MathDimensionSolution, solve_math_equation_unknown_dimension }
+
+function main() -> i32 {
+    let length: Dimension = length_dimension()
+    let time: Dimension = time_dimension()
+    let speed: Dimension = quotient_dimension(length, time)
+    let acceleration: Dimension = quotient_dimension(speed, time)
+    let area: Dimension = product_dimension(length, length)
+    let mut known: MathDimensionBindings = empty_math_dimension_bindings()
+    known.count = 2
+    known.symbols[0] = MathDimensionSymbol { name: "duration", dimension: time }
+    known.symbols[1] = MathDimensionSymbol { name: "δ₀", dimension: speed }
+
+    let mut result: MathDimensionSolution = solve_math_equation_unknown_dimension(
+        "x * duration = 1m", known, "x")
+    if not result.valid or result.failed_at != -1 or
+       not same_dimension(result.dimension, speed) { return 1 }
+
+    result = solve_math_equation_unknown_dimension("x / duration = 1m/s²", known, "x")
+    if not result.valid or not same_dimension(result.dimension, speed) { return 2 }
+    result = solve_math_equation_unknown_dimension("x = duration", known, "x")
+    if not result.valid or not same_dimension(result.dimension, time) { return 3 }
+    result = solve_math_equation_unknown_dimension("x = δ₀", known, "x")
+    if not result.valid or not same_dimension(result.dimension, speed) { return 4 }
+    result = solve_math_equation_unknown_dimension("x + 2m = 3m", known, "x")
+    if not result.valid or not same_dimension(result.dimension, length) { return 5 }
+    result = solve_math_equation_unknown_dimension("x + x = 1m", known, "x")
+    if not result.valid or not same_dimension(result.dimension, length) { return 6 }
+    result = solve_math_equation_unknown_dimension("x * x = 1m²", known, "x")
+    if not result.valid or not same_dimension(result.dimension, length) { return 7 }
+    result = solve_math_equation_unknown_dimension("x³ = 1m³", known, "x")
+    if not result.valid or not same_dimension(result.dimension, length) { return 8 }
+    result = solve_math_equation_unknown_dimension("sqrt(x²) = 1m", known, "x")
+    if not result.valid or not same_dimension(result.dimension, length) { return 9 }
+    result = solve_math_equation_unknown_dimension("x² = 1m²", known, "x")
+    if not result.valid or not same_dimension(result.dimension, length) { return 10 }
+    result = solve_math_equation_unknown_dimension("x = 1m²", known, "x")
+    if not result.valid or not same_dimension(result.dimension, area) { return 11 }
+    result = solve_math_equation_unknown_dimension("sin(x) = 1", known, "x")
+    if not result.valid or not same_dimension(result.dimension, dimensionless()) { return 12 }
+    result = solve_math_equation_unknown_dimension("atan2(x,1m) = 0", known, "x")
+    if not result.valid or not same_dimension(result.dimension, length) { return 13 }
+    result = solve_math_equation_unknown_dimension("norm3(x,1m,2m) = 1m", known, "x")
+    if not result.valid or not same_dimension(result.dimension, length) { return 14 }
+    result = solve_math_equation_unknown_dimension("where(true,x,2m) = 3m", known, "x")
+    if not result.valid or not same_dimension(result.dimension, length) { return 15 }
+    result = solve_math_equation_unknown_dimension("x > 2m = true", known, "x")
+    if result.valid { return 16 }
+    result = solve_math_equation_unknown_dimension("x + 1m = 1s", known, "x")
+    if result.valid { return 17 }
+    result = solve_math_equation_unknown_dimension("x * x = 1m", known, "x")
+    if result.valid { return 18 }
+    result = solve_math_equation_unknown_dimension("x / x = 1", known, "x")
+    if result.valid { return 19 }
+    result = solve_math_equation_unknown_dimension("x^0 = 1", known, "x")
+    if result.valid { return 20 }
+    result = solve_math_equation_unknown_dimension("sqrt(x) = 1m", known, "x")
+    if result.valid { return 21 }
+    result = solve_math_equation_unknown_dimension("x = missing", known, "x")
+    if result.valid { return 22 }
+    result = solve_math_equation_unknown_dimension("x = 1m", known, "duration")
+    if result.valid { return 23 }
+    result = solve_math_equation_unknown_dimension("x = 1m", known, "bad-name")
+    if result.valid { return 24 }
+    result = solve_math_equation_unknown_dimension("x = 1m", known, "")
+    if result.valid { return 25 }
+
+    let empty: MathDimensionBindings = empty_math_dimension_bindings()
+    result = solve_math_equation_unknown_dimension("δ₁ = 1m/s²", empty, "δ₁")
+    if not result.valid or not same_dimension(result.dimension, acceleration) { return 26 }
+    result = solve_math_equation_unknown_dimension("π = 1m", empty, "π")
+    if not result.valid or not same_dimension(result.dimension, length) { return 27 }
+    result = solve_math_equation_unknown_dimension("pi = 1m", empty, "pi")
+    if not result.valid or not same_dimension(result.dimension, length) { return 28 }
+    result = solve_math_equation_unknown_dimension("x = 1m", empty, "x")
+    if not result.valid or not same_dimension(result.dimension, length) { return 29 }
+    result = solve_math_equation_unknown_dimension("x = 1m", empty, "y")
+    if result.valid { return 30 }
+    result = solve_math_equation_unknown_dimension("x = 1m = 2m", empty, "x")
+    if result.valid { return 31 }
+    result = solve_math_equation_unknown_dimension("x = 1m + 1s", empty, "x")
+    if result.valid { return 32 }
+
+    known.count = 8
+    result = solve_math_equation_unknown_dimension("x = 1m", known, "x")
+    if result.valid { return 33 }
+    known.count = -1
+    result = solve_math_equation_unknown_dimension("x = 1m", known, "x")
+    if result.valid { return 34 }
+
+    println("native-math-unknown-dimension-constraints-ok")
+    return 0
+}

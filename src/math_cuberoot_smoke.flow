@@ -1,0 +1,187 @@
+# Native Flow 2.0 physical cube-root execution, static inference and equation tests.
+# This is executable source; the same module is run on Linux and macOS in CI.
+# flow run src/math_cuberoot_smoke.flow
+import .math_dimensions { Dimension, dimensionless, length_dimension, time_dimension, mass_dimension, temperature_dimension, product_dimension, quotient_dimension, same_dimension, quantity }
+import .math_expression_ir { MathInstruction, MathProgram, MathResult, evaluate_math_ir }
+import .math_expression_source { ParsedMathExpression, MathSymbol, MathBindings, empty_math_bindings, parse_math_expression, evaluate_math_expression, evaluate_math_expression_with_bindings }
+import .math_static { MathInferredType, infer_math_ir, infer_math_expression_source, infer_math_expression_source_with_bindings, infer_math_equation_source }
+import .math_equation { MathEquationResult, evaluate_math_equation_source }
+
+function close(actual: f64, expected: f64) -> bool {
+    let mut difference: f64 = actual - expected
+    if difference < 0.0 { difference = -difference }
+    return difference < 0.00000000001
+}
+
+function close_relative(actual: f64, expected: f64) -> bool {
+    if expected == 0.0 { return actual == 0.0 }
+    return close(actual / expected, 1.0)
+}
+
+function main() -> i32 {
+    let metres: Dimension = length_dimension()
+    let seconds: Dimension = time_dimension()
+    let speed: Dimension = quotient_dimension(metres, seconds)
+    let volume: Dimension = Dimension { length: 3, mass: 0, time: 0, temperature: 0 }
+    let inverse_volume: Dimension = Dimension { length: -3, mass: 0, time: 0, temperature: 0 }
+    let inverse_length: Dimension = Dimension { length: -1, mass: 0, time: 0, temperature: 0 }
+    let area: Dimension = Dimension { length: 2, mass: 0, time: 0, temperature: 0 }
+    let mut result: MathResult = evaluate_math_expression("cbrt(27*1m³)")
+    if not result.valid or not close(result.result.value, 3.0) or
+       not same_dimension(result.result.dimension, metres) { return 1 }
+    result = evaluate_math_expression("∛(27*1m³)")
+    if not result.valid or not close(result.result.value, 3.0) or
+       not same_dimension(result.result.dimension, metres) { return 2 }
+    result = evaluate_math_expression("cbrt(-8*1m³)")
+    if not result.valid or not close(result.result.value, -2.0) or
+       not same_dimension(result.result.dimension, metres) { return 3 }
+    result = evaluate_math_expression("∛(-8*1m³)")
+    if not result.valid or not close(result.result.value, -2.0) { return 4 }
+    result = evaluate_math_expression("cbrt(0)")
+    if not result.valid or result.result.value != 0.0 { return 5 }
+    result = evaluate_math_expression("cbrt(0m³)")
+    if not result.valid or result.result.value != 0.0 or
+       not same_dimension(result.result.dimension, metres) { return 6 }
+    result = evaluate_math_expression("cbrt(1e-24*1m³)")
+    if not result.valid or not close_relative(result.result.value, 1e-8) or
+       not same_dimension(result.result.dimension, metres) { return 7 }
+    result = evaluate_math_expression("cbrt(-1e24*1s³)")
+    if not result.valid or not close_relative(result.result.value, -1e8) or
+       not same_dimension(result.result.dimension, seconds) { return 8 }
+    result = evaluate_math_expression("cbrt(8*1kg³)")
+    if not result.valid or not close(result.result.value, 2.0) or
+       not same_dimension(result.result.dimension, mass_dimension()) { return 9 }
+    result = evaluate_math_expression("cbrt(125*1K³)")
+    if not result.valid or not close(result.result.value, 5.0) or
+       not same_dimension(result.result.dimension, temperature_dimension()) { return 10 }
+    result = evaluate_math_expression("cbrt(27*1m³/(8*1s³))")
+    if not result.valid or not close(result.result.value, 1.5) or
+       not same_dimension(result.result.dimension, speed) { return 11 }
+    result = evaluate_math_expression("cbrt(-27)^3")
+    if not result.valid or not close(result.result.value, -27.0) { return 12 }
+    result = evaluate_math_expression("cbrt(cbrt(512))")
+    if not result.valid or not close(result.result.value, 2.0) { return 13 }
+    result = evaluate_math_expression("cbrt(64)+∛(27)")
+    if not result.valid or not close(result.result.value, 7.0) { return 14 }
+    result = evaluate_math_expression("cbrt(9m²)")
+    if result.valid or result.failed_at != 0 { return 15 }
+    result = evaluate_math_expression("cbrt(9m)")
+    if result.valid or result.failed_at != 0 { return 16 }
+    result = evaluate_math_expression("cbrt(true)")
+    if result.valid or result.failed_at != 0 { return 17 }
+    result = evaluate_math_expression("∛false")
+    if result.valid or result.failed_at != 0 { return 18 }
+    if parse_math_expression("cbrt(1,2)").valid { return 19 }
+    if parse_math_expression("cbrt()").valid { return 20 }
+    if parse_math_expression("cbrt(8").valid { return 21 }
+    if parse_math_expression("cbrt (8)").valid { return 22 }
+    if parse_math_expression("∛").valid { return 23 }
+    let mut inferred: MathInferredType = infer_math_expression_source("cbrt(-8*1m³)")
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension, metres) { return 24 }
+    inferred = infer_math_expression_source("cbrt(-9*1m³)")
+    if not inferred.valid or not same_dimension(inferred.dimension, metres) { return 25 }
+    inferred = infer_math_expression_source("cbrt(8m²)")
+    if inferred.valid or inferred.failed_at != 0 { return 26 }
+    inferred = infer_math_expression_source("cbrt(true)")
+    if inferred.valid or inferred.failed_at != 0 { return 27 }
+    inferred = infer_math_expression_source("∛(8s³)")
+    if not inferred.valid or not same_dimension(inferred.dimension, seconds) { return 28 }
+    let mut equation: MathEquationResult = evaluate_math_equation_source(
+        "cbrt(-8*1m³) = -2m", quantity(1e-10, metres))
+    if not equation.valid or not equation.satisfied or
+       not same_dimension(equation.residual.dimension, metres) { return 29 }
+    equation = evaluate_math_equation_source("cbrt(8*1m³) = 2s", quantity(1e-10, metres))
+    if equation.valid { return 30 }
+    inferred = infer_math_equation_source("cbrt(8*1m³) = 2m")
+    if not inferred.valid or not same_dimension(inferred.dimension, metres) { return 31 }
+    let mut parsed: ParsedMathExpression = parse_math_expression("cbrt(8)")
+    if not parsed.valid or parsed.program.count != 2 or
+       parsed.program.instructions[1].opcode != 44 or
+       parsed.program.instructions[1].source_start != 0 or
+       parsed.program.instructions[1].source_end != 4 { return 32 }
+    parsed = parse_math_expression("∛(8)")
+    if not parsed.valid or parsed.program.count != 2 or
+       parsed.program.instructions[1].opcode != 44 or
+       parsed.program.instructions[1].source_start != 0 or
+       parsed.program.instructions[1].source_end != 3 { return 33 }
+    result = evaluate_math_expression("-cbrt(8)^2")
+    if not result.valid or not close(result.result.value, -4.0) { return 34 }
+    result = evaluate_math_expression("cbrt(-8*1m³)^2")
+    if not result.valid or not close(result.result.value, 4.0) or
+       not same_dimension(result.result.dimension, area) { return 35 }
+    result = evaluate_math_expression("cbrt(8*1m⁻³)")
+    if not result.valid or not close(result.result.value, 2.0) or
+       not same_dimension(result.result.dimension, inverse_length) { return 36 }
+    result = evaluate_math_expression("cbrt(8*1m³*27*1s³)")
+    if not result.valid or not close(result.result.value, 6.0) or
+       not same_dimension(result.result.dimension, product_dimension(metres, seconds)) { return 37 }
+    result = evaluate_math_expression("cbrt(0m³)^-1")
+    if result.valid { return 38 }
+    result = evaluate_math_expression("cbrt(27*1m³)==3m")
+    if not result.valid or not result.is_predicate or result.result.value != 1.0 { return 39 }
+    let mut bindings: MathBindings = empty_math_bindings()
+    bindings.count = 1
+    bindings.symbols[0] = MathSymbol { name: "volume", value: quantity(-64.0, volume) }
+    result = evaluate_math_expression_with_bindings("cbrt(volume)", bindings)
+    if not result.valid or not close(result.result.value, -4.0) or
+       not same_dimension(result.result.dimension, metres) { return 40 }
+    inferred = infer_math_expression_source_with_bindings("cbrt(volume)", bindings)
+    if not inferred.valid or not same_dimension(inferred.dimension, metres) { return 41 }
+    bindings.symbols[0] = MathSymbol { name: "volume", value: quantity(4.0, speed) }
+    inferred = infer_math_expression_source_with_bindings("cbrt(volume)", bindings)
+    if inferred.valid or inferred.failed_at != 0 { return 42 }
+    let blank: MathInstruction = MathInstruction {
+        opcode: 0, literal: quantity(0.0, dimensionless()), exponent: 0,
+        source_start: 0, source_end: 1
+    }
+    let mut program: MathProgram = MathProgram { instructions: [blank], count: 2, source_length: 2 }
+    program.instructions[0] = MathInstruction {
+        opcode: 0, literal: quantity(-27.0, volume), exponent: 0,
+        source_start: 0, source_end: 1
+    }
+    program.instructions[1] = MathInstruction {
+        opcode: 44, literal: quantity(0.0, dimensionless()), exponent: 0,
+        source_start: 1, source_end: 2
+    }
+    result = evaluate_math_ir(program)
+    if not result.valid or not close(result.result.value, -3.0) or
+       not same_dimension(result.result.dimension, metres) { return 43 }
+    inferred = infer_math_ir(program)
+    if not inferred.valid or not same_dimension(inferred.dimension, metres) { return 44 }
+    program.instructions[0].literal = quantity(8.0, inverse_volume)
+    result = evaluate_math_ir(program)
+    if not result.valid or not close(result.result.value, 2.0) or
+       not same_dimension(result.result.dimension, inverse_length) { return 45 }
+    result = evaluate_math_expression("cbrt(1e30)")
+    if not result.valid or not close_relative(result.result.value, 1e10) { return 46 }
+    result = evaluate_math_expression("cbrt(-1e30)")
+    if not result.valid or not close_relative(result.result.value, -1e10) { return 47 }
+    result = evaluate_math_expression("cbrt(1e-300)")
+    if not result.valid or not close_relative(result.result.value, 1e-100) { return 48 }
+    result = evaluate_math_expression("cbrt(-1e-300)")
+    if not result.valid or not close_relative(result.result.value, -1e-100) { return 49 }
+    inferred = infer_math_expression_source("cbrt(-8*1m³) = 2m")
+    if inferred.valid { return 50 }
+    # Independent analytical references from the real-valued cube-root function.
+    result = evaluate_math_expression("cbrt(2)")
+    if not result.valid or not close_relative(result.result.value, 1.2599210498948734) { return 51 }
+    result = evaluate_math_expression("cbrt(-3)")
+    if not result.valid or not close_relative(result.result.value, -1.4422495703074083) { return 52 }
+    result = evaluate_math_expression("∛123456789")
+    if not result.valid or not close_relative(result.result.value, 497.93385921817446) { return 53 }
+    result = evaluate_math_expression("cbrt(-987654321)")
+    if not result.valid or not close_relative(result.result.value, -995.8677214612972) { return 54 }
+    result = evaluate_math_expression("cbrt(0.001)")
+    if not result.valid or not close_relative(result.result.value, 0.1) { return 55 }
+    # Postfix powers apply to the numeric quantity, not just its unit:
+    # 8m³ is (8m)^3, whereas 8*1m³ represents 8 cubic metres.
+    result = evaluate_math_expression("cbrt(8m³)")
+    if not result.valid or not close(result.result.value, 8.0) or
+       not same_dimension(result.result.dimension, metres) { return 56 }
+    result = evaluate_math_expression("∛27m³")
+    if not result.valid or not close(result.result.value, 27.0) or
+       not same_dimension(result.result.dimension, metres) { return 57 }
+    println("native-math-cuberoot-ok")
+    return 0
+}

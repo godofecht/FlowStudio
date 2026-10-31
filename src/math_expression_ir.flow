@@ -17,7 +17,7 @@
 #          42 log1p(x), stable natural logarithm of 1+x for x > -1,
 #          43 expm1(x), stable exp(x)-1 for dimensionless |x| <= 60,
 #          44 cbrt(x), signed physical cube root with SI exponents divisible by 3,
-#          45 norm3(x, y, z), stable three-component Euclidean norm with matched units.
+#          45 norm3(x, y, z), stable three-component Euclidean norm with matched units,\n#          46 root4(x), real fourth root with SI exponents divisible by 4.
 # Predicate values are dimensionless 0/1 with a separate runtime type bit.
 # where and logical operators evaluate operands eagerly (no short circuit).
 # Unsupported instructions and type mismatches fail closed.
@@ -538,7 +538,7 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
         } elif opcode == 5 or opcode == 6 or opcode == 18 or opcode == 20 or opcode == 21 or opcode == 25 or
              opcode == 26 or opcode == 27 or opcode == 28 or opcode == 29 or opcode == 30 or opcode == 31 or
              opcode == 33 or opcode == 34 or opcode == 35 or opcode == 36 or opcode == 37 or
-             opcode == 38 or opcode == 39 or opcode == 40 or opcode == 42 or opcode == 43 or opcode == 44 or opcode == 45 {
+             opcode == 38 or opcode == 39 or opcode == 40 or opcode == 42 or opcode == 43 or opcode == 44 or opcode == 46 {
             if depth < 1 { return failed(instruction.source_start) }
             let input: Quantity = stack[depth - 1]
             if opcode == 18 {
@@ -558,7 +558,7 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
                     }
                     stack[depth - 1] = quantity(
                         positive_square_root(input.value), half_dimension(input.dimension))
-                } elif opcode == 45 {
+                } elif opcode == 46 {
                     if input.value < 0.0 or not divisible_by_four_dimension(input.dimension) {
                         return failed(instruction.source_start)
                     }

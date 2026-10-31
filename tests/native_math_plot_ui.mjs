@@ -303,6 +303,48 @@ try {
     }
   }
 
+  // Real physical Chromium -> Monaco Run -> production Flow compiler/HTTP.
+  // Both 8x8 images are computed z=0 slices of a coupled 8x8x8 volume.
+  // Every displayed voxel is checked against an independent Fourier matrix
+  // evolution, rather than just checking the success marker or SVG presence.
+  await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
+    readFileSync('examples/native_coupled_volume8.flow', 'utf8'));
+  await page.locator('#run').click();
+  await page.waitForFunction(() =>
+    document.querySelector('#console')?.textContent?.includes('native-coupled-volume8-ok'),
+    null, { timeout: 80000 });
+  await page.waitForFunction(() =>
+    document.querySelectorAll('#mathFlowPlot rect[data-field-name="U"]').length === 64 &&
+    document.querySelectorAll('#mathFlowPlot rect[data-field-name="V"]').length === 64,
+    null, { timeout: 30000 });
+  let volumeMeans = [300, 5];
+  const volumeAmplitudes = [[7, 3, 2], [.8, -.5, 1.1]];
+  const volumeRates = [[.18, .14, .24], [.11, .12, .16]];
+  for (let step = 0; step < 64; step++) {
+    const [u, v] = volumeMeans;
+    volumeMeans = [.97 * u + .03 * v, .03 * u + .97 * v];
+    for (let mode = 0; mode < 3; mode++) {
+      const a = (1 - .4 * volumeRates[0][mode]) * volumeAmplitudes[0][mode];
+      const b = (1 - .4 * volumeRates[1][mode]) * volumeAmplitudes[1][mode];
+      volumeAmplitudes[0][mode] = .97 * a + .03 * b;
+      volumeAmplitudes[1][mode] = .03 * a + .97 * b;
+    }
+  }
+  const quarter = n => [1, 0, -1, 0][((n % 4) + 4) % 4];
+  for (const [species, name] of ['U', 'V'].entries()) {
+    const actual = await page.locator('#mathFlowPlot rect[data-field-name="' + name + '"]')
+      .evaluateAll(nodes => nodes.map(node => Number(node.getAttribute('data-grid-value'))));
+    assert.equal(actual.length, 64);
+    for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) {
+      const modes = [quarter(x+y), quarter(y), quarter(x+y)];
+      const expected = volumeMeans[species] +
+        modes.reduce((sum, mode, i) => sum + volumeAmplitudes[species][i] * mode, 0);
+      assert.ok(Number.isFinite(actual[y*8+x]) &&
+        Math.abs(actual[y*8+x] - expected) < .002,
+        'Native 3D slice mismatch at ' + name + '(' + x + ',' + y + ')');
+    }
+  }
+
   // Upstream field/boundary/laplacian syntax: physical Chromium Monaco Run,
   // native HTTP and compiler-generated 32-cell Dirichlet Euler solver.
   await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),

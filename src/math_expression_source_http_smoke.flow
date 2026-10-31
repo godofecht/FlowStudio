@@ -85,6 +85,14 @@ function main() -> i32 {
     if not cube_source.valid or cube_source.program.instructions[1].opcode != 44 or
        cube_source.program.instructions[1].source_end != 3 { return 31 }
 
+    result = evaluate_math_expression("norm3(3m,4m,12m)")
+    if not result.valid or not close(result.result.value, 13.0) or
+       not same_dimension(result.result.dimension, length_dimension()) { return 32 }
+    result = evaluate_math_expression("norm3(3m,4s,12m)")
+    if result.valid or result.failed_at != 0 { return 33 }
+    result = evaluate_math_expression("norm3(1e20,1,1)")
+    if not result.valid or not close(result.result.value / 1e20, 1.0) { return 34 }
+
     println("native-math-source-ok")
     return 0
 }

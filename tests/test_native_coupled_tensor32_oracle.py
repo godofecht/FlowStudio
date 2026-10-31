@@ -50,14 +50,16 @@ def tensor_slope(values, tensor):
     return output
 
 
-def slope(state, exchange=EXCHANGE):
+def slope(state, exchange=EXCHANGE, reverse=None):
     u, v = state
     du = tensor_slope(u, FIRST)
     dv = tensor_slope(v, SECOND)
+    if reverse is None:
+        reverse = exchange
     for i in range(COUNT):
-        transfer = exchange * (v[i] - u[i])
-        du[i] += transfer
-        dv[i] -= transfer
+        transfer = exchange * u[i] - reverse * v[i]
+        du[i] -= transfer
+        dv[i] += transfer
     return du, dv
 
 
@@ -66,13 +68,13 @@ def scaled(state, derivative, h):
                   for values, rates in zip(state, derivative)])
 
 
-def integrate(state, steps=128, duration=DURATION, exchange=EXCHANGE):
+def integrate(state, steps=128, duration=DURATION, exchange=EXCHANGE, reverse=None):
     h = duration / steps
     u, v = (list(state[0]), list(state[1]))
     for _ in range(steps):
         current = (u, v)
-        middle = scaled(current, slope(current, exchange), h / 2)
-        u, v = scaled(current, slope(middle, exchange), h)
+        middle = scaled(current, slope(current, exchange, reverse), h / 2)
+        u, v = scaled(current, slope(middle, exchange, reverse), h)
     return u, v
 
 
@@ -98,6 +100,34 @@ def exact():
         [mean_u + plus_u * quarter(x + y) + minus_u * quarter(x - y)
          for y in range(SIZE) for x in range(SIZE)],
         [mean_v + plus_v * quarter(x + y) + minus_v * quarter(x - y)
+         for y in range(SIZE) for x in range(SIZE)],
+    )
+
+
+
+def directed_mode(u, v, decay_u, decay_v, forward, reverse, duration=DURATION):
+    """Exact two-rate Fourier matrix exponential; independent of the RK2 step."""
+    center = -(decay_u + decay_v + forward + reverse) / 2
+    difference = (decay_v - decay_u - forward + reverse) / 2
+    radius = math.hypot(difference, math.sqrt(forward * reverse))
+    hyperbolic = (math.sinh(radius * duration) / radius
+                  if radius else duration)
+    factor = math.exp(center * duration)
+    cosine = math.cosh(radius * duration)
+    return (
+        factor * (cosine * u + hyperbolic * (difference * u + reverse * v)),
+        factor * (cosine * v + hyperbolic * (forward * u - difference * v)),
+    )
+
+
+def directed_exact(forward=0.8, reverse=0.2):
+    mean = directed_mode(300, 5, 0, 0, forward, reverse)
+    plus = directed_mode(7, 0.8, 69.632, 32.768, forward, reverse)
+    minus = directed_mode(3, -0.3, 53.248, 40.96, forward, reverse)
+    return (
+        [mean[0] + plus[0] * quarter(x + y) + minus[0] * quarter(x - y)
+         for y in range(SIZE) for x in range(SIZE)],
+        [mean[1] + plus[1] * quarter(x + y) + minus[1] * quarter(x - y)
          for y in range(SIZE) for x in range(SIZE)],
     )
 
@@ -172,11 +202,47 @@ class NativeCoupledTensor32Oracle(unittest.TestCase):
         minus = tensor_slope(state[0], (FIRST[0], -FIRST[1], FIRST[2]))
         self.assertGreater(max(abs(a - b) for a, b in zip(plus, minus)), 100)
 
+
+    def test_directed_exchange_all_2048_cells_against_matrix_exponential(self):
+        state = initial()
+        reference = directed_exact()
+        errors = [error(integrate(state, steps, exchange=0.8, reverse=0.2),
+                        reference) for steps in (32, 64, 128)]
+        self.assertGreater(errors[0], 0.001)
+        self.assertLess(errors[-1], 0.00012)
+        self.assertLess(errors[1], errors[0] * 0.30)
+        self.assertLess(errors[2], errors[1] * 0.30)
+        fine = integrate(state, 128, exchange=0.8, reverse=0.2)
+        self.assertEqual(fine, integrate(state, 128, exchange=0.8, reverse=0.2))
+        self.assertAlmostEqual(sum(fine[0]) / COUNT, 294.0990689747715,
+                               delta=1e-6)
+        self.assertAlmostEqual(sum(fine[1]) / COUNT, 10.900931025228488,
+                               delta=1e-6)
+        self.assertAlmostEqual((sum(fine[0]) + sum(fine[1])) / COUNT,
+                               305, delta=5e-11)
+        self.assertGreater(error(fine, integrate(state)), 3.0)
+
+    def test_directed_exchange_seeded_conservation_and_orientation(self):
+        rng = random.Random(20261031)
+        for _ in range(8):
+            state = ([rng.uniform(-100, 100) for _ in range(COUNT)],
+                     [rng.uniform(-100, 100) for _ in range(COUNT)])
+            derivative = slope(state, exchange=0.8, reverse=0.2)
+            self.assertAlmostEqual(sum(derivative[0]) + sum(derivative[1]),
+                                   0, delta=1e-7)
+            reversed_rates = slope(state, exchange=0.2, reverse=0.8)
+            self.assertGreater(error(derivative, reversed_rates), 10)
+        for forward, reverse in ((0.8, 0.2), (0.2, 0.8), (0.0, 0.0)):
+            mean = directed_mode(300, 5, 0, 0, forward, reverse)
+            self.assertAlmostEqual(sum(mean), 305, delta=1e-12)
+
     def test_checked_in_native_source_and_resource_guard(self):
         source = (Path(__file__).resolve().parents[1] /
                   "examples/native_coupled_tensor32.flow").read_text()
         self.assertIn("coupledSlope(equation, middle)", source)
-        self.assertIn("equation.exchange *", source)
+        self.assertIn("equation.forward * state.u.values[index]", source)
+        self.assertIn("equation.reverse * state.v.values[index]", source)
+        self.assertIn("maximumRate + equation.forward + equation.reverse", source)
         self.assertIn("steps > 195", source)
         self.assertIn('println("FLOWSTUDIO_GRID_V1 32 32 2")', source)
         self.assertIn("print(fine.state.u.values[cell])", source)

@@ -92,6 +92,65 @@ function main() -> i32 {
     result = solve_math_equation_unknown_dimension("x = 1m", known, "x")
     if result.valid { return 34 }
 
+    # Rational-affine dimension constraints: unknown roots are solved by
+    # clearing denominators, then verified by native static SI inference.
+    let volume: Dimension = product_dimension(area, length)
+    let fourth_length: Dimension = product_dimension(area, area)
+    let sixth_length: Dimension = product_dimension(volume, volume)
+    let squared_speed: Dimension = product_dimension(speed, speed)
+    let squared_time: Dimension = product_dimension(time, time)
+    let cubed_speed: Dimension = product_dimension(squared_speed, speed)
+
+    result = solve_math_equation_unknown_dimension("sqrt(x) = 1m", empty, "x")
+    if not result.valid or not same_dimension(result.dimension, area) { return 35 }
+    result = solve_math_equation_unknown_dimension("cbrt(x) = 1m", empty, "x")
+    if not result.valid or not same_dimension(result.dimension, volume) { return 36 }
+    result = solve_math_equation_unknown_dimension("sqrt(x*1m) = 1m²", empty, "x")
+    if not result.valid or not same_dimension(result.dimension, volume) { return 37 }
+    result = solve_math_equation_unknown_dimension("sqrt(cbrt(x)) = 1m", empty, "x")
+    if not result.valid or not same_dimension(result.dimension, sixth_length) { return 38 }
+    result = solve_math_equation_unknown_dimension("sqrt(x) = duration", known, "x")
+    if result.valid { return 39 }
+    known.count = 2
+    result = solve_math_equation_unknown_dimension("sqrt(x) = duration", known, "x")
+    if not result.valid or not same_dimension(result.dimension, squared_time) { return 40 }
+    result = solve_math_equation_unknown_dimension("cbrt(x) = δ₀", known, "x")
+    if not result.valid or not same_dimension(result.dimension, cubed_speed) { return 41 }
+    result = solve_math_equation_unknown_dimension("sqrt(x) + 1m = 2m", empty, "x")
+    if not result.valid or not same_dimension(result.dimension, area) { return 42 }
+    result = solve_math_equation_unknown_dimension("x * sqrt(x) = 1m³", empty, "x")
+    if not result.valid or not same_dimension(result.dimension, area) { return 43 }
+    result = solve_math_equation_unknown_dimension("sqrt(x) = x", empty, "x")
+    if not result.valid or not same_dimension(result.dimension, dimensionless()) { return 44 }
+    result = solve_math_equation_unknown_dimension("sqrt(x²) = 1m", empty, "x")
+    if not result.valid or not same_dimension(result.dimension, length) { return 45 }
+    result = solve_math_equation_unknown_dimension("cbrt(x³) = 1m", empty, "x")
+    if not result.valid or not same_dimension(result.dimension, length) { return 46 }
+    result = solve_math_equation_unknown_dimension("sqrt(x) = 1m/1s", empty, "x")
+    if not result.valid or not same_dimension(result.dimension, squared_speed) { return 47 }
+    result = solve_math_equation_unknown_dimension("cbrt(x/1m) = 1m", empty, "x")
+    if not result.valid or not same_dimension(result.dimension, fourth_length) { return 48 }
+    result = solve_math_equation_unknown_dimension("where(true,sqrt(x),1m) = 2m", empty, "x")
+    if not result.valid or not same_dimension(result.dimension, area) { return 49 }
+    result = solve_math_equation_unknown_dimension("norm3(sqrt(x),1m,2m) = 1m", empty, "x")
+    if not result.valid or not same_dimension(result.dimension, area) { return 50 }
+    result = solve_math_equation_unknown_dimension("atan2(sqrt(x),1m) = 0", empty, "x")
+    if not result.valid or not same_dimension(result.dimension, area) { return 51 }
+    result = solve_math_equation_unknown_dimension("sin(sqrt(x)) = 1", empty, "x")
+    if not result.valid or not same_dimension(result.dimension, dimensionless()) { return 52 }
+    result = solve_math_equation_unknown_dimension("sqrt(x) = cbrt(x)", empty, "x")
+    if not result.valid or not same_dimension(result.dimension, dimensionless()) { return 53 }
+    result = solve_math_equation_unknown_dimension("sqrt(x) + cbrt(x) = 1m", empty, "x")
+    if result.valid { return 54 }
+    result = solve_math_equation_unknown_dimension("sqrt(x) = 1m + 1s", empty, "x")
+    if result.valid { return 55 }
+    result = solve_math_equation_unknown_dimension("sqrt(x/x) = 1", empty, "x")
+    if result.valid { return 56 }
+    result = solve_math_equation_unknown_dimension("sin(sqrt(x)) = 1m", empty, "x")
+    if result.valid { return 57 }
+    result = solve_math_equation_unknown_dimension("sqrt(x) = 1m²", empty, "x")
+    if not result.valid or not same_dimension(result.dimension, fourth_length) { return 58 }
+
     println("native-math-unknown-dimension-constraints-ok")
     return 0
 }

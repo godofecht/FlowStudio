@@ -375,7 +375,7 @@ function main() -> i32 {
     result = evaluate_math_expression_with_bindings("distance^9", bindings)
     if result.valid or result.failed_at != 8 { return 117 }
     result = evaluate_math_expression_with_bindings("distance+π", bindings)
-    if result.valid or result.failed_at != 9 { return 118 }
+    if result.valid or result.failed_at != 8 { return 118 }
     result = evaluate_math_expression_with_bindings("distance+1e999", bindings)
     if result.valid or result.failed_at != 9 { return 119 }
     result = evaluate_math_expression_with_bindings("distance*1e30", bindings)
@@ -1189,13 +1189,17 @@ function main() -> i32 {
     let mut constant_binding: MathBindings = empty_math_bindings()
     constant_binding.count = 1
     constant_binding.symbols[0] = MathSymbol { name: "pi", value: quantity(4.0, dimensionless()) }
-    if parse_math_expression_with_bindings("pi", constant_binding).valid { return 444 }
+    result = evaluate_math_expression_with_bindings("pi", constant_binding)
+    if not result.valid or not near(result.result.value, 4.0) { return 444 }
     constant_binding.symbols[0] = MathSymbol { name: "π", value: quantity(4.0, dimensionless()) }
-    if parse_math_expression_with_bindings("π", constant_binding).valid { return 445 }
+    result = evaluate_math_expression_with_bindings("π", constant_binding)
+    if not result.valid or not near(result.result.value, 4.0) { return 445 }
     constant_binding.symbols[0] = MathSymbol { name: "tau", value: quantity(4.0, dimensionless()) }
-    if parse_math_expression_with_bindings("tau", constant_binding).valid { return 446 }
+    result = evaluate_math_expression_with_bindings("tau", constant_binding)
+    if not result.valid or not near(result.result.value, 4.0) { return 446 }
     constant_binding.symbols[0] = MathSymbol { name: "τ", value: quantity(4.0, dimensionless()) }
-    if parse_math_expression_with_bindings("τ", constant_binding).valid { return 447 }
+    result = evaluate_math_expression_with_bindings("τ", constant_binding)
+    if not result.valid or not near(result.result.value, 4.0) { return 447 }
 
     println("native-math-source-ok")
     return 0

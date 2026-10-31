@@ -1,0 +1,467 @@
+# Native Flow 2.0 four-unknown SI dimensional inference for four scalar equations.
+# This is an intentionally bounded four-variable monomial constraint system over the actual
+# parsed postfix equation IR. It does not solve numerical equations or accept
+# additive, conditional, predicate, or general tensor/PDE expressions.
+# Products, quotients, signed integer powers, sqrt, cbrt, unary minus and abs
+# are supported. Each SI exponent is solved by exact integer 4x4 Cramer's rule.
+import .math_dimensions { Dimension, dimensionless, quantity }
+import .math_expression_ir { MathInstruction, MathProgram }
+import .math_expression_source { MathBindings, MathSymbol, empty_math_bindings }
+import .math_equation { MathEquation, parse_math_equation_with_bindings }
+import .math_static { MathDimensionBindings, MathDimensionSymbol, MathInferredType, infer_math_equation_source_with_dimensions }
+
+extern {
+    function strlen(source: string) -> i64
+}
+
+export struct MathFourDimensionSolution {
+    valid: bool,
+    first: Dimension,
+    second: Dimension,
+    third: Dimension,
+    fourth: Dimension,
+    failed_equation: i32,
+    failed_at: i32
+}
+
+struct QuadAffine {
+    first: i32,
+    second: i32,
+    third: i32,
+    fourth: i32,
+    offset: Dimension,
+    denominator: i32
+}
+
+struct QuadAnalysis {
+    valid: bool,
+    value: QuadAffine,
+    failed_at: i32
+}
+
+struct DimensionRow {
+    valid: bool,
+    first: i32,
+    second: i32,
+    third: i32,
+    fourth: i32,
+    target: Dimension,
+    failed_at: i32
+}
+
+function blank_affine() -> QuadAffine {
+    return QuadAffine {
+        first: 0, second: 0, third: 0, fourth: 0, offset: dimensionless(), denominator: 1
+    }
+}
+
+function quad_failed(index: i32, position: i32) -> MathFourDimensionSolution {
+    return MathFourDimensionSolution {
+        valid: false, first: dimensionless(), second: dimensionless(),
+        third: dimensionless(), fourth: dimensionless(),
+        failed_equation: index, failed_at: position
+    }
+}
+
+function failed_analysis(position: i32) -> QuadAnalysis {
+    return QuadAnalysis { valid: false, value: blank_affine(), failed_at: position }
+}
+
+function failed_row(position: i32) -> DimensionRow {
+    return DimensionRow {
+        valid: false, first: 0, second: 0, third: 0, fourth: 0,
+        target: dimensionless(), failed_at: position
+    }
+}
+
+function absolute(value: i32) -> i32 {
+    if value < 0 { return -value }
+    return value
+}
+
+function gcd(a: i32, b: i32) -> i32 {
+    let mut x: i32 = absolute(a)
+    let mut y: i32 = absolute(b)
+    while y != 0 {
+        let remainder: i32 = x - (x / y) * y
+        x = y
+        y = remainder
+    }
+    return x
+}
+
+function scaled(d: Dimension, factor: i32) -> Dimension {
+    return Dimension {
+        length: d.length * factor, mass: d.mass * factor,
+        time: d.time * factor, temperature: d.temperature * factor
+    }
+}
+
+function added(a: Dimension, b: Dimension) -> Dimension {
+    return Dimension {
+        length: a.length + b.length, mass: a.mass + b.mass,
+        time: a.time + b.time, temperature: a.temperature + b.temperature
+    }
+}
+
+function quad_bounded_dimension(d: Dimension, limit: i32) -> bool {
+    return absolute(d.length) <= limit and absolute(d.mass) <= limit and
+        absolute(d.time) <= limit and absolute(d.temperature) <= limit
+}
+
+function normalise(a: QuadAffine) -> QuadAffine {
+    let mut divisor: i32 = gcd(a.denominator, a.first)
+    divisor = gcd(divisor, a.second)
+    divisor = gcd(divisor, a.third)
+    divisor = gcd(divisor, a.fourth)
+    divisor = gcd(divisor, a.offset.length)
+    divisor = gcd(divisor, a.offset.mass)
+    divisor = gcd(divisor, a.offset.time)
+    divisor = gcd(divisor, a.offset.temperature)
+    if divisor <= 1 { return a }
+    return QuadAffine {
+        first: a.first / divisor, second: a.second / divisor,
+        third: a.third / divisor, fourth: a.fourth / divisor,
+        offset: Dimension {
+            length: a.offset.length / divisor,
+            mass: a.offset.mass / divisor,
+            time: a.offset.time / divisor,
+            temperature: a.offset.temperature / divisor
+        },
+        denominator: a.denominator / divisor
+    }
+}
+
+function bounded_affine(a: QuadAffine) -> bool {
+    return a.denominator >= 1 and a.denominator <= 64 and
+        absolute(a.first) <= 64 and absolute(a.second) <= 64 and
+        absolute(a.third) <= 64 and absolute(a.fourth) <= 64 and
+        quad_bounded_dimension(a.offset, 64)
+}
+
+function composed(a: QuadAffine, b: QuadAffine, divide: bool) -> QuadAffine {
+    let mut sign: i32 = 1
+    if divide { sign = -1 }
+    return normalise(QuadAffine {
+        first: a.first * b.denominator + sign * b.first * a.denominator,
+        second: a.second * b.denominator + sign * b.second * a.denominator,
+        third: a.third * b.denominator + sign * b.third * a.denominator,
+        fourth: a.fourth * b.denominator + sign * b.fourth * a.denominator,
+        offset: added(
+            scaled(a.offset, b.denominator),
+            scaled(b.offset, sign * a.denominator)),
+        denominator: a.denominator * b.denominator
+    })
+}
+
+function symbol_matches(source: string, op: MathInstruction, name: string) -> bool {
+    let size: i32 = strlen(name) as i32
+    if op.source_end - op.source_start != size { return false }
+    let bytes: ptr<u8> = source as ptr<u8>
+    let name_bytes: ptr<u8> = name as ptr<u8>
+    let mut index: i32 = 0
+    while index < size {
+        if bytes[op.source_start + index] != name_bytes[index] { return false }
+        index = index + 1
+    }
+    return true
+}
+
+function analyse(program: MathProgram, source: string,
+                 first_name: string, second_name: string,
+                 third_name: string, fourth_name: string) -> QuadAnalysis {
+    let blank: QuadAffine = blank_affine()
+    let mut stack: array<QuadAffine, 64> = [blank]
+    let mut depth: i32 = 0
+    let mut index: i32 = 0
+    while index < program.count {
+        let op: MathInstruction = program.instructions[index]
+        let opcode: i32 = op.opcode
+        let position: i32 = op.source_start
+        if opcode == 0 {
+            if depth >= 64 { return failed_analysis(position) }
+            let mut value: QuadAffine = blank_affine()
+            if symbol_matches(source, op, first_name) {
+                value.first = 1
+            } elif symbol_matches(source, op, second_name) {
+                value.second = 1
+            } elif symbol_matches(source, op, third_name) {
+                value.third = 1
+            } elif symbol_matches(source, op, fourth_name) {
+                value.fourth = 1
+            } else {
+                value.offset = op.literal.dimension
+            }
+            if not bounded_affine(value) { return failed_analysis(position) }
+            stack[depth] = value
+            depth = depth + 1
+        } elif opcode == 5 or opcode == 6 or opcode == 20 or
+             opcode == 21 or opcode == 44 {
+            if depth < 1 { return failed_analysis(position) }
+            let mut value: QuadAffine = stack[depth - 1]
+            if opcode == 6 {
+                if op.exponent < -8 or op.exponent > 8 {
+                    return failed_analysis(position)
+                }
+                value.first = value.first * op.exponent
+                value.second = value.second * op.exponent
+                value.third = value.third * op.exponent
+                value.fourth = value.fourth * op.exponent
+                value.offset = scaled(value.offset, op.exponent)
+            } elif opcode == 21 {
+                value.denominator = value.denominator * 2
+            } elif opcode == 44 {
+                value.denominator = value.denominator * 3
+            }
+            value = normalise(value)
+            if not bounded_affine(value) { return failed_analysis(position) }
+            stack[depth - 1] = value
+        } elif opcode == 3 or opcode == 4 {
+            if depth < 2 { return failed_analysis(position) }
+            let value: QuadAffine = composed(
+                stack[depth - 2], stack[depth - 1], opcode == 4)
+            if not bounded_affine(value) { return failed_analysis(position) }
+            depth = depth - 1
+            stack[depth - 1] = value
+        } else {
+            # Do not silently discard dimensional constraints of sums,
+            # comparisons, where(), or other non-monomial operations.
+            return failed_analysis(position)
+        }
+        index = index + 1
+    }
+    if depth != 1 { return failed_analysis(program.source_length) }
+    return QuadAnalysis { valid: true, value: stack[0], failed_at: -1 }
+}
+
+function equation_row(source: string, bindings: MathBindings,
+                      first_name: string, second_name: string,
+                      third_name: string, fourth_name: string) -> DimensionRow {
+    let equation: MathEquation = parse_math_equation_with_bindings(source, bindings)
+    if not equation.valid { return failed_row(equation.failed_at) }
+    let left: QuadAnalysis = analyse(equation.left, source, first_name, second_name, third_name, fourth_name)
+    if not left.valid { return failed_row(left.failed_at) }
+    let right: QuadAnalysis = analyse(equation.right, source, first_name, second_name, third_name, fourth_name)
+    if not right.valid { return failed_row(right.failed_at) }
+    let a: QuadAffine = left.value
+    let b: QuadAffine = right.value
+    return DimensionRow {
+        valid: true,
+        first: a.first * b.denominator - b.first * a.denominator,
+        second: a.second * b.denominator - b.second * a.denominator,
+        third: a.third * b.denominator - b.third * a.denominator,
+        fourth: a.fourth * b.denominator - b.fourth * a.denominator,
+        target: added(
+            scaled(b.offset, a.denominator),
+            scaled(a.offset, -b.denominator)),
+        failed_at: -1
+    }
+}
+
+
+
+# Use i64 intermediates for exact 4x4 determinants; bounded affine coefficients
+# can exceed the safe range for i32 determinant products.
+function determinant3(
+    a0: i32, a1: i32, a2: i32,
+    b0: i32, b1: i32, b2: i32,
+    c0: i32, c1: i32, c2: i32) -> i64 {
+    return (a0 as i64) * ((b1 as i64) * (c2 as i64) - (b2 as i64) * (c1 as i64)) -
+        (a1 as i64) * ((b0 as i64) * (c2 as i64) - (b2 as i64) * (c0 as i64)) +
+        (a2 as i64) * ((b0 as i64) * (c1 as i64) - (b1 as i64) * (c0 as i64))
+}
+
+function determinant4(a: DimensionRow, b: DimensionRow,
+                      c: DimensionRow, d: DimensionRow) -> i64 {
+    let first: i64 = determinant3(
+        b.second, b.third, b.fourth,
+        c.second, c.third, c.fourth,
+        d.second, d.third, d.fourth)
+    let second: i64 = determinant3(
+        b.first, b.third, b.fourth,
+        c.first, c.third, c.fourth,
+        d.first, d.third, d.fourth)
+    let third: i64 = determinant3(
+        b.first, b.second, b.fourth,
+        c.first, c.second, c.fourth,
+        d.first, d.second, d.fourth)
+    let fourth: i64 = determinant3(
+        b.first, b.second, b.third,
+        c.first, c.second, c.third,
+        d.first, d.second, d.third)
+    return (a.first as i64) * first - (a.second as i64) * second +
+        (a.third as i64) * third - (a.fourth as i64) * fourth
+}
+
+function replaced(row: DimensionRow, column: i32, value: i32) -> DimensionRow {
+    let mut result: DimensionRow = row
+    if column == 0 { result.first = value }
+    elif column == 1 { result.second = value }
+    elif column == 2 { result.third = value }
+    else { result.fourth = value }
+    return result
+}
+
+struct FourAxisSolution {
+    valid: bool,
+    first: i32,
+    second: i32,
+    third: i32,
+    fourth: i32
+}
+
+function solve_axis(a: DimensionRow, b: DimensionRow,
+                    c: DimensionRow, d: DimensionRow,
+                    target_a: i32, target_b: i32,
+                    target_c: i32, target_d: i32,
+                    divisor: i64) -> FourAxisSolution {
+    let mut answer: FourAxisSolution = FourAxisSolution {
+        valid: false, first: 0, second: 0, third: 0, fourth: 0
+    }
+    let mut column: i32 = 0
+    while column < 4 {
+        let numerator: i64 = determinant4(
+            replaced(a, column, target_a),
+            replaced(b, column, target_b),
+            replaced(c, column, target_c),
+            replaced(d, column, target_d))
+        let value: i64 = numerator / divisor
+        if value < -32 or value > 32 or value * divisor != numerator {
+            return answer
+        }
+        if column == 0 { answer.first = value as i32 }
+        elif column == 1 { answer.second = value as i32 }
+        elif column == 2 { answer.third = value as i32 }
+        else { answer.fourth = value as i32 }
+        column = column + 1
+    }
+    answer.valid = true
+    return answer
+}
+
+# Exactly four independent monomial equations and four unknown physical types.
+# Reject rank deficiency, fractional SI exponents and unsupported expressions.
+# Recheck every solution with the same native static typechecker used elsewhere.
+export function solve_math_equations_four_unknown_dimensions(
+    first_equation: string, second_equation: string,
+    third_equation: string, fourth_equation: string,
+    known: MathDimensionBindings,
+    first_unknown: string, second_unknown: string,
+    third_unknown: string, fourth_unknown: string) -> MathFourDimensionSolution {
+    if known.count < 0 or known.count > 4 or
+       strlen(first_unknown) < 1 or strlen(first_unknown) > 32 or
+       strlen(second_unknown) < 1 or strlen(second_unknown) > 32 or
+       strlen(third_unknown) < 1 or strlen(third_unknown) > 32 or
+       strlen(fourth_unknown) < 1 or strlen(fourth_unknown) > 32 {
+        return quad_failed(0, 0)
+    }
+    let mut bindings: MathBindings = empty_math_bindings()
+    let mut index: i32 = 0
+    while index < known.count {
+        bindings.symbols[index] = MathSymbol {
+            name: known.symbols[index].name,
+            value: quantity(1.0, known.symbols[index].dimension)
+        }
+        index = index + 1
+    }
+    bindings.symbols[known.count] = MathSymbol {
+        name: first_unknown, value: quantity(1.0, dimensionless())
+    }
+    bindings.symbols[known.count + 1] = MathSymbol {
+        name: second_unknown, value: quantity(1.0, dimensionless())
+    }
+    bindings.symbols[known.count + 2] = MathSymbol {
+        name: third_unknown, value: quantity(1.0, dimensionless())
+    }
+    bindings.symbols[known.count + 3] = MathSymbol {
+        name: fourth_unknown, value: quantity(1.0, dimensionless())
+    }
+    bindings.count = known.count + 4
+    let a: DimensionRow = equation_row(
+        first_equation, bindings, first_unknown, second_unknown,
+        third_unknown, fourth_unknown)
+    if not a.valid { return quad_failed(0, a.failed_at) }
+    let b: DimensionRow = equation_row(
+        second_equation, bindings, first_unknown, second_unknown,
+        third_unknown, fourth_unknown)
+    if not b.valid { return quad_failed(1, b.failed_at) }
+    let c: DimensionRow = equation_row(
+        third_equation, bindings, first_unknown, second_unknown,
+        third_unknown, fourth_unknown)
+    if not c.valid { return quad_failed(2, c.failed_at) }
+    let d: DimensionRow = equation_row(
+        fourth_equation, bindings, first_unknown, second_unknown,
+        third_unknown, fourth_unknown)
+    if not d.valid { return quad_failed(3, d.failed_at) }
+    let divisor: i64 = determinant4(a, b, c, d)
+    if divisor == 0 { return quad_failed(3, 0) }
+    let length: FourAxisSolution = solve_axis(
+        a, b, c, d, a.target.length, b.target.length,
+        c.target.length, d.target.length, divisor)
+    let mass: FourAxisSolution = solve_axis(
+        a, b, c, d, a.target.mass, b.target.mass,
+        c.target.mass, d.target.mass, divisor)
+    let time: FourAxisSolution = solve_axis(
+        a, b, c, d, a.target.time, b.target.time,
+        c.target.time, d.target.time, divisor)
+    let temperature: FourAxisSolution = solve_axis(
+        a, b, c, d, a.target.temperature, b.target.temperature,
+        c.target.temperature, d.target.temperature, divisor)
+    if not length.valid or not mass.valid or not time.valid or
+       not temperature.valid { return quad_failed(3, 0) }
+    let first_dimension: Dimension = Dimension {
+        length: length.first, mass: mass.first,
+        time: time.first, temperature: temperature.first
+    }
+    let second_dimension: Dimension = Dimension {
+        length: length.second, mass: mass.second,
+        time: time.second, temperature: temperature.second
+    }
+    let third_dimension: Dimension = Dimension {
+        length: length.third, mass: mass.third,
+        time: time.third, temperature: temperature.third
+    }
+    let fourth_dimension: Dimension = Dimension {
+        length: length.fourth, mass: mass.fourth,
+        time: time.fourth, temperature: temperature.fourth
+    }
+    let mut declarations: MathDimensionBindings = known
+    declarations.symbols[known.count] = MathDimensionSymbol {
+        name: first_unknown, dimension: first_dimension
+    }
+    declarations.symbols[known.count + 1] = MathDimensionSymbol {
+        name: second_unknown, dimension: second_dimension
+    }
+    declarations.symbols[known.count + 2] = MathDimensionSymbol {
+        name: third_unknown, dimension: third_dimension
+    }
+    declarations.symbols[known.count + 3] = MathDimensionSymbol {
+        name: fourth_unknown, dimension: fourth_dimension
+    }
+    declarations.count = known.count + 4
+    let first_verified: MathInferredType =
+        infer_math_equation_source_with_dimensions(first_equation, declarations)
+    if not first_verified.valid or first_verified.is_predicate {
+        return quad_failed(0, first_verified.failed_at)
+    }
+    let second_verified: MathInferredType =
+        infer_math_equation_source_with_dimensions(second_equation, declarations)
+    if not second_verified.valid or second_verified.is_predicate {
+        return quad_failed(1, second_verified.failed_at)
+    }
+    let third_verified: MathInferredType =
+        infer_math_equation_source_with_dimensions(third_equation, declarations)
+    if not third_verified.valid or third_verified.is_predicate {
+        return quad_failed(2, third_verified.failed_at)
+    }
+    let fourth_verified: MathInferredType =
+        infer_math_equation_source_with_dimensions(fourth_equation, declarations)
+    if not fourth_verified.valid or fourth_verified.is_predicate {
+        return quad_failed(3, fourth_verified.failed_at)
+    }
+    return MathFourDimensionSolution {
+        valid: true, first: first_dimension, second: second_dimension,
+        third: third_dimension, fourth: fourth_dimension,
+        failed_equation: -1, failed_at: -1
+    }
+}

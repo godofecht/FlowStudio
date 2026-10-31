@@ -514,9 +514,12 @@ try {
       // The real persistent native Rscript kernel must produce a plot inside
       // a mixed-language notebook cell, rasterize its SVG in Chromium, and
       // preserve the actual PNG in a portable .fsnb roundtrip.
-      await setNotebookSource(
-        '# %% [r]\\nplot(c(1,2,3,4), c(3,1,4,2), type="l")\\ncat("r-notebook-plot-ok\\\\n")\\n'
-          .replaceAll('\\\\n', '\\n'));
+      await setNotebookSource([
+        '# %% [r]',
+        'plot(c(1,2,3,4), c(3,1,4,2), type="l")',
+        'cat("r-notebook-plot-ok\\n")',
+        ''
+      ].join('\n'));
       await notebookPage.locator('#runNotebook').click();
       await notebookPage.waitForFunction(() =>
         document.querySelector('#notice')?.textContent === 'Notebook executed 1 cells.',
@@ -524,7 +527,7 @@ try {
       const nativePlotImage = notebookPage.locator('#notebookOutput .notebook-cell img').first();
       await nativePlotImage.waitFor({timeout:15000});
       const plotSrc = await nativePlotImage.getAttribute('src');
-      assert.match(plotSrc, /^data:image\\/png;base64,iVBORw0KGgo/);
+      assert.match(plotSrc, /^data:image\/png;base64,iVBORw0KGgo/);
       assert.equal(await nativePlotImage.evaluate(image => image.naturalWidth > 0 &&
         image.naturalHeight > 0), true, 'Native R notebook plot must decode as an actual image');
       assert.match(await notebookPage.locator('#notebookOutput').innerText(), /r-notebook-plot-ok/);
@@ -535,7 +538,7 @@ try {
       assert.equal(plotBundle.results[0].plots.length, 1);
       assert.equal(plotBundle.results[0].plots[0].png, plotSrc.slice('data:image/png;base64,'.length));
       const requestsBeforePlotImport = notebookRequests.length;
-      await setNotebookSource('# %% [r]\\nstop("import must not execute")\\n'.replaceAll('\\n', '\n'));
+      await setNotebookSource(['# %% [r]', 'stop("import must not execute")', ''].join('\n'));
       notebookPage.once('dialog', dialog => dialog.accept());
       await notebookPage.locator('#flowNotebookFile').setInputFiles({
         name:'native-r-plot.fsnb', mimeType:'application/json',

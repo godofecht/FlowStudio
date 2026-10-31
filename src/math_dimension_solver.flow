@@ -214,7 +214,7 @@ function analyse(program: MathProgram, source: string, unknown: string,
              opcode == 28 or opcode == 29 or opcode == 30 or opcode == 31 or
              opcode == 33 or opcode == 34 or opcode == 35 or opcode == 36 or
              opcode == 37 or opcode == 38 or opcode == 39 or opcode == 40 or
-             opcode == 42 or opcode == 43 or opcode == 44 or opcode == 45 {
+             opcode == 42 or opcode == 43 or opcode == 44 or opcode == 46 {
             if depth < 1 { return error_analysis(position, state) }
             let mut a: AffineDimension = stack[depth - 1]
             if opcode == 18 {
@@ -229,10 +229,10 @@ function analyse(program: MathProgram, source: string, unknown: string,
                     }
                     a.coefficient = a.coefficient * op.exponent
                     a.offset = scaled(a.offset, op.exponent)
-                } elif opcode == 21 or opcode == 44 or opcode == 45 {
+                } elif opcode == 21 or opcode == 44 or opcode == 46 {
                     let mut divisor: i32 = 2
                     if opcode == 44 { divisor = 3 }
-                    if opcode == 45 { divisor = 4 }
+                    if opcode == 46 { divisor = 4 }
                     a.denominator = a.denominator * divisor
                 } elif opcode != 5 and opcode != 20 {
                     state = constrain(state, a, zero_affine(), position)

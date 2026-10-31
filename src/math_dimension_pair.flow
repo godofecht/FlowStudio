@@ -4,7 +4,7 @@
 # additive, conditional, predicate, or general tensor/PDE expressions.
 # Products, quotients, signed integer powers, sqrt, cbrt, unary minus and abs
 # are supported. Each SI exponent is solved by exact integer Cramer's rule.
-import .math_dimensions { Dimension, dimensionless, quantity, same_dimension }
+import .math_dimensions { Dimension, dimensionless, quantity }
 import .math_expression_ir { MathInstruction, MathProgram }
 import .math_expression_source { MathBindings, MathSymbol, empty_math_bindings }
 import .math_equation { MathEquation, parse_math_equation_with_bindings }
@@ -267,8 +267,7 @@ export function solve_math_equations_two_unknown_dimensions(
     first_unknown: string, second_unknown: string) -> MathTwoDimensionSolution {
     if known.count < 0 or known.count > 6 or
        strlen(first_unknown) < 1 or strlen(first_unknown) > 32 or
-       strlen(second_unknown) < 1 or strlen(second_unknown) > 32 or
-       first_unknown == second_unknown {
+       strlen(second_unknown) < 1 or strlen(second_unknown) > 32 {
         return failed(0, 0)
     }
     let mut bindings: MathBindings = empty_math_bindings()

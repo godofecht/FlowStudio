@@ -20,7 +20,7 @@ function main() -> i32 {
     if not result.valid or result.failed_at != -1 or
        not same_dimension(result.dimension, speed) { return 1 }
 
-    result = solve_math_equation_unknown_dimension("x / duration = 1m/s²", known, "x")
+    result = solve_math_equation_unknown_dimension("x / duration = 1m/1s²", known, "x")
     if not result.valid or not same_dimension(result.dimension, speed) { return 2 }
     result = solve_math_equation_unknown_dimension("x = duration", known, "x")
     if not result.valid or not same_dimension(result.dimension, time) { return 3 }
@@ -70,7 +70,7 @@ function main() -> i32 {
     if result.valid { return 25 }
 
     let empty: MathDimensionBindings = empty_math_dimension_bindings()
-    result = solve_math_equation_unknown_dimension("δ₁ = 1m/s²", empty, "δ₁")
+    result = solve_math_equation_unknown_dimension("δ₁ = 1m/1s²", empty, "δ₁")
     if not result.valid or not same_dimension(result.dimension, acceleration) { return 26 }
     result = solve_math_equation_unknown_dimension("π = 1m", empty, "π")
     if not result.valid or not same_dimension(result.dimension, length) { return 27 }

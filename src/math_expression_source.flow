@@ -326,6 +326,13 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
                 if index < length {
                     if bytes[index] == 45 { sign = -1; index = index + 1 }
                     elif bytes[index] == 43 { index = index + 1 }
+                    # Mathematical U+2212 minus is the same exponent sign
+                    # as ASCII '-', but consumes three source bytes.
+                    elif index + 2 < length and bytes[index] == 226 and
+                         bytes[index + 1] == 136 and bytes[index + 2] == 146 {
+                        sign = -1
+                        index = index + 3
+                    }
                 }
                 if index >= length or not str_is_ascii_digit(bytes[index]) {
                     return source_error(start, length)

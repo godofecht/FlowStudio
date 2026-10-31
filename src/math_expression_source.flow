@@ -182,6 +182,29 @@ function make_instruction(opcode: i32, value: Quantity, start: i32, end: i32) ->
     }
 }
 
+# Mathematical notation commonly uses typographic spacing. Consume only
+# complete, explicitly recognized Unicode White_Space code points; do not
+# normalize invisible format controls such as U+200B or U+2060.
+# Return UTF-8 byte width so source diagnostics remain byte-accurate.
+function math_space_width(bytes: ptr<u8>, position: i32, length: i32) -> i32 {
+    if str_is_ascii_ws(bytes[position]) { return 1 }
+    if position + 1 < length and bytes[position] == 194 and
+       bytes[position + 1] == 160 { return 2 } # U+00A0 NBSP
+    if position + 2 < length {
+        if bytes[position] == 226 and bytes[position + 1] == 128 {
+            if bytes[position + 2] >= 128 and bytes[position + 2] <= 138 {
+                return 3 # U+2000..U+200A typographic spaces
+            }
+            if bytes[position + 2] == 175 { return 3 } # U+202F narrow NBSP
+        }
+        if bytes[position] == 226 and bytes[position + 1] == 129 and
+           bytes[position + 2] == 159 { return 3 } # U+205F medium mathematical space
+        if bytes[position] == 227 and bytes[position + 1] == 128 and
+           bytes[position + 2] == 128 { return 3 } # U+3000 ideographic space
+    }
+    return 0
+}
+
 # Operators are recognized only at exact byte sequences. Supported UTF-8
 # spellings include ×, ·, ⋅, ∙, ∗, ÷, ∕, −, ≤, ≥, ≠, ∧ and ∨.
 # Prefix ¬ is handled separately to enforce unary placement.
@@ -226,11 +249,13 @@ function source_operator(bytes: ptr<u8>, position: i32, length: i32) -> i32 {
     return 0
 }
 
-function operator_bytes(bytes: ptr<u8>, position: i32) -> i32 {
+function operator_bytes(bytes: ptr<u8>, position: i32, length: i32) -> i32 {
     if bytes[position] == 194 or bytes[position] == 195 { return 2 }
     if bytes[position] == 226 { return 3 }
-    if bytes[position] == 61 or bytes[position] == 33 { return 2 }
-    if (bytes[position] == 60 or bytes[position] == 62) and bytes[position + 1] == 61 { return 2 }
+    if (bytes[position] == 61 or bytes[position] == 33) and
+       position + 1 < length and bytes[position + 1] == 61 { return 2 }
+    if (bytes[position] == 60 or bytes[position] == 62) and
+       position + 1 < length and bytes[position + 1] == 61 { return 2 }
     return 1
 }
 
@@ -280,8 +305,9 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
     let mut previous_was_power: bool = false
     while index < length {
         let c: u8 = bytes[index]
-        if str_is_ascii_ws(c) {
-            index = index + 1
+        let space_width: i32 = math_space_width(bytes, index, length)
+        if space_width > 0 {
+            index = index + space_width
             continue
         }
         # Integer powers bind to the preceding primary before pending
@@ -718,7 +744,7 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
         }
         let opcode: i32 = source_operator(bytes, index, length)
         if opcode == 0 { return source_error(index, length) }
-        let width: i32 = operator_bytes(bytes, index)
+        let width: i32 = operator_bytes(bytes, index, length)
         if expect_operand {
             if opcode != 1 and opcode != 2 { return source_error(index, length) }
             if opcode == 2 {

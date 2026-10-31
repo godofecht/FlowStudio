@@ -151,6 +151,25 @@ function main() -> i32 {
        eighth_norm_source.program.instructions[8].opcode != 55 or
        eighth_norm_source.program.instructions[8].source_end != 5 { return 56 }
 
+    # These run through the production native HTTP compiler and Monaco Run.
+    result = evaluate_math_expression("1m + 2m")
+    if not result.valid or not close(result.result.value, 3.0) or
+       not same_dimension(result.result.dimension, length_dimension()) { return 57 }
+    result = evaluate_math_expression("2 × 3")
+    if not result.valid or not close(result.result.value, 6.0) { return 58 }
+    result = evaluate_math_expression("4 ÷ 2")
+    if not result.valid or not close(result.result.value, 2.0) { return 59 }
+    let spaced: ParsedMathExpression = parse_math_expression("1 + 2")
+    if not spaced.valid or spaced.program.count != 3 or
+       spaced.program.instructions[2].source_start != 4 or
+       spaced.program.instructions[2].source_end != 5 { return 60 }
+    let invisible: ParsedMathExpression = parse_math_expression("1​+2")
+    if invisible.valid or invisible.failed_at != 1 { return 61 }
+    result = evaluate_math_expression("2 + 3")
+    if not result.valid or not close(result.result.value, 5.0) { return 62 }
+    result = evaluate_math_expression("2　+　3")
+    if not result.valid or not close(result.result.value, 5.0) { return 63 }
+
     println("native-math-source-ok")
     return 0
 }

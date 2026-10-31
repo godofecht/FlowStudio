@@ -182,7 +182,7 @@ test("final cell exceeding the aggregate budget still fails when its snapshot is
 
 
 test("aggregate PNG snapshots are bounded by eight MiB across a twelve-cell notebook", async () => {
-  const png = "iVBORw0KGgo" + "A".repeat(1048576 - 12);
+  const png = "iVBORw0KGgo" + "A".repeat(1048576 - "iVBORw0KGgo".length);
   const f = fixture(async () => ({ok:true, output:"computed", plots:[{number:17, png}]}));
   const source = Array.from({length:12}, (_, index) =>
     "# %% [python]\nprint(" + index + ")").join("\n");
@@ -197,7 +197,7 @@ test("aggregate PNG snapshots are bounded by eight MiB across a twelve-cell note
 
 test("oversized and malformed plot payloads are dropped without blocking later valid plots", async () => {
   const small = "iVBORw0KGgo" + "A".repeat(1024);
-  const large = "iVBORw0KGgo" + "A".repeat(1398105 - 12);
+  const large = "iVBORw0KGgo" + "A".repeat(1398105 - "iVBORw0KGgo".length);
   const f = fixture(async () => ({ok:true, output:"ok", plots:[
     {png:large}, {png:"<script>bad</script>"}, {png:small, auxiliary:"x".repeat(2000000)}
   ]}));
@@ -207,7 +207,7 @@ test("oversized and malformed plot payloads are dropped without blocking later v
 });
 
 test("plot payload budget is independent of aggregate text and bitmap limits", async () => {
-  const png = "iVBORw0KGgo" + "A".repeat(1048576 - 12);
+  const png = "iVBORw0KGgo" + "A".repeat(1048576 - "iVBORw0KGgo".length);
   let calls = 0;
   const f = fixture(async () => {
     calls++;

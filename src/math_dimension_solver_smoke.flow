@@ -59,7 +59,7 @@ function main() -> i32 {
     result = solve_math_equation_unknown_dimension("x^0 = 1", known, "x")
     if result.valid { return 20 }
     result = solve_math_equation_unknown_dimension("sqrt(x) = 1m", known, "x")
-    if result.valid { return 21 }
+    if not result.valid or not same_dimension(result.dimension, area) { return 21 }
     result = solve_math_equation_unknown_dimension("x = missing", known, "x")
     if result.valid { return 22 }
     result = solve_math_equation_unknown_dimension("x = 1m", known, "duration")

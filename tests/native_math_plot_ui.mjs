@@ -537,6 +537,34 @@ try {
   assert.match(await page.locator('#console').textContent(),
     /native-math-variable-constraints-ok/);
 
+  // Real Chromium -> Monaco Run -> production HTTP -> upstream Flow 2.0.
+  // Exercise the newly compiled four-unknown SI system, not a JS substitute.
+  const nativeFourFiles = [
+    'src/math_dimensions.flow',
+    'src/math_expression_ir.flow',
+    'src/math_expression_source.flow',
+    'src/math_equation.flow',
+    'src/math_static.flow',
+    'src/math_dimension_four.flow',
+    'src/math_dimension_four_smoke.flow'
+  ];
+  const nativeFourSource = nativeFourFiles.map(path =>
+    readFileSync(path, 'utf8').split(/\r?\n/)
+      .filter(line => !/^import \.math_(dimensions|expression_ir|expression_source|equation|static|dimension_four) \{/.test(line))
+      .map(line => line.replace(/^export /, '')).join('\n')
+  ).join('\n');
+  assert.ok(Buffer.byteLength(nativeFourSource, 'utf8') < 128 * 1024);
+  assert.match(nativeFourSource, /function determinant4\(/);
+  assert.match(nativeFourSource, /native-math-dimension-four-ok/);
+  await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
+    nativeFourSource);
+  await page.locator('#run').click();
+  await page.waitForFunction(() =>
+    document.querySelector('#console')?.textContent?.includes('native-math-dimension-four-ok'),
+    null, { timeout: 120000 });
+  assert.match(await page.locator('#console').textContent(),
+    /native-math-dimension-four-ok/);
+
   assert.deepEqual(errors, [], errors.join('\n'));
   console.log('PASS: native mathematical Flow HTTP, linear/nonlinear NumPy PDEs and actual SVG plots in Chromium');
 } finally {

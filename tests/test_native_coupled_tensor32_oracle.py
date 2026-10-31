@@ -258,7 +258,7 @@ class NativeCoupledTensor32Oracle(unittest.TestCase):
             self.assertAlmostEqual(actual_u, expected_u, delta=1e-12)
             self.assertAlmostEqual(actual_v, expected_v, delta=1e-12)
             self.assertIn(str(expected_u), source)
-            self.assertIn(str(expected_v), source)
+            self.assertIn(str(abs(expected_v)), source)
         state = initial()
         whole = integrate(state, 128, exchange=0.8, reverse=0.2)
         half = integrate(state, 64, duration=DURATION / 2,

@@ -53,3 +53,34 @@ Navier–Stokes program remains on the separate Python/NumPy mathematical
 dialect; it is **not** yet executed by the native Flow PDE compiler. Upstream
 grammar integration, general tensor/PDE ASTs, arbitrary-rank inference, and
 computed multidimensional visualization remain incomplete.
+
+## Executable scaled SI suffixes
+
+The native source parser also lowers these **explicitly supported** prefixed
+literals to coherent SI values, including in dimensional inference, equations,
+production HTTP compilation, and the workbench:
+
+| Literal | Stored value | Stored dimension |
+| --- | ---: | --- |
+| `1km` | 1000 | length |
+| `1cm` | 0.01 | length |
+| `1mm` | 0.001 | length |
+| `1ms` | 0.001 | time |
+| `1µm` or `1μm` | 0.000001 | length |
+| `1µs` or `1μs` | 0.000001 | time |
+| `1kPa` | 1000 | pressure |
+| `1kHz` | 1000 | frequency |
+| `1kN` | 1000 | force |
+| `1kJ` | 1000 | energy |
+| `1kW` | 1000 | power |
+
+Both the micro sign (U+00B5) and Greek small mu (U+03BC) are recognized in
+these two suffixes, and UTF-8 source byte offsets are preserved. Bare `m`
+remains metre, `ms` is millisecond, and `kg` remains kilogram. Unit
+symbols are case-sensitive; arbitrary prefix/unit combinations, conversions,
+and general compound unit grammars are not yet implemented.
+
+The native assertions include `1km=1000m`,
+`2kPa*3m*1m=6000N`, and `2kHz*500µs=1`. These are executed by
+`flow run src/math_derived_units_smoke.flow` and the production HTTP
+smoke, not merely recognized by editor highlighting.

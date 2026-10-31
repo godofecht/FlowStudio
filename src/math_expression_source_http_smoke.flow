@@ -57,6 +57,14 @@ function main() -> i32 {
     if not result.valid or not close(result.result.value, 0.0000000000009999999999995) { return 19 }
     result = evaluate_math_expression("log1p(-1)")
     if result.valid or result.failed_at != 0 { return 20 }
+    result = evaluate_math_expression("expm1(0.000000000001)")
+    if not result.valid or not close(result.result.value, 0.0000000000010000000000005) { return 21 }
+    result = evaluate_math_expression("log1p(expm1(0.5))")
+    if not result.valid or not close(result.result.value, 0.5) { return 22 }
+    result = evaluate_math_expression("expm1(1m)")
+    if result.valid or result.failed_at != 0 { return 23 }
+    result = evaluate_math_expression("expm1(61)")
+    if result.valid or result.failed_at != 0 { return 24 }
     println("native-math-source-ok")
     return 0
 }

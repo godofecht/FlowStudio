@@ -1,3 +1,17 @@
+## 2026-10-31: asynchronous mixed-format notebook import isolation (qualification pending)
+
+Production `docs/app/notebook_io.js` now rejects stale asynchronous file reads,
+intervening source/language edits and overlapping import application across
+`.ipynb`, `.fsnb`, `.Rmd` and `.qmd`. It checks actual UTF-8 payload
+bytes against the 4 MiB file budget, rather than trusting file metadata.
+Ten deterministic controller regression cases use real notebook decoders.
+[Reproduction](NOTEBOOK_IMPORT_ISOLATION.md).
+
+**Pending:** exact-head Linux/macOS CI, existing production native Flow/HTTP,
+R/C FlowJIT and Ubuntu Chromium acceptance. **Unexecuted:** a physical-browser
+race stress case, independent macOS physical browser and local native Flow/R.
+This is a persistence safety improvement, not full RStudio parity.
+
 ## 2026-10-31: aggregate notebook media retention limits (qualification pending)
 
 The production mixed-language notebook runner now retains at most 32 image

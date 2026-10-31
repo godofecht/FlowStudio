@@ -565,6 +565,36 @@ try {
   assert.match(await page.locator('#console').textContent(),
     /native-math-dimension-four-ok/);
 
+  // Actual Chromium -> Monaco Run -> native HTTP -> Flow 2.0.
+  // Run all 16 bounded four-unknown constraint assertions, including the
+  // late contradiction, Unicode identifiers, rank deficiency and radicals.
+  const nativeVariableFourFiles = [
+    'src/math_dimensions.flow',
+    'src/math_expression_ir.flow',
+    'src/math_expression_source.flow',
+    'src/math_equation.flow',
+    'src/math_static.flow',
+    'src/math_dimension_four.flow',
+    'src/math_dimension_variable_four.flow',
+    'src/math_dimension_variable_four_smoke.flow'
+  ];
+  const nativeVariableFourSource = nativeVariableFourFiles.map(path =>
+    readFileSync(path, 'utf8').split(/\r?\n/)
+      .filter(line => !/^import \.math_(dimensions|expression_ir|expression_source|equation|static|dimension_four|dimension_variable_four) \{/.test(line))
+      .map(line => line.replace(/^export /, '')).join('\n')
+  ).join('\n');
+  assert.ok(Buffer.byteLength(nativeVariableFourSource, 'utf8') < 128 * 1024);
+  assert.match(nativeVariableFourSource, /system\.count = 16/);
+  assert.match(nativeVariableFourSource, /native-math-variable-four-constraints-ok/);
+  await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
+    nativeVariableFourSource);
+  await page.locator('#run').click();
+  await page.waitForFunction(() =>
+    document.querySelector('#console')?.textContent?.includes('native-math-variable-four-constraints-ok'),
+    null, { timeout: 120000 });
+  assert.match(await page.locator('#console').textContent(),
+    /native-math-variable-four-constraints-ok/);
+
   assert.deepEqual(errors, [], errors.join('\n'));
   console.log('PASS: native mathematical Flow HTTP, linear/nonlinear NumPy PDEs and actual SVG plots in Chromium');
 } finally {

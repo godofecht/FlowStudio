@@ -24,8 +24,10 @@ The new Node regressions exercise all four real decoders, delayed reads,
 intervening editor edits, cross-format selection ordering, malformed size
 metadata and an asynchronous import-application lock. The existing native
 acceptance exercises real Flow compilation, production HTTP, R/C FlowJIT and
-Ubuntu Chromium. These new races are controller tests, **not** a claim of
-physical-browser race verification.
+Ubuntu Chromium. The native Chromium acceptance now also delays a real browser File.text()
+read to verify latest-selection ordering and editor-change cancellation in
+the served production notebook UI. That physical-browser gate requires CI
+qualification; it does not mock the interpreter or HTTP responses.
 
 Resource ceilings: 4 MiB per imported document, checked against actual
 UTF-8 bytes; existing parser-specific cell/source limits remain enforced.

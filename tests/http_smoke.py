@@ -660,6 +660,52 @@ def main() -> None:
     assert status == 422 and body.strip(), (
         "native rational SI malformed compiler rejection", status, body)
 
+    # Two unknown SI dimensions are inferred from real native equation IR.
+    # Concatenate exact checked-in modules for the production HTTP compiler;
+    # both successful execution and corrupted assertions must be observable.
+    pair_files = static_files[:-1] + (
+        "src/math_dimension_pair.flow",
+        "src/math_dimension_pair_smoke.flow",
+    )
+    native_pair = "\n".join(
+        "\n".join(
+            line.removeprefix("export ")
+            for line in (Path(__file__).resolve().parents[1] / path)
+                .read_text(encoding="utf-8").splitlines()
+            if not line.startswith("import .math_dimensions {")
+            and not line.startswith("import .math_expression_ir {")
+            and not line.startswith("import .math_expression_source {")
+            and not line.startswith("import .math_equation {")
+            and not line.startswith("import .math_static {")
+            and not line.startswith("import .math_dimension_pair {")
+        )
+        for path in pair_files
+    )
+    assert "function solve_math_equations_two_unknown_dimensions(" in native_pair
+    assert len(native_pair.encode("utf-8")) < 128 * 1024
+    status, body = request("POST", "/api/check/flow", native_pair, accepted_headers)
+    assert status == 200, ("native paired SI compiler", status, body)
+    status, body = request("POST", "/api/run/flow", native_pair, accepted_headers)
+    assert status == 200 and "native-math-two-unknown-dimension-constraints-ok" in body, (
+        "native paired SI execution", status, body)
+    corrupted_pair = native_pair.replace(
+        '"x*y = 1m²", "x/y = 1s²", known, "x", "y"',
+        '"x*y = 1m²", "x/y = 1m", known, "x", "y"',
+        1,
+    )
+    assert corrupted_pair != native_pair
+    status, body = request("POST", "/api/run/flow", corrupted_pair, accepted_headers)
+    assert status == 422, ("native paired SI corrupted assertion", status, body)
+    malformed_pair = native_pair.replace(
+        "function solve_axis(first: DimensionRow, second: DimensionRow,",
+        "function solve_axis(first: DimensionRow, second: DimensionRow",
+        1,
+    )
+    assert malformed_pair != native_pair
+    status, body = request("POST", "/api/check/flow", malformed_pair, accepted_headers)
+    assert status == 422 and body.strip(), (
+        "native paired SI invalid compiler syntax", status, body)
+
     # Native hyperbolic source lowering, typed IR, static dimensions and
     # scalar equation residuals through the real Flow compiler and HTTP runner.
     # The temporary HTTP source is built from the checked-in native modules,

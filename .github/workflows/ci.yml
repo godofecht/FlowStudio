@@ -96,6 +96,7 @@ jobs:
           flow run src/math_equation_smoke.flow
           flow run src/math_static_smoke.flow
           flow run src/math_declared_dimensions_smoke.flow
+          flow run src/math_dimension_solver_smoke.flow
           flow run src/math_trigonometry_smoke.flow
           flow run src/math_hyperbolic_smoke.flow
           flow run src/math_inverse_hyperbolic_smoke.flow

@@ -485,8 +485,10 @@ The real-valued cube root supports negative and zero radicands. Its
 physical dimensions must have exponents divisible by three in **each**
 supported SI axis (length, mass, time and temperature); the result
 divides those exponents by three. For example,
-`cbrt(-8m³) = -2m` and `∛(27m³/8s³) = 1.5m/s`, while
-`cbrt(8m²)` is a type error. Static inference checks dimensional
+`cbrt(-8*1m³) = -2m` and `∛(27*1m³/(8*1s³)) = 1.5m/s`, while
+`cbrt(8m²)` is a type error.
+A postfix power applies to the **entire preceding quantity**: `8m³` is
+`(8m)^3`, not `8*(1m)^3`; the two expressions must not be conflated. Static inference checks dimensional
 divisibility without executing the numerical root, so negative inputs
 remain statically well-typed. Predicate operands fail closed.
 
@@ -496,7 +498,7 @@ then restores the scale and sign. This avoids an `exp(log(x)/3)`
 implementation and handles very small nonzero inputs. Existing
 finite-value and bounded-physical-dimension guards remain active.
 
-`src/math_cuberoot_smoke.flow` contains 55 native assertions covering
+`src/math_cuberoot_smoke.flow` contains 57 native assertions covering
 signed analytical values, SI dimensions, UTF-8 source spans, direct
 postfix IR, parser arity, equations, symbolic bindings and static
 inference. `src/math_expression_source_http_smoke.flow` adds four

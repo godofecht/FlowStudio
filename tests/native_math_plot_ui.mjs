@@ -333,6 +333,27 @@ try {
     null, { timeout: 80000 });
   assert.match(await page.locator('#console').textContent(), /native-field-dual48-ok/);
 
+  // Real Chromium Monaco -> Flow HTTP -> upstream compiler: three distinct
+  // PDE fields with directed exchange, 288 numerical assertions and a
+  // computed three-curve SVG. No browser-side numerical substitute.
+  await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
+    readFileSync('examples/native_field_cyclic32.flow', 'utf8'));
+  await page.locator('#run').click();
+  await page.waitForFunction(() =>
+    document.querySelector('#console')?.textContent?.includes('native-field-cyclic32-ok'),
+    null, { timeout: 80000 });
+  assert.match(await page.locator('#console').textContent(),
+    /native-field-cyclic32-ok/);
+  await page.waitForFunction(() =>
+    document.querySelectorAll('#mathFlowPlot path[data-field-name]').length === 3,
+    null, { timeout: 30000 });
+  for (const name of ['U', 'V', 'W']) {
+    const path = await page.locator(
+      '#mathFlowPlot path[data-field-name="' + name + '"]').getAttribute('d');
+    assert.ok(path && path.startsWith('M'), 'Missing computed native curve ' + name);
+  }
+  assert.equal(await page.locator('#tab-plots').getAttribute('aria-selected'), 'true');
+
   // Actual Chromium Monaco Run of two compiler-backed PDE fields with
   // nonlinear Gray-Scott cross-coupling and 384 numerical cell assertions.
   await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),

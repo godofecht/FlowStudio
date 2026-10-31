@@ -360,6 +360,15 @@ def main() -> None:
     status, body = request("POST", "/api/run/flow", broken_coupled_assertion,
                            accepted_headers)
     assert status == 422, ("coupled tensor corrupted numerical assertion", status, body[-500:])
+    # Deliberately reverse the strict energy-dissipation invariant. A source
+    # that compiles but violates it must fail through production Flow HTTP.
+    broken_coupled_energy = coupled_tensor_source.replace(
+        "initialEnergy > halfEnergy", "initialEnergy < halfEnergy", 1)
+    assert broken_coupled_energy != coupled_tensor_source
+    status, body = request("POST", "/api/run/flow", broken_coupled_energy,
+                           accepted_headers)
+    assert status == 422, (
+        "coupled tensor corrupted Lyapunov assertion", status, body[-500:])
     # Actual upstream Flow evolution DSL, not a hand-coded ODE or Python
     # interpreter: four coupled states with compiler-generated RK4, checked
     # against a discrete Fourier/Poisson oracle and fourth-order refinement.

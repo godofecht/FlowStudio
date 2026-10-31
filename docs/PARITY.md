@@ -1,3 +1,15 @@
+## 2026-10-31: directed conservative 32×32 cross-coupling (CI pending)
+
+The compiler-executed two-species tensor kernel now accepts unequal forward
+and reverse exchange rates (0.8/0.2), checks exact analytical species means,
+conservation, replay and invalid reverse rates, while retaining the previously
+qualified symmetric 0.35/0.35 2,048-cell HTTP/Chromium heatmap output.
+The independent Python oracle adds full 2,048-cell nonsymmetric Fourier
+matrix-exponential comparisons at three refinements and seeded conservation.
+Local independent numerical calculations passed; new native Flow, production
+HTTP/browser and Linux/macOS CI remain **unexecuted** at submission.
+See [directed coupling acceptance](NATIVE_COUPLED_TENSOR32.md).
+
 ## 2026-10-31: genuinely exchange-coupled native 32×32 tensor PDEs (six CI jobs passed)
 
 `examples/native_coupled_tensor32.flow` evolves two simultaneous 1,024-cell

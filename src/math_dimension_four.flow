@@ -196,7 +196,7 @@ function analyse(program: MathProgram, source: string,
             stack[depth] = value
             depth = depth + 1
         } elif opcode == 5 or opcode == 6 or opcode == 20 or
-             opcode == 21 or opcode == 44 or opcode == 45 {
+             opcode == 21 or opcode == 44 or opcode == 46 {
             if depth < 1 { return failed_analysis(position) }
             let mut value: QuadAffine = stack[depth - 1]
             if opcode == 6 {
@@ -212,7 +212,7 @@ function analyse(program: MathProgram, source: string,
                 value.denominator = value.denominator * 2
             } elif opcode == 44 {
                 value.denominator = value.denominator * 3
-            } elif opcode == 45 {
+            } elif opcode == 46 {
                 value.denominator = value.denominator * 4
             }
             value = normalise(value)

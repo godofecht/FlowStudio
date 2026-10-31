@@ -35,7 +35,7 @@ struct DualAnalysis {
     failed_at: i32
 }
 
-struct DimensionRow {
+struct PairDimensionRow {
     valid: bool,
     first: i32,
     second: i32,
@@ -43,7 +43,7 @@ struct DimensionRow {
     failed_at: i32
 }
 
-struct AxisSolution {
+struct PairAxisSolution {
     valid: bool,
     first: i32,
     second: i32
@@ -66,8 +66,8 @@ function failed_analysis(position: i32) -> DualAnalysis {
     return DualAnalysis { valid: false, value: blank_affine(), failed_at: position }
 }
 
-function failed_row(position: i32) -> DimensionRow {
-    return DimensionRow {
+function failed_row(position: i32) -> PairDimensionRow {
+    return PairDimensionRow {
         valid: false, first: 0, second: 0,
         target: dimensionless(), failed_at: position
     }
@@ -225,7 +225,7 @@ function analyse(program: MathProgram, source: string,
 }
 
 function equation_row(source: string, bindings: MathBindings,
-                      first_name: string, second_name: string) -> DimensionRow {
+                      first_name: string, second_name: string) -> PairDimensionRow {
     let equation: MathEquation = parse_math_equation_with_bindings(source, bindings)
     if not equation.valid { return failed_row(equation.failed_at) }
     let left: DualAnalysis = analyse(equation.left, source, first_name, second_name)
@@ -234,7 +234,7 @@ function equation_row(source: string, bindings: MathBindings,
     if not right.valid { return failed_row(right.failed_at) }
     let a: DualAffine = left.value
     let b: DualAffine = right.value
-    return DimensionRow {
+    return PairDimensionRow {
         valid: true,
         first: a.first * b.denominator - b.first * a.denominator,
         second: a.second * b.denominator - b.second * a.denominator,
@@ -245,9 +245,9 @@ function equation_row(source: string, bindings: MathBindings,
     }
 }
 
-function solve_axis(first: DimensionRow, second: DimensionRow,
+function solve_axis(first: PairDimensionRow, second: PairDimensionRow,
                     target_first: i32, target_second: i32,
-                    determinant: i32) -> AxisSolution {
+                    determinant: i32) -> PairAxisSolution {
     let first_numerator: i32 =
         target_first * second.second - target_second * first.second
     let second_numerator: i32 =
@@ -257,9 +257,9 @@ function solve_axis(first: DimensionRow, second: DimensionRow,
     if absolute(x) > 32 or absolute(y) > 32 or
        x * determinant != first_numerator or
        y * determinant != second_numerator {
-        return AxisSolution { valid: false, first: 0, second: 0 }
+        return PairAxisSolution { valid: false, first: 0, second: 0 }
     }
-    return AxisSolution { valid: true, first: x, second: y }
+    return PairAxisSolution { valid: true, first: x, second: y }
 }
 
 # Two equations, exactly two unknown symbols and at most six known symbols.
@@ -291,23 +291,23 @@ export function solve_math_equations_two_unknown_dimensions(
     }
     bindings.count = known.count + 2
 
-    let first: DimensionRow = equation_row(
+    let first: PairDimensionRow = equation_row(
         first_equation, bindings, first_unknown, second_unknown)
     if not first.valid { return pair_failed(0, first.failed_at) }
-    let second: DimensionRow = equation_row(
+    let second: PairDimensionRow = equation_row(
         second_equation, bindings, first_unknown, second_unknown)
     if not second.valid { return pair_failed(1, second.failed_at) }
 
     let determinant: i32 =
         first.first * second.second - second.first * first.second
     if determinant == 0 { return pair_failed(1, 0) }
-    let length: AxisSolution = solve_axis(
+    let length: PairAxisSolution = solve_axis(
         first, second, first.target.length, second.target.length, determinant)
-    let mass: AxisSolution = solve_axis(
+    let mass: PairAxisSolution = solve_axis(
         first, second, first.target.mass, second.target.mass, determinant)
-    let time: AxisSolution = solve_axis(
+    let time: PairAxisSolution = solve_axis(
         first, second, first.target.time, second.target.time, determinant)
-    let temperature: AxisSolution = solve_axis(
+    let temperature: PairAxisSolution = solve_axis(
         first, second, first.target.temperature, second.target.temperature,
         determinant)
     if not length.valid or not mass.valid or not time.valid or

@@ -112,19 +112,29 @@ function main() -> i32 {
         opcode: 0, literal: quantity(0.0, metres), exponent: 0,
         source_start: 0, source_end: 1
     }
-    let mut program: MathProgram = MathProgram {
-        instructions: [blank], count: 4, source_length: 10
-    }
-    program.instructions[3] = MathInstruction {
+    let mut instructions: array<MathInstruction, 64> = [blank]
+    instructions[3] = MathInstruction {
         opcode: 45, literal: quantity(0.0, dimensionless()), exponent: 0,
         source_start: 2, source_end: 7
     }
     let mut i: i32 = 1
     while i <= 200 {
         let scale: f64 = (i as f64) * 0.125
-        program.instructions[0].literal = quantity(3.0 * scale, metres)
-        program.instructions[1].literal = quantity(-4.0 * scale, metres)
-        program.instructions[2].literal = quantity(12.0 * scale, metres)
+        instructions[0] = MathInstruction {
+            opcode: 0, literal: quantity(3.0 * scale, metres), exponent: 0,
+            source_start: 0, source_end: 1
+        }
+        instructions[1] = MathInstruction {
+            opcode: 0, literal: quantity(-4.0 * scale, metres), exponent: 0,
+            source_start: 1, source_end: 2
+        }
+        instructions[2] = MathInstruction {
+            opcode: 0, literal: quantity(12.0 * scale, metres), exponent: 0,
+            source_start: 2, source_end: 3
+        }
+        let program: MathProgram = MathProgram {
+            instructions: instructions, count: 4, source_length: 10
+        }
         result = evaluate_math_ir(program)
         if not result.valid or not relative(result.result.value, 13.0 * scale) or
            not same_dimension(result.result.dimension, metres) { return 42 }
@@ -132,10 +142,16 @@ function main() -> i32 {
         if not inferred.valid or not same_dimension(inferred.dimension, metres) { return 43 }
         i = i + 1
     }
-    program.instructions[2].literal = quantity(1.0, time_dimension())
-    result = evaluate_math_ir(program)
+    instructions[2] = MathInstruction {
+        opcode: 0, literal: quantity(1.0, time_dimension()), exponent: 0,
+        source_start: 2, source_end: 3
+    }
+    let invalid_program: MathProgram = MathProgram {
+        instructions: instructions, count: 4, source_length: 10
+    }
+    result = evaluate_math_ir(invalid_program)
     if result.valid or result.failed_at != 2 { return 44 }
-    inferred = infer_math_ir(program)
+    inferred = infer_math_ir(invalid_program)
     if inferred.valid or inferred.failed_at != 2 { return 45 }
     println("native-math-norm3-ok")
     return 0

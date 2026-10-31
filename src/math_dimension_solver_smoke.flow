@@ -109,8 +109,9 @@ function main() -> i32 {
     if not result.valid or not same_dimension(result.dimension, volume) { return 37 }
     result = solve_math_equation_unknown_dimension("sqrt(cbrt(x)) = 1m", empty, "x")
     if not result.valid or not same_dimension(result.dimension, sixth_length) { return 38 }
-    result = solve_math_equation_unknown_dimension("sqrt(x) = duration", known, "x")
-    if result.valid { return 39 }
+    result = solve_math_equation_unknown_dimension("sqrt(x) = 1m/1s²", empty, "x")
+    if not result.valid or not same_dimension(result.dimension,
+       product_dimension(acceleration, acceleration)) { return 39 }
     known.count = 2
     result = solve_math_equation_unknown_dimension("sqrt(x) = duration", known, "x")
     if not result.valid or not same_dimension(result.dimension, squared_time) { return 40 }

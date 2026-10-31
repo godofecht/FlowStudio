@@ -131,6 +131,31 @@ function positive_square_root(value: f64) -> f64 {
 # Normalize by exact powers of eight so Newton iteration is well-conditioned
 # for tiny and large finite values without libm or a cancellation-prone
 # exp(log(x)/3) approximation. Negative radicands retain their real sign.
+# Real principal fourth root, normalized by exact powers of sixteen to
+# keep Newton iteration stable for the supported finite numeric range.
+# Negative radicands have no real fourth root and are rejected by the caller.
+function real_fourth_root(value: f64) -> f64 {
+    if value == 0.0 { return 0.0 }
+    let mut normalized: f64 = value
+    let mut scale: f64 = 1.0
+    while normalized > 16.0 {
+        normalized = normalized * 0.0625
+        scale = scale * 2.0
+    }
+    while normalized < 0.0625 {
+        normalized = normalized * 16.0
+        scale = scale * 0.5
+    }
+    let mut estimate: f64 = 1.0
+    let mut iteration: i32 = 0
+    while iteration < 40 {
+        estimate = (3.0 * estimate + normalized /
+            (estimate * estimate * estimate)) * 0.25
+        iteration = iteration + 1
+    }
+    return estimate * scale
+}
+
 function real_cube_root(value: f64) -> f64 {
     if value == 0.0 { return 0.0 }
     let mut normalized: f64 = magnitude(value)
@@ -440,6 +465,20 @@ function even_dimension(dimension: Dimension) -> bool {
         dimension.temperature == (dimension.temperature / 2) * 2
 }
 
+function fourth_dimension(dimension: Dimension) -> Dimension {
+    return Dimension {
+        length: dimension.length / 4, mass: dimension.mass / 4,
+        time: dimension.time / 4, temperature: dimension.temperature / 4
+    }
+}
+
+function divisible_by_four_dimension(dimension: Dimension) -> bool {
+    return dimension.length == (dimension.length / 4) * 4 and
+        dimension.mass == (dimension.mass / 4) * 4 and
+        dimension.time == (dimension.time / 4) * 4 and
+        dimension.temperature == (dimension.temperature / 4) * 4
+}
+
 function third_dimension(dimension: Dimension) -> Dimension {
     return Dimension {
         length: dimension.length / 3, mass: dimension.mass / 3,
@@ -499,7 +538,7 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
         } elif opcode == 5 or opcode == 6 or opcode == 18 or opcode == 20 or opcode == 21 or opcode == 25 or
              opcode == 26 or opcode == 27 or opcode == 28 or opcode == 29 or opcode == 30 or opcode == 31 or
              opcode == 33 or opcode == 34 or opcode == 35 or opcode == 36 or opcode == 37 or
-             opcode == 38 or opcode == 39 or opcode == 40 or opcode == 42 or opcode == 43 or opcode == 44 {
+             opcode == 38 or opcode == 39 or opcode == 40 or opcode == 42 or opcode == 43 or opcode == 44 or opcode == 45 {
             if depth < 1 { return failed(instruction.source_start) }
             let input: Quantity = stack[depth - 1]
             if opcode == 18 {
@@ -519,6 +558,12 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
                     }
                     stack[depth - 1] = quantity(
                         positive_square_root(input.value), half_dimension(input.dimension))
+                } elif opcode == 45 {
+                    if input.value < 0.0 or not divisible_by_four_dimension(input.dimension) {
+                        return failed(instruction.source_start)
+                    }
+                    stack[depth - 1] = quantity(
+                        real_fourth_root(input.value), fourth_dimension(input.dimension))
                 } elif opcode == 44 {
                     if not divisible_by_three_dimension(input.dimension) {
                         return failed(instruction.source_start)

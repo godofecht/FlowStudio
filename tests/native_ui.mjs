@@ -304,6 +304,62 @@ try {
       assert.equal(response.status(), 200);
       assert.equal(await notebookPage.evaluate(() =>
         globalThis.FlowStudioNativeFlow?.available?.() === true), true);
+      // Physical Chromium regression on the served production notebook UI:
+      // delay only File.text() completion; all decoding and DOM mutation use
+      // the real controller. No interpreter or HTTP responses are mocked.
+      const importIsolation = await notebookPage.evaluate(async () => {
+        const source = document.getElementById('source');
+        const qmdInput = document.getElementById('quartoFile');
+        const ipynbInput = document.getElementById('notebookFile');
+        const tick = String.fromCharCode(96).repeat(3);
+        const qmd = tick + '{r}\ncat(31)\n' + tick + '\n';
+        const ipynb = JSON.stringify({nbformat:4, nbformat_minor:4,
+          metadata:{language_info:{name:'python'}},
+          cells:[{cell_type:'code', source:'print(17)', metadata:{}, outputs:[]}]});
+        function select(input, file) {
+          const data = new DataTransfer();
+          data.items.add(file);
+          input.files = data.files;
+          input.dispatchEvent(new Event('change', {bubbles:true}));
+        }
+        const originalConfirm = window.confirm;
+        const originalText = File.prototype.text;
+        let releaseStale, releasePending;
+        window.confirm = () => true;
+        File.prototype.text = function () {
+          if (this.name === 'stale.qmd')
+            return new Promise(resolve => { releaseStale = () => resolve(qmd); });
+          if (this.name === 'pending.qmd')
+            return new Promise(resolve => { releasePending = () => resolve(qmd); });
+          return originalText.call(this);
+        };
+        try {
+          select(qmdInput, new File([qmd], 'stale.qmd', {type:'text/markdown'}));
+          if (!releaseStale) throw Error('Browser did not enter delayed Quarto read');
+          select(ipynbInput, new File([ipynb], 'new.ipynb', {type:'application/json'}));
+          for (let attempt = 0; attempt < 20 && !source.value.includes('print(17)'); attempt++)
+            await new Promise(resolve => setTimeout(resolve, 10));
+          const beforeRelease = source.value;
+          releaseStale();
+          await new Promise(resolve => setTimeout(resolve, 0));
+          const latest = source.value;
+          select(qmdInput, new File([qmd], 'pending.qmd', {type:'text/markdown'}));
+          if (!releasePending) throw Error('Browser did not enter second delayed Quarto read');
+          source.value = 'user_edit_must_survive = 42';
+          source.dispatchEvent(new Event('input', {bubbles:true}));
+          releasePending();
+          await new Promise(resolve => setTimeout(resolve, 0));
+          return {beforeRelease, latest, edited:source.value,
+            notice:document.getElementById('notice').textContent};
+        } finally {
+          window.confirm = originalConfirm;
+          File.prototype.text = originalText;
+        }
+      });
+      assert.match(importIsolation.latest, /print\(17\)/,
+        'late Quarto read must not overwrite newer Jupyter import: ' + JSON.stringify(importIsolation));
+      assert.equal(importIsolation.edited, 'user_edit_must_survive = 42');
+      assert.match(importIsolation.notice, /editor changed during file read/);
       await notebookPage.locator('#rRuntime').selectOption('native');
       await notebookPage.locator('#language').selectOption('flow');
       const coupled = readFileSync(new URL('../examples/native_coupled_diffusion_2d.flow',

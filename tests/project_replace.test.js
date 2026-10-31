@@ -240,3 +240,50 @@ for (const [name, api] of [["native", native], ["Pages", pages]]) {
     } finally {cleanup();}
   });
 }
+
+for (const [label, project] of [["native", native], ["Pages", pages]]) {
+  test(label + " refuses a multibyte replacement that exceeds the source byte limit", async () => {
+    const original = "λ".repeat(524280) + "x";
+    const target = file("solver.flow", original);
+    const root = directory("work", [["solver.flow", target]]);
+    await assert.rejects(project.planProjectReplace(root, "x", "🚀".repeat(5)),
+      /per-file UTF-8 byte limit/);
+    assert.equal(target.contents, original);
+  });
+
+  test(label + " rejects replacement introducing binary NUL before opening writers", async () => {
+    const target = file("model.py", "x = 1");
+    const root = directory("work", [["model.py", target]]);
+    await assert.rejects(project.planProjectReplace(root, "x", String.fromCharCode(0)),
+      /binary NUL/);
+    assert.equal(target.contents, "x = 1");
+  });
+
+  test(label + " deterministically roundtrips twelve multilingual Flow/R/Python files", async () => {
+    let seed = 0x51a7;
+    const next = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0);
+    const files = [];
+    const groups = [[], [], []];
+    for (let i = 0; i < 12; i++) {
+      const extension = ["flow", "R", "py"][i % 3];
+      const name = "module_" + String(i).padStart(2, "0") + "." + extension;
+      const contents = Array.from({length:8}, () =>
+        "marker α " + (next() % 100000) + " λ²").join("\n") + "\n";
+      const target = file(name, contents);
+      files.push({target, contents});
+      groups[i % 3].push([name, target]);
+    }
+    const root = directory("research", groups.map((entries, i) =>
+      ["part_" + i, directory("part_" + i, entries)]));
+    const plan = await project.planProjectReplace(root, "α", "β");
+    assert.equal(plan.matches, 96);
+    assert.equal(plan.files.length, 12);
+    assert.deepEqual(await project.applyProjectReplacement(plan), {files:12, matches:96});
+    for (const {target, contents} of files) {
+      assert.equal(target.contents, contents.replaceAll("α", "β"));
+    }
+    const reverse = await project.planProjectReplace(root, "β", "α");
+    assert.deepEqual(await project.applyProjectReplacement(reverse), {files:12, matches:96});
+    for (const {target, contents} of files) assert.equal(target.contents, contents);
+  });
+}

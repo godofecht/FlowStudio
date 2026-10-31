@@ -140,6 +140,39 @@ def main() -> None:
     assert status == 200, ("native cyclic Flow compile", status, body)
     status, body = request("POST", "/api/run/flow", cyclic_source, accepted_headers)
     assert status == 200, ("native cyclic Flow eigenmode acceptance", status, body)
+    # Two genuinely coupled anisotropic 8x8x8 native Flow volumes: all 3,072
+    # checkpoint species-voxels are asserted in Flow main against independent
+    # Fourier amplitude evolution. The HTTP frame exposes a computed z=0 slice.
+    from test_native_coupled_volume8_oracle import spectral, z_slice
+    volume_source = (Path(__file__).resolve().parents[1] /
+                     "examples/native_coupled_volume8.flow").read_text(encoding="utf-8")
+    assert len(volume_source.encode("utf-8")) < 128 * 1024
+    status, body = request("POST", "/api/check/flow", volume_source, accepted_headers)
+    assert status == 200, ("native 3D coupled compile", status, body)
+    status, body = request("POST", "/api/run/flow", volume_source, accepted_headers)
+    assert status == 200 and "native-coupled-volume8-ok" in body, (
+        "native 3D coupled numerical execution", status, body)
+    volume_lines = [line.strip() for line in body.splitlines()]
+    start = volume_lines.index("FLOWSTUDIO_GRID_V1 8 8 2")
+    assert volume_lines[start + 3] == "FLOWSTUDIO_GRID_END"
+    for offset, (name, expected) in enumerate(zip(("U", "V"), z_slice(spectral(64)))):
+        fields = volume_lines[start + 1 + offset].split()
+        assert fields[0] == name and len(fields) == 65, (name, len(fields))
+        actual = [float(token) for token in fields[1:]]
+        assert all(math.isfinite(value) for value in actual)
+        assert max(abs(a - b) for a, b in zip(actual, expected)) < 0.002, (
+            "native 3D computed slice", name, actual[:4], expected[:4])
+    corrupted_volume = volume_source.replace(
+        "let tolerance: f64 = 0.000000002", "let tolerance: f64 = -1.0", 1)
+    assert corrupted_volume != volume_source
+    status, body = request("POST", "/api/run/flow", corrupted_volume, accepted_headers)
+    assert status == 422, ("native 3D corrupted numerical assertion", status, body)
+    malformed_volume = volume_source.replace(
+        "function advance(state: State, e: Equation) -> State {",
+        "function advance(", 1)
+    assert malformed_volume != volume_source
+    status, body = request("POST", "/api/check/flow", malformed_volume, accepted_headers)
+    assert status == 422, ("native 3D malformed compiler syntax", status, body)
     # Native periodic heat PDE: actual Flow compiler and numerical RK2 run.
     # All 25 numerical and invalid-input assertions are in Flow main().
     heat_native_source = (Path(__file__).resolve().parents[1] /

@@ -1,3 +1,29 @@
+## 2026-10-31: native two-species 8×8×8 anisotropic volume PDE (six CI jobs passed)
+
+`examples/native_coupled_volume8.flow` computes two distinct 512-voxel
+periodic anisotropic diffusion volumes with simultaneous conservative
+interspecies exchange in the actual Flow 2.0 runtime. Its native main
+checks 3,072 values against independently evolved Fourier amplitudes at
+8/32/64 steps, conservation, replay, semigroup, coefficient mutation,
+invalid inputs, output nonmutation and a 262,144 species-voxel-step ceiling.
+A separate standard-library Python oracle checks the full 3D stencil,
+discrete Fourier/matrix evolution and deterministic seeded arbitrary states.
+Real production Flow HTTP check/run and 422 negative acceptance, plus
+physical Ubuntu Chromium Monaco Run and 128 computed z=0 heatmap cells,
+run in existing qualification paths without hosted CI edits.
+[Reproduction](NATIVE_COUPLED_VOLUME8.md).
+
+**Verified:** independent local Python and JavaScript direct-stencil versus
+spectral calculations reached maximum error 1.71e-13 at 8/32/64 steps.
+[PR exact-head CI #41216648010](https://github.com/godofecht/FlowStudio/actions/runs/41216648010)
+passed all six Linux/macOS jobs: 1,176 JavaScript passed and 12 skipped
+per platform; 428 Python tests executed with 13 skipped per platform;
+native Flow compile/HTTP including numerical and 422 negative cases,
+R/C FlowJIT and Ubuntu physical Chromium Monaco/128 SVG cells passed.
+**Unexecuted:** independent macOS physical browser and local native Flow/R.
+This is explicit array-backed 3D numerics, **not** generalized 3D
+compiler-generated `field` lowering or full RStudio parity.
+
 ## 2026-10-31: three compiler-backed directed cyclic 1D fields (qualification pending)
 
 `examples/native_field_cyclic32.flow` declares three distinct upstream

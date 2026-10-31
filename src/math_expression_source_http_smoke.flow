@@ -178,7 +178,7 @@ function main() -> i32 {
     if not negative_power.valid or negative_power.program.count != 2 or
        negative_power.program.instructions[1].exponent != -2 or
        negative_power.program.instructions[1].source_start != 2 or
-       negative_power.program.instructions[1].source_end != 6 { return 65 }
+       negative_power.program.instructions[1].source_end != 7 { return 65 }
     let malformed_power: ParsedMathExpression = parse_math_expression("2m^−")
     if malformed_power.valid or malformed_power.failed_at != 2 { return 66 }
 

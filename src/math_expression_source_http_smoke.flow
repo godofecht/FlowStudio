@@ -106,6 +106,23 @@ function main() -> i32 {
     if not fourth_source.valid or fourth_source.program.instructions[1].opcode != 46 or
        fourth_source.program.instructions[1].source_end != 3 { return 39 }
 
+    result = evaluate_math_expression("root5(-32*1m⁵)")
+    if not result.valid or not close(result.result.value, -2.0) or
+       not same_dimension(result.result.dimension, length_dimension()) { return 40 }
+    result = evaluate_math_expression("root6(64*1m⁶)")
+    if not result.valid or not close(result.result.value, 2.0) { return 41 }
+    result = evaluate_math_expression("root7(-128*1m⁷)")
+    if not result.valid or not close(result.result.value, -2.0) { return 42 }
+    result = evaluate_math_expression("root8(256*1m⁸)")
+    if not result.valid or not close(result.result.value, 2.0) { return 43 }
+    result = evaluate_math_expression("root8(-256)")
+    if result.valid or result.failed_at != 0 { return 44 }
+    result = evaluate_math_expression("root5(1m⁴)")
+    if result.valid or result.failed_at != 0 { return 45 }
+    let high_root_source: ParsedMathExpression = parse_math_expression("root8(256)")
+    if not high_root_source.valid or high_root_source.program.instructions[1].opcode != 50 or
+       high_root_source.program.instructions[1].source_end != 5 { return 46 }
+
     println("native-math-source-ok")
     return 0
 }

@@ -53,7 +53,7 @@ function main() -> i32 {
     system = parse_math_equation_system("1=(2;3)")
     if system.valid or system.failed_at != 4 { return 10 }
     system = parse_math_equation_system("1m=1m;1m=1m;1m=1m;1m=1m;1m=1m;1m=1m;1m=1m;1m=1m;1m=1m")
-    if system.valid or system.failed_equation != 8 { return 11 }
+    if not system.valid or system.count != 9 { return 11 }
 
     system = parse_math_equation_system("1m=1m;1m=1m;1m=1m;1m=1m;1m=1m;1m=1m;1m=1m;1m=1m")
     if not system.valid or system.count != 8 { return 12 }
@@ -131,6 +131,53 @@ function main() -> i32 {
     if result.valid or result.failed_equation != 7 or result.failed_at != 116 { return 22 }
     system = parse_math_equation_system("1m=1m;1m=1m;foo=1m")
     if system.valid or system.failed_equation != 2 or system.failed_at != 12 { return 23 }
+
+    # Sixteen independently dimensioned equations run through the same native
+    # typed parser and evaluator. The last expression is not a fixture stub.
+    let sixteen_source: string = "1m=1m;1s=1s;1K=1K;1=1;2m=2m;2s=2s;2K=2K;2=2;3m=3m;3s=3s;3K=3K;3=3;4m=4m;4s=4s;4K=4K;4=4"
+    system = parse_math_equation_system(sixteen_source)
+    if not system.valid or system.count != 16 or system.source_length != 87 or
+       system.equations[8].equality_at != 46 or
+       system.equations[15].equality_at != 85 or
+       system.equations[15].right.instructions[0].source_start != 86 { return 24 }
+    tolerances.count = 16
+    i = 0
+    while i < 16 {
+        tolerances.values[i] = quantity(0.0, length_dimension())
+        tolerances.values[i + 1] = quantity(0.0, time_dimension())
+        tolerances.values[i + 2] = quantity(0.0, temperature_dimension())
+        tolerances.values[i + 3] = quantity(0.0, dimensionless())
+        i = i + 4
+    }
+    result = evaluate_math_equation_system(system, tolerances)
+    if not result.valid or not result.satisfied or result.count != 16 or
+       not same_dimension(result.results[13].residual.dimension, time_dimension()) or
+       not near(result.results[15].residual.value, 0.0) { return 25 }
+
+    # Numerical disagreement in equation sixteen is not invalid execution.
+    system = parse_math_equation_system(
+        "1m=1m;1s=1s;1K=1K;1=1;2m=2m;2s=2s;2K=2K;2=2;3m=3m;3s=3s;3K=3K;3=3;4m=4m;4s=4s;4K=4K;4=5")
+    result = evaluate_math_equation_system(system, tolerances)
+    if not result.valid or result.satisfied or result.results[15].satisfied or
+       not near(result.results[15].residual.value, -1.0) { return 26 }
+    tolerances.values[15] = quantity(1.0, dimensionless())
+    result = evaluate_math_equation_system(system, tolerances)
+    if not result.valid or not result.satisfied { return 27 }
+    tolerances.values[15] = quantity(0.0, dimensionless())
+
+    # A late dimensional error reports the original full-source byte offset.
+    system = parse_math_equation_system(
+        "1m=1m;1s=1s;1K=1K;1=1;2m=2m;2s=2s;2K=2K;2=2;3m=3m;3s=3s;3K=3K;3=3;4m=4m;4s=4s;4K=4K;4m=4s")
+    result = evaluate_math_equation_system(system, tolerances)
+    if result.valid or result.failed_equation != 15 or result.failed_at != 86 { return 28 }
+
+    # Seventeen equations exceed the bounded native storage and fail closed.
+    system = parse_math_equation_system(sixteen_source + ";1=1")
+    if system.valid or system.failed_equation != 16 or system.failed_at != 88 { return 29 }
+    system = parse_math_equation_system(sixteen_source)
+    tolerances.count = 15
+    result = evaluate_math_equation_system(system, tolerances)
+    if result.valid or result.failed_equation != -1 { return 30 }
 
     println("native-math-equation-system-ok")
     return 0

@@ -546,6 +546,21 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
                 }
                 symbol_index = symbol_index + 1
             }
+            # Explicit caller bindings take precedence over the four
+            # dimensionless mathematical constants. This preserves existing
+            # Greek symbolic variables (including physical τ and π) while
+            # making unbound pi/π and tau/τ useful in numeric expressions.
+            if not found {
+                if identifier_matches(bytes, start, index, "pi") or
+                   identifier_matches(bytes, start, index, "π") {
+                    value = quantity(3.14159265358979323846, dimensionless())
+                    found = true
+                } elif identifier_matches(bytes, start, index, "tau") or
+                     identifier_matches(bytes, start, index, "τ") {
+                    value = quantity(6.28318530717958647692, dimensionless())
+                    found = true
+                }
+            }
             if not found { return source_error(start, length) }
             if count >= 64 { return source_error(start, length) }
             instructions[count] = make_instruction(0, value, start, index)

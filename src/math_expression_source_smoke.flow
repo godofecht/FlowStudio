@@ -375,7 +375,7 @@ function main() -> i32 {
     result = evaluate_math_expression_with_bindings("distance^9", bindings)
     if result.valid or result.failed_at != 8 { return 117 }
     result = evaluate_math_expression_with_bindings("distance+π", bindings)
-    if result.valid or result.failed_at != 9 { return 118 }
+    if result.valid or result.failed_at != 8 { return 118 }
     result = evaluate_math_expression_with_bindings("distance+1e999", bindings)
     if result.valid or result.failed_at != 9 { return 119 }
     result = evaluate_math_expression_with_bindings("distance*1e30", bindings)
@@ -1154,6 +1154,52 @@ function main() -> i32 {
     if not result.valid or not near(result.result.value, -0.2741556778080377) { return 430 }
     result = evaluate_math_expression("acos(1)^2")
     if not result.valid or not near(result.result.value, 0.0) { return 431 }
+
+    # Native named constants use the same dimensional IR and UTF-8 spans.
+    result = evaluate_math_expression("pi")
+    if not result.valid or not near(result.result.value, 3.141592653589793) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 432 }
+    result = evaluate_math_expression("π")
+    if not result.valid or not near(result.result.value, 3.141592653589793) { return 433 }
+    result = evaluate_math_expression("tau")
+    if not result.valid or not near(result.result.value, 6.283185307179586) { return 434 }
+    result = evaluate_math_expression("τ")
+    if not result.valid or not near(result.result.value, 6.283185307179586) { return 435 }
+    result = evaluate_math_expression("sin(π/2)")
+    if not result.valid or not near(result.result.value, 1.0) { return 436 }
+    result = evaluate_math_expression("cos(tau/2)")
+    if not result.valid or not near(result.result.value, -1.0) { return 437 }
+    result = evaluate_math_expression("-π²")
+    if not result.valid or not near(result.result.value, -9.869604401089358) { return 438 }
+    result = evaluate_math_expression("π+1m")
+    if result.valid or result.failed_at != 2 { return 439 }
+    result = evaluate_math_expression("tau+1s")
+    if result.valid or result.failed_at != 3 { return 440 }
+    result = evaluate_math_expression("2π")
+    if result.valid or result.failed_at != 1 { return 441 }
+    result = evaluate_math_expression("π(2)")
+    if result.valid or result.failed_at != 2 { return 442 }
+    let pi_source: ParsedMathExpression = parse_math_expression("π+tau")
+    if not pi_source.valid or pi_source.program.count != 3 or
+       pi_source.program.instructions[0].source_start != 0 or
+       pi_source.program.instructions[0].source_end != 2 or
+       pi_source.program.instructions[1].source_start != 3 or
+       pi_source.program.instructions[1].source_end != 6 or
+       pi_source.program.instructions[2].source_start != 2 { return 443 }
+    let mut constant_binding: MathBindings = empty_math_bindings()
+    constant_binding.count = 1
+    constant_binding.symbols[0] = MathSymbol { name: "pi", value: quantity(4.0, dimensionless()) }
+    result = evaluate_math_expression_with_bindings("pi", constant_binding)
+    if not result.valid or not near(result.result.value, 4.0) { return 444 }
+    constant_binding.symbols[0] = MathSymbol { name: "π", value: quantity(4.0, dimensionless()) }
+    result = evaluate_math_expression_with_bindings("π", constant_binding)
+    if not result.valid or not near(result.result.value, 4.0) { return 445 }
+    constant_binding.symbols[0] = MathSymbol { name: "tau", value: quantity(4.0, dimensionless()) }
+    result = evaluate_math_expression_with_bindings("tau", constant_binding)
+    if not result.valid or not near(result.result.value, 4.0) { return 446 }
+    constant_binding.symbols[0] = MathSymbol { name: "τ", value: quantity(4.0, dimensionless()) }
+    result = evaluate_math_expression_with_bindings("τ", constant_binding)
+    if not result.valid or not near(result.result.value, 4.0) { return 447 }
 
     println("native-math-source-ok")
     return 0

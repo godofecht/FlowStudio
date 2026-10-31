@@ -269,6 +269,21 @@ function main() -> i32 {
     inferred = infer_math_expression_source("ln(exp(2))")
     if not inferred.valid or not same_dimension(inferred.dimension, dimensionless()) { return 83 }
 
+    # Named constants are dimensionless without executing trigonometry.
+    inferred = infer_math_expression_source("π/tau")
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension, dimensionless()) { return 84 }
+    inferred = infer_math_expression_source("sin(pi/2)")
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension, dimensionless()) { return 85 }
+    inferred = infer_math_expression_source("π+1m")
+    if inferred.valid or inferred.failed_at != 2 { return 86 }
+    inferred = infer_math_equation_source("2π = tau")
+    if inferred.valid { return 87 }
+    inferred = infer_math_equation_source("2*π = tau")
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension, dimensionless()) { return 88 }
+
     println("native-math-static-ok")
     return 0
 }

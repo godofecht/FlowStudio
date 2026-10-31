@@ -232,6 +232,23 @@ function main() -> i32 {
     if not derived.valid or derived.program.count != 1 or
        derived.program.instructions[0].source_end != 3 { return 79 }
 
+    # Production HTTP and Chromium compile real scaled SI quantities.
+    result = evaluate_math_expression("1km+250m")
+    if not result.valid or not close(result.result.value, 1250.0) or
+       not same_dimension(result.result.dimension, length_dimension()) { return 80 }
+    result = evaluate_math_expression("5mm/1ms")
+    if not result.valid or not close(result.result.value, 5.0) { return 81 }
+    result = evaluate_math_expression("2kPa*3m*1m")
+    if not result.valid or not close(result.result.value, 6000.0) or
+       not same_dimension(result.result.dimension, force) { return 82 }
+    result = evaluate_math_expression("2kHz*500µs")
+    if not result.valid or not close(result.result.value, 1.0) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 83 }
+    let micro: ParsedMathExpression = parse_math_expression("1μm")
+    if not micro.valid or micro.program.instructions[0].source_end != 4 { return 84 }
+    result = evaluate_math_expression("1kPa+1kN")
+    if result.valid or result.failed_at != 4 { return 85 }
+
     println("native-math-source-ok")
     return 0
 }

@@ -528,6 +528,7 @@ try {
         !line.startsWith('import .math_expression_source {') &&
         !line.startsWith('import .math_equation {') &&
         !line.startsWith('import .math_static {'))
+      .filter(line => line.trim() && !line.trimStart().startsWith('#'))
       .map(line => line.replace(/^export /, '')).join('\n')
   ).join('\n');
   await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
@@ -555,6 +556,7 @@ try {
         !line.startsWith('import .math_expression_source {') &&
         !line.startsWith('import .math_equation {') &&
         !line.startsWith('import .math_static {'))
+      .filter(line => line.trim() && !line.trimStart().startsWith('#'))
       .map(line => line.replace(/^export /, '')).join('\n')
   ).join('\n');
   await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
@@ -582,6 +584,7 @@ try {
   const nativeVariableSource = nativeVariableFiles.map(path =>
     readFileSync(path, 'utf8').split(/\r?\n/)
       .filter(line => !/^import \.math_(dimensions|expression_ir|expression_source|equation|static|dimension_triple|dimension_variable) \{/.test(line))
+      .filter(line => line.trim() && !line.trimStart().startsWith('#'))
       .map(line => line.replace(/^export /, '')).join('\n')
   ).join('\n');
   assert.ok(Buffer.byteLength(nativeVariableSource, 'utf8') < 128 * 1024);
@@ -609,6 +612,7 @@ try {
   const nativeFourSource = nativeFourFiles.map(path =>
     readFileSync(path, 'utf8').split(/\r?\n/)
       .filter(line => !/^import \.math_(dimensions|expression_ir|expression_source|equation|static|dimension_four) \{/.test(line))
+      .filter(line => line.trim() && !line.trimStart().startsWith('#'))
       .map(line => line.replace(/^export /, '')).join('\n')
   ).join('\n');
   assert.ok(Buffer.byteLength(nativeFourSource, 'utf8') < 128 * 1024);
@@ -641,6 +645,7 @@ try {
       .filter(line => !/^import \.math_(dimensions|expression_ir|expression_source|equation|static|dimension_four|dimension_variable_four) \{/.test(line))
       // Keep the complete executable program within the HTTP 128 KiB budget.
       // Only comments and empty lines are removed from checked-in source.
+      .filter(line => line.trim() && !line.trimStart().startsWith('#'))
       .filter(line => line.trim() && !line.trimStart().startsWith('#'))
       .map(line => line.replace(/^export /, '')).join('\n')
   ).join('\n');

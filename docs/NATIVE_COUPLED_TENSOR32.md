@@ -1,0 +1,63 @@
+# Cross-coupled native 32×32 tensor PDE acceptance
+
+`examples/native_coupled_tensor32.flow` is a real Flow 2.0 program, not
+a Python interpretation or a precomputed browser visualization. It integrates
+two 1,024-cell periodic fields simultaneously with explicit midpoint RK2:
+
+```text
+∂t U = 0.012 ∂xx U + 0.008 ∂xy U + 0.018 ∂yy U + 0.35 (V-U)
+∂t V = 0.008 ∂xx V - 0.004 ∂xy V + 0.010 ∂yy V + 0.35 (U-V)
+```
+
+Both species have different positive-definite diffusion tensors. The mixed
+derivative uses four periodic corner neighbors and the same simultaneous
+midpoint state supplies the interspecies exchange. The initial fields are
+`U=300+7 cos(π(x+y)/2)+3 cos(π(x-y)/2)` and
+`V=5+0.8 cos(π(x+y)/2)-0.3 cos(π(x-y)/2)`.
+Quarter-turn modes use exact integer phase values to avoid relying on native
+trigonometric lowering. Spatial spacing is 1/32.
+
+The two diagonal modes have distinct discrete decay rates: U has 69.632
+and 53.248; V has 32.768 and 40.96. Each mode's exact time evolution is
+the **matrix exponential** of the 2×2 operator with diagonal entries
+`-decayU-0.35`, `-decayV-0.35` and off-diagonal entries `0.35`.
+At t=0.025, the exact baseline is (297.4412047605983,
+7.55879523940171), plus-mode amplitudes are
+(1.2190283628708836, 0.36705079343263286), and minus-mode amplitudes
+are (0.7848050213369989, -0.09876499673375012).
+
+The Flow program checks all 2,048 evolved cells against those analytical
+references at 32, 64 and 128 steps, second-order refinement, conserved
+total mass 305, real species-to-species mass transfer, semigroup composition,
+deterministic replay, uncoupled counterfactual, zero time, invalid diffusion
+tensor, invalid exchange, invalid time, stability rejection, input nonmutation
+and a 400,000 species-cell-step ceiling. The frame is emitted **only after**
+those assertions pass, using `FLOWSTUDIO_GRID_V1 32 32 2` and the actual
+RK2 states U/V. The workbench renders 2,048 SVG cells with independent
+per-field color scales.
+
+`tests/test_native_coupled_tensor32_oracle.py` independently implements
+the full two-dimensional stencil, midpoint solver, Fourier matrix
+exponential, deterministic seeded translation and conservation tests.
+`tests/http_smoke.py` submits the checked-in Flow source to production
+`/api/check/flow` and `/api/run/flow`, verifies every transmitted
+cell and tests malformed source and a deliberately corrupted numerical
+assertion. `tests/native_math_plot_ui.mjs` clicks the actual Monaco Run
+control in Chromium and checks both heatmaps and 14 analytical samples.
+
+```sh
+python3 -m unittest discover -s tests -p 'test_native_coupled_tensor32_oracle.py' -v
+flow run examples/native_coupled_tensor32.flow
+python3 scripts/verify_native.py --require-r
+```
+
+**Qualification status:** independent local direct-stencil numerical
+cross-check completed: maximum analytical error 0.00142276 (32 steps),
+0.000348733 (64 steps), 0.0000863335 (128 steps); derivative residuals
+below 1.2e-13. Native Flow compilation, live HTTP, Chromium, and Linux/macOS
+CI are not claimed as passed until their actual jobs finish. Local Flow/R
+and independent macOS physical-browser acceptance are unexecuted.
+
+This is genuinely coupled *array-based* 2D native Flow numerical execution,
+not general multidimensional `field` grammar, automatic PDE lowering,
+solver selection, or full RStudio parity.

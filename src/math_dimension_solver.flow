@@ -275,6 +275,25 @@ function analyse(program: MathProgram, source: string, unknown: string,
             }
             depth = depth - 1
             stack[depth - 1] = result
+        } elif opcode >= 52 and opcode <= 55 {
+            # The native IR's norm5..norm8 operands must all share a
+            # dimension. Solve each affine equality before collapsing the
+            # argument stack, just as the runtime and static checker do.
+            let arity: i32 = opcode - 47
+            if depth < arity { return error_analysis(position, state) }
+            let first: AffineDimension = stack[depth - arity]
+            if first.predicate { return error_analysis(position, state) }
+            let mut component: i32 = 1
+            while component < arity {
+                let current: AffineDimension = stack[depth - arity + component]
+                if current.predicate { return error_analysis(position, state) }
+                state = constrain(state, first, current, position)
+                if not state.valid { return error_analysis(position, state) }
+                component = component + 1
+            }
+            if not bounded_affine(first) { return error_analysis(position, state) }
+            depth = depth - arity + 1
+            stack[depth - 1] = first
         } elif opcode == 51 {
             if depth < 4 { return error_analysis(position, state) }
             let a: AffineDimension = stack[depth - 4]

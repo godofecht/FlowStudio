@@ -57,6 +57,7 @@ x + 2</textarea><div id="findPanel" role="search" aria-label="Source find and re
 <script src="./completion.js"></script>
 <script src="./editor_find.js"></script>
 <script src="./find_panel.js"></script>
+<script src="./notebook_plot_capture.js"></script>
 <script src="./notebook_runner.js"></script>
 <script src="./notebook_recovery.js"></script>
 <script src="./notebook_format.js"></script>
@@ -522,8 +523,32 @@ async function runNotebook(fromCaret = false, throughCaret = false) {
   $("workspace").replaceChildren(notebookOutput);
   notebookRunner = FlowStudioNotebook.create({
     parseCells: FlowStudioSourceCells.parseCells,
-    execute: (code, selectedLanguage) => selectedLanguage === "flow" ?
-      globalThis.FlowStudioNativeFlow.run(code) : selectedLanguage === "r" ? getRSession().run(code) : request("run", code),
+    execute: async (code, selectedLanguage) => {
+      if (selectedLanguage === "flow") return globalThis.FlowStudioNativeFlow.run(code);
+      if (selectedLanguage === "python") return request("run", code);
+      const session = getRSession();
+      const response = await session.run(code);
+      if (response?.ok !== true) return response;
+      try {
+        if (nativeRSelected()) {
+          // Rscript's actual per-execution plot device yields SVG (PDF fallback
+          // cannot be rasterized here). Capture an inert PNG for notebook
+          // rendering, .ipynb/.fsnb export and browser recovery.
+          const snapshot = await session.plot();
+          if (snapshot?.ok && snapshot.svg) {
+            const png = await FlowStudioNotebookPlotCapture.svgToPng(snapshot.svg);
+            if (png) response.plots = [png];
+          }
+        } else if (Array.isArray(response.images)) {
+          // webR returns ImageBitmaps; keep the originals for the live cell
+          // renderer while saving bounded PNG copies for portable notebooks.
+          response.plots = FlowStudioNotebookPlotCapture.bitmapsToPng(response.images, document);
+        }
+      } catch (error) {
+        notice("Notebook R plot snapshot unavailable: " + String(error.message || error));
+      }
+      return response;
+    },
     allowNativeFlow: globalThis.FlowStudioNativeFlow?.available?.() === true,
     onCell: renderNotebookCell, notice
   });

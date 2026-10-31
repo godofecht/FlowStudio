@@ -551,7 +551,7 @@ function main() -> i32 {
            replayV[i] != initialV[i] or
            replayW[i] != initialW[i] { return 16 }
     }
-    if not integrate(initialU, initialV, initialW, replayU, replayV, replayW, RATIO, 0, 128) { return 17 }
+    if not integrate(initialU, initialV, initialW, replayU, replayV, replayW, RATIO, 0.0, 128) { return 17 }
     if absolute(replayU[15] - afterU128[15]) < 0.0001 { return 18 }
     let sentinelU: array<f64, 32> = [0.0]
     let sentinelV: array<f64, 32> = [0.0]

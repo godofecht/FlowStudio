@@ -55,7 +55,7 @@ function blank_affine() -> DualAffine {
     }
 }
 
-function failed(index: i32, position: i32) -> MathTwoDimensionSolution {
+function pair_failed(index: i32, position: i32) -> MathTwoDimensionSolution {
     return MathTwoDimensionSolution {
         valid: false, first: dimensionless(), second: dimensionless(),
         failed_equation: index, failed_at: position
@@ -103,7 +103,7 @@ function added(a: Dimension, b: Dimension) -> Dimension {
     }
 }
 
-function bounded_dimension(d: Dimension, limit: i32) -> bool {
+function pair_bounded_dimension(d: Dimension, limit: i32) -> bool {
     return absolute(d.length) <= limit and absolute(d.mass) <= limit and
         absolute(d.time) <= limit and absolute(d.temperature) <= limit
 }
@@ -131,7 +131,7 @@ function normalise(a: DualAffine) -> DualAffine {
 function bounded_affine(a: DualAffine) -> bool {
     return a.denominator >= 1 and a.denominator <= 64 and
         absolute(a.first) <= 64 and absolute(a.second) <= 64 and
-        bounded_dimension(a.offset, 64)
+        pair_bounded_dimension(a.offset, 64)
 }
 
 function composed(a: DualAffine, b: DualAffine, divide: bool) -> DualAffine {
@@ -268,7 +268,7 @@ export function solve_math_equations_two_unknown_dimensions(
     if known.count < 0 or known.count > 6 or
        strlen(first_unknown) < 1 or strlen(first_unknown) > 32 or
        strlen(second_unknown) < 1 or strlen(second_unknown) > 32 {
-        return failed(0, 0)
+        return pair_failed(0, 0)
     }
     let mut bindings: MathBindings = empty_math_bindings()
     let mut index: i32 = 0
@@ -289,14 +289,14 @@ export function solve_math_equations_two_unknown_dimensions(
 
     let first: DimensionRow = equation_row(
         first_equation, bindings, first_unknown, second_unknown)
-    if not first.valid { return failed(0, first.failed_at) }
+    if not first.valid { return pair_failed(0, first.failed_at) }
     let second: DimensionRow = equation_row(
         second_equation, bindings, first_unknown, second_unknown)
-    if not second.valid { return failed(1, second.failed_at) }
+    if not second.valid { return pair_failed(1, second.failed_at) }
 
     let determinant: i32 =
         first.first * second.second - second.first * first.second
-    if determinant == 0 { return failed(1, 0) }
+    if determinant == 0 { return pair_failed(1, 0) }
     let length: AxisSolution = solve_axis(
         first, second, first.target.length, second.target.length, determinant)
     let mass: AxisSolution = solve_axis(
@@ -308,7 +308,7 @@ export function solve_math_equations_two_unknown_dimensions(
         determinant)
     if not length.valid or not mass.valid or not time.valid or
        not temperature.valid {
-        return failed(1, 0)
+        return pair_failed(1, 0)
     }
     let first_dimension: Dimension = Dimension {
         length: length.first, mass: mass.first,
@@ -332,12 +332,12 @@ export function solve_math_equations_two_unknown_dimensions(
     let first_verified: MathInferredType =
         infer_math_equation_source_with_dimensions(first_equation, declarations)
     if not first_verified.valid or first_verified.is_predicate {
-        return failed(0, first_verified.failed_at)
+        return pair_failed(0, first_verified.failed_at)
     }
     let second_verified: MathInferredType =
         infer_math_equation_source_with_dimensions(second_equation, declarations)
     if not second_verified.valid or second_verified.is_predicate {
-        return failed(1, second_verified.failed_at)
+        return pair_failed(1, second_verified.failed_at)
     }
     return MathTwoDimensionSolution {
         valid: true, first: first_dimension, second: second_dimension,

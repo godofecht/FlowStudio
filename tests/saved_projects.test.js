@@ -75,3 +75,79 @@ test("corrupt storage is discarded instead of breaking load", () => {
   assert.equal(store.list().length, 0);
   assert.equal(storage.getItem(storeModule.KEY), null, "corrupt entry removed");
 });
+
+test("UTF-8 byte ceilings, exact boundaries and malformed Unicode fail closed", () => {
+  const source = text => project("unicode", [{ name: "λ.flow", language: "flow", text }]);
+  assert.equal(storeModule.validProject(source("é".repeat(32768))), true,
+    "exactly 65,536 UTF-8 bytes is allowed");
+  assert.equal(storeModule.validProject(source("é".repeat(32769))), false,
+    "UTF-16 code-unit count must not bypass the byte ceiling");
+  assert.equal(storeModule.validProject(source("🧪".repeat(16385))), false,
+    "four-byte Unicode must obey the same bound");
+  assert.equal(storeModule.validProject(source("a\\ud800b")), false,
+    "unpaired surrogates must not be silently replaced");
+  for (const name of ["..", ".", "bad\\n.py", "bad\\u0000.py", "bad\\udc00.py"]) {
+    assert.equal(storeModule.validProject(project("bad-name", [
+      { name, language: "python", text: "pass" }
+    ])), false, name);
+  }
+  assert.equal(storeModule.validProject(project("duplicates", [
+    { name: "same.py", language: "python", text: "a" },
+    { name: "same.py", language: "python", text: "b" }
+  ])), false, "duplicate source paths cannot overwrite each other on restore");
+});
+
+test("saved project snapshots cannot be mutated through inputs or returned files", () => {
+  const storage = memoryStorage();
+  const store = storeModule.createStore(storage);
+  const original = project("immutable", [
+    { name: "simulation.flow", language: "flow", text: "print(42)" },
+    { name: "analysis.R", language: "r", text: "mean(c(1,2,3))" },
+    { name: "plot.py", language: "python", text: "print('π')" }
+  ]);
+  const returned = store.upsert(original);
+  original.files[0].text = "corrupted input";
+  returned.files[1].text = "corrupted return";
+  const listed = store.list();
+  listed[0].files[2].text = "corrupted list";
+  const found = store.find("immutable");
+  found.files[0].name = "../bad.flow";
+  found.files.pop();
+  assert.deepEqual(store.find("immutable").files.map(f => f.text),
+    ["print(42)", "mean(c(1,2,3))", "print('π')"]);
+  assert.equal(storeModule.createStore(storage).find("immutable").files.length, 3);
+});
+
+test("large deterministic polyglot projects round-trip without Unicode truncation", () => {
+  const storage = memoryStorage();
+  const store = storeModule.createStore(storage);
+  const files = Array.from({ length: 12 }, (_, index) => ({
+    name: "module" + index + (index % 3 === 0 ? ".flow" : index % 3 === 1 ? ".R" : ".py"),
+    language: index % 3 === 0 ? "flow" : index % 3 === 1 ? "r" : "python",
+    text: ("λ" + index + " 🧪\\n").repeat(4000)
+  }));
+  const saved = project("large-reproducible", files);
+  assert.equal(storeModule.validProject(saved), true);
+  assert.ok(store.upsert(saved));
+  const restored = storeModule.createStore(storage).find(saved.id);
+  assert.deepEqual(restored.files, files);
+  assert.ok(new TextEncoder().encode(JSON.stringify(restored)).byteLength < storeModule.MAX_TOTAL_BYTES);
+  const invalid = project("invalid", [{ name: "bad.py", language: "python",
+    text: "🧪".repeat(16385) }]);
+  assert.equal(store.upsert(invalid), null);
+  assert.equal(storeModule.createStore(storage).find("invalid"), null);
+  assert.deepEqual(storeModule.createStore(storage).find(saved.id).files, files);
+});
+
+test("corrupt or duplicate saved file entries are excluded on reload", () => {
+  const storage = memoryStorage();
+  const good = project("good");
+  const bad = project("bad", [
+    { name: "same.py", language: "python", text: "1" },
+    { name: "same.py", language: "python", text: "2" }
+  ]);
+  storage.setItem(storeModule.KEY, JSON.stringify([bad, good]));
+  const store = storeModule.createStore(storage);
+  assert.deepEqual(store.list().map(p => p.id), ["good"]);
+  assert.equal(store.find("bad"), null);
+});

@@ -38,9 +38,11 @@ function fixture(onImportedOverride = null) {
     quartoOpenButton:control(), quartoFileInput:control()
   };
   const source = {value:"original source"}, language = {value:"r"};
+  const documentIdentity = {value:"document-A"};
   const imports = [], notices = [];
   create({...controls, source, language, format, parseCells, rMarkdown, quarto,
     isBusy:() => false, canReplace:() => true,
+    getDocumentIdentity:() => documentIdentity.value,
     onImported:async (imported, name) => {
       if (onImportedOverride) await onImportedOverride(imported, name);
       imports.push({imported, name});
@@ -49,7 +51,7 @@ function fixture(onImportedOverride = null) {
     },
     onExport:() => {}, getResults:() => [], getFilename:() => "analysis.r",
     notice:message => notices.push(message)});
-  return {...controls, source, language, imports, notices};
+  return {...controls, source, language, documentIdentity, imports, notices};
 }
 function inputFor(f, type) {
   return {ipynb:f.fileInput, fsnb:f.bundleFileInput,
@@ -70,6 +72,22 @@ for (const type of Object.keys(documents)) {
     assert.deepEqual(f.imports.map(entry => entry.name), ["new.ipynb"]);
     assert.match(f.source.value, /print\(17\)/);
     assert.equal(f.language.value, "python");
+  });
+  test(type + " pending read cannot overwrite a switched document with identical source", async () => {
+    const f = fixture(), pending = deferred();
+    const first = inputFor(f, type).change([{
+      name:"old." + type, size:new TextEncoder().encode(documents[type]).length,
+      text:() => pending.promise
+    }]);
+    f.documentIdentity.value = "document-B";
+    pending.resolve(documents[type]);
+    await first;
+    assert.equal(f.imports.length, 0);
+    assert.equal(f.source.value, "original source");
+    assert.equal(f.language.value, "r");
+    assert.match(f.notices.join(" "), /active document changed during file read/);
+    await inputFor(f, type).change([file(documents[type], "fresh." + type)]);
+    assert.deepEqual(f.imports.map(entry => entry.name), ["fresh." + type]);
   });
   test(type + " pending read cannot overwrite intervening editor edits", async () => {
     const f = fixture(), pending = deferred();

@@ -218,7 +218,7 @@ def main() -> None:
         actual = [float(value) for value in tokens[1:]]
         assert all(math.isfinite(value) and -1e-12 <= value <= 10 for value in actual)
         reference = re.search(
-            rf"let expected{species}128: array<f64, 32> = \\[(.*?)\\]",
+            rf"let expected{species}128: array<f64, 32> = \[(.*?)\]",
             cyclic_source, re.S)
         assert reference is not None, species
         expected = [float(value.strip()) for value in reference.group(1).split(",")
@@ -232,8 +232,8 @@ def main() -> None:
     assert status == 422 and body.strip(), (
         "native third-field malformed syntax rejection", status, body[:500])
     corrupted_cyclic = cyclic_source.replace(
-        "let expectedU128: array<f64, 32> = [\\n        0.0",
-        "let expectedU128: array<f64, 32> = [\\n        1.0", 1)
+        "let expectedU128: array<f64, 32> = [\n        0.0",
+        "let expectedU128: array<f64, 32> = [\n        1.0", 1)
     assert corrupted_cyclic != cyclic_source
     status, body = request("POST", "/api/run/flow", corrupted_cyclic, accepted_headers)
     assert status == 422, ("native corrupted numerical oracle rejection", status, body[:500])

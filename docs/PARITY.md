@@ -1,4 +1,4 @@
-## 2026-10-31: genuinely exchange-coupled native 32×32 tensor PDEs (CI pending)
+## 2026-10-31: genuinely exchange-coupled native 32×32 tensor PDEs (six CI jobs passed)
 
 `examples/native_coupled_tensor32.flow` evolves two simultaneous 1,024-cell
 periodic anisotropic fields with distinct mixed-derivative tensors and
@@ -10,12 +10,16 @@ Independent standard-library Python tests, real Flow HTTP check/run assertions,
 negative execution tests and actual Chromium Monaco Run/heatmap acceptance
 are checked in. See [coupled tensor acceptance](NATIVE_COUPLED_TENSOR32.md).
 
-**Status:** independent local Python direct-stencil calculation completed
-with maximum 128-step analytical error 8.63e-5. Linux/macOS CI, native
-compiler, production HTTP and Chromium acceptance for this revision are
-pending; local Flow/R and independent macOS browser acceptance unexecuted.
-This is array-based coupling, **not** general compiler-backed multidimensional
-`field` lowering or RStudio parity.
+**Verified:** independent local Python direct-stencil calculation completed
+with maximum 128-step analytical error 8.63e-5.
+[Exact-head PR CI #41152594762](https://github.com/godofecht/FlowStudio/actions/runs/41152594762)
+passed all six Linux/macOS jobs, including production native Flow compilation,
+all 2,048 HTTP numerical values, negative execution cases, Ubuntu physical
+Chromium Monaco Run/heatmaps, and R/C FlowJIT. Each source platform passed
+1,156 JavaScript tests (12 skipped) and 392 Python tests (13 skipped).
+**Unexecuted:** local Flow/R, independent macOS physical browser and
+post-merge main CI. This is array-based coupling, **not** general
+compiler-backed multidimensional `field` lowering or RStudio parity.
 
 ## 2026-10-30: two independently computed 32×32 native PDE species (qualification pending)
 

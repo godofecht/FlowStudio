@@ -217,6 +217,48 @@ function main() -> i32 {
     system = parse_math_equation_system("1m+\n2m=3m")
     if system.valid or system.failed_equation != 0 { return 41 }
 
+
+    # Top-level comments are discarded before native scalar compilation, not
+    # merely colored by the editor. Semicolons and parentheses inside them
+    # must not change equation boundaries or UTF-8 diagnostic positions.
+    system = parse_math_equation_system(
+        "# header; )\r\n1m=1m # trailing; )\r\n# blank; )\r\n2s=2s")
+    if not system.valid or system.count != 2 or system.source_length != 51 or
+       system.equations[0].equality_at != 15 or
+       system.equations[0].left.instructions[0].source_start != 13 or
+       system.equations[1].equality_at != 48 or
+       system.equations[1].right.instructions[0].source_start != 49 { return 42 }
+    tolerances.count = 2
+    tolerances.values[0] = quantity(0.0, length_dimension())
+    tolerances.values[1] = quantity(0.0, time_dimension())
+    result = evaluate_math_equation_system(system, tolerances)
+    if not result.valid or not result.satisfied or result.count != 2 { return 43 }
+
+    system = parse_math_equation_system("# comment only\n")
+    if system.valid or system.failed_equation != 0 { return 44 }
+    system = parse_math_equation_system("1m=1m; # comment")
+    if system.valid or system.failed_equation != 1 { return 45 }
+    system = parse_math_equation_system("1m=1m # tail; )")
+    if not system.valid or system.count != 1 { return 46 }
+    system = parse_math_equation_system("1m=(1m+#no)")
+    if system.valid { return 47 }
+
+    # Runtime failures after comments retain the original equality byte.
+    system = parse_math_equation_system("1m=1m # note\n2s=2m")
+    if not system.valid or system.count != 2 { return 48 }
+    result = evaluate_math_equation_system(system, tolerances)
+    if result.valid or result.failed_equation != 1 or result.failed_at != 15 { return 49 }
+
+    # Comments with multibyte UTF-8 leave later source positions untouched.
+    system = parse_math_equation_system_with_bindings(
+        "α+2m=5m # α note\n2s=2s", bindings)
+    if not system.valid or system.count != 2 or system.source_length != 24 or
+       system.equations[0].equality_at != 5 or
+       system.equations[1].equality_at != 21 or
+       system.equations[1].right.instructions[0].source_start != 22 { return 50 }
+    result = evaluate_math_equation_system(system, tolerances)
+    if not result.valid or not result.satisfied { return 51 }
+
     println("native-math-equation-system-ok")
     return 0
 }

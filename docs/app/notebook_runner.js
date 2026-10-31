@@ -2,6 +2,9 @@
 (function (global) {
 "use strict";
 const MAX_EXECUTABLE_CELLS = 128;
+const MAX_SOURCE_BYTES = 2 * 1024 * 1024;
+const MAX_SELECTED_CELLS = 512;
+const MAX_MARKDOWN_BYTES = 16384;
 const MAX_CELL_BYTES = 65536;
 const MAX_OUTPUT_TOTAL = 1048576;
 const MAX_OUTPUT_CELL = 131072;
@@ -37,6 +40,13 @@ function create({parseCells, execute, onCell, notice, allowNativeFlow = false}) 
     if (active) return {ok:false, executed:0, error:"Notebook execution is already running."};
     if (!["python", "r", "flow"].includes(language))
       return {ok:false, executed:0, error:"Unsupported default notebook language."};
+    if (typeof source !== "string" || source.length > MAX_SOURCE_BYTES)
+      return {ok:false, executed:0, error:"Notebook source exceeds the 2 MiB execution limit."};
+    const encoder = new TextEncoder();
+    if (encoder.encode(source).length > MAX_SOURCE_BYTES)
+      return {ok:false, executed:0, error:"Notebook source exceeds the 2 MiB UTF-8 execution limit."};
+    try { encodeURIComponent(source); }
+    catch (_) { return {ok:false, executed:0, error:"Notebook source contains invalid Unicode."}; }
     let cells;
     try { cells = parseCells(source); }
     catch (error) { return {ok:false, executed:0, error:String(error.message || error)}; }
@@ -48,6 +58,8 @@ function create({parseCells, execute, onCell, notice, allowNativeFlow = false}) 
     if (!Number.isSafeInteger(endIndex) || endIndex < startIndex || endIndex >= cells.length)
       return {ok:false, executed:0, error:"Notebook end cell is outside the selected source range."};
     const selectedCells = cells.slice(startIndex, endIndex + 1);
+    if (selectedCells.length > MAX_SELECTED_CELLS)
+      return {ok:false, executed:0, error:"Notebook exceeds the 512 selected-cell execution limit."};
     const runnable = selectedCells.filter(cell => cell.kind === "code" && typeof cell.code === "string" && cell.code.trim());
     if (!runnable.length) return {ok:false, executed:0, error:"No executable source cells."};
     const languages = runnable.map(cell => cell.language || language);
@@ -57,7 +69,6 @@ function create({parseCells, execute, onCell, notice, allowNativeFlow = false}) 
       return {ok:false, executed:0, error:"Flow notebook execution requires an explicitly enabled native Flow server."};
     if (runnable.length > MAX_EXECUTABLE_CELLS)
       return {ok:false, executed:0, error:"Notebook exceeds the 128 executable-cell limit."};
-    const encoder = new TextEncoder();
     if (runnable.some(cell => encoder.encode(cell.code).length > MAX_CELL_BYTES))
       return {ok:false, executed:0, error:"Notebook cell exceeds the 64 KiB execution limit."};
     const token = ++generation;
@@ -68,7 +79,11 @@ function create({parseCells, execute, onCell, notice, allowNativeFlow = false}) 
       for (const cell of selectedCells) {
         if (token !== generation) return {ok:false, executed, cancelled:true};
         if (cell.kind === "markdown") {
-          onCell({index:cell.index, kind:"markdown", code:String(cell.code).slice(0, 16384)});
+          const bounded = boundUTF8(String(cell.code), MAX_MARKDOWN_BYTES);
+          try { onCell({index:cell.index, kind:"markdown", code:bounded.output}); }
+          catch (error) {
+            return {ok:false, executed, error:"Notebook rendering failed: " + String(error.message || error)};
+          }
           continue;
         }
         if (cell.kind !== "code" || !cell.code.trim()) continue;

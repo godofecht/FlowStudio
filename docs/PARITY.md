@@ -1,3 +1,22 @@
+## 2026-10-31: genuinely exchange-coupled native 32×32 tensor PDEs (CI pending)
+
+`examples/native_coupled_tensor32.flow` evolves two simultaneous 1,024-cell
+periodic anisotropic fields with distinct mixed-derivative tensors and
+conservative interspecies exchange. A 2×2 matrix-exponential Fourier oracle
+checks all 2,048 cells at three RK2 refinements; native assertions cover
+mass transfer, conservation, replay, semigroup, uncoupled counterfactual,
+invalid coefficients and a bounded 400,000 species-cell-step budget.
+Independent standard-library Python tests, real Flow HTTP check/run assertions,
+negative execution tests and actual Chromium Monaco Run/heatmap acceptance
+are checked in. See [coupled tensor acceptance](NATIVE_COUPLED_TENSOR32.md).
+
+**Status:** independent local Python direct-stencil calculation completed
+with maximum 128-step analytical error 8.63e-5. Linux/macOS CI, native
+compiler, production HTTP and Chromium acceptance for this revision are
+pending; local Flow/R and independent macOS browser acceptance unexecuted.
+This is array-based coupling, **not** general compiler-backed multidimensional
+`field` lowering or RStudio parity.
+
 ## 2026-10-30: two independently computed 32×32 native PDE species (qualification pending)
 
 The production Flow tensor solver now computes **two separate 1,024-cell

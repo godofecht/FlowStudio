@@ -2,7 +2,7 @@
 # flow run src/math_dimension_pair_smoke.flow
 import .math_dimensions { Dimension, dimensionless, length_dimension, time_dimension, mass_dimension, product_dimension, quotient_dimension, same_dimension }
 import .math_static { MathDimensionBindings, MathDimensionSymbol, empty_math_dimension_bindings }
-import .math_dimension_pair { MathTwoDimensionSolution, solve_math_equations_two_unknown_dimensions }
+import .math_dimension_pair { MathTwoDimensionSolution, solve_math_equations_two_unknown_dimensions, solve_math_equations_three_constraints_two_unknown_dimensions }
 
 function main() -> i32 {
     let length: Dimension = length_dimension()
@@ -154,6 +154,82 @@ function main() -> i32 {
     result = solve_math_equations_two_unknown_dimensions(
         "x*y = 1m²", "x/y = 1", known, "x", "y")
     if result.valid { return 33 }
+
+
+    # Three-constraint dimensional systems: try all rank-two pivot pairs and
+    # statically validate every equation, including redundant/additive ones.
+    known = empty_math_dimension_bindings()
+    result = solve_math_equations_three_constraints_two_unknown_dimensions(
+        "x*y = 1m²", "x*y = 1m²", "x/y = 1s²", known, "x", "y")
+    if not result.valid or not same_dimension(result.first, length_time) or
+       not same_dimension(result.second, speed) { return 34 }
+
+    result = solve_math_equations_three_constraints_two_unknown_dimensions(
+        "x*y = 1m²", "x/y = 1s²", "x*y = 1m²", known, "x", "y")
+    if not result.valid or not same_dimension(result.first, length_time) or
+       not same_dimension(result.second, speed) { return 35 }
+
+    result = solve_math_equations_three_constraints_two_unknown_dimensions(
+        "x+y = 1m", "x*y = 1m²", "x/y = 1", known, "x", "y")
+    if not result.valid or not same_dimension(result.first, length) or
+       not same_dimension(result.second, length) { return 36 }
+
+    result = solve_math_equations_three_constraints_two_unknown_dimensions(
+        "x*y = 1m²", "x/y = 1", "x+y = 1m", known, "x", "y")
+    if not result.valid or not same_dimension(result.first, length) or
+       not same_dimension(result.second, length) { return 37 }
+
+    result = solve_math_equations_three_constraints_two_unknown_dimensions(
+        "sqrt(x)*y = 1m²", "x/y = 1m", "x = 1m²", known, "x", "y")
+    if not result.valid or not same_dimension(result.first, area) or
+       not same_dimension(result.second, length) { return 38 }
+
+    result = solve_math_equations_three_constraints_two_unknown_dimensions(
+        "x*y = 1m²", "x*y = 1s²", "x/y = 1", known, "x", "y")
+    if result.valid { return 39 }
+
+    result = solve_math_equations_three_constraints_two_unknown_dimensions(
+        "x*y = 1m²", "x/y = 1s²", "x/y = 1m²", known, "x", "y")
+    if result.valid { return 40 }
+
+    result = solve_math_equations_three_constraints_two_unknown_dimensions(
+        "x*y = 1m²", "x/y = 1", "x+y = 1s", known, "x", "y")
+    if result.valid { return 41 }
+
+    result = solve_math_equations_three_constraints_two_unknown_dimensions(
+        "x*y = 1m²", "x*y = 1m²", "x*y = 1m²", known, "x", "y")
+    if result.valid { return 42 }
+
+    result = solve_math_equations_three_constraints_two_unknown_dimensions(
+        "x*y = 1m²", "x/y = 1", "x + = 1m", known, "x", "y")
+    if result.valid { return 43 }
+
+    result = solve_math_equations_three_constraints_two_unknown_dimensions(
+        "x*y = 1m²", "sin(x) = 1", "x/y = 1", known, "x", "y")
+    if result.valid { return 44 }
+
+    result = solve_math_equations_three_constraints_two_unknown_dimensions(
+        "x*y = 1m²", "x/y = 1", "x*y = 1m²", known, "x", "x")
+    if result.valid { return 45 }
+
+    known.count = 2
+    known.symbols[0] = MathDimensionSymbol { name: "duration", dimension: time }
+    known.symbols[1] = MathDimensionSymbol { name: "δ₀", dimension: speed }
+    result = solve_math_equations_three_constraints_two_unknown_dimensions(
+        "x*y = duration*duration", "x/y = 1",
+        "x = duration", known, "x", "y")
+    if not result.valid or not same_dimension(result.first, time) or
+       not same_dimension(result.second, time) { return 46 }
+
+    result = solve_math_equations_three_constraints_two_unknown_dimensions(
+        "x*y = δ₀*δ₀", "x/y = 1", "x = δ₀", known, "x", "y")
+    if not result.valid or not same_dimension(result.first, speed) or
+       not same_dimension(result.second, speed) { return 47 }
+
+    known.count = 7
+    result = solve_math_equations_three_constraints_two_unknown_dimensions(
+        "x*y = 1m²", "x/y = 1", "x = 1m", known, "x", "y")
+    if result.valid { return 48 }
 
     println("native-math-two-unknown-dimension-constraints-ok")
     return 0

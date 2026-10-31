@@ -226,6 +226,29 @@ function expectedState() -> Species {
     return Species { u: u, v: v }
 }
 
+function expectedDirectedState() -> Species {
+    # Independent nonsymmetric 2x2 Fourier matrix exponential at t=0.025.
+    # Forward exchange is 0.8 and reverse exchange is 0.2.
+    # These coefficients are analytic, not computed by the RK2 integrator.
+    let mut u: Grid = blank()
+    let mut v: Grid = blank()
+    let mut y: i32 = 0
+    while y < 32 {
+        let mut x: i32 = 0
+        while x < 32 {
+            let plus: f64 = quarterMode(x + y)
+            let minus: f64 = quarterMode(x - y)
+            u.values[y * 32 + x] = 294.09906897477157 +
+                1.2045742437862 * plus + 0.7763731765973004 * minus
+            v.values[y * 32 + x] = 10.900931025228495 +
+                0.39074462095173346 * plus - 0.08888326676573649 * minus
+            x = x + 1
+        }
+        y = y + 1
+    }
+    return Species { u: u, v: v }
+}
+
 function main() -> i32 {
     let equation: Equation = Equation {
         first: Tensor { xx: 0.012, xy: 0.004, yy: 0.018 },
@@ -326,6 +349,31 @@ function main() -> i32 {
        speciesMean(directedFine.state.v) - 305.0) > 0.00000000005 {
         return 27
     }
+
+    # All 2,048 directed cells, not merely the conserved zero mode,
+    # must converge at second order to an independent Fourier oracle.
+    let directedReference: Species = expectedDirectedState()
+    let directedCoarse: Result = integrate(directed, initial, 0.025, 32)
+    let directedMedium: Result = integrate(directed, initial, 0.025, 64)
+    if not directedCoarse.valid or not directedMedium.valid { return 28 }
+    let directedCoarseError: f64 = maximumDifference(
+        directedCoarse.state, directedReference)
+    let directedMediumError: f64 = maximumDifference(
+        directedMedium.state, directedReference)
+    let directedFineError: f64 = maximumDifference(
+        directedFine.state, directedReference)
+    if not (directedCoarseError > 0.001 and
+            directedMediumError > 0.0002) { return 29 }
+    if directedFineError > 0.00012 { return 30 }
+    if directedMediumError >= 0.30 * directedCoarseError or
+       directedFineError >= 0.30 * directedMediumError { return 31 }
+    let directedFirstHalf: Result = integrate(directed, initial, 0.0125, 64)
+    let directedSecondHalf: Result = integrate(
+        directed, directedFirstHalf.state, 0.0125, 64)
+    if not directedFirstHalf.valid or not directedSecondHalf.valid or
+       maximumDifference(directedSecondHalf.state, directedFine.state) >
+       0.00000000005 { return 32 }
+    if maximumDifference(initial, initialState()) > 0.0 { return 33 }
 
     println("native-coupled-tensor32-ok")
     println("FLOWSTUDIO_GRID_V1 32 32 2")

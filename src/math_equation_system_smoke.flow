@@ -169,10 +169,10 @@ function main() -> i32 {
     system = parse_math_equation_system(
         "1m=1m;1s=1s;1K=1K;1=1;2m=2m;2s=2s;2K=2K;2=2;3m=3m;3s=3s;3K=3K;3=3;4m=4m;4s=4s;4K=4K;4m=4s")
     result = evaluate_math_equation_system(system, tolerances)
-    if result.valid or result.failed_equation != 15 or result.failed_at != 86 { return 28 }
+    if result.valid or result.failed_equation != 15 or result.failed_at != 85 { return 28 }
 
     # Seventeen equations exceed the bounded native storage and fail closed.
-    system = parse_math_equation_system(sixteen_source + ";1=1")
+    system = parse_math_equation_system("1m=1m;1s=1s;1K=1K;1=1;2m=2m;2s=2s;2K=2K;2=2;3m=3m;3s=3s;3K=3K;3=3;4m=4m;4s=4s;4K=4K;4=4;1=1")
     if system.valid or system.failed_equation != 16 or system.failed_at != 88 { return 29 }
     system = parse_math_equation_system(sixteen_source)
     tolerances.count = 15

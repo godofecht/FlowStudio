@@ -178,6 +178,18 @@ function main() -> i32 {
     result = evaluate_math_equation_source("ln(2m/1m) = 0.6931471805599453", logarithm_tolerance)
     if not result.valid or not result.satisfied { return 62 }
 
+    # Constants compile through the same native equation residual path.
+    result = evaluate_math_equation_source("2*π = tau",
+        quantity(0.000000000001, dimensionless()))
+    if not result.valid or not result.satisfied or
+       not near(result.residual.value, 0.0) { return 63 }
+    result = evaluate_math_equation_source("pi*2 = τ",
+        quantity(0.000000000001, dimensionless()))
+    if not result.valid or not result.satisfied { return 64 }
+    result = evaluate_math_equation_source("π = 3m",
+        quantity(0.000000000001, dimensionless()))
+    if result.valid { return 65 }
+
     println("native-math-equation-ok")
     return 0
 }

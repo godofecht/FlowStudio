@@ -231,6 +231,13 @@ function main() -> i32 {
         "x*y = 1m²", "x/y = 1", "x = 1m", known, "x", "y")
     if result.valid { return 48 }
 
+    let fourth_length: Dimension = product_dimension(area, area)
+    let empty: MathDimensionBindings = empty_math_dimension_bindings()
+    result = solve_math_equations_two_unknown_dimensions(
+        "root4(x) = 1m", "y = 1s", empty, "x", "y")
+    if not result.valid or not same_dimension(result.first, fourth_length) or
+       not same_dimension(result.second, time) { return 49 }
+
     println("native-math-two-unknown-dimension-constraints-ok")
     return 0
 }

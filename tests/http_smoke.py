@@ -613,6 +613,53 @@ def main() -> None:
     assert status == 422 and body.strip(), (
         "native mathematical static inference invalid compiler syntax", status, body)
 
+    # Real Flow 2.0 compiler and HTTP runner for rational-affine unknown SI
+    # dimensions, including nested roots and deliberately inconsistent roots.
+    # The HTTP compiler stages a single source, so bundle the exact modules.
+    dimension_solver_files = static_files[:-1] + (
+        "src/math_dimension_solver.flow",
+        "src/math_dimension_solver_smoke.flow",
+    )
+    native_dimension_solver = "\n".join(
+        "\n".join(
+            line.removeprefix("export ")
+            for line in (Path(__file__).resolve().parents[1] / path)
+                .read_text(encoding="utf-8").splitlines()
+            if not line.startswith("import .math_dimensions {")
+            and not line.startswith("import .math_expression_ir {")
+            and not line.startswith("import .math_expression_source {")
+            and not line.startswith("import .math_equation {")
+            and not line.startswith("import .math_static {")
+            and not line.startswith("import .math_dimension_solver {")
+        )
+        for path in dimension_solver_files
+    )
+    assert "function solve_math_equation_unknown_dimension(" in native_dimension_solver
+    assert "sqrt(cbrt(x)) = 1m" in native_dimension_solver
+    assert len(native_dimension_solver.encode("utf-8")) < 128 * 1024
+    status, body = request("POST", "/api/check/flow", native_dimension_solver, accepted_headers)
+    assert status == 200, ("native rational SI constraint compile", status, body)
+    status, body = request("POST", "/api/run/flow", native_dimension_solver, accepted_headers)
+    assert status == 200 and "native-math-unknown-dimension-constraints-ok" in body, (
+        "native rational SI constraint execution", status, body)
+    corrupted_root = native_dimension_solver.replace(
+        '"sqrt(x) = 1m", empty, "x"',
+        '"sqrt(x) = 1s", empty, "x"',
+        1,
+    )
+    assert corrupted_root != native_dimension_solver
+    status, body = request("POST", "/api/run/flow", corrupted_root, accepted_headers)
+    assert status == 422, ("native rational SI corrupted assertion rejection", status, body)
+    malformed_solver = native_dimension_solver.replace(
+        "function normalise_affine(a: AffineDimension) -> AffineDimension {",
+        "function normalise_affine(a: AffineDimension -> AffineDimension {",
+        1,
+    )
+    assert malformed_solver != native_dimension_solver
+    status, body = request("POST", "/api/check/flow", malformed_solver, accepted_headers)
+    assert status == 422 and body.strip(), (
+        "native rational SI malformed compiler rejection", status, body)
+
     # Native hyperbolic source lowering, typed IR, static dimensions and
     # scalar equation residuals through the real Flow compiler and HTTP runner.
     # The temporary HTTP source is built from the checked-in native modules,

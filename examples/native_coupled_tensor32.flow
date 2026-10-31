@@ -203,6 +203,24 @@ function speciesMean(grid: Grid) -> f64 {
     return total / 1024.0
 }
 
+# A directed exchange generator is self-adjoint in the detailed-balance
+# weights (forward, reverse). Spatial fluctuations must dissipate in that
+# weighted norm when both diffusion tensors are positive semidefinite.
+function weightedFluctuationEnergy(state: Species,
+                                   forward: f64, reverse: f64) -> f64 {
+    let meanU: f64 = speciesMean(state.u)
+    let meanV: f64 = speciesMean(state.v)
+    let mut energy: f64 = 0.0
+    let mut index: i32 = 0
+    while index < 1024 {
+        let du: f64 = state.u.values[index] - meanU
+        let dv: f64 = state.v.values[index] - meanV
+        energy = energy + forward * du * du + reverse * dv * dv
+        index = index + 1
+    }
+    return energy
+}
+
 function expectedState() -> Species {
     # Independent 2x2 matrix-exponential Fourier solution at t=0.025,
     # with lambda_U = (69.632, 53.248), lambda_V = (32.768, 40.96),
@@ -374,6 +392,43 @@ function main() -> i32 {
        maximumDifference(directedSecondHalf.state, directedFine.state) >
        0.00000000005 { return 32 }
     if maximumDifference(initial, initialState()) > 0.0 { return 33 }
+
+    # Directed detailed-balance energy decays at both physical time checkpoints.
+    # This catches stable-looking but incorrectly oriented cross-species fluxes.
+    let initialEnergy: f64 = weightedFluctuationEnergy(initial, 0.8, 0.2)
+    let halfEnergy: f64 = weightedFluctuationEnergy(
+        directedFirstHalf.state, 0.8, 0.2)
+    let fullEnergy: f64 = weightedFluctuationEnergy(
+        directedFine.state, 0.8, 0.2)
+    if not (initialEnergy > halfEnergy and halfEnergy > fullEnergy and
+            fullEnergy >= 0.0) { return 34 }
+
+    # Actual native one-way transfer limits (not only Python oracle tests).
+    # With forward-only transfer Ubar(t)=300 exp(-0.8t), Vbar=305-Ubar.
+    let forwardOnly: Equation = Equation {
+        first: equation.first, second: equation.second,
+        forward: 0.8, reverse: 0.0
+    }
+    let forwardResult: Result = integrate(forwardOnly, initial, 0.025, 128)
+    if not forwardResult.valid or
+       absolute(speciesMean(forwardResult.state.u) - 294.05960199202656) >
+       0.000001 or
+       absolute(speciesMean(forwardResult.state.v) - 10.940398007973442) >
+       0.000001 { return 35 }
+    # With reverse-only transfer Vbar(t)=5 exp(-0.2t), Ubar=305-Vbar.
+    let reverseOnly: Equation = Equation {
+        first: equation.first, second: equation.second,
+        forward: 0.0, reverse: 0.2
+    }
+    let reverseResult: Result = integrate(reverseOnly, initial, 0.025, 128)
+    if not reverseResult.valid or
+       absolute(speciesMean(reverseResult.state.u) - 300.0249376040366) >
+       0.000001 or
+       absolute(speciesMean(reverseResult.state.v) - 4.975062395963412) >
+       0.000001 { return 36 }
+    if maximumDifference(forwardResult.state, reverseResult.state) < 5.0 {
+        return 37
+    }
 
     println("native-coupled-tensor32-ok")
     println("FLOWSTUDIO_GRID_V1 32 32 2")

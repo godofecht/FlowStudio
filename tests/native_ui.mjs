@@ -311,7 +311,8 @@ try {
         const source = document.getElementById('source');
         const qmdInput = document.getElementById('quartoFile');
         const ipynbInput = document.getElementById('notebookFile');
-        const qmd = '```{r}\\ncat(31)\\n```\\n'.replaceAll('\\n', '\n');
+        const tick = String.fromCharCode(96).repeat(3);
+        const qmd = tick + '{r}\\ncat(31)\\n' + tick + '\\n';
         const ipynb = JSON.stringify({nbformat:4, nbformat_minor:4,
           metadata:{language_info:{name:'python'}},
           cells:[{cell_type:'code', source:'print(17)', metadata:{}, outputs:[]}]});
@@ -322,32 +323,38 @@ try {
           input.dispatchEvent(new Event('change', {bubbles:true}));
         }
         const originalConfirm = window.confirm;
+        const originalText = File.prototype.text;
+        let releaseStale, releasePending;
         window.confirm = () => true;
+        File.prototype.text = function () {
+          if (this.name === 'stale.qmd')
+            return new Promise(resolve => { releaseStale = () => resolve(qmd); });
+          if (this.name === 'pending.qmd')
+            return new Promise(resolve => { releasePending = () => resolve(qmd); });
+          return originalText.call(this);
+        };
         try {
-          const stale = new File([qmd], 'stale.qmd', {type:'text/markdown'});
-          let releaseStale;
-          Object.defineProperty(stale, 'text', {value:() => new Promise(resolve => {
-            releaseStale = () => resolve(qmd);
-          })});
-          select(qmdInput, stale);
+          select(qmdInput, new File([qmd], 'stale.qmd', {type:'text/markdown'}));
+          if (!releaseStale) throw Error('Browser did not enter delayed Quarto read');
           select(ipynbInput, new File([ipynb], 'new.ipynb', {type:'application/json'}));
-          await new Promise(resolve => setTimeout(resolve, 0));
+          for (let attempt = 0; attempt < 20 && !source.value.includes('print(17)'); attempt++)
+            await new Promise(resolve => setTimeout(resolve, 10));
+          const beforeRelease = source.value;
           releaseStale();
           await new Promise(resolve => setTimeout(resolve, 0));
           const latest = source.value;
-          const pending = new File([qmd], 'pending.qmd', {type:'text/markdown'});
-          let releasePending;
-          Object.defineProperty(pending, 'text', {value:() => new Promise(resolve => {
-            releasePending = () => resolve(qmd);
-          })});
-          select(qmdInput, pending);
+          select(qmdInput, new File([qmd], 'pending.qmd', {type:'text/markdown'}));
+          if (!releasePending) throw Error('Browser did not enter second delayed Quarto read');
           source.value = 'user_edit_must_survive = 42';
           source.dispatchEvent(new Event('input', {bubbles:true}));
           releasePending();
           await new Promise(resolve => setTimeout(resolve, 0));
-          return {latest, edited:source.value,
+          return {beforeRelease, latest, edited:source.value,
             notice:document.getElementById('notice').textContent};
-        } finally { window.confirm = originalConfirm; }
+        } finally {
+          window.confirm = originalConfirm;
+          File.prototype.text = originalText;
+        }
       });
       assert.match(importIsolation.latest, /print\\(17\\)/,
         'late Quarto read must not overwrite newer Jupyter import');

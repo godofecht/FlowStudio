@@ -51,12 +51,17 @@ flow run examples/native_coupled_tensor32.flow
 python3 scripts/verify_native.py --require-r
 ```
 
-**Qualification status:** independent local direct-stencil numerical
-cross-check completed: maximum analytical error 0.00142276 (32 steps),
-0.000348733 (64 steps), 0.0000863335 (128 steps); derivative residuals
-below 1.2e-13. Native Flow compilation, live HTTP, Chromium, and Linux/macOS
-CI are not claimed as passed until their actual jobs finish. Local Flow/R
-and independent macOS physical-browser acceptance are unexecuted.
+**Qualification:** independent local direct-stencil numerical cross-check
+completed: maximum analytical error 0.00142276 (32 steps), 0.000348733
+(64 steps), 0.0000863335 (128 steps); derivative residuals below 1.2e-13.
+[Exact-head PR CI #41152594762](https://github.com/godofecht/FlowStudio/actions/runs/41152594762)
+passed all six Linux/macOS jobs: each source platform passed 1,156
+JavaScript tests (12 skipped) and 392 Python tests (13 skipped); both
+production native Flow/HTTP suites passed, including all 2,048 cell checks,
+malformed source and corrupted numerical assertion rejection; Ubuntu Chromium
+executed the real Monaco Run and verified both SVG fields; both native R/C
+FlowJIT jobs passed. Local Flow/R and independent macOS physical-browser
+acceptance remain unexecuted. Post-merge main CI remains unverified.
 
 This is genuinely coupled *array-based* 2D native Flow numerical execution,
 not general multidimensional `field` grammar, automatic PDE lowering,

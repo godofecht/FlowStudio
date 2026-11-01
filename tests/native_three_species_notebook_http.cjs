@@ -78,5 +78,62 @@ async function run({post, routes, flow, read, parseCells, create, format}) {
     "length(flowstudio_three_final_c) == 1024L); cat('r-three-recovery-ok\\n')");
   assert.equal(rThreeRecovery.status, 200, rThreeRecovery.body.slice(0, 300));
   assert.match(rThreeRecovery.body, /r-three-recovery-ok/);
+
+  // Real notebook controller must resume a persistent R PDE checkpoint across
+  // two separate executable cells and preserve its exact numerical output.
+  const restart = read("coupled_three_species_restart_r.R");
+  assert.ok(Buffer.byteLength(restart, "utf8") < 65536);
+  const restartSource = [
+    "# %% [r]\nassign('flowstudio_three_restart_phase', 0L, envir=.GlobalEnv)\n",
+    "# %% [r]\n" + restart + "\n",
+    "# %% [r]\n" + restart + "\n"
+  ].join("");
+  const runCheckpointNotebook = async () => {
+    const callsBefore = threeCalls.length;
+    const entriesBefore = threeEntries.length;
+    const checkpointRun = await threeRunner.run(restartSource, "python");
+    assert.deepEqual(checkpointRun, {ok:true, executed:3},
+      JSON.stringify(threeEntries.slice(entriesBefore).map(entry =>
+        ({language:entry.language, output:String(entry.output).slice(0, 500)}))));
+    assert.deepEqual(threeCalls.slice(callsBefore), ["r", "r", "r"]);
+    const outputs = threeEntries.slice(entriesBefore);
+    assert.equal(outputs.length, 3);
+    assert.deepEqual(outputs.map(entry => entry.language), ["r", "r", "r"]);
+    for (const [index, phase] of [[1, 1], [2, 2]]) {
+      const frame = outputs[index].output.split(/\r?\n/).filter(line =>
+        line.startsWith("FLOWSTUDIO_THREE_RESTART_V1 "));
+      assert.equal(frame.length, 1);
+      assert.ok(frame[0].startsWith("FLOWSTUDIO_THREE_RESTART_V1 " + phase + " "));
+    }
+    const frame = outputs[2].output.split(/\r?\n/).find(line =>
+      line.startsWith("FLOWSTUDIO_THREE_RESTART_V1 2 "));
+    const values = frame.slice("FLOWSTUDIO_THREE_RESTART_V1 2 ".length)
+      .split(",").map(Number);
+    assert.equal(values.length, 3072);
+    assert.ok(values.every(Number.isFinite));
+    const result = Object.fromEntries(["a", "b", "c"].map((name, i) =>
+      [name, values.slice(i * 1024, (i + 1) * 1024)]));
+    const checked = await checkThree(result);
+    assert.equal(checked.status, 200, checked.body.slice(0, 300));
+    const saved = format.encodeBundle(restartSource, "python", outputs, parseCells);
+    const restored = format.decodeBundle(saved, parseCells);
+    assert.equal(restored.source, restartSource);
+    assert.deepEqual(restored.entries.map(entry => entry.output),
+      outputs.map(entry => entry.output));
+    return outputs[2].output;
+  };
+  const checkpointOutput = await runCheckpointNotebook();
+  const failedBefore = threeCalls.length;
+  assert.deepEqual(await threeRunner.run(
+    "# %% [r]\n" + restart +
+    "\n# %% [r]\nflowstudio_three_notebook_unexpected <- TRUE\n", "python"),
+    {ok:false, executed:1, failedIndex:0, error:"Cell execution failed."});
+  assert.deepEqual(threeCalls.slice(failedBefore), ["r"]);
+  const noMutation = await post(routes.r,
+    "stopifnot(!exists('flowstudio_three_notebook_unexpected', inherits=TRUE)); " +
+    "cat('checkpoint-notebook-stop-ok\\n')");
+  assert.equal(noMutation.status, 200, noMutation.body.slice(0, 300));
+  assert.match(noMutation.body, /checkpoint-notebook-stop-ok/);
+  assert.equal(await runCheckpointNotebook(), checkpointOutput);
 }
 module.exports = {run};

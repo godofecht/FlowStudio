@@ -83,3 +83,97 @@ def verify_three_species_interop(request, headers: dict[str, str]) -> None:
     status, body = verify_python(result)
     assert status == 200 and "three-species-anisotropic-oracle-ok" in body, (
         "three-species Python recovery after 422", status, body[:300])
+    verify_three_species_restart(request, headers, result)
+
+
+
+def verify_three_species_restart(request, headers: dict[str, str],
+                                 uninterrupted: dict[str, list[float]]) -> None:
+    """Two separate persistent-R midpoint chunks, with fail-closed checkpoint recovery."""
+    restart = (ROOT / "examples/coupled_three_species_restart_r.R").read_text(encoding="utf-8")
+    assert len(restart.encode("utf-8")) < 65536
+    status, body = request("POST", "/api/run/r",
+                           "assign('flowstudio_three_restart_phase', 0L, envir=.GlobalEnv)", headers)
+    assert status == 200, ("restart reset", status, body[:300])
+
+    def run_chunk(expected_phase: int) -> dict[str, list[float]]:
+        status, body = request("POST", "/api/run/r", restart, headers)
+        assert status == 200, ("R checkpoint chunk", expected_phase, status, body[:400])
+        frames = [line[len("FLOWSTUDIO_THREE_RESTART_V1 "):]
+                  for line in body.splitlines()
+                  if line.startswith("FLOWSTUDIO_THREE_RESTART_V1 ")]
+        assert len(frames) == 1 and len(body) < 100000, ("bounded restart frame", body[:300])
+        phase, values = frames[0].split(" ", 1)
+        assert phase == str(expected_phase), ("restart phase", phase, expected_phase)
+        cells = [float(v) for v in values.split(",")]
+        assert len(cells) == 3072 and all(math.isfinite(v) for v in cells)
+        result = {name: cells[i * 1024:(i + 1) * 1024]
+                  for i, name in enumerate(("a", "b", "c"))}
+        payload = json.dumps(result, allow_nan=False, separators=(",", ":"))
+        source = (
+            "import json\n"
+            "checkpoint_actual = json.loads(" + repr(payload) + ")\n"
+            "checkpoint_expected = integrate(initial_fields(), " +
+            str(expected_phase * 24) + ")\n"
+            "checkpoint_error = max(abs(a-b) for name, field in zip(NAMES, checkpoint_expected) "
+            "for a,b in zip(checkpoint_actual[name], field))\n"
+            "assert checkpoint_error < 5e-11, checkpoint_error\n"
+            "print('three-species-checkpoint-oracle-ok', checkpoint_error)\n"
+        )
+        assert len(source.encode("utf-8")) < 131072
+        py_status, py_body = request("POST", "/api/run/python", source, headers)
+        assert py_status == 200 and "three-species-checkpoint-oracle-ok" in py_body, (
+            "checkpoint independent Python stencil", expected_phase, py_status, py_body[:400])
+        return result
+
+    first = run_chunk(1)
+    status, body = request(
+        "POST", "/api/run/r",
+        "assign('flowstudio_three_restart_backup', "
+        "lapply(get('flowstudio_three_restart_state', envir=.GlobalEnv), "
+        "function(f) f + 0), envir=.GlobalEnv); "
+        "corrupt <- get('flowstudio_three_restart_state', envir=.GlobalEnv); "
+        "corrupt[[1L]][1L,1L] <- NaN; "
+        "assign('flowstudio_three_restart_state', corrupt, envir=.GlobalEnv)",
+        headers)
+    assert status == 200, ("checkpoint corruption setup", status, body[:300])
+    status, body = request("POST", "/api/run/r", restart, headers)
+    assert status == 422 and "restart checkpoint invalid" in body, (
+        "corrupt checkpoint rejected", status, body[:300])
+    status, body = request("POST", "/api/run/r",
+                           "cat(flowstudio_three_restart_phase, '\\n')", headers)
+    assert status == 200 and body.strip() == "1", (
+        "failed restart did not advance phase", status, body[:300])
+    status, body = request(
+        "POST", "/api/run/r",
+        "assign('flowstudio_three_restart_state', "
+        "get('flowstudio_three_restart_backup', envir=.GlobalEnv), "
+        "envir=.GlobalEnv)",
+        headers)
+    assert status == 200, ("checkpoint recovery", status, body[:300])
+
+    oversized = restart.replace("chunk_steps <- 24L", "chunk_steps <- 25L", 1)
+    assert oversized != restart
+    status, body = request("POST", "/api/run/r", oversized, headers)
+    assert status == 422 and "restart resource limit exceeded" in body, (
+        "oversized checkpoint evolution rejected", status, body[:300])
+
+    second = run_chunk(2)
+    assert max(abs(a - b) for name in ("a", "b", "c")
+               for a, b in zip(second[name], uninterrupted[name])) < 5e-11
+    status, body = request("POST", "/api/run/r", restart, headers)
+    assert status == 422 and "restart phase invalid" in body, (
+        "third chunk rejected", status, body[:300])
+    status, body = request("POST", "/api/run/r",
+                           "cat(flowstudio_three_restart_phase, '\\n')", headers)
+    assert status == 200 and body.strip() == "2", (
+        "rejected third chunk preserved phase", status, body[:300])
+
+    # A second 24+24 replay must reproduce the exact checkpoint and final fields.
+    status, body = request("POST", "/api/run/r",
+                           "assign('flowstudio_three_restart_phase', 0L, envir=.GlobalEnv)", headers)
+    assert status == 200, ("restart replay reset", status, body[:300])
+    replay_first = run_chunk(1)
+    replay_second = run_chunk(2)
+    assert first == replay_first and second == replay_second, (
+        "persistent R checkpoint replay was not deterministic")

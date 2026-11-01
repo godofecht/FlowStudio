@@ -173,3 +173,12 @@ independent macOS physical-browser execution and local native Flow/R
 remain unexecuted or not yet independently established. No hosted workflow
 configuration changed. This verifies in-session integrity and recovery,
 not durable restart after process termination or full RStudio parity.
+
+The follow-up [PR #339](https://github.com/godofecht/FlowStudio/pull/339)
+adds an explicit real `/api/reset/r` boundary: after the saved 24+24
+notebook output is captured, the R kernel is destroyed, its phase/state/raw
+snapshot globals must disappear, and the persistent Python oracle must
+remain callable. Chromium then imports the saved `.fsnb` and restores its
+output while the fresh R kernel remains empty. **This new reset-isolation
+scenario is pending exact-head Linux/macOS and Ubuntu Chromium CI**; the
+passed PR #338 evidence above does not qualify it.

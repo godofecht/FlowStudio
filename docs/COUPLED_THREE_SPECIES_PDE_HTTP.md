@@ -92,3 +92,29 @@ physical Chromium three-species execution, all 3,072-cell Python oracle
 assertions, R PNG decoding, failure isolation and .fsnb restoration.
 Independent macOS physical-browser interaction and local native Flow/R
 remain unexecuted.
+
+
+## Two-stage native R checkpoint/restart acceptance
+
+The same seed-9137 three-species 32×32 anisotropic system is now evolved
+through two **separate** persistent native R HTTP requests, each running 24
+explicit-midpoint steps from `examples/coupled_three_species_restart_r.R`.
+The first request commits an R matrix checkpoint and phase 1; the second
+resumes that checkpoint and commits phase 2. Every one of the 3,072 values
+at both checkpoints is independently checked against the production Python
+direct-stencil implementation at 24 and 48 steps. The final restarted
+solution must agree with the separate uninterrupted 48-step R integration.
+
+The real HTTP acceptance rejects a NaN-corrupted checkpoint (422), a
+25-step chunk exceeding the 147,456 species-cell-step ceiling (422), and
+a third chunk after completion (422). Rejection must preserve the phase,
+and restoring the saved checkpoint must allow recovery. A fresh two-chunk
+replay must reproduce both complete output frames exactly. Every R source
+is below 64 KiB, every Python oracle request below 128 KiB, and each R
+result frame below 100 KiB. No mocked R or Python runtimes are involved.
+
+This scenario is wired into `tests/coupled_three_species_http.py`, invoked
+by `python3 scripts/verify_native.py --require-r`. Local native R and
+independent physical Chromium execution of the checkpoint scenario are
+**unexecuted** until separately qualified. It does not implement
+compiler-generated multidimensional Flow `field` lowering.

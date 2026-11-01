@@ -20,8 +20,12 @@ def main() -> None:
     )
     source = "\n".join(
         "\n".join(
-            line.removeprefix("export ")
+            # Preserve executable Flow tokens, trimming only comments,
+            # blank lines and cosmetic brace-delimited indentation so the
+            # production 128 KiB HTTP request budget remains enforced.
+            line.removeprefix("export ").removeprefix("    ")
             for line in (root / path).read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
             if not line.startswith("import .math_dimensions {")
             and not line.startswith("import .math_expression_ir {")
             and not line.startswith("import .math_expression_source {")

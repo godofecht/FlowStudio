@@ -54,9 +54,8 @@ export async function runThreeSpeciesRestartBrowser({page, setNotebookSource, re
   const assignments = names.map(name => {
     assert.equal(fields[name].length, 1024);
     assert.ok(fields[name].every(Number.isFinite));
-    const code = 'assign("flowstudio_three_initial_' + name + '", c(' +
-      fields[name].map(value => value.toPrecision(17)).join(',') +
-      '), envir=.GlobalEnv)';
+    const code = 'flowstudio_three_initial_' + name + ' <- c(' +
+      fields[name].map(value => value.toPrecision(17)).join(',') + ')';
     assert.ok(Buffer.byteLength(code, 'utf8') < 65536);
     return code;
   });
@@ -65,9 +64,11 @@ export async function runThreeSpeciesRestartBrowser({page, setNotebookSource, re
   const cell = code => '# %% [r]\n' + code + '\n';
   const backup = [
     'assign("flowstudio_three_restart_backup",',
-    '  lapply(flowstudio_three_restart_state, function(f) f + 0), envir=.GlobalEnv)',
+    '  lapply(get("flowstudio_three_restart_state", envir=.GlobalEnv, inherits=FALSE),',
+    '    function(f) f + 0), envir=.GlobalEnv)',
     'assign("flowstudio_three_restart_snapshot_backup",',
-    '  flowstudio_three_restart_snapshot, envir=.GlobalEnv)',
+    '  get("flowstudio_three_restart_snapshot", envir=.GlobalEnv, inherits=FALSE),',
+    '  envir=.GlobalEnv)',
     'stopifnot(identical(flowstudio_three_restart_phase, 1L),',
     '  is.raw(flowstudio_three_restart_snapshot),',
     '  length(flowstudio_three_restart_snapshot) <= 65536L)'
@@ -116,7 +117,7 @@ export async function runThreeSpeciesRestartBrowser({page, setNotebookSource, re
   // Mass is unchanged by these two edits. Only byte-exact checkpoint
   // verification can reject the resumed trajectory before phase advances.
   const corruption = [
-    'corrupt <- flowstudio_three_restart_state',
+    'corrupt <- get("flowstudio_three_restart_state", envir=.GlobalEnv, inherits=FALSE)',
     'corrupt[[1L]][1L,1L] <- corrupt[[1L]][1L,1L] + 0.25',
     'corrupt[[1L]][1L,2L] <- corrupt[[1L]][1L,2L] - 0.25',
     'assign("flowstudio_three_restart_state", corrupt, envir=.GlobalEnv)'

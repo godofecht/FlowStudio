@@ -1,3 +1,17 @@
+## 2026-11-01: R reset and notebook snapshot non-resurrection (exact-head CI pending)
+
+The physical Chromium checkpoint/restart acceptance now calls the production
+`/api/reset/r` endpoint after completing the 24+24 R integration, verifies
+the restarted R kernel has no phase/state/snapshot globals, and independently
+checks that the persistent Python numerical oracle survived the R reset.
+It then imports the saved `.fsnb` through the real browser file input,
+checks that all saved outputs are restored without execution, and rechecks
+that no R checkpoint globals were resurrected. This distinguishes notebook
+output persistence from kernel-state persistence and tests cross-runtime
+reset isolation. **Pending:** exact-head Linux/macOS CI and physical Ubuntu
+Chromium for this revision. **Unexecuted:** local native Flow/R and independent
+macOS physical browser. No hosted workflow changes.
+
 ## 2026-11-01: physical Chromium R checkpoint/restart and corruption isolation (4/4 exact-head CI passed)
 
 [PR #338](https://github.com/godofecht/FlowStudio/pull/338) merged at

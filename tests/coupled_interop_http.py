@@ -81,7 +81,7 @@ def verify_coupled_interop(request, headers: dict[str, str]) -> None:
     status, body = request("POST", "/api/run/r",
                            "cat(length(flowstudio_coupled_final_u), ' ', "
                            "length(flowstudio_coupled_final_v), '\\n')", headers)
-    assert status == 200 and body.strip() == "1024 1024", (
+    assert status == 200 and body.split() == ["1024", "1024"], (
         "persistent R coupled fields", status, body[:300])
     status, body = verify_python(result)
     assert status == 200 and "coupled-python-oracle-ok" in body, (

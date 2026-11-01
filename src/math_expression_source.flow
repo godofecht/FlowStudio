@@ -281,6 +281,73 @@ function source_unit(bytes: ptr<u8>, index: i32, length: i32) -> SourceUnit {
     return base_source_unit(bytes, index, length)
 }
 
+# A numeral adjacent to a recognized call is a product, not a unit
+# suffix. In particular 2sin(x), 2sqrt(x), 2min(a,b) would otherwise be
+# consumed as seconds, seconds, and minutes. Preserve 2mcos(x): mcos is
+# not a call, so the metre suffix is consumed before the cos call.
+# Only complete recognized ASCII function names immediately followed by
+# '(' are exempted; unknown identifiers still fail closed.
+function function_call_after_number(bytes: ptr<u8>, start: i32, length: i32) -> bool {
+    if start >= length or not identifier_start(bytes[start]) { return false }
+    let mut end: i32 = start
+    while end < length and identifier_part(bytes[end]) {
+        end = end + 1
+    }
+    if end >= length or bytes[end] != 40 { return false }
+    return identifier_matches(bytes, start, end, "abs") or
+        identifier_matches(bytes, start, end, "sqrt") or
+        identifier_matches(bytes, start, end, "cbrt") or
+        identifier_matches(bytes, start, end, "root4") or
+        identifier_matches(bytes, start, end, "root5") or
+        identifier_matches(bytes, start, end, "root6") or
+        identifier_matches(bytes, start, end, "root7") or
+        identifier_matches(bytes, start, end, "root8") or
+        identifier_matches(bytes, start, end, "factorial") or
+        identifier_matches(bytes, start, end, "sign") or
+        identifier_matches(bytes, start, end, "sgn") or
+        identifier_matches(bytes, start, end, "sin") or
+        identifier_matches(bytes, start, end, "cos") or
+        identifier_matches(bytes, start, end, "tan") or
+        identifier_matches(bytes, start, end, "sinh") or
+        identifier_matches(bytes, start, end, "cosh") or
+        identifier_matches(bytes, start, end, "tanh") or
+        identifier_matches(bytes, start, end, "asinh") or
+        identifier_matches(bytes, start, end, "acosh") or
+        identifier_matches(bytes, start, end, "atanh") or
+        identifier_matches(bytes, start, end, "asin") or
+        identifier_matches(bytes, start, end, "acos") or
+        identifier_matches(bytes, start, end, "atan") or
+        identifier_matches(bytes, start, end, "atan2") or
+        identifier_matches(bytes, start, end, "ln") or
+        identifier_matches(bytes, start, end, "log") or
+        identifier_matches(bytes, start, end, "log10") or
+        identifier_matches(bytes, start, end, "log1p") or
+        identifier_matches(bytes, start, end, "expm1") or
+        identifier_matches(bytes, start, end, "exp") or
+        identifier_matches(bytes, start, end, "min") or
+        identifier_matches(bytes, start, end, "max") or
+        identifier_matches(bytes, start, end, "norm") or
+        identifier_matches(bytes, start, end, "norm3") or
+        identifier_matches(bytes, start, end, "norm4") or
+        identifier_matches(bytes, start, end, "norm5") or
+        identifier_matches(bytes, start, end, "norm6") or
+        identifier_matches(bytes, start, end, "norm7") or
+        identifier_matches(bytes, start, end, "norm8") or
+        identifier_matches(bytes, start, end, "dot2") or
+        identifier_matches(bytes, start, end, "dot3") or
+        identifier_matches(bytes, start, end, "dot4") or
+        identifier_matches(bytes, start, end, "dot5") or
+        identifier_matches(bytes, start, end, "dot6") or
+        identifier_matches(bytes, start, end, "dot7") or
+        identifier_matches(bytes, start, end, "dot8") or
+        identifier_matches(bytes, start, end, "cross2") or
+        identifier_matches(bytes, start, end, "lerp") or
+        identifier_matches(bytes, start, end, "clamp") or
+        identifier_matches(bytes, start, end, "where") or
+        identifier_matches(bytes, start, end, "smoothstep") or
+        identifier_matches(bytes, start, end, "smootherstep")
+}
+
 function blank_instruction() -> MathInstruction {
     return MathInstruction {
         opcode: 0, literal: quantity(0.0, dimensionless()),
@@ -941,7 +1008,13 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
             if not number.ok or number.end <= index { return source_error(index, length) }
             let start: i32 = index
             index = number.end
-            let parsed_unit: SourceUnit = source_unit(bytes, index, length)
+            let mut parsed_unit: SourceUnit = source_unit(bytes, index, length)
+            if function_call_after_number(bytes, index, length) {
+                parsed_unit = SourceUnit {
+                    matched: false, dimension: dimensionless(),
+                    scale: 1.0, end: index
+                }
+            }
             let mut unit: Dimension = dimensionless()
             let mut unit_scale: f64 = 1.0
             if parsed_unit.matched {

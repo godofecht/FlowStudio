@@ -128,3 +128,22 @@ outputs. A forbidden extra chunk must stop the notebook before a later R
 side effect. A fresh notebook replay must reproduce the exact final frame.
 This controller path is exercised through the existing native HTTP acceptance,
 not a mocked notebook executor.
+
+## Byte-exact persistent R checkpoint integrity
+
+The 24+24 native R restart now stores a bounded (at most 64 KiB) base-R
+version-3 serialized snapshot of the three 32×32 matrix fields alongside
+the persistent state. Before the second 24-step chunk, the production R
+script compares the exact serialized bytes with the saved snapshot.
+Conservation alone is insufficient: adding 0.25 to one cell and subtracting
+0.25 from another preserves total mass while changing the solution.
+
+Production `tests/coupled_three_species_http.py` explicitly performs this
+finite mass-preserving corruption and a malformed snapshot, requires HTTP
+422 for each, verifies that phase remains 1, restores the original state
+and snapshot, and then resumes the independent 3,072-cell numerical oracle.
+The snapshot and emitted frame are both bounded before phase advances.
+The snapshot detects accidental checkpoint mutation within the persistent
+kernel; it is not a cryptographic authentication scheme or durable
+cross-process persistence. Local Rscript and independent macOS browser
+qualification must be reported separately from CI.

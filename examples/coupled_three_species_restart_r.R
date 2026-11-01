@@ -42,6 +42,17 @@ if (!is.list(inputs) || length(inputs) != 3L ||
     stop("three-species restart checkpoint invalid")
 if (abs(sum(vapply(inputs, sum, numeric(1L))) - initial_mass) > 3e-9)
     stop("three-species restart checkpoint mass mismatch")
+# Mass conservation alone cannot detect two compensating corruptions.
+# Compare the exact R-serialized checkpoint bytes within the persistent kernel.
+if (phase == 1L) {
+    if (!exists("flowstudio_three_restart_snapshot", envir = .GlobalEnv, inherits = FALSE))
+        stop("three-species restart checkpoint snapshot missing")
+    snapshot <- get("flowstudio_three_restart_snapshot", envir = .GlobalEnv,
+                    inherits = FALSE)
+    if (!is.raw(snapshot) || length(snapshot) > 65536L ||
+        !identical(serialize(inputs, NULL, version = 3L), snapshot))
+        stop("three-species restart checkpoint changed")
+}
 before <- c(n, seq_len(n - 1L))
 after <- c(2L:n, 1L)
 slope <- function(fields) {
@@ -62,9 +73,17 @@ for (iteration in seq_len(chunk_steps)) {
 if (any(!vapply(state, function(f) all(is.finite(f)), logical(1L))) ||
     abs(sum(vapply(state, sum, numeric(1L))) - initial_mass) > 3e-9)
     stop("three-species restart conservation failed")
+# Construct and bound both the checkpoint and output before advancing phase.
+snapshot <- serialize(state, NULL, version = 3L)
+if (length(snapshot) > 65536L)
+    stop("three-species restart checkpoint snapshot exceeds 64 KiB")
+frame <- paste0("FLOWSTUDIO_THREE_RESTART_V1 ", phase + 1L, " ",
+                paste(sprintf("%.16g", unlist(lapply(state, function(f) as.vector(t(f))))),
+                      collapse = ","), "\n")
+if (nchar(frame, type = "bytes") > 100000L)
+    stop("three-species restart output exceeds 100 KiB")
+assign("flowstudio_three_restart_snapshot", snapshot, envir = .GlobalEnv)
 assign("flowstudio_three_restart_state", state, envir = .GlobalEnv)
 assign("flowstudio_three_restart_mass", initial_mass, envir = .GlobalEnv)
 assign("flowstudio_three_restart_phase", phase + 1L, envir = .GlobalEnv)
-cat("FLOWSTUDIO_THREE_RESTART_V1 ", phase + 1L, " ",
-    paste(sprintf("%.16g", unlist(lapply(state, function(f) as.vector(t(f))))),
-          collapse = ","), "\n", sep = "")
+cat(frame)

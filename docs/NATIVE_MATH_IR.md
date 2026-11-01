@@ -595,3 +595,22 @@ introduce general symbolic exponents or change upstream Flow 2.0 grammar.
 `src/math_expression_source_http_smoke.flow` test numerical evaluation,
 physical units, source spans and invalid inputs. Qualification requires
 native Linux/macOS execution and production HTTP/Chromium CI.
+
+## Native coherent angle quantities and Euler's number (2026-11-01)
+
+The actual Flow 2.0 source-to-IR parser now lowers numeric suffixes `rad`,
+`deg`, `°` (U+00B0), `grad` and `turn` into dimensionless radians.
+One degree is π/180 rad, one gradian is π/200 rad, and one turn is 2π rad.
+The shared metric-prefix lowering also supports quantities such as `mrad`
+and `µrad`. This lets native `sin`, `cos`, `tan` and other
+dimensionless numerical operators accept coherent angular quantities
+without editor-only substitution. The unbound identifier `e` lowers to
+Euler's number; explicit caller bindings retain precedence over it.
+
+The native source, equation-system and HTTP smoke fixtures contain analytic
+trigonometric identities, SI dimension errors, explicit binding precedence,
+and exact UTF-8 source-span checks. The CI gate executes these same Flow
+modules on Linux and macOS, including through the production HTTP compiler.
+This is **not** a fifth physical base dimension, a generalized unit algebra,
+an extension to upstream Flow grammar, or native Navier–Stokes.
+

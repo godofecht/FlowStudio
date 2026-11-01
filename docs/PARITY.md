@@ -1,4 +1,4 @@
-## 2026-11-01: seeded non-Fourier coupled 3D native PDE (qualification pending)
+## 2026-11-01: seeded non-Fourier coupled 3D native PDE (4/4 exact-head CI passed)
 
 A new seed-9137, non-Fourier, asymmetric two-species 8×8×8 state is
 evolved through 64 actual native Flow timesteps. The source checks
@@ -11,10 +11,18 @@ native response against independent sparse operators, including a deliberately
 inverted energy assertion requiring HTTP 422. The original Fourier 3D
 acceptance and 128-cell SVG heatmap remain intact.
 
-**Passed:** local independent seed-9137 numerical reproduction (64 steps,
-mass drift below 1e-9, exact 32+32 semigroup in the Python oracle).
-**Pending:** exact-head Linux/macOS CI, native compiler/HTTP and physical
-Ubuntu Chromium qualification. **Unexecuted:** local native Flow/R and
+**Verified:** [PR #343](https://github.com/godofecht/FlowStudio/pull/343)
+merged as [f72c74b1](https://github.com/godofecht/FlowStudio/commit/f72c74b1009c1e6a2833d6f637b24a5bc56c776f).
+[Exact-head CI #41308445613](https://github.com/godofecht/FlowStudio/actions/runs/41308445613)
+passed all four Ubuntu 24.04/macOS 15 jobs at `b7cd64a7`. Each source
+platform passed 1,201 JavaScript tests (12 skipped) and ran 449 Python
+tests (13 skipped). Native Flow compilation, real HTTP with inverted
+seeded-energy HTTP 422 rejection, native R/C FlowJIT, and physical Ubuntu
+Chromium Monaco Run checking all 1,024 seeded voxels and 64 energies passed.
+Local independent seed-9137 numerical reproduction had 64-step direct
+stencil versus sparse-operator maximum error below 5e-14 and mass drift
+below 1e-9. **Failed:** zero final exact-head CI jobs.
+**Pending:** post-merge main CI. **Unexecuted:** local native Flow/R and
 independent macOS physical browser. No hosted workflow configuration changed.
 This is not generalized compiler-generated multidimensional `field`
 lowering or independently verified RStudio parity.

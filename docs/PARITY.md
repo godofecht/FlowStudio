@@ -1,3 +1,21 @@
+## 2026-11-01: byte-exact persistent R PDE checkpoint integrity (qualification pending)
+
+The production 24+24 R midpoint restart now saves a bounded base-R
+serialized state snapshot (64 KiB ceiling) and checks its exact bytes
+before resuming. Finite two-cell +0.25/-0.25 corruption preserves mass
+but must return HTTP 422; a malformed snapshot must also fail closed.
+Both failures preserve phase 1, and restored state/snapshot must recover
+the 3,072-value Python-oracle-verified final field. The R script bounds
+its emitted frame before advancing phase. [Reproduction](COUPLED_THREE_SPECIES_PDE_HTTP.md).
+
+**Pending:** exact-head Linux/macOS production native Flow/HTTP and R/C
+FlowJIT CI, Ubuntu physical Chromium baseline and post-merge CI.
+**Unexecuted:** local native R, dedicated physical-browser checkpoint
+corruption, independent macOS physical browser. No hosted workflow edits.
+This is in-kernel accidental-corruption detection, not authenticated or
+cross-process durable persistence, generalized compiler-generated
+multidimensional `field` lowering, or full RStudio parity.
+
 ## 2026-11-01: persistent R PDE checkpoint/restart acceptance (qualification pending)
 
 Added `examples/coupled_three_species_restart_r.R` and production HTTP

@@ -56,8 +56,10 @@ def compact_native_math_line(line: str, *, tighten_equals: bool = False,
         if not quoted and char in " \t" and result and (
             result[-1] in ",:"
             or (tighten_equals and result[-1] == "=")
+            # Flow's lexer can absorb adjacent slash or star into a token;
+            # keep their surrounding spaces when compacting native bundles.
             or (tighten_math_ops and (
-                result[-1] in "=+*/" or source[index + 1:index + 2] in "=+*/"
+                result[-1] in "=+" or source[index + 1:index + 2] in "=+"
             ))
         ):
             continue

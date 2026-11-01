@@ -333,8 +333,14 @@ export function infer_math_ir(program: MathProgram) -> MathInferredType {
             # Infer derivative dimensions without evaluating step sizes.
             let mut arity: i32 = 3
             let mut fields: i32 = 2
-            if opcode == 82 { arity = 4; fields = 3 }
-            if opcode == 83 { arity = 7; fields = 5 }
+            if opcode == 82 {
+                arity = 4
+                fields = 3
+            }
+            if opcode == 83 {
+                arity = 7
+                fields = 5
+            }
             if depth < arity { return static_error(instruction.source_start) }
             let base: i32 = depth - arity
             let field_dimension: Dimension = dimensions[base]

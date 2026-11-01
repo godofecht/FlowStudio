@@ -1094,7 +1094,7 @@ def main() -> None:
     )
     native_overdetermined = "\n".join(
         "\n".join(
-            compact_native_math_line(line)
+            compact_native_math_line(line, tighten_equals=True)
             for line in (Path(__file__).resolve().parents[1] / path)
                 .read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.lstrip().startswith("#")

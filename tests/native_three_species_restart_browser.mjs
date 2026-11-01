@@ -172,6 +172,28 @@ export async function runThreeSpeciesRestartBrowser({page, setNotebookSource, re
   assert.equal(state.status, 200, state.body.slice(0, 300));
   assert.match(state.body, /restart-final-phase-ok/);
 
+  // A notebook snapshot must remain readable after the real R interpreter
+  // has been destroyed. Reset must not disturb the independent Python oracle.
+  const resetResponse = await fetch(origin + '/api/reset/r', {
+    method:'POST', headers:{'X-FlowStudio-Intent':'run'}, body:'',
+    signal:AbortSignal.timeout(30000)
+  });
+  const resetBody = await resetResponse.text();
+  assert.equal(resetResponse.status, 200, resetBody.slice(0, 300));
+  assert.match(resetBody, /R session reset/);
+  const cleared = await native('r',
+    'stopifnot(!exists("flowstudio_three_restart_phase", envir=.GlobalEnv, inherits=FALSE), ' +
+    '!exists("flowstudio_three_restart_state", envir=.GlobalEnv, inherits=FALSE), ' +
+    '!exists("flowstudio_three_restart_snapshot", envir=.GlobalEnv, inherits=FALSE)); ' +
+    'cat("restart-reset-clean-ok\\n")');
+  assert.equal(cleared.status, 200, cleared.body.slice(0, 300));
+  assert.match(cleared.body, /restart-reset-clean-ok/);
+  const pythonSurvived = await native('python',
+    'assert callable(integrate) and len(initial_fields()) == 3\n' +
+    'print("restart-python-isolated-ok")');
+  assert.equal(pythonSurvived.status, 200, pythonSurvived.body.slice(0, 300));
+  assert.match(pythonSurvived.body, /restart-python-isolated-ok/);
+
   const beforeImport = requests.length;
   page.once('dialog', dialog => dialog.accept());
   await page.locator('#flowNotebookFile').setInputFiles({
@@ -186,4 +208,11 @@ export async function runThreeSpeciesRestartBrowser({page, setNotebookSource, re
   assert.equal(await page.locator('#notebookOutput .notebook-cell').count(), 2);
   assert.match(await page.locator('#notebookOutput').innerText(), /FLOWSTUDIO_THREE_RESTART_V1 2 /);
   assert.equal(requests.length, beforeImport, 'Notebook import must not execute the R checkpoint');
+  const stillCleared = await native('r',
+    'stopifnot(!exists("flowstudio_three_restart_phase", envir=.GlobalEnv, inherits=FALSE), ' +
+    '!exists("flowstudio_three_restart_state", envir=.GlobalEnv, inherits=FALSE), ' +
+    '!exists("flowstudio_three_restart_snapshot", envir=.GlobalEnv, inherits=FALSE)); ' +
+    'cat("restart-import-state-clean-ok\\n")');
+  assert.equal(stillCleared.status, 200, stillCleared.body.slice(0, 300));
+  assert.match(stillCleared.body, /restart-import-state-clean-ok/);
 }

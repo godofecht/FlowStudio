@@ -147,3 +147,38 @@ The snapshot detects accidental checkpoint mutation within the persistent
 kernel; it is not a cryptographic authentication scheme or durable
 cross-process persistence. Local Rscript and independent macOS browser
 qualification must be reported separately from CI.
+
+
+## Physical Chromium 24+24 checkpoint/restart (exact-head CI verified)
+
+`tests/native_three_species_restart_browser.mjs` runs through the production
+Playwright workbench invoked by `tests/native_ui.mjs`. The actual Chromium
+notebook executes six native R cells, then resumes the saved 32×32 three-species
+state in a separate two-cell run. Persistent native Python independently
+reconstructs all 3,072 cells after each 24-step phase (6,144 comparisons,
+tolerance `5e-11`). The browser rejects mass-preserving two-cell corruption,
+a malformed global raw snapshot, an over-budget 25-step chunk and a third
+post-completion chunk, while asserting unchanged phase and absence of
+forbidden R side effects. A valid restored checkpoint resumes correctly;
+`.fsnb` import restores saved output without executing interpreter code.
+All source, output, serialized snapshot and CPU work budgets remain bounded.
+
+[PR #338](https://github.com/godofecht/FlowStudio/pull/338) merged as
+[09c6130e](https://github.com/godofecht/FlowStudio/commit/09c6130ee007351d04356b359dfc04747ea4ee0a).
+[Exact-head CI #41299812914](https://github.com/godofecht/FlowStudio/actions/runs/41299812914)
+passed all four Ubuntu 24.04/macOS 15 jobs at
+`d59118bb599d3614bdef9c8988074de37f4ca588`, including the real Ubuntu
+Chromium scenario. Zero final exact-head jobs failed. Post-merge main CI,
+independent macOS physical-browser execution and local native Flow/R
+remain unexecuted or not yet independently established. No hosted workflow
+configuration changed. This verifies in-session integrity and recovery,
+not durable restart after process termination or full RStudio parity.
+
+The follow-up [PR #339](https://github.com/godofecht/FlowStudio/pull/339)
+adds an explicit real `/api/reset/r` boundary: after the saved 24+24
+notebook output is captured, the R kernel is destroyed, its phase/state/raw
+snapshot globals must disappear, and the persistent Python oracle must
+remain callable. Chromium then imports the saved `.fsnb` and restores its
+output while the fresh R kernel remains empty. **This new reset-isolation
+scenario is pending exact-head Linux/macOS and Ubuntu Chromium CI**; the
+passed PR #338 evidence above does not qualify it.

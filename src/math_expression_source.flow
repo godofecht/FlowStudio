@@ -351,6 +351,7 @@ function function_call_after_number(bytes: ptr<u8>, start: i32, length: i32) -> 
         identifier_matches(bytes, start, end, "rms") or
         identifier_matches(bytes, start, end, "median") or
         identifier_matches(bytes, start, end, "mad") or
+        identifier_matches(bytes, start, end, "quantile") or
         identifier_matches(bytes, start, end, "lerp") or
         identifier_matches(bytes, start, end, "approx") or
         identifier_matches(bytes, start, end, "clamp") or
@@ -394,6 +395,7 @@ function precedence(opcode: i32) -> i32 {
 # Commas are legal only inside recognized calls. All operands are eager.
 function function_arity(opcode: i32) -> i32 {
     if opcode >= 73 and opcode <= 79 { return -2 }
+    if opcode == 80 { return -3 } # p followed by 1..7 observations
     if opcode == 20 or opcode == 21 or opcode == 25 or
        opcode == 26 or opcode == 27 or opcode == 28 or opcode == 29 or opcode == 30 or opcode == 31 or
        opcode == 33 or opcode == 34 or opcode == 35 or opcode == 36 or opcode == 37 or
@@ -907,6 +909,10 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
                identifier_matches(bytes, index, index + 3, "mad") {
             unary_opcode = 79
             unary_width = 3
+        } elif index + 8 < length and bytes[index + 8] == 40 and
+               identifier_matches(bytes, index, index + 8, "quantile") {
+            unary_opcode = 80
+            unary_width = 8
         } elif index + 4 < length and bytes[index + 4] == 40 and
                identifier_matches(bytes, index, index + 4, "lerp") {
             unary_opcode = 66
@@ -1157,9 +1163,9 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
             }
             if opening < 1 { return source_error(index, length) }
             let arity: i32 = function_arity(operators[opening - 1])
-            if (arity < 2 and arity != -2) or
+            if (arity < 2 and arity != -2 and arity != -3) or
                (arity > 0 and argument_counts[opening] >= arity - 1) or
-               (arity == -2 and argument_counts[opening] >= 7) {
+               ((arity == -2 or arity == -3) and argument_counts[opening] >= 7) {
                 return source_error(index, length)
             }
             while top > opening + 1 {
@@ -1204,12 +1210,13 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
                 let arity: i32 = function_arity(operators[top - 1])
                 let actual_arity: i32 = argument_counts[top] + 1
                 if (arity > 0 and actual_arity != arity) or
-                   (arity == -2 and (actual_arity < 1 or actual_arity > 8)) {
+                   (arity == -2 and (actual_arity < 1 or actual_arity > 8)) or
+                    (arity == -3 and (actual_arity < 2 or actual_arity > 8)) {
                     return source_error(index, length)
                 }
                 top = top - 1
                 if count >= 64 { return source_error(positions[top], length) }
-                if arity == -2 {
+                if arity == -2 or arity == -3 {
                     # Preserve the actual operand count in the existing IR
                     # exponent field; source spans still refer to the call.
                     instructions[count] = MathInstruction {

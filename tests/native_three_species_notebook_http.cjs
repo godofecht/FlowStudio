@@ -84,9 +84,9 @@ async function run({post, routes, flow, read, parseCells, create, format}) {
   const restart = read("coupled_three_species_restart_r.R");
   assert.ok(Buffer.byteLength(restart, "utf8") < 65536);
   const restartSource = [
-    "# %% [r]\\nflowstudio_three_restart_phase <- 0L\\n",
-    "# %% [r]\\n" + restart + "\\n",
-    "# %% [r]\\n" + restart + "\\n"
+    "# %% [r]\nflowstudio_three_restart_phase <- 0L\n",
+    "# %% [r]\n" + restart + "\n",
+    "# %% [r]\n" + restart + "\n"
   ].join("");
   const runCheckpointNotebook = async () => {
     const callsBefore = threeCalls.length;
@@ -98,12 +98,12 @@ async function run({post, routes, flow, read, parseCells, create, format}) {
     assert.equal(outputs.length, 3);
     assert.deepEqual(outputs.map(entry => entry.language), ["r", "r", "r"]);
     for (const [index, phase] of [[1, 1], [2, 2]]) {
-      const frame = outputs[index].output.split(/\\r?\\n/).filter(line =>
+      const frame = outputs[index].output.split(/\r?\n/).filter(line =>
         line.startsWith("FLOWSTUDIO_THREE_RESTART_V1 "));
       assert.equal(frame.length, 1);
       assert.ok(frame[0].startsWith("FLOWSTUDIO_THREE_RESTART_V1 " + phase + " "));
     }
-    const frame = outputs[2].output.split(/\\r?\\n/).find(line =>
+    const frame = outputs[2].output.split(/\r?\n/).find(line =>
       line.startsWith("FLOWSTUDIO_THREE_RESTART_V1 2 "));
     const values = frame.slice("FLOWSTUDIO_THREE_RESTART_V1 2 ".length)
       .split(",").map(Number);
@@ -123,13 +123,13 @@ async function run({post, routes, flow, read, parseCells, create, format}) {
   const checkpointOutput = await runCheckpointNotebook();
   const failedBefore = threeCalls.length;
   assert.deepEqual(await threeRunner.run(
-    "# %% [r]\\n" + restart +
-    "\\n# %% [r]\\nflowstudio_three_notebook_unexpected <- TRUE\\n", "python"),
+    "# %% [r]\n" + restart +
+    "\n# %% [r]\nflowstudio_three_notebook_unexpected <- TRUE\n", "python"),
     {ok:false, executed:1});
   assert.deepEqual(threeCalls.slice(failedBefore), ["r"]);
   const noMutation = await post(routes.r,
     "stopifnot(!exists('flowstudio_three_notebook_unexpected', inherits=TRUE)); " +
-    "cat('checkpoint-notebook-stop-ok\\\\n')");
+    "cat('checkpoint-notebook-stop-ok\\n')");
   assert.equal(noMutation.status, 200, noMutation.body.slice(0, 300));
   assert.match(noMutation.body, /checkpoint-notebook-stop-ok/);
   assert.equal(await runCheckpointNotebook(), checkpointOutput);

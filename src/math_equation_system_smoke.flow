@@ -348,7 +348,7 @@ function main() -> i32 {
     tolerances.values[2] = quantity(0.0, dimensionless())
     result = evaluate_math_equation_system(system, tolerances)
     if not result.valid or not result.satisfied or result.count != 3 { return 73 }
-    system = parse_math_equation_system("5!=120m")
+    system = parse_math_equation_system("5! =120m")
     if not system.valid { return 74 }
     tolerances.count = 1
     result = evaluate_math_equation_system(system, tolerances)

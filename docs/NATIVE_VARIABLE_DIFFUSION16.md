@@ -27,7 +27,10 @@ The production `tests/http_smoke.py` compiles and runs the checked-in Flow
 source through real `/api/check/flow` and `/api/run/flow` endpoints,
 independently checks every returned cell against the sparse operator, and
 requires HTTP 422 for a deliberately broken numerical assertion and
-malformed Flow source.
+malformed Flow source. The existing physical Chromium
+`tests/native_math_plot_ui.mjs` path also runs the real Monaco editor,
+production Flow HTTP and SVG renderer, independently checking all 256
+rendered heatmap cells against a separate sparse Markov operator.
 
 Reproduce locally where the real compiler is installed:
 

@@ -67,3 +67,28 @@ production FlowStudio server and real Flow, Python and R runtimes.
 The new six-cell scenario is **not** separately exercised through physical
 Chromium. Its Linux/macOS CI status must be established on the exact commit
 before treating it as verified.
+
+## Physical Chromium notebook acceptance (exact-head CI verified)
+
+`tests/native_three_species_browser.mjs` is invoked by the existing
+`tests/native_ui.mjs` production Playwright path. Native Python HTTP creates
+the seed-9137 vectors and later checks the 3,072 R-computed cells. Chromium
+itself clicks Run all cells on one native Flow and four persistent native R
+cells, verifies the decoded R PNG, downloads and reimports the actual
+`.fsnb` snapshot without execution, and confirms that a non-finite R input
+stops the notebook before a later cell mutates persistent R state.
+
+Run with the existing real-server qualification:
+
+```sh
+python3 scripts/verify_native.py --require-r
+```
+
+The existing six-cell Python/R/Flow HTTP controller test is distinct from
+this five-cell physical browser case. This addition is not a browser Python
+kernel acceptance. [Exact-head CI #41270555580](https://github.com/godofecht/FlowStudio/actions/runs/41270555580)
+passed all four Linux/macOS jobs; the Ubuntu native job logged successful
+physical Chromium three-species execution, all 3,072-cell Python oracle
+assertions, R PNG decoding, failure isolation and .fsnb restoration.
+Independent macOS physical-browser interaction and local native Flow/R
+remain unexecuted.

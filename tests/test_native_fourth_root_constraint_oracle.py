@@ -87,18 +87,18 @@ class FourthRootConstraintOracle(unittest.TestCase):
     def test_native_source_matches_oracle_fixture(self):
         source = SOURCE.read_text(encoding="utf-8")
         for equation in (
-            'system.equations[0] = "root4(x) = 1m"',
-            'system.equations[1] = "y/root4(x) = 1"',
-            'system.equations[2] = "z/y = 1s/1m"',
-            'system.equations[3] = "w*z = 1m*1s"',
-            'system.equations[4] = "∜(x)+y = 2m"',
-            'system.equations[5] = "root4(x)*w = 1m²"',
-            'system.equations[6] = "x = 1m⁴"',
-            'system.equations[7] = "z = 1s"',
-            'system.equations[15] = "root4(x)+y = 2s"',
+            'sys.equations[0] = "root4(x) = 1m"',
+            'sys.equations[1] = "y/root4(x) = 1"',
+            'sys.equations[2] = "z/y = 1s/1m"',
+            'sys.equations[3] = "w*z = 1m*1s"',
+            'sys.equations[4] = "∜(x)+y = 2m"',
+            'sys.equations[5] = "root4(x)*w = 1m²"',
+            'sys.equations[6] = "x = 1m⁴"',
+            'sys.equations[7] = "z = 1s"',
+            'sys.equations[15] = "root4(x)+y = 2s"',
         ):
             self.assertIn(equation, source)
-        self.assertIn("system.count = 16", source)
+        self.assertIn("sys.count = 16", source)
 
 
 if __name__ == "__main__":

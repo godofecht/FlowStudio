@@ -21,7 +21,10 @@ tests (13 skipped). **Failed:** zero final exact-head jobs.
 **Cancelled:** one superseded branch run, not counted as passed.
 **Skipped:** optional and platform-inapplicable steps.
 **Unexecuted:** independent macOS physical-browser testing and local
-native Flow/R. **Pending:** post-merge main CI.
+native Flow/R. **Passed post-merge:** [main CI #41329009033](https://github.com/godofecht/FlowStudio/actions/runs/41329009033),
+4/4 Linux/macOS jobs on documentation descendant `382467e3` containing
+merge `fd05d9b`; the immediate merge run was superseded and cancelled,
+not counted as passed.
 No hosted workflow configuration was changed. Generalized compiler-generated
 multidimensional `field` lowering and full RStudio parity remain incomplete.
 

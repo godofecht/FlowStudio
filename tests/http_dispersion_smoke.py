@@ -4,6 +4,7 @@ from pathlib import Path
 
 from http_smoke import request, compact_native_math_line
 from dispersion_oracle import dispersion_cases, inject_dispersion_assertions
+from http_dispersion_interop import verify_dispersion_interop
 
 
 def bundled_source(root: Path) -> str:
@@ -62,6 +63,7 @@ def verify_dispersion() -> None:
     assert status == 200, ("corrupted dispersion compile", status, body)
     status, body = request("POST", "/api/run/flow", corrupted, headers)
     assert status == 422, ("corrupted dispersion must fail", status, body)
+    verify_dispersion_interop(request, headers)
     print("PASS: SI sample variance and standard deviations through native HTTP; "
           "60 seeded numerical/negative cases, corrupted expectation HTTP 422")
 

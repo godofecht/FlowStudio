@@ -326,6 +326,51 @@ class NativeCoupledVolumeOracle(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     sparse_oracle(fields, steps, ratio, exchange, coefficients)
 
+    def test_exact_periodic_impulse_on_each_axis_at_cfl_limit(self):
+        """Independent closed-form Green function, not just stencil agreement."""
+        impulse = ([0.0] * COUNT, [0.0] * COUNT)
+        impulse[0][index(0, 0, 0)] = 1.0
+        for axis in range(3):
+            with self.subTest(axis=axis):
+                coeff = tuple(float(i == axis) for i in range(3))
+                tensor = (coeff, (0.0, 0.0, 0.0))
+                expected = ([0.0] * COUNT, [0.0] * COUNT)
+                plus = [0, 0, 0]
+                minus = [0, 0, 0]
+                plus[axis] = 1
+                minus[axis] = -1
+                expected[0][index(*plus)] = 0.5
+                expected[0][index(*minus)] = 0.5
+                for solver in (direct, sparse_oracle):
+                    actual = solver(impulse, 1, ratio=0.5,
+                                    exchange=0.0, diffusion=tensor)
+                    self.assertEqual(actual, expected)
+                    self.assertEqual(sum(map(sum, actual)), 1.0)
+                excessive = (tuple(value + (0.01 if i == (axis + 1) % 3
+                                            else 0.0)
+                                   for i, value in enumerate(coeff)),
+                             (0.0, 0.0, 0.0))
+                for solver in (direct, sparse_oracle):
+                    with self.assertRaisesRegex(ValueError, "unstable"):
+                        solver(impulse, 1, ratio=0.5,
+                               exchange=0.0, diffusion=excessive)
+                self.assertEqual(impulse[0][0], 1.0)
+
+    def test_exact_exchange_only_and_constant_fixed_points(self):
+        impulse = ([0.0] * COUNT, [0.0] * COUNT)
+        impulse[0][0] = 1.0
+        zero = ((0.0, 0.0, 0.0), (0.0, 0.0, 0.0))
+        expected = ([0.0] * COUNT, [0.0] * COUNT)
+        expected[0][0] = 0.625
+        expected[1][0] = 0.375
+        for solver in (direct, sparse_oracle):
+            self.assertEqual(solver(impulse, 16, ratio=0.0,
+                                    exchange=0.0, diffusion=zero), impulse)
+            self.assertEqual(solver(impulse, 2, ratio=0.0,
+                                    exchange=0.25, diffusion=zero), expected)
+            flat = ([3.0] * COUNT, [7.0] * COUNT)
+            self.assertLess(maximum_error(solver(flat, 16, exchange=0.0), flat), 1e-12)
+
     def test_native_source_contract_and_plot_slice(self):
         source = SOURCE.read_text(encoding="utf-8")
         self.assertLess(len(source.encode("utf-8")), 128*1024)
@@ -337,6 +382,7 @@ class NativeCoupledVolumeOracle(unittest.TestCase):
                          "FLOWSTUDIO_VOLUME_SEEDED_V1 8 8 8 2",
                          "FLOWSTUDIO_VOLUME_SEEDED_ENERGY_V1 64 1",
                          "seededInitialState",
+                         "Exact 3D Green-function checks",
                          "native-coupled-volume8-ok", "index3(x, y, 0)"):
             self.assertIn(fragment, source)
         self.assertEqual(len(z_slice(spectral(64))[0]), 64)

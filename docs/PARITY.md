@@ -5295,19 +5295,27 @@ acceptance remain unverified.** Package updates/removal, dependency conflict
 resolution and multi-user installation isolation remain unimplemented. No
 hosted CI configuration was changed.
 
-## 2026-11-01: native SI robust-statistics R/Python interoperability (pending verification)
+## 2026-11-01: native SI robust-statistics R/Python interoperability (verified)
 
-[PR #358](https://github.com/godofecht/FlowStudio/pull/358) adds a real
-persistent R/Python HTTP cross-check for the 48 valid seeded native Flow
-median and unscaled MAD cases. R uses `mad(..., constant=1)` rather than its
-scaled default, converts kilometres to metres, and emits bounded numbered
-frames. A separate persistent Python `Fraction`/`statistics.median` oracle
-recomputes the numerical expectations and must reject finite corruption and
-truncation with HTTP 422; both kernels must recover. This gate is invoked by
-the existing native HTTP verification without workflow edits.
+[PR #358](https://github.com/godofecht/FlowStudio/pull/358) merged as
+[642b97b4](https://github.com/godofecht/FlowStudio/commit/642b97b4b358f854e71a2988fe3d2e35101c511a).
+The same 48 valid seeded native Flow median/unscaled MAD cases now run through
+real persistent R and Python HTTP kernels. Base R explicitly uses
+`mad(..., constant=1)` instead of its scaled default. Kilometre/metre
+normalization, exact rational values, bounded numbered frames, independently
+recomputed Python `Fraction`/`statistics.median` results, finite numerical
+corruption, truncated frames (both HTTP 422) and interpreter recovery are
+verified. The existing native HTTP gate invokes this test without changing
+hosted CI configuration.
 
-**Passed:** none claimed for this PR yet. **Failed:** none observed yet.
-**Skipped:** not yet known. **Unexecuted:** local native Flow/R/HTTP and
-independent macOS physical Chromium. **Pending:** Linux/macOS exact-head
-source/native/HTTP/Chromium CI and post-merge CI. This does not establish
-compiler-generated multidimensional `field` lowering or full RStudio parity.
+**Passed:** [exact-head CI #41346210654](https://github.com/godofecht/FlowStudio/actions/runs/41346210654)
+and [post-merge main CI #41346932465](https://github.com/godofecht/FlowStudio/actions/runs/41346932465),
+each all four Ubuntu 24.04/macOS 15 source/native jobs. Each source
+platform passed 1,201 JavaScript tests (12 skipped) and ran 471 Python
+tests (13 skipped). Native Flow compiler, production R/Python HTTP, R/C
+FlowJIT and physical Ubuntu Chromium passed. **Failed:** zero final jobs.
+Superseded exact-head CI was cancelled, not counted as passed.
+**Unexecuted:** local native Flow/R and independent macOS physical Chromium.
+**Pending:** separate CI for this documentation-only commit.
+Generalized multidimensional compiler-generated `field` lowering and full
+RStudio parity remain incomplete.

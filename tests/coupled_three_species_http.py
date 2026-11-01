@@ -129,6 +129,16 @@ def verify_three_species_restart(request, headers: dict[str, str],
     first = run_chunk(1)
     status, body = request(
         "POST", "/api/run/r",
+        "cat(typeof(flowstudio_three_restart_snapshot), ' ', "
+        "length(flowstudio_three_restart_snapshot), '\\n', sep='')", headers)
+    assert status == 200 and body.strip().startswith("raw "), (
+        "checkpoint snapshot type", status, body[:300])
+    assert 0 < int(body.strip().split()[1]) <= 65536, (
+        "checkpoint snapshot budget", body[:300])
+    status, body = request(
+        "POST", "/api/run/r",
+        "assign('flowstudio_three_restart_snapshot_backup', "
+        "get('flowstudio_three_restart_snapshot', envir=.GlobalEnv), envir=.GlobalEnv); "
         "assign('flowstudio_three_restart_backup', "
         "lapply(get('flowstudio_three_restart_state', envir=.GlobalEnv), "
         "function(f) f + 0), envir=.GlobalEnv); "
@@ -151,6 +161,43 @@ def verify_three_species_restart(request, headers: dict[str, str],
         "envir=.GlobalEnv)",
         headers)
     assert status == 200, ("checkpoint recovery", status, body[:300])
+
+    # A finite, mass-preserving two-cell corruption previously passed every
+    # checkpoint guard and silently resumed from the wrong numerical state.
+    status, body = request(
+        "POST", "/api/run/r",
+        "corrupt <- get('flowstudio_three_restart_state', envir=.GlobalEnv); "
+        "corrupt[[1L]][1L,1L] <- corrupt[[1L]][1L,1L] + 0.25; "
+        "corrupt[[1L]][1L,2L] <- corrupt[[1L]][1L,2L] - 0.25; "
+        "assign('flowstudio_three_restart_state', corrupt, envir=.GlobalEnv)",
+        headers)
+    assert status == 200, ("mass-preserving corruption setup", status, body[:300])
+    status, body = request("POST", "/api/run/r", restart, headers)
+    assert status == 422 and "restart checkpoint changed" in body, (
+        "mass-preserving corruption rejected", status, body[:300])
+    status, body = request("POST", "/api/run/r",
+                           "cat(flowstudio_three_restart_phase, '\\n')", headers)
+    assert status == 200 and body.strip() == "1", (
+        "mass-preserving corruption left phase unchanged", status, body[:300])
+    status, body = request(
+        "POST", "/api/run/r",
+        "assign('flowstudio_three_restart_state', "
+        "get('flowstudio_three_restart_backup', envir=.GlobalEnv), "
+        "envir=.GlobalEnv); "
+        "assign('flowstudio_three_restart_snapshot', 1L, envir=.GlobalEnv)",
+        headers)
+    assert status == 200, ("invalid snapshot setup", status, body[:300])
+    status, body = request("POST", "/api/run/r", restart, headers)
+    assert status == 422 and "restart checkpoint changed" in body, (
+        "invalid checkpoint snapshot rejected", status, body[:300])
+    status, body = request(
+        "POST", "/api/run/r",
+        "stopifnot(identical(flowstudio_three_restart_phase, 1L)); "
+        "assign('flowstudio_three_restart_snapshot', "
+        "get('flowstudio_three_restart_snapshot_backup', envir=.GlobalEnv), "
+        "envir=.GlobalEnv)",
+        headers)
+    assert status == 200, ("checkpoint snapshot recovery", status, body[:300])
 
     oversized = restart.replace("chunk_steps <- 24L", "chunk_steps <- 25L", 1)
     assert oversized != restart

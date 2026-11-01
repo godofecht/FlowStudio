@@ -17,30 +17,30 @@ function main() -> i32 {
     system.equations[3] = "z/w = 1"
     system.equations[4] = "x*y*z*w = 1m*1m*1m*1m"
     system.equations[5] = "x+z = 2m"
-    let mut result: MathFourDimensionSolution =
+    let mut sol: MathFourDimensionSolution =
         solve_math_equations_variable_constraints_four_unknown_dimensions(
             system, known, "x", "y", "z", "w")
-    if not result.valid or result.failed_equation != -1 or
-       not same_dimension(result.first, length) or
-       not same_dimension(result.second, length) or
-       not same_dimension(result.third, length) or
-       not same_dimension(result.fourth, length) { return 1 }
+    if not sol.valid or sol.failed_equation != -1 or
+       not same_dimension(sol.first, length) or
+       not same_dimension(sol.second, length) or
+       not same_dimension(sol.third, length) or
+       not same_dimension(sol.fourth, length) { return 1 }
 
     system.equations[5] = "x+z = 2s"
-    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
+    sol = solve_math_equations_variable_constraints_four_unknown_dimensions(
         system, known, "x", "y", "z", "w")
-    if result.valid or result.failed_equation != 5 { return 2 }
+    if sol.valid or sol.failed_equation != 5 { return 2 }
 
     system.equations[5] = "x+=1m"
-    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
+    sol = solve_math_equations_variable_constraints_four_unknown_dimensions(
         system, known, "x", "y", "z", "w")
-    if result.valid or result.failed_equation != 5 { return 3 }
+    if sol.valid or sol.failed_equation != 5 { return 3 }
 
     system.equations[5] = "x+z = 2m"
     system.equations[0] = "x+=1m"
-    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
+    sol = solve_math_equations_variable_constraints_four_unknown_dimensions(
         system, known, "x", "y", "z", "w")
-    if result.valid or result.failed_equation != 0 { return 4 }
+    if sol.valid or sol.failed_equation != 0 { return 4 }
 
     system = empty_math_four_constraint_system()
     system.count = 7
@@ -51,14 +51,14 @@ function main() -> i32 {
     system.equations[4] = "z/w = 1"
     system.equations[5] = "x*y*z*w = 1m*1m*1m*1m"
     system.equations[6] = "x = 1m"
-    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
+    sol = solve_math_equations_variable_constraints_four_unknown_dimensions(
         system, known, "x", "y", "z", "w")
-    if not result.valid or not same_dimension(result.fourth, length) { return 5 }
+    if not sol.valid or not same_dimension(sol.fourth, length) { return 5 }
 
     system.equations[6] = "x = 1s"
-    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
+    sol = solve_math_equations_variable_constraints_four_unknown_dimensions(
         system, known, "x", "y", "z", "w")
-    if result.valid or result.failed_equation != 6 { return 6 }
+    if sol.valid or sol.failed_equation != 6 { return 6 }
 
     system = empty_math_four_constraint_system()
     system.count = 16
@@ -71,24 +71,24 @@ function main() -> i32 {
         system.equations[index] = "x+y = 2m"
         index = index + 1
     }
-    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
+    sol = solve_math_equations_variable_constraints_four_unknown_dimensions(
         system, known, "x", "y", "z", "w")
-    if not result.valid or not same_dimension(result.first, length) { return 7 }
+    if not sol.valid or not same_dimension(sol.first, length) { return 7 }
 
     system.equations[15] = "x+y = 2s"
-    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
+    sol = solve_math_equations_variable_constraints_four_unknown_dimensions(
         system, known, "x", "y", "z", "w")
-    if result.valid or result.failed_equation != 15 { return 8 }
+    if sol.valid or sol.failed_equation != 15 { return 8 }
 
     system.equations[15] = "x+y = 2m"
     system.count = 17
-    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
+    sol = solve_math_equations_variable_constraints_four_unknown_dimensions(
         system, known, "x", "y", "z", "w")
-    if result.valid { return 9 }
+    if sol.valid { return 9 }
     system.count = 3
-    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
+    sol = solve_math_equations_variable_constraints_four_unknown_dimensions(
         system, known, "x", "y", "z", "w")
-    if result.valid { return 10 }
+    if sol.valid { return 10 }
 
     system = empty_math_four_constraint_system()
     system.count = 5
@@ -97,38 +97,38 @@ function main() -> i32 {
     system.equations[2] = "ρ/ζ = 1"
     system.equations[3] = "ζ/ω = 1"
     system.equations[4] = "δ₀ = 1m"
-    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
+    sol = solve_math_equations_variable_constraints_four_unknown_dimensions(
         system, known, "δ₀", "ρ", "ζ", "ω")
-    if not result.valid or not same_dimension(result.first, length) or
-       not same_dimension(result.fourth, length) { return 11 }
+    if not sol.valid or not same_dimension(sol.first, length) or
+       not same_dimension(sol.fourth, length) { return 11 }
 
     system.equations[0] = "sqrt(x)*y*z*w = 1m*1m*1m*1m"
     system.equations[1] = "x/y = 1m"
     system.equations[2] = "y/z = 1"
     system.equations[3] = "z/w = 1"
     system.equations[4] = "x = 1m²"
-    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
+    sol = solve_math_equations_variable_constraints_four_unknown_dimensions(
         system, known, "x", "y", "z", "w")
-    if not result.valid or not same_dimension(result.first, area) or
-       not same_dimension(result.second, length) { return 12 }
+    if not sol.valid or not same_dimension(sol.first, area) or
+       not same_dimension(sol.second, length) { return 12 }
 
     system.equations[0] = "x/y = 1"
     system.equations[1] = "x/y = 1"
     system.equations[2] = "y/z = 1"
     system.equations[3] = "z/w = 1"
     system.equations[4] = "z/w = 1"
-    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
+    sol = solve_math_equations_variable_constraints_four_unknown_dimensions(
         system, known, "x", "y", "z", "w")
-    if result.valid { return 13 }
+    if sol.valid { return 13 }
 
     system.equations[0] = "x*y*z*w = 1m³"
     system.equations[1] = "x/y = 1"
     system.equations[2] = "y/z = 1"
     system.equations[3] = "z/w = 1"
     system.equations[4] = "x = 1m"
-    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
+    sol = solve_math_equations_variable_constraints_four_unknown_dimensions(
         system, known, "x", "y", "z", "w")
-    if result.valid { return 14 }
+    if sol.valid { return 14 }
 
     known.count = 1
     known.symbols[0] = MathDimensionSymbol { name: "duration", dimension: time }
@@ -137,16 +137,16 @@ function main() -> i32 {
     system.equations[2] = "y/z = 1"
     system.equations[3] = "z/w = 1"
     system.equations[4] = "x = duration*1m"
-    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
+    sol = solve_math_equations_variable_constraints_four_unknown_dimensions(
         system, known, "x", "y", "z", "w")
     let length_time: Dimension = product_dimension(length, time)
-    if not result.valid or not same_dimension(result.first, length_time) or
-       not same_dimension(result.fourth, length_time) { return 15 }
+    if not sol.valid or not same_dimension(sol.first, length_time) or
+       not same_dimension(sol.fourth, length_time) { return 15 }
 
     known.count = 5
-    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
+    sol = solve_math_equations_variable_constraints_four_unknown_dimensions(
         system, known, "x", "y", "z", "w")
-    if result.valid { return 16 }
+    if sol.valid { return 16 }
 
     # Sixteen independently checked constraints with rational fourth-root
     # dimensions, Unicode radicals and a late contradictory equation.
@@ -166,27 +166,27 @@ function main() -> i32 {
         system.equations[index] = "root4(x)+y = 2m"
         index = index + 1
     }
-    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
+    sol = solve_math_equations_variable_constraints_four_unknown_dimensions(
         system, known, "x", "y", "z", "w")
     let fourth_length: Dimension = Dimension {
         length: 4, mass: 0, time: 0, temperature: 0
     }
-    if not result.valid or result.failed_equation != -1 or
-       not same_dimension(result.first, fourth_length) or
-       not same_dimension(result.second, length) or
-       not same_dimension(result.third, time) or
-       not same_dimension(result.fourth, length) { return 17 }
+    if not sol.valid or sol.failed_equation != -1 or
+       not same_dimension(sol.first, fourth_length) or
+       not same_dimension(sol.second, length) or
+       not same_dimension(sol.third, time) or
+       not same_dimension(sol.fourth, length) { return 17 }
 
     system.equations[15] = "root4(x)+y = 2s"
-    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
+    sol = solve_math_equations_variable_constraints_four_unknown_dimensions(
         system, known, "x", "y", "z", "w")
-    if result.valid or result.failed_equation != 15 { return 18 }
+    if sol.valid or sol.failed_equation != 15 { return 18 }
 
     system.equations[15] = "root4(x)+y = 2m"
     system.equations[6] = "x = 1m³"
-    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
+    sol = solve_math_equations_variable_constraints_four_unknown_dimensions(
         system, known, "x", "y", "z", "w")
-    if result.valid { return 19 }
+    if sol.valid { return 19 }
 
     system = empty_math_four_constraint_system()
     system.count = 4
@@ -194,9 +194,9 @@ function main() -> i32 {
     system.equations[1] = "root4(x)/y = 1"
     system.equations[2] = "z/w = 1"
     system.equations[3] = "z/w = 1"
-    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
+    sol = solve_math_equations_variable_constraints_four_unknown_dimensions(
         system, known, "x", "y", "z", "w")
-    if result.valid { return 20 }
+    if sol.valid { return 20 }
 
     print("native-math-variable-four-constraints-ok")
     return 0

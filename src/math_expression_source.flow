@@ -857,7 +857,29 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
             continue
         }
         if c == 40 { # (
-            if not expect_operand or top >= 64 { return source_error(index, length) }
+            # A parenthesized primary following a complete primary is an
+            # implicit product: 2(3+4), (a+b)(c+d), or 2m(3s).
+            # It has the same left-associative precedence as explicit * and
+            # /, and is represented by the real typed multiplication opcode.
+            # The zero-width synthetic operator points to the opening '('
+            # for accurate diagnostics without rewriting the UTF-8 source.
+            if not expect_operand {
+                while top > 0 and operators[top - 1] != -1 and
+                      precedence(operators[top - 1]) >= precedence(3) {
+                    top = top - 1
+                    if count >= 64 { return source_error(index, length) }
+                    instructions[count] = make_instruction(operators[top],
+                        quantity(0.0, dimensionless()), positions[top], positions[top] + widths[top])
+                    count = count + 1
+                }
+                if top >= 63 { return source_error(index, length) }
+                operators[top] = 3
+                positions[top] = index
+                widths[top] = 0
+                top = top + 1
+                expect_operand = true
+            }
+            if top >= 64 { return source_error(index, length) }
             operators[top] = -1
             positions[top] = index
             widths[top] = 1

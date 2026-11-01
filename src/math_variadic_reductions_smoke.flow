@@ -94,6 +94,61 @@ function main() -> i32 {
     if inferred.valid { return 30 }
     inferred = infer_math_expression_source("product(2m,3s)/6s")
     if not inferred.valid or not same_dimension(inferred.dimension, length) { return 31 }
+    # U+2211 and U+220F are executable aliases for bounded variadic calls,
+    # not unbounded indexed sums/products. They retain original UTF-8 spans.
+    result = evaluate_math_expression("∑(1m,2m,3m)")
+    if not result.valid or not near(result.result.value, 6.0) or
+       not same_dimension(result.result.dimension, length) { return 32 }
+    result = evaluate_math_expression("∏(2m,3s,4K,5kg)")
+    if not result.valid or not near(result.result.value, 120.0) or
+       not same_dimension(result.result.dimension, four_units) { return 33 }
+    result = evaluate_math_expression("2∑(1,2,3)")
+    if not result.valid or not near(result.result.value, 12.0) { return 34 }
+    result = evaluate_math_expression("3m∏(2s,4)")
+    if not result.valid or not near(result.result.value, 24.0) or
+       not same_dimension(result.result.dimension, length_time) { return 35 }
+    result = evaluate_math_expression("∑(∏(2m,3s),∏(4m,5s))")
+    if not result.valid or not near(result.result.value, 26.0) or
+       not same_dimension(result.result.dimension, length_time) { return 36 }
+    parsed = parse_math_expression("∑(1m,2m,3m)")
+    if not parsed.valid or parsed.program.count != 4 or
+       parsed.program.instructions[3].opcode != 73 or
+       parsed.program.instructions[3].exponent != 3 or
+       parsed.program.instructions[3].source_start != 0 or
+       parsed.program.instructions[3].source_end != 3 { return 37 }
+    parsed = parse_math_expression("∏(2m,3s)")
+    if not parsed.valid or parsed.program.count != 3 or
+       parsed.program.instructions[2].opcode != 74 or
+       parsed.program.instructions[2].exponent != 2 or
+       parsed.program.instructions[2].source_end != 3 { return 38 }
+    if parse_math_expression("∑()").valid or
+       parse_math_expression("∏()").valid or
+       parse_math_expression("∑(1,)").valid or
+       parse_math_expression("∏(,1)").valid { return 39 }
+    if parse_math_expression("∑(1,2,3,4,5,6,7,8,9)").valid or
+       parse_math_expression("∏(1,2,3,4,5,6,7,8,9)").valid { return 40 }
+    if parse_math_expression("∑(1,2").valid or
+       parse_math_expression("∏(1,2))").valid or
+       parse_math_expression("∑").valid { return 41 }
+    result = evaluate_math_expression("∑(1m,2s)")
+    if result.valid or result.failed_at != 0 { return 42 }
+    result = evaluate_math_expression("∏(true,2m)")
+    if result.valid or result.failed_at != 0 { return 43 }
+    inferred = infer_math_expression_source("∑(1m,2m,3m)")
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension, length) { return 44 }
+    inferred = infer_math_expression_source("∏(2m,3s)")
+    if not inferred.valid or not same_dimension(inferred.dimension, length_time) { return 45 }
+    inferred = infer_math_expression_source("∑(1m,2s)")
+    if inferred.valid or inferred.failed_at != 0 { return 46 }
+    inferred = infer_math_equation_source("∑(1m,2m) = 3m")
+    if not inferred.valid or not same_dimension(inferred.dimension, length) { return 47 }
+    inferred = infer_math_equation_source("∏(2m,3s) = 6m")
+    if inferred.valid { return 48 }
+    result = evaluate_math_expression("∑(1e30,1e30)")
+    if result.valid or result.failed_at != 0 { return 49 }
+    inferred = infer_math_expression_source("∑(1e30,1e30)")
+    if not inferred.valid { return 50 }
     println("native-math-variadic-ok")
     return 0
 }

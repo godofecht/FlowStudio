@@ -340,7 +340,7 @@ function main() -> i32 {
     if result.valid or result.failed_at != 4 { return 71 }
 
     # Executable factorial equation ASTs share native scalar dimensional checks.
-    system = parse_math_equation_system("factorial(5)=120;3!²=36;0!=1")
+    system = parse_math_equation_system("factorial(5)=120;3!²=36;0! =1")
     if not system.valid or system.count != 3 { return 72 }
     tolerances.count = 3
     tolerances.values[0] = quantity(0.0, dimensionless())

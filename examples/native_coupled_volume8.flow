@@ -69,6 +69,29 @@ function initialState() -> State {
     return State { u: u, v: v }
 }
 
+
+# Seed 9137 is intentionally non-Fourier and asymmetric in all three axes.
+# The two species have different, bounded initial residue patterns.
+function seededInitialState() -> State {
+    let mut u: Volume = blankVolume()
+    let mut v: Volume = blankVolume()
+    for z in 0 to 8 {
+        for y in 0 to 8 {
+            for x in 0 to 8 {
+                let mut residue: i32 = 9137 + 71 * x + 113 * y + 157 * z +
+                    17 * x * y + 19 * y * z + 23 * z * x
+                while residue >= 251 { residue = residue - 251 }
+                let mut other: i32 = 3 * residue + 41
+                while other >= 251 { other = other - 251 }
+                let i: i32 = index3(x, y, z)
+                u.values[i] = 30.0 + 0.1 * (residue as f64)
+                v.values[i] = 10.0 + 0.07 * (other as f64)
+            }
+        }
+    }
+    return State { u: u, v: v }
+}
+
 function validEquation(e: Equation, steps: i32) -> bool {
     if steps < 0 or steps > 256 { return false }
     if not (e.ratio >= 0.0 and e.ratio <= 0.5) { return false }
@@ -313,6 +336,63 @@ function main() -> i32 {
     println("")
     println("FLOWSTUDIO_VOLUME_ENERGY_END")
     if maxDifference(trajectory, first.state) > 0.00000000001 { return 18 }
+
+    # A non-Fourier 3D field independently exercises every periodic face,
+    # all six anisotropic coefficients, and the conservative exchange.
+    let seededInitial: State = seededInitialState()
+    let seededMass: f64 = totalMass(seededInitial)
+    let seededFirst: Result = integrate(seededInitial, equation, 64)
+    let seededHalf: Result = integrate(seededInitial, equation, 32)
+    let seededComposed: Result = integrate(seededHalf.state, equation, 32)
+    let seededReplay: Result = integrate(seededInitial, equation, 64)
+    if not seededFirst.valid or not seededHalf.valid or
+       not seededComposed.valid or not seededReplay.valid { return 19 }
+    if maxDifference(seededFirst.state, seededReplay.state) != 0.0 { return 20 }
+    if maxDifference(seededFirst.state, seededComposed.state) > 0.00000000001 {
+        return 21
+    }
+    if absolute(totalMass(seededFirst.state) - seededMass) > 0.0000001 {
+        return 22
+    }
+    let seededChanged: Result = integrate(seededInitial, changed, 32)
+    if not seededChanged.valid or
+       maxDifference(seededChanged.state, seededHalf.state) < 0.01 { return 23 }
+    let mut seededLow: f64 = seededInitial.v.values[0]
+    let mut seededHigh: f64 = seededInitial.u.values[0]
+    for i in 0 to 512 {
+        if seededInitial.u.values[i] < seededLow { seededLow = seededInitial.u.values[i] }
+        if seededInitial.v.values[i] < seededLow { seededLow = seededInitial.v.values[i] }
+        if seededInitial.u.values[i] > seededHigh { seededHigh = seededInitial.u.values[i] }
+        if seededInitial.v.values[i] > seededHigh { seededHigh = seededInitial.v.values[i] }
+    }
+    let mut seededTrajectory: State = seededInitial
+    let mut previousSeededEnergy: f64 = spatialEnergy(seededTrajectory)
+    println("FLOWSTUDIO_VOLUME_SEEDED_ENERGY_V1 64 1")
+    print("E")
+    for step in 0 to 64 {
+        seededTrajectory = advance(seededTrajectory, equation)
+        let energy: f64 = spatialEnergy(seededTrajectory)
+        if energy > previousSeededEnergy + 0.0000001 { return 24 }
+        if absolute(totalMass(seededTrajectory) - seededMass) > 0.0000001 {
+            return 25
+        }
+        for i in 0 to 512 {
+            if seededTrajectory.u.values[i] < seededLow - 0.000000001 or
+               seededTrajectory.u.values[i] > seededHigh + 0.000000001 or
+               seededTrajectory.v.values[i] < seededLow - 0.000000001 or
+               seededTrajectory.v.values[i] > seededHigh + 0.000000001 {
+                return 26
+            }
+        }
+        print(" ")
+        print(energy)
+        previousSeededEnergy = energy
+    }
+    println("")
+    println("FLOWSTUDIO_VOLUME_SEEDED_ENERGY_END")
+    if maxDifference(seededTrajectory, seededFirst.state) > 0.00000000001 {
+        return 27
+    }
     println("native-coupled-volume8-ok")
     println("FLOWSTUDIO_GRID_V1 8 8 2")
     print("U")
@@ -348,5 +428,22 @@ function main() -> i32 {
     }
     println("")
     println("FLOWSTUDIO_VOLUME_FIELDS_END")
+
+    # Separate complete 3D frame: do not replace the original Fourier heatmap.
+    println("FLOWSTUDIO_VOLUME_SEEDED_V1 8 8 8 2")
+    print("U")
+    for i in 0 to 512 {
+        print(" ")
+        print(seededFirst.state.u.values[i])
+    }
+    println("")
+    print("V")
+    for i in 0 to 512 {
+        print(" ")
+        print(seededFirst.state.v.values[i])
+    }
+    println("")
+    println("FLOWSTUDIO_VOLUME_SEEDED_END")
+
     return 0
 }

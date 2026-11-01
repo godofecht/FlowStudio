@@ -18,7 +18,7 @@ def main() -> None:
     )
     source = "\n".join(
         "\n".join(
-            line.removeprefix("export ").removeprefix("    ")
+            line.strip().removeprefix("export ")
             for line in (root / path).read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.lstrip().startswith("#")
             if not line.startswith("import .math_dimensions {")

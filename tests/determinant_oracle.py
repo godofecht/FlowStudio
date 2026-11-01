@@ -1,4 +1,4 @@
-"""Deterministic exact-integer oracle for production Flow det2/det3 HTTP tests.
+"""Deterministic exact-integer oracle for production Flow det2/det3/det4 HTTP tests.
 
 The runtime evaluates floating-point postfix IR; this oracle uses fraction-free
 integer elimination and cross-checks it against independent permutation sums.
@@ -11,14 +11,14 @@ import random
 
 
 SEED = 20261101
-MAX_CASES = 34
+MAX_CASES = 43
 MAX_ABS_ENTRY = 12
 
 
 def determinant_bareiss(rows: tuple[tuple[int, ...], ...]) -> int:
     n = len(rows)
-    if n not in (2, 3) or any(len(row) != n for row in rows):
-        raise ValueError("only 2x2 and 3x3 square matrices are supported")
+    if n not in (2, 3, 4) or any(len(row) != n for row in rows):
+        raise ValueError("only 2x2 through 4x4 square matrices are supported")
     if any(type(value) is not int or abs(value) > MAX_ABS_ENTRY
            for row in rows for value in row):
         raise ValueError("matrix entry outside exact bounded integer domain")
@@ -47,7 +47,7 @@ def determinant_bareiss(rows: tuple[tuple[int, ...], ...]) -> int:
 
 def determinant_permutations(rows: tuple[tuple[int, ...], ...]) -> int:
     n = len(rows)
-    if n not in (2, 3) or any(len(row) != n for row in rows):
+    if n not in (2, 3, 4) or any(len(row) != n for row in rows):
         raise ValueError("invalid square matrix")
     total = 0
     for columns in permutations(range(n)):
@@ -61,7 +61,7 @@ def determinant_permutations(rows: tuple[tuple[int, ...], ...]) -> int:
 
 
 def matrix_cases() -> tuple[tuple[str, tuple[tuple[int, ...], ...], int], ...]:
-    """Four nondegenerate seeds per size, each with three metamorphic transforms.
+    """Four seeds for 2x2/3x3, two for 4x4, each with three transforms.
 
     Transpose and row addition preserve determinant; swapping two rows flips
     its sign. Include one exactly singular matrix per size. All cases have
@@ -69,8 +69,8 @@ def matrix_cases() -> tuple[tuple[str, tuple[tuple[int, ...], ...], int], ...]:
     """
     rng = random.Random(SEED)
     result = []
-    for n in (2, 3):
-        for _ in range(4):
+    for n in (2, 3, 4):
+        for _ in range(4 if n < 4 else 2):
             for attempt in range(128):
                 rows = tuple(tuple(rng.randint(-4, 4) for _ in range(n))
                              for _ in range(n))
@@ -116,14 +116,17 @@ def inject_native_assertions(source: str, sabotage: bool = False) -> str:
         # Alternate dimensionless matrices with SI row-typed matrices.
         # Every signed permutation then has the same product dimension.
         unitful = index % 2 == 0
-        suffixes = ("m", "s", "K")[:len(rows)] if unitful else ("",) * len(rows)
+        suffixes = ("m", "s", "K", "kg")[:len(rows)] if unitful else ("",) * len(rows)
         arguments = ",".join(
             f"{value}{suffixes[row_index]}"
             for row_index, row in enumerate(rows) for value in row
         )
         expected_dimension = (
-            "space_time" if len(rows) == 2 else "volume_time_temperature"
-        ) if unitful else "dimensionless()"
+            ("space_time" if len(rows) == 2 else
+             "volume_time_temperature" if len(rows) == 3 else
+             "four_dimensional_product")
+            if unitful else "dimensionless()"
+        )
         wanted = expected + (1 if sabotage and index == 0 else 0)
         statements.append(
             f'result = evaluate_math_expression("{function}({arguments})")'

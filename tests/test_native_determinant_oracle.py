@@ -28,12 +28,13 @@ class NativeDeterminantOracle(unittest.TestCase):
         self.assertEqual(len(cases), MAX_CASES)
         self.assertEqual(sum(function == "det2" for function, _, _ in cases), 17)
         self.assertEqual(sum(function == "det3" for function, _, _ in cases), 17)
+        self.assertEqual(sum(function == "det4" for function, _, _ in cases), 9)
         for function, rows, expected in cases:
             with self.subTest(function=function, rows=rows):
                 self.assertEqual(determinant_bareiss(rows), expected)
                 self.assertEqual(determinant_permutations(rows), expected)
                 self.assertLessEqual(max(abs(x) for row in rows for x in row), 12)
-        self.assertEqual(sum(expected == 0 for _, _, expected in cases), 2)
+        self.assertEqual(sum(expected == 0 for _, _, expected in cases), 3)
 
     def test_fraction_free_oracle_pivot_and_rejection_edges(self):
         self.assertEqual(determinant_bareiss(((0, 2), (3, 4))), -6)
@@ -41,6 +42,8 @@ class NativeDeterminantOracle(unittest.TestCase):
                                                (1, 0, 3),
                                                (4, 5, 6))), 16)
         self.assertEqual(determinant_bareiss(((1, 2), (1, 2))), 0)
+        self.assertEqual(determinant_bareiss(((1, 2, 3, 4), (0, 1, 4, 2),
+                                               (5, 6, 0, 1), (1, 0, 2, 3))), 80)
         for bad in (
             (), ((1,),), ((1, 2), (3,)), ((1, 2), (3, 13)),
             ((1, 2), (3, True)), ((1, 2, 3), (4, 5, 6)),
@@ -51,7 +54,7 @@ class NativeDeterminantOracle(unittest.TestCase):
     def test_native_http_source_budget_and_deliberate_failure(self):
         source = "\n".join(
             "\n".join(
-                line.removeprefix("export ").removeprefix("    ")
+                line.strip().removeprefix("export ")
                 for line in (ROOT / path).read_text(encoding="utf-8").splitlines()
                 if line.strip() and not line.lstrip().startswith("#")
                 if not line.startswith("import .math_dimensions {")
@@ -66,8 +69,8 @@ class NativeDeterminantOracle(unittest.TestCase):
         negative = inject_native_assertions(source, sabotage=True)
         self.assertLessEqual(len(positive.encode("utf-8")), 128 * 1024)
         self.assertEqual(positive.count('result = evaluate_math_expression("det'),
-                         source.count('result = evaluate_math_expression("det') + 34)
-        self.assertEqual(positive.count("return 70"), 34)
+                         source.count('result = evaluate_math_expression("det') + 43)
+        self.assertEqual(positive.count("return 70"), 43)
         self.assertNotEqual(positive, negative)
         self.assertIn('println("native-math-determinants-ok")', positive)
         self.assertIn('println("native-math-determinants-ok")', negative)

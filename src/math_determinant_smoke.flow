@@ -1,7 +1,7 @@
-# Native execution of dimension-aware 2x2 and 3x3 matrix determinants.
+# Native execution of dimension-aware 2x2, 3x3 and 4x4 matrix determinants.
 # flow run src/math_determinant_smoke.flow
-import .math_dimensions { Dimension, dimensionless, length_dimension, time_dimension, temperature_dimension, product_dimension, same_dimension }
-import .math_expression_ir { MathResult }
+import .math_dimensions { Dimension, dimensionless, length_dimension, mass_dimension, time_dimension, temperature_dimension, product_dimension, same_dimension }
+import .math_expression_ir { MathResult, MathPermutation4, math_permutation4 }
 import .math_expression_source { ParsedMathExpression, parse_math_expression, evaluate_math_expression }
 import .math_static { MathInferredType, infer_math_expression_source, infer_math_equation_source }
 
@@ -17,6 +17,8 @@ function main() -> i32 {
     let space_time: Dimension = product_dimension(length, time_dimension())
     let volume_time_temperature: Dimension = product_dimension(
         space_time, temperature_dimension())
+    let four_dimensional_product: Dimension = product_dimension(
+        volume_time_temperature, mass_dimension())
     let mut result: MathResult = evaluate_math_expression("det2(1,2,3,4)")
     if not result.valid or not near(result.result.value, -2.0) or
        not same_dimension(result.result.dimension, dimensionless()) { return 1 }
@@ -84,6 +86,74 @@ function main() -> i32 {
     if not result.valid or not near(result.result.value, -4.0) { return 25 }
     result = evaluate_math_expression("det2(1,2,3,4)+det3(1,0,0,0,1,0,0,0,1)")
     if not result.valid or not near(result.result.value, -1.0) { return 26 }
+
+    result = evaluate_math_expression("det4(1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1)")
+    if not result.valid or not near(result.result.value, 1.0) { return 27 }
+    result = evaluate_math_expression("det4(0,1,0,0,1,0,0,0,0,0,1,0,0,0,0,1)")
+    if not result.valid or not near(result.result.value, -1.0) { return 28 }
+    result = evaluate_math_expression("det4(1,0,0,0,1,0,0,0,0,0,1,0,0,0,0,1)")
+    if not result.valid or not near(result.result.value, 0.0) { return 29 }
+    result = evaluate_math_expression("det4(1,2,3,4,0,1,4,2,5,6,0,1,1,0,2,3)")
+    if not result.valid or not near(result.result.value, 80.0) { return 30 }
+    result = evaluate_math_expression("det4(1m,0m,0m,0m,0s,1s,0s,0s,0K,0K,1K,0K,0kg,0kg,0kg,1kg)")
+    if not result.valid or not near(result.result.value, 1.0) or
+       not same_dimension(result.result.dimension, four_dimensional_product) { return 31 }
+    result = evaluate_math_expression("det4(1m,0m,0m,0m,0s,1s,0s,0s,0K,0K,1K,0K,0kg,0kg,0kg,1m)")
+    if result.valid or result.failed_at != 0 { return 32 }
+    result = evaluate_math_expression("det4(true,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1)")
+    if result.valid or result.failed_at != 0 { return 33 }
+    result = evaluate_math_expression("det4(1e10,0,0,0,0,1e10,0,0,0,0,1e10,0,0,0,0,1e10)")
+    if result.valid or result.failed_at != 0 { return 34 }
+    if parse_math_expression("det4(1,1,1,1,1,1,1,1,1,1,1,1,1,1,1)").valid or
+       parse_math_expression("det4(1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1)").valid { return 35 }
+    let det4_source: ParsedMathExpression = parse_math_expression("det4(1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1)")
+    if not det4_source.valid or det4_source.program.count != 17 or
+       det4_source.program.instructions[16].opcode != 72 or
+       det4_source.program.instructions[16].source_start != 0 or
+       det4_source.program.instructions[16].source_end != 4 { return 36 }
+    inferred = infer_math_expression_source("det4(1m,0m,0m,0m,0s,1s,0s,0s,0K,0K,1K,0K,0kg,0kg,0kg,1kg)")
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension, four_dimensional_product) { return 37 }
+    inferred = infer_math_expression_source("det4(1m,0m,0m,0m,0s,1s,0s,0s,0K,0K,1K,0K,0kg,0kg,0kg,1m)")
+    if inferred.valid or inferred.failed_at != 0 { return 38 }
+    inferred = infer_math_expression_source("det4(1e10,0,0,0,0,1e10,0,0,0,0,1e10,0,0,0,0,1e10)")
+    if not inferred.valid { return 39 }
+    inferred = infer_math_equation_source("det4(1m,0m,0m,0m,0s,1s,0s,0s,0K,0K,1K,0K,0kg,0kg,0kg,1kg) = 1m*1s*1K*1kg")
+    if not inferred.valid or
+       not same_dimension(inferred.dimension, four_dimensional_product) { return 40 }
+    inferred = infer_math_equation_source("det4(1m,0m,0m,0m,0s,1s,0s,0s,0K,0K,1K,0K,0kg,0kg,0kg,1kg) = 1m")
+    if inferred.valid { return 41 }
+    result = evaluate_math_expression("2det4(1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1)")
+    if not result.valid or not near(result.result.value, 2.0) { return 42 }
+    result = evaluate_math_expression("det4(1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1)+det3(1,0,0,0,1,0,0,0,1)")
+    if not result.valid or not near(result.result.value, 2.0) { return 43 }
+
+    # The exact factoradic enumeration must cover 24 distinct permutations,
+    # with 12 odd and 12 even signs; both compiler passes share this helper.
+    let mut seen: array<i32, 256> = [0]
+    let mut negative_count: i32 = 0
+    let mut permutation_index: i32 = 0
+    while permutation_index < 24 {
+        let permutation: MathPermutation4 = math_permutation4(permutation_index)
+        let mut signature: i32 = 0
+        let mut row: i32 = 0
+        while row < 4 {
+            let column: i32 = permutation.columns[row]
+            if column < 0 or column >= 4 { return 44 }
+            let mut previous: i32 = 0
+            while previous < row {
+                if permutation.columns[previous] == column { return 45 }
+                previous = previous + 1
+            }
+            signature = signature * 4 + column
+            row = row + 1
+        }
+        if seen[signature] != 0 { return 46 }
+        seen[signature] = 1
+        if permutation.negative { negative_count = negative_count + 1 }
+        permutation_index = permutation_index + 1
+    }
+    if negative_count != 12 { return 47 }
     println("native-math-determinants-ok")
     return 0
 }

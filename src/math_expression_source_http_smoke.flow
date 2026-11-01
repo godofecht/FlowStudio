@@ -480,6 +480,13 @@ function main() -> i32 {
     if not result.valid or not result.is_predicate or result.result.value != 0.0 { return 180 }
     result = evaluate_math_expression("approx(1m,2s,1m)")
     if result.valid or result.failed_at != 0 { return 181 }
+    # Monaco Run and production HTTP execute real native 4x4 determinant IR.
+    result = evaluate_math_expression("det4(1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1)")
+    if not result.valid or not close(result.result.value, 1.0) { return 182 }
+    result = evaluate_math_expression("det4(0,1,0,0,1,0,0,0,0,0,1,0,0,0,0,1)")
+    if not result.valid or not close(result.result.value, -1.0) { return 183 }
+    result = evaluate_math_expression("det4(true,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1)")
+    if result.valid or result.failed_at != 0 { return 184 }
     println("native-math-source-ok")
     return 0
 }

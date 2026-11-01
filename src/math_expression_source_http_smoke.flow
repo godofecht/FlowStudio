@@ -335,6 +335,37 @@ function main() -> i32 {
     result = evaluate_math_expression("21!")
     if result.valid or result.failed_at != 2 { return 122 }
 
+    # Real native HTTP execution of implicit parenthesized products.
+    result = evaluate_math_expression("2(3+4)")
+    if not result.valid or not close(result.result.value, 14.0) { return 123 }
+    result = evaluate_math_expression("(2+3)(4-1)")
+    if not result.valid or not close(result.result.value, 15.0) { return 124 }
+    result = evaluate_math_expression("2m(3s)/6s")
+    if not result.valid or not close(result.result.value, 1.0) or
+       not same_dimension(result.result.dimension, length_dimension()) { return 125 }
+    result = evaluate_math_expression("1/2(4)")
+    if not result.valid or not close(result.result.value, 2.0) { return 126 }
+    result = evaluate_math_expression("3!(2+1)")
+    if not result.valid or not close(result.result.value, 18.0) { return 127 }
+    result = evaluate_math_expression("sin(π/2)(2)")
+    if not result.valid or not close(result.result.value, 2.0) { return 128 }
+    result = evaluate_math_expression("2(3)^2")
+    if not result.valid or not close(result.result.value, 18.0) { return 129 }
+    result = evaluate_math_expression("2(true)")
+    if result.valid or result.failed_at != 1 { return 130 }
+    result = evaluate_math_expression("2(3m+1s)")
+    if result.valid or result.failed_at != 4 { return 131 }
+    let implicit_span: ParsedMathExpression = parse_math_expression("(2)(3)")
+    if not implicit_span.valid or implicit_span.program.count != 3 or
+       implicit_span.program.instructions[2].opcode != 3 or
+       implicit_span.program.instructions[2].source_start != 3 or
+       implicit_span.program.instructions[2].source_end != 3 { return 132 }
+    if parse_math_expression("2(3,4)").valid { return 133 }
+    result = evaluate_math_expression("2(3)(4)")
+    if not result.valid or not close(result.result.value, 24.0) { return 134 }
+    result = evaluate_math_expression("2(3)!²")
+    if not result.valid or not close(result.result.value, 72.0) { return 135 }
+
     println("native-math-source-ok")
     return 0
 }

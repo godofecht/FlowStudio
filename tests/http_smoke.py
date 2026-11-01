@@ -19,6 +19,7 @@ import urllib.error
 import urllib.request
 
 from spectral_interop_http import verify_spectral_interop
+from http_matrix_interop import verify_matrix_interop
 
 ROOT = "http://127.0.0.1:8751"
 
@@ -2355,6 +2356,9 @@ def main() -> None:
         # Full production Flow HTTP -> persistent CPython -> Rscript -> R plot
         # acceptance. The independent R oracle verifies every Fourier cell,
         # rejects a corrupted transfer, and survives the failed evaluation.
+        # Cross-check native Flow's exact determinant fixtures using actual
+        # persistent R QR/solve and independent Python Fraction/Cramer oracles.
+        verify_matrix_interop(request, accepted_headers)
         verify_spectral_interop(request, accepted_headers)
 
         # The production notebook controller executes mixed Flow/Python/R cells

@@ -45,6 +45,20 @@ function initialGrid() -> Grid {
     return grid
 }
 
+# A second, deliberately non-Fourier initial condition. Seed 9137 and the
+# integer residue give reproducible, bounded asymmetric values on every cell.
+function seededInitialGrid() -> Grid {
+    let mut grid: Grid = blankGrid()
+    for y in 0 to 16 {
+        for x in 0 to 16 {
+            let mut residue: i32 = 9137 + 71 * x + 113 * y + 17 * x * y
+            while residue >= 251 { residue = residue - 251 }
+            grid.values[index2(x, y)] = 1.0 + 0.1 * (residue as f64)
+        }
+    }
+    return grid
+}
+
 function conductivity() -> Grid {
     let mut grid: Grid = blankGrid()
     for y in 0 to 16 {
@@ -157,6 +171,25 @@ function main() -> i32 {
     let mut malformed: Grid = initial
     malformed.values[255] = 1001.0
     if integrate(malformed, coefficient, ratio, 48).valid { return 13 }
+    # Independently exercise every periodic face on a seeded non-Fourier
+    # field, including the conductivity discontinuity and both wrap seams.
+    let seeded: Grid = seededInitialGrid()
+    let seededFirst: SolveResult = integrate(seeded, coefficient, ratio, 48)
+    let seededHalf: SolveResult = integrate(seeded, coefficient, ratio, 24)
+    let seededComposed: SolveResult = integrate(seededHalf.grid, coefficient, ratio, 24)
+    if not seededFirst.valid or not seededHalf.valid or not seededComposed.valid { return 14 }
+    if maximumDifference(seededFirst.grid, seededComposed.grid) > 0.00000000001 { return 15 }
+    if absolute(totalMass(seededFirst.grid) - totalMass(seeded)) > 0.000000001 { return 16 }
+    let seededMutated: SolveResult = integrate(seeded, changed, ratio, 24)
+    if not seededMutated.valid or maximumDifference(seededMutated.grid, seededHalf.grid) < 0.001 {
+        return 17
+    }
+    let mut badSeeded: Grid = seeded
+    badSeeded.values[index2(0, 0)] = -1.0
+    let rejectedSeeded: SolveResult = integrate(badSeeded, coefficient, ratio, 48)
+    if rejectedSeeded.valid or maximumDifference(rejectedSeeded.grid, badSeeded) != 0.0 {
+        return 18
+    }
     println("native-variable-diffusion16-ok")
     println("FLOWSTUDIO_GRID_V1 16 16 1")
     print("U")
@@ -168,5 +201,17 @@ function main() -> i32 {
     }
     println("")
     println("FLOWSTUDIO_GRID_END")
+    # Separate protocol marker: existing heatmap consumers still render the
+    # primary U grid, while production HTTP verifies all 256 seeded values.
+    println("FLOWSTUDIO_SEEDED_GRID_V1 16 16 1")
+    print("S")
+    for y in 0 to 16 {
+        for x in 0 to 16 {
+            print(" ")
+            print(seededFirst.grid.values[index2(x, y)])
+        }
+    }
+    println("")
+    println("FLOWSTUDIO_SEEDED_GRID_END")
     return 0
 }

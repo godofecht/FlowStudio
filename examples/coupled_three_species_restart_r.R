@@ -7,7 +7,7 @@ dt <- 0.1
 exchange <- 0.07
 diffusion_x <- c(0.08, 0.13, 0.19)
 diffusion_y <- c(0.17, 0.09, 0.05)
-names <- c("a", "b", "c")
+species_names <- c("a", "b", "c")
 if (3L * n * n * 2L * chunk_steps > 147456L)
     stop("three-species restart resource limit exceeded")
 if (!exists("flowstudio_three_restart_phase", envir = .GlobalEnv, inherits = FALSE))
@@ -16,7 +16,7 @@ phase <- get("flowstudio_three_restart_phase", envir = .GlobalEnv, inherits = FA
 if (!identical(phase, 0L) && !identical(phase, 1L))
     stop("three-species restart phase invalid")
 if (phase == 0L) {
-    inputs <- lapply(names, function(name) {
+    inputs <- lapply(species_names, function(name) {
         variable <- paste0("flowstudio_three_initial_", name)
         if (!exists(variable, envir = .GlobalEnv, inherits = FALSE))
             stop("three-species restart input missing")

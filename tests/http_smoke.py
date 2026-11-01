@@ -1227,9 +1227,11 @@ def main() -> None:
     status, body = request("POST", "/api/run/flow", native_four, accepted_headers)
     assert status == 200 and "native-math-dimension-four-ok" in body, (
         "native four-unknown SI HTTP execution", status, body)
+    # Match only the quoted equation: HTTP source compaction removes
+    # whitespace between list entries, but never changes string contents.
     corrupted_four = native_four.replace(
-        '"x*y*z*w = 1m*1m*1m*1m", "x/y = 1", "y/z = 1", "z/w = 1",',
-        '"x*y*z*w = 1m³", "x/y = 1", "y/z = 1", "z/w = 1",',
+        '"x*y*z*w = 1m*1m*1m*1m"',
+        '"x*y*z*w = 1m³"',
         1,
     )
     assert corrupted_four != native_four

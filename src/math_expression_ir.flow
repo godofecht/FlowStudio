@@ -34,9 +34,10 @@
 #          75 mean, 76 population variance, 77 RMS: 1..8 same-unit operands.
 #          78 median, 79 median absolute deviation: 1..8 same-unit operands.
 #          80 quantile(p, x1, ..., xn): Type-7 linear quantile, 1..7 samples.
-#          81 fd1(left, right, step): centered first derivative.
-#          82 fd2(left, center, right, step): centered second derivative.
-#          83 laplacian2(center, left, right, down, up, dx, dy): 2D five-point stencil.
+#          81-83 reserved for native dispersion statistics (PR #361).
+#          84 fd1(left, right, step): centered first derivative.
+#          85 fd2(left, center, right, step): centered second derivative.
+#          86 laplacian2(center, left, right, down, up, dx, dy): 2D five-point stencil.
 #          The instruction exponent stores the actual variadic arity.
 #          Every permutation product must have the same SI dimension.
 # Predicate values are dimensionless 0/1 with a separate runtime type bit.
@@ -1145,17 +1146,17 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
             depth = base + 1
             stack[base] = quantity(output_value, input_dimension)
             predicate[base] = false
-        } elif opcode == 81 or opcode == 82 or opcode == 83 {
+        } elif opcode == 84 or opcode == 85 or opcode == 86 {
             # Executable centered differences on physical scalar samples.
             # fd1/fd2 permit arbitrary physical step dimensions; laplacian2
             # requires two positive spatial lengths. No symbolic PDE claim.
             let mut arity: i32 = 3
             let mut fields: i32 = 2
-            if opcode == 82 {
+            if opcode == 85 {
                 arity = 4
                 fields = 3
             }
-            if opcode == 83 {
+            if opcode == 86 {
                 arity = 7
                 fields = 5
             }
@@ -1180,7 +1181,7 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
             if predicate[step_position] or not bounded_value(step.value) or step.value <= 0.0 {
                 return failed(instruction.source_start)
             }
-            if opcode == 83 {
+            if opcode == 86 {
                 let other: Quantity = stack[step_position + 1]
                 if predicate[step_position + 1] or not bounded_value(other.value) or
                    other.value <= 0.0 or
@@ -1190,17 +1191,17 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
                 }
             }
             let mut output_dimension: Dimension = quotient_dimension(field_dimension, step.dimension)
-            if opcode != 81 {
+            if opcode != 84 {
                 output_dimension = quotient_dimension(output_dimension, step.dimension)
             }
             if not bounded_dimension(output_dimension) { return failed(instruction.source_start) }
             let mut output_value: f64 = 0.0
             if scale > 0.0 {
-                if opcode == 81 {
+                if opcode == 84 {
                     let left: f64 = stack[base].value / scale
                     let right: f64 = stack[base + 1].value / scale
                     output_value = ((right - left) * 0.5 / step.value) * scale
-                } elif opcode == 82 {
+                } elif opcode == 85 {
                     let left: f64 = stack[base].value / scale
                     let center: f64 = stack[base + 1].value / scale
                     let right: f64 = stack[base + 2].value / scale

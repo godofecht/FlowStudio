@@ -329,15 +329,15 @@ export function infer_math_ir(program: MathProgram) -> MathInferredType {
             depth = base + 1
             dimensions[base] = output_dimension
             predicates[base] = false
-        } elif opcode == 81 or opcode == 82 or opcode == 83 {
+        } elif opcode == 84 or opcode == 85 or opcode == 86 {
             # Infer derivative dimensions without evaluating step sizes.
             let mut arity: i32 = 3
             let mut fields: i32 = 2
-            if opcode == 82 {
+            if opcode == 85 {
                 arity = 4
                 fields = 3
             }
-            if opcode == 83 {
+            if opcode == 86 {
                 arity = 7
                 fields = 5
             }
@@ -356,7 +356,7 @@ export function infer_math_ir(program: MathProgram) -> MathInferredType {
             let step_position: i32 = base + fields
             let step_dimension: Dimension = dimensions[step_position]
             if predicates[step_position] { return static_error(instruction.source_start) }
-            if opcode == 83 {
+            if opcode == 86 {
                 if predicates[step_position + 1] or
                    not same_dimension(step_dimension, length_dimension()) or
                    not same_dimension(dimensions[step_position + 1], length_dimension()) {
@@ -364,7 +364,7 @@ export function infer_math_ir(program: MathProgram) -> MathInferredType {
                 }
             }
             let mut output_dimension: Dimension = quotient_dimension(field_dimension, step_dimension)
-            if opcode != 81 {
+            if opcode != 84 {
                 output_dimension = quotient_dimension(output_dimension, step_dimension)
             }
             if not static_bounded_dimension(output_dimension) {

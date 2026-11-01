@@ -16,7 +16,7 @@ five-point axis-aligned 2D Laplacian, allowing `dx != dy` and requiring
 positive spatial lengths for both spacings. Its output dimension is
 `[field]/m²`.
 
-The actual source parser lowers calls to opcodes 81–83, with exact
+The actual source parser lowers calls to opcodes 84–86, with exact
 argument counts and UTF-8 byte spans. The native evaluator checks all
 sample dimensions, predicate types, positive nonzero spacing, bounded
 finite values and result dimensions. The independent static pass checks

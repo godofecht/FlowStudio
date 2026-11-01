@@ -62,15 +62,15 @@ function main() -> i32 {
     if result.valid or result.failed_at != 0 { return 20 }
     let mut parsed: ParsedMathExpression = parse_math_expression("fd1(1m,3m,1s)")
     if not parsed.valid or parsed.program.count != 4 or
-       parsed.program.instructions[3].opcode != 81 or
+       parsed.program.instructions[3].opcode != 84 or
        parsed.program.instructions[3].source_start != 0 or
        parsed.program.instructions[3].source_end != 3 { return 21 }
     parsed = parse_math_expression("fd2(1m,2m,3m,1s)")
     if not parsed.valid or parsed.program.count != 5 or
-       parsed.program.instructions[4].opcode != 82 { return 22 }
+       parsed.program.instructions[4].opcode != 85 { return 22 }
     parsed = parse_math_expression("laplacian2(0K,1K,1K,1K,1K,1m,1m)")
     if not parsed.valid or parsed.program.count != 8 or
-       parsed.program.instructions[7].opcode != 83 or
+       parsed.program.instructions[7].opcode != 86 or
        parsed.program.instructions[7].source_end != 10 { return 23 }
     if parse_math_expression("fd1(1m,2m)").valid or
        parse_math_expression("fd2(1m,2m,3m)").valid or

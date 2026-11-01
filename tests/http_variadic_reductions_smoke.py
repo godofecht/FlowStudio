@@ -4,6 +4,7 @@ from pathlib import Path
 
 from http_smoke import request
 from variadic_oracle import inject_variadic_assertions, variadic_cases
+from unicode_variadic_oracle import inject_unicode_variadic_assertions, unicode_variadic_cases
 
 
 def bundled_source(root: Path) -> str:
@@ -50,8 +51,24 @@ def main() -> None:
     assert status == 200, ("tampered source must compile", status, body)
     status, body = request("POST", "/api/run/flow", tampered, headers)
     assert status == 422, ("tampered native execution must fail", status, body)
-    print(f"PASS: native SI variadic reductions over real HTTP, 31 baseline "
-          f"+ {len(variadic_cases())} seeded cases and deliberate HTTP 422")
+    # Separate bounded source keeps both seeded batteries below 128 KiB.
+    unicode_source = inject_unicode_variadic_assertions(base_source)
+    status, body = request("POST", "/api/check/flow", unicode_source, headers)
+    assert status == 200, ("Unicode source compile", status, body)
+    status, body = request("POST", "/api/run/flow", unicode_source, headers)
+    assert status == 200 and "native-math-variadic-ok" in body, (
+        "Unicode native execution", status, body)
+
+    unicode_tampered = inject_unicode_variadic_assertions(base_source, sabotage=True)
+    assert unicode_tampered != unicode_source
+    status, body = request("POST", "/api/check/flow", unicode_tampered, headers)
+    assert status == 200, ("tampered Unicode source must compile", status, body)
+    status, body = request("POST", "/api/run/flow", unicode_tampered, headers)
+    assert status == 422, ("tampered Unicode native execution must fail", status, body)
+    print(f"PASS: native SI reductions over real HTTP, 50 baseline "
+          f"+ {len(variadic_cases())} ASCII and "
+          f"{len(unicode_variadic_cases())} Unicode seeded cases, "
+          f"both with deliberate HTTP 422")
 
 
 if __name__ == "__main__":

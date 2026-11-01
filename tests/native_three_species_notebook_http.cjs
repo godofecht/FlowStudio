@@ -84,7 +84,7 @@ async function run({post, routes, flow, read, parseCells, create, format}) {
   const restart = read("coupled_three_species_restart_r.R");
   assert.ok(Buffer.byteLength(restart, "utf8") < 65536);
   const restartSource = [
-    "# %% [r]\nflowstudio_three_restart_phase <- 0L\n",
+    "# %% [r]\nassign('flowstudio_three_restart_phase', 0L, envir=.GlobalEnv)\n",
     "# %% [r]\n" + restart + "\n",
     "# %% [r]\n" + restart + "\n"
   ].join("");

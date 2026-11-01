@@ -168,6 +168,50 @@ def main() -> None:
         assert all(math.isfinite(value) for value in actual)
         assert max(abs(a - b) for a, b in zip(actual, expected)) < 0.002, (
             "native 3D computed slice", name, actual[:4], expected[:4])
+    # Verify the complete two-species 8x8x8 result (1,024 actual voxels),
+    # not just the 128 z=0 values exposed by the SVG heatmap.
+    from test_native_coupled_volume8_oracle import spatial_energy
+    full_markers = [i for i, line in enumerate(volume_lines)
+                    if line == "FLOWSTUDIO_VOLUME_FIELDS_V1 8 8 8 2"]
+    assert len(full_markers) == 1, ("native full-volume frame", body[-500:])
+    full_at = full_markers[0]
+    assert volume_lines[full_at + 3] == "FLOWSTUDIO_VOLUME_FIELDS_END"
+    expected_fields = spectral(64)
+    for offset, name in enumerate(("U", "V")):
+        tokens = volume_lines[full_at + 1 + offset].split()
+        assert tokens[0] == name and len(tokens) == 513, (
+            "native full 3D field", name, len(tokens))
+        actual = [float(value) for value in tokens[1:]]
+        assert all(math.isfinite(value) for value in actual)
+        assert max(abs(a - b) for a, b in zip(actual, expected_fields[offset])) < .002, (
+            "native full 3D Fourier oracle", name, actual[:4], expected_fields[offset][:4])
+    energy_markers = [i for i, line in enumerate(volume_lines)
+                      if line == "FLOWSTUDIO_VOLUME_ENERGY_V1 64 1"]
+    assert len(energy_markers) == 1, ("native 3D energy frame", body[-500:])
+    energy_at = energy_markers[0]
+    assert volume_lines[energy_at + 2] == "FLOWSTUDIO_VOLUME_ENERGY_END"
+    energy_tokens = volume_lines[energy_at + 1].split()
+    assert energy_tokens[0] == "E" and len(energy_tokens) == 65
+    previous_energy = spatial_energy(spectral(0))
+    for step, token in enumerate(energy_tokens[1:], start=1):
+        measured = float(token)
+        expected_energy = spatial_energy(spectral(step))
+        tolerance = .05 + .0001 * expected_energy
+        assert math.isfinite(measured) and abs(measured - expected_energy) < tolerance, (
+            "native 3D intermediate energy", step, measured, expected_energy)
+        assert measured <= previous_energy + tolerance, (
+            "native 3D energy increased", step)
+        previous_energy = measured
+    # This mutation preserves the computed final field and mass, but inverts
+    # a real native intermediate invariant; execution must fail with HTTP 422.
+    reversed_energy = volume_source.replace(
+        "if energy > previousEnergy + 0.0000001 { return 15 }",
+        "if energy < previousEnergy + 0.0000001 { return 15 }", 1)
+    assert reversed_energy != volume_source
+    status, body = request("POST", "/api/check/flow", reversed_energy, accepted_headers)
+    assert status == 200, ("native 3D reversed energy compile", status, body[:500])
+    status, body = request("POST", "/api/run/flow", reversed_energy, accepted_headers)
+    assert status == 422, ("native 3D reversed energy rejection", status, body[:500])
     corrupted_volume = volume_source.replace(
         "let tolerance: f64 = 0.000000002", "let tolerance: f64 = -1.0", 1)
     assert corrupted_volume != volume_source

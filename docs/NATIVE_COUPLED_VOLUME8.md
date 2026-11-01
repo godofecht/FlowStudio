@@ -33,6 +33,20 @@ checks every one of the 128 actual SVG grid-cell values against the
 independently evolved reference. The 8×8 heatmaps are **computed slices of
 3D volumes**, not claims of general 3D visualization.
 
+The native program also checks **every one of 64 intermediate steps** for
+centered two-species spatial-energy contraction, combined mass conservation
+and the global maximum principle. A versioned
+`FLOWSTUDIO_VOLUME_ENERGY_V1` frame emits 64 computed energy values, and
+`FLOWSTUDIO_VOLUME_FIELDS_V1` emits the complete 1,024-value 3D state.
+Production HTTP compares every voxel against the independent Fourier
+oracle and every intermediate energy against independently reconstructed
+U/V means. Deliberately reversing the native energy invariant must compile
+but fail execution with HTTP 422. Physical Ubuntu Chromium captures the
+actual Monaco-triggered HTTP response and independently verifies all 1,024
+voxels and all 64 energy samples, in addition to the 128 SVG slice cells.
+The 64-step trace does not change the 262,144 species-voxel-step ceiling
+for an individual integration.
+
 Reproduce with:
 
 ```sh

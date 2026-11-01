@@ -198,6 +198,27 @@ function maxDifference(first: State, second: State) -> f64 {
     return error
 }
 
+
+# Spatial fluctuation energy: each species is centered on its own mean.
+# Conservative diffusion and convex exchange must contract this quantity.
+function spatialEnergy(state: State) -> f64 {
+    let mut sumU: f64 = 0.0
+    let mut sumV: f64 = 0.0
+    for i in 0 to 512 {
+        sumU = sumU + state.u.values[i]
+        sumV = sumV + state.v.values[i]
+    }
+    let meanU: f64 = sumU / 512.0
+    let meanV: f64 = sumV / 512.0
+    let mut energy: f64 = 0.0
+    for i in 0 to 512 {
+        let du: f64 = state.u.values[i] - meanU
+        let dv: f64 = state.v.values[i] - meanV
+        energy = energy + du * du + dv * dv
+    }
+    return energy
+}
+
 function totalMass(state: State) -> f64 {
     let mut mass: f64 = 0.0
     for i in 0 to 512 {
@@ -260,6 +281,38 @@ function main() -> i32 {
     malformed.u.values[511] = 1001.0
     let bad: Result = integrate(malformed, equation, 64)
     if bad.valid or maxDifference(bad.state, malformed) != 0.0 { return 14 }
+    # Check every actual 3D intermediate state, not just the final slice.
+    # The same 64-step trajectory emits a bounded 64-value energy trace.
+    let mut trajectory: State = initial
+    let mut previousEnergy: f64 = spatialEnergy(trajectory)
+    let mut low: f64 = initial.v.values[0]
+    let mut high: f64 = initial.u.values[0]
+    for i in 0 to 512 {
+        if initial.u.values[i] < low { low = initial.u.values[i] }
+        if initial.v.values[i] < low { low = initial.v.values[i] }
+        if initial.u.values[i] > high { high = initial.u.values[i] }
+        if initial.v.values[i] > high { high = initial.v.values[i] }
+    }
+    println("FLOWSTUDIO_VOLUME_ENERGY_V1 64 1")
+    print("E")
+    for step in 0 to 64 {
+        trajectory = advance(trajectory, equation)
+        let energy: f64 = spatialEnergy(trajectory)
+        if energy > previousEnergy + 0.0000001 { return 15 }
+        if absolute(totalMass(trajectory) - mass) > 0.0000001 { return 16 }
+        for i in 0 to 512 {
+            if trajectory.u.values[i] < low - 0.000000001 or
+               trajectory.u.values[i] > high + 0.000000001 or
+               trajectory.v.values[i] < low - 0.000000001 or
+               trajectory.v.values[i] > high + 0.000000001 { return 17 }
+        }
+        print(" ")
+        print(energy)
+        previousEnergy = energy
+    }
+    println("")
+    println("FLOWSTUDIO_VOLUME_ENERGY_END")
+    if maxDifference(trajectory, first.state) > 0.00000000001 { return 18 }
     println("native-coupled-volume8-ok")
     println("FLOWSTUDIO_GRID_V1 8 8 2")
     print("U")
@@ -279,5 +332,21 @@ function main() -> i32 {
     }
     println("")
     println("FLOWSTUDIO_GRID_END")
+    # Complete native 3D fields, separately framed from the z=0 SVG slice.
+    # Production HTTP and physical Chromium independently verify all 1,024.
+    println("FLOWSTUDIO_VOLUME_FIELDS_V1 8 8 8 2")
+    print("U")
+    for i in 0 to 512 {
+        print(" ")
+        print(first.state.u.values[i])
+    }
+    println("")
+    print("V")
+    for i in 0 to 512 {
+        print(" ")
+        print(first.state.v.values[i])
+    }
+    println("")
+    println("FLOWSTUDIO_VOLUME_FIELDS_END")
     return 0
 }

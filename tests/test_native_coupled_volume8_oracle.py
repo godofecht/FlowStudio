@@ -117,6 +117,13 @@ def maximum_error(a, b) -> float:
     return max(abs(x-y) for fa, fb in zip(a, b) for x, y in zip(fa, fb))
 
 
+
+def spatial_energy(state) -> float:
+    """Sum of centered U/V variances, independent of their exchanged means."""
+    return sum(sum((v - sum(field) / COUNT) ** 2 for v in field)
+               for field in state)
+
+
 def z_slice(state, z: int = 0) -> tuple[list[float], list[float]]:
     return tuple([field[index(x, y, z)] for y in range(SIDE)
                   for x in range(SIDE)] for field in state)
@@ -173,12 +180,31 @@ class NativeCoupledVolumeOracle(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     direct(state, steps, ratio, exchange, tensor)
 
+    def test_every_3d_intermediate_energy_and_full_volume(self):
+        state = initial()
+        initial_low = min(min(field) for field in state)
+        initial_high = max(max(field) for field in state)
+        previous_energy = spatial_energy(state)
+        self.assertGreater(previous_energy, 1000)
+        for step in range(1, 65):
+            state = direct(state, 1)
+            reference = spectral(step)
+            self.assertLess(maximum_error(state, reference), 2e-10)
+            self.assertLessEqual(spatial_energy(state), previous_energy + 1e-8)
+            self.assertGreaterEqual(min(min(field) for field in state), initial_low - 1e-9)
+            self.assertLessEqual(max(max(field) for field in state), initial_high + 1e-9)
+            previous_energy = spatial_energy(state)
+        self.assertLess(previous_energy, spatial_energy(initial()))
+        self.assertEqual(sum(len(field) for field in state), 1024)
+
     def test_native_source_contract_and_plot_slice(self):
         source = SOURCE.read_text(encoding="utf-8")
         self.assertLess(len(source.encode("utf-8")), 128*1024)
         for fragment in ("function advance(", "function integrate(",
                          "function reference(", "steps > 256",
                          "FLOWSTUDIO_GRID_V1 8 8 2",
+                         "FLOWSTUDIO_VOLUME_FIELDS_V1 8 8 8 2",
+                         "FLOWSTUDIO_VOLUME_ENERGY_V1 64 1",
                          "native-coupled-volume8-ok", "index3(x, y, 0)"):
             self.assertIn(fragment, source)
         self.assertEqual(len(z_slice(spectral(64))[0]), 64)

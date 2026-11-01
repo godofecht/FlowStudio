@@ -33,6 +33,31 @@ Markov oracle, and deliberately corrupted seeded conservation must return
 HTTP 422. The original `FLOWSTUDIO_GRID_V1` frame remains unchanged
 for the existing physical Chromium heatmap.
 
+## Stepwise thermodynamic and fixed-point acceptance
+
+The native Flow solver now independently checks both the Fourier and seed-9137
+fields **after every one of the 48 updates**, not merely at the final
+checkpoint. Its variance about the current mean must never increase
+(tolerance 1e-8), and every intermediate cell must remain within the
+initial global minimum/maximum (tolerance 1e-9). Final variance must
+strictly decrease. Constant 23.75 fields and zero-timestep-ratio seeded
+fields are exact fixed points. The original 32,768 cell-step limit per
+integration call and 128 KiB HTTP source cap remain enforced.
+
+Two additional standard-library Python tests independently assemble the
+sparse Markov transition matrix, compare every timestep against the
+separate direct finite-volume stencil, check both invariants, and prove
+the energy check discriminates a deliberately sign-reversed
+anti-diffusion step even though it still conserves mass. The production
+HTTP suite also compiles a source-mutated negative-flux variant through
+the real Flow compiler and requires the actual native run to return
+HTTP 422 from the intermediate energy assertion.
+
+**Qualification pending:** exact-head Linux/macOS native compiler,
+production HTTP, Ubuntu Chromium and post-merge CI. The Python oracle
+can run locally without the native compiler; that alone is not
+evidence that the Flow program executes.
+
 The production `tests/http_smoke.py` compiles and runs the checked-in Flow
 source through real `/api/check/flow` and `/api/run/flow` endpoints,
 independently checks every returned cell against the sparse operator, and

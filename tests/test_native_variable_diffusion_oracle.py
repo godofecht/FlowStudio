@@ -156,6 +156,48 @@ class VariableConductivityOracle(unittest.TestCase):
         self.assertGreater(maximum_error(
             first, direct(values, transposed, 48)), .01)
 
+    def test_stepwise_energy_decay_and_maximum_principle(self):
+        """Every actual timestep must contract variance, not just the final grid."""
+        coefficients = conductivity()
+        for label, values in (("Fourier", initial()), ("seed-9137", seeded_initial())):
+            with self.subTest(field=label):
+                state = values[:]
+                mean = sum(values) / COUNT
+                energy = lambda grid: sum((value - mean) ** 2 for value in grid)
+                previous_energy = energy(state)
+                low, high = min(values), max(values)
+                for step in range(1, 49):
+                    next_state = matrix_oracle(state, coefficients, 1)
+                    self.assertLess(maximum_error(
+                        next_state, direct(state, coefficients, 1)), 2e-12)
+                    current_energy = energy(next_state)
+                    self.assertLessEqual(current_energy, previous_energy + 1e-8,
+                                         (label, step, current_energy, previous_energy))
+                    self.assertGreaterEqual(min(next_state), low - 1e-9)
+                    self.assertLessEqual(max(next_state), high + 1e-9)
+                    state, previous_energy = next_state, current_energy
+                self.assertLess(previous_energy, energy(values))
+                self.assertLess(maximum_error(
+                    state, matrix_oracle(values, coefficients, 48)), 2e-12)
+
+    def test_constant_and_zero_ratio_fixed_points_and_antidiffusion_control(self):
+        coefficients = conductivity()
+        constant = [23.75] * COUNT
+        self.assertEqual(direct(constant, coefficients, 48), constant)
+        self.assertLess(maximum_error(matrix_oracle(constant, coefficients, 48), constant), 1e-12)
+        seeded = seeded_initial()
+        self.assertEqual(direct(seeded, coefficients, 48, ratio=0), seeded)
+        self.assertEqual(matrix_oracle(seeded, coefficients, 48, ratio=0), seeded)
+        # Deliberately reverse the sign in the independent Markov operator.
+        # The resulting energy growth proves the contraction test detects a
+        # sign error that a mass-only acceptance would miss.
+        values = initial()
+        mean = sum(values) / COUNT
+        energy = lambda grid: sum((value - mean) ** 2 for value in grid)
+        reversed_step = matrix_oracle(values, coefficients, 1, ratio=-RATIO)
+        self.assertAlmostEqual(sum(reversed_step), sum(values), delta=1e-9)
+        self.assertGreater(energy(reversed_step), energy(values) + 100)
+
     def test_negative_inputs_and_budget(self):
         values, coefficients = initial(), conductivity()
         bad_values = values[:]
@@ -185,7 +227,8 @@ class VariableConductivityOracle(unittest.TestCase):
                          "FLOWSTUDIO_GRID_V1 16 16 1",
                          "native-variable-diffusion16-ok",
                          "FLOWSTUDIO_SEEDED_GRID_V1 16 16 1",
-                         "seededInitialGrid"):
+                         "seededInitialGrid", "function quadraticEnergy(",
+                         "function dissipatesAtEveryStep("):
             self.assertIn(fragment, source)
 
 

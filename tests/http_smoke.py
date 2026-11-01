@@ -226,6 +226,17 @@ def main() -> None:
         variable_seeded_initial(), variable_conductivity(), 48)
     assert max(abs(a - b) for a, b in zip(seeded_actual, seeded_expected)) < 0.002, (
         "seeded 256-cell sparse oracle", seeded_actual[:4], seeded_expected[:4])
+    # Mass conservation alone cannot detect reversed diffusion. Force the
+    # real Flow intermediate-step energy check to run with negative flux:
+    # compilation must succeed but the native executable must return 422.
+    anti_diffusive = variable_source.replace(
+        "if not dissipatesAtEveryStep(initial, coefficient, ratio, 48) { return 19 }",
+        "if not dissipatesAtEveryStep(initial, coefficient, -ratio, 48) { return 19 }", 1)
+    assert anti_diffusive != variable_source
+    status, body = request("POST", "/api/check/flow", anti_diffusive, accepted_headers)
+    assert status == 200, ("anti-diffusive negative-control compile", status, body[:500])
+    status, body = request("POST", "/api/run/flow", anti_diffusive, accepted_headers)
+    assert status == 422, ("anti-diffusive intermediate energy rejection", status, body[:500])
     corrupted_seeded = variable_source.replace(
         "if absolute(totalMass(seededFirst.grid) - totalMass(seeded)) > 0.000000001",
         "if absolute(totalMass(seededFirst.grid) - totalMass(seeded)) > -1.0", 1)

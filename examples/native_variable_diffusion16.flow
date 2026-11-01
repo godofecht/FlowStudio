@@ -129,6 +129,41 @@ function totalMass(grid: Grid) -> f64 {
     return mass
 }
 
+# Symmetric harmonic fluxes are a doubly-stochastic contraction.
+# Check variance and the maximum principle at every intermediate step.
+function quadraticEnergy(grid: Grid) -> f64 {
+    let mean: f64 = totalMass(grid) / 256.0
+    let mut energy: f64 = 0.0
+    for i in 0 to 256 {
+        let difference: f64 = grid.values[i] - mean
+        energy = energy + difference * difference
+    }
+    return energy
+}
+
+function dissipatesAtEveryStep(initial: Grid, coefficient: Grid, ratio: f64, steps: i32) -> bool {
+    let mut minimum: f64 = initial.values[0]
+    let mut maximum: f64 = initial.values[0]
+    for i in 0 to 256 {
+        if initial.values[i] < minimum { minimum = initial.values[i] }
+        if initial.values[i] > maximum { maximum = initial.values[i] }
+    }
+    let mut previous: Grid = initial
+    let mut previousEnergy: f64 = quadraticEnergy(previous)
+    for step in 0 to steps {
+        let next: Grid = advance(previous, coefficient, ratio)
+        let energy: f64 = quadraticEnergy(next)
+        if energy > previousEnergy + 0.00000001 { return false }
+        for i in 0 to 256 {
+            if next.values[i] < minimum - 0.000000001 or
+               next.values[i] > maximum + 0.000000001 { return false }
+        }
+        previous = next
+        previousEnergy = energy
+    }
+    return true
+}
+
 function maximumDifference(first: Grid, second: Grid) -> f64 {
     let mut error: f64 = 0.0
     for i in 0 to 256 {
@@ -190,6 +225,19 @@ function main() -> i32 {
     if rejectedSeeded.valid or maximumDifference(rejectedSeeded.grid, badSeeded) != 0.0 {
         return 18
     }
+    # Final-only checks can miss unstable intermediate excursions.
+    if not dissipatesAtEveryStep(initial, coefficient, ratio, 48) { return 19 }
+    if not dissipatesAtEveryStep(seeded, coefficient, ratio, 48) { return 20 }
+    if quadraticEnergy(first.grid) >= quadraticEnergy(initial) or
+       quadraticEnergy(seededFirst.grid) >= quadraticEnergy(seeded) { return 21 }
+    let mut constant: Grid = blankGrid()
+    for i in 0 to 256 { constant.values[i] = 23.75 }
+    let constantResult: SolveResult = integrate(constant, coefficient, ratio, 48)
+    if not constantResult.valid or maximumDifference(constantResult.grid, constant) != 0.0 {
+        return 22
+    }
+    let zeroRatio: SolveResult = integrate(seeded, coefficient, 0.0, 48)
+    if not zeroRatio.valid or maximumDifference(zeroRatio.grid, seeded) != 0.0 { return 23 }
     println("native-variable-diffusion16-ok")
     println("FLOWSTUDIO_GRID_V1 16 16 1")
     print("U")

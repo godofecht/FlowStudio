@@ -93,7 +93,7 @@ def verify_three_species_restart(request, headers: dict[str, str],
     restart = (ROOT / "examples/coupled_three_species_restart_r.R").read_text(encoding="utf-8")
     assert len(restart.encode("utf-8")) < 65536
     status, body = request("POST", "/api/run/r",
-                           "flowstudio_three_restart_phase <- 0L", headers)
+                           "assign('flowstudio_three_restart_phase', 0L, envir=.GlobalEnv)", headers)
     assert status == 200, ("restart reset", status, body[:300])
 
     def run_chunk(expected_phase: int) -> dict[str, list[float]]:
@@ -129,8 +129,12 @@ def verify_three_species_restart(request, headers: dict[str, str],
     first = run_chunk(1)
     status, body = request(
         "POST", "/api/run/r",
-        "flowstudio_three_restart_backup <- lapply(flowstudio_three_restart_state, "
-        "function(f) f + 0); flowstudio_three_restart_state[[1L]][1L,1L] <- NaN",
+        "assign('flowstudio_three_restart_backup', "
+        "lapply(get('flowstudio_three_restart_state', envir=.GlobalEnv), "
+        "function(f) f + 0), envir=.GlobalEnv); "
+        "corrupt <- get('flowstudio_three_restart_state', envir=.GlobalEnv); "
+        "corrupt[[1L]][1L,1L] <- NaN; "
+        "assign('flowstudio_three_restart_state', corrupt, envir=.GlobalEnv)",
         headers)
     assert status == 200, ("checkpoint corruption setup", status, body[:300])
     status, body = request("POST", "/api/run/r", restart, headers)
@@ -142,7 +146,9 @@ def verify_three_species_restart(request, headers: dict[str, str],
         "failed restart did not advance phase", status, body[:300])
     status, body = request(
         "POST", "/api/run/r",
-        "flowstudio_three_restart_state <- flowstudio_three_restart_backup",
+        "assign('flowstudio_three_restart_state', "
+        "get('flowstudio_three_restart_backup', envir=.GlobalEnv), "
+        "envir=.GlobalEnv)",
         headers)
     assert status == 200, ("checkpoint recovery", status, body[:300])
 
@@ -165,7 +171,7 @@ def verify_three_species_restart(request, headers: dict[str, str],
 
     # A second 24+24 replay must reproduce the exact checkpoint and final fields.
     status, body = request("POST", "/api/run/r",
-                           "flowstudio_three_restart_phase <- 0L", headers)
+                           "assign('flowstudio_three_restart_phase', 0L, envir=.GlobalEnv)", headers)
     assert status == 200, ("restart replay reset", status, body[:300])
     replay_first = run_chunk(1)
     replay_second = run_chunk(2)

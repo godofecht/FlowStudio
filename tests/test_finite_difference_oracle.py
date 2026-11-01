@@ -56,8 +56,8 @@ def inject_finite_difference_assertions(source: str, *, start: int = 0,
         numeric = float(expected + (1 if sabotage and index == start else 0))
         statements.append(
             f'    result = evaluate_math_expression("{expression}")\n'
-            f'    if not result.valid or not near(result.result.value,{numeric}): '
-            f'return {100 + index}'
+            f'    if not result.valid or not near(result.result.value,{numeric}) '
+            f'{{ return {100 + index} }}'
         )
     # HTTP bundling removes leading indentation; match the semantic marker.
     marker = 'println("native-math-finite-difference-ok")'

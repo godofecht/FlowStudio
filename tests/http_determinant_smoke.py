@@ -2,7 +2,7 @@
 """Execute the checked-in native SI-aware matrix determinants over real HTTP."""
 from pathlib import Path
 
-from http_smoke import request
+from http_smoke import request, compact_native_math_line
 from determinant_oracle import inject_native_assertions, matrix_cases
 
 
@@ -18,7 +18,7 @@ def main() -> None:
     )
     source = "\n".join(
         "\n".join(
-            line.strip().removeprefix("export ")
+            compact_native_math_line(line)
             for line in (root / path).read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.lstrip().startswith("#")
             if not line.startswith("import .math_dimensions {")

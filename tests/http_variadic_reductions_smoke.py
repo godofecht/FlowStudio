@@ -38,18 +38,21 @@ def main() -> None:
     root = Path(__file__).resolve().parents[1]
     base_source = bundled_source(root)
     assert "native-math-variadic-ok" in base_source
-    source = inject_variadic_assertions(base_source)
     headers = {"X-FlowStudio-Intent": "run"}
-    status, body = request("POST", "/api/check/flow", source, headers)
-    assert status == 200, ("variadic source compile", status, body)
-    status, body = request("POST", "/api/run/flow", source, headers)
-    assert status == 200 and "native-math-variadic-ok" in body, (
-        "variadic native execution", status, body)
+    # Preserve all 48 independent ASCII cases while respecting the actual
+    # 128 KiB production HTTP request budget as the native parser grows.
+    for start in (0, 24):
+        source = inject_variadic_assertions(base_source, start=start, stop=start + 24)
+        status, body = request("POST", "/api/check/flow", source, headers)
+        assert status == 200, ("variadic source compile", start, status, body)
+        status, body = request("POST", "/api/run/flow", source, headers)
+        assert status == 200 and "native-math-variadic-ok" in body, (
+            "variadic native execution", start, status, body)
 
     # Sabotage only the first independently computed integer expectation.
     # Production compilation must still succeed, execution must fail closed.
-    tampered = inject_variadic_assertions(base_source, sabotage=True)
-    assert tampered != source
+    tampered = inject_variadic_assertions(base_source, sabotage=True, start=0, stop=24)
+    assert tampered != inject_variadic_assertions(base_source, start=0, stop=24)
     status, body = request("POST", "/api/check/flow", tampered, headers)
     assert status == 200, ("tampered source must compile", status, body)
     status, body = request("POST", "/api/run/flow", tampered, headers)

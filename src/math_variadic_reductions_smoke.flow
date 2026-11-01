@@ -94,5 +94,6 @@ function main() -> i32 {
     if inferred.valid { return 30 }
     inferred = infer_math_expression_source("product(2m,3s)/6s")
     if not inferred.valid or not same_dimension(inferred.dimension, length) { return 31 }
+    println("native-math-variadic-ok")
     return 0
 }

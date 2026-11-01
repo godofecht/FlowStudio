@@ -1,3 +1,38 @@
+## 2026-11-01: native SI finite differences, manufactured refinement and real Flow/R/Python HTTP (verified)
+
+[PR #363](https://github.com/godofecht/FlowStudio/pull/363) merged as
+[812a0feb](https://github.com/godofecht/FlowStudio/commit/812a0feb5654e9c9428f2645ee857f9766319e65)
+after [exact-head CI #41358442672](https://github.com/godofecht/FlowStudio/actions/runs/41358442672)
+passed all four Ubuntu/macOS source and native jobs. The production native Flow 2.0
+scalar expression IR now evaluates SI-aware centered `fd1`, `fd2` and anisotropic
+`laplacian2` with positive-spacing and predicate/dimension rejection, parser
+source spans, 34 native smoke assertions and 27 seeded exact-rational polynomial
+fixtures. [PR #364](https://github.com/godofecht/FlowStudio/pull/364)
+added three non-quadratic manufactured fields, coarse/fine stencil comparisons
+and exact 4:1 truncation-error ratios, also exercised through real Flow HTTP.
+
+[PR #366](https://github.com/godofecht/FlowStudio/pull/366) merged as
+[42e1b37d](https://github.com/godofecht/FlowStudio/commit/42e1b37d295b0bfc00e8a70d2f2deb15186dee87).
+It makes the previously checked-in native finite-difference HTTP acceptance
+a mandatory real server gate and independently cross-verifies all 27 fixtures
+through persistent base R and CPython exact-rational kernels. The live
+`/api/check/flow` and `/api/run/flow` paths compile/execute seeded and
+manufactured tests and require HTTP 422 for deliberately corrupted numerical
+expectations; the Python oracle also requires HTTP 422 on corruption and checks
+R/Python interpreter recovery. HTTP sources and frames have explicit
+128 KiB/24 KiB limits. [Exact-head CI #41360256129](https://github.com/godofecht/FlowStudio/actions/runs/41360256129)
+passed **4/4** Ubuntu 24.04/macOS 15 source/native jobs, including R/C FlowJIT,
+production HTTP and Ubuntu physical Chromium. Each source platform passed
+1,201 JavaScript tests (12 skipped) and ran 487 Python tests (13 skipped).
+**Failed:** zero final exact-head jobs; earlier superseded runs found and
+corrected a regex fixture extraction bug and a stale HTTP caller signature.
+**Skipped:** optional MLIR without installed LLVM and platform-inapplicable
+browser steps. **Unexecuted:** local native Flow/R and independent macOS
+physical-browser interaction. **Post-merge main CI:** not yet independently
+verified. No hosted CI workflow configuration was changed by PR #366.
+This remains bounded scalar stencil execution, not general multidimensional
+compiler-generated `field` lowering or complete RStudio parity.
+
 ## 2026-11-01: native parallel streaming Welford merge and Flow/R/Python HTTP (verified)
 
 [PR #362](https://github.com/godofecht/FlowStudio/pull/362) merged as

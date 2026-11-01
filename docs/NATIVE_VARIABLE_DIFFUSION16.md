@@ -53,10 +53,19 @@ HTTP suite also compiles a source-mutated negative-flux variant through
 the real Flow compiler and requires the actual native run to return
 HTTP 422 from the intermediate energy assertion.
 
-**Qualification pending:** exact-head Linux/macOS native compiler,
-production HTTP, Ubuntu Chromium and post-merge CI. The Python oracle
-can run locally without the native compiler; that alone is not
-evidence that the Flow program executes.
+**Verified for PR #333:** [exact-head CI #41286104819](https://github.com/godofecht/FlowStudio/actions/runs/41286104819) passed all four Ubuntu 24.04/macOS 15 jobs. Both native compiler/HTTP jobs, R/C FlowJIT and physical Ubuntu Chromium passed. [Merge e0966f83](https://github.com/godofecht/FlowStudio/commit/e0966f839bfae0b41b1624c04ea10ee90b2272ed). Post-merge main qualification is separately tracked; independent macOS physical browser and local native Flow/R remain unexecuted.
+
+## Native stepwise energy trace
+
+The solver emits `FLOWSTUDIO_ENERGY_TRACE_V1 48 2` with exactly 48
+computed post-update variance values for each of the Fourier and seed-9137
+fields. The native source derives them by running the actual harmonic-flux
+stencil. Production HTTP and physical Chromium independently reassemble
+the 256×256 sparse transition and compare all **96 intermediate values**
+against the actual browser-triggered response, enforcing monotone decay,
+finite output and a fixed 48-step budget. This exposes the numerical
+trajectory for debugging, rather than relying on a final success marker.
+Qualification of this extension is pending exact-head Linux/macOS CI.
 
 The production `tests/http_smoke.py` compiles and runs the checked-in Flow
 source through real `/api/check/flow` and `/api/run/flow` endpoints,

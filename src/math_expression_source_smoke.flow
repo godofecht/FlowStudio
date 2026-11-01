@@ -1298,6 +1298,50 @@ function main() -> i32 {
     result = evaluate_math_expression("2m**2 + 1s")
     if result.valid or result.failed_at != 6 { return 479 }
 
+    # Practical volume, pressure and time units lower into the same SI-typed
+    # native postfix IR, including nontrivial scaling and dimensional failures.
+    result = evaluate_math_expression("1L/1m³")
+    if not result.valid or not near(result.result.value, 0.001) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 480 }
+    result = evaluate_math_expression("1mL/1L")
+    if not result.valid or not near(result.result.value, 0.001) { return 481 }
+    result = evaluate_math_expression("1bar/1kPa")
+    if not result.valid or not near(result.result.value, 100.0) { return 482 }
+    result = evaluate_math_expression("1min+30s")
+    if not result.valid or not near(result.result.value, 90.0) or
+       not same_dimension(result.result.dimension, time) { return 483 }
+    result = evaluate_math_expression("1h/60min")
+    if not result.valid or not near(result.result.value, 1.0) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 484 }
+    result = evaluate_math_expression("1dm+20cm")
+    if not result.valid or not near(result.result.value, 0.3) or
+       not same_dimension(result.result.dimension, length) { return 485 }
+    result = evaluate_math_expression("1hm/1m")
+    if not result.valid or not near(result.result.value, 100.0) { return 486 }
+    result = evaluate_math_expression("1daN/1N")
+    if not result.valid or not near(result.result.value, 10.0) { return 487 }
+    result = evaluate_math_expression("1pPa/1fPa")
+    if not result.valid or not near(result.result.value, 1000.0) { return 488 }
+    result = evaluate_math_expression("1Tm/1Gm")
+    if not result.valid or not near(result.result.value, 1000.0) { return 489 }
+    result = evaluate_math_expression("1mbar+1Pa")
+    if not result.valid or not near(result.result.value, 101.0) { return 490 }
+    result = evaluate_math_expression("1h+1m")
+    if result.valid or result.failed_at != 2 { return 491 }
+    result = evaluate_math_expression("1min+1m")
+    if result.valid or result.failed_at != 4 { return 492 }
+    result = evaluate_math_expression("1L+1m")
+    if result.valid or result.failed_at != 2 { return 493 }
+    let practical_unit: ParsedMathExpression = parse_math_expression("1µL")
+    if not practical_unit.valid or practical_unit.program.count != 1 or
+       practical_unit.program.instructions[0].source_end != 4 { return 494 }
+    practical_unit = parse_math_expression("1daPa")
+    if not practical_unit.valid or practical_unit.program.instructions[0].source_end != 5 { return 495 }
+    practical_unit = parse_math_expression("1fPa")
+    if not practical_unit.valid or practical_unit.program.instructions[0].source_end != 4 { return 496 }
+    practical_unit = parse_math_expression("1minute")
+    if practical_unit.valid or practical_unit.failed_at != 4 { return 497 }
+
     println("native-math-source-ok")
     return 0
 }

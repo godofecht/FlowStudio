@@ -20,6 +20,7 @@ import urllib.request
 
 from spectral_interop_http import verify_spectral_interop
 from http_matrix_interop import verify_matrix_interop
+from http_volume8_interop import verify_volume8_interop
 
 ROOT = "http://127.0.0.1:8751"
 
@@ -239,6 +240,7 @@ def main() -> None:
     seeded_at = seeded_markers[0]
     assert volume_lines[seeded_at + 3] == "FLOWSTUDIO_VOLUME_SEEDED_END"
     seeded_expected = sparse_oracle(seeded_initial(), 64)
+    seeded_native_fields = []
     for offset, name in enumerate(("U", "V")):
         tokens = volume_lines[seeded_at + 1 + offset].split()
         assert tokens[0] == name and len(tokens) == 513, (
@@ -247,6 +249,10 @@ def main() -> None:
         assert all(math.isfinite(value) for value in actual)
         assert max(abs(a - b) for a, b in zip(actual, seeded_expected[offset])) < .002, (
             "seeded non-Fourier 3D sparse oracle", name, actual[:4], seeded_expected[offset][:4])
+        seeded_native_fields.append(actual)
+    # Compare the same real Flow-generated 3D result with a separately executed
+    # vectorized base-R evolution and an independent persistent Python stencil.
+    verify_volume8_interop(request, accepted_headers, tuple(seeded_native_fields))
     seeded_energy_markers = [i for i, line in enumerate(volume_lines)
                              if line == "FLOWSTUDIO_VOLUME_SEEDED_ENERGY_V1 64 1"]
     assert len(seeded_energy_markers) == 1

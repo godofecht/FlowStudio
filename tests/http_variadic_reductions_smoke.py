@@ -58,11 +58,11 @@ def main() -> None:
     status, body = request("POST", "/api/run/flow", tampered, headers)
     assert status == 422, ("tampered native execution must fail", status, body)
     # Preserve all 48 independently seeded Unicode cases and SI inference
-    # assertions. Split the real HTTP compilation into bounded 24-case
-    # batches instead of silently dropping coverage when the parser grows.
-    for start in (0, 24):
+    # assertions. Split real HTTP compilation into four bounded 12-case
+    # batches instead of silently dropping coverage as the parser grows.
+    for start in (0, 12, 24, 36):
         unicode_source = inject_unicode_variadic_assertions(
-            base_source, start=start, stop=start + 24)
+            base_source, start=start, stop=start + 12)
         status, body = request("POST", "/api/check/flow", unicode_source, headers)
         assert status == 200, ("Unicode source compile", start, status, body)
         status, body = request("POST", "/api/run/flow", unicode_source, headers)
@@ -70,9 +70,9 @@ def main() -> None:
             "Unicode native execution", start, status, body)
 
     unicode_tampered = inject_unicode_variadic_assertions(
-        base_source, sabotage=True, start=0, stop=24)
+        base_source, sabotage=True, start=0, stop=12)
     assert unicode_tampered != inject_unicode_variadic_assertions(
-        base_source, start=0, stop=24)
+        base_source, start=0, stop=12)
     status, body = request("POST", "/api/check/flow", unicode_tampered, headers)
     assert status == 200, ("tampered Unicode source must compile", status, body)
     status, body = request("POST", "/api/run/flow", unicode_tampered, headers)

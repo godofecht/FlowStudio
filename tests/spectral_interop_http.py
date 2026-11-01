@@ -11,6 +11,7 @@ from pathlib import Path
 
 from spectral_roundtrip_http import verify_spectral_roundtrip
 from coupled_interop_http import verify_coupled_interop
+from coupled_three_species_http import verify_three_species_interop
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -76,3 +77,7 @@ def verify_spectral_interop(request, headers: dict[str, str]) -> None:
     # Independent 32x32 two-species R midpoint integration, real R plot and
     # complete 2,048-cell verification in the persistent Python kernel.
     verify_coupled_interop(request, headers)
+
+    # Three anisotropic 32x32 fields, directed nonreversible exchange, true
+    # R midpoint integration and complete 3,072-cell Python stencil oracle.
+    verify_three_species_interop(request, headers)

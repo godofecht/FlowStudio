@@ -3,6 +3,7 @@
 from pathlib import Path
 
 from http_smoke import request
+from determinant_oracle import inject_native_assertions, matrix_cases
 
 
 def main() -> None:
@@ -29,13 +30,23 @@ def main() -> None:
         for path in paths
     )
     assert "native-math-determinants-ok" in source
+    base_source = source
+    source = inject_native_assertions(base_source)
     headers = {"X-FlowStudio-Intent": "run"}
     status, body = request("POST", "/api/check/flow", source, headers)
     assert status == 200, ("native determinant compile", status, body)
     status, body = request("POST", "/api/run/flow", source, headers)
     assert status == 200 and "native-math-determinants-ok" in body, (
         "native determinant execution", status, body)
-    print("PASS: real native determinant HTTP compile and execution")
+    # This source differs in one expected numerical value only. It must still
+    # compile, but the real native main must fail and propagate HTTP 422.
+    tampered = inject_native_assertions(base_source, sabotage=True)
+    status, body = request("POST", "/api/check/flow", tampered, headers)
+    assert status == 200, ("tampered determinant must compile", status, body)
+    status, body = request("POST", "/api/run/flow", tampered, headers)
+    assert status == 422, ("tampered determinant must fail at runtime", status, body)
+    print(f"PASS: real native determinant HTTP, {len(matrix_cases())} exact seeded "
+          "metamorphic cases and deliberate HTTP 422 numerical failure")
 
 
 if __name__ == "__main__":

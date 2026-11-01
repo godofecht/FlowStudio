@@ -249,6 +249,27 @@ function main() -> i32 {
     result = evaluate_math_expression("1kPa+1kN")
     if result.valid or result.failed_at != 4 { return 85 }
 
+
+    # Native production HTTP execution of generalized metric SI prefixes.
+    result = evaluate_math_expression("2MPa/1kPa")
+    if not result.valid or not close(result.result.value, 2000.0) { return 86 }
+    result = evaluate_math_expression("3GHz/1MHz")
+    if not result.valid or not close(result.result.value, 3000.0) { return 87 }
+    result = evaluate_math_expression("4nm/2µm")
+    if not result.valid or not close(result.result.value, 0.002) { return 88 }
+    result = evaluate_math_expression("2g+500mg")
+    if not result.valid or not close(result.result.value, 0.0025) { return 89 }
+    result = evaluate_math_expression("4mJ/2ms")
+    if not result.valid or not close(result.result.value, 2.0) or
+       not same_dimension(result.result.dimension, power) { return 90 }
+    result = evaluate_math_expression("1μg/1µg")
+    if not result.valid or not close(result.result.value, 1.0) { return 91 }
+    let expanded: ParsedMathExpression = parse_math_expression("1MPa+2μg")
+    if not expanded.valid or expanded.program.instructions[0].source_end != 4 or
+       expanded.program.instructions[1].source_end != 9 { return 92 }
+    result = evaluate_math_expression("1mPa+1mN")
+    if result.valid or result.failed_at != 4 { return 93 }
+    if parse_math_expression("1mkg").valid { return 94 }
     println("native-math-source-ok")
     return 0
 }

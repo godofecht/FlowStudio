@@ -179,6 +179,9 @@ adds an explicit real `/api/reset/r` boundary: after the saved 24+24
 notebook output is captured, the R kernel is destroyed, its phase/state/raw
 snapshot globals must disappear, and the persistent Python oracle must
 remain callable. Chromium then imports the saved `.fsnb` and restores its
-output while the fresh R kernel remains empty. **This new reset-isolation
-scenario is pending exact-head Linux/macOS and Ubuntu Chromium CI**; the
-passed PR #338 evidence above does not qualify it.
+output while the fresh R kernel remains empty. PR #339 merged as
+[cc672df8](https://github.com/godofecht/FlowStudio/commit/cc672df8e397308c96eaeb6f253af3401b25493b)
+after [exact-head CI #41300846315](https://github.com/godofecht/FlowStudio/actions/runs/41300846315)
+passed all four Linux/macOS jobs, including actual Ubuntu Chromium and native
+Flow/R HTTP. Post-merge CI, independent macOS physical-browser execution and
+local native Flow/R remain unverified.

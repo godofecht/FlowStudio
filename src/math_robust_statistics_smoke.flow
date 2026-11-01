@@ -54,7 +54,7 @@ function main() -> i32 {
     if result.valid or result.failed_at != 0 { return 18 }
     result = evaluate_math_expression("mad(1,false)")
     if result.valid or result.failed_at != 0 { return 19 }
-    let parsed: ParsedMathExpression = parse_math_expression("median(1m,3m)")
+    let mut parsed: ParsedMathExpression = parse_math_expression("median(1m,3m)")
     if not parsed.valid or parsed.program.count != 3 or
        parsed.program.instructions[2].opcode != 78 or
        parsed.program.instructions[2].exponent != 2 or

@@ -1,3 +1,30 @@
+## 2026-11-01: seeded native SI variadic reduction HTTP qualification
+
+[PR #351](https://github.com/godofecht/FlowStudio/pull/351) merged as
+[fd05d9b](https://github.com/godofecht/FlowStudio/commit/fd05d9b49bbc977b1bdb082f117f2dcc8abd62c9).
+The real Flow 2.0 source parser, typed IR and static SI inference execute
+48 deterministic seed-20261101 independent Python integer-oracle cases:
+16 sum permutations, 16 product permutations with mixed SI dimensions,
+eight nested sum/product cases, and eight malformed-arity, dimension,
+predicate or overflow negatives. The 40 valid cases check exact values,
+dimensions and static inference; overflow intentionally rejects at runtime
+while remaining statically well typed. A source ceiling of 128 KiB is
+enforced. Deliberately corrupting one numerical expectation must compile
+but return HTTP 422 through production Flow HTTP.
+[Reproduction](NATIVE_VARIADIC_REDUCTIONS.md).
+
+**Passed:** [exact-head CI #41328449758](https://github.com/godofecht/FlowStudio/actions/runs/41328449758),
+all four Ubuntu 24.04/macOS 15 jobs, including real Flow compilation,
+native HTTP, R/C FlowJIT, and Ubuntu physical Chromium. Each source
+platform passed 1,201 JavaScript tests (12 skipped) and ran 459 Python
+tests (13 skipped). **Failed:** zero final exact-head jobs.
+**Cancelled:** one superseded branch run, not counted as passed.
+**Skipped:** optional and platform-inapplicable steps.
+**Unexecuted:** independent macOS physical-browser testing and local
+native Flow/R. **Pending:** post-merge main CI.
+No hosted workflow configuration was changed. Generalized compiler-generated
+multidimensional `field` lowering and full RStudio parity remain incomplete.
+
 ## 2026-11-01: production R/Python matrix-solve interoperability (4/4 exact-head CI passed)
 
 [PR #349](https://github.com/godofecht/FlowStudio/pull/349) merged as

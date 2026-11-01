@@ -1,0 +1,98 @@
+# Native variable-arity reduction calls: source parser -> typed IR -> SI inference.
+# flow run src/math_variadic_reductions_smoke.flow
+import .math_dimensions { Dimension, dimensionless, length_dimension, mass_dimension, time_dimension, temperature_dimension, product_dimension, same_dimension }
+import .math_expression_ir { MathResult }
+import .math_expression_source { ParsedMathExpression, parse_math_expression, evaluate_math_expression }
+import .math_static { MathInferredType, infer_math_expression_source, infer_math_equation_source }
+
+function near(actual: f64, expected: f64) -> bool {
+    let mut error: f64 = actual - expected
+    if error < 0.0 { error = -error }
+    return error < 0.00000000001
+}
+
+function main() -> i32 {
+    let length: Dimension = length_dimension()
+    let length_time: Dimension = product_dimension(length, time_dimension())
+    let four_units: Dimension = product_dimension(
+        product_dimension(length_time, temperature_dimension()), mass_dimension())
+    let mut result: MathResult = evaluate_math_expression("sum(1m,2m,3m)")
+    if not result.valid or not near(result.result.value, 6.0) or
+       not same_dimension(result.result.dimension, length) { return 1 }
+    result = evaluate_math_expression("product(2m,3s,4K,5kg)")
+    if not result.valid or not near(result.result.value, 120.0) or
+       not same_dimension(result.result.dimension, four_units) { return 2 }
+    result = evaluate_math_expression("sum(7)")
+    if not result.valid or not near(result.result.value, 7.0) { return 3 }
+    result = evaluate_math_expression("product(7)")
+    if not result.valid or not near(result.result.value, 7.0) { return 4 }
+    result = evaluate_math_expression("sum(1,2,3,4,5,6,7,8)")
+    if not result.valid or not near(result.result.value, 36.0) { return 5 }
+    result = evaluate_math_expression("product(1,2,3,4,5,6,7,8)")
+    if not result.valid or not near(result.result.value, 40320.0) { return 6 }
+    result = evaluate_math_expression("2sum(1,2,3)")
+    if not result.valid or not near(result.result.value, 12.0) { return 7 }
+    result = evaluate_math_expression("3product(2,3)")
+    if not result.valid or not near(result.result.value, 18.0) { return 8 }
+    result = evaluate_math_expression("product(sum(1m,2m),2s)")
+    if not result.valid or not near(result.result.value, 6.0) or
+       not same_dimension(result.result.dimension, length_time) { return 9 }
+    result = evaluate_math_expression("sum(product(2m,3s),product(4m,5s))")
+    if not result.valid or not near(result.result.value, 26.0) or
+       not same_dimension(result.result.dimension, length_time) { return 10 }
+    result = evaluate_math_expression("sum(1m,2m)+3m")
+    if not result.valid or not near(result.result.value, 6.0) { return 11 }
+    result = evaluate_math_expression("product(2m,3s)/6s")
+    if not result.valid or not near(result.result.value, 1.0) or
+       not same_dimension(result.result.dimension, length) { return 12 }
+
+    let mut parsed: ParsedMathExpression = parse_math_expression("sum(1m,2m,3m)")
+    if not parsed.valid or parsed.program.count != 4 or
+       parsed.program.instructions[3].opcode != 73 or
+       parsed.program.instructions[3].exponent != 3 or
+       parsed.program.instructions[3].source_start != 0 or
+       parsed.program.instructions[3].source_end != 3 { return 13 }
+    parsed = parse_math_expression("product(2m,3s)")
+    if not parsed.valid or parsed.program.count != 3 or
+       parsed.program.instructions[2].opcode != 74 or
+       parsed.program.instructions[2].exponent != 2 or
+       parsed.program.instructions[2].source_end != 7 { return 14 }
+    if parse_math_expression("sum()").valid or
+       parse_math_expression("product()").valid { return 15 }
+    if parse_math_expression("sum(1,)").valid or
+       parse_math_expression("product(,1)").valid { return 16 }
+    if parse_math_expression("sum(1,2,3,4,5,6,7,8,9)").valid or
+       parse_math_expression("product(1,2,3,4,5,6,7,8,9)").valid { return 17 }
+    if parse_math_expression("sum(1,2").valid or
+       parse_math_expression("product(1,2))").valid { return 18 }
+
+    result = evaluate_math_expression("sum(1m,2s)")
+    if result.valid or result.failed_at != 0 { return 19 }
+    result = evaluate_math_expression("sum(true,1)")
+    if result.valid or result.failed_at != 0 { return 20 }
+    result = evaluate_math_expression("product(true,1)")
+    if result.valid or result.failed_at != 0 { return 21 }
+    result = evaluate_math_expression("sum(1e30,1e30)")
+    if result.valid or result.failed_at != 0 { return 22 }
+    result = evaluate_math_expression("product(1e20,1e20)")
+    if result.valid or result.failed_at != 0 { return 23 }
+
+    let mut inferred: MathInferredType = infer_math_expression_source("sum(1m,2m,3m)")
+    if not inferred.valid or not same_dimension(inferred.dimension, length) or
+       inferred.is_predicate { return 24 }
+    inferred = infer_math_expression_source("product(2m,3s,4K,5kg)")
+    if not inferred.valid or not same_dimension(inferred.dimension, four_units) { return 25 }
+    inferred = infer_math_expression_source("sum(1m,2s)")
+    if inferred.valid or inferred.failed_at != 0 { return 26 }
+    inferred = infer_math_expression_source("product(true,1)")
+    if inferred.valid or inferred.failed_at != 0 { return 27 }
+    inferred = infer_math_expression_source("sum(1e30,1e30)")
+    if not inferred.valid { return 28 }
+    inferred = infer_math_equation_source("sum(1m,2m,3m) = 6m")
+    if not inferred.valid { return 29 }
+    inferred = infer_math_equation_source("product(2m,3s) = 6m")
+    if inferred.valid { return 30 }
+    inferred = infer_math_expression_source("product(2m,3s)/6s")
+    if not inferred.valid or not same_dimension(inferred.dimension, length) { return 31 }
+    return 0
+}

@@ -702,11 +702,13 @@ try {
     'src/math_dimension_variable.flow',
     'src/math_dimension_variable_smoke.flow'
   ];
+  // Strip indentation in this brace-delimited Flow source bundle. The
+  // 128-KiB production HTTP cap is intentional; whitespace is not syntax.
   const nativeVariableSource = nativeVariableFiles.map(path =>
     readFileSync(path, 'utf8').split(/\r?\n/)
       .filter(line => !/^import \.math_(dimensions|expression_ir|expression_source|equation|static|dimension_triple|dimension_variable) \{/.test(line))
       .filter(line => line.trim() && !line.trimStart().startsWith('#'))
-      .map(line => line.replace(/^export /, '')).join('\n')
+      .map(line => line.trimStart().replace(/^export /, '')).join('\n')
   ).join('\n');
   assert.ok(Buffer.byteLength(nativeVariableSource, 'utf8') < 128 * 1024);
   assert.match(nativeVariableSource, /system\.count = 16/);

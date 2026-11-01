@@ -41,9 +41,9 @@ function main() -> i32 {
         let bucket: i32 = index % 4
         if bucket == 0 {
             a = summary_add(a, value)
-        } else if bucket == 1 {
+        } elif bucket == 1 {
             b = summary_add(b, value)
-        } else if bucket == 2 {
+        } elif bucket == 2 {
             c = summary_add(c, value)
         } else {
             d = summary_add(d, value)

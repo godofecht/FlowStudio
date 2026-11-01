@@ -1,3 +1,25 @@
+## 2026-11-01: native heterogeneous 16×16 conservative PDE (qualification pending)
+
+Added `examples/native_variable_diffusion16.flow` with real Flow 2.0
+periodic finite-volume diffusion across a discontinuous conductivity,
+harmonic interface fluxes, 48 time steps, mass/positivity/replay/semigroup
+assertions, negative inputs and a 32,768-cell-step ceiling. A separate
+standard-library Python oracle compares all 256 values with an independently
+assembled sparse Markov operator, including seeded arbitrary fields.
+Production Flow HTTP check/run, 422 corruption and malformed-source
+acceptance are wired into the existing native suite. Physical Ubuntu
+Chromium Monaco Run is wired to check all 256 SVG heatmap cells against
+an independently assembled sparse Markov operator.
+[Reproduction](NATIVE_VARIABLE_DIFFUSION16.md).
+
+**Pending:** exact-head Linux/macOS CI, real native Flow compiler/HTTP,
+Ubuntu physical Chromium baseline, post-merge qualification.
+**Unexecuted:** local native Flow/R and independent macOS physical browser.
+The dedicated Ubuntu Chromium case is pending exact-head CI qualification.
+No hosted workflow configuration changes. This is array-backed numerical
+PDE execution, not compiler-generated multidimensional `field` lowering
+or full RStudio parity.
+
 ## 2026-11-01: byte-exact persistent R PDE checkpoint integrity (qualification pending)
 
 The production 24+24 R midpoint restart now saves a bounded base-R

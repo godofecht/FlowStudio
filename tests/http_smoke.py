@@ -179,6 +179,47 @@ def main() -> None:
     assert malformed_volume != volume_source
     status, body = request("POST", "/api/check/flow", malformed_volume, accepted_headers)
     assert status == 422, ("native 3D malformed compiler syntax", status, body)
+    # Heterogeneous 16x16 native Flow flux PDE. The complete 256-cell result
+    # is checked against an independent Python sparse Markov operator, not a
+    # reference embedded in the Flow program or a mocked compiler.
+    from test_native_variable_diffusion_oracle import (
+        conductivity as variable_conductivity, initial as variable_initial,
+        matrix_oracle as variable_matrix_oracle,
+    )
+    variable_source = (Path(__file__).resolve().parents[1] /
+                       "examples/native_variable_diffusion16.flow").read_text(encoding="utf-8")
+    assert len(variable_source.encode("utf-8")) < 128 * 1024
+    status, body = request("POST", "/api/check/flow", variable_source, accepted_headers)
+    assert status == 200, ("native variable-conductivity compile", status, body[:500])
+    status, body = request("POST", "/api/run/flow", variable_source, accepted_headers)
+    assert status == 200 and "native-variable-diffusion16-ok" in body, (
+        "native variable-conductivity numerical execution", status, body[:500])
+    lines = body.splitlines()
+    markers = [i for i, line in enumerate(lines)
+               if line == "FLOWSTUDIO_GRID_V1 16 16 1"]
+    assert len(markers) == 1, ("native heterogeneous grid frame", body[-500:])
+    start = markers[0]
+    assert lines[start + 2] == "FLOWSTUDIO_GRID_END"
+    tokens = lines[start + 1].split()
+    assert tokens[0] == "U" and len(tokens) == 257, (
+        "native heterogeneous 256-cell frame", len(tokens))
+    actual = [float(value) for value in tokens[1:]]
+    assert all(math.isfinite(value) for value in actual)
+    expected = variable_matrix_oracle(variable_initial(), variable_conductivity(), 48)
+    assert max(abs(a - b) for a, b in zip(actual, expected)) < 0.002, (
+        "native heterogeneous 256-cell independent oracle", actual[:4], expected[:4])
+    corrupted_variable = variable_source.replace(
+        "if absolute(totalMass(first.grid) - originalMass) > 0.000000001",
+        "if absolute(totalMass(first.grid) - originalMass) > -1.0", 1)
+    assert corrupted_variable != variable_source
+    status, body = request("POST", "/api/run/flow", corrupted_variable, accepted_headers)
+    assert status == 422, ("native heterogeneous corrupted assertion", status, body[:500])
+    malformed_variable = variable_source.replace(
+        "function harmonic(first: f64, second: f64) -> f64 {",
+        "function harmonic(", 1)
+    assert malformed_variable != variable_source
+    status, body = request("POST", "/api/check/flow", malformed_variable, accepted_headers)
+    assert status == 422, ("native heterogeneous malformed syntax", status, body[:500])
     # Native periodic heat PDE: actual Flow compiler and numerical RK2 run.
     # All 25 numerical and invalid-input assertions are in Flow main().
     heat_native_source = (Path(__file__).resolve().parents[1] /

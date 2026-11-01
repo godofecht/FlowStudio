@@ -303,6 +303,60 @@ try {
     }
   }
 
+  // Physical Chromium -> Monaco Run -> production Flow 2.0 HTTP ->
+  // actual 16x16 heterogeneous finite-volume solution and SVG heatmap.
+  // Reassemble the conservative sparse Markov operator independently here,
+  // and verify every rendered cell rather than only the success marker.
+  await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
+    readFileSync('examples/native_variable_diffusion16.flow', 'utf8'));
+  await page.locator('#run').click();
+  await page.waitForFunction(() =>
+    document.querySelector('#console')?.textContent?.includes('native-variable-diffusion16-ok'),
+    null, { timeout: 80000 });
+  await page.waitForFunction(() =>
+    document.querySelectorAll('#mathFlowPlot rect[data-field-name="U"]').length === 256,
+    null, { timeout: 30000 });
+  const variableCells = await page.locator('#mathFlowPlot rect[data-field-name="U"]')
+    .evaluateAll(nodes => nodes.map(node => ({
+      x: Number(node.getAttribute('data-grid-x')),
+      y: Number(node.getAttribute('data-grid-y')),
+      value: Number(node.getAttribute('data-grid-value'))
+    })));
+  assert.equal(variableCells.length, 256);
+  const variableIndex = (x, y) => ((x + 16) % 16) + 16 * ((y + 16) % 16);
+  const variableQuarter = value => [1, 0, -1, 0][((value % 4) + 4) % 4];
+  const variableConductivity = Array.from({length:256}, (_, i) =>
+    (i % 16 >= 8 ? .75 : .25) + (Math.floor(i / 16) < 8 ? .05 : 0));
+  const variableRows = Array.from({length:256}, (_, i) => {
+    const x = i % 16, y = Math.floor(i / 16);
+    const adjacent = [variableIndex(x-1, y), variableIndex(x+1, y),
+      variableIndex(x, y-1), variableIndex(x, y+1)];
+    const edges = adjacent.map(j => [j, .2 * 2 * variableConductivity[i] *
+      variableConductivity[j] / (variableConductivity[i] + variableConductivity[j])]);
+    return [[i, 1 - edges.reduce((sum, [, weight]) => sum + weight, 0)], ...edges];
+  });
+  let variableExpected = Array.from({length:256}, (_, i) => {
+    const x = i % 16, y = Math.floor(i / 16);
+    return 20 + 3 * variableQuarter(x) + 2 * variableQuarter(y) +
+      1.5 * variableQuarter(x + y);
+  });
+  for (let step = 0; step < 48; step++)
+    variableExpected = variableRows.map(row =>
+      row.reduce((sum, [j, weight]) => sum + weight * variableExpected[j], 0));
+  const variableSeen = new Set();
+  for (const cell of variableCells) {
+    assert.ok(Number.isInteger(cell.x) && cell.x >= 0 && cell.x < 16 &&
+      Number.isInteger(cell.y) && cell.y >= 0 && cell.y < 16);
+    const i = variableIndex(cell.x, cell.y);
+    assert.ok(!variableSeen.has(i), 'Duplicate heterogeneous grid cell');
+    variableSeen.add(i);
+    assert.ok(Number.isFinite(cell.value) &&
+      Math.abs(cell.value - variableExpected[i]) < .002,
+      'Native variable-conductivity heatmap mismatch at ' + cell.x + ',' + cell.y);
+  }
+  assert.equal(variableSeen.size, 256);
+  assert.equal(await page.locator('#tab-plots').getAttribute('aria-selected'), 'true');
+
   // Real physical Chromium -> Monaco Run -> production Flow compiler/HTTP.
   // Both 8x8 images are computed z=0 slices of a coupled 8x8x8 volume.
   // Every displayed voxel is checked against an independent Fourier matrix

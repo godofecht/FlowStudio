@@ -380,6 +380,41 @@ try {
     assert.ok(Number.isFinite(seededBrowserValues[i]) &&
       Math.abs(seededBrowserValues[i] - seededBrowserExpected[i]) < .002,
       'Native seeded non-Fourier browser HTTP mismatch at cell ' + i);
+  // The actual browser-triggered HTTP response must expose all 96
+  // intermediate native PDE energies. Independently reconstruct the sparse
+  // transition and compare every sample, not just the final heatmap.
+  const energyFrame = variableHttpBody.match(
+    /FLOWSTUDIO_ENERGY_TRACE_V1 48 2\r?\nU ([^\r\n]+)\r?\nS ([^\r\n]+)\r?\nFLOWSTUDIO_ENERGY_TRACE_END/);
+  assert.ok(energyFrame, 'Native PDE energy trace absent from browser HTTP');
+  for (const [name, field, row] of [
+    ['U', Array.from({length:256}, (_, i) => {
+      const x = i % 16, y = Math.floor(i / 16);
+      return 20 + 3 * variableQuarter(x) + 2 * variableQuarter(y) +
+        1.5 * variableQuarter(x + y);
+    }), 1],
+    ['S', Array.from({length:256}, (_, i) => {
+      const x = i % 16, y = Math.floor(i / 16);
+      return 1 + .1 * ((9137 + 71 * x + 113 * y + 17 * x * y) % 251);
+    }), 2]
+  ]) {
+    const samples = energyFrame[row].trim().split(/\s+/).map(Number);
+    assert.equal(samples.length, 48);
+    let state = field, previous = Infinity;
+    for (let step = 0; step < 48; step++) {
+      state = variableRows.map(transition =>
+        transition.reduce((sum, [j, weight]) => sum + weight * state[j], 0));
+      const mean = state.reduce((sum, value) => sum + value, 0) / 256;
+      const expectedEnergy = state.reduce((sum, value) =>
+        sum + (value - mean) ** 2, 0);
+      const tolerance = .05 + .0001 * expectedEnergy;
+      assert.ok(Number.isFinite(samples[step]) &&
+        Math.abs(samples[step] - expectedEnergy) < tolerance,
+        'Native browser PDE energy oracle ' + name + ' step ' + (step + 1));
+      assert.ok(samples[step] <= previous + tolerance,
+        'Native browser PDE energy increased for ' + name);
+      previous = samples[step];
+    }
+  }
   assert.equal(await page.locator('#tab-plots').getAttribute('aria-selected'), 'true');
 
   // Real physical Chromium -> Monaco Run -> production Flow compiler/HTTP.

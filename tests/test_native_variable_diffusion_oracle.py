@@ -228,7 +228,9 @@ class VariableConductivityOracle(unittest.TestCase):
                          "native-variable-diffusion16-ok",
                          "FLOWSTUDIO_SEEDED_GRID_V1 16 16 1",
                          "seededInitialGrid", "function quadraticEnergy(",
-                         "function dissipatesAtEveryStep("):
+                         "function dissipatesAtEveryStep(",
+                         "FLOWSTUDIO_ENERGY_TRACE_V1 48 2",
+                         "FLOWSTUDIO_ENERGY_TRACE_END"):
             self.assertIn(fragment, source)
 
 

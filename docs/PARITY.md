@@ -8,9 +8,14 @@ It then imports the saved `.fsnb` through the real browser file input,
 checks that all saved outputs are restored without execution, and rechecks
 that no R checkpoint globals were resurrected. This distinguishes notebook
 output persistence from kernel-state persistence and tests cross-runtime
-reset isolation. **Pending:** exact-head Linux/macOS CI and physical Ubuntu
-Chromium for this revision. **Unexecuted:** local native Flow/R and independent
-macOS physical browser. No hosted workflow changes.
+reset isolation. [PR #339](https://github.com/godofecht/FlowStudio/pull/339)
+merged at [cc672df8](https://github.com/godofecht/FlowStudio/commit/cc672df8e397308c96eaeb6f253af3401b25493b).
+[Exact-head CI #41300846315](https://github.com/godofecht/FlowStudio/actions/runs/41300846315)
+passed all four Ubuntu 24.04/macOS 15 jobs, including actual physical Ubuntu
+Chromium, native Flow/HTTP, R/C FlowJIT and source/transport suites.
+**Failed:** zero final jobs. **Skipped:** platform-inapplicable CI steps.
+**Unexecuted:** post-merge CI, local native Flow/R and independent macOS
+physical browser. No hosted workflow changes.
 
 ## 2026-11-01: physical Chromium R checkpoint/restart and corruption isolation (4/4 exact-head CI passed)
 

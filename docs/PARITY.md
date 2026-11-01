@@ -1,3 +1,22 @@
+## 2026-11-01: persistent R PDE checkpoint/restart acceptance (qualification pending)
+
+Added `examples/coupled_three_species_restart_r.R` and production HTTP
+acceptance for a seeded 3×32×32 anisotropic directed-exchange PDE split into
+24+24 native R midpoint steps across separate persistent-kernel requests.
+The 3,072 values at each checkpoint are checked against the independent
+Python stencil, and the final field against uninterrupted R execution.
+Corrupted checkpoints, over-budget steps and a forbidden third chunk must
+return HTTP 422 without advancing the phase. A restored checkpoint resumes,
+and a second two-chunk replay must reproduce the complete frames.
+R and Python source/output byte ceilings are asserted.
+
+**Pending:** exact-head Linux/macOS native Flow/HTTP and R/C FlowJIT CI,
+Ubuntu physical Chromium baseline, post-merge qualification. **Unexecuted:**
+local native R, dedicated physical Chromium checkpoint/restart interaction,
+independent macOS physical browser. No hosted workflow changes.
+This is checkpoint correctness, not generalized compiler-generated
+multidimensional `field` lowering or complete RStudio parity.
+
 ## 2026-11-01: physical Chromium three-species notebook numerical acceptance (4/4 CI verified)
 
 The production Playwright workbench now has a dedicated five-cell **native Flow/R**

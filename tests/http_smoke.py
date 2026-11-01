@@ -554,7 +554,7 @@ def main() -> None:
     ]
     native_math_ir = "\n".join(
         "\n".join(
-            line.removeprefix("export ")
+            line.removeprefix("export ").removeprefix("    ")
             for line in source.splitlines()
             if line.strip() and not line.lstrip().startswith("#")
             if not line.startswith("import .math_dimensions {")
@@ -590,7 +590,7 @@ def main() -> None:
     )
     native_math_source = "\n".join(
         "\n".join(
-            line.removeprefix("export ")
+            line.removeprefix("export ").removeprefix("    ")
             # splitlines() would split Unicode NEL/LS/PS inside Flow strings.
             for line in (Path(__file__).resolve().parents[1] / path)
                 .read_text(encoding="utf-8").split("\n")
@@ -630,7 +630,7 @@ def main() -> None:
     )
     native_equation = "\n".join(
         "\n".join(
-            line.removeprefix("export ")
+            line.removeprefix("export ").removeprefix("    ")
             for line in (Path(__file__).resolve().parents[1] / path)
                 .read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.lstrip().startswith("#")
@@ -670,7 +670,7 @@ def main() -> None:
     )
     native_equation_system = "\n".join(
         "\n".join(
-            line.removeprefix("export ")
+            line.removeprefix("export ").removeprefix("    ")
             # Preserve Unicode line-boundary literals during HTTP bundling.
             for line in (Path(__file__).resolve().parents[1] / path)
                 .read_text(encoding="utf-8").split("\n")
@@ -692,6 +692,8 @@ def main() -> None:
     assert status == 200 and "native-math-equation-system-ok" in body, (
         "native equation-system execution", status, body)
 
+    # Brace-delimited Flow ignores cosmetic indentation; trimming one level
+    # keeps every real native HTTP bundle within the 128 KiB source ceiling.
     # Native value-independent static SI inference is compiled and executed
     # using the exact checked-in Flow modules through production HTTP.
     # This is separate from runtime evaluation and never runs editor snippets.
@@ -705,7 +707,7 @@ def main() -> None:
     )
     native_static = "\n".join(
         "\n".join(
-            line.removeprefix("export ")
+            line.removeprefix("export ").removeprefix("    ")
             for line in (Path(__file__).resolve().parents[1] / path)
                 .read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.lstrip().startswith("#")
@@ -743,7 +745,7 @@ def main() -> None:
     )
     native_dimension_solver = "\n".join(
         "\n".join(
-            line.removeprefix("export ")
+            line.removeprefix("export ").removeprefix("    ")
             for line in (Path(__file__).resolve().parents[1] / path)
                 .read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.lstrip().startswith("#")
@@ -791,7 +793,7 @@ def main() -> None:
     )
     native_pair = "\n".join(
         "\n".join(
-            line.removeprefix("export ")
+            line.removeprefix("export ").removeprefix("    ")
             for line in (Path(__file__).resolve().parents[1] / path)
                 .read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.lstrip().startswith("#")
@@ -848,7 +850,7 @@ def main() -> None:
     )
     native_overdetermined = "\n".join(
         "\n".join(
-            line.removeprefix("export ")
+            line.removeprefix("export ").removeprefix("    ")
             for line in (Path(__file__).resolve().parents[1] / path)
                 .read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.lstrip().startswith("#")
@@ -897,7 +899,7 @@ def main() -> None:
     )
     native_variable = "\n".join(
         "\n".join(
-            line.removeprefix("export ")
+            line.removeprefix("export ").removeprefix("    ")
             for line in (Path(__file__).resolve().parents[1] / path)
                 .read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.lstrip().startswith("#")
@@ -951,7 +953,7 @@ def main() -> None:
     )
     native_four = "\n".join(
         "\n".join(
-            line.removeprefix("export ")
+            line.removeprefix("export ").removeprefix("    ")
             for line in (Path(__file__).resolve().parents[1] / path)
                 .read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.lstrip().startswith("#")
@@ -1005,7 +1007,7 @@ def main() -> None:
             # Flow's block structure is brace-delimited. Removing at most
             # one indentation level leaves the exact executable tokens and
             # assertions intact while respecting the 128 KiB HTTP limit.
-            line.removeprefix("export ").removeprefix("    ")
+            line.removeprefix("export ").removeprefix("    ").removeprefix("    ")
             for line in (Path(__file__).resolve().parents[1] / path)
                 .read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.lstrip().startswith("#")
@@ -1061,7 +1063,7 @@ def main() -> None:
     hyperbolic_files = static_files[:-1] + ("src/math_hyperbolic_smoke.flow",)
     native_hyperbolic = "\n".join(
         "\n".join(
-            line.removeprefix("export ")
+            line.removeprefix("export ").removeprefix("    ")
             for line in (Path(__file__).resolve().parents[1] / path)
                 .read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.lstrip().startswith("#")

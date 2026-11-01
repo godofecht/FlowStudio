@@ -1,6 +1,6 @@
 # Real native Flow vector contractions: source, typed IR, static units, equations.
 # flow run src/math_dot_smoke.flow
-import .math_dimensions { Dimension, dimensionless, length_dimension, time_dimension, mass_dimension, quotient_dimension, product_dimension, same_dimension }
+import .math_dimensions { Dimension, dimensionless, length_dimension, time_dimension, mass_dimension, quotient_dimension, product_dimension, same_dimension, quantity }
 import .math_expression_ir { MathResult }
 import .math_expression_source { ParsedMathExpression, parse_math_expression, evaluate_math_expression }
 import .math_static { MathInferredType, infer_math_expression_source }
@@ -67,7 +67,7 @@ function main() -> i32 {
     inferred = infer_math_expression_source("dot2(true,2,3,4)")
     if inferred.valid or inferred.failed_at != 0 { return 23 }
     let equation: MathEquationResult = evaluate_math_equation_source(
-        "dot2(3m,4m,2/s,1/s)=10m/s")
+        "dot2(3m,4m,2/s,1/s)=10m/s", quantity(0.00000001, speed))
     if not equation.valid or not equation.satisfied or
        not near(equation.residual.value, 0.0) { return 24 }
     println("native-math-dot-ok")

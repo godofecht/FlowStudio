@@ -185,11 +185,11 @@ export async function runThreeSpeciesRestartBrowser({page, setNotebookSource, re
     'stopifnot(!exists("flowstudio_three_restart_phase", envir=.GlobalEnv, inherits=FALSE), ' +
     '!exists("flowstudio_three_restart_state", envir=.GlobalEnv, inherits=FALSE), ' +
     '!exists("flowstudio_three_restart_snapshot", envir=.GlobalEnv, inherits=FALSE)); ' +
-    'cat("restart-reset-clean-ok\\\\n")');
+    'cat("restart-reset-clean-ok\\n")');
   assert.equal(cleared.status, 200, cleared.body.slice(0, 300));
   assert.match(cleared.body, /restart-reset-clean-ok/);
   const pythonSurvived = await native('python',
-    'assert callable(integrate) and len(initial_fields()) == 3\\n' +
+    'assert callable(integrate) and len(initial_fields()) == 3\n' +
     'print("restart-python-isolated-ok")');
   assert.equal(pythonSurvived.status, 200, pythonSurvived.body.slice(0, 300));
   assert.match(pythonSurvived.body, /restart-python-isolated-ok/);

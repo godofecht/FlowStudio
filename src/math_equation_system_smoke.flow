@@ -358,6 +358,38 @@ function main() -> i32 {
     result = evaluate_math_equation_system(system, tolerances)
     if result.valid { return 77 }
 
+    # Native equation ASTs retain the same implicit multiplication semantics
+    # as the standalone expression compiler, with physical residual checks.
+    system = parse_math_equation_system("2(3+4)=14;(2m)(3s)=6m*1s")
+    if not system.valid or system.count != 2 { return 78 }
+    tolerances.count = 2
+    tolerances.values[0] = quantity(0.0, dimensionless())
+    tolerances.values[1] = quantity(0.0, product_dimension(length_dimension(), time_dimension()))
+    result = evaluate_math_equation_system(system, tolerances)
+    if not result.valid or not result.satisfied or result.count != 2 { return 79 }
+    system = parse_math_equation_system("1/2(4)=2;3!(2+1)=18")
+    if not system.valid or system.count != 2 { return 80 }
+    tolerances.values[1] = quantity(0.0, dimensionless())
+    result = evaluate_math_equation_system(system, tolerances)
+    if not result.valid or not result.satisfied { return 81 }
+    system = parse_math_equation_system("2(3m+1s)=0m")
+    if not system.valid { return 82 }
+    tolerances.count = 1
+    result = evaluate_math_equation_system(system, tolerances)
+    if result.valid or result.failed_at != 4 { return 83 }
+    system = parse_math_equation_system("2(3,4)=0")
+    if system.valid { return 84 }
+    system = parse_math_equation_system("2(3)=6\n(2+3)(4)=20")
+    if not system.valid or system.count != 2 { return 85 }
+    tolerances.count = 2
+    result = evaluate_math_equation_system(system, tolerances)
+    if not result.valid or not result.satisfied { return 86 }
+    system = parse_math_equation_system("2(true)=0")
+    if not system.valid { return 87 }
+    tolerances.count = 1
+    result = evaluate_math_equation_system(system, tolerances)
+    if result.valid or result.failed_at != 1 { return 88 }
+
     println("native-math-equation-system-ok")
     return 0
 }

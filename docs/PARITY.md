@@ -1,3 +1,31 @@
+## 2026-11-01: exact 3D periodic Green-function and CFL-edge native acceptance (verified)
+
+[PR #345](https://github.com/godofecht/FlowStudio/pull/345) merged as
+[0a01fe6d](https://github.com/godofecht/FlowStudio/commit/0a01fe6d62c6644ee865ad11988260f84aabc590).
+The same production Flow 2.0 two-species 8×8×8 solver now checks exact
+one-step corner-impulse distributions for x, y and z separately at the
+Courant stability boundary: only the two periodic neighbors on each axis
+may contain 0.5. Native assertions also check nonmutating rejection for
+coefficient sum 1.01 at ratio 0.5, 16-step zero-diffusion identity,
+exact two-step 0.25 exchange (0.625/0.375), and constant-field fixed points.
+Two checked-in independent Python oracle tests verify these against both
+direct and sparse operators. A production HTTP negative control compiles a
+mass-preserving but deliberately incorrect impulse expectation and requires
+HTTP 422 on execution. Existing 1,024-voxel PDE, 64-energy, R/C, notebook,
+plot and physical Chromium paths remain in the same qualification suite.
+[Reproduction](NATIVE_COUPLED_VOLUME8.md).
+
+**Passed:** [exact-head CI #41313423931](https://github.com/godofecht/FlowStudio/actions/runs/41313423931)
+and [post-merge main CI #41314049464](https://github.com/godofecht/FlowStudio/actions/runs/41314049464),
+each 4/4 Ubuntu 24.04/macOS 15 jobs. Source suites passed 1,201 JS
+assertions (12 skipped) and ran 451 Python tests (13 skipped) per platform.
+Native Flow, real HTTP 422 negative acceptance, R/C FlowJIT and Ubuntu
+physical Chromium passed. **Failed:** zero final CI jobs. The superseded
+prior-head CI was cancelled, not counted as passed. **Unexecuted:** local
+native Flow/R and independent macOS physical-browser interaction. Hosted
+workflow configuration unchanged. This remains array-backed 3D numerics,
+not compiler-generated multidimensional `field` lowering or full RStudio parity.
+
 ## 2026-11-01: seeded non-Fourier coupled 3D native PDE (4/4 exact-head CI passed)
 
 A new seed-9137, non-Fourier, asymmetric two-species 8×8×8 state is

@@ -298,6 +298,25 @@ function main() -> i32 {
     if result.valid or result.failed_at != 4 { return 105 }
     if parse_math_expression("1minute").valid { return 106 }
 
+
+    # Production HTTP compiler/runtime must execute angular scaling and e.
+    result = evaluate_math_expression("sin(90°)")
+    if not result.valid or not close(result.result.value, 1.0) { return 107 }
+    result = evaluate_math_expression("cos(180deg)")
+    if not result.valid or not close(result.result.value, -1.0) { return 108 }
+    result = evaluate_math_expression("tan(50grad)")
+    if not result.valid or not close(result.result.value, 1.0) { return 109 }
+    result = evaluate_math_expression("sin(0.25turn)")
+    if not result.valid or not close(result.result.value, 1.0) { return 110 }
+    result = evaluate_math_expression("1mrad+1rad")
+    if not result.valid or not close(result.result.value, 1.001) { return 111 }
+    result = evaluate_math_expression("ln(e)")
+    if not result.valid or not close(result.result.value, 1.0) { return 112 }
+    let angle_span: ParsedMathExpression = parse_math_expression("90°")
+    if not angle_span.valid or angle_span.program.instructions[0].source_end != 4 { return 113 }
+    result = evaluate_math_expression("90°+1m")
+    if result.valid or result.failed_at != 4 { return 114 }
+
     println("native-math-source-ok")
     return 0
 }

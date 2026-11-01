@@ -235,10 +235,12 @@ export function infer_math_ir(program: MathProgram) -> MathInferredType {
             depth = depth - 1
             dimensions[depth - 1] = result
             predicates[depth - 1] = result_predicate
-        } elif opcode == 58 or opcode == 59 or opcode == 60 or opcode == 61 {
+        } elif opcode == 58 or opcode == 59 or opcode == 60 or opcode == 61 or
+             (opcode >= 62 and opcode <= 65) {
             let mut components: i32 = 2
             if opcode == 59 { components = 3 }
             if opcode == 61 { components = 4 }
+            if opcode >= 62 and opcode <= 65 { components = opcode - 57 }
             let arity: i32 = components * 2
             if depth < arity { return static_error(instruction.source_start) }
             let first: Dimension = dimensions[depth - arity]

@@ -1,0 +1,26 @@
+# Production HTTP compiler fixture; the full native paired solver smoke
+# remains separately executable on both Linux and macOS.
+import .math_dimensions { Dimension, length_dimension, time_dimension, product_dimension, quotient_dimension, same_dimension }
+import .math_static { MathDimensionBindings, empty_math_dimension_bindings }
+import .math_dimension_pair { MathTwoDimensionSolution, solve_math_equations_two_unknown_dimensions, solve_math_equations_three_constraints_two_unknown_dimensions }
+
+function main() -> i32 {
+    let length: Dimension = length_dimension()
+    let time: Dimension = time_dimension()
+    let length_time: Dimension = product_dimension(length, time)
+    let speed: Dimension = quotient_dimension(length, time)
+    let known: MathDimensionBindings = empty_math_dimension_bindings()
+    let mut result: MathTwoDimensionSolution = solve_math_equations_two_unknown_dimensions(
+        "x*y = 1m²", "x/y = 1s²", known, "x", "y")
+    if not result.valid or not same_dimension(result.first, length_time) or
+       not same_dimension(result.second, speed) { return 1 }
+    result = solve_math_equations_three_constraints_two_unknown_dimensions(
+        "x*y = 1m²", "x*y = 1m²", "x/y = 1s²", known, "x", "y")
+    if not result.valid or not same_dimension(result.first, length_time) or
+       not same_dimension(result.second, speed) { return 2 }
+    result = solve_math_equations_two_unknown_dimensions(
+        "x*y = 1m²", "x*y = 1m²", known, "x", "y")
+    if result.valid { return 3 }
+    println("native-math-two-unknown-dimension-constraints-ok")
+    return 0
+}

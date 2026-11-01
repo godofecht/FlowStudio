@@ -64,13 +64,20 @@ def unicode_variadic_cases() -> tuple[tuple[str, str, int, str], ...]:
     return tuple(cases)
 
 
-def inject_unicode_variadic_assertions(source: str, sabotage: bool = False) -> str:
+def inject_unicode_variadic_assertions(source: str, sabotage: bool = False,
+                                      start: int = 0, stop: int | None = None) -> str:
     """Add independently computed Unicode cases to checked-in native Flow main."""
     marker = 'println("native-math-variadic-ok")'
     if source.count(marker) != 1:
         raise ValueError("missing or ambiguous native Flow main marker")
+    cases = unicode_variadic_cases()
+    if stop is None:
+        stop = len(cases)
+    if start < 0 or stop > len(cases) or start >= stop:
+        raise ValueError("invalid Unicode variadic batch")
     statements: list[str] = []
-    for index, (kind, expression, expected, dimension) in enumerate(unicode_variadic_cases()):
+    for index in range(start, stop):
+        kind, expression, expected, dimension = cases[index]
         if kind == "valid":
             wanted = expected + (1 if sabotage and index == 0 else 0)
             statements.append(f'result = evaluate_math_expression("{expression}")')

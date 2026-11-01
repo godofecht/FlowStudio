@@ -1,0 +1,96 @@
+# Native Flow 2.0 robust statistics: source parsing, typed IR and SI inference.
+# flow run src/math_robust_statistics_smoke.flow
+import .math_dimensions { Dimension, length_dimension, time_dimension, same_dimension }
+import .math_expression_ir { MathResult }
+import .math_expression_source { ParsedMathExpression, parse_math_expression, evaluate_math_expression }
+import .math_static { MathInferredType, infer_math_expression_source, infer_math_equation_source }
+
+function near(actual: f64, expected: f64, tolerance: f64) -> bool {
+    let mut error: f64 = actual - expected
+    if error < 0.0 { error = -error }
+    return error <= tolerance
+}
+
+function main() -> i32 {
+    let length: Dimension = length_dimension()
+    let mut result: MathResult = evaluate_math_expression("median(1m,2m,3m)")
+    if not result.valid or result.result.value != 2.0 or
+       not same_dimension(result.result.dimension, length) { return 1 }
+    result = evaluate_math_expression("median(9m,1m,3m,5m)")
+    if not result.valid or result.result.value != 4.0 { return 2 }
+    result = evaluate_math_expression("median(3m)")
+    if not result.valid or result.result.value != 3.0 { return 3 }
+    result = evaluate_math_expression("median(8,7,6,5,4,3,2,1)")
+    if not result.valid or result.result.value != 4.5 { return 4 }
+    result = evaluate_math_expression("median(-1e30,1e30)")
+    if not result.valid or result.result.value != 0.0 { return 5 }
+    result = evaluate_math_expression("median(1e30,1e30)")
+    if not result.valid or not near(result.result.value / 1e30,1.0,1e-12) { return 6 }
+    result = evaluate_math_expression("median(1km,500m,2km)")
+    if not result.valid or result.result.value != 1000.0 or
+       not same_dimension(result.result.dimension,length) { return 7 }
+    result = evaluate_math_expression("mad(1m,1m,2m,2m,100m)")
+    if not result.valid or result.result.value != 1.0 or
+       not same_dimension(result.result.dimension,length) { return 8 }
+    result = evaluate_math_expression("mad(1m,2m,3m,4m)")
+    if not result.valid or result.result.value != 1.0 { return 9 }
+    result = evaluate_math_expression("mad(7m)")
+    if not result.valid or result.result.value != 0.0 { return 10 }
+    result = evaluate_math_expression("mad(-1e30,1e30)")
+    if not result.valid or not near(result.result.value / 1e30,1.0,1e-12) { return 11 }
+    result = evaluate_math_expression("mad(0m,0m,0m)")
+    if not result.valid or result.result.value != 0.0 { return 12 }
+    result = evaluate_math_expression("mad(1,2,3,4,5,6,7,8)")
+    if not result.valid or result.result.value != 2.0 { return 13 }
+    result = evaluate_math_expression("2median(1m,3m)")
+    if not result.valid or result.result.value != 4.0 { return 14 }
+    result = evaluate_math_expression("mad(median(1m,3m),median(1m,3m))")
+    if not result.valid or result.result.value != 0.0 { return 15 }
+    result = evaluate_math_expression("median(1m,3s)")
+    if result.valid or result.failed_at != 0 { return 16 }
+    result = evaluate_math_expression("mad(1m,3s)")
+    if result.valid or result.failed_at != 0 { return 17 }
+    result = evaluate_math_expression("median(true,3)")
+    if result.valid or result.failed_at != 0 { return 18 }
+    result = evaluate_math_expression("mad(1,false)")
+    if result.valid or result.failed_at != 0 { return 19 }
+    let parsed: ParsedMathExpression = parse_math_expression("median(1m,3m)")
+    if not parsed.valid or parsed.program.count != 3 or
+       parsed.program.instructions[2].opcode != 78 or
+       parsed.program.instructions[2].exponent != 2 or
+       parsed.program.instructions[2].source_start != 0 or
+       parsed.program.instructions[2].source_end != 6 { return 20 }
+    parsed = parse_math_expression("mad(1m,3m)")
+    if not parsed.valid or parsed.program.instructions[2].opcode != 79 or
+       parsed.program.instructions[2].source_end != 3 { return 21 }
+    if parse_math_expression("median()").valid or
+       parse_math_expression("mad()").valid { return 22 }
+    if parse_math_expression("median(1,)").valid or
+       parse_math_expression("mad(,1)").valid { return 23 }
+    if parse_math_expression("median(1,2,3,4,5,6,7,8,9)").valid or
+       parse_math_expression("mad(1,2,3,4,5,6,7,8,9)").valid { return 24 }
+    let mut inferred: MathInferredType = infer_math_expression_source("median(1m,3m)")
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension,length) { return 25 }
+    inferred = infer_math_expression_source("mad(1m,3m)")
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension,length) { return 26 }
+    inferred = infer_math_expression_source("median(1m,3s)")
+    if inferred.valid or inferred.failed_at != 0 { return 27 }
+    inferred = infer_math_expression_source("mad(true,2)")
+    if inferred.valid or inferred.failed_at != 0 { return 28 }
+    inferred = infer_math_equation_source("median(1m,3m) = 2m")
+    if not inferred.valid or not same_dimension(inferred.dimension,length) { return 29 }
+    inferred = infer_math_equation_source("mad(1m,3m) = 1m")
+    if not inferred.valid or not same_dimension(inferred.dimension,length) { return 30 }
+    inferred = infer_math_equation_source("mad(1m,3m) = 1s")
+    if inferred.valid { return 31 }
+    result = evaluate_math_expression("median(1m,2m,3m,4m)+mad(1m,2m,3m,4m)")
+    if not result.valid or result.result.value != 3.5 { return 32 }
+    result = evaluate_math_expression("mad(1e30,1e30)")
+    if not result.valid or result.result.value != 0.0 { return 33 }
+    result = evaluate_math_expression("median(1m,1m,1m,1m,1m,1m,1m,1m)")
+    if not result.valid or result.result.value != 1.0 { return 34 }
+    println("native-math-robust-statistics-ok")
+    return 0
+}

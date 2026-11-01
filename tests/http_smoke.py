@@ -983,7 +983,7 @@ def main() -> None:
     # The HTTP compiler stages a single source, so bundle the exact modules.
     dimension_solver_files = static_files[:-1] + (
         "src/math_dimension_solver.flow",
-        "src/math_dimension_solver_smoke.flow",
+        "src/math_dimension_solver_http_smoke.flow",
     )
     native_dimension_solver = "\n".join(
         "\n".join(
@@ -1031,7 +1031,7 @@ def main() -> None:
     # both successful execution and corrupted assertions must be observable.
     pair_files = static_files[:-1] + (
         "src/math_dimension_pair.flow",
-        "src/math_dimension_pair_smoke.flow",
+        "src/math_dimension_pair_http_smoke.flow",
     )
     native_pair = "\n".join(
         "\n".join(

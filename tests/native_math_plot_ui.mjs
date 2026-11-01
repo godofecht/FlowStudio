@@ -309,7 +309,13 @@ try {
   // and verify every rendered cell rather than only the success marker.
   await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
     readFileSync('examples/native_variable_diffusion16.flow', 'utf8'));
+  const variableHttpResponse = page.waitForResponse(response =>
+    response.url().endsWith('/api/run/flow') &&
+    response.request().method() === 'POST', { timeout: 90000 });
   await page.locator('#run').click();
+  const variableHttpReply = await variableHttpResponse;
+  assert.equal(variableHttpReply.status(), 200);
+  const variableHttpBody = await variableHttpReply.text();
   await page.waitForFunction(() =>
     document.querySelector('#console')?.textContent?.includes('native-variable-diffusion16-ok'),
     null, { timeout: 80000 });
@@ -355,6 +361,25 @@ try {
       'Native variable-conductivity heatmap mismatch at ' + cell.x + ',' + cell.y);
   }
   assert.equal(variableSeen.size, 256);
+  // The same physical Chromium Run must also transport all 256 computed
+  // seed-9137 non-Fourier values. Keep this second oracle independent of
+  // the native Flow generator and of the SVG's original Fourier field.
+  const seededFrame = variableHttpBody.match(
+    /FLOWSTUDIO_SEEDED_GRID_V1 16 16 1\r?\nS ([^\r\n]+)\r?\nFLOWSTUDIO_SEEDED_GRID_END/);
+  assert.ok(seededFrame, 'Native seeded grid missing from real browser HTTP response');
+  const seededBrowserValues = seededFrame[1].trim().split(/\s+/).map(Number);
+  assert.equal(seededBrowserValues.length, 256);
+  let seededBrowserExpected = Array.from({length:256}, (_, i) => {
+    const x = i % 16, y = Math.floor(i / 16);
+    return 1 + .1 * ((9137 + 71 * x + 113 * y + 17 * x * y) % 251);
+  });
+  for (let step = 0; step < 48; step++)
+    seededBrowserExpected = variableRows.map(row =>
+      row.reduce((sum, [j, weight]) => sum + weight * seededBrowserExpected[j], 0));
+  for (let i = 0; i < 256; i++)
+    assert.ok(Number.isFinite(seededBrowserValues[i]) &&
+      Math.abs(seededBrowserValues[i] - seededBrowserExpected[i]) < .002,
+      'Native seeded non-Fourier browser HTTP mismatch at cell ' + i);
   assert.equal(await page.locator('#tab-plots').getAttribute('aria-selected'), 'true');
 
   // Real physical Chromium -> Monaco Run -> production Flow compiler/HTTP.

@@ -23,6 +23,16 @@ also exercises arbitrary non-Fourier data, mass conservation and
 coefficient-axis transposition. Negative tests reject malformed fields,
 non-finite values, unstable ratios and out-of-budget steps.
 
+The native main also evolves a second 256-cell, non-Fourier field generated
+by deterministic integer residue seed **9137**. Its 48-step solution,
+24+24 restart, mass conservation, positivity, coefficient mutation and
+negative-input nonmutation are checked by native Flow. A distinct
+`FLOWSTUDIO_SEEDED_GRID_V1` output frame allows real production HTTP
+to compare **all 256 additional values** with the independent sparse
+Markov oracle, and deliberately corrupted seeded conservation must return
+HTTP 422. The original `FLOWSTUDIO_GRID_V1` frame remains unchanged
+for the existing physical Chromium heatmap.
+
 The production `tests/http_smoke.py` compiles and runs the checked-in Flow
 source through real `/api/check/flow` and `/api/run/flow` endpoints,
 independently checks every returned cell against the sparse operator, and

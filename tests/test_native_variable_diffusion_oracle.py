@@ -26,6 +26,12 @@ def initial() -> list[float]:
             1.5 * quarter(x + y) for y in range(SIDE) for x in range(SIDE)]
 
 
+def seeded_initial() -> list[float]:
+    """Independent closed-form seed-9137 integer-residue initial condition."""
+    return [1.0 + 0.1 * ((9137 + 71 * x + 113 * y + 17 * x * y) % 251)
+            for y in range(SIDE) for x in range(SIDE)]
+
+
 def conductivity() -> list[float]:
     return [(0.75 if x >= 8 else 0.25) + (0.05 if y < 8 else 0.0)
             for y in range(SIDE) for x in range(SIDE)]
@@ -123,6 +129,33 @@ class VariableConductivityOracle(unittest.TestCase):
         self.assertGreater(maximum_error(
             first, direct(values, transposed, 8)), .01)
 
+    def test_seeded_non_fourier_256_cells_and_periodic_interfaces(self):
+        values, coefficients = seeded_initial(), conductivity()
+        self.assertEqual(len(values), 256)
+        self.assertTrue(all(1 <= v <= 26 for v in values))
+        for steps in (0, 8, 24, 48):
+            with self.subTest(steps=steps):
+                actual = direct(values, coefficients, steps)
+                expected = matrix_oracle(values, coefficients, steps)
+                self.assertLess(maximum_error(actual, expected), 2e-12)
+                self.assertAlmostEqual(sum(actual), sum(values), delta=1e-9)
+                self.assertTrue(all(min(values) <= v <= max(values) for v in actual))
+        first = direct(values, coefficients, 48)
+        self.assertLess(maximum_error(
+            direct(direct(values, coefficients, 24), coefficients, 24),
+            first), 1e-12)
+        changed = coefficients[:]
+        changed[index(7, 3)] = .95
+        self.assertGreater(maximum_error(
+            direct(values, changed, 24),
+            direct(values, coefficients, 24)), .001)
+        # An erroneous non-periodic or transposed conductivity implementation
+        # must disagree on this asymmetric, non-Fourier field.
+        transposed = [coefficients[index(y, x)]
+                      for y in range(SIDE) for x in range(SIDE)]
+        self.assertGreater(maximum_error(
+            first, direct(values, transposed, 48)), .01)
+
     def test_negative_inputs_and_budget(self):
         values, coefficients = initial(), conductivity()
         bad_values = values[:]
@@ -150,7 +183,9 @@ class VariableConductivityOracle(unittest.TestCase):
         for fragment in ("function harmonic(", "function advance(",
                          "function integrate(", "steps > 128",
                          "FLOWSTUDIO_GRID_V1 16 16 1",
-                         "native-variable-diffusion16-ok"):
+                         "native-variable-diffusion16-ok",
+                         "FLOWSTUDIO_SEEDED_GRID_V1 16 16 1",
+                         "seededInitialGrid"):
             self.assertIn(fragment, source)
 
 

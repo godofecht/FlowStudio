@@ -445,6 +445,13 @@ function main() -> i32 {
     if not result.valid or result.result.value != 120.0 { return 164 }
     result = evaluate_math_expression("dot8(true,2,3,4,5,6,7,8,8,7,6,5,4,3,2,1)")
     if result.valid or result.failed_at != 0 { return 165 }
+    result = evaluate_math_expression("lerp(2m,8m,0.25)")
+    if not result.valid or not close(result.result.value, 3.5) or
+       not same_dimension(result.result.dimension, length_dimension()) { return 166 }
+    result = evaluate_math_expression("lerp(2m,8m,1.1)")
+    if result.valid or result.failed_at != 0 { return 167 }
+    result = evaluate_math_expression("lerp(2m,8s,0.25)")
+    if result.valid or result.failed_at != 0 { return 168 }
     println("native-math-source-ok")
     return 0
 }

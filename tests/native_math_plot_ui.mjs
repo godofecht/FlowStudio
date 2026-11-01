@@ -736,7 +736,7 @@ try {
     readFileSync(path, 'utf8').split(/\r?\n/)
       .filter(line => !/^import \.math_(dimensions|expression_ir|expression_source|equation|static|dimension_four) \{/.test(line))
       .filter(line => line.trim() && !line.trimStart().startsWith('#'))
-      .map(line => line.replace(/^export /, '')).join('\n')
+      .map(line => line.trimStart().replace(/^export /, '')).join('\n')
   ).join('\n');
   assert.ok(Buffer.byteLength(nativeFourSource, 'utf8') < 128 * 1024);
   assert.match(nativeFourSource, /function determinant4\(/);

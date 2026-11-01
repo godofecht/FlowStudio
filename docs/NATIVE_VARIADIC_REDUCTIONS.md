@@ -28,6 +28,29 @@ It also compiles a deliberately sabotaged numerical expectation and
 requires a real HTTP 422 runtime failure. Linux and macOS CI execute
 both suites, alongside the checked-in Navier–Stokes and heat programs.
 
+## Seeded production HTTP regression
+
+`tests/variadic_oracle.py` generates 48 reproducible cases using Python's
+standard-library integer arithmetic and seed `20261101`. Sixteen sums and
+sixteen products include reversed-argument metamorphic pairs; eight more
+cases nest products inside sums. Forty valid cases check exact expected
+integer results, SI dimensions and static inference in the actual compiled
+Flow runtime. Eight negative cases exercise zero and excessive arity,
+incompatible dimensions, predicate rejection and numerical overflow. The
+overflow case intentionally expects static type inference to succeed while
+runtime arithmetic rejects the out-of-range value.
+
+The production HTTP smoke injects these assertions into the checked-in
+Flow main, enforces a **128 KiB** UTF-8 source ceiling, then compiles and
+executes the result through `/api/check/flow` and `/api/run/flow`.
+A second compilation changes exactly one expected integer, requiring
+HTTP 422 on execution. No fake compiler or HTTP service is used.
+
+Reproduce the independent Python generator tests with
+`python3 -m unittest discover -s tests -p 'test_variadic_oracle.py' -v`.
+The full production HTTP test is part of
+`python3 scripts/verify_native.py --require-r` on Linux/macOS CI.
+
 General equation ASTs, arbitrary-rank tensor types, native
 Navier–Stokes and computed multidimensional visualization remain
 separate unfinished work.

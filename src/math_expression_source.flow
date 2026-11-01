@@ -158,6 +158,27 @@ function base_source_unit(bytes: ptr<u8>, index: i32, length: i32) -> SourceUnit
             dimension = Dimension { length: -1, mass: 1, time: -2, temperature: 0 }
             scale = 100000.0
             end = index + 3
+        } elif index + 3 < length and bytes[index] == 116 and
+             bytes[index + 1] == 117 and bytes[index + 2] == 114 and
+             bytes[index + 3] == 110 { # turn: 2π radians
+            scale = 6.28318530717958647692
+            end = index + 4
+        } elif index + 3 < length and bytes[index] == 103 and
+             bytes[index + 1] == 114 and bytes[index + 2] == 97 and
+             bytes[index + 3] == 100 { # gradian: π/200 radians
+            scale = 0.01570796326794896619
+            end = index + 4
+        } elif index + 2 < length and bytes[index] == 114 and
+             bytes[index + 1] == 97 and bytes[index + 2] == 100 { # rad
+            end = index + 3
+        } elif index + 2 < length and bytes[index] == 100 and
+             bytes[index + 1] == 101 and bytes[index + 2] == 103 { # deg: π/180 radians
+            scale = 0.01745329251994329577
+            end = index + 3
+        } elif index + 1 < length and bytes[index] == 194 and
+             bytes[index + 1] == 176 { # U+00B0 degree sign
+            scale = 0.01745329251994329577
+            end = index + 2
         } elif index + 1 < length and bytes[index] == 80 and bytes[index + 1] == 97 { # Pa
             dimension = Dimension { length: -1, mass: 1, time: -2, temperature: 0 }
             end = index + 2
@@ -776,10 +797,9 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
                 }
                 symbol_index = symbol_index + 1
             }
-            # Explicit caller bindings take precedence over the four
-            # dimensionless mathematical constants. This preserves existing
-            # Greek symbolic variables (including physical τ and π) while
-            # making unbound pi/π and tau/τ useful in numeric expressions.
+            # Explicit caller bindings take precedence over mathematical
+            # constants. This preserves Greek symbolic variables (including
+            # physical τ and π) while providing unbound pi/π, tau/τ and e.
             if not found {
                 if identifier_matches(bytes, start, index, "pi") or
                    identifier_matches(bytes, start, index, "π") {
@@ -788,6 +808,9 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
                 } elif identifier_matches(bytes, start, index, "tau") or
                      identifier_matches(bytes, start, index, "τ") {
                     value = quantity(6.28318530717958647692, dimensionless())
+                    found = true
+                } elif identifier_matches(bytes, start, index, "e") {
+                    value = quantity(2.71828182845904523536, dimensionless())
                     found = true
                 }
             }

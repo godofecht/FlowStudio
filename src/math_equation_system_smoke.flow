@@ -323,6 +323,22 @@ function main() -> i32 {
     result = evaluate_math_equation_system(system, tolerances)
     if result.valid or result.failed_equation != 1 or result.failed_at != 13 { return 67 }
 
+
+    # Angle units and Euler's constant execute in native multi-equation ASTs.
+    system = parse_math_equation_system("sin(90°)=1;cos(180deg)=-1;ln(e)=1")
+    if not system.valid or system.count != 3 { return 68 }
+    tolerances.count = 3
+    tolerances.values[0] = quantity(0.0000000001, dimensionless())
+    tolerances.values[1] = quantity(0.0000000001, dimensionless())
+    tolerances.values[2] = quantity(0.0000000001, dimensionless())
+    result = evaluate_math_equation_system(system, tolerances)
+    if not result.valid or not result.satisfied or result.count != 3 { return 69 }
+    system = parse_math_equation_system("90°=90m")
+    if not system.valid { return 70 }
+    tolerances.count = 1
+    result = evaluate_math_equation_system(system, tolerances)
+    if result.valid or result.failed_at != 4 { return 71 }
+
     println("native-math-equation-system-ok")
     return 0
 }

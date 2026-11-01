@@ -452,6 +452,19 @@ function main() -> i32 {
     if result.valid or result.failed_at != 0 { return 167 }
     result = evaluate_math_expression("lerp(2m,8s,0.25)")
     if result.valid or result.failed_at != 0 { return 168 }
+    # Native HTTP compilation and execution of dimensioned smooth transitions.
+    result = evaluate_math_expression("smoothstep(0m,10m,2.5m)")
+    if not result.valid or not close(result.result.value, 0.15625) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 169 }
+    result = evaluate_math_expression("smootherstep(0m,10m,2.5m)")
+    if not result.valid or not close(result.result.value, 0.103515625) { return 170 }
+    result = evaluate_math_expression("smoothstep(0m,10m,2s)")
+    if result.valid or result.failed_at != 0 { return 171 }
+    result = evaluate_math_expression("smootherstep(10m,0m,5m)")
+    if result.valid or result.failed_at != 0 { return 172 }
+    result = evaluate_math_expression("smoothstep(0,2π,π)")
+    if not result.valid or not close(result.result.value, 0.5) { return 173 }
+    if parse_math_expression("smoothstep(0,1)").valid { return 174 }
     println("native-math-source-ok")
     return 0
 }

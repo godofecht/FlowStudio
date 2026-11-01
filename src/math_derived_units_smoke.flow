@@ -1,7 +1,7 @@
 # Native mathematical Flow: SI-derived unit literals are typed at source lowering.
 # Run: flow run src/math_derived_units_smoke.flow
 # These execute through the real parser, postfix IR, static inference and equation runtime.
-import .math_dimensions { Dimension, dimensionless, length_dimension, same_dimension, quantity }
+import .math_dimensions { Dimension, dimensionless, length_dimension, mass_dimension, temperature_dimension, same_dimension, quantity }
 import .math_expression_ir { MathResult }
 import .math_expression_source { ParsedMathExpression, parse_math_expression, evaluate_math_expression }
 import .math_static { MathInferredType, infer_math_expression_source }
@@ -157,5 +157,67 @@ function main() -> i32 {
         evaluate_math_equation_system(scaled_system, tolerances)
     if not scaled_checked.valid or not scaled_checked.satisfied or
        scaled_checked.count != 3 { return 46 }
+
+    # The prefix lexer is shared across base and derived SI units. All
+    # results are coherent SI quantities, not unit-decorated raw numbers.
+    result = evaluate_math_expression("2MPa/1kPa")
+    if not result.valid or not near(result.result.value, 2000.0) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 47 }
+    result = evaluate_math_expression("3GHz/1MHz")
+    if not result.valid or not near(result.result.value, 3000.0) { return 48 }
+    result = evaluate_math_expression("4nm/2µm")
+    if not result.valid or not near(result.result.value, 0.002) { return 49 }
+    result = evaluate_math_expression("5ns/1µs")
+    if not result.valid or not near(result.result.value, 0.005) { return 50 }
+    result = evaluate_math_expression("2mPa*3m*1m")
+    if not result.valid or not near(result.result.value, 0.006) or
+       not same_dimension(result.result.dimension, force) { return 51 }
+    result = evaluate_math_expression("3mN*2m")
+    if not result.valid or not near(result.result.value, 0.006) or
+       not same_dimension(result.result.dimension, energy) { return 52 }
+    result = evaluate_math_expression("4mJ/2ms")
+    if not result.valid or not near(result.result.value, 2.0) or
+       not same_dimension(result.result.dimension, power) { return 53 }
+    result = evaluate_math_expression("2g+500mg")
+    if not result.valid or not near(result.result.value, 0.0025) or
+       not same_dimension(result.result.dimension, mass_dimension()) { return 54 }
+    result = evaluate_math_expression("1kg+500g")
+    if not result.valid or not near(result.result.value, 1.5) { return 55 }
+    result = evaluate_math_expression("1µg/1ng")
+    if not result.valid or not near(result.result.value, 1000.0) { return 56 }
+    result = evaluate_math_expression("1μg/1µg")
+    if not result.valid or not near(result.result.value, 1.0) { return 57 }
+    result = evaluate_math_expression("1GPa/1MPa")
+    if not result.valid or not near(result.result.value, 1000.0) { return 58 }
+    result = evaluate_math_expression("1mHz*1ks")
+    if not result.valid or not near(result.result.value, 1.0) { return 59 }
+    result = evaluate_math_expression("1mK+1K")
+    if not result.valid or not near(result.result.value, 1.001) or
+       not same_dimension(result.result.dimension, temperature_dimension()) { return 60 }
+    result = evaluate_math_expression("1mPa+1mN")
+    if result.valid or result.failed_at != 4 { return 61 }
+    if parse_math_expression("1mkg").valid or
+       parse_math_expression("1uPa").valid or
+       parse_math_expression("1MPA").valid { return 62 }
+    let expanded: ParsedMathExpression = parse_math_expression("1MPa+2μg")
+    if not expanded.valid or expanded.program.count != 3 or
+       expanded.program.instructions[0].source_end != 4 or
+       expanded.program.instructions[1].source_start != 5 or
+       expanded.program.instructions[1].source_end != 9 { return 63 }
+    inferred = infer_math_expression_source("1MPa/0m")
+    if not inferred.valid or not same_dimension(inferred.dimension, gradient) { return 64 }
+    if evaluate_math_expression("1MPa/0m").valid { return 65 }
+
+    let expanded_system: MathEquationSystem = parse_math_equation_system(
+        "1MPa=1000kPa;1kg=1000g;1GHz=1000MHz")
+    if not expanded_system.valid or expanded_system.count != 3 { return 66 }
+    tolerances.count = 3
+    tolerances.values[0] = quantity(0.0, pressure)
+    tolerances.values[1] = quantity(0.0, mass_dimension())
+    tolerances.values[2] = quantity(0.0, frequency)
+    let expanded_checked: MathEquationSystemResult =
+        evaluate_math_equation_system(expanded_system, tolerances)
+    if not expanded_checked.valid or not expanded_checked.satisfied or
+       expanded_checked.count != 3 { return 67 }
     return 0
 }

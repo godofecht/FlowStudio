@@ -130,6 +130,96 @@ function valid_bindings(bindings: MathBindings) -> bool {
     return true
 }
 
+
+# SI unit suffixes are lowered to coherent base quantities before typed IR
+# evaluation. A single suffix table is shared by all recognized prefixes.
+# Gram is scaled to kilograms; kg is consequently k + g, not a special case.
+struct SourceUnit {
+    matched: bool,
+    dimension: Dimension,
+    scale: f64,
+    end: i32
+}
+
+function base_source_unit(bytes: ptr<u8>, index: i32, length: i32) -> SourceUnit {
+    let mut dimension: Dimension = dimensionless()
+    let mut scale: f64 = 1.0
+    let mut end: i32 = index
+    if index < length {
+        if index + 1 < length and bytes[index] == 80 and bytes[index + 1] == 97 { # Pa
+            dimension = Dimension { length: -1, mass: 1, time: -2, temperature: 0 }
+            end = index + 2
+        } elif index + 1 < length and bytes[index] == 72 and bytes[index + 1] == 122 { # Hz
+            dimension = Dimension { length: 0, mass: 0, time: -1, temperature: 0 }
+            end = index + 2
+        } elif bytes[index] == 109 { # m
+            dimension = length_dimension()
+            end = index + 1
+        } elif bytes[index] == 115 { # s
+            dimension = time_dimension()
+            end = index + 1
+        } elif bytes[index] == 75 { # K
+            dimension = temperature_dimension()
+            end = index + 1
+        } elif bytes[index] == 103 { # g = 0.001 kg
+            dimension = mass_dimension()
+            scale = 0.001
+            end = index + 1
+        } elif bytes[index] == 78 { # N
+            dimension = Dimension { length: 1, mass: 1, time: -2, temperature: 0 }
+            end = index + 1
+        } elif bytes[index] == 74 { # J
+            dimension = Dimension { length: 2, mass: 1, time: -2, temperature: 0 }
+            end = index + 1
+        } elif bytes[index] == 87 { # W
+            dimension = Dimension { length: 2, mass: 1, time: -3, temperature: 0 }
+            end = index + 1
+        }
+    }
+    return SourceUnit { matched: end > index, dimension: dimension, scale: scale, end: end }
+}
+
+function source_unit(bytes: ptr<u8>, index: i32, length: i32) -> SourceUnit {
+    let mut prefix_width: i32 = 0
+    let mut prefix_scale: f64 = 1.0
+    if index < length {
+        if bytes[index] == 107 { # kilo
+            prefix_width = 1
+            prefix_scale = 1000.0
+        } elif bytes[index] == 77 { # mega
+            prefix_width = 1
+            prefix_scale = 1000000.0
+        } elif bytes[index] == 71 { # giga
+            prefix_width = 1
+            prefix_scale = 1000000000.0
+        } elif bytes[index] == 99 { # centi
+            prefix_width = 1
+            prefix_scale = 0.01
+        } elif bytes[index] == 109 { # milli; bare m remains metre
+            prefix_width = 1
+            prefix_scale = 0.001
+        } elif bytes[index] == 110 { # nano
+            prefix_width = 1
+            prefix_scale = 0.000000001
+        } elif index + 1 < length and
+             ((bytes[index] == 194 and bytes[index + 1] == 181) or
+              (bytes[index] == 206 and bytes[index + 1] == 188)) { # micro sign / Greek mu
+            prefix_width = 2
+            prefix_scale = 0.000001
+        }
+    }
+    if prefix_width > 0 {
+        let base: SourceUnit = base_source_unit(bytes, index + prefix_width, length)
+        if base.matched {
+            return SourceUnit {
+                matched: true, dimension: base.dimension,
+                scale: base.scale * prefix_scale, end: base.end
+            }
+        }
+    }
+    return base_source_unit(bytes, index, length)
+}
+
 function blank_instruction() -> MathInstruction {
     return MathInstruction {
         opcode: 0, literal: quantity(0.0, dimensionless()),
@@ -674,96 +764,13 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
             if not number.ok or number.end <= index { return source_error(index, length) }
             let start: i32 = index
             index = number.end
+            let parsed_unit: SourceUnit = source_unit(bytes, index, length)
             let mut unit: Dimension = dimensionless()
             let mut unit_scale: f64 = 1.0
-            if index < length {
-                # Prefixes are deliberately explicit to avoid ambiguity with
-                # bare metre (m), second (s), and kilogram (kg) literals.
-                # All numeric quantities are stored in coherent SI base units.
-                if index + 2 < length and bytes[index] == 107 and
-                   bytes[index + 1] == 80 and bytes[index + 2] == 97 { # kPa
-                    unit = Dimension { length: -1, mass: 1, time: -2, temperature: 0 }
-                    unit_scale = 1000.0
-                    index = index + 3
-                } elif index + 2 < length and bytes[index] == 107 and
-                       bytes[index + 1] == 72 and bytes[index + 2] == 122 { # kHz
-                    unit = Dimension { length: 0, mass: 0, time: -1, temperature: 0 }
-                    unit_scale = 1000.0
-                    index = index + 3
-                } elif index + 1 < length and bytes[index] == 107 and
-                       bytes[index + 1] == 109 { # km
-                    unit = length_dimension()
-                    unit_scale = 1000.0
-                    index = index + 2
-                } elif index + 1 < length and bytes[index] == 107 and
-                       bytes[index + 1] == 78 { # kN
-                    unit = Dimension { length: 1, mass: 1, time: -2, temperature: 0 }
-                    unit_scale = 1000.0
-                    index = index + 2
-                } elif index + 1 < length and bytes[index] == 107 and
-                       bytes[index + 1] == 74 { # kJ
-                    unit = Dimension { length: 2, mass: 1, time: -2, temperature: 0 }
-                    unit_scale = 1000.0
-                    index = index + 2
-                } elif index + 1 < length and bytes[index] == 107 and
-                       bytes[index + 1] == 87 { # kW
-                    unit = Dimension { length: 2, mass: 1, time: -3, temperature: 0 }
-                    unit_scale = 1000.0
-                    index = index + 2
-                } elif index + 1 < length and bytes[index] == 99 and
-                       bytes[index + 1] == 109 { # cm
-                    unit = length_dimension()
-                    unit_scale = 0.01
-                    index = index + 2
-                } elif index + 1 < length and bytes[index] == 109 and
-                       bytes[index + 1] == 109 { # mm
-                    unit = length_dimension()
-                    unit_scale = 0.001
-                    index = index + 2
-                } elif index + 1 < length and bytes[index] == 109 and
-                       bytes[index + 1] == 115 { # ms
-                    unit = time_dimension()
-                    unit_scale = 0.001
-                    index = index + 2
-                } elif index + 2 < length and
-                       ((bytes[index] == 194 and bytes[index + 1] == 181) or
-                        (bytes[index] == 206 and bytes[index + 1] == 188)) and
-                       (bytes[index + 2] == 109 or bytes[index + 2] == 115) { # µm, μm, µs, μs
-                    if bytes[index + 2] == 109 {
-                        unit = length_dimension()
-                    } else {
-                        unit = time_dimension()
-                    }
-                    unit_scale = 0.000001
-                    index = index + 3
-                } elif bytes[index] == 109 { # m
-                    unit = length_dimension()
-                    index = index + 1
-                } elif bytes[index] == 115 { # s
-                    unit = time_dimension()
-                    index = index + 1
-                } elif bytes[index] == 75 { # K
-                    unit = temperature_dimension()
-                    index = index + 1
-                } elif bytes[index] == 107 and index + 1 < length and bytes[index + 1] == 103 { # kg
-                    unit = mass_dimension()
-                    index = index + 2
-                } elif bytes[index] == 80 and index + 1 < length and bytes[index + 1] == 97 { # Pa = kg/(m*s²)
-                    unit = Dimension { length: -1, mass: 1, time: -2, temperature: 0 }
-                    index = index + 2
-                } elif bytes[index] == 72 and index + 1 < length and bytes[index + 1] == 122 { # Hz = 1/s
-                    unit = Dimension { length: 0, mass: 0, time: -1, temperature: 0 }
-                    index = index + 2
-                } elif bytes[index] == 78 { # N = kg*m/s²
-                    unit = Dimension { length: 1, mass: 1, time: -2, temperature: 0 }
-                    index = index + 1
-                } elif bytes[index] == 74 { # J = N*m
-                    unit = Dimension { length: 2, mass: 1, time: -2, temperature: 0 }
-                    index = index + 1
-                } elif bytes[index] == 87 { # W = J/s
-                    unit = Dimension { length: 2, mass: 1, time: -3, temperature: 0 }
-                    index = index + 1
-                }
+            if parsed_unit.matched {
+                unit = parsed_unit.dimension
+                unit_scale = parsed_unit.scale
+                index = parsed_unit.end
             }
             if count >= 64 { return source_error(start, length) }
             instructions[count] = make_instruction(0, quantity(number.value * unit_scale, unit), start, index)

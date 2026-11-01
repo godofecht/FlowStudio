@@ -1186,8 +1186,8 @@ def main() -> None:
     status, body = request("POST", "/api/run/flow", corrupted_variable, accepted_headers)
     assert status == 422, ("native variable SI corrupted assertion", status, body)
     malformed_variable = native_variable.replace(
-        "function constraint_failure(index: i32, position: i32) -> MathThreeDimensionSolution {",
-        "function constraint_failure(index: i32, position: i32 -> MathThreeDimensionSolution {",
+        "function constraint_failure(index:i32,position:i32) -> MathThreeDimensionSolution {",
+        "function constraint_failure(index:i32,position:i32 -> MathThreeDimensionSolution {",
         1,
     )
     assert malformed_variable != native_variable

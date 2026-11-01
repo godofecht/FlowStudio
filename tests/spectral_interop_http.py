@@ -10,6 +10,7 @@ import math
 from pathlib import Path
 
 from spectral_roundtrip_http import verify_spectral_roundtrip
+from coupled_interop_http import verify_coupled_interop
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -71,3 +72,7 @@ def verify_spectral_interop(request, headers: dict[str, str]) -> None:
     # R independently advances the Python field, then persistent CPython
     # validates every returned cell against a step-121 Fourier oracle.
     verify_spectral_roundtrip(request, headers)
+
+    # Independent 32x32 two-species R midpoint integration, real R plot and
+    # complete 2,048-cell verification in the persistent Python kernel.
+    verify_coupled_interop(request, headers)

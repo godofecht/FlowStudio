@@ -984,8 +984,8 @@ def main() -> None:
     assert status == 200 and "native-math-static-ok" in body, (
         "native mathematical static inference execution", status, body)
     broken_static = native_static.replace(
-        "function infer_math_ir(program: MathProgram) -> MathInferredType {",
-        "function infer_math_ir(program: MathProgram -> MathInferredType {",
+        "function infer_math_ir(program:MathProgram) -> MathInferredType {",
+        "function infer_math_ir(program:MathProgram -> MathInferredType {",
         1,
     )
     assert broken_static != native_static

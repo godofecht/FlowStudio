@@ -460,8 +460,14 @@ executable native Flow 2.0 lowering, not editor substitution or the Python
 mathematical dialect. UTF-8 byte spans are retained for both Greek spellings,
 and existing dimensional, trigonometric, equation-residual and static type
 checks apply unchanged. Explicit caller-provided `MathBindings` take precedence over these
-four fallback constants, preserving existing Greek symbolic variables. Multiplication remains explicit: `2*π` is accepted;
-`2π` is rejected.
+four fallback constants, preserving existing Greek symbolic variables. The native typed
+parser also accepts adjacent resolved symbols and constants as multiplication:
+`2π`, `(2+1)π`, `3ρ` (with an explicit binding) and `2π²` execute through
+the same typed IR as `2*π`. Implicit products have left-associative
+multiplication/division precedence (`1/2π` means `(1/2)*π`); their synthetic
+operator has a zero-width UTF-8 source span. Unknown identifiers and Boolean
+operands are rejected. This is still a bounded scalar grammar, not general
+symbolic or tensor/PDE compilation.
 
 The checked-in native source, static inference, equation and compact HTTP
 smoke programs exercise analytical identities, dimensional errors, byte

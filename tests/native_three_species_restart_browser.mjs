@@ -96,7 +96,9 @@ export async function runThreeSpeciesRestartBrowser({page, setNotebookSource, re
         document.querySelector('#notice')?.textContent || ''),
       null, {timeout:120000});
     const notice = await page.locator('#notice').innerText();
-    assert.ok(notice.startsWith(expectedNotice), notice);
+    assert.ok(notice.startsWith(expectedNotice), JSON.stringify({notice,
+      output:(await page.locator('#notebookOutput').innerText()).slice(-2500),
+      routes:requests.slice(-10)}));
     assert.equal(await page.locator('#notebookOutput .notebook-cell').count(), count);
     await page.waitForFunction(() => !document.querySelector('#runNotebook').disabled,
       null, {timeout:30000});

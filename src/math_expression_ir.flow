@@ -25,6 +25,7 @@
 #          60 cross2(ax,ay,bx,by): signed 2D exterior product.
 #          61 dot4(ax,ay,az,aw,bx,by,bz,bw): four-component contraction.
 #          62-65 dot5..dot8: five-through-eight-component typed contractions.
+#          66 lerp(a, b, t): bounded physical linear interpolation, 0 <= t <= 1.
 # Predicate values are dimensionless 0/1 with a separate runtime type bit.
 # where and logical operators evaluate operands eagerly (no short circuit).
 # Unsupported instructions and type mismatches fail closed.
@@ -988,6 +989,24 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
             if not bounded_value(norm) { return failed(instruction.source_start) }
             depth = depth - 2
             stack[depth - 1] = quantity(norm, first.dimension)
+            predicate[depth - 1] = false
+        } elif opcode == 66 {
+            # Convex interpolation avoids forming b-a, which may overflow
+            # even when both endpoints and the interpolated result are bounded.
+            if depth < 3 { return failed(instruction.source_start) }
+            let first: Quantity = stack[depth - 3]
+            let second: Quantity = stack[depth - 2]
+            let weight: Quantity = stack[depth - 1]
+            if predicate[depth - 3] or predicate[depth - 2] or predicate[depth - 1] or
+               not same_dimension(first.dimension, second.dimension) or
+               not same_dimension(weight.dimension, dimensionless()) or
+               weight.value < 0.0 or weight.value > 1.0 {
+                return failed(instruction.source_start)
+            }
+            let value: f64 = first.value * (1.0 - weight.value) + second.value * weight.value
+            if not bounded_value(value) { return failed(instruction.source_start) }
+            depth = depth - 2
+            stack[depth - 1] = quantity(value, first.dimension)
             predicate[depth - 1] = false
         } elif opcode == 9 or opcode == 19 {
             if depth < 3 { return failed(instruction.source_start) }

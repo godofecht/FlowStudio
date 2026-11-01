@@ -45,6 +45,20 @@ class Volume8InteropSourceTests(unittest.TestCase):
                     exec(compile(_python_verifier(values, energies),
                                  "<volume-http-kernel>", "exec"), {})
 
+    def test_oracle_does_not_pollute_persistent_python_environment(self):
+        namespace = {"flowstudio_persistent": 42}
+        with contextlib.redirect_stdout(io.StringIO()):
+            exec(compile(_python_verifier(self.values, self.energies),
+                         "<volume-http-kernel>", "exec"), namespace)
+        self.assertEqual(namespace["flowstudio_persistent"], 42)
+        self.assertEqual(set(namespace) - {"__builtins__"}, {"flowstudio_persistent"})
+        corrupted = self.values[:]
+        corrupted[511] += .25
+        with self.assertRaisesRegex(AssertionError, "volume field mismatch"):
+            exec(compile(_python_verifier(corrupted, self.energies),
+                         "<volume-http-kernel>", "exec"), namespace)
+        self.assertEqual(set(namespace) - {"__builtins__"}, {"flowstudio_persistent"})
+
     def test_r_example_has_bounded_real_3d_restart_contract(self):
         source = (ROOT / "examples/coupled_volume8_r.R").read_text(encoding="utf-8")
         self.assertLess(len(source.encode("utf-8")), MAX_SOURCE_BYTES)

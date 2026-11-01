@@ -45,7 +45,7 @@ function main() -> i32 {
     result = evaluate_math_expression("3+")
     if result.valid or result.failed_at != 2 { return 10 }
     result = evaluate_math_expression("3(4)")
-    if result.valid or result.failed_at != 1 { return 11 }
+    if not result.valid or not near(result.result.value, 12.0) { return 11 }
     result = evaluate_math_expression("(3+4")
     if result.valid or result.failed_at != 0 { return 12 }
     result = evaluate_math_expression("3+4)")

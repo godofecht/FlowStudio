@@ -1,3 +1,33 @@
+## 2026-11-01: native 3D Flow/R/Python volume interoperability (4/4 exact-head CI passed)
+
+[PR #355](https://github.com/godofecht/FlowStudio/pull/355) merged as
+[69692723](https://github.com/godofecht/FlowStudio/commit/69692723c074de0f433a81265dfc94fbda33ea7c).
+The production Flow 2.0 compiler emits 1,024 seed-9137 anisotropic two-species
+8×8×8 voxel values. A checked-in independent vectorized base-R solver evolves
+the same 64-step periodic system with 32+32 restart/replay, mass, positivity,
+maximum-principle and 64 centered-energy assertions. Real R HTTP output is
+checked against the native Flow values, a Python sparse Markov oracle and a
+separate persistent Python direct-stencil HTTP kernel. All 1,024 final values
+and 64 energies are verified; finite voxel corruption, energy corruption,
+truncated frames and unstable R coefficients return HTTP 422. R/Python recovery
+and Python inspector namespace isolation are asserted. The checked-in source,
+resource limits and reproduction are in
+[the 3D interop guide](NATIVE_VOLUME8_R_PYTHON_HTTP.md).
+
+**Passed:** [exact-head CI #41339246216](https://github.com/godofecht/FlowStudio/actions/runs/41339246216),
+all four Ubuntu 24.04/macOS 15 source and native jobs. Each source platform
+passed 1,201 JavaScript tests (12 skipped) and ran 466 Python tests (13 skipped).
+Native Flow, real R/Python HTTP, corruption controls, R/C FlowJIT and physical
+Ubuntu Chromium acceptance passed. Four focused local Python oracle/namespace
+tests passed with a standalone local reference; independent vectorized numerical
+reproduction differed by less than 3e-14. **Failed:** zero final exact-head
+jobs; an earlier run failed bounded Python inspection due test-oracle globals,
+which was fixed and regression-tested. **Skipped:** optional and
+platform-inapplicable tests. **Unexecuted:** local native Flow/R and independent
+macOS physical Chromium. **Post-merge main CI:** pending. Hosted workflow
+configuration was unchanged by PR #355. Compiler-generated multidimensional
+field lowering and full RStudio parity remain incomplete.
+
 ## 2026-11-01: seeded Unicode SI reductions through native Flow/HTTP (verified)
 
 [PR #353](https://github.com/godofecht/FlowStudio/pull/353) merged as

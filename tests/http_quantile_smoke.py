@@ -19,7 +19,7 @@ def verify_quantiles() -> None:
         assert status == 200, ("quantile SI compile", start, status, body[:500])
         status, body = request("POST", "/api/run/flow", source, headers)
         assert status == 200 and "native-math-robust-statistics-ok" in body, (
-            "quantile SI execution", start, status, body[:500])
+            "quantile SI execution", start, status, body[-3000:])
     corrupted = inject_quantile_assertions(base, start=0, stop=20, sabotage=True)
     status, body = request("POST", "/api/check/flow", corrupted, headers)
     assert status == 200, ("quantile corrupted expectation compile", status, body[:500])

@@ -944,7 +944,13 @@ try {
     // executable bundle; preserve every solver statement and assertion.
     .replaceAll(/\bidentifier_matches\b/g, 'idmatch')
     .replaceAll(/\bsolve_math_equations_variable_constraints_four_unknown_dimensions\b/g, 'solve4')
-    .replaceAll(/\boutput_dimension\b/g, 'outdim');
+    .replaceAll(/\boutput_dimension\b/g, 'outdim')
+    // Preserve the entire executable native solver, including every check;
+    // shorten only identifiers in this isolated HTTP acceptance bundle.
+    .replaceAll(/\bsame_dimension\b/g, 'samedim')
+    .replaceAll(/\bsource_start\b/g, 'srcstart')
+    .replaceAll(/\bsource_error\b/g, 'srcerr')
+    .replaceAll(/\bdimensionless\b/g, 'dimless');
   assert.ok(Buffer.byteLength(nativeVariableFourSource, 'utf8') < 128 * 1024);
   assert.match(nativeVariableFourSource, /system\.count =\s*16/);
   assert.match(nativeVariableFourSource, /native-math-variable-four-constraints-ok/);

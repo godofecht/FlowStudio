@@ -1,7 +1,7 @@
 # Native Flow 2.0 static physical-type inference for bounded mathematical postfix IR.
 # Operates on opcode structure and SI exponents without evaluating numeric values.
 # It does not perform value-range analysis, symbolic algebra, or PDE inference.
-import .math_dimensions { Dimension, dimensionless, same_dimension, quantity, product_dimension }
+import .math_dimensions { Dimension, dimensionless, same_dimension, quantity, product_dimension, quotient_dimension, length_dimension }
 import .math_expression_ir { MathInstruction, MathProgram, MathPermutation4, math_permutation4 }
 import .math_expression_source { MathSymbol, MathBindings, ParsedMathExpression, parse_math_expression_with_bindings, empty_math_bindings }
 import .math_equation { MathEquation, parse_math_equation_with_bindings }
@@ -322,6 +322,50 @@ export function infer_math_ir(program: MathProgram) -> MathInferredType {
             let mut output_dimension: Dimension = input_dimension
             if opcode == 76 {
                 output_dimension = product_dimension(input_dimension, input_dimension)
+            }
+            if not static_bounded_dimension(output_dimension) {
+                return static_error(instruction.source_start)
+            }
+            depth = base + 1
+            dimensions[base] = output_dimension
+            predicates[base] = false
+        } elif opcode == 84 or opcode == 85 or opcode == 86 {
+            # Infer derivative dimensions without evaluating step sizes.
+            let mut arity: i32 = 3
+            let mut fields: i32 = 2
+            if opcode == 85 {
+                arity = 4
+                fields = 3
+            }
+            if opcode == 86 {
+                arity = 7
+                fields = 5
+            }
+            if depth < arity { return static_error(instruction.source_start) }
+            let base: i32 = depth - arity
+            let field_dimension: Dimension = dimensions[base]
+            let mut component: i32 = 0
+            while component < fields {
+                let position: i32 = base + component
+                if predicates[position] or
+                   not same_dimension(dimensions[position], field_dimension) {
+                    return static_error(instruction.source_start)
+                }
+                component = component + 1
+            }
+            let step_position: i32 = base + fields
+            let step_dimension: Dimension = dimensions[step_position]
+            if predicates[step_position] { return static_error(instruction.source_start) }
+            if opcode == 86 {
+                if predicates[step_position + 1] or
+                   not same_dimension(step_dimension, length_dimension()) or
+                   not same_dimension(dimensions[step_position + 1], length_dimension()) {
+                    return static_error(instruction.source_start)
+                }
+            }
+            let mut output_dimension: Dimension = quotient_dimension(field_dimension, step_dimension)
+            if opcode != 84 {
+                output_dimension = quotient_dimension(output_dimension, step_dimension)
             }
             if not static_bounded_dimension(output_dimension) {
                 return static_error(instruction.source_start)

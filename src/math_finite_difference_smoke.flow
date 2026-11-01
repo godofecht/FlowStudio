@@ -1,0 +1,102 @@
+# Executable native Flow 2.0 centered finite differences and physical SI inference.
+# flow run src/math_finite_difference_smoke.flow
+import .math_dimensions { Dimension, length_dimension, time_dimension, temperature_dimension, same_dimension, quotient_dimension }
+import .math_expression_ir { MathResult }
+import .math_expression_source { ParsedMathExpression, parse_math_expression, evaluate_math_expression }
+import .math_static { MathInferredType, infer_math_expression_source, infer_math_equation_source }
+
+function near(actual: f64, expected: f64) -> bool {
+    let mut difference: f64 = actual - expected
+    if difference < 0.0 { difference = -difference }
+    return difference < 0.00000000001
+}
+
+function main() -> i32 {
+    let velocity: Dimension = quotient_dimension(length_dimension(), time_dimension())
+    let acceleration: Dimension = quotient_dimension(velocity, time_dimension())
+    let curvature: Dimension = quotient_dimension(
+        quotient_dimension(temperature_dimension(), length_dimension()), length_dimension())
+    let mut result: MathResult = evaluate_math_expression("fd1(-4m,8m,2s)")
+    if not result.valid or not near(result.result.value,3.0) or
+       not same_dimension(result.result.dimension,velocity) { return 1 }
+    result = evaluate_math_expression("fd1(1km,3km,500s)")
+    if not result.valid or not near(result.result.value,2.0) { return 2 }
+    result = evaluate_math_expression("fd2(1m,2m,5m,1s)")
+    if not result.valid or not near(result.result.value,2.0) or
+       not same_dimension(result.result.dimension,acceleration) { return 3 }
+    result = evaluate_math_expression("fd2(1K,1K,9K,2m)")
+    if not result.valid or not near(result.result.value,2.0) or
+       not same_dimension(result.result.dimension,curvature) { return 4 }
+    result = evaluate_math_expression("laplacian2(0K,1K,1K,8K,8K,1m,2m)")
+    if not result.valid or not near(result.result.value,6.0) or
+       not same_dimension(result.result.dimension,curvature) { return 5 }
+    result = evaluate_math_expression("laplacian2(0K,1K,1K,-1K,-1K,1m,1m)")
+    if not result.valid or result.result.value != 0.0 { return 6 }
+    result = evaluate_math_expression("laplacian2(7K,7K,7K,7K,7K,1m,1m)")
+    if not result.valid or result.result.value != 0.0 { return 7 }
+    result = evaluate_math_expression("2fd1(1m,3m,1s)")
+    if not result.valid or not near(result.result.value,2.0) { return 8 }
+    result = evaluate_math_expression("fd1(1m,3m,1s)+fd1(1m,3m,1s)")
+    if not result.valid or not near(result.result.value,2.0) { return 9 }
+    result = evaluate_math_expression("fd1(1m,3m,1s) = 1m/s")
+    if result.valid { return 10 }
+    result = evaluate_math_expression("fd1(1m,3s,1s)")
+    if result.valid or result.failed_at != 0 { return 11 }
+    result = evaluate_math_expression("fd2(1m,2m,3s,1s)")
+    if result.valid or result.failed_at != 0 { return 12 }
+    result = evaluate_math_expression("laplacian2(0K,1K,1K,1K,1s,1m,1m)")
+    if result.valid or result.failed_at != 0 { return 13 }
+    result = evaluate_math_expression("fd1(true,3m,1s)")
+    if result.valid or result.failed_at != 0 { return 14 }
+    result = evaluate_math_expression("fd2(1m,false,3m,1s)")
+    if result.valid or result.failed_at != 0 { return 15 }
+    result = evaluate_math_expression("laplacian2(0K,1K,1K,1K,1K,1s,1m)")
+    if result.valid or result.failed_at != 0 { return 16 }
+    result = evaluate_math_expression("fd1(1m,3m,0s)")
+    if result.valid or result.failed_at != 0 { return 17 }
+    result = evaluate_math_expression("fd2(1m,2m,3m,-1s)")
+    if result.valid or result.failed_at != 0 { return 18 }
+    result = evaluate_math_expression("laplacian2(0K,1K,1K,1K,1K,1m,0m)")
+    if result.valid or result.failed_at != 0 { return 19 }
+    result = evaluate_math_expression("fd1(-1e30,1e30,1e-30s)")
+    if result.valid or result.failed_at != 0 { return 20 }
+    let mut parsed: ParsedMathExpression = parse_math_expression("fd1(1m,3m,1s)")
+    if not parsed.valid or parsed.program.count != 4 or
+       parsed.program.instructions[3].opcode != 84 or
+       parsed.program.instructions[3].source_start != 0 or
+       parsed.program.instructions[3].source_end != 3 { return 21 }
+    parsed = parse_math_expression("fd2(1m,2m,3m,1s)")
+    if not parsed.valid or parsed.program.count != 5 or
+       parsed.program.instructions[4].opcode != 85 { return 22 }
+    parsed = parse_math_expression("laplacian2(0K,1K,1K,1K,1K,1m,1m)")
+    if not parsed.valid or parsed.program.count != 8 or
+       parsed.program.instructions[7].opcode != 86 or
+       parsed.program.instructions[7].source_end != 10 { return 23 }
+    if parse_math_expression("fd1(1m,2m)").valid or
+       parse_math_expression("fd2(1m,2m,3m)").valid or
+       parse_math_expression("laplacian2(1,2,3,4,5,6)").valid { return 24 }
+    if parse_math_expression("fd1(1m,2m,1s,)").valid or
+       parse_math_expression("fd2(1m,,2m,3m,1s)").valid or
+       parse_math_expression("laplacian2()").valid { return 25 }
+    let mut inferred: MathInferredType = infer_math_expression_source("fd1(1m,3m,1s)")
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension,velocity) { return 26 }
+    inferred = infer_math_expression_source("fd2(1m,2m,3m,1s)")
+    if not inferred.valid or not same_dimension(inferred.dimension,acceleration) { return 27 }
+    inferred = infer_math_expression_source("laplacian2(0K,1K,1K,1K,1K,1m,1m)")
+    if not inferred.valid or not same_dimension(inferred.dimension,curvature) { return 28 }
+    inferred = infer_math_expression_source("fd1(1m,3m,0s)")
+    if not inferred.valid { return 29 }
+    inferred = infer_math_expression_source("fd1(1m,3s,1s)")
+    if inferred.valid or inferred.failed_at != 0 { return 30 }
+    inferred = infer_math_expression_source("laplacian2(0K,1K,1K,1K,1K,1s,1m)")
+    if inferred.valid or inferred.failed_at != 0 { return 31 }
+    inferred = infer_math_equation_source("fd1(1m,3m,1s) = 1m/1s")
+    if not inferred.valid or not same_dimension(inferred.dimension,velocity) { return 32 }
+    inferred = infer_math_equation_source("laplacian2(0K,1K,1K,8K,8K,1m,2m) = 6K/1m²")
+    if not inferred.valid or not same_dimension(inferred.dimension,curvature) { return 33 }
+    inferred = infer_math_equation_source("fd1(1m,3m,1s) = 1m")
+    if inferred.valid { return 34 }
+    println("native-math-finite-difference-ok")
+    return 0
+}

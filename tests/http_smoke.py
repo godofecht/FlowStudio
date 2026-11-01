@@ -39,7 +39,8 @@ def request(method: str, path: str, body: str | None = None,
         return exc.code, exc.read().decode("utf-8")
 
 
-def compact_native_math_line(line: str, *, tighten_equals: bool = False) -> str:
+def compact_native_math_line(line: str, *, tighten_equals: bool = False,
+                             tighten_math_ops: bool = False) -> str:
     """Compact only code whitespace/comments, preserving string literals.
 
     The native Flow HTTP endpoint deliberately enforces a 128 KiB request
@@ -49,11 +50,19 @@ def compact_native_math_line(line: str, *, tighten_equals: bool = False) -> str:
     result: list[str] = []
     quoted = False
     escaped = False
-    for char in source:
+    for index, char in enumerate(source):
         if not quoted and char == "#":
             break
         if not quoted and char in " \t" and result and (
-            result[-1] in ",:" or (tighten_equals and result[-1] == "=")
+            result[-1] in ",:"
+            or (tighten_equals and result[-1] == "=")
+            # Flow's lexer can absorb adjacent slash or star into a token;
+            # keep their surrounding spaces when compacting native bundles.
+            or (tighten_math_ops and not (
+                result[-1] in "<>!=+-" and source[index + 1:index + 2] in "=+"
+            ) and (
+                result[-1] in "=+" or source[index + 1:index + 2] in "=+"
+            ))
         ):
             continue
         result.append(char)
@@ -1097,7 +1106,7 @@ def main() -> None:
     )
     native_overdetermined = "\n".join(
         "\n".join(
-            compact_native_math_line(line)
+            compact_native_math_line(line, tighten_equals=True)
             for line in (Path(__file__).resolve().parents[1] / path)
                 .read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.lstrip().startswith("#")
@@ -1146,7 +1155,7 @@ def main() -> None:
     )
     native_variable = "\n".join(
         "\n".join(
-            line.strip().removeprefix("export ")
+            compact_native_math_line(line, tighten_equals=True)
             for line in (Path(__file__).resolve().parents[1] / path)
                 .read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.lstrip().startswith("#")
@@ -1161,8 +1170,8 @@ def main() -> None:
         for path in variable_files
     )
     assert "function solve_math_equations_variable_constraints_three_unknown_dimensions(" in native_variable
-    assert 'system.count = 16' in native_variable
-    assert 'system.equations[15] = "x = 1s"' in native_variable
+    assert 'system.count =16' in native_variable
+    assert 'system.equations[15] ="x = 1s"' in native_variable
     assert len(native_variable.encode("utf-8")) < 128 * 1024
     status, body = request("POST", "/api/check/flow", native_variable, accepted_headers)
     assert status == 200, ("native variable SI HTTP compile", status, body)
@@ -1173,16 +1182,16 @@ def main() -> None:
     # Change that equation to a consistent one; the negative assertion in the
     # real Flow program must then reject execution, not silently succeed.
     corrupted_variable = native_variable.replace(
-        'system.equations[15] = "x = 1s"',
-        'system.equations[15] = "x = 1m"',
+        'system.equations[15] ="x = 1s"',
+        'system.equations[15] ="x = 1m"',
         1,
     )
     assert corrupted_variable != native_variable
     status, body = request("POST", "/api/run/flow", corrupted_variable, accepted_headers)
     assert status == 422, ("native variable SI corrupted assertion", status, body)
     malformed_variable = native_variable.replace(
-        "function constraint_failure(index: i32, position: i32) -> MathThreeDimensionSolution {",
-        "function constraint_failure(index: i32, position: i32 -> MathThreeDimensionSolution {",
+        "function constraint_failure(index:i32,position:i32) -> MathThreeDimensionSolution {",
+        "function constraint_failure(index:i32,position:i32 -> MathThreeDimensionSolution {",
         1,
     )
     assert malformed_variable != native_variable
@@ -1200,7 +1209,7 @@ def main() -> None:
     )
     native_four = "\n".join(
         "\n".join(
-            line.strip().removeprefix("export ")
+            compact_native_math_line(line, tighten_equals=True)
             for line in (Path(__file__).resolve().parents[1] / path)
                 .read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.lstrip().startswith("#")
@@ -1222,17 +1231,19 @@ def main() -> None:
     status, body = request("POST", "/api/run/flow", native_four, accepted_headers)
     assert status == 200 and "native-math-dimension-four-ok" in body, (
         "native four-unknown SI HTTP execution", status, body)
+    # Match only the quoted equation: HTTP source compaction removes
+    # whitespace between list entries, but never changes string contents.
     corrupted_four = native_four.replace(
-        '"x*y*z*w = 1m*1m*1m*1m", "x/y = 1", "y/z = 1", "z/w = 1",',
-        '"x*y*z*w = 1m³", "x/y = 1", "y/z = 1", "z/w = 1",',
+        '"x*y*z*w = 1m*1m*1m*1m"',
+        '"x*y*z*w = 1m³"',
         1,
     )
     assert corrupted_four != native_four
     status, body = request("POST", "/api/run/flow", corrupted_four, accepted_headers)
     assert status == 422, ("native four-unknown corrupted assertion", status, body)
     malformed_four = native_four.replace(
-        "function determinant4(a: FourDimensionRow, b: FourDimensionRow,",
-        "function determinant4(a: FourDimensionRow, b: FourDimensionRow",
+        "function determinant4(a:FourDimensionRow,b:FourDimensionRow,",
+        "function determinant4(a:FourDimensionRow,b:FourDimensionRow",
         1,
     )
     assert malformed_four != native_four
@@ -1253,9 +1264,19 @@ def main() -> None:
     assert compact_native_math_line('let s = "a, b: c # literal" # trailing') == (
         'let s = "a, b: c # literal"'
     )
+    assert compact_native_math_line(
+        'value: a.value / b.value', tighten_math_ops=True
+    ) == 'value:a.value / b.value'
+    assert compact_native_math_line(
+        'value: a.value * b.value', tighten_math_ops=True
+    ) == 'value:a.value * b.value'
+    assert compact_native_math_line(
+        'let a: array<i32, 4> = [0, 1]',
+        tighten_equals=True, tighten_math_ops=True
+    ) == 'let a:array<i32,4> =[0,1]'
     native_variable_four = "\n".join(
         "\n".join(
-            compact_native_math_line(line, tighten_equals=True)
+            compact_native_math_line(line, tighten_equals=True, tighten_math_ops=True)
             for line in (Path(__file__).resolve().parents[1] / path)
                 .read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.lstrip().startswith("#")
@@ -1271,7 +1292,7 @@ def main() -> None:
     )
     assert "function solve_math_equations_variable_constraints_four_unknown_dimensions(" in native_variable_four
     assert "function determinant4(" in native_variable_four
-    assert 'system.count =16' in native_variable_four
+    assert 'system.count=16' in native_variable_four
     assert "native-math-variable-four-constraints-ok" in native_variable_four
     assert len(native_variable_four.encode("utf-8")) < 128 * 1024
     status, body = request("POST", "/api/check/flow", native_variable_four, accepted_headers)
@@ -1282,8 +1303,8 @@ def main() -> None:
     # Convert the deliberately contradictory last equation to a valid
     # equation: the Flow program must now return its nonzero assertion code.
     corrupted_variable_four = native_variable_four.replace(
-        'system.equations[15] ="x+y = 2s"',
-        'system.equations[15] ="x+y = 2m"',
+        'system.equations[15]="x+y = 2s"',
+        'system.equations[15]="x+y = 2m"',
         1,
     )
     assert corrupted_variable_four != native_variable_four

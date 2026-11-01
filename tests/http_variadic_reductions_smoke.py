@@ -7,6 +7,7 @@ from variadic_oracle import inject_variadic_assertions, variadic_cases
 from unicode_variadic_oracle import inject_unicode_variadic_assertions, unicode_variadic_cases
 from http_robust_statistics_smoke import verify_robust_statistics
 from http_quantile_smoke import verify_quantiles
+from http_finite_difference_smoke import verify_finite_differences
 
 
 def bundled_source(root: Path) -> str:
@@ -37,28 +38,31 @@ def main() -> None:
     root = Path(__file__).resolve().parents[1]
     base_source = bundled_source(root)
     assert "native-math-variadic-ok" in base_source
-    source = inject_variadic_assertions(base_source)
     headers = {"X-FlowStudio-Intent": "run"}
-    status, body = request("POST", "/api/check/flow", source, headers)
-    assert status == 200, ("variadic source compile", status, body)
-    status, body = request("POST", "/api/run/flow", source, headers)
-    assert status == 200 and "native-math-variadic-ok" in body, (
-        "variadic native execution", status, body)
+    # Preserve all 48 independent ASCII cases while respecting the actual
+    # 128 KiB production HTTP request budget as the native parser grows.
+    for start in (0, 24):
+        source = inject_variadic_assertions(base_source, start=start, stop=start + 24)
+        status, body = request("POST", "/api/check/flow", source, headers)
+        assert status == 200, ("variadic source compile", start, status, body)
+        status, body = request("POST", "/api/run/flow", source, headers)
+        assert status == 200 and "native-math-variadic-ok" in body, (
+            "variadic native execution", start, status, body)
 
     # Sabotage only the first independently computed integer expectation.
     # Production compilation must still succeed, execution must fail closed.
-    tampered = inject_variadic_assertions(base_source, sabotage=True)
-    assert tampered != source
+    tampered = inject_variadic_assertions(base_source, sabotage=True, start=0, stop=24)
+    assert tampered != inject_variadic_assertions(base_source, start=0, stop=24)
     status, body = request("POST", "/api/check/flow", tampered, headers)
     assert status == 200, ("tampered source must compile", status, body)
     status, body = request("POST", "/api/run/flow", tampered, headers)
     assert status == 422, ("tampered native execution must fail", status, body)
     # Preserve all 48 independently seeded Unicode cases and SI inference
-    # assertions. Split the real HTTP compilation into bounded 24-case
-    # batches instead of silently dropping coverage when the parser grows.
-    for start in (0, 24):
+    # assertions. Split real HTTP compilation into four bounded 12-case
+    # batches instead of silently dropping coverage as the parser grows.
+    for start in (0, 12, 24, 36):
         unicode_source = inject_unicode_variadic_assertions(
-            base_source, start=start, stop=start + 24)
+            base_source, start=start, stop=start + 12)
         status, body = request("POST", "/api/check/flow", unicode_source, headers)
         assert status == 200, ("Unicode source compile", start, status, body)
         status, body = request("POST", "/api/run/flow", unicode_source, headers)
@@ -66,15 +70,16 @@ def main() -> None:
             "Unicode native execution", start, status, body)
 
     unicode_tampered = inject_unicode_variadic_assertions(
-        base_source, sabotage=True, start=0, stop=24)
+        base_source, sabotage=True, start=0, stop=12)
     assert unicode_tampered != inject_unicode_variadic_assertions(
-        base_source, start=0, stop=24)
+        base_source, start=0, stop=12)
     status, body = request("POST", "/api/check/flow", unicode_tampered, headers)
     assert status == 200, ("tampered Unicode source must compile", status, body)
     status, body = request("POST", "/api/run/flow", unicode_tampered, headers)
     assert status == 422, ("tampered Unicode native execution must fail", status, body)
     verify_robust_statistics()
     verify_quantiles()
+    verify_finite_differences()
     print(f"PASS: native SI reductions over real HTTP, 50 baseline "
           f"+ {len(variadic_cases())} ASCII and "
           f"{len(unicode_variadic_cases())} Unicode seeded cases, "

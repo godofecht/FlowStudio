@@ -876,10 +876,10 @@ try {
     readFileSync(path, 'utf8').split(/\r?\n/)
       .filter(line => !/^import \.math_(dimensions|expression_ir|expression_source|equation|static|dimension_triple|dimension_variable) \{/.test(line))
       .filter(line => line.trim() && !line.trimStart().startsWith('#'))
-      .map(line => line.trimStart().replace(/^export /, '')).join('\n')
+      .map(line => compactNativeMathLine(line, true)).join('\n')
   ).join('\n');
   assert.ok(Buffer.byteLength(nativeVariableSource, 'utf8') < 128 * 1024);
-  assert.match(nativeVariableSource, /system\.count = 16/);
+  assert.match(nativeVariableSource, /system\.count =\s*16/);
   await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
     nativeVariableSource);
   await page.locator('#run').click();
@@ -904,7 +904,7 @@ try {
     readFileSync(path, 'utf8').split(/\r?\n/)
       .filter(line => !/^import \.math_(dimensions|expression_ir|expression_source|equation|static|dimension_four) \{/.test(line))
       .filter(line => line.trim() && !line.trimStart().startsWith('#'))
-      .map(line => line.trimStart().replace(/^export /, '')).join('\n')
+      .map(line => compactNativeMathLine(line, true)).join('\n')
   ).join('\n');
   assert.ok(Buffer.byteLength(nativeFourSource, 'utf8') < 128 * 1024);
   assert.match(nativeFourSource, /function determinant4\(/);
@@ -939,7 +939,12 @@ try {
       // alongside comments/blank lines to respect the real 128 KiB limit.
       .filter(line => line.trim() && !line.trimStart().startsWith('#'))
       .map(line => compactNativeMathLine(line, true)).join('\n')
-  ).join('\n');
+  ).join('\n')
+    // Alpha-rename internal identifiers consistently in this self-contained
+    // executable bundle; preserve every solver statement and assertion.
+    .replaceAll(/\bidentifier_matches\b/g, 'idmatch')
+    .replaceAll(/\bsolve_math_equations_variable_constraints_four_unknown_dimensions\b/g, 'solve4')
+    .replaceAll(/\boutput_dimension\b/g, 'outdim');
   assert.ok(Buffer.byteLength(nativeVariableFourSource, 'utf8') < 128 * 1024);
   assert.match(nativeVariableFourSource, /system\.count =\s*16/);
   assert.match(nativeVariableFourSource, /native-math-variable-four-constraints-ok/);

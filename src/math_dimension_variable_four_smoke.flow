@@ -9,194 +9,194 @@ function main() -> i32 {
     let time: Dimension = time_dimension()
     let area: Dimension = product_dimension(length, length)
     let mut known: MathDimensionBindings = empty_math_dimension_bindings()
-    let mut system: MathFourConstraintSystem = empty_math_four_constraint_system()
-    system.count = 6
-    system.equations[0] = "x+y = 2m"
-    system.equations[1] = "x/y = 1"
-    system.equations[2] = "y/z = 1"
-    system.equations[3] = "z/w = 1"
-    system.equations[4] = "x*y*z*w = 1m*1m*1m*1m"
-    system.equations[5] = "x+z = 2m"
-    let mut result: MathFourDimensionSolution =
+    let mut sys: MathFourConstraintSystem = empty_math_four_constraint_system()
+    sys.count = 6
+    sys.equations[0] = "x+y = 2m"
+    sys.equations[1] = "x/y = 1"
+    sys.equations[2] = "y/z = 1"
+    sys.equations[3] = "z/w = 1"
+    sys.equations[4] = "x*y*z*w = 1m*1m*1m*1m"
+    sys.equations[5] = "x+z = 2m"
+    let mut sol: MathFourDimensionSolution =
         solve_math_equations_variable_constraints_four_unknown_dimensions(
-            system, known, "x", "y", "z", "w")
-    if not result.valid or result.failed_equation != -1 or
-       not same_dimension(result.first, length) or
-       not same_dimension(result.second, length) or
-       not same_dimension(result.third, length) or
-       not same_dimension(result.fourth, length) { return 1 }
+            sys, known, "x", "y", "z", "w")
+    if not sol.valid or sol.failed_equation != -1 or
+       not same_dimension(sol.first, length) or
+       not same_dimension(sol.second, length) or
+       not same_dimension(sol.third, length) or
+       not same_dimension(sol.fourth, length) { return 1 }
 
-    system.equations[5] = "x+z = 2s"
-    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
-        system, known, "x", "y", "z", "w")
-    if result.valid or result.failed_equation != 5 { return 2 }
+    sys.equations[5] = "x+z = 2s"
+    sol = solve_math_equations_variable_constraints_four_unknown_dimensions(
+        sys, known, "x", "y", "z", "w")
+    if sol.valid or sol.failed_equation != 5 { return 2 }
 
-    system.equations[5] = "x+=1m"
-    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
-        system, known, "x", "y", "z", "w")
-    if result.valid or result.failed_equation != 5 { return 3 }
+    sys.equations[5] = "x+=1m"
+    sol = solve_math_equations_variable_constraints_four_unknown_dimensions(
+        sys, known, "x", "y", "z", "w")
+    if sol.valid or sol.failed_equation != 5 { return 3 }
 
-    system.equations[5] = "x+z = 2m"
-    system.equations[0] = "x+=1m"
-    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
-        system, known, "x", "y", "z", "w")
-    if result.valid or result.failed_equation != 0 { return 4 }
+    sys.equations[5] = "x+z = 2m"
+    sys.equations[0] = "x+=1m"
+    sol = solve_math_equations_variable_constraints_four_unknown_dimensions(
+        sys, known, "x", "y", "z", "w")
+    if sol.valid or sol.failed_equation != 0 { return 4 }
 
-    system = empty_math_four_constraint_system()
-    system.count = 7
-    system.equations[0] = "x/y = 1"
-    system.equations[1] = "x/y = 1"
-    system.equations[2] = "x+y = 2m"
-    system.equations[3] = "y/z = 1"
-    system.equations[4] = "z/w = 1"
-    system.equations[5] = "x*y*z*w = 1m*1m*1m*1m"
-    system.equations[6] = "x = 1m"
-    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
-        system, known, "x", "y", "z", "w")
-    if not result.valid or not same_dimension(result.fourth, length) { return 5 }
+    sys = empty_math_four_constraint_system()
+    sys.count = 7
+    sys.equations[0] = "x/y = 1"
+    sys.equations[1] = "x/y = 1"
+    sys.equations[2] = "x+y = 2m"
+    sys.equations[3] = "y/z = 1"
+    sys.equations[4] = "z/w = 1"
+    sys.equations[5] = "x*y*z*w = 1m*1m*1m*1m"
+    sys.equations[6] = "x = 1m"
+    sol = solve_math_equations_variable_constraints_four_unknown_dimensions(
+        sys, known, "x", "y", "z", "w")
+    if not sol.valid or not same_dimension(sol.fourth, length) { return 5 }
 
-    system.equations[6] = "x = 1s"
-    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
-        system, known, "x", "y", "z", "w")
-    if result.valid or result.failed_equation != 6 { return 6 }
+    sys.equations[6] = "x = 1s"
+    sol = solve_math_equations_variable_constraints_four_unknown_dimensions(
+        sys, known, "x", "y", "z", "w")
+    if sol.valid or sol.failed_equation != 6 { return 6 }
 
-    system = empty_math_four_constraint_system()
-    system.count = 16
-    system.equations[0] = "x*y*z*w = 1m*1m*1m*1m"
-    system.equations[1] = "x/y = 1"
-    system.equations[2] = "y/z = 1"
-    system.equations[3] = "z/w = 1"
+    sys = empty_math_four_constraint_system()
+    sys.count = 16
+    sys.equations[0] = "x*y*z*w = 1m*1m*1m*1m"
+    sys.equations[1] = "x/y = 1"
+    sys.equations[2] = "y/z = 1"
+    sys.equations[3] = "z/w = 1"
     let mut index: i32 = 4
     while index < 16 {
-        system.equations[index] = "x+y = 2m"
+        sys.equations[index] = "x+y = 2m"
         index = index + 1
     }
-    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
-        system, known, "x", "y", "z", "w")
-    if not result.valid or not same_dimension(result.first, length) { return 7 }
+    sol = solve_math_equations_variable_constraints_four_unknown_dimensions(
+        sys, known, "x", "y", "z", "w")
+    if not sol.valid or not same_dimension(sol.first, length) { return 7 }
 
-    system.equations[15] = "x+y = 2s"
-    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
-        system, known, "x", "y", "z", "w")
-    if result.valid or result.failed_equation != 15 { return 8 }
+    sys.equations[15] = "x+y = 2s"
+    sol = solve_math_equations_variable_constraints_four_unknown_dimensions(
+        sys, known, "x", "y", "z", "w")
+    if sol.valid or sol.failed_equation != 15 { return 8 }
 
-    system.equations[15] = "x+y = 2m"
-    system.count = 17
-    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
-        system, known, "x", "y", "z", "w")
-    if result.valid { return 9 }
-    system.count = 3
-    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
-        system, known, "x", "y", "z", "w")
-    if result.valid { return 10 }
+    sys.equations[15] = "x+y = 2m"
+    sys.count = 17
+    sol = solve_math_equations_variable_constraints_four_unknown_dimensions(
+        sys, known, "x", "y", "z", "w")
+    if sol.valid { return 9 }
+    sys.count = 3
+    sol = solve_math_equations_variable_constraints_four_unknown_dimensions(
+        sys, known, "x", "y", "z", "w")
+    if sol.valid { return 10 }
 
-    system = empty_math_four_constraint_system()
-    system.count = 5
-    system.equations[0] = "δ₀*ρ*ζ*ω = 1m*1m*1m*1m"
-    system.equations[1] = "δ₀/ρ = 1"
-    system.equations[2] = "ρ/ζ = 1"
-    system.equations[3] = "ζ/ω = 1"
-    system.equations[4] = "δ₀ = 1m"
-    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
-        system, known, "δ₀", "ρ", "ζ", "ω")
-    if not result.valid or not same_dimension(result.first, length) or
-       not same_dimension(result.fourth, length) { return 11 }
+    sys = empty_math_four_constraint_system()
+    sys.count = 5
+    sys.equations[0] = "δ₀*ρ*ζ*ω = 1m*1m*1m*1m"
+    sys.equations[1] = "δ₀/ρ = 1"
+    sys.equations[2] = "ρ/ζ = 1"
+    sys.equations[3] = "ζ/ω = 1"
+    sys.equations[4] = "δ₀ = 1m"
+    sol = solve_math_equations_variable_constraints_four_unknown_dimensions(
+        sys, known, "δ₀", "ρ", "ζ", "ω")
+    if not sol.valid or not same_dimension(sol.first, length) or
+       not same_dimension(sol.fourth, length) { return 11 }
 
-    system.equations[0] = "sqrt(x)*y*z*w = 1m*1m*1m*1m"
-    system.equations[1] = "x/y = 1m"
-    system.equations[2] = "y/z = 1"
-    system.equations[3] = "z/w = 1"
-    system.equations[4] = "x = 1m²"
-    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
-        system, known, "x", "y", "z", "w")
-    if not result.valid or not same_dimension(result.first, area) or
-       not same_dimension(result.second, length) { return 12 }
+    sys.equations[0] = "sqrt(x)*y*z*w = 1m*1m*1m*1m"
+    sys.equations[1] = "x/y = 1m"
+    sys.equations[2] = "y/z = 1"
+    sys.equations[3] = "z/w = 1"
+    sys.equations[4] = "x = 1m²"
+    sol = solve_math_equations_variable_constraints_four_unknown_dimensions(
+        sys, known, "x", "y", "z", "w")
+    if not sol.valid or not same_dimension(sol.first, area) or
+       not same_dimension(sol.second, length) { return 12 }
 
-    system.equations[0] = "x/y = 1"
-    system.equations[1] = "x/y = 1"
-    system.equations[2] = "y/z = 1"
-    system.equations[3] = "z/w = 1"
-    system.equations[4] = "z/w = 1"
-    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
-        system, known, "x", "y", "z", "w")
-    if result.valid { return 13 }
+    sys.equations[0] = "x/y = 1"
+    sys.equations[1] = "x/y = 1"
+    sys.equations[2] = "y/z = 1"
+    sys.equations[3] = "z/w = 1"
+    sys.equations[4] = "z/w = 1"
+    sol = solve_math_equations_variable_constraints_four_unknown_dimensions(
+        sys, known, "x", "y", "z", "w")
+    if sol.valid { return 13 }
 
-    system.equations[0] = "x*y*z*w = 1m³"
-    system.equations[1] = "x/y = 1"
-    system.equations[2] = "y/z = 1"
-    system.equations[3] = "z/w = 1"
-    system.equations[4] = "x = 1m"
-    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
-        system, known, "x", "y", "z", "w")
-    if result.valid { return 14 }
+    sys.equations[0] = "x*y*z*w = 1m³"
+    sys.equations[1] = "x/y = 1"
+    sys.equations[2] = "y/z = 1"
+    sys.equations[3] = "z/w = 1"
+    sys.equations[4] = "x = 1m"
+    sol = solve_math_equations_variable_constraints_four_unknown_dimensions(
+        sys, known, "x", "y", "z", "w")
+    if sol.valid { return 14 }
 
     known.count = 1
     known.symbols[0] = MathDimensionSymbol { name: "duration", dimension: time }
-    system.equations[0] = "x*y*z*w = duration³*duration*1m³*1m"
-    system.equations[1] = "x/y = 1"
-    system.equations[2] = "y/z = 1"
-    system.equations[3] = "z/w = 1"
-    system.equations[4] = "x = duration*1m"
-    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
-        system, known, "x", "y", "z", "w")
+    sys.equations[0] = "x*y*z*w = duration³*duration*1m³*1m"
+    sys.equations[1] = "x/y = 1"
+    sys.equations[2] = "y/z = 1"
+    sys.equations[3] = "z/w = 1"
+    sys.equations[4] = "x = duration*1m"
+    sol = solve_math_equations_variable_constraints_four_unknown_dimensions(
+        sys, known, "x", "y", "z", "w")
     let length_time: Dimension = product_dimension(length, time)
-    if not result.valid or not same_dimension(result.first, length_time) or
-       not same_dimension(result.fourth, length_time) { return 15 }
+    if not sol.valid or not same_dimension(sol.first, length_time) or
+       not same_dimension(sol.fourth, length_time) { return 15 }
 
     known.count = 5
-    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
-        system, known, "x", "y", "z", "w")
-    if result.valid { return 16 }
+    sol = solve_math_equations_variable_constraints_four_unknown_dimensions(
+        sys, known, "x", "y", "z", "w")
+    if sol.valid { return 16 }
 
     # Sixteen independently checked constraints with rational fourth-root
     # dimensions, Unicode radicals and a late contradictory equation.
     known = empty_math_dimension_bindings()
-    system = empty_math_four_constraint_system()
-    system.count = 16
-    system.equations[0] = "root4(x) = 1m"
-    system.equations[1] = "y/root4(x) = 1"
-    system.equations[2] = "z/y = 1s/1m"
-    system.equations[3] = "w*z = 1m*1s"
-    system.equations[4] = "∜(x)+y = 2m"
-    system.equations[5] = "root4(x)*w = 1m²"
-    system.equations[6] = "x = 1m⁴"
-    system.equations[7] = "z = 1s"
+    sys = empty_math_four_constraint_system()
+    sys.count = 16
+    sys.equations[0] = "root4(x) = 1m"
+    sys.equations[1] = "y/root4(x) = 1"
+    sys.equations[2] = "z/y = 1s/1m"
+    sys.equations[3] = "w*z = 1m*1s"
+    sys.equations[4] = "∜(x)+y = 2m"
+    sys.equations[5] = "root4(x)*w = 1m²"
+    sys.equations[6] = "x = 1m⁴"
+    sys.equations[7] = "z = 1s"
     index = 8
     while index < 16 {
-        system.equations[index] = "root4(x)+y = 2m"
+        sys.equations[index] = "root4(x)+y = 2m"
         index = index + 1
     }
-    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
-        system, known, "x", "y", "z", "w")
+    sol = solve_math_equations_variable_constraints_four_unknown_dimensions(
+        sys, known, "x", "y", "z", "w")
     let fourth_length: Dimension = Dimension {
         length: 4, mass: 0, time: 0, temperature: 0
     }
-    if not result.valid or result.failed_equation != -1 or
-       not same_dimension(result.first, fourth_length) or
-       not same_dimension(result.second, length) or
-       not same_dimension(result.third, time) or
-       not same_dimension(result.fourth, length) { return 17 }
+    if not sol.valid or sol.failed_equation != -1 or
+       not same_dimension(sol.first, fourth_length) or
+       not same_dimension(sol.second, length) or
+       not same_dimension(sol.third, time) or
+       not same_dimension(sol.fourth, length) { return 17 }
 
-    system.equations[15] = "root4(x)+y = 2s"
-    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
-        system, known, "x", "y", "z", "w")
-    if result.valid or result.failed_equation != 15 { return 18 }
+    sys.equations[15] = "root4(x)+y = 2s"
+    sol = solve_math_equations_variable_constraints_four_unknown_dimensions(
+        sys, known, "x", "y", "z", "w")
+    if sol.valid or sol.failed_equation != 15 { return 18 }
 
-    system.equations[15] = "root4(x)+y = 2m"
-    system.equations[6] = "x = 1m³"
-    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
-        system, known, "x", "y", "z", "w")
-    if result.valid { return 19 }
+    sys.equations[15] = "root4(x)+y = 2m"
+    sys.equations[6] = "x = 1m³"
+    sol = solve_math_equations_variable_constraints_four_unknown_dimensions(
+        sys, known, "x", "y", "z", "w")
+    if sol.valid { return 19 }
 
-    system = empty_math_four_constraint_system()
-    system.count = 4
-    system.equations[0] = "root4(x)/y = 1"
-    system.equations[1] = "root4(x)/y = 1"
-    system.equations[2] = "z/w = 1"
-    system.equations[3] = "z/w = 1"
-    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
-        system, known, "x", "y", "z", "w")
-    if result.valid { return 20 }
+    sys = empty_math_four_constraint_system()
+    sys.count = 4
+    sys.equations[0] = "root4(x)/y = 1"
+    sys.equations[1] = "root4(x)/y = 1"
+    sys.equations[2] = "z/w = 1"
+    sys.equations[3] = "z/w = 1"
+    sol = solve_math_equations_variable_constraints_four_unknown_dimensions(
+        sys, known, "x", "y", "z", "w")
+    if sol.valid { return 20 }
 
     print("native-math-variable-four-constraints-ok")
     return 0

@@ -1,0 +1,24 @@
+# Compact native Flow HTTP acceptance: no editor-only source.
+import .math_expression_ir { MathResult }
+import .math_expression_source { evaluate_math_expression }
+
+function dispersion_close(actual: f64, expected: f64) -> bool {
+    let mut error: f64 = actual - expected
+    if error < 0.0 { error = -error }
+    return error < 0.00000000001
+}
+
+function main() -> i32 {
+    let mut result: MathResult = evaluate_math_expression("sample_variance(1m,3m)")
+    if not result.valid or not dispersion_close(result.result.value,2.0) { return 1 }
+    result = evaluate_math_expression("sample_stddev(1m,3m)")
+    if not result.valid or not dispersion_close(result.result.value,1.4142135623730951) { return 2 }
+    result = evaluate_math_expression("stddev(1km,3km)")
+    if not result.valid or not dispersion_close(result.result.value,1000.0) { return 3 }
+    result = evaluate_math_expression("sample_variance(7m)")
+    if result.valid or result.failed_at != 0 { return 4 }
+    result = evaluate_math_expression("stddev(1m,2s)")
+    if result.valid or result.failed_at != 0 { return 5 }
+    println("native-math-dispersion-http-ok")
+    return 0
+}

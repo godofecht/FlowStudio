@@ -1267,8 +1267,16 @@ def main() -> None:
         for path in variable_four_files
     )
     assert "function solve_math_equations_variable_constraints_four_unknown_dimensions(" in native_variable_four
+    # Alpha-rename only this internal function in the self-contained HTTP bundle.
+    # All 16 checked-in assertions remain intact; the native flow run uses the
+    # unmodified module. Keep the real 128 KiB transport limit enforced.
+    native_variable_four = native_variable_four.replace(
+        "solve_math_equations_variable_constraints_four_unknown_dimensions",
+        "solve4",
+    )
+    assert "function solve4(" in native_variable_four
     assert "function determinant4(" in native_variable_four
-    assert 'system.count =16' in native_variable_four
+    assert 'sys.count = 16' in native_variable_four
     assert "native-math-variable-four-constraints-ok" in native_variable_four
     assert len(native_variable_four.encode("utf-8")) < 128 * 1024
     status, body = request("POST", "/api/check/flow", native_variable_four, accepted_headers)
@@ -1279,8 +1287,8 @@ def main() -> None:
     # Convert the deliberately contradictory last equation to a valid
     # equation: the Flow program must now return its nonzero assertion code.
     corrupted_variable_four = native_variable_four.replace(
-        'system.equations[15] ="x+y = 2s"',
-        'system.equations[15] ="x+y = 2m"',
+        'sys.equations[15] = "x+y = 2s"',
+        'sys.equations[15] = "x+y = 2m"',
         1,
     )
     assert corrupted_variable_four != native_variable_four

@@ -62,3 +62,33 @@ compiler-generated three-dimensional `field` DSL, native Navier–Stokes
 or complete RStudio parity. Qualification must distinguish independent
 local numerical checks, native compilation, production HTTP, physical
 browser execution, and Linux/macOS CI.
+
+
+## Seeded non-Fourier 3D qualification
+
+The native Flow program also constructs two asymmetric seed-9137 volumes
+from a bounded integer residue depending on all three coordinates. This is
+not a Fourier eigenmode. It evolves both species for 64 steps with unequal
+directional diffusivities and conservative exchange. Native assertions
+cover 32+32 restart, replay, conservation, all-step centered spatial-energy
+contraction, global maximum principle, coefficient mutation, and a bounded
+256-step maximum (262,144 species-voxel updates).
+
+The separate `FLOWSTUDIO_VOLUME_SEEDED_V1` frame exposes all 1,024
+computed values, and `FLOWSTUDIO_VOLUME_SEEDED_ENERGY_V1` exposes
+64 post-update energies. `tests/test_native_coupled_volume8_oracle.py`
+independently assembles sparse Markov transition rows rather than reusing
+the native stencil or Fourier reference. The production `/api/check/flow`
+and `/api/run/flow` acceptance compares the complete native output to
+that oracle and requires HTTP 422 for deliberately inverted seeded-energy
+assertions. Physical Ubuntu Chromium checks the same complete output from
+its actual Monaco-triggered HTTP request using separately assembled
+JavaScript sparse rows.
+
+Run the standard-library oracle with
+`python -m unittest discover -s tests -p 'test_native_coupled_volume8_oracle.py'`.
+Run the native example with `flow run examples/native_coupled_volume8.flow`
+in an environment with the pinned production Flow toolchain. CI qualification
+and independent macOS physical-browser execution must be reported separately.
+This remains array-backed PDE execution, not generalized compiler-generated
+multidimensional `field` lowering or full RStudio parity.

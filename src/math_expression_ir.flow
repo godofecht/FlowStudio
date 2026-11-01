@@ -34,12 +34,15 @@
 #          75 mean, 76 population variance, 77 RMS: 1..8 same-unit operands.
 #          78 median, 79 median absolute deviation: 1..8 same-unit operands.
 #          80 quantile(p, x1, ..., xn): Type-7 linear quantile, 1..7 samples.
+#          81 fd1(left, right, step): centered first derivative.
+#          82 fd2(left, center, right, step): centered second derivative.
+#          83 laplacian2(center, left, right, down, up, dx, dy): 2D five-point stencil.
 #          The instruction exponent stores the actual variadic arity.
 #          Every permutation product must have the same SI dimension.
 # Predicate values are dimensionless 0/1 with a separate runtime type bit.
 # where and logical operators evaluate operands eagerly (no short circuit).
 # Unsupported instructions and type mismatches fail closed.
-import .math_dimensions { Dimension, Quantity, CheckedQuantity, dimensionless, quantity, quantity_add, quantity_subtract, quantity_multiply, quantity_divide, same_dimension, product_dimension }
+import .math_dimensions { Dimension, Quantity, CheckedQuantity, dimensionless, quantity, quantity_add, quantity_subtract, quantity_multiply, quantity_divide, same_dimension, product_dimension, quotient_dimension, length_dimension }
 
 export struct MathInstruction {
     opcode: i32,
@@ -1141,6 +1144,79 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
             if not bounded_value(output_value) { return failed(instruction.source_start) }
             depth = base + 1
             stack[base] = quantity(output_value, input_dimension)
+            predicate[base] = false
+        } elif opcode == 81 or opcode == 82 or opcode == 83 {
+            # Executable centered differences on physical scalar samples.
+            # fd1/fd2 permit arbitrary physical step dimensions; laplacian2
+            # requires two positive spatial lengths. No symbolic PDE claim.
+            let mut arity: i32 = 3
+            let mut fields: i32 = 2
+            if opcode == 82 { arity = 4; fields = 3 }
+            if opcode == 83 { arity = 7; fields = 5 }
+            if depth < arity { return failed(instruction.source_start) }
+            let base: i32 = depth - arity
+            let field_dimension: Dimension = stack[base].dimension
+            let mut scale: f64 = 0.0
+            let mut component: i32 = 0
+            while component < fields {
+                let position: i32 = base + component
+                let sample: Quantity = stack[position]
+                if predicate[position] or not same_dimension(sample.dimension, field_dimension) or
+                   not bounded_value(sample.value) {
+                    return failed(instruction.source_start)
+                }
+                let absolute: f64 = magnitude(sample.value)
+                if absolute > scale { scale = absolute }
+                component = component + 1
+            }
+            let step_position: i32 = base + fields
+            let step: Quantity = stack[step_position]
+            if predicate[step_position] or not bounded_value(step.value) or step.value <= 0.0 {
+                return failed(instruction.source_start)
+            }
+            if opcode == 83 {
+                let other: Quantity = stack[step_position + 1]
+                if predicate[step_position + 1] or not bounded_value(other.value) or
+                   other.value <= 0.0 or
+                   not same_dimension(step.dimension, length_dimension()) or
+                   not same_dimension(other.dimension, length_dimension()) {
+                    return failed(instruction.source_start)
+                }
+            }
+            let mut output_dimension: Dimension = quotient_dimension(field_dimension, step.dimension)
+            if opcode != 81 {
+                output_dimension = quotient_dimension(output_dimension, step.dimension)
+            }
+            if not bounded_dimension(output_dimension) { return failed(instruction.source_start) }
+            let mut output_value: f64 = 0.0
+            if scale > 0.0 {
+                if opcode == 81 {
+                    let left: f64 = stack[base].value / scale
+                    let right: f64 = stack[base + 1].value / scale
+                    output_value = ((right - left) * 0.5 / step.value) * scale
+                } elif opcode == 82 {
+                    let left: f64 = stack[base].value / scale
+                    let center: f64 = stack[base + 1].value / scale
+                    let right: f64 = stack[base + 2].value / scale
+                    output_value = ((((left - center) + (right - center)) /
+                        step.value) / step.value) * scale
+                } else {
+                    let center: f64 = stack[base].value / scale
+                    let left: f64 = stack[base + 1].value / scale
+                    let right: f64 = stack[base + 2].value / scale
+                    let down: f64 = stack[base + 3].value / scale
+                    let up: f64 = stack[base + 4].value / scale
+                    let dy: f64 = stack[step_position + 1].value
+                    let x_curvature: f64 = ((left - center) + (right - center)) /
+                        step.value / step.value
+                    let y_curvature: f64 = ((down - center) + (up - center)) /
+                        dy / dy
+                    output_value = (x_curvature + y_curvature) * scale
+                }
+            }
+            if not bounded_value(output_value) { return failed(instruction.source_start) }
+            depth = base + 1
+            stack[base] = quantity(output_value, output_dimension)
             predicate[base] = false
         } elif opcode == 70 or opcode == 71 or opcode == 72 {
             # Determinants are scalar contractions of row-major matrices.

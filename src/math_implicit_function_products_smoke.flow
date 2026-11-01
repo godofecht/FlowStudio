@@ -108,6 +108,15 @@ function main() -> i32 {
         "2sin(π/2)*1m=2m", quantity(0.00000001, length_dimension()))
     if not equation.valid or not equation.satisfied or
        not near(equation.residual.value, 0.0) { return 38 }
+    result = evaluate_math_expression("2min")
+    if not result.valid or not near(result.result.value, 120.0) or
+       not same_dimension(result.result.dimension, time_dimension()) { return 39 }
+    result = evaluate_math_expression("2m(3)")
+    if not result.valid or not near(result.result.value, 6.0) or
+       not same_dimension(result.result.dimension, length_dimension()) { return 40 }
+    result = evaluate_math_expression("2scos(0)")
+    if not result.valid or not near(result.result.value, 2.0) or
+       not same_dimension(result.result.dimension, time_dimension()) { return 41 }
     println("native-implicit-function-products-ok")
     return 0
 }

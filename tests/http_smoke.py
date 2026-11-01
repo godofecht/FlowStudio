@@ -1121,6 +1121,12 @@ def main() -> None:
         )
         for path in overdetermined_files
     )
+    # Alpha-renaming only this self-contained executable acceptance source
+    # retains every equation while staying below the production HTTP ceiling.
+    for old, short in (("same_dimension", "samedim"),
+                       ("source_start", "srcstart"),
+                       ("output_dimension", "outdim")):
+        native_overdetermined = re.sub(r"\\b" + old + r"\\b", short, native_overdetermined)
     assert "function solve_math_equations_four_constraints_three_unknown_dimensions(" in native_overdetermined
     assert len(native_overdetermined.encode("utf-8")) < 128 * 1024
     status, body = request("POST", "/api/check/flow", native_overdetermined, accepted_headers)
@@ -1291,6 +1297,10 @@ def main() -> None:
         )
         for path in variable_four_files
     )
+    for old, short in (("same_dimension", "samedim"),
+                       ("source_start", "srcstart"),
+                       ("output_dimension", "outdim")):
+        native_variable_four = re.sub(r"\\b" + old + r"\\b", short, native_variable_four)
     assert "function solve_math_equations_variable_constraints_four_unknown_dimensions(" in native_variable_four
     assert "function determinant4(" in native_variable_four
     assert 'system.count=16' in native_variable_four

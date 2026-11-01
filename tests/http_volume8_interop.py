@@ -52,6 +52,11 @@ def _python_verifier(values: list[float], energies: list[float]) -> str:
         "assert max(abs(a-b) for a,b in zip(u+v,volume_values)) < 2e-10, 'volume field mismatch'\n"
         "print('volume8-r-python-oracle-ok')\n"
     )
+    # Keep oracle variables local: bounded environment inspection must not
+    # evict unrelated persistent user variables after numerical acceptance.
+    source = ("def flowstudio_volume8_check():\n" +
+              "".join("    " + line for line in source.splitlines(keepends=True)) +
+              "try:\n    flowstudio_volume8_check()\nfinally:\n    del flowstudio_volume8_check\n")
     assert len(source.encode("utf-8")) < MAX_SOURCE_BYTES
     return source
 

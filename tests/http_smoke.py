@@ -38,7 +38,7 @@ def request(method: str, path: str, body: str | None = None,
         return exc.code, exc.read().decode("utf-8")
 
 
-def compact_native_math_line(line: str) -> str:
+def compact_native_math_line(line: str, *, tighten_equals: bool = False) -> str:
     """Compact only code whitespace/comments, preserving string literals.
 
     The native Flow HTTP endpoint deliberately enforces a 128 KiB request
@@ -51,7 +51,9 @@ def compact_native_math_line(line: str) -> str:
     for char in source:
         if not quoted and char == "#":
             break
-        if not quoted and char in " \t" and result and result[-1] in ",:":
+        if not quoted and char in " \t" and result and (
+            result[-1] in ",:" or (tighten_equals and result[-1] == "=")
+        ):
             continue
         result.append(char)
         if char == '"' and not escaped:
@@ -1250,7 +1252,7 @@ def main() -> None:
     )
     native_variable_four = "\n".join(
         "\n".join(
-            compact_native_math_line(line)
+            compact_native_math_line(line, tighten_equals=True)
             for line in (Path(__file__).resolve().parents[1] / path)
                 .read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.lstrip().startswith("#")
@@ -1266,7 +1268,7 @@ def main() -> None:
     )
     assert "function solve_math_equations_variable_constraints_four_unknown_dimensions(" in native_variable_four
     assert "function determinant4(" in native_variable_four
-    assert 'system.count = 16' in native_variable_four
+    assert 'system.count =16' in native_variable_four
     assert "native-math-variable-four-constraints-ok" in native_variable_four
     assert len(native_variable_four.encode("utf-8")) < 128 * 1024
     status, body = request("POST", "/api/check/flow", native_variable_four, accepted_headers)
@@ -1277,8 +1279,8 @@ def main() -> None:
     # Convert the deliberately contradictory last equation to a valid
     # equation: the Flow program must now return its nonzero assertion code.
     corrupted_variable_four = native_variable_four.replace(
-        'system.equations[15] = "x+y = 2s"',
-        'system.equations[15] = "x+y = 2m"',
+        'system.equations[15] ="x+y = 2s"',
+        'system.equations[15] ="x+y = 2m"',
         1,
     )
     assert corrupted_variable_four != native_variable_four

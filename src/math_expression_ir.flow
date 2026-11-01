@@ -20,6 +20,7 @@
 #          45 norm3(x, y, z), stable three-component Euclidean norm with matched units,\n#          46 root4(x), real fourth root with SI exponents divisible by 4.\n#          47-50 root5(x)..root8(x), real nth roots with exact SI divisibility.
 #          51 norm4(x, y, z, w), stable four-component Euclidean norm with matched units.
 #          52-55 norm5(x1,..,x5)..norm8(x1,..,x8), scale-stable physical vector norms.
+#          56 factorial(x) / postfix !, dimensionless integer 0..20.
 # Predicate values are dimensionless 0/1 with a separate runtime type bit.
 # where and logical operators evaluate operands eagerly (no short circuit).
 # Unsupported instructions and type mismatches fail closed.
@@ -592,7 +593,7 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
         } elif opcode == 5 or opcode == 6 or opcode == 18 or opcode == 20 or opcode == 21 or opcode == 25 or
              opcode == 26 or opcode == 27 or opcode == 28 or opcode == 29 or opcode == 30 or opcode == 31 or
              opcode == 33 or opcode == 34 or opcode == 35 or opcode == 36 or opcode == 37 or
-             opcode == 38 or opcode == 39 or opcode == 40 or opcode == 42 or opcode == 43 or opcode == 44 or opcode == 46 or (opcode >= 47 and opcode <= 50) {
+             opcode == 38 or opcode == 39 or opcode == 40 or opcode == 42 or opcode == 43 or opcode == 44 or opcode == 46 or opcode == 56 or (opcode >= 47 and opcode <= 50) {
             if depth < 1 { return failed(instruction.source_start) }
             let input: Quantity = stack[depth - 1]
             if opcode == 18 {
@@ -606,6 +607,22 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
                     stack[depth - 1] = quantity(-input.value, input.dimension)
                 } elif opcode == 20 {
                     stack[depth - 1] = quantity(magnitude(input.value), input.dimension)
+                } elif opcode == 56 {
+                    # Bounded integer combinatorics: reject fractional, negative,
+                    # dimensional, predicate, and overflow-prone operands.
+                    if not same_dimension(input.dimension, dimensionless()) or
+                       input.value < 0.0 or input.value > 20.0 or
+                       input.value != ((input.value as i32) as f64) {
+                        return failed(instruction.source_start)
+                    }
+                    let mut factorial: f64 = 1.0
+                    let mut factor: i32 = 2
+                    let n: i32 = input.value as i32
+                    while factor <= n {
+                        factorial = factorial * (factor as f64)
+                        factor = factor + 1
+                    }
+                    stack[depth - 1] = quantity(factorial, dimensionless())
                 } elif opcode == 21 {
                     if input.value < 0.0 or not even_dimension(input.dimension) {
                         return failed(instruction.source_start)

@@ -30,6 +30,8 @@
 #          68 smootherstep(edge0, edge1, x): quintic C2 transition, dimensionless output.
 #          69 approx(a, b, tolerance): typed absolute-tolerance predicate, same SI units.
 #          70 det2, 71 det3, 72 det4: row-major SI-aware matrix determinants.
+#          73 sum, 74 product: 1..8-argument SI-aware reductions.
+#          The instruction exponent stores the actual variadic arity.
 #          Every permutation product must have the same SI dimension.
 # Predicate values are dimensionless 0/1 with a separate runtime type bit.
 # where and logical operators evaluate operands eagerly (no short circuit).
@@ -942,6 +944,41 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
             depth = depth - arity + 1
             stack[depth - 1] = quantity(sum, output_dimension)
             predicate[depth - 1] = false
+        } elif opcode == 73 or opcode == 74 {
+            # The source compiler records bounded call arity in exponent.
+            # sum requires identical units; product multiplies SI dimensions.
+            let arity: i32 = instruction.exponent
+            if arity < 1 or arity > 8 or depth < arity {
+                return failed(instruction.source_start)
+            }
+            let base: i32 = depth - arity
+            let mut output_dimension: Dimension = dimensionless()
+            let mut output_value: f64 = 0.0
+            if opcode == 74 { output_value = 1.0 }
+            let mut component: i32 = 0
+            while component < arity {
+                let position: i32 = base + component
+                let entry: Quantity = stack[position]
+                if predicate[position] { return failed(instruction.source_start) }
+                if opcode == 73 {
+                    if component == 0 {
+                        output_dimension = entry.dimension
+                    } elif not same_dimension(output_dimension, entry.dimension) {
+                        return failed(instruction.source_start)
+                    }
+                    output_value = output_value + entry.value
+                } else {
+                    output_dimension = product_dimension(output_dimension, entry.dimension)
+                    output_value = output_value * entry.value
+                }
+                if not bounded_dimension(output_dimension) or not bounded_value(output_value) {
+                    return failed(instruction.source_start)
+                }
+                component = component + 1
+            }
+            depth = base + 1
+            stack[base] = quantity(output_value, output_dimension)
+            predicate[base] = false
         } elif opcode == 70 or opcode == 71 or opcode == 72 {
             # Determinants are scalar contractions of row-major matrices.
             # Unlike dot products, entries may have different dimensions:

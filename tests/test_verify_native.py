@@ -37,6 +37,7 @@ class NativeGateTest(unittest.TestCase):
         # A successful fake gate must also supply the new independent HTTP gate.
         (self.root / "tests/http_trigonometry_smoke.py").write_text("pass\n")
         (self.root / "tests/http_determinant_smoke.py").write_text("pass\n")
+        (self.root / "tests/http_variadic_reductions_smoke.py").write_text("pass\n")
 
     def test_real_loopback_health_probe_rejects_wrong_body(self):
         class HealthHandler(BaseHTTPRequestHandler):

@@ -344,6 +344,8 @@ function function_call_after_number(bytes: ptr<u8>, start: i32, length: i32) -> 
         identifier_matches(bytes, start, end, "det2") or
         identifier_matches(bytes, start, end, "det3") or
         identifier_matches(bytes, start, end, "det4") or
+        identifier_matches(bytes, start, end, "sum") or
+        identifier_matches(bytes, start, end, "product") or
         identifier_matches(bytes, start, end, "lerp") or
         identifier_matches(bytes, start, end, "approx") or
         identifier_matches(bytes, start, end, "clamp") or
@@ -383,9 +385,10 @@ function precedence(opcode: i32) -> i32 {
     return 0
 }
 
-# Arity is explicit: commas are only legal inside a recognized function call.
-# All operands are eagerly evaluated by the existing typed postfix IR.
+# Fixed arities are positive; -2 denotes a bounded 1..8-argument reduction.
+# Commas are legal only inside recognized calls. All operands are eager.
 function function_arity(opcode: i32) -> i32 {
+    if opcode == 73 or opcode == 74 { return -2 }
     if opcode == 20 or opcode == 21 or opcode == 25 or
        opcode == 26 or opcode == 27 or opcode == 28 or opcode == 29 or opcode == 30 or opcode == 31 or
        opcode == 33 or opcode == 34 or opcode == 35 or opcode == 36 or opcode == 37 or
@@ -861,6 +864,14 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
                identifier_matches(bytes, index, index + 10, "smoothstep") {
             unary_opcode = 67
             unary_width = 10
+        } elif index + 3 < length and bytes[index + 3] == 40 and
+               identifier_matches(bytes, index, index + 3, "sum") {
+            unary_opcode = 73
+            unary_width = 3
+        } elif index + 7 < length and bytes[index + 7] == 40 and
+               identifier_matches(bytes, index, index + 7, "product") {
+            unary_opcode = 74
+            unary_width = 7
         } elif index + 4 < length and bytes[index + 4] == 40 and
                identifier_matches(bytes, index, index + 4, "lerp") {
             unary_opcode = 66
@@ -1111,7 +1122,9 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
             }
             if opening < 1 { return source_error(index, length) }
             let arity: i32 = function_arity(operators[opening - 1])
-            if arity < 2 or argument_counts[opening] >= arity - 1 {
+            if (arity < 2 and arity != -2) or
+               (arity > 0 and argument_counts[opening] >= arity - 1) or
+               (arity == -2 and argument_counts[opening] >= 7) {
                 return source_error(index, length)
             }
             while top > opening + 1 {
@@ -1146,7 +1159,7 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
             if not found { return source_error(index, length) }
             # A completed function call is one primary, before a postfix
             # power. A function with missing or extra arguments fails closed.
-            if top > 0 and function_arity(operators[top - 1]) > 0 {
+            if top > 0 and function_arity(operators[top - 1]) != 0 {
                 if c == 124 {
                     if operators[top - 1] != 20 or bytes[positions[top - 1]] != 124 {
                         return source_error(index, length)
@@ -1154,11 +1167,25 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
                     widths[top - 1] = index + 1 - positions[top - 1]
                 }
                 let arity: i32 = function_arity(operators[top - 1])
-                if argument_counts[top] != arity - 1 { return source_error(index, length) }
+                let actual_arity: i32 = argument_counts[top] + 1
+                if (arity > 0 and actual_arity != arity) or
+                   (arity == -2 and (actual_arity < 1 or actual_arity > 8)) {
+                    return source_error(index, length)
+                }
                 top = top - 1
                 if count >= 64 { return source_error(positions[top], length) }
-                instructions[count] = make_instruction(operators[top],
-                    quantity(0.0, dimensionless()), positions[top], positions[top] + widths[top])
+                if arity == -2 {
+                    # Preserve the actual operand count in the existing IR
+                    # exponent field; source spans still refer to the call.
+                    instructions[count] = MathInstruction {
+                        opcode: operators[top], literal: quantity(0.0, dimensionless()),
+                        exponent: actual_arity, source_start: positions[top],
+                        source_end: positions[top] + widths[top]
+                    }
+                } else {
+                    instructions[count] = make_instruction(operators[top],
+                        quantity(0.0, dimensionless()), positions[top], positions[top] + widths[top])
+                }
                 count = count + 1
             }
             index = index + 1

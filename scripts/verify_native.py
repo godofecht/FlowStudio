@@ -296,6 +296,18 @@ def verify(root: Path, port: int = 8751, build_timeout: int = 180,
             if determinant_result.returncode != 0:
                 raise VerificationError(
                     f"Native determinant HTTP failed with exit code {determinant_result.returncode}")
+            variadic_smoke = root / "tests/http_variadic_reductions_smoke.py"
+            if not variadic_smoke.is_file():
+                raise VerificationError("Missing native variadic reduction HTTP acceptance")
+            variadic_result = _command(
+                [sys.executable, str(variadic_smoke)], root, 120)
+            if variadic_result.stdout:
+                print(variadic_result.stdout, end="", flush=True)
+            if variadic_result.stderr:
+                print(variadic_result.stderr, end="", file=sys.stderr, flush=True)
+            if variadic_result.returncode != 0:
+                raise VerificationError(
+                    f"Native variadic HTTP failed with exit code {variadic_result.returncode}")
             if proc.poll() is not None:
                 raise VerificationError(f"Server exited during HTTP smoke (code {proc.returncode})")
             print("PASS: native build, live health and HTTP smoke", flush=True)

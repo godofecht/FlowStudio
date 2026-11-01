@@ -263,6 +263,35 @@ export function infer_math_ir(program: MathProgram) -> MathInferredType {
             depth = depth - arity + 1
             dimensions[depth - 1] = output_dimension
             predicates[depth - 1] = false
+        } elif opcode == 73 or opcode == 74 {
+            # Infer variadic reduction dimensions without evaluating values.
+            let arity: i32 = instruction.exponent
+            if arity < 1 or arity > 8 or depth < arity {
+                return static_error(instruction.source_start)
+            }
+            let base: i32 = depth - arity
+            let mut output_dimension: Dimension = dimensionless()
+            let mut component: i32 = 0
+            while component < arity {
+                let position: i32 = base + component
+                if predicates[position] { return static_error(instruction.source_start) }
+                if opcode == 73 {
+                    if component == 0 {
+                        output_dimension = dimensions[position]
+                    } elif not same_dimension(output_dimension, dimensions[position]) {
+                        return static_error(instruction.source_start)
+                    }
+                } else {
+                    output_dimension = product_dimension(output_dimension, dimensions[position])
+                }
+                if not static_bounded_dimension(output_dimension) {
+                    return static_error(instruction.source_start)
+                }
+                component = component + 1
+            }
+            depth = base + 1
+            dimensions[base] = output_dimension
+            predicates[base] = false
         } elif opcode == 70 or opcode == 71 or opcode == 72 {
             let mut arity: i32 = 4
             if opcode == 71 { arity = 9 }

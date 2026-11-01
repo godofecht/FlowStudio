@@ -1,0 +1,25 @@
+# Compact production HTTP acceptance for native rational SI dimension constraints.
+# Full analytic coverage remains in math_dimension_solver_smoke.flow on Linux/macOS.
+import .math_dimensions { Dimension, length_dimension, time_dimension, product_dimension, same_dimension }
+import .math_static { MathDimensionBindings, empty_math_dimension_bindings }
+import .math_dimension_solver { MathDimensionSolution, solve_math_equation_unknown_dimension }
+
+function main() -> i32 {
+    let empty: MathDimensionBindings = empty_math_dimension_bindings()
+    let length: Dimension = length_dimension()
+    let area: Dimension = product_dimension(length, length)
+    let mut result: MathDimensionSolution =
+        solve_math_equation_unknown_dimension("sqrt(x) = 1m", empty, "x")
+    if not result.valid or not same_dimension(result.dimension, area) { return 1 }
+    result = solve_math_equation_unknown_dimension("sqrt(cbrt(x)) = 1m", empty, "x")
+    if not result.valid or
+       not same_dimension(result.dimension, product_dimension(area, area)) { return 2 }
+    result = solve_math_equation_unknown_dimension("x = 1m", empty, "x")
+    if not result.valid or not same_dimension(result.dimension, length) { return 3 }
+    result = solve_math_equation_unknown_dimension("x = 1m + 1s", empty, "x")
+    if result.valid { return 4 }
+    result = solve_math_equation_unknown_dimension("sqrt(x) = 1m + 1s", empty, "x")
+    if result.valid { return 5 }
+    println("native-math-unknown-dimension-constraints-ok")
+    return 0
+}

@@ -1262,6 +1262,12 @@ def main() -> None:
     assert compact_native_math_line('let s = "a, b: c # literal" # trailing') == (
         'let s = "a, b: c # literal"'
     )
+    assert compact_native_math_line(
+        'value: a.value / b.value', tighten_math_ops=True
+    ) == 'value:a.value / b.value'
+    assert compact_native_math_line(
+        'value: a.value * b.value', tighten_math_ops=True
+    ) == 'value:a.value * b.value'
     native_variable_four = "\n".join(
         "\n".join(
             compact_native_math_line(line, tighten_equals=True, tighten_math_ops=True)

@@ -1276,7 +1276,7 @@ def main() -> None:
     )
     assert "function solve_four_dimensions(" in native_variable_four
     assert "function determinant4(" in native_variable_four
-    assert 'sys.count =16' in native_variable_four
+    assert 'sys.count = 16' in native_variable_four
     assert "native-math-variable-four-constraints-ok" in native_variable_four
     assert len(native_variable_four.encode("utf-8")) < 128 * 1024
     status, body = request("POST", "/api/check/flow", native_variable_four, accepted_headers)
@@ -1287,8 +1287,8 @@ def main() -> None:
     # Convert the deliberately contradictory last equation to a valid
     # equation: the Flow program must now return its nonzero assertion code.
     corrupted_variable_four = native_variable_four.replace(
-        'sys.equations[15] ="x+y = 2s"',
-        'sys.equations[15] ="x+y = 2m"',
+        'sys.equations[15] = "x+y = 2s"',
+        'sys.equations[15] = "x+y = 2m"',
         1,
     )
     assert corrupted_variable_four != native_variable_four

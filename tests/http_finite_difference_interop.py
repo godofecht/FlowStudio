@@ -39,7 +39,7 @@ def exact_stencil(index: int, values: list[int]) -> Fraction:
 
 
 def r_source(records: list[tuple[int, list[int], Fraction]]) -> str:
-    lines = ["local({", "flowstudio_fd_count <- 0L"]
+    lines = ["flowstudio_fd_count <- 0L"]
     for index, values, expected in records:
         items = ",".join(str(v) for v in values)
         formula = ("(v[2]-v[1])/(2*v[3])" if index < 9 else
@@ -52,7 +52,7 @@ def r_source(records: list[tuple[int, list[int], Fraction]]) -> str:
             f"cat('{MARKER}', {index}, sprintf('%.17g',answer), '\\n')",
             "flowstudio_fd_count <- flowstudio_fd_count + 1L",
         ))
-    lines.extend((f"stopifnot(flowstudio_fd_count == {len(records)}L)", "})"))
+    lines.append(f"stopifnot(flowstudio_fd_count == {len(records)}L)")
     source = "\n".join(lines)
     assert len(source.encode("utf-8")) < MAX_SOURCE_BYTES
     return source

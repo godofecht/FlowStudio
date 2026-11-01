@@ -1,3 +1,24 @@
+## 2026-11-01: production R/Python matrix-solve interoperability (PR #349; CI pending)
+
+[PR #349](https://github.com/godofecht/FlowStudio/pull/349) adds
+real persistent R `det`, `qr` and `solve` execution for all 43 seeded
+2×2–4×4 matrix fixtures already checked by native Flow 2.0. A separate
+exact-permutation/Cramer's-rule oracle executes inside the production Python
+HTTP kernel, verifying every determinant, rank and nonsingular solution.
+A deliberately corrupted solution must produce HTTP 422; both persistent
+kernels must remain usable afterward. The generated sources and frames have
+explicit size ceilings. [Reproduction](MATRIX_INTEROP_HTTP.md).
+
+**Passed locally:** two deterministic Python source/oracle tests, including
+the injected-corruption rejection. **Failed locally:** zero.
+**Unexecuted locally:** native Flow, Rscript and real HTTP/browser (no Flow/R
+toolchains or networked repository clone in the local environment).
+**Pending:** exact-head Linux/macOS source and native HTTP/Chromium CI,
+and post-merge CI. Do not claim production acceptance or merge before CI.
+Hosted workflow configuration unchanged. This is cross-runtime matrix
+correctness, not generalized multidimensional `field` lowering or RStudio
+parity.
+
 ## 2026-11-01: native SI determinant metamorphic HTTP qualification (4/4 exact-head CI passed)
 
 [PR #347](https://github.com/godofecht/FlowStudio/pull/347) merged as

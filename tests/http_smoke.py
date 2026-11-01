@@ -963,7 +963,7 @@ def main() -> None:
     )
     native_static = "\n".join(
         "\n".join(
-            line.strip().removeprefix("export ")
+            compact_native_math_line(line)
             for line in (Path(__file__).resolve().parents[1] / path)
                 .read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.lstrip().startswith("#")
@@ -975,6 +975,7 @@ def main() -> None:
         )
         for path in static_files
     )
+    assert len(native_static.encode("utf-8")) < 128 * 1024, "native static HTTP budget"
     assert "function infer_math_ir(" in native_static
     assert "native-math-static-ok" in native_static
     status, body = request("POST", "/api/check/flow", native_static, accepted_headers)
@@ -983,8 +984,8 @@ def main() -> None:
     assert status == 200 and "native-math-static-ok" in body, (
         "native mathematical static inference execution", status, body)
     broken_static = native_static.replace(
-        "function infer_math_ir(program: MathProgram) -> MathInferredType {",
-        "function infer_math_ir(program: MathProgram -> MathInferredType {",
+        "function infer_math_ir(program:MathProgram) -> MathInferredType {",
+        "function infer_math_ir(program:MathProgram -> MathInferredType {",
         1,
     )
     assert broken_static != native_static

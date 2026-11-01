@@ -292,6 +292,33 @@ export function infer_math_ir(program: MathProgram) -> MathInferredType {
             depth = base + 1
             dimensions[base] = output_dimension
             predicates[base] = false
+        } elif opcode == 75 or opcode == 76 or opcode == 77 {
+            # Infer physical statistical reductions without evaluating inputs.
+            let arity: i32 = instruction.exponent
+            if arity < 1 or arity > 8 or depth < arity {
+                return static_error(instruction.source_start)
+            }
+            let base: i32 = depth - arity
+            let input_dimension: Dimension = dimensions[base]
+            let mut component: i32 = 0
+            while component < arity {
+                let position: i32 = base + component
+                if predicates[position] or
+                   not same_dimension(dimensions[position], input_dimension) {
+                    return static_error(instruction.source_start)
+                }
+                component = component + 1
+            }
+            let mut output_dimension: Dimension = input_dimension
+            if opcode == 76 {
+                output_dimension = product_dimension(input_dimension, input_dimension)
+            }
+            if not static_bounded_dimension(output_dimension) {
+                return static_error(instruction.source_start)
+            }
+            depth = base + 1
+            dimensions[base] = output_dimension
+            predicates[base] = false
         } elif opcode == 70 or opcode == 71 or opcode == 72 {
             let mut arity: i32 = 4
             if opcode == 71 { arity = 9 }

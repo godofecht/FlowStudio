@@ -346,6 +346,9 @@ function function_call_after_number(bytes: ptr<u8>, start: i32, length: i32) -> 
         identifier_matches(bytes, start, end, "det4") or
         identifier_matches(bytes, start, end, "sum") or
         identifier_matches(bytes, start, end, "product") or
+        identifier_matches(bytes, start, end, "mean") or
+        identifier_matches(bytes, start, end, "variance") or
+        identifier_matches(bytes, start, end, "rms") or
         identifier_matches(bytes, start, end, "lerp") or
         identifier_matches(bytes, start, end, "approx") or
         identifier_matches(bytes, start, end, "clamp") or
@@ -388,7 +391,7 @@ function precedence(opcode: i32) -> i32 {
 # Fixed arities are positive; -2 denotes a bounded 1..8-argument reduction.
 # Commas are legal only inside recognized calls. All operands are eager.
 function function_arity(opcode: i32) -> i32 {
-    if opcode == 73 or opcode == 74 { return -2 }
+    if opcode == 73 or opcode == 74 or opcode == 75 or opcode == 76 or opcode == 77 { return -2 }
     if opcode == 20 or opcode == 21 or opcode == 25 or
        opcode == 26 or opcode == 27 or opcode == 28 or opcode == 29 or opcode == 30 or opcode == 31 or
        opcode == 33 or opcode == 34 or opcode == 35 or opcode == 36 or opcode == 37 or
@@ -882,6 +885,18 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
                identifier_matches(bytes, index, index + 7, "product") {
             unary_opcode = 74
             unary_width = 7
+        } elif index + 4 < length and bytes[index + 4] == 40 and
+               identifier_matches(bytes, index, index + 4, "mean") {
+            unary_opcode = 75
+            unary_width = 4
+        } elif index + 8 < length and bytes[index + 8] == 40 and
+               identifier_matches(bytes, index, index + 8, "variance") {
+            unary_opcode = 76
+            unary_width = 8
+        } elif index + 3 < length and bytes[index + 3] == 40 and
+               identifier_matches(bytes, index, index + 3, "rms") {
+            unary_opcode = 77
+            unary_width = 3
         } elif index + 4 < length and bytes[index + 4] == 40 and
                identifier_matches(bytes, index, index + 4, "lerp") {
             unary_opcode = 66

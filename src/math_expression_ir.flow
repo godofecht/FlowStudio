@@ -31,6 +31,7 @@
 #          69 approx(a, b, tolerance): typed absolute-tolerance predicate, same SI units.
 #          70 det2, 71 det3, 72 det4: row-major SI-aware matrix determinants.
 #          73 sum, 74 product: 1..8-argument SI-aware reductions.
+#          75 mean, 76 population variance, 77 RMS: 1..8 same-unit operands.
 #          The instruction exponent stores the actual variadic arity.
 #          Every permutation product must have the same SI dimension.
 # Predicate values are dimensionless 0/1 with a separate runtime type bit.
@@ -975,6 +976,65 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
                     return failed(instruction.source_start)
                 }
                 component = component + 1
+            }
+            depth = base + 1
+            stack[base] = quantity(output_value, output_dimension)
+            predicate[base] = false
+        } elif opcode == 75 or opcode == 76 or opcode == 77 {
+            # Bounded physical statistics: mean, population variance and RMS.
+            # Scaling by the largest absolute component prevents premature
+            # overflow in intermediate sums and square accumulations.
+            let arity: i32 = instruction.exponent
+            if arity < 1 or arity > 8 or depth < arity {
+                return failed(instruction.source_start)
+            }
+            let base: i32 = depth - arity
+            let input_dimension: Dimension = stack[base].dimension
+            let mut scale: f64 = 0.0
+            let mut component: i32 = 0
+            while component < arity {
+                let position: i32 = base + component
+                let entry: Quantity = stack[position]
+                if predicate[position] or not same_dimension(entry.dimension, input_dimension) or
+                   not bounded_value(entry.value) {
+                    return failed(instruction.source_start)
+                }
+                let absolute: f64 = magnitude(entry.value)
+                if absolute > scale { scale = absolute }
+                component = component + 1
+            }
+            let mut normalized_mean: f64 = 0.0
+            if scale > 0.0 {
+                component = 0
+                while component < arity {
+                    normalized_mean = normalized_mean + stack[base + component].value / scale
+                    component = component + 1
+                }
+                normalized_mean = normalized_mean / (arity as f64)
+            }
+            let mut output_value: f64 = normalized_mean * scale
+            let mut output_dimension: Dimension = input_dimension
+            if opcode == 76 or opcode == 77 {
+                let mut normalized_squares: f64 = 0.0
+                if scale > 0.0 {
+                    component = 0
+                    while component < arity {
+                        let mut normalized: f64 = stack[base + component].value / scale
+                        if opcode == 76 { normalized = normalized - normalized_mean }
+                        normalized_squares = normalized_squares + normalized * normalized
+                        component = component + 1
+                    }
+                }
+                let normalized_second_moment: f64 = normalized_squares / (arity as f64)
+                if opcode == 76 {
+                    output_dimension = product_dimension(input_dimension, input_dimension)
+                    output_value = (scale * normalized_second_moment) * scale
+                } else {
+                    output_value = scale * positive_square_root(normalized_second_moment)
+                }
+            }
+            if not bounded_dimension(output_dimension) or not bounded_value(output_value) {
+                return failed(instruction.source_start)
             }
             depth = base + 1
             stack[base] = quantity(output_value, output_dimension)

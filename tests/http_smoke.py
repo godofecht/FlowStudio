@@ -37,6 +37,31 @@ def request(method: str, path: str, body: str | None = None,
         return exc.code, exc.read().decode("utf-8")
 
 
+def compact_native_math_line(line: str) -> str:
+    """Compact only code whitespace/comments, preserving string literals.
+
+    The native Flow HTTP endpoint deliberately enforces a 128 KiB request
+    limit. This is lexical compaction, not an alternate evaluator.
+    """
+    source = line.strip().removeprefix("export ")
+    result: list[str] = []
+    quoted = False
+    escaped = False
+    for char in source:
+        if not quoted and char == "#":
+            break
+        if not quoted and char in " \t" and result and result[-1] in ",:":
+            continue
+        result.append(char)
+        if char == '"' and not escaped:
+            quoted = not quoted
+        if quoted and char == "\\" and not escaped:
+            escaped = True
+        else:
+            escaped = False
+    return "".join(result).rstrip()
+
+
 def oversized_body_status() -> int:
     """Exercise header-level 413 without racing an early-close against sendall.
 
@@ -1213,12 +1238,13 @@ def main() -> None:
         "src/math_dimension_variable_four.flow",
         "src/math_dimension_variable_four_smoke.flow",
     )
+    assert compact_native_math_line(' x: f64, y: i32 # comment') == 'x:f64,y:i32'
+    assert compact_native_math_line('let s = "a, b: c # literal" # trailing') == (
+        'let s = "a, b: c # literal"'
+    )
     native_variable_four = "\n".join(
         "\n".join(
-            # Flow's block structure is brace-delimited. Removing at most
-            # one indentation level leaves the exact executable tokens and
-            # assertions intact while respecting the 128 KiB HTTP limit.
-            line.strip().removeprefix("export ").removeprefix("    ")
+            compact_native_math_line(line)
             for line in (Path(__file__).resolve().parents[1] / path)
                 .read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.lstrip().startswith("#")
@@ -1229,11 +1255,6 @@ def main() -> None:
             and not line.startswith("import .math_static {")
             and not line.startswith("import .math_dimension_four {")
             and not line.startswith("import .math_dimension_variable_four {")
-            # The HTTP endpoint has a strict 128 KiB source budget.
-            # Remove only non-executable comments and empty lines; preserve
-            # the exact checked-in declarations, functions and assertions.
-            and line.strip()
-            and not line.lstrip().startswith("#")
         )
         for path in variable_four_files
     )
@@ -1258,8 +1279,8 @@ def main() -> None:
     status, body = request("POST", "/api/run/flow", corrupted_variable_four, accepted_headers)
     assert status == 422, ("native four-variable corrupted assertion", status, body)
     malformed_variable_four = native_variable_four.replace(
-        "function constraint_failure(index: i32, position: i32) -> MathFourDimensionSolution {",
-        "function constraint_failure(index: i32, position: i32 -> MathFourDimensionSolution {",
+        "function constraint_failure(index:i32,position:i32) -> MathFourDimensionSolution {",
+        "function constraint_failure(index:i32,position:i32 -> MathFourDimensionSolution {",
         1,
     )
     assert malformed_variable_four != native_variable_four

@@ -1,0 +1,121 @@
+# Native Flow 2.0 physical statistical reductions: actual parser, IR and SI inference.
+# flow run src/math_statistical_reductions_smoke.flow
+import .math_dimensions { Dimension, dimensionless, length_dimension, time_dimension, product_dimension, same_dimension }
+import .math_expression_ir { MathResult }
+import .math_expression_source { ParsedMathExpression, parse_math_expression, evaluate_math_expression }
+import .math_static { MathInferredType, infer_math_expression_source, infer_math_equation_source }
+
+function near(actual: f64, expected: f64, tolerance: f64) -> bool {
+    let mut error: f64 = actual - expected
+    if error < 0.0 { error = -error }
+    return error <= tolerance
+}
+
+function main() -> i32 {
+    let length: Dimension = length_dimension()
+    let area: Dimension = product_dimension(length, length)
+    let mut result: MathResult = evaluate_math_expression("mean(1m,2m,3m)")
+    if not result.valid or not near(result.result.value, 2.0, 0.000000000001) or
+       not same_dimension(result.result.dimension, length) { return 1 }
+    result = evaluate_math_expression("variance(1m,3m)")
+    if not result.valid or not near(result.result.value, 1.0, 0.000000000001) or
+       not same_dimension(result.result.dimension, area) { return 2 }
+    result = evaluate_math_expression("rms(3m,4m)")
+    if not result.valid or not near(result.result.value, 3.5355339059327378, 0.000000000001) or
+       not same_dimension(result.result.dimension, length) { return 3 }
+    result = evaluate_math_expression("variance(2m,4m,6m)")
+    if not result.valid or not near(result.result.value, 2.6666666666666665, 0.000000000001) { return 4 }
+    result = evaluate_math_expression("mean(7s)")
+    if not result.valid or result.result.value != 7.0 or
+       not same_dimension(result.result.dimension, time_dimension()) { return 5 }
+    result = evaluate_math_expression("variance(7m)")
+    if not result.valid or result.result.value != 0.0 or
+       not same_dimension(result.result.dimension, area) { return 6 }
+    result = evaluate_math_expression("rms(-7m)")
+    if not result.valid or result.result.value != 7.0 { return 7 }
+    result = evaluate_math_expression("mean(1,2,3,4,5,6,7,8)")
+    if not result.valid or result.result.value != 4.5 { return 8 }
+    result = evaluate_math_expression("variance(1,2,3,4,5,6,7,8)")
+    if not result.valid or not near(result.result.value, 5.25, 0.000000000001) { return 9 }
+    result = evaluate_math_expression("rms(1,2,3,4,5,6,7,8)")
+    if not result.valid or not near(result.result.value, 5.049752469181039, 0.000000000001) { return 10 }
+    result = evaluate_math_expression("2mean(1m,3m)")
+    if not result.valid or result.result.value != 4.0 or
+       not same_dimension(result.result.dimension, length) { return 11 }
+    result = evaluate_math_expression("mean(rms(3m,4m),rms(3m,4m))")
+    if not result.valid or not near(result.result.value, 3.5355339059327378, 0.000000000001) { return 12 }
+    result = evaluate_math_expression("variance(1m,3m)+1m²")
+    if not result.valid or result.result.value != 2.0 or
+       not same_dimension(result.result.dimension, area) { return 13 }
+    result = evaluate_math_expression("mean(1e30,1e30)")
+    if not result.valid or not near(result.result.value / 1e30, 1.0, 0.000000000001) { return 14 }
+    result = evaluate_math_expression("variance(1e30,1e30)")
+    if not result.valid or result.result.value != 0.0 { return 15 }
+    result = evaluate_math_expression("rms(1e30,1e30)")
+    if not result.valid or not near(result.result.value / 1e30, 1.0, 0.000000000001) { return 16 }
+    result = evaluate_math_expression("mean(-1e30,1e30)")
+    if not result.valid or result.result.value != 0.0 { return 17 }
+    result = evaluate_math_expression("variance(1e20,-1e20)")
+    if result.valid or result.failed_at != 0 { return 18 }
+    result = evaluate_math_expression("mean(1m,3s)")
+    if result.valid or result.failed_at != 0 { return 19 }
+    result = evaluate_math_expression("variance(1m,3s)")
+    if result.valid or result.failed_at != 0 { return 20 }
+    result = evaluate_math_expression("rms(1m,3s)")
+    if result.valid or result.failed_at != 0 { return 21 }
+    result = evaluate_math_expression("mean(true,3)")
+    if result.valid or result.failed_at != 0 { return 22 }
+    result = evaluate_math_expression("variance(1,false)")
+    if result.valid or result.failed_at != 0 { return 23 }
+    result = evaluate_math_expression("rms(true)")
+    if result.valid or result.failed_at != 0 { return 24 }
+    let parsed: ParsedMathExpression = parse_math_expression("mean(1m,3m)")
+    if not parsed.valid or parsed.program.count != 3 or
+       parsed.program.instructions[2].opcode != 75 or
+       parsed.program.instructions[2].exponent != 2 or
+       parsed.program.instructions[2].source_start != 0 or
+       parsed.program.instructions[2].source_end != 4 { return 25 }
+    parsed = parse_math_expression("variance(1m,3m)")
+    if not parsed.valid or parsed.program.instructions[2].opcode != 76 or
+       parsed.program.instructions[2].source_end != 8 { return 26 }
+    parsed = parse_math_expression("rms(3m,4m)")
+    if not parsed.valid or parsed.program.instructions[2].opcode != 77 or
+       parsed.program.instructions[2].source_end != 3 { return 27 }
+    if parse_math_expression("mean()").valid or
+       parse_math_expression("variance()").valid or
+       parse_math_expression("rms()").valid { return 28 }
+    if parse_math_expression("mean(1,)").valid or
+       parse_math_expression("variance(,1)").valid or
+       parse_math_expression("rms(1,2").valid { return 29 }
+    if parse_math_expression("mean(1,2,3,4,5,6,7,8,9)").valid or
+       parse_math_expression("variance(1,2,3,4,5,6,7,8,9)").valid or
+       parse_math_expression("rms(1,2,3,4,5,6,7,8,9)").valid { return 30 }
+    let mut inferred: MathInferredType = infer_math_expression_source("mean(1m,3m)")
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension, length) { return 31 }
+    inferred = infer_math_expression_source("variance(1m,3m)")
+    if not inferred.valid or not same_dimension(inferred.dimension, area) { return 32 }
+    inferred = infer_math_expression_source("rms(1m,3m)")
+    if not inferred.valid or not same_dimension(inferred.dimension, length) { return 33 }
+    inferred = infer_math_expression_source("variance(1m,3s)")
+    if inferred.valid or inferred.failed_at != 0 { return 34 }
+    inferred = infer_math_expression_source("mean(true,3)")
+    if inferred.valid or inferred.failed_at != 0 { return 35 }
+    inferred = infer_math_expression_source("variance(1e20,-1e20)")
+    if not inferred.valid { return 36 }
+    inferred = infer_math_equation_source("variance(1m,3m) = 1m²")
+    if not inferred.valid or not same_dimension(inferred.dimension, area) { return 37 }
+    inferred = infer_math_equation_source("variance(1m,3m) = 1m")
+    if inferred.valid { return 38 }
+    inferred = infer_math_equation_source("rms(3m,4m) = 4m")
+    if not inferred.valid or not same_dimension(inferred.dimension, length) { return 39 }
+    result = evaluate_math_expression("variance(1km,3km)")
+    if not result.valid or not near(result.result.value, 1000000.0, 0.000000001) or
+       not same_dimension(result.result.dimension, area) { return 40 }
+    result = evaluate_math_expression("mean(1km,500m)")
+    if not result.valid or result.result.value != 750.0 { return 41 }
+    result = evaluate_math_expression("rms(0m,0m)")
+    if not result.valid or result.result.value != 0.0 { return 42 }
+    println("native-math-statistics-ok")
+    return 0
+}

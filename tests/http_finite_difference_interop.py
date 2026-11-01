@@ -20,7 +20,7 @@ MAX_FRAME_BYTES = 24 * 1024
 def sampled_stencils() -> list[tuple[int, list[int], Fraction]]:
     records = []
     for index, (expression, expected) in enumerate(finite_difference_cases()):
-        numbers = [int(value) for value in re.findall(r"-?\\d+", expression.partition("(")[2])]
+        numbers = [int(value) for value in re.findall(r"-?\d+", expression.partition("(")[2])]
         arity = 3 if index < 9 else 4 if index < 18 else 7
         assert len(numbers) == arity, (index, expression, numbers)
         records.append((index, numbers, expected))

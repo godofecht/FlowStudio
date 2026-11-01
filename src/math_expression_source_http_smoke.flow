@@ -366,6 +366,28 @@ function main() -> i32 {
     result = evaluate_math_expression("2(3)!²")
     if not result.valid or not close(result.result.value, 72.0) { return 135 }
 
+    # Production HTTP executes native symbol juxtaposition, not editor text.
+    result = evaluate_math_expression("2π")
+    if not result.valid or not close(result.result.value, 6.283185307179586) { return 136 }
+    result = evaluate_math_expression("(2+1)π")
+    if not result.valid or not close(result.result.value, 9.42477796076938) { return 137 }
+    result = evaluate_math_expression("2π²")
+    if not result.valid or not close(result.result.value, 19.739208802178716) { return 138 }
+    result = evaluate_math_expression("1/2π")
+    if not result.valid or not close(result.result.value, 1.5707963267948966) { return 139 }
+    result = evaluate_math_expression("2mπ")
+    if not result.valid or not close(result.result.value, 6.283185307179586) or
+       not same_dimension(result.result.dimension, length_dimension()) { return 140 }
+    let symbol_span: ParsedMathExpression = parse_math_expression("2π")
+    if not symbol_span.valid or symbol_span.program.count != 3 or
+       symbol_span.program.instructions[2].opcode != 3 or
+       symbol_span.program.instructions[2].source_start != 1 or
+       symbol_span.program.instructions[2].source_end != 1 { return 141 }
+    result = evaluate_math_expression("2π+1m")
+    if result.valid or result.failed_at != 3 { return 142 }
+    if parse_math_expression("2ζ").valid { return 143 }
+    if parse_math_expression("2true").valid { return 144 }
+
     println("native-math-source-ok")
     return 0
 }

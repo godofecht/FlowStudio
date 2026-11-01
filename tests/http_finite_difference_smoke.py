@@ -3,6 +3,7 @@
 from pathlib import Path
 
 from http_smoke import request, compact_native_math_line
+from http_finite_difference_interop import verify_fd_interop
 from test_finite_difference_oracle import (
     finite_difference_cases, inject_finite_difference_assertions,
     manufactured_refinement_cases, inject_manufactured_refinement_assertions,
@@ -67,6 +68,7 @@ def verify_finite_differences() -> None:
     assert status == 200, ("corrupted expectation compiles", status, body)
     status, body = request("POST", "/api/run/flow", corrupted, headers)
     assert status == 422, ("corrupted numerical expectation must fail", status, body)
+    verify_fd_interop(request, headers)
     print("PASS: 27 exact polynomial cases plus 3 manufactured 4:1 refinement "
           "tests through native Flow HTTP, SI checks, and deliberate HTTP 422")
 

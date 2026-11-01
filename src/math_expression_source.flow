@@ -1026,7 +1026,22 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
             expect_operand = false
             continue
         }
-        if c == 40 { # (
+        # Absolute-value bars lower to the existing typed abs opcode. A bar
+        # closes only when the innermost open delimiter is another bar;
+        # otherwise it opens a new primary (including implicit products 2|x|).
+        # Delimiter identity is checked at closure: |x) and (x| fail closed.
+        let mut close_bar: bool = false
+        if c == 124 and not expect_operand {
+            let mut probe: i32 = top - 1
+            while probe >= 0 {
+                if operators[probe] == -1 {
+                    close_bar = bytes[positions[probe]] == 124
+                    break
+                }
+                probe = probe - 1
+            }
+        }
+        if c == 40 or (c == 124 and not close_bar) { # ( or opening |
             # A parenthesized primary following a complete primary is an
             # implicit product: 2(3+4), (a+b)(c+d), or 2m(3s).
             # It has the same left-associative precedence as explicit * and
@@ -1049,6 +1064,13 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
                 top = top + 1
                 expect_operand = true
             }
+            if c == 124 {
+                if top >= 63 { return source_error(index, length) }
+                operators[top] = 20
+                positions[top] = index
+                widths[top] = 1
+                top = top + 1
+            }
             if top >= 64 { return source_error(index, length) }
             operators[top] = -1
             positions[top] = index
@@ -1056,6 +1078,7 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
             argument_counts[top] = 0
             top = top + 1
             index = index + 1
+            expect_operand = true
             continue
         }
         if c == 44 { # , separates arguments of recognized calls only
@@ -1081,12 +1104,16 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
             index = index + 1
             continue
         }
-        if c == 41 { # )
+        if c == 41 or (c == 124 and close_bar) { # ) or closing |
             if expect_operand { return source_error(index, length) }
             let mut found: bool = false
             while top > 0 {
                 top = top - 1
                 if operators[top] == -1 {
+                    if (c == 41 and bytes[positions[top]] != 40) or
+                       (c == 124 and bytes[positions[top]] != 124) {
+                        return source_error(index, length)
+                    }
                     found = true
                     break
                 }
@@ -1098,6 +1125,12 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
             # A completed function call is one primary, before a postfix
             # power. A function with missing or extra arguments fails closed.
             if top > 0 and function_arity(operators[top - 1]) > 0 {
+                if c == 124 {
+                    if operators[top - 1] != 20 or bytes[positions[top - 1]] != 124 {
+                        return source_error(index, length)
+                    }
+                    widths[top - 1] = index + 1 - positions[top - 1]
+                }
                 let arity: i32 = function_arity(operators[top - 1])
                 if argument_counts[top] != arity - 1 { return source_error(index, length) }
                 top = top - 1

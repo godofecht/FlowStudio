@@ -2,7 +2,6 @@
 """Execute native Flow centered differences through the production HTTP router."""
 from pathlib import Path
 
-from http_smoke import compact_native_math_line
 from http_finite_difference_interop import verify_fd_interop
 from test_finite_difference_oracle import (
     finite_difference_cases, inject_finite_difference_assertions,
@@ -10,6 +9,7 @@ from test_finite_difference_oracle import (
 
 
 def bundled_source(root: Path) -> str:
+    from http_smoke import compact_native_math_line
     paths = (
         "src/math_dimensions.flow",
         "src/math_expression_ir.flow",

@@ -800,7 +800,10 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
                 expect_operand = false
                 continue
             }
-            if not expect_operand { return source_error(start, length) }
+            # A resolved mathematical constant or explicit symbol may follow
+            # a complete primary as an implicit typed product (2π, 3ρ).
+            # Resolve first: unknown identifiers and Boolean keywords must
+            # not become silently accepted multiplication operands.
             let mut found: bool = false
             let mut value: Quantity = quantity(0.0, dimensionless())
             let mut symbol_index: i32 = 0
@@ -830,6 +833,24 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
                 }
             }
             if not found { return source_error(start, length) }
+            if not expect_operand {
+                # Identical precedence to explicit * and /, left associative.
+                # The synthetic operator is zero-width at the symbol's first
+                # UTF-8 byte; the identifier retains its full source span.
+                while top > 0 and operators[top - 1] != -1 and
+                      precedence(operators[top - 1]) >= precedence(3) {
+                    top = top - 1
+                    if count >= 64 { return source_error(start, length) }
+                    instructions[count] = make_instruction(operators[top],
+                        quantity(0.0, dimensionless()), positions[top], positions[top] + widths[top])
+                    count = count + 1
+                }
+                if top >= 64 { return source_error(start, length) }
+                operators[top] = 3
+                positions[top] = start
+                widths[top] = 0
+                top = top + 1
+            }
             if count >= 64 { return source_error(start, length) }
             instructions[count] = make_instruction(0, value, start, index)
             count = count + 1

@@ -1,0 +1,115 @@
+# Executable native Flow 2.0 absolute-value bars, typed IR and SI inference.
+# flow run src/math_absolute_bars_smoke.flow
+import .math_dimensions { Dimension, dimensionless, length_dimension, time_dimension, quotient_dimension, product_dimension, same_dimension, quantity }
+import .math_expression_ir { MathResult }
+import .math_expression_source { ParsedMathExpression, parse_math_expression, evaluate_math_expression }
+import .math_static { MathInferredType, infer_math_expression_source }
+import .math_equation { MathEquationResult, evaluate_math_equation_source }
+
+function near(actual: f64, expected: f64) -> bool {
+    let mut difference: f64 = actual - expected
+    if difference < 0.0 { difference = -difference }
+    return difference < 0.00000000001
+}
+
+function main() -> i32 {
+    let length: Dimension = length_dimension()
+    let speed: Dimension = quotient_dimension(length, time_dimension())
+    let mut result: MathResult = evaluate_math_expression("|-3|")
+    if not result.valid or not near(result.result.value, 3.0) { return 1 }
+    result = evaluate_math_expression("|-3m|")
+    if not result.valid or not near(result.result.value, 3.0) or
+       not same_dimension(result.result.dimension, length) { return 2 }
+    result = evaluate_math_expression("|2m-5m|")
+    if not result.valid or not near(result.result.value, 3.0) or
+       not same_dimension(result.result.dimension, length) { return 3 }
+    result = evaluate_math_expression("2|-3m|")
+    if not result.valid or not near(result.result.value, 6.0) or
+       not same_dimension(result.result.dimension, length) { return 4 }
+    result = evaluate_math_expression("(2+1)|-3m|")
+    if not result.valid or not near(result.result.value, 9.0) { return 5 }
+    result = evaluate_math_expression("|2m||3s|")
+    if not result.valid or not near(result.result.value, 6.0) or
+       not same_dimension(result.result.dimension,
+           product_dimension(length, time_dimension())) { return 6 }
+    result = evaluate_math_expression("||-3||")
+    if not result.valid or not near(result.result.value, 3.0) { return 7 }
+    result = evaluate_math_expression("|(2-5)|")
+    if not result.valid or not near(result.result.value, 3.0) { return 8 }
+    result = evaluate_math_expression("|sin(π/2)|")
+    if not result.valid or not near(result.result.value, 1.0) { return 9 }
+    result = evaluate_math_expression("|2|²")
+    if not result.valid or not near(result.result.value, 4.0) { return 10 }
+    result = evaluate_math_expression("|3m|/2s")
+    if not result.valid or not near(result.result.value, 1.5) or
+       not same_dimension(result.result.dimension, speed) { return 11 }
+    result = evaluate_math_expression("|1-3|+|4-9|")
+    if not result.valid or not near(result.result.value, 7.0) { return 12 }
+    result = evaluate_math_expression("|1m-2s|")
+    if result.valid { return 13 }
+    result = evaluate_math_expression("|true|")
+    if result.valid { return 14 }
+    result = evaluate_math_expression("|1/0|")
+    if result.valid { return 15 }
+    if parse_math_expression("|1+2)").valid { return 16 }
+    if parse_math_expression("(1+2|").valid { return 17 }
+    if parse_math_expression("|1+2").valid { return 18 }
+    if parse_math_expression("1+2|").valid { return 19 }
+    if parse_math_expression("||").valid { return 20 }
+    if parse_math_expression("| |").valid { return 21 }
+    if parse_math_expression("|unknown|").valid { return 22 }
+    result = evaluate_math_expression("|1|+2")
+    if not result.valid or not near(result.result.value, 3.0) { return 23 }
+    result = evaluate_math_expression("1+|2-5|")
+    if not result.valid or not near(result.result.value, 4.0) { return 24 }
+    result = evaluate_math_expression("2/|−2|")
+    if not result.valid or not near(result.result.value, 1.0) { return 25 }
+    result = evaluate_math_expression("|2|!")
+    if not result.valid or not near(result.result.value, 2.0) { return 26 }
+    let parsed: ParsedMathExpression = parse_math_expression("|-3m|")
+    if not parsed.valid or parsed.program.count != 3 or
+       parsed.program.instructions[2].opcode != 20 or
+       parsed.program.instructions[2].source_start != 0 or
+       parsed.program.instructions[2].source_end != 5 { return 27 }
+    let mut inferred: MathInferredType = infer_math_expression_source("|-3m|")
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension, length) { return 28 }
+    inferred = infer_math_expression_source("|2m|/2s")
+    if not inferred.valid or not same_dimension(inferred.dimension, speed) { return 29 }
+    inferred = infer_math_expression_source("|1m-2s|")
+    if inferred.valid { return 30 }
+    inferred = infer_math_expression_source("|true|")
+    if inferred.valid { return 31 }
+    let mut equation: MathEquationResult = evaluate_math_equation_source(
+        "|2m-5m|=3m", quantity(0.00000001, length))
+    if not equation.valid or not equation.satisfied or
+       not near(equation.residual.value, 0.0) { return 32 }
+    equation = evaluate_math_equation_source(
+        "|2m-5m|=2m", quantity(0.00000001, length))
+    if not equation.valid or equation.satisfied { return 33 }
+    result = evaluate_math_expression("2|1|+3")
+    if not result.valid or not near(result.result.value, 5.0) { return 34 }
+    result = evaluate_math_expression("|1+(2|3|)|")
+    if not result.valid or not near(result.result.value, 7.0) { return 35 }
+    result = evaluate_math_expression("|2m|²")
+    if not result.valid or not near(result.result.value, 4.0) or
+       not same_dimension(result.result.dimension,
+           product_dimension(length, length)) { return 36 }
+    result = evaluate_math_expression("|1m|+|2m|")
+    if not result.valid or not near(result.result.value, 3.0) or
+       not same_dimension(result.result.dimension, length) { return 37 }
+    result = evaluate_math_expression("|1| == 1")
+    if not result.valid or not result.is_predicate or result.result.value != 1.0 { return 38 }
+    result = evaluate_math_expression("not (|-2| < 1)")
+    if not result.valid or not result.is_predicate or result.result.value != 1.0 { return 39 }
+    result = evaluate_math_expression("|1+2|*|3-5|")
+    if not result.valid or not near(result.result.value, 6.0) { return 40 }
+    result = evaluate_math_expression("|2+3| |4-1|")
+    if not result.valid or not near(result.result.value, 15.0) { return 41 }
+    result = evaluate_math_expression("|2|cos(0)")
+    if not result.valid or not near(result.result.value, 2.0) { return 42 }
+    result = evaluate_math_expression("|−3m|")
+    if not result.valid or not near(result.result.value, 3.0) or
+       not same_dimension(result.result.dimension, length) { return 43 }
+    return 0
+}

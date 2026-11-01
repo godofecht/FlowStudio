@@ -1,3 +1,25 @@
+## 2026-11-01: seeded non-Fourier coupled 3D native PDE (qualification pending)
+
+A new seed-9137, non-Fourier, asymmetric two-species 8×8×8 state is
+evolved through 64 actual native Flow timesteps. The source checks
+conservation, deterministic replay, 32+32 restart, coefficient sensitivity,
+global maximum principle and 64 stepwise energy contractions. An independent
+Python sparse Markov oracle checks all 1,024 computed voxels and 64 energies,
+with invalid inputs and 262,144 species-voxel-step budget tests. Production
+HTTP and physical Ubuntu Chromium are wired to compare the complete
+native response against independent sparse operators, including a deliberately
+inverted energy assertion requiring HTTP 422. The original Fourier 3D
+acceptance and 128-cell SVG heatmap remain intact.
+
+**Passed:** local independent seed-9137 numerical reproduction (64 steps,
+mass drift below 1e-9, exact 32+32 semigroup in the Python oracle).
+**Pending:** exact-head Linux/macOS CI, native compiler/HTTP and physical
+Ubuntu Chromium qualification. **Unexecuted:** local native Flow/R and
+independent macOS physical browser. No hosted workflow configuration changed.
+This is not generalized compiler-generated multidimensional `field`
+lowering or independently verified RStudio parity.
+
+
 ## 2026-11-01: R reset and notebook snapshot non-resurrection (exact-head CI pending)
 
 The physical Chromium checkpoint/restart acceptance now calls the production

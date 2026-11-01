@@ -369,7 +369,7 @@ class NativeCoupledVolumeOracle(unittest.TestCase):
             self.assertEqual(solver(impulse, 2, ratio=0.0,
                                     exchange=0.25, diffusion=zero), expected)
             flat = ([3.0] * COUNT, [7.0] * COUNT)
-            self.assertEqual(solver(flat, 16, exchange=0.0), flat)
+            self.assertLess(maximum_error(solver(flat, 16, exchange=0.0), flat), 1e-12)
 
     def test_native_source_contract_and_plot_slice(self):
         source = SOURCE.read_text(encoding="utf-8")

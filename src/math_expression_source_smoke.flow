@@ -1509,6 +1509,51 @@ function main() -> i32 {
     if parse_math_expression("2ζ").valid { return 563 }
     if parse_math_expression("2true").valid { return 564 }
 
+
+    # Native Type-7 quantiles: interpolation, SI units and rejection.
+    result = evaluate_math_expression("quantile(0,9m,1m,3m,5m)")
+    if not result.valid or not near(result.result.value, 1.0) or
+       not same_dimension(result.result.dimension, length) { return 565 }
+    result = evaluate_math_expression("quantile(1,9m,1m,3m,5m)")
+    if not result.valid or not near(result.result.value, 9.0) { return 566 }
+    result = evaluate_math_expression("quantile(0.5,9m,1m,3m,5m)")
+    if not result.valid or not near(result.result.value, 4.0) { return 567 }
+    result = evaluate_math_expression("quantile(0.25,0m,4m,8m,12m,16m)")
+    if not result.valid or not near(result.result.value, 4.0) { return 568 }
+    result = evaluate_math_expression("quantile(0.1,0,10)")
+    if not result.valid or not near(result.result.value, 1.0) { return 569 }
+    result = evaluate_math_expression("quantile(0.5,-1e30,1e30)")
+    if not result.valid or not near(result.result.value, 0.0) { return 570 }
+    result = evaluate_math_expression("quantile(0.25,-1e30,1e30)")
+    if not result.valid or not near(result.result.value / 1e30, -0.5) { return 571 }
+    result = evaluate_math_expression("quantile(0.5,1km,500m)")
+    if not result.valid or not near(result.result.value, 750.0) or
+       not same_dimension(result.result.dimension, length) { return 572 }
+    result = evaluate_math_expression("quantile(0.5,3m)")
+    if not result.valid or not near(result.result.value, 3.0) { return 573 }
+    result = evaluate_math_expression("quantile(0.5,1m,2s)")
+    if result.valid or result.failed_at != 0 { return 574 }
+    result = evaluate_math_expression("quantile(0.5m,1m,2m)")
+    if result.valid or result.failed_at != 0 { return 575 }
+    result = evaluate_math_expression("quantile(true,1,2)")
+    if result.valid or result.failed_at != 0 { return 576 }
+    result = evaluate_math_expression("quantile(1.1,1,2)")
+    if result.valid or result.failed_at != 0 { return 577 }
+    result = evaluate_math_expression("quantile(-0.1,1,2)")
+    if result.valid or result.failed_at != 0 { return 578 }
+    if parse_math_expression("quantile(0.5)").valid { return 579 }
+    if parse_math_expression("quantile()").valid { return 580 }
+    if parse_math_expression("quantile(0.5,1,2,3,4,5,6,7,8)").valid { return 581 }
+    let quantile_ir: ParsedMathExpression = parse_math_expression("quantile(0.5,1m,3m)")
+    if not quantile_ir.valid or quantile_ir.program.instructions[3].opcode != 80 or
+       quantile_ir.program.instructions[3].exponent != 3 or
+       quantile_ir.program.instructions[3].source_start != 0 or
+       quantile_ir.program.instructions[3].source_end != 8 { return 582 }
+    result = evaluate_math_expression("2quantile(0.5,2m,4m)")
+    if not result.valid or not near(result.result.value, 6.0) or
+       not same_dimension(result.result.dimension, length) { return 583 }
+    result = evaluate_math_expression("quantile(0.5,quantile(0.5,1m,3m),6m)")
+    if not result.valid or not near(result.result.value, 4.0) { return 584 }
     println("native-math-source-ok")
     return 0
 }

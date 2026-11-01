@@ -6,14 +6,15 @@ import { readFileSync } from 'node:fs';
 
 // Compact executable Flow source without changing quoted strings. The native
 // HTTP endpoint enforces a 128 KiB source limit for Monaco Run as well.
-function compactNativeMathLine(line) {
+function compactNativeMathLine(line, tightenEquals = false) {
   const source = line.trim().replace(/^export /, '');
   let result = '';
   let quoted = false;
   let escaped = false;
   for (const char of source) {
     if (!quoted && char === '#') break;
-    if (!quoted && /[ \t]/.test(char) && /[,:]$/.test(result)) continue;
+    if (!quoted && /[ \t]/.test(char) &&
+        (/[,:]$/.test(result) || (tightenEquals && result.endsWith('=')))) continue;
     result += char;
     if (char === '"' && !escaped) quoted = !quoted;
     if (quoted && char === '\\' && !escaped) escaped = true;
@@ -937,10 +938,10 @@ try {
       // brace-delimited, so one cosmetic indentation level can be removed
       // alongside comments/blank lines to respect the real 128 KiB limit.
       .filter(line => line.trim() && !line.trimStart().startsWith('#'))
-      .map(compactNativeMathLine).join('\n')
+      .map(line => compactNativeMathLine(line, true)).join('\n')
   ).join('\n');
   assert.ok(Buffer.byteLength(nativeVariableFourSource, 'utf8') < 128 * 1024);
-  assert.match(nativeVariableFourSource, /system\.count = 16/);
+  assert.match(nativeVariableFourSource, /system\.count =\s*16/);
   assert.match(nativeVariableFourSource, /native-math-variable-four-constraints-ok/);
   await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
     nativeVariableFourSource);

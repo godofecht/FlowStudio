@@ -33,6 +33,7 @@
 #          73 sum, 74 product: 1..8-argument SI-aware reductions.
 #          75 mean, 76 population variance, 77 RMS: 1..8 same-unit operands.
 #          78 median, 79 median absolute deviation: 1..8 same-unit operands.
+#          80 quantile(p, x1, ..., xn): Type-7 linear quantile, 1..7 samples.
 #          81 sample_variance, 82 sample_stddev, 83 stddev: SI-aware dispersion.
 #          Sample estimators require 2..8 operands (Bessel correction).
 #          The instruction exponent stores the actual variadic arity.
@@ -1049,20 +1050,33 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
             depth = base + 1
             stack[base] = quantity(output_value, output_dimension)
             predicate[base] = false
-        } elif opcode == 78 or opcode == 79 {
+        } elif opcode == 78 or opcode == 79 or opcode == 80 {
             # Scale before sorting to avoid overflow for opposite signed
             # magnitudes near the finite 1e30 numerical limit. Insertion sort
             # is deterministic for the bounded 1..8 input count.
             let arity: i32 = instruction.exponent
-            if arity < 1 or arity > 8 or depth < arity {
+            if arity < 1 or arity > 8 or depth < arity or
+               (opcode == 80 and arity < 2) {
                 return failed(instruction.source_start)
             }
             let base: i32 = depth - arity
-            let input_dimension: Dimension = stack[base].dimension
+            let mut first_sample: i32 = base
+            let mut samples: i32 = arity
+            if opcode == 80 {
+                first_sample = base + 1
+                samples = arity - 1
+                let probability: Quantity = stack[base]
+                if predicate[base] or not same_dimension(probability.dimension, dimensionless()) or
+                   not bounded_value(probability.value) or
+                   probability.value < 0.0 or probability.value > 1.0 {
+                    return failed(instruction.source_start)
+                }
+            }
+            let input_dimension: Dimension = stack[first_sample].dimension
             let mut scale: f64 = 0.0
             let mut component: i32 = 0
-            while component < arity {
-                let position: i32 = base + component
+            while component < samples {
+                let position: i32 = first_sample + component
                 let entry: Quantity = stack[position]
                 if predicate[position] or not same_dimension(entry.dimension, input_dimension) or
                    not bounded_value(entry.value) {
@@ -1074,9 +1088,9 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
             }
             let mut sorted: array<f64, 8> = [0.0]
             component = 0
-            while component < arity {
+            while component < samples {
                 let mut value: f64 = 0.0
-                if scale > 0.0 { value = stack[base + component].value / scale }
+                if scale > 0.0 { value = stack[first_sample + component].value / scale }
                 let mut position: i32 = component
                 let mut shifting: bool = true
                 while position > 0 and shifting {
@@ -1090,17 +1104,29 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
                 sorted[position] = value
                 component = component + 1
             }
-            let middle: i32 = arity / 2
+            let middle: i32 = samples / 2
             let mut center: f64 = sorted[middle]
-            if arity % 2 == 0 {
+            if samples % 2 == 0 {
                 center = (sorted[middle - 1] + sorted[middle]) * 0.5
+            }
+            if opcode == 80 {
+                # Type-7 rank interpolation on normalized sorted samples.
+                let rank: f64 = stack[base].value * ((samples - 1) as f64)
+                let mut lower: i32 = 0
+                while lower + 1 < samples and ((lower + 1) as f64) <= rank {
+                    lower = lower + 1
+                }
+                let mut upper: i32 = lower
+                if upper + 1 < samples { upper = upper + 1 }
+                let weight: f64 = rank - (lower as f64)
+                center = sorted[lower] * (1.0 - weight) + sorted[upper] * weight
             }
             if opcode == 79 {
                 # The median absolute deviation is median(|x - median(x)|),
                 # not the mean absolute deviation or a Gaussian-scaled MAD.
                 let mut deviations: array<f64, 8> = [0.0]
                 component = 0
-                while component < arity {
+                while component < samples {
                     let value: f64 = magnitude(sorted[component] - center)
                     let mut position: i32 = component
                     let mut shifting: bool = true
@@ -1116,7 +1142,7 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
                     component = component + 1
                 }
                 center = deviations[middle]
-                if arity % 2 == 0 {
+                if samples % 2 == 0 {
                     center = (deviations[middle - 1] + deviations[middle]) * 0.5
                 }
             }

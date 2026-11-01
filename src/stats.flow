@@ -32,3 +32,25 @@ export function summary_variance(s: NumericSummary) -> f64 {
     if s.count < 2 { return 0.0 }
     return s.m2 / ((s.count - 1) as f64)
 }
+
+# Pairwise Chan–Golub–LeVeque reduction. Inputs are summaries of disjoint
+# finite streams. The caller owns the total i64 count bound.
+export function summary_merge(left: NumericSummary, right: NumericSummary) -> NumericSummary {
+    if left.count == 0 { return right }
+    if right.count == 0 { return left }
+    let count: i64 = left.count + right.count
+    let delta: f64 = right.mean - left.mean
+    let left_weight: f64 = left.count as f64
+    let right_weight: f64 = right.count as f64
+    let total_weight: f64 = count as f64
+    let mean: f64 = left.mean + delta * (right_weight / total_weight)
+    let m2: f64 = left.m2 + right.m2 +
+        delta * delta * (left_weight / total_weight) * right_weight
+    let mut minimum: f64 = left.minimum
+    let mut maximum: f64 = left.maximum
+    if right.minimum < minimum { minimum = right.minimum }
+    if right.maximum > maximum { maximum = right.maximum }
+    return NumericSummary {
+        count: count, mean: mean, m2: m2, minimum: minimum, maximum: maximum
+    }
+}

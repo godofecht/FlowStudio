@@ -21,6 +21,7 @@ import urllib.request
 from spectral_interop_http import verify_spectral_interop
 from http_matrix_interop import verify_matrix_interop
 from http_volume8_interop import verify_volume8_interop
+from http_streaming_stats import verify_parallel_streaming_stats
 
 ROOT = "http://127.0.0.1:8751"
 
@@ -168,6 +169,8 @@ def main() -> None:
     assert status == 200, ("native mathematical Flow compile", status, body)
     status, body = request("POST", "/api/run/flow", native_math_source, accepted_headers)
     assert status == 200, ("native mathematical Flow execution", status, body)
+    # Actual Flow module merge, real HTTP, and persistent R/Python oracle.
+    verify_parallel_streaming_stats(request, accepted_headers)
     # A genuinely coupled three-state native Flow model with a conservative
     # transport generator, independent exact eigenmode values, RK2 refinement,
     # positivity, deterministic replay, rescaling and negative-input assertions.

@@ -10,8 +10,8 @@ test("Flow files list structs and functions in line order", () => {
   const source = fs.readFileSync(path.join(root, "src", "stats.flow"), "utf8");
   const list = symbols.parse("flow", source);
   assert.deepEqual(list.map(item => item.name),
-    ["NumericSummary", "summary_empty", "summary_add", "summary_variance"]);
-  assert.deepEqual(list.map(item => item.kind), ["struct", "function", "function", "function"]);
+    ["NumericSummary", "summary_empty", "summary_add", "summary_variance", "summary_merge"]);
+  assert.deepEqual(list.map(item => item.kind), ["struct", "function", "function", "function", "function"]);
   assert.equal(list[0].line, 4);
   for (let index = 1; index < list.length; index++)
     assert.ok(list[index].line > list[index - 1].line);

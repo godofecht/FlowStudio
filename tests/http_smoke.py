@@ -1002,7 +1002,10 @@ def main() -> None:
     )
     native_variable_four = "\n".join(
         "\n".join(
-            line.removeprefix("export ")
+            # Flow's block structure is brace-delimited. Removing at most
+            # one indentation level leaves the exact executable tokens and
+            # assertions intact while respecting the 128 KiB HTTP limit.
+            line.removeprefix("export ").removeprefix("    ")
             for line in (Path(__file__).resolve().parents[1] / path)
                 .read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.lstrip().startswith("#")

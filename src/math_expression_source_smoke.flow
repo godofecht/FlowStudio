@@ -45,7 +45,7 @@ function main() -> i32 {
     result = evaluate_math_expression("3+")
     if result.valid or result.failed_at != 2 { return 10 }
     result = evaluate_math_expression("3(4)")
-    if result.valid or result.failed_at != 1 { return 11 }
+    if not result.valid or not near(result.result.value, 12.0) { return 11 }
     result = evaluate_math_expression("(3+4")
     if result.valid or result.failed_at != 0 { return 12 }
     result = evaluate_math_expression("3+4)")
@@ -1178,7 +1178,7 @@ function main() -> i32 {
     result = evaluate_math_expression("2π")
     if result.valid or result.failed_at != 1 { return 441 }
     result = evaluate_math_expression("π(2)")
-    if result.valid or result.failed_at != 2 { return 442 }
+    if not result.valid or not near(result.result.value, 6.28318530717958647692) { return 442 }
     let pi_source: ParsedMathExpression = parse_math_expression("π+tau")
     if not pi_source.valid or pi_source.program.count != 3 or
        pi_source.program.instructions[0].source_start != 0 or
@@ -1416,6 +1416,62 @@ function main() -> i32 {
     if parse_math_expression("factorial()").valid { return 525 }
     if parse_math_expression("factorial(1,2)").valid { return 526 }
     if parse_math_expression("!5").valid { return 527 }
+
+    # Adjacent parenthesized primaries compile into real typed multiplication,
+    # including dimensional products and left-associative division.
+    result = evaluate_math_expression("2(3+4)")
+    if not result.valid or not near(result.result.value, 14.0) { return 528 }
+    result = evaluate_math_expression("(2+3)(4-1)")
+    if not result.valid or not near(result.result.value, 15.0) { return 529 }
+    result = evaluate_math_expression("2m(3s)")
+    if not result.valid or not near(result.result.value, 6.0) or
+       not same_dimension(result.result.dimension, product_dimension(length, time)) { return 530 }
+    result = evaluate_math_expression("(1m+2m)(2s)")
+    if not result.valid or not near(result.result.value, 6.0) or
+       not same_dimension(result.result.dimension, product_dimension(length, time)) { return 531 }
+    result = evaluate_math_expression("1/2(4)")
+    if not result.valid or not near(result.result.value, 2.0) { return 532 }
+    result = evaluate_math_expression("2(3)^2")
+    if not result.valid or not near(result.result.value, 18.0) { return 533 }
+    result = evaluate_math_expression("2(3)(4)")
+    if not result.valid or not near(result.result.value, 24.0) { return 534 }
+    result = evaluate_math_expression("3!(2+1)")
+    if not result.valid or not near(result.result.value, 18.0) { return 535 }
+    result = evaluate_math_expression("2(3)!")
+    if not result.valid or not near(result.result.value, 12.0) { return 536 }
+    result = evaluate_math_expression("2(-3)")
+    if not result.valid or not near(result.result.value, -6.0) { return 537 }
+    result = evaluate_math_expression("2 (3)")
+    if not result.valid or not near(result.result.value, 6.0) { return 538 }
+    result = evaluate_math_expression("sin(π/2)(2)")
+    if not result.valid or not near(result.result.value, 2.0) { return 539 }
+    result = evaluate_math_expression("2m(3s)/6s")
+    if not result.valid or not near(result.result.value, 1.0) or
+       not same_dimension(result.result.dimension, length) { return 540 }
+    result = evaluate_math_expression("2(3m+1s)")
+    if result.valid or result.failed_at != 4 { return 541 }
+    result = evaluate_math_expression("2(true)")
+    if result.valid or result.failed_at != 1 { return 542 }
+    if parse_math_expression("2(3,4)").valid { return 543 }
+    if parse_math_expression("2()").valid { return 544 }
+    let implicit_source: ParsedMathExpression = parse_math_expression("(2)(3)")
+    if not implicit_source.valid or implicit_source.program.count != 3 or
+       implicit_source.program.instructions[2].opcode != 3 or
+       implicit_source.program.instructions[2].source_start != 3 or
+       implicit_source.program.instructions[2].source_end != 3 { return 545 }
+    if parse_math_expression("2(3)4").valid { return 546 }
+    result = evaluate_math_expression("2m(3m)")
+    if not result.valid or not near(result.result.value, 6.0) or
+       not same_dimension(result.result.dimension, product_dimension(length, length)) { return 547 }
+    result = evaluate_math_expression_with_bindings("e(2)", e_bindings)
+    if not result.valid or not near(result.result.value, 6.0) or
+       not same_dimension(result.result.dimension, length) { return 548 }
+    result = evaluate_math_expression("(1+2)(3+4)")
+    if not result.valid or not near(result.result.value, 21.0) { return 549 }
+    result = evaluate_math_expression("2(3)+4(5)")
+    if not result.valid or not near(result.result.value, 26.0) { return 550 }
+    result = evaluate_math_expression("2(3)!²")
+    if not result.valid or not near(result.result.value, 72.0) { return 551 }
 
     println("native-math-source-ok")
     return 0

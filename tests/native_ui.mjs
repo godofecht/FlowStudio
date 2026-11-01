@@ -3,6 +3,7 @@ import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import {runThreeSpeciesBrowser} from './native_three_species_browser.mjs';
+import {runThreeSpeciesRestartBrowser} from './native_three_species_restart_browser.mjs';
 
 const browser = await chromium.launch({ headless: true,
   ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}) });
@@ -554,9 +555,12 @@ try {
         'Importing the saved R plot must not run interpreter code');
       await runThreeSpeciesBrowser({page:notebookPage, setNotebookSource,
         requests:notebookRequests});
+      await runThreeSpeciesRestartBrowser({page:notebookPage, setNotebookSource,
+        requests:notebookRequests});
       assert.deepEqual(notebookErrors, []);
       console.log('PASS: physical Chromium native Flow/R complex notebook, .fsnb roundtrip, stop-on-error and real R plot');
       console.log('PASS: physical Chromium three-species anisotropic PDE, 3072-cell native Python oracle, R PNG, failure isolation and .fsnb restore');
+      console.log('PASS: physical Chromium R 24+24 PDE checkpoint, 6144-cell oracle, mass-preserving corruption, snapshot integrity and .fsnb restore');
     } finally {
       await notebookContext.close();
     }

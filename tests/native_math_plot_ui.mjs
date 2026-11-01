@@ -657,8 +657,11 @@ try {
       .filter(line => !line.startsWith('import .math_dimensions {') &&
         !line.startsWith('import .math_expression_ir {') &&
         !line.startsWith('import .math_expression_source {'))
-      .map(line => line.replace(/^export /, '')).join('\n')
+      .filter(line => line.trim() && !line.trimStart().startsWith('#'))
+      .map(line => line.trim().replace(/^export /, '')).join('\n')
   ).join('\n');
+  assert.ok(Buffer.byteLength(nativeMathSource, 'utf8') < 128 * 1024,
+    'Native mathematical browser source must fit the production HTTP limit');
   await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
     nativeMathSource);
   await page.locator('#run').click();
@@ -685,7 +688,7 @@ try {
         !line.startsWith('import .math_equation {') &&
         !line.startsWith('import .math_static {'))
       .filter(line => line.trim() && !line.trimStart().startsWith('#'))
-      .map(line => line.replace(/^export /, '')).join('\n')
+      .map(line => line.trim().replace(/^export /, '')).join('\n')
   ).join('\n');
   await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
     nativeTrigSource);
@@ -713,7 +716,7 @@ try {
         !line.startsWith('import .math_equation {') &&
         !line.startsWith('import .math_static {'))
       .filter(line => line.trim() && !line.trimStart().startsWith('#'))
-      .map(line => line.replace(/^export /, '')).join('\n')
+      .map(line => line.trim().replace(/^export /, '')).join('\n')
   ).join('\n');
   await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
     nativeHyperbolicSource);

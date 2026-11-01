@@ -393,6 +393,89 @@ function main() -> i32 {
     if maxDifference(seededTrajectory, seededFirst.state) > 0.00000000001 {
         return 27
     }
+    # Exact 3D Green-function checks at the explicit stability boundary.
+    # A unit impulse at the periodic corner must move only to the two
+    # neighboring voxels on the selected axis; this detects axis aliasing,
+    # swapped strides and a missing wraparound even when total mass agrees.
+    let mut impulse: State = State { u: blankVolume(), v: blankVolume() }
+    impulse.u.values[index3(0, 0, 0)] = 1.0
+    let mut axisEquation: Equation = Equation {
+        ux: 0.0, uy: 0.0, uz: 0.0,
+        vx: 0.0, vy: 0.0, vz: 0.0,
+        ratio: 0.5, exchange: 0.0
+    }
+    for axis in 0 to 3 {
+        axisEquation.ux = 0.0
+        axisEquation.uy = 0.0
+        axisEquation.uz = 0.0
+        let mut left: i32 = 7
+        let mut right: i32 = 1
+        if axis == 0 { axisEquation.ux = 1.0 }
+        if axis == 1 {
+            axisEquation.uy = 1.0
+            left = 56
+            right = 8
+        }
+        if axis == 2 {
+            axisEquation.uz = 1.0
+            left = 448
+            right = 64
+        }
+        let response: Result = integrate(impulse, axisEquation, 1)
+        if not response.valid { return 28 }
+        for i in 0 to 512 {
+            let mut expected: f64 = 0.0
+            if i == left or i == right { expected = 0.5 }
+            if absolute(response.state.u.values[i] - expected) > 0.000000000001 or
+               response.state.v.values[i] != 0.0 { return 29 }
+        }
+        if absolute(totalMass(response.state) - 1.0) > 0.000000000001 {
+            return 30
+        }
+    }
+    # The same boundary rejects even a tiny excess Courant sum, without
+    # mutating the caller's state or producing a partial timestep.
+    axisEquation.ux = 1.0
+    axisEquation.uy = 0.01
+    axisEquation.uz = 0.0
+    let unstable: Result = integrate(impulse, axisEquation, 1)
+    if unstable.valid or maxDifference(unstable.state, impulse) != 0.0 {
+        return 31
+    }
+    # Zero diffusion is identity; exchange alone follows the exact 2x2
+    # stochastic transition (one step: 3/4,1/4; two: 5/8,3/8).
+    axisEquation.ux = 0.0
+    axisEquation.uy = 0.0
+    axisEquation.uz = 0.0
+    axisEquation.ratio = 0.0
+    axisEquation.exchange = 0.0
+    let frozen: Result = integrate(impulse, axisEquation, 16)
+    if not frozen.valid or maxDifference(frozen.state, impulse) != 0.0 {
+        return 32
+    }
+    axisEquation.exchange = 0.25
+    let mixed: Result = integrate(impulse, axisEquation, 2)
+    if not mixed.valid or
+       mixed.state.u.values[0] != 0.625 or
+       mixed.state.v.values[0] != 0.375 or
+       absolute(totalMass(mixed.state) - 1.0) > 0.000000000001 {
+        return 33
+    }
+    for i in 1 to 512 {
+        if mixed.state.u.values[i] != 0.0 or
+           mixed.state.v.values[i] != 0.0 { return 34 }
+    }
+    # Constant but unequal fields are fixed by periodic diffusion when
+    # interspecies exchange is disabled.
+    let mut flat: State = State { u: blankVolume(), v: blankVolume() }
+    for i in 0 to 512 {
+        flat.u.values[i] = 3.0
+        flat.v.values[i] = 7.0
+    }
+    let flatResult: Result = integrate(flat, noExchange, 16)
+    if not flatResult.valid or maxDifference(flatResult.state, flat) != 0.0 {
+        return 35
+    }
     println("native-coupled-volume8-ok")
     println("FLOWSTUDIO_GRID_V1 8 8 2")
     print("U")

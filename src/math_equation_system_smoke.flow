@@ -390,6 +390,22 @@ function main() -> i32 {
     result = evaluate_math_equation_system(system, tolerances)
     if result.valid or result.failed_at != 1 { return 88 }
 
+    # Native multi-equation ASTs preserve implicit symbolic products.
+    system = parse_math_equation_system("2π=π+π;2τ=4π")
+    if not system.valid or system.count != 2 { return 89 }
+    tolerances.count = 2
+    tolerances.values[0] = quantity(0.0000000001, dimensionless())
+    tolerances.values[1] = quantity(0.0000000001, dimensionless())
+    result = evaluate_math_equation_system(system, tolerances)
+    if not result.valid or not result.satisfied or result.count != 2 { return 90 }
+    system = parse_math_equation_system("2π=2m")
+    if not system.valid { return 91 }
+    tolerances.count = 1
+    result = evaluate_math_equation_system(system, tolerances)
+    if result.valid { return 92 }
+    system = parse_math_equation_system("2ζ=0")
+    if system.valid { return 93 }
+
     println("native-math-equation-system-ok")
     return 0
 }

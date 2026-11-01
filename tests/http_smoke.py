@@ -1114,8 +1114,8 @@ def main() -> None:
     assert status == 200 and "native-math-three-unknown-four-constraints-ok" in body, (
         "native overdetermined SI execution", status, body)
     corrupted_overdetermined = native_overdetermined.replace(
-        '"x*y*z = 1m³", "x/y = 1", "y/z = 1", "x = 1m",',
-        '"x*y*z = 1m³", "x/y = 1", "y/z = 1", "x = 1s",',
+        '"x*y*z = 1m³","x/y = 1","y/z = 1","x = 1m",',
+        '"x*y*z = 1m³","x/y = 1","y/z = 1","x = 1s",',
         1,
     )
     assert corrupted_overdetermined != native_overdetermined
@@ -1141,7 +1141,7 @@ def main() -> None:
     )
     native_variable = "\n".join(
         "\n".join(
-            compact_native_math_line(line)
+            line.strip().removeprefix("export ")
             for line in (Path(__file__).resolve().parents[1] / path)
                 .read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.lstrip().startswith("#")

@@ -79,7 +79,7 @@ def main() -> None:
     assert status == 422, ("tampered Unicode native execution must fail", status, body)
     verify_robust_statistics()
     verify_quantiles()
-    verify_finite_differences()
+    verify_finite_differences(request)
     print(f"PASS: native SI reductions over real HTTP, 50 baseline "
           f"+ {len(variadic_cases())} ASCII and "
           f"{len(unicode_variadic_cases())} Unicode seeded cases, "

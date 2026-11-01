@@ -59,7 +59,8 @@ def inject_finite_difference_assertions(source: str, *, start: int = 0,
             f'    if not result.valid or not near(result.result.value,{numeric}): '
             f'return {100 + index}'
         )
-    marker = '    println("native-math-finite-difference-ok")'
+    # HTTP bundling removes leading indentation; match the semantic marker.
+    marker = 'println("native-math-finite-difference-ok")'
     assert source.count(marker) == 1
     return source.replace(marker, "\n".join(statements) + "\n" + marker)
 

@@ -1,23 +1,28 @@
-## 2026-11-01: production R/Python matrix-solve interoperability (PR #349; CI pending)
+## 2026-11-01: production R/Python matrix-solve interoperability (4/4 exact-head CI passed)
 
-[PR #349](https://github.com/godofecht/FlowStudio/pull/349) adds
-real persistent R `det`, `qr` and `solve` execution for all 43 seeded
-2×2–4×4 matrix fixtures already checked by native Flow 2.0. A separate
-exact-permutation/Cramer's-rule oracle executes inside the production Python
-HTTP kernel, verifying every determinant, rank and nonsingular solution.
-A deliberately corrupted solution must produce HTTP 422; both persistent
-kernels must remain usable afterward. The generated sources and frames have
-explicit size ceilings. [Reproduction](MATRIX_INTEROP_HTTP.md).
+[PR #349](https://github.com/godofecht/FlowStudio/pull/349) merged as
+[42b16c47](https://github.com/godofecht/FlowStudio/commit/42b16c477834c10242956085a7d2c1887cde9e06).
+The same 43 deterministic 2×2–4×4 native Flow determinant fixtures execute
+through persistent base-R `det`, `qr` and `solve`, then through a separate
+exact-permutation/Cramer's-rule oracle in the real Python HTTP kernel.
+All nonsingular solutions, determinants and ranks are checked; singular,
+transpose, row-swap and row-addition cases are included. A deliberately
+corrupted solution returns HTTP 422, and both kernels recover. Bounded
+sources and output frames are asserted.
+[Reproduction](MATRIX_INTEROP_HTTP.md).
 
-**Passed locally:** two deterministic Python source/oracle tests, including
-the injected-corruption rejection. **Failed locally:** zero.
-**Unexecuted locally:** native Flow, Rscript and real HTTP/browser (no Flow/R
-toolchains or networked repository clone in the local environment).
-**Pending:** exact-head Linux/macOS source and native HTTP/Chromium CI,
-and post-merge CI. Do not claim production acceptance or merge before CI.
-Hosted workflow configuration unchanged. This is cross-runtime matrix
-correctness, not generalized multidimensional `field` lowering or RStudio
-parity.
+**Passed:** [exact-head CI #41323216041](https://github.com/godofecht/FlowStudio/actions/runs/41323216041),
+all four Ubuntu 24.04/macOS 15 source/native jobs. Each source platform
+passed 1,201 JavaScript tests with 12 skipped and ran 456 Python tests with
+13 skipped, including two new exact source/oracle tests. Both native jobs
+executed the actual Flow 2.0 determinant compiler, real R/Python matrix
+HTTP 422/recovery and native R/C FlowJIT. Ubuntu physical Chromium acceptance
+also passed. **Failed:** zero final exact-head jobs.
+**Skipped:** 12 JS, 13 Python and platform-inapplicable CI steps.
+**Unexecuted:** independent macOS physical browser and local native Flow/R.
+**Pending:** post-merge main CI. Superseded branch runs were cancelled, not
+counted as passes. No hosted CI workflow configuration changed. This is not
+generalized multidimensional `field` lowering or RStudio parity.
 
 ## 2026-11-01: native SI determinant metamorphic HTTP qualification (4/4 exact-head CI passed)
 

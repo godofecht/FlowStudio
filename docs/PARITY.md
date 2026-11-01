@@ -1,4 +1,4 @@
-## 2026-11-01: stepwise native PDE energy trace (qualification pending)
+## 2026-11-01: stepwise native PDE energy trace (4/4 exact-head CI passed)
 
 The compiler-executed 16×16 heterogeneous Flow solver now emits 96
 bounded post-step variance samples (48 each for the Fourier and seed-9137
@@ -9,7 +9,7 @@ trajectory. The solver also retains all 512 final-grid oracle checks,
 stepwise energy/maximum-principle assertions, HTTP 422 anti-diffusion
 negative control, R/C FlowJIT and notebook acceptance.
 
-**Pending:** exact-head Linux/macOS CI and post-merge CI for the new trace.
+[PR #335](https://github.com/godofecht/FlowStudio/pull/335) [exact-head CI #41290697131](https://github.com/godofecht/FlowStudio/actions/runs/41290697131) passed all four Ubuntu 24.04/macOS 15 jobs: 1,201 JavaScript tests passed per platform (12 skipped), 445 Python tests executed per platform (13 skipped), production native Flow compilation, real HTTP 96-energy sparse oracle, 512 final-grid values, R/C FlowJIT and physical Ubuntu Chromium Monaco Run. **Pending:** post-merge main CI.
 **Unexecuted:** local native Flow/R and independent macOS physical browser.
 This is observable array-backed numerical evolution, not generalized
 compiler-generated multidimensional `field` lowering or RStudio parity.

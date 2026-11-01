@@ -1,4 +1,4 @@
-## 2026-11-01: seeded non-Fourier native heterogeneous PDE (PR #331; qualification pending)
+## 2026-11-01: seeded non-Fourier native heterogeneous PDE (4/4 exact-head and post-merge CI)
 
 The 16×16 periodic discontinuous-conductivity native Flow solver now
 also evolves an independently seeded (9137) asymmetric, non-Fourier field.
@@ -12,14 +12,23 @@ from the actual browser-triggered Flow HTTP response while retaining the
 original 256-cell SVG heatmap oracle. Reproduction:
 [NATIVE_VARIABLE_DIFFUSION16.md](NATIVE_VARIABLE_DIFFUSION16.md).
 
-**Locally executed:** independent Python direct-stencil versus sparse
-Markov 0/8/24/48-step maximum errors 0, 8.88e-15, 2.31e-14 and 3.55e-14;
-mass drift zero; coefficient-transposition discrepancy 0.4923.
-**Pending:** exact-head Linux/macOS source, native Flow, production HTTP,
-R/C FlowJIT and physical Ubuntu Chromium CI. **Unexecuted:** local native
-Flow/R and independent macOS physical-browser interaction. No hosted CI
-workflow changes. This does not implement generalized compiler-generated
-multidimensional `field` lowering or establish RStudio parity.
+**Verified:** [PR #331](https://github.com/godofecht/FlowStudio/pull/331)
+merged at [aac13112](https://github.com/godofecht/FlowStudio/commit/aac131120c1d45271cdcfd667cf294d6fd8c72c6).
+[Exact-head CI #41282399319](https://github.com/godofecht/FlowStudio/actions/runs/41282399319)
+and [post-merge CI #41282806804](https://github.com/godofecht/FlowStudio/actions/runs/41282806804)
+each passed all four Ubuntu 24.04/macOS 15 jobs. Each platform passed
+1,201 JavaScript tests (12 skipped) and ran 443 Python tests (13 skipped).
+Native Flow compilation, full 256-cell seeded production HTTP oracle,
+corrupted-assertion HTTP 422, R/C FlowJIT, mixed-language notebooks and
+physical Ubuntu Chromium Monaco/256 SVG cells plus 256 seeded browser
+HTTP values passed. Flow MLIR was skipped where LLVM tooling was absent.
+Independent Python direct-stencil versus sparse Markov 0/8/24/48-step
+maximum errors were 0, 8.88e-15, 2.31e-14 and 3.55e-14; mass drift zero;
+coefficient-transposition discrepancy 0.4923.
+**Unexecuted:** local native Flow/R and independent macOS physical-browser
+interaction. No hosted CI workflow changes. This does not implement
+generalized compiler-generated multidimensional `field` lowering or
+establish RStudio parity.
 
 ## 2026-11-01: native heterogeneous 16×16 conservative PDE (4/4 exact-head and post-merge CI)
 

@@ -32,6 +32,7 @@
 #          70 det2, 71 det3, 72 det4: row-major SI-aware matrix determinants.
 #          73 sum, 74 product: 1..8-argument SI-aware reductions.
 #          75 mean, 76 population variance, 77 RMS: 1..8 same-unit operands.
+#          78 median, 79 median absolute deviation: 1..8 same-unit operands.
 #          The instruction exponent stores the actual variadic arity.
 #          Every permutation product must have the same SI dimension.
 # Predicate values are dimensionless 0/1 with a separate runtime type bit.
@@ -1038,6 +1039,82 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
             }
             depth = base + 1
             stack[base] = quantity(output_value, output_dimension)
+            predicate[base] = false
+        } elif opcode == 78 or opcode == 79 {
+            # Scale before sorting to avoid overflow for opposite signed
+            # magnitudes near the finite 1e30 numerical limit. Insertion sort
+            # is deterministic for the bounded 1..8 input count.
+            let arity: i32 = instruction.exponent
+            if arity < 1 or arity > 8 or depth < arity {
+                return failed(instruction.source_start)
+            }
+            let base: i32 = depth - arity
+            let input_dimension: Dimension = stack[base].dimension
+            let mut scale: f64 = 0.0
+            let mut component: i32 = 0
+            while component < arity {
+                let position: i32 = base + component
+                let entry: Quantity = stack[position]
+                if predicate[position] or not same_dimension(entry.dimension, input_dimension) or
+                   not bounded_value(entry.value) {
+                    return failed(instruction.source_start)
+                }
+                let absolute: f64 = magnitude(entry.value)
+                if absolute > scale { scale = absolute }
+                component = component + 1
+            }
+            let mut sorted: array<f64, 8> = [0.0]
+            component = 0
+            while component < arity {
+                let mut value: f64 = 0.0
+                if scale > 0.0 { value = stack[base + component].value / scale }
+                let mut position: i32 = component
+                let mut shifting: bool = true
+                while position > 0 and shifting {
+                    if sorted[position - 1] > value {
+                        sorted[position] = sorted[position - 1]
+                        position = position - 1
+                    } else {
+                        shifting = false
+                    }
+                }
+                sorted[position] = value
+                component = component + 1
+            }
+            let middle: i32 = arity / 2
+            let mut center: f64 = sorted[middle]
+            if arity % 2 == 0 {
+                center = (sorted[middle - 1] + sorted[middle]) * 0.5
+            }
+            if opcode == 79 {
+                # The median absolute deviation is median(|x - median(x)|),
+                # not the mean absolute deviation or a Gaussian-scaled MAD.
+                let mut deviations: array<f64, 8> = [0.0]
+                component = 0
+                while component < arity {
+                    let value: f64 = magnitude(sorted[component] - center)
+                    let mut position: i32 = component
+                    let mut shifting: bool = true
+                    while position > 0 and shifting {
+                        if deviations[position - 1] > value {
+                            deviations[position] = deviations[position - 1]
+                            position = position - 1
+                        } else {
+                            shifting = false
+                        }
+                    }
+                    deviations[position] = value
+                    component = component + 1
+                }
+                center = deviations[middle]
+                if arity % 2 == 0 {
+                    center = (deviations[middle - 1] + deviations[middle]) * 0.5
+                }
+            }
+            let output_value: f64 = center * scale
+            if not bounded_value(output_value) { return failed(instruction.source_start) }
+            depth = base + 1
+            stack[base] = quantity(output_value, input_dimension)
             predicate[base] = false
         } elif opcode == 70 or opcode == 71 or opcode == 72 {
             # Determinants are scalar contractions of row-major matrices.

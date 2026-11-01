@@ -503,6 +503,15 @@ function main() -> i32 {
     if result.valid or result.failed_at != 0 { return 189 }
     result = evaluate_math_expression("mean(1e30,1e30)")
     if not result.valid or not close(result.result.value / 1e30, 1.0) { return 190 }
+    result = evaluate_math_expression("median(9m,1m,3m,5m)")
+    if not result.valid or not close(result.result.value, 4.0) or
+       not same_dimension(result.result.dimension, length_dimension()) { return 191 }
+    result = evaluate_math_expression("mad(1m,1m,2m,2m,100m)")
+    if not result.valid or not close(result.result.value, 1.0) { return 192 }
+    result = evaluate_math_expression("median(1m,2s)")
+    if result.valid or result.failed_at != 0 { return 193 }
+    result = evaluate_math_expression("mad(true,2)")
+    if result.valid or result.failed_at != 0 { return 194 }
     println("native-math-source-ok")
     return 0
 }

@@ -620,3 +620,17 @@ modules on Linux and macOS, including through the production HTTP compiler.
 This is **not** a fifth physical base dimension, a generalized unit algebra,
 an extension to upstream Flow grammar, or native Navier–Stokes.
 
+
+## Native robust statistics (2026-11-01)
+
+The real Flow 2.0 scalar source parser, typed postfix runtime and static SI
+inference support `median(x1,...,x8)` and `mad(x1,...,x8)` with 1–8
+arguments. `mad` is the unscaled median absolute deviation about the sample
+median; it is not mean absolute deviation or a Gaussian-calibrated estimator.
+Both return the original physical dimension, require identical dimensions and
+reject predicates. Sorting is deterministic and bounded; normalized inputs
+avoid premature overflow for mixed-sign values near the 1e30 runtime bound.
+`src/math_robust_statistics_smoke.flow` exercises the native implementation
+on Linux and macOS, while the production HTTP source bundle executes both
+operations through the actual compiler and runtime. This does not add tensor
+or symbolic-indexed reductions to the upstream Flow grammar.

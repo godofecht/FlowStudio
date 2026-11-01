@@ -292,7 +292,7 @@ export function infer_math_ir(program: MathProgram) -> MathInferredType {
             depth = base + 1
             dimensions[base] = output_dimension
             predicates[base] = false
-        } elif opcode == 75 or opcode == 76 or opcode == 77 {
+        } elif opcode >= 75 and opcode <= 79 {
             # Infer physical statistical reductions without evaluating inputs.
             let arity: i32 = instruction.exponent
             if arity < 1 or arity > 8 or depth < arity {

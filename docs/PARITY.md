@@ -1,4 +1,4 @@
-## 2026-11-01: native heterogeneous 16×16 conservative PDE (qualification pending)
+## 2026-11-01: native heterogeneous 16×16 conservative PDE (4/4 exact-head and post-merge CI)
 
 Added `examples/native_variable_diffusion16.flow` with real Flow 2.0
 periodic finite-volume diffusion across a discontinuous conductivity,
@@ -12,10 +12,17 @@ Chromium Monaco Run is wired to check all 256 SVG heatmap cells against
 an independently assembled sparse Markov operator.
 [Reproduction](NATIVE_VARIABLE_DIFFUSION16.md).
 
-**Pending:** exact-head Linux/macOS CI, real native Flow compiler/HTTP,
-Ubuntu physical Chromium baseline, post-merge qualification.
+**Verified:** [PR #329](https://github.com/godofecht/FlowStudio/pull/329)
+merged at [64daba87](https://github.com/godofecht/FlowStudio/commit/64daba877fe9c4f24ecf51c24b4685c66b1baf01).
+[Exact-head CI #41278730979](https://github.com/godofecht/FlowStudio/actions/runs/41278730979)
+and [post-merge CI #41279171977](https://github.com/godofecht/FlowStudio/actions/runs/41279171977)
+each passed all four Linux/macOS jobs. Both source platforms passed
+1,201 JavaScript tests (12 skipped) and 442 Python tests (13 skipped),
+including five new independent PDE oracle tests. Production Flow check/run,
+real HTTP 422 negatives, R/C FlowJIT, and Ubuntu physical Chromium
+256-cell SVG numerical acceptance passed. Independent local Python/JavaScript
+direct-vs-sparse reproductions reached maximum error 3.6e-14.
 **Unexecuted:** local native Flow/R and independent macOS physical browser.
-The dedicated Ubuntu Chromium case is pending exact-head CI qualification.
 No hosted workflow configuration changes. This is array-backed numerical
 PDE execution, not compiler-generated multidimensional `field` lowering
 or full RStudio parity.

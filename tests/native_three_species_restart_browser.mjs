@@ -208,4 +208,11 @@ export async function runThreeSpeciesRestartBrowser({page, setNotebookSource, re
   assert.equal(await page.locator('#notebookOutput .notebook-cell').count(), 2);
   assert.match(await page.locator('#notebookOutput').innerText(), /FLOWSTUDIO_THREE_RESTART_V1 2 /);
   assert.equal(requests.length, beforeImport, 'Notebook import must not execute the R checkpoint');
+  const stillCleared = await native('r',
+    'stopifnot(!exists("flowstudio_three_restart_phase", envir=.GlobalEnv, inherits=FALSE), ' +
+    '!exists("flowstudio_three_restart_state", envir=.GlobalEnv, inherits=FALSE), ' +
+    '!exists("flowstudio_three_restart_snapshot", envir=.GlobalEnv, inherits=FALSE)); ' +
+    'cat("restart-import-state-clean-ok\\n")');
+  assert.equal(stillCleared.status, 200, stillCleared.body.slice(0, 300));
+  assert.match(stillCleared.body, /restart-import-state-clean-ok/);
 }

@@ -65,7 +65,7 @@ the 256×256 sparse transition and compare all **96 intermediate values**
 against the actual browser-triggered response, enforcing monotone decay,
 finite output and a fixed 48-step budget. This exposes the numerical
 trajectory for debugging, rather than relying on a final success marker.
-Qualification of this extension is pending exact-head Linux/macOS CI.
+**Verified for PR #335:** [exact-head CI #41290697131](https://github.com/godofecht/FlowStudio/actions/runs/41290697131) passed all four Linux/macOS source/transport and native Flow/HTTP jobs, including physical Ubuntu Chromium and R/C FlowJIT. The trace is checked against the independent sparse oracle on both native HTTP platforms and the browser-triggered response on Ubuntu. Post-merge CI remains separately unverified.
 
 The production `tests/http_smoke.py` compiles and runs the checked-in Flow
 source through real `/api/check/flow` and `/api/run/flow` endpoints,

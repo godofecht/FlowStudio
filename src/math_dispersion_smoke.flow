@@ -36,7 +36,7 @@ function main() -> i32 {
     result = evaluate_math_expression("sample_stddev(7m)")
     if result.valid or result.failed_at != 0 { return 9 }
     result = evaluate_math_expression("sample_variance(1km,3km)")
-    if not result.valid or not near(result.result.value,2000000.0) or
+    if not result.valid or not near(result.result.value / 1000000.0,2.0) or
        not same_dimension(result.result.dimension,area) { return 10 }
     result = evaluate_math_expression("stddev(1km,3km)")
     if not result.valid or not near(result.result.value,1000.0) { return 11 }

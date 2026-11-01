@@ -24,7 +24,7 @@ reproduction differed by less than 3e-14. **Failed:** zero final exact-head
 jobs; an earlier run failed bounded Python inspection due test-oracle globals,
 which was fixed and regression-tested. **Skipped:** optional and
 platform-inapplicable tests. **Unexecuted:** local native Flow/R and independent
-macOS physical Chromium. **Post-merge main CI:** pending. Hosted workflow
+macOS physical Chromium. **Post-merge main CI:** [#41339798419](https://github.com/godofecht/FlowStudio/actions/runs/41339798419) passed 4/4 Ubuntu/macOS jobs on combined main `64936f8e` (including merged PR #354). Hosted workflow
 configuration was unchanged by PR #355. Compiler-generated multidimensional
 field lowering and full RStudio parity remain incomplete.
 

@@ -342,6 +342,7 @@ function function_call_after_number(bytes: ptr<u8>, start: i32, length: i32) -> 
         identifier_matches(bytes, start, end, "dot8") or
         identifier_matches(bytes, start, end, "cross2") or
         identifier_matches(bytes, start, end, "lerp") or
+        identifier_matches(bytes, start, end, "approx") or
         identifier_matches(bytes, start, end, "clamp") or
         identifier_matches(bytes, start, end, "where") or
         identifier_matches(bytes, start, end, "smoothstep") or
@@ -387,7 +388,7 @@ function function_arity(opcode: i32) -> i32 {
        opcode == 33 or opcode == 34 or opcode == 35 or opcode == 36 or opcode == 37 or
         opcode == 38 or opcode == 39 or opcode == 40 or opcode == 42 or opcode == 43 or opcode == 44 or opcode == 46 or opcode == 56 or opcode == 57 or (opcode >= 47 and opcode <= 50) { return 1 }
     if opcode == 7 or opcode == 8 or opcode == 22 or opcode == 32 { return 2 }
-    if opcode == 9 or opcode == 19 or opcode == 45 or opcode == 66 or opcode == 67 or opcode == 68 { return 3 }
+    if opcode == 9 or opcode == 19 or opcode == 45 or opcode == 66 or opcode == 67 or opcode == 68 or opcode == 69 { return 3 }
     if opcode == 51 or opcode == 58 or opcode == 60 { return 4 }
     if opcode == 59 { return 6 }
     if opcode == 61 { return 8 }
@@ -847,6 +848,10 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
                identifier_matches(bytes, index, index + 4, "lerp") {
             unary_opcode = 66
             unary_width = 4
+        } elif index + 6 < length and bytes[index + 6] == 40 and
+               identifier_matches(bytes, index, index + 6, "approx") {
+            unary_opcode = 69
+            unary_width = 6
         } elif index + 5 < length and bytes[index + 5] == 40 and
                identifier_matches(bytes, index, index + 5, "clamp") {
             unary_opcode = 9

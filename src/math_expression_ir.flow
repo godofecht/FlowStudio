@@ -28,6 +28,7 @@
 #          66 lerp(a, b, t): bounded physical linear interpolation, 0 <= t <= 1.
 #          67 smoothstep(edge0, edge1, x): cubic C1 transition, dimensionless output.
 #          68 smootherstep(edge0, edge1, x): quintic C2 transition, dimensionless output.
+#          69 approx(a, b, tolerance): typed absolute-tolerance predicate, same SI units.
 # Predicate values are dimensionless 0/1 with a separate runtime type bit.
 # where and logical operators evaluate operands eagerly (no short circuit).
 # Unsupported instructions and type mismatches fail closed.
@@ -992,6 +993,27 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
             depth = depth - 2
             stack[depth - 1] = quantity(norm, first.dimension)
             predicate[depth - 1] = false
+        } elif opcode == 69 {
+            # Explicit absolute tolerance, never an implicit epsilon. Inputs
+            # share physical dimensions; negative tolerance and predicates
+            # are invalid. The result is a typed Boolean, not a scalar.
+            if depth < 3 { return failed(instruction.source_start) }
+            let first: Quantity = stack[depth - 3]
+            let second: Quantity = stack[depth - 2]
+            let tolerance: Quantity = stack[depth - 1]
+            if predicate[depth - 3] or predicate[depth - 2] or predicate[depth - 1] or
+               not same_dimension(first.dimension, second.dimension) or
+               not same_dimension(first.dimension, tolerance.dimension) or
+               tolerance.value < 0.0 {
+                return failed(instruction.source_start)
+            }
+            let mut matched: f64 = 0.0
+            if magnitude(first.value - second.value) <= tolerance.value {
+                matched = 1.0
+            }
+            depth = depth - 2
+            stack[depth - 1] = quantity(matched, dimensionless())
+            predicate[depth - 1] = true
         } elif opcode == 67 or opcode == 68 {
             # Dimensioned transition coordinates, dimensionless result. The
             # endpoint tests ensure exact saturation and avoid cancellation.

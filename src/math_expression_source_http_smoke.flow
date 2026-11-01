@@ -270,6 +270,34 @@ function main() -> i32 {
     result = evaluate_math_expression("1mPa+1mN")
     if result.valid or result.failed_at != 4 { return 93 }
     if parse_math_expression("1mkg").valid { return 94 }
+    # Real production HTTP execution of practical physical units and
+    # additional metric prefixes, not editor-only syntax highlighting.
+    result = evaluate_math_expression("1L/1m³")
+    if not result.valid or not close(result.result.value, 0.001) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 95 }
+    result = evaluate_math_expression("1mL/1L")
+    if not result.valid or not close(result.result.value, 0.001) { return 96 }
+    result = evaluate_math_expression("1bar/1kPa")
+    if not result.valid or not close(result.result.value, 100.0) { return 97 }
+    result = evaluate_math_expression("1h/60min")
+    if not result.valid or not close(result.result.value, 1.0) { return 98 }
+    result = evaluate_math_expression("1dm+20cm")
+    if not result.valid or not close(result.result.value, 0.3) or
+       not same_dimension(result.result.dimension, length_dimension()) { return 99 }
+    result = evaluate_math_expression("1mbar+1Pa")
+    if not result.valid or not close(result.result.value, 101.0) { return 100 }
+    result = evaluate_math_expression("1daN/1N")
+    if not result.valid or not close(result.result.value, 10.0) { return 101 }
+    result = evaluate_math_expression("1pPa/1fPa")
+    if not result.valid or not close(result.result.value, 1000.0) { return 102 }
+    result = evaluate_math_expression("1Tm/1Gm")
+    if not result.valid or not close(result.result.value, 1000.0) { return 103 }
+    let volume_span: ParsedMathExpression = parse_math_expression("1µL")
+    if not volume_span.valid or volume_span.program.instructions[0].source_end != 4 { return 104 }
+    result = evaluate_math_expression("1min+1m")
+    if result.valid or result.failed_at != 4 { return 105 }
+    if parse_math_expression("1minute").valid { return 106 }
+
     println("native-math-source-ok")
     return 0
 }

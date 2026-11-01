@@ -570,7 +570,7 @@ function main() -> i32 {
 
     # Typed signum returns dimensionless numeric directions for physical scalars.
     operations[0] = instruction(0, quantity(-5.0, length), 0, 1)
-    operations[1] = instruction(57, quantity(0.0, dimensionless()), 1, 5)
+    operations[1] = instruction(57, quantity(0.0, dimensionless()), 0, 1)
     program = MathProgram { instructions: operations, count: 2, source_length: 5 }
     result = evaluate_math_ir(program)
     if not result.valid or result.is_predicate or result.result.value != -1.0 or

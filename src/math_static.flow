@@ -263,6 +263,51 @@ export function infer_math_ir(program: MathProgram) -> MathInferredType {
             depth = depth - arity + 1
             dimensions[depth - 1] = output_dimension
             predicates[depth - 1] = false
+        } elif opcode == 70 or opcode == 71 {
+            let mut arity: i32 = 4
+            if opcode == 71 { arity = 9 }
+            if depth < arity { return static_error(instruction.source_start) }
+            let base: i32 = depth - arity
+            let mut component: i32 = 0
+            while component < arity {
+                if predicates[base + component] {
+                    return static_error(instruction.source_start)
+                }
+                component = component + 1
+            }
+            let mut output_dimension: Dimension = dimensionless()
+            if opcode == 70 {
+                output_dimension = product_dimension(dimensions[base], dimensions[base + 3])
+                let alternative: Dimension = product_dimension(
+                    dimensions[base + 1], dimensions[base + 2])
+                if not same_dimension(output_dimension, alternative) {
+                    return static_error(instruction.source_start)
+                }
+            } else {
+                let permutations: array<i32, 18> = [
+                    0,4,8, 0,5,7, 1,3,8, 1,5,6, 2,3,7, 2,4,6
+                ]
+                let mut term_index: i32 = 0
+                while term_index < 6 {
+                    let offset: i32 = term_index * 3
+                    let term_dimension: Dimension = product_dimension(
+                        product_dimension(dimensions[base + permutations[offset]],
+                            dimensions[base + permutations[offset + 1]]),
+                        dimensions[base + permutations[offset + 2]])
+                    if term_index == 0 {
+                        output_dimension = term_dimension
+                    } elif not same_dimension(output_dimension, term_dimension) {
+                        return static_error(instruction.source_start)
+                    }
+                    term_index = term_index + 1
+                }
+            }
+            if not static_bounded_dimension(output_dimension) {
+                return static_error(instruction.source_start)
+            }
+            depth = base + 1
+            dimensions[base] = output_dimension
+            predicates[base] = false
         } elif opcode >= 52 and opcode <= 55 {
             let arity: i32 = opcode - 47
             if depth < arity { return static_error(instruction.source_start) }

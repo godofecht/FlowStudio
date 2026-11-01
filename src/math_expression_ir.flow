@@ -29,6 +29,8 @@
 #          67 smoothstep(edge0, edge1, x): cubic C1 transition, dimensionless output.
 #          68 smootherstep(edge0, edge1, x): quintic C2 transition, dimensionless output.
 #          69 approx(a, b, tolerance): typed absolute-tolerance predicate, same SI units.
+#          70 det2(a,b,c,d), 71 det3(a,b,c,d,e,f,g,h,i): row-major determinants.
+#          Every permutation product must have the same SI dimension.
 # Predicate values are dimensionless 0/1 with a separate runtime type bit.
 # where and logical operators evaluate operands eagerly (no short circuit).
 # Unsupported instructions and type mismatches fail closed.
@@ -899,6 +901,79 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
             depth = depth - arity + 1
             stack[depth - 1] = quantity(sum, output_dimension)
             predicate[depth - 1] = false
+        } elif opcode == 70 or opcode == 71 {
+            # Determinants are scalar contractions of row-major matrices.
+            # Unlike dot products, entries may have different dimensions:
+            # only the complete signed permutation products must agree.
+            let mut arity: i32 = 4
+            if opcode == 71 { arity = 9 }
+            if depth < arity { return failed(instruction.source_start) }
+            let base: i32 = depth - arity
+            let mut component: i32 = 0
+            while component < arity {
+                if predicate[base + component] {
+                    return failed(instruction.source_start)
+                }
+                component = component + 1
+            }
+            let mut determinant: f64 = 0.0
+            let mut output_dimension: Dimension = dimensionless()
+            if opcode == 70 {
+                let positive_dimension: Dimension = product_dimension(
+                    stack[base].dimension, stack[base + 3].dimension)
+                let negative_dimension: Dimension = product_dimension(
+                    stack[base + 1].dimension, stack[base + 2].dimension)
+                if not same_dimension(positive_dimension, negative_dimension) {
+                    return failed(instruction.source_start)
+                }
+                output_dimension = positive_dimension
+                let positive: f64 = stack[base].value * stack[base + 3].value
+                let negative: f64 = stack[base + 1].value * stack[base + 2].value
+                if not bounded_value(positive) or not bounded_value(negative) {
+                    return failed(instruction.source_start)
+                }
+                determinant = positive - negative
+            } else {
+                # Six permutations of columns 0,1,2, with their parity.
+                # Each intermediate multiplication is bounded independently.
+                let permutations: array<i32, 18> = [
+                    0,4,8, 0,5,7, 1,3,8, 1,5,6, 2,3,7, 2,4,6
+                ]
+                let mut term_index: i32 = 0
+                while term_index < 6 {
+                    let offset: i32 = term_index * 3
+                    let first: Quantity = stack[base + permutations[offset]]
+                    let second: Quantity = stack[base + permutations[offset + 1]]
+                    let third: Quantity = stack[base + permutations[offset + 2]]
+                    let term_dimension: Dimension = product_dimension(
+                        product_dimension(first.dimension, second.dimension), third.dimension)
+                    if term_index == 0 {
+                        output_dimension = term_dimension
+                    } elif not same_dimension(output_dimension, term_dimension) {
+                        return failed(instruction.source_start)
+                    }
+                    let partial: f64 = first.value * second.value
+                    if not bounded_value(partial) { return failed(instruction.source_start) }
+                    let term: f64 = partial * third.value
+                    if not bounded_value(term) { return failed(instruction.source_start) }
+                    if term_index == 0 or term_index == 3 or term_index == 4 {
+                        determinant = determinant + term
+                    } else {
+                        determinant = determinant - term
+                    }
+                    if not bounded_value(determinant) {
+                        return failed(instruction.source_start)
+                    }
+                    term_index = term_index + 1
+                }
+            }
+            if not bounded_dimension(output_dimension) or
+               not bounded_value(determinant) {
+                return failed(instruction.source_start)
+            }
+            depth = base + 1
+            stack[base] = quantity(determinant, output_dimension)
+            predicate[base] = false
         } elif opcode >= 52 and opcode <= 55 {
             # Bounded five-through-eight component vector norms. Scale before
             # squaring to avoid overflow/underflow in the intermediate sum.

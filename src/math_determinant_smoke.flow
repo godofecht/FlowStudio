@@ -1,0 +1,89 @@
+# Native execution of dimension-aware 2x2 and 3x3 matrix determinants.
+# flow run src/math_determinant_smoke.flow
+import .math_dimensions { Dimension, dimensionless, length_dimension, time_dimension, temperature_dimension, product_dimension, same_dimension }
+import .math_expression_ir { MathResult }
+import .math_expression_source { ParsedMathExpression, parse_math_expression, evaluate_math_expression }
+import .math_static { MathInferredType, infer_math_expression_source, infer_math_equation_source }
+
+function near(actual: f64, expected: f64) -> bool {
+    let mut error: f64 = actual - expected
+    if error < 0.0 { error = -error }
+    return error < 0.00000000001
+}
+
+function main() -> i32 {
+    let length: Dimension = length_dimension()
+    let area: Dimension = product_dimension(length, length)
+    let space_time: Dimension = product_dimension(length, time_dimension())
+    let volume_time_temperature: Dimension = product_dimension(
+        space_time, temperature_dimension())
+    let mut result: MathResult = evaluate_math_expression("det2(1,2,3,4)")
+    if not result.valid or not near(result.result.value, -2.0) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 1 }
+    result = evaluate_math_expression("det2(1m,2m,3m,4m)")
+    if not result.valid or not near(result.result.value, -2.0) or
+       not same_dimension(result.result.dimension, area) { return 2 }
+    result = evaluate_math_expression("det2(1m,2s,3m,4s)")
+    if not result.valid or not near(result.result.value, -2.0) or
+       not same_dimension(result.result.dimension, space_time) { return 3 }
+    result = evaluate_math_expression("det2(1m,2s,3s,4m)")
+    if result.valid or result.failed_at != 0 { return 4 }
+    result = evaluate_math_expression("det2(true,2,3,4)")
+    if result.valid or result.failed_at != 0 { return 5 }
+    result = evaluate_math_expression("det2(1e20,0,0,1e20)")
+    if result.valid or result.failed_at != 0 { return 6 }
+    if parse_math_expression("det2(1,2,3)").valid or
+       parse_math_expression("det2(1,2,3,4,5)").valid { return 7 }
+
+    result = evaluate_math_expression("det3(1,0,0,0,1,0,0,0,1)")
+    if not result.valid or not near(result.result.value, 1.0) { return 8 }
+    result = evaluate_math_expression("det3(0,1,0,1,0,0,0,0,1)")
+    if not result.valid or not near(result.result.value, -1.0) { return 9 }
+    result = evaluate_math_expression("det3(1,2,3,4,5,6,7,8,9)")
+    if not result.valid or not near(result.result.value, 0.0) { return 10 }
+    result = evaluate_math_expression("det3(1m,2m,3m,0s,1s,4s,5K,6K,0K)")
+    if not result.valid or not near(result.result.value, 1.0) or
+       not same_dimension(result.result.dimension, volume_time_temperature) { return 11 }
+    result = evaluate_math_expression("det3(1m,2m,3m,0s,1s,4s,5K,6K,0m)")
+    if result.valid or result.failed_at != 0 { return 12 }
+    result = evaluate_math_expression("det3(1,0,0,0,true,0,0,0,1)")
+    if result.valid or result.failed_at != 0 { return 13 }
+    if parse_math_expression("det3(1,2,3,4,5,6,7,8)").valid or
+       parse_math_expression("det3(1,2,3,4,5,6,7,8,9,10)").valid { return 14 }
+
+    let parsed: ParsedMathExpression = parse_math_expression("det3(1,2,3,4,5,6,7,8,9)")
+    if not parsed.valid or parsed.program.count != 10 or
+       parsed.program.instructions[9].opcode != 71 or
+       parsed.program.instructions[9].source_start != 0 or
+       parsed.program.instructions[9].source_end != 4 { return 15 }
+    let det2_source: ParsedMathExpression = parse_math_expression("det2(1,2,3,4)")
+    if not det2_source.valid or det2_source.program.instructions[4].opcode != 70 or
+       det2_source.program.instructions[4].source_end != 4 { return 16 }
+
+    let mut inferred: MathInferredType = infer_math_expression_source("det2(1m,2s,3m,4s)")
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension, space_time) { return 17 }
+    inferred = infer_math_expression_source("det2(1m,2s,3s,4m)")
+    if inferred.valid or inferred.failed_at != 0 { return 18 }
+    inferred = infer_math_expression_source("det3(1m,2m,3m,0s,1s,4s,5K,6K,0K)")
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension, volume_time_temperature) { return 19 }
+    inferred = infer_math_expression_source("det3(1m,2m,3m,0s,1s,4s,5K,6K,0m)")
+    if inferred.valid or inferred.failed_at != 0 { return 20 }
+    inferred = infer_math_expression_source("det3(1e20,0,0,0,1e20,0,0,0,1e20)")
+    if not inferred.valid or evaluate_math_expression(
+        "det3(1e20,0,0,0,1e20,0,0,0,1e20)").valid { return 21 }
+    inferred = infer_math_equation_source("det2(1m,2s,3m,4s) = -2m*1s")
+    if not inferred.valid or not same_dimension(inferred.dimension, space_time) { return 22 }
+    inferred = infer_math_equation_source("det2(1m,2s,3m,4s) = 1m")
+    if inferred.valid { return 23 }
+    inferred = infer_math_equation_source(
+        "det3(1m,2m,3m,0s,1s,4s,5K,6K,0K) = 1m*1s*1K")
+    if not inferred.valid or not same_dimension(inferred.dimension, volume_time_temperature) { return 24 }
+    result = evaluate_math_expression("2det2(1,2,3,4)")
+    if not result.valid or not near(result.result.value, -4.0) { return 25 }
+    result = evaluate_math_expression("det2(1,2,3,4)+det3(1,0,0,0,1,0,0,0,1)")
+    if not result.valid or not near(result.result.value, -1.0) { return 26 }
+    println("native-math-determinants-ok")
+    return 0
+}

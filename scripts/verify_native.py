@@ -284,6 +284,18 @@ def verify(root: Path, port: int = 8751, build_timeout: int = 180,
             if trigonometry_result.returncode != 0:
                 raise VerificationError(
                     f"Native trigonometry HTTP failed with exit code {trigonometry_result.returncode}")
+            determinant_smoke = root / "tests/http_determinant_smoke.py"
+            if not determinant_smoke.is_file():
+                raise VerificationError("Missing native determinant HTTP acceptance")
+            determinant_result = _command(
+                [sys.executable, str(determinant_smoke)], root, 120)
+            if determinant_result.stdout:
+                print(determinant_result.stdout, end="", flush=True)
+            if determinant_result.stderr:
+                print(determinant_result.stderr, end="", file=sys.stderr, flush=True)
+            if determinant_result.returncode != 0:
+                raise VerificationError(
+                    f"Native determinant HTTP failed with exit code {determinant_result.returncode}")
             if proc.poll() is not None:
                 raise VerificationError(f"Server exited during HTTP smoke (code {proc.returncode})")
             print("PASS: native build, live health and HTTP smoke", flush=True)

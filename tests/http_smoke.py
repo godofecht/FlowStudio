@@ -226,6 +226,33 @@ def main() -> None:
         variable_seeded_initial(), variable_conductivity(), 48)
     assert max(abs(a - b) for a, b in zip(seeded_actual, seeded_expected)) < 0.002, (
         "seeded 256-cell sparse oracle", seeded_actual[:4], seeded_expected[:4])
+    # Every native intermediate variance is observable and independently
+    # checked, rather than trusting the final grid or a hardcoded trace.
+    trace_headers = [i for i, line in enumerate(lines)
+                     if line == "FLOWSTUDIO_ENERGY_TRACE_V1 48 2"]
+    assert len(trace_headers) == 1, ("native energy trace marker", body[-500:])
+    trace_at = trace_headers[0]
+    assert lines[trace_at + 3] == "FLOWSTUDIO_ENERGY_TRACE_END"
+    for offset, (name, initial_field) in enumerate((
+            ("U", variable_initial()), ("S", variable_seeded_initial()))):
+        trace_tokens = lines[trace_at + offset + 1].split()
+        assert trace_tokens[0] == name and len(trace_tokens) == 49, (
+            "native energy trace length", name, len(trace_tokens))
+        actual_trace = [float(token) for token in trace_tokens[1:]]
+        assert all(math.isfinite(value) and value >= 0 for value in actual_trace)
+        state = initial_field
+        previous_energy = math.inf
+        for step, actual_energy in enumerate(actual_trace, start=1):
+            state = variable_matrix_oracle(state, variable_conductivity(), 1)
+            mean = sum(state) / 256
+            expected_energy = sum((value - mean) ** 2 for value in state)
+            tolerance = 0.05 + 0.0001 * expected_energy
+            assert abs(actual_energy - expected_energy) < tolerance, (
+                "native energy trace sparse oracle", name, step,
+                actual_energy, expected_energy)
+            assert actual_energy <= previous_energy + tolerance, (
+                "native intermediate energy increased", name, step)
+            previous_energy = actual_energy
     # Mass conservation alone cannot detect reversed diffusion. Force the
     # real Flow intermediate-step energy check to run with negative flux:
     # compilation must succeed but the native executable must return 422.

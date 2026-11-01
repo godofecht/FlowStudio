@@ -4,6 +4,7 @@ from pathlib import Path
 
 from http_smoke import request, compact_native_math_line
 from robust_statistics_oracle import inject_robust_assertions, robust_cases
+from http_robust_interop import verify_robust_interop
 
 
 def bundled_source(root: Path) -> str:
@@ -48,6 +49,7 @@ def verify_robust_statistics() -> None:
     assert status == 200, ("robust corrupted expectation must compile", status, body)
     status, body = request("POST", "/api/run/flow", corrupted, headers)
     assert status == 422, ("robust corrupted expectation must fail", status, body)
+    verify_robust_interop(request, headers)
     print("PASS: 60 seeded SI median/MAD cases through real native Flow HTTP; "
           "48 exact rational expectations, 12 negatives, corruption HTTP 422")
 

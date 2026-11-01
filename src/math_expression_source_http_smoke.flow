@@ -530,8 +530,8 @@ function main() -> i32 {
                length_dimension()), length_dimension())) { return 199 }
     result = evaluate_math_expression("laplacian3(0K,1K,1K,8K,8K,27K,27K,1m,2m,0m)")
     if result.valid or result.failed_at != 0 { return 200 }
-    parsed = parse_math_expression("laplacian3(0K,1K,1K,8K,8K,27K,27K,1m,2m,3m)")
-    if not parsed.valid or parsed.program.instructions[10].opcode != 87 { return 201 }
+    let parsed3: ParsedMathExpression = parse_math_expression("laplacian3(0K,1K,1K,8K,8K,27K,27K,1m,2m,3m)")
+    if not parsed3.valid or parsed3.program.instructions[10].opcode != 87 { return 201 }
     println("native-math-source-ok")
     return 0
 }

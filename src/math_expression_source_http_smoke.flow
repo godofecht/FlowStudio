@@ -465,6 +465,15 @@ function main() -> i32 {
     result = evaluate_math_expression("smoothstep(0,2π,π)")
     if not result.valid or not close(result.result.value, 0.5) { return 173 }
     if parse_math_expression("smoothstep(0,1)").valid { return 174 }
+    result = evaluate_math_expression("|-3m|")
+    if not result.valid or not close(result.result.value, 3.0) or
+       not same_dimension(result.result.dimension, length_dimension()) { return 175 }
+    result = evaluate_math_expression("2|3|")
+    if not result.valid or result.result.value != 6.0 { return 176 }
+    if parse_math_expression("|1+2)").valid { return 177 }
+    let bars: ParsedMathExpression = parse_math_expression("|-3m|")
+    if not bars.valid or bars.program.instructions[2].opcode != 20 or
+       bars.program.instructions[2].source_end != 5 { return 178 }
     println("native-math-source-ok")
     return 0
 }

@@ -1,3 +1,32 @@
+## 2026-11-01: seeded Unicode SI reductions through native Flow/HTTP (verified)
+
+[PR #353](https://github.com/godofecht/FlowStudio/pull/353) merged as
+[56bad8c9](https://github.com/godofecht/FlowStudio/commit/56bad8c93ab8712342785e027570997e628668d4).
+The production Flow 2.0 scalar compiler and real localhost HTTP server now
+execute 48 independent seed-20261102 Unicode ∑/∏ cases: 40 valid exact
+integer/SI/static-inference checks (including reversed arguments and nested
+products) and eight malformed, dimensional, predicate or overflow negatives.
+Two additional postfix assertions check multibyte UTF-8 source spans after
+preceding expressions. The Unicode and existing 48-case ASCII batteries
+each remain under the 128 KiB HTTP source ceiling, and each deliberately
+corrupts a numerical expectation: compilation succeeds, runtime returns
+HTTP 422. [Reproduction](NATIVE_VARIADIC_REDUCTIONS.md).
+
+**Passed:** [exact-head CI #41333665882](https://github.com/godofecht/FlowStudio/actions/runs/41333665882)
+and [post-merge main CI #41334255658](https://github.com/godofecht/FlowStudio/actions/runs/41334255658),
+each 4/4 Ubuntu 24.04/macOS 15 source and native jobs. Both source platforms
+passed 1,201 JavaScript tests (12 skipped) and ran 462 Python tests
+(13 skipped), including three new source/oracle tests. Native Flow
+compilation, real HTTP check/run and corrupted-expectation HTTP 422 passed
+on both platforms; Ubuntu physical Chromium, R/C FlowJIT, mixed-language
+notebooks, Navier–Stokes and PDE acceptance also passed.
+**Failed:** zero final jobs. **Skipped:** the enumerated optional tests and
+platform-inapplicable macOS physical Chromium step.
+**Unexecuted:** independent macOS physical browser and local native Flow/R.
+No hosted workflow configuration changed. This does not establish indexed
+reductions, compiler-generated heterogeneous multidimensional `field`
+lowering or full RStudio parity.
+
 ## 2026-11-01: seeded native SI variadic reduction HTTP qualification
 
 [PR #351](https://github.com/godofecht/FlowStudio/pull/351) merged as

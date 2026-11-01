@@ -51,16 +51,22 @@ def main() -> None:
     assert status == 200, ("tampered source must compile", status, body)
     status, body = request("POST", "/api/run/flow", tampered, headers)
     assert status == 422, ("tampered native execution must fail", status, body)
-    # Separate bounded source keeps both seeded batteries below 128 KiB.
-    unicode_source = inject_unicode_variadic_assertions(base_source)
-    status, body = request("POST", "/api/check/flow", unicode_source, headers)
-    assert status == 200, ("Unicode source compile", status, body)
-    status, body = request("POST", "/api/run/flow", unicode_source, headers)
-    assert status == 200 and "native-math-variadic-ok" in body, (
-        "Unicode native execution", status, body)
+    # Preserve all 48 independently seeded Unicode cases and SI inference
+    # assertions. Split the real HTTP compilation into bounded 24-case
+    # batches instead of silently dropping coverage when the parser grows.
+    for start in (0, 24):
+        unicode_source = inject_unicode_variadic_assertions(
+            base_source, start=start, stop=start + 24)
+        status, body = request("POST", "/api/check/flow", unicode_source, headers)
+        assert status == 200, ("Unicode source compile", start, status, body)
+        status, body = request("POST", "/api/run/flow", unicode_source, headers)
+        assert status == 200 and "native-math-variadic-ok" in body, (
+            "Unicode native execution", start, status, body)
 
-    unicode_tampered = inject_unicode_variadic_assertions(base_source, sabotage=True)
-    assert unicode_tampered != unicode_source
+    unicode_tampered = inject_unicode_variadic_assertions(
+        base_source, sabotage=True, start=0, stop=24)
+    assert unicode_tampered != inject_unicode_variadic_assertions(
+        base_source, start=0, stop=24)
     status, body = request("POST", "/api/check/flow", unicode_tampered, headers)
     assert status == 200, ("tampered Unicode source must compile", status, body)
     status, body = request("POST", "/api/run/flow", unicode_tampered, headers)

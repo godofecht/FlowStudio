@@ -369,9 +369,11 @@ function main() -> i32 {
     result = evaluate_math_expression_with_bindings("distance+missing", bindings)
     if result.valid or result.failed_at != 9 { return 114 }
     result = evaluate_math_expression_with_bindings("2distance", bindings)
-    if result.valid or result.failed_at != 1 { return 115 }
+    if not result.valid or not near(result.result.value, 24.0) or
+       not same_dimension(result.result.dimension, length) { return 115 }
     result = evaluate_math_expression_with_bindings("distance duration", bindings)
-    if result.valid or result.failed_at != 9 { return 116 }
+    if not result.valid or not near(result.result.value, 36.0) or
+       not same_dimension(result.result.dimension, product_dimension(length, time)) { return 116 }
     result = evaluate_math_expression_with_bindings("distance^9", bindings)
     if result.valid or result.failed_at != 8 { return 117 }
     result = evaluate_math_expression_with_bindings("distance+π", bindings)
@@ -1176,7 +1178,7 @@ function main() -> i32 {
     result = evaluate_math_expression("tau+1s")
     if result.valid or result.failed_at != 3 { return 440 }
     result = evaluate_math_expression("2π")
-    if result.valid or result.failed_at != 1 { return 441 }
+    if not result.valid or not near(result.result.value, 6.283185307179586) { return 441 }
     result = evaluate_math_expression("π(2)")
     if not result.valid or not near(result.result.value, 6.28318530717958647692) { return 442 }
     let pi_source: ParsedMathExpression = parse_math_expression("π+tau")

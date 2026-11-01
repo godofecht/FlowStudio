@@ -1,0 +1,75 @@
+# Real native Flow vector contractions: source, typed IR, static units, equations.
+# flow run src/math_dot_smoke.flow
+import .math_dimensions { Dimension, dimensionless, length_dimension, time_dimension, mass_dimension, quotient_dimension, product_dimension, same_dimension }
+import .math_expression_ir { MathResult }
+import .math_expression_source { ParsedMathExpression, parse_math_expression, evaluate_math_expression }
+import .math_static { MathInferredType, infer_math_expression_source }
+import .math_equation { MathEquationResult, evaluate_math_equation_source }
+
+function near(actual: f64, expected: f64) -> bool {
+    let mut difference: f64 = actual - expected
+    if difference < 0.0 { difference = -difference }
+    return difference < 0.00000000001
+}
+
+function main() -> i32 {
+    let speed: Dimension = quotient_dimension(length_dimension(), time_dimension())
+    let momentum: Dimension = product_dimension(length_dimension(), mass_dimension())
+    let mut result: MathResult = evaluate_math_expression("dot2(3m,4m,2/s,1/s)")
+    if not result.valid or not near(result.result.value, 10.0) or
+       not same_dimension(result.result.dimension, speed) { return 1 }
+    result = evaluate_math_expression("dot3(1m,2m,3m,4/s,5/s,6/s)")
+    if not result.valid or not near(result.result.value, 32.0) or
+       not same_dimension(result.result.dimension, speed) { return 2 }
+    result = evaluate_math_expression("dot2(3m,4m,2kg,1kg)")
+    if not result.valid or not near(result.result.value, 10.0) or
+       not same_dimension(result.result.dimension, momentum) { return 3 }
+    result = evaluate_math_expression("dot2(1,0,0,1)")
+    if not result.valid or result.result.value != 0.0 { return 4 }
+    result = evaluate_math_expression("dot2(1e20,1e20,1,-1)")
+    if not result.valid or result.result.value != 0.0 { return 5 }
+    result = evaluate_math_expression("dot3(1,2,3,4,5,6)")
+    if not result.valid or result.result.value != 32.0 { return 6 }
+    result = evaluate_math_expression("dot2(1,2,3,4)²")
+    if not result.valid or result.result.value != 121.0 { return 7 }
+    result = evaluate_math_expression("dot2(1m,2s,3m,4m)")
+    if result.valid or result.failed_at != 0 { return 8 }
+    result = evaluate_math_expression("dot2(1m,2m,3s,4m)")
+    if result.valid or result.failed_at != 0 { return 9 }
+    result = evaluate_math_expression("dot3(1m,2m,3s,4m,5m,6m)")
+    if result.valid or result.failed_at != 0 { return 10 }
+    result = evaluate_math_expression("dot2(true,2,3,4)")
+    if result.valid or result.failed_at != 0 { return 11 }
+    result = evaluate_math_expression("dot2(1e20,1e20,1e20,-1e20)")
+    if result.valid or result.failed_at != 0 { return 12 }
+    if parse_math_expression("dot2(1,2,3)").valid { return 13 }
+    if parse_math_expression("dot2(1,2,3,4,5)").valid { return 14 }
+    if parse_math_expression("dot3(1,2,3,4,5)").valid { return 15 }
+    if parse_math_expression("dot3(1,2,3,4,5,6,7)").valid { return 16 }
+    let dot2_source: ParsedMathExpression = parse_math_expression("dot2(3,4,5,6)")
+    if not dot2_source.valid or dot2_source.program.count != 5 or
+       dot2_source.program.instructions[4].opcode != 58 or
+       dot2_source.program.instructions[4].source_start != 0 or
+       dot2_source.program.instructions[4].source_end != 4 { return 17 }
+    let dot3_source: ParsedMathExpression = parse_math_expression("dot3(1,2,3,4,5,6)")
+    if not dot3_source.valid or dot3_source.program.count != 7 or
+       dot3_source.program.instructions[6].opcode != 59 or
+       dot3_source.program.instructions[6].source_end != 4 { return 18 }
+    let mut inferred: MathInferredType = infer_math_expression_source("dot2(3m,4m,2/s,1/s)")
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension, speed) { return 19 }
+    inferred = infer_math_expression_source("dot3(1m,2m,3m,4/s,5/s,6/s)")
+    if not inferred.valid or not same_dimension(inferred.dimension, speed) { return 20 }
+    inferred = infer_math_expression_source("dot2(1,2,3m,4m)")
+    if not inferred.valid or not same_dimension(inferred.dimension, length_dimension()) { return 21 }
+    inferred = infer_math_expression_source("dot2(1m,2s,3m,4m)")
+    if inferred.valid or inferred.failed_at != 0 { return 22 }
+    inferred = infer_math_expression_source("dot2(true,2,3,4)")
+    if inferred.valid or inferred.failed_at != 0 { return 23 }
+    let equation: MathEquationResult = evaluate_math_equation_source(
+        "dot2(3m,4m,2/s,1/s)=10m/s")
+    if not equation.valid or not equation.satisfied or
+       not near(equation.residual.value, 0.0) { return 24 }
+    println("native-math-dot-ok")
+    return 0
+}

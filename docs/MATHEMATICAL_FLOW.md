@@ -1,3 +1,28 @@
+## Native physical statistical reductions (CI qualification pending)
+
+The native Flow 2.0 mathematical source parser lowers `mean(...)`,
+`variance(...)` and `rms(...)` to executable postfix IR opcodes 75–77.
+Each accepts 1–8 eager scalar operands with matching SI dimensions;
+Booleans, mismatched units and malformed arities fail closed. `variance`
+is the **population** variance (divisor `n`, not `n-1`) and returns
+squared physical units; `mean` and `rms` preserve the input units.
+The numerical runtime scales by the largest absolute operand before
+accumulating, avoiding premature overflow for same-sign values near
+the existing 1e30 bound. Final overflow remains an error.
+
+`src/math_statistical_reductions_smoke.flow` exercises 42 native
+analytical, static SI, equation, source-span, negative and large-magnitude
+assertions. `src/math_expression_source_http_smoke.flow` adds six
+production HTTP assertions. CI executes both on Linux and macOS,
+alongside the checked-in Python-backed Navier–Stokes regression.
+This does not establish upstream grammar integration, indexed
+summation, tensor ASTs, native Navier–Stokes or general PDE lowering.
+
+```sh
+flow run src/math_statistical_reductions_smoke.flow
+flow run src/math_expression_source_http_smoke.flow
+```
+
 ## Native fifth-through-eighth roots (executable)
 
 The native Flow mathematical source parser lowers `root5(x)`, `root6(x)`,

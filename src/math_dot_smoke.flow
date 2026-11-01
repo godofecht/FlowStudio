@@ -166,6 +166,48 @@ function main() -> i32 {
        not near(dot5_equation.residual.value, 0.0) { return 63 }
     result = evaluate_math_expression("dot5(1,2,3,4,5,5,4,3,2,1)+5")
     if not result.valid or result.result.value != 40.0 { return 64 }
+    # Executable SI-aware convex interpolation through the same source/IR pipeline.
+    result = evaluate_math_expression("lerp(2m,8m,0.25)")
+    if not result.valid or not near(result.result.value, 3.5) or
+       not same_dimension(result.result.dimension, length_dimension()) { return 65 }
+    result = evaluate_math_expression("lerp(0m,10m,0)")
+    if not result.valid or result.result.value != 0.0 { return 66 }
+    result = evaluate_math_expression("lerp(0m,10m,1)")
+    if not result.valid or result.result.value != 10.0 { return 67 }
+    result = evaluate_math_expression("lerp(-1e30,1e30,0.5)")
+    if not result.valid or result.result.value != 0.0 { return 68 }
+    result = evaluate_math_expression("lerp(0m,10m,0.25)+1m")
+    if not result.valid or result.result.value != 3.5 { return 69 }
+    result = evaluate_math_expression("lerp(1m,2s,0.5)")
+    if result.valid or result.failed_at != 0 { return 70 }
+    result = evaluate_math_expression("lerp(1m,2m,1s)")
+    if result.valid or result.failed_at != 0 { return 71 }
+    result = evaluate_math_expression("lerp(1m,2m,true)")
+    if result.valid or result.failed_at != 0 { return 72 }
+    result = evaluate_math_expression("lerp(1m,2m,-0.1)")
+    if result.valid or result.failed_at != 0 { return 73 }
+    result = evaluate_math_expression("lerp(1m,2m,1.1)")
+    if result.valid or result.failed_at != 0 { return 74 }
+    if parse_math_expression("lerp(1,2)").valid { return 75 }
+    if parse_math_expression("lerp(1,2,3,4)").valid { return 76 }
+    let lerp_source: ParsedMathExpression = parse_math_expression("lerp(2m,8m,0.25)")
+    if not lerp_source.valid or lerp_source.program.count != 4 or
+       lerp_source.program.instructions[3].opcode != 66 or
+       lerp_source.program.instructions[3].source_start != 0 or
+       lerp_source.program.instructions[3].source_end != 4 { return 77 }
+    inferred = infer_math_expression_source("lerp(2m,8m,0.25)")
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension, length_dimension()) { return 78 }
+    inferred = infer_math_expression_source("lerp(2m,8m,2)")
+    if not inferred.valid or not same_dimension(inferred.dimension, length_dimension()) { return 79 }
+    inferred = infer_math_expression_source("lerp(2m,8s,0.25)")
+    if inferred.valid or inferred.failed_at != 0 { return 80 }
+    inferred = infer_math_expression_source("lerp(2m,8m,true)")
+    if inferred.valid or inferred.failed_at != 0 { return 81 }
+    let lerp_equation: MathEquationResult = evaluate_math_equation_source(
+        "lerp(2m,8m,0.25)=3.5m", quantity(0.00000001, length_dimension()))
+    if not lerp_equation.valid or not lerp_equation.satisfied or
+       not near(lerp_equation.residual.value, 0.0) { return 82 }
     println("native-math-dot-ok")
     return 0
 }

@@ -302,6 +302,21 @@ function main() -> i32 {
     inferred = infer_math_equation_source("5! = 120m")
     if inferred.valid { return 95 }
 
+    # signum accepts physical numeric inputs, inferring dimensionless output.
+    inferred = infer_math_expression_source("sign(3m)")
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension, dimensionless()) { return 96 }
+    inferred = infer_math_expression_source("sgn(-3K)")
+    if not inferred.valid or not same_dimension(inferred.dimension, dimensionless()) { return 97 }
+    inferred = infer_math_expression_source("sign(true)")
+    if inferred.valid or inferred.failed_at != 0 { return 98 }
+    inferred = infer_math_expression_source("sign(3m)+2m")
+    if inferred.valid or inferred.failed_at != 8 { return 99 }
+    inferred = infer_math_expression_source("sign(0m)")
+    if not inferred.valid or not same_dimension(inferred.dimension, dimensionless()) { return 100 }
+    inferred = infer_math_equation_source("sign(-2m) = -1")
+    if not inferred.valid or not same_dimension(inferred.dimension, dimensionless()) { return 101 }
+
     println("native-math-static-ok")
     return 0
 }

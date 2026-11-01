@@ -593,7 +593,7 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
         } elif opcode == 5 or opcode == 6 or opcode == 18 or opcode == 20 or opcode == 21 or opcode == 25 or
              opcode == 26 or opcode == 27 or opcode == 28 or opcode == 29 or opcode == 30 or opcode == 31 or
              opcode == 33 or opcode == 34 or opcode == 35 or opcode == 36 or opcode == 37 or
-             opcode == 38 or opcode == 39 or opcode == 40 or opcode == 42 or opcode == 43 or opcode == 44 or opcode == 46 or opcode == 56 or (opcode >= 47 and opcode <= 50) {
+             opcode == 38 or opcode == 39 or opcode == 40 or opcode == 42 or opcode == 43 or opcode == 44 or opcode == 46 or opcode == 56 or opcode == 57 or (opcode >= 47 and opcode <= 50) {
             if depth < 1 { return failed(instruction.source_start) }
             let input: Quantity = stack[depth - 1]
             if opcode == 18 {
@@ -607,6 +607,13 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
                     stack[depth - 1] = quantity(-input.value, input.dimension)
                 } elif opcode == 20 {
                     stack[depth - 1] = quantity(magnitude(input.value), input.dimension)
+                } elif opcode == 57 {
+                    # sign/sgn accepts finite physical scalars and returns
+                    # a dimensionless numeric direction, including zero.
+                    let mut direction: f64 = 0.0
+                    if input.value < 0.0 { direction = -1.0 }
+                    elif input.value > 0.0 { direction = 1.0 }
+                    stack[depth - 1] = quantity(direction, dimensionless())
                 } elif opcode == 56 {
                     # Bounded integer combinatorics: reject fractional, negative,
                     # dimensional, predicate, and overflow-prone operands.

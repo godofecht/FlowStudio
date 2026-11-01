@@ -47,6 +47,7 @@ class RobustStatisticsOracleTests(unittest.TestCase):
     def test_injection_and_limits(self) -> None:
         fixture = (ROOT / "src/math_robust_statistics_smoke.flow").read_text()
         self.assertIn('println("native-math-robust-statistics-ok")', fixture)
+        self.assertIn("let mut parsed: ParsedMathExpression", fixture)
         base = bundled_source(ROOT)
         for start in (0, 20, 40):
             expanded = inject_robust_assertions(base, start=start, stop=start + 20)

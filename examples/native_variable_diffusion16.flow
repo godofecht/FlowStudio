@@ -1,0 +1,173 @@
+# Native Flow 2.0: conservative 16x16 periodic diffusion with discontinuous
+# spatial conductivity. The interface flux uses the harmonic face coefficient.
+# This is array-backed PDE execution, not compiler-generated field lowering.
+
+struct Grid {
+    values: array<f64, 256>
+}
+
+struct SolveResult {
+    valid: bool,
+    grid: Grid
+}
+
+function blankGrid() -> Grid {
+    let values: array<f64, 256> = [0.0]
+    return Grid { values: values }
+}
+
+function index2(x: i32, y: i32) -> i32 {
+    return x + 16 * y
+}
+
+function quarterMode(input: i32) -> f64 {
+    let mut phase: i32 = input
+    while phase < 0 { phase = phase + 4 }
+    while phase >= 4 { phase = phase - 4 }
+    if phase == 0 { return 1.0 }
+    if phase == 2 { return -1.0 }
+    return 0.0
+}
+
+function absolute(value: f64) -> f64 {
+    if value < 0.0 { return -value }
+    return value
+}
+
+function initialGrid() -> Grid {
+    let mut grid: Grid = blankGrid()
+    for y in 0 to 16 {
+        for x in 0 to 16 {
+            grid.values[index2(x, y)] = 20.0 + 3.0 * quarterMode(x) +
+                2.0 * quarterMode(y) + 1.5 * quarterMode(x + y)
+        }
+    }
+    return grid
+}
+
+function conductivity() -> Grid {
+    let mut grid: Grid = blankGrid()
+    for y in 0 to 16 {
+        for x in 0 to 16 {
+            let mut value: f64 = 0.25
+            if x >= 8 { value = 0.75 }
+            if y < 8 { value = value + 0.05 }
+            grid.values[index2(x, y)] = value
+        }
+    }
+    return grid
+}
+
+function harmonic(first: f64, second: f64) -> f64 {
+    return 2.0 * first * second / (first + second)
+}
+
+function advance(grid: Grid, coefficient: Grid, ratio: f64) -> Grid {
+    let mut next: Grid = blankGrid()
+    for y in 0 to 16 {
+        let mut ym: i32 = y - 1
+        let mut yp: i32 = y + 1
+        if ym < 0 { ym = 15 }
+        if yp == 16 { yp = 0 }
+        for x in 0 to 16 {
+            let mut xm: i32 = x - 1
+            let mut xp: i32 = x + 1
+            if xm < 0 { xm = 15 }
+            if xp == 16 { xp = 0 }
+            let center: i32 = index2(x, y)
+            let left: i32 = index2(xm, y)
+            let right: i32 = index2(xp, y)
+            let down: i32 = index2(x, ym)
+            let up: i32 = index2(x, yp)
+            let u: f64 = grid.values[center]
+            let k: f64 = coefficient.values[center]
+            let flux: f64 =
+                harmonic(k, coefficient.values[left]) * (grid.values[left] - u) +
+                harmonic(k, coefficient.values[right]) * (grid.values[right] - u) +
+                harmonic(k, coefficient.values[down]) * (grid.values[down] - u) +
+                harmonic(k, coefficient.values[up]) * (grid.values[up] - u)
+            next.values[center] = u + ratio * flux
+        }
+    }
+    return next
+}
+
+function integrate(initial: Grid, coefficient: Grid, ratio: f64, steps: i32) -> SolveResult {
+    # At most 32,768 cell-steps, and ratio * sum(face conductivities) <= 1.
+    if steps < 0 or steps > 128 or not (ratio >= 0.0 and ratio <= 0.25) {
+        return SolveResult { valid: false, grid: initial }
+    }
+    for i in 0 to 256 {
+        if not (initial.values[i] >= 0.0 and initial.values[i] <= 1000.0 and
+                coefficient.values[i] >= 0.01 and coefficient.values[i] <= 1.0) {
+            return SolveResult { valid: false, grid: initial }
+        }
+    }
+    let mut grid: Grid = initial
+    for step in 0 to steps {
+        grid = advance(grid, coefficient, ratio)
+    }
+    return SolveResult { valid: true, grid: grid }
+}
+
+function totalMass(grid: Grid) -> f64 {
+    let mut mass: f64 = 0.0
+    for i in 0 to 256 { mass = mass + grid.values[i] }
+    return mass
+}
+
+function maximumDifference(first: Grid, second: Grid) -> f64 {
+    let mut error: f64 = 0.0
+    for i in 0 to 256 {
+        let difference: f64 = absolute(first.values[i] - second.values[i])
+        if difference > error { error = difference }
+    }
+    return error
+}
+
+function main() -> i32 {
+    let initial: Grid = initialGrid()
+    let coefficient: Grid = conductivity()
+    let ratio: f64 = 0.20
+    let originalMass: f64 = totalMass(initial)
+    let first: SolveResult = integrate(initial, coefficient, ratio, 48)
+    let half: SolveResult = integrate(initial, coefficient, ratio, 24)
+    let composed: SolveResult = integrate(half.grid, coefficient, ratio, 24)
+    let replay: SolveResult = integrate(initial, coefficient, ratio, 48)
+    if not first.valid or not half.valid or not composed.valid or not replay.valid { return 1 }
+    if maximumDifference(first.grid, replay.grid) != 0.0 { return 2 }
+    if maximumDifference(first.grid, composed.grid) > 0.00000000001 { return 3 }
+    if absolute(totalMass(first.grid) - originalMass) > 0.000000001 { return 4 }
+    for i in 0 to 256 {
+        if first.grid.values[i] < 0.0 or first.grid.values[i] > 1000.0 { return 5 }
+    }
+    let zero: SolveResult = integrate(initial, coefficient, ratio, 0)
+    if not zero.valid or maximumDifference(zero.grid, initial) != 0.0 { return 6 }
+    let mut changed: Grid = coefficient
+    changed.values[index2(7, 3)] = 0.95
+    let mutated: SolveResult = integrate(initial, changed, ratio, 24)
+    if not mutated.valid or maximumDifference(mutated.grid, half.grid) < 0.0001 { return 7 }
+    let mut invalid: Grid = coefficient
+    invalid.values[index2(15, 15)] = -0.1
+    let rejected: SolveResult = integrate(initial, invalid, ratio, 48)
+    if rejected.valid or maximumDifference(rejected.grid, initial) != 0.0 { return 8 }
+    if integrate(initial, coefficient, -0.1, 48).valid { return 9 }
+    if integrate(initial, coefficient, 0.250001, 48).valid { return 10 }
+    if integrate(initial, coefficient, ratio, -1).valid { return 11 }
+    if integrate(initial, coefficient, ratio, 129).valid { return 12 }
+    let mut malformed: Grid = initial
+    malformed.values[255] = 1001.0
+    if integrate(malformed, coefficient, ratio, 48).valid { return 13 }
+    println("native-variable-diffusion16-ok")
+    println("FLOWSTUDIO_GRID_V1 16 16 1")
+    print("U")
+    for y in 0 to 16 {
+        for x in 0 to 16 {
+            print(" ")
+            print(first.grid.values[index2(x, y)])
+        }
+    }
+    println("")
+    println("FLOWSTUDIO_GRID_END")
+    return 0
+}

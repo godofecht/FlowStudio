@@ -81,8 +81,7 @@ function advance(grid: Grid, coefficient: Grid, ratio: f64) -> Grid {
             let up: i32 = index2(x, yp)
             let u: f64 = grid.values[center]
             let k: f64 = coefficient.values[center]
-            let flux: f64 =
-                harmonic(k, coefficient.values[left]) * (grid.values[left] - u) +
+            let flux: f64 = harmonic(k, coefficient.values[left]) * (grid.values[left] - u) +
                 harmonic(k, coefficient.values[right]) * (grid.values[right] - u) +
                 harmonic(k, coefficient.values[down]) * (grid.values[down] - u) +
                 harmonic(k, coefficient.values[up]) * (grid.values[up] - u)

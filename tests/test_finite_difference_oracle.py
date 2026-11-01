@@ -79,6 +79,8 @@ class ExactFiniteDifferenceOracle(unittest.TestCase):
         self.assertNotEqual(correct, sabotaged)
         self.assertEqual(correct.count("evaluate_math_expression"), 9)
         self.assertEqual(sabotaged.count("evaluate_math_expression"), 9)
+        self.assertIn("{ return 100 }", correct)
+        self.assertNotIn(": return", correct)
 
     def test_injection_accepts_compacted_http_marker(self) -> None:
         # Production HTTP bundles strip indentation from native Flow lines.

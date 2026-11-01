@@ -33,6 +33,7 @@
 #          73 sum, 74 product: 1..8-argument SI-aware reductions.
 #          75 mean, 76 population variance, 77 RMS: 1..8 same-unit operands.
 #          78 median, 79 median absolute deviation: 1..8 same-unit operands.
+#          80 quantile(p, x1, ..., xn): Type-7 linear quantile, 1..7 samples.
 #          The instruction exponent stores the actual variadic arity.
 #          Every permutation product must have the same SI dimension.
 # Predicate values are dimensionless 0/1 with a separate runtime type bit.
@@ -1112,6 +1113,67 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
                 }
             }
             let output_value: f64 = center * scale
+            if not bounded_value(output_value) { return failed(instruction.source_start) }
+            depth = base + 1
+            stack[base] = quantity(output_value, input_dimension)
+            predicate[base] = false
+        } elif opcode == 80 {
+            # Type-7 sample quantile, p followed by 1..7 observations.
+            # Normalize before sorting to prevent intermediate overflow.
+            let arity: i32 = instruction.exponent
+            if arity < 2 or arity > 8 or depth < arity {
+                return failed(instruction.source_start)
+            }
+            let base: i32 = depth - arity
+            let probability: Quantity = stack[base]
+            if predicate[base] or not same_dimension(probability.dimension, dimensionless()) or
+               not bounded_value(probability.value) or
+               probability.value < 0.0 or probability.value > 1.0 {
+                return failed(instruction.source_start)
+            }
+            let samples: i32 = arity - 1
+            let input_dimension: Dimension = stack[base + 1].dimension
+            let mut scale: f64 = 0.0
+            let mut component: i32 = 0
+            while component < samples {
+                let position: i32 = base + 1 + component
+                let entry: Quantity = stack[position]
+                if predicate[position] or not same_dimension(entry.dimension, input_dimension) or
+                   not bounded_value(entry.value) {
+                    return failed(instruction.source_start)
+                }
+                let absolute: f64 = magnitude(entry.value)
+                if absolute > scale { scale = absolute }
+                component = component + 1
+            }
+            let mut sorted: array<f64, 8> = [0.0]
+            component = 0
+            while component < samples {
+                let mut value: f64 = 0.0
+                if scale > 0.0 { value = stack[base + 1 + component].value / scale }
+                let mut position: i32 = component
+                let mut shifting: bool = true
+                while position > 0 and shifting {
+                    if sorted[position - 1] > value {
+                        sorted[position] = sorted[position - 1]
+                        position = position - 1
+                    } else {
+                        shifting = false
+                    }
+                }
+                sorted[position] = value
+                component = component + 1
+            }
+            let rank: f64 = probability.value * ((samples - 1) as f64)
+            let mut lower: i32 = 0
+            while lower + 1 < samples and ((lower + 1) as f64) <= rank {
+                lower = lower + 1
+            }
+            let mut upper: i32 = lower
+            if upper + 1 < samples { upper = upper + 1 }
+            let weight: f64 = rank - (lower as f64)
+            let interpolated: f64 = sorted[lower] * (1.0 - weight) + sorted[upper] * weight
+            let output_value: f64 = interpolated * scale
             if not bounded_value(output_value) { return failed(instruction.source_start) }
             depth = base + 1
             stack[base] = quantity(output_value, input_dimension)

@@ -423,7 +423,13 @@ try {
   // evolution, rather than just checking the success marker or SVG presence.
   await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
     readFileSync('examples/native_coupled_volume8.flow', 'utf8'));
+  const fullVolumeResponse = page.waitForResponse(response =>
+    response.url().endsWith('/api/run/flow') &&
+    response.request().method() === 'POST', {timeout:90000});
   await page.locator('#run').click();
+  const fullVolumeReply = await fullVolumeResponse;
+  assert.equal(fullVolumeReply.status(), 200);
+  const fullVolumeBody = await fullVolumeReply.text();
   await page.waitForFunction(() =>
     document.querySelector('#console')?.textContent?.includes('native-coupled-volume8-ok'),
     null, { timeout: 80000 });
@@ -457,6 +463,48 @@ try {
         Math.abs(actual[y*8+x] - expected) < .002,
         'Native 3D slice mismatch at ' + name + '(' + x + ',' + y + ')');
     }
+  }
+
+  // The real browser-triggered native response also carries all 1,024
+  // computed 3D voxels and 64 intermediate centered spatial energies.
+  const volumeFrame = fullVolumeBody.match(
+    /FLOWSTUDIO_VOLUME_FIELDS_V1 8 8 8 2\r?\nU ([^\r\n]+)\r?\nV ([^\r\n]+)\r?\nFLOWSTUDIO_VOLUME_FIELDS_END/);
+  const energyFrame3d = fullVolumeBody.match(
+    /FLOWSTUDIO_VOLUME_ENERGY_V1 64 1\r?\nE ([^\r\n]+)\r?\nFLOWSTUDIO_VOLUME_ENERGY_END/);
+  assert.ok(volumeFrame && energyFrame3d,
+    'Native Chromium HTTP must return complete 3D volume and energy frames');
+  for (const [species, name] of ['U', 'V'].entries()) {
+    const values = volumeFrame[species + 1].trim().split(/\s+/).map(Number);
+    assert.equal(values.length, 512);
+    for (let z = 0; z < 8; z++) for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) {
+      const modes = [quarter(x+y), quarter(y+z), quarter(x+y+z)];
+      const expected = volumeMeans[species] +
+        modes.reduce((sum, mode, i) => sum + volumeAmplitudes[species][i] * mode, 0);
+      const index = x + 8*y + 64*z;
+      assert.ok(Number.isFinite(values[index]) && Math.abs(values[index] - expected) < .002,
+        'Native Chromium full 3D voxel mismatch at ' + name + '(' + x + ',' + y + ',' + z + ')');
+    }
+  }
+  const actualEnergies3d = energyFrame3d[1].trim().split(/\s+/).map(Number);
+  assert.equal(actualEnergies3d.length, 64);
+  const energyAmplitudes = [[7,3,2],[.8,-.5,1.1]];
+  let previousSpatialEnergy = Infinity;
+  for (let step = 0; step < 64; step++) {
+    for (let mode = 0; mode < 3; mode++) {
+      const u = (1 - .4*volumeRates[0][mode])*energyAmplitudes[0][mode];
+      const v = (1 - .4*volumeRates[1][mode])*energyAmplitudes[1][mode];
+      energyAmplitudes[0][mode] = .97*u + .03*v;
+      energyAmplitudes[1][mode] = .03*u + .97*v;
+    }
+    // The three quarter-wave modes are orthogonal with mean square 1/2.
+    const expected = 256 * energyAmplitudes.flat().reduce((sum,a) => sum+a*a,0);
+    const tolerance = .05 + .0001*expected;
+    assert.ok(Number.isFinite(actualEnergies3d[step]) &&
+      Math.abs(actualEnergies3d[step]-expected) < tolerance,
+      'Native Chromium 3D energy mismatch at step ' + (step+1));
+    assert.ok(actualEnergies3d[step] <= previousSpatialEnergy + tolerance,
+      'Native Chromium 3D energy increased at step ' + (step+1));
+    previousSpatialEnergy = actualEnergies3d[step];
   }
 
   // Upstream field/boundary/laplacian syntax: physical Chromium Monaco Run,

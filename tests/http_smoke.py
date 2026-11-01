@@ -1162,8 +1162,8 @@ def main() -> None:
         for path in variable_files
     )
     assert "function solve_math_equations_variable_constraints_three_unknown_dimensions(" in native_variable
-    assert 'system.count = 16' in native_variable
-    assert 'system.equations[15] = "x = 1s"' in native_variable
+    assert 'system.count =16' in native_variable
+    assert 'system.equations[15] ="x = 1s"' in native_variable
     assert len(native_variable.encode("utf-8")) < 128 * 1024
     status, body = request("POST", "/api/check/flow", native_variable, accepted_headers)
     assert status == 200, ("native variable SI HTTP compile", status, body)
@@ -1174,8 +1174,8 @@ def main() -> None:
     # Change that equation to a consistent one; the negative assertion in the
     # real Flow program must then reject execution, not silently succeed.
     corrupted_variable = native_variable.replace(
-        'system.equations[15] = "x = 1s"',
-        'system.equations[15] = "x = 1m"',
+        'system.equations[15] ="x = 1s"',
+        'system.equations[15] ="x = 1m"',
         1,
     )
     assert corrupted_variable != native_variable
@@ -1232,8 +1232,8 @@ def main() -> None:
     status, body = request("POST", "/api/run/flow", corrupted_four, accepted_headers)
     assert status == 422, ("native four-unknown corrupted assertion", status, body)
     malformed_four = native_four.replace(
-        "function determinant4(a: FourDimensionRow, b: FourDimensionRow,",
-        "function determinant4(a: FourDimensionRow, b: FourDimensionRow",
+        "function determinant4(a:FourDimensionRow,b:FourDimensionRow,",
+        "function determinant4(a:FourDimensionRow,b:FourDimensionRow",
         1,
     )
     assert malformed_four != native_four

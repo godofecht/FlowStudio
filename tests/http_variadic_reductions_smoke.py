@@ -2,7 +2,7 @@
 """Compile and execute native variadic SI reductions through production HTTP."""
 from pathlib import Path
 
-from http_smoke import request
+from http_smoke import request, compact_native_math_line
 from variadic_oracle import inject_variadic_assertions, variadic_cases
 from unicode_variadic_oracle import inject_unicode_variadic_assertions, unicode_variadic_cases
 
@@ -18,7 +18,7 @@ def bundled_source(root: Path) -> str:
     )
     return "\n".join(
         "\n".join(
-            line.strip().removeprefix("export ")
+            compact_native_math_line(line)
             for line in (root / path).read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.lstrip().startswith("#")
             if not line.startswith("import .math_dimensions {")

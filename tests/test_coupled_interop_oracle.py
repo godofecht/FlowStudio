@@ -59,5 +59,53 @@ class CoupledInteropOracleTests(unittest.TestCase):
             model.expected_fields(True)
 
 
+
+    def test_uniform_exchange_exact_midpoint_and_zero_step(self):
+        fields = ([10.0] * model.COUNT, [20.0] * model.COUNT)
+        baseline = (fields[0][:], fields[1][:])
+        for steps in (0, 1, 32, 64):
+            actual = model.direct_integrate(fields, steps)
+            decay = (1 - 2 * model.EXCHANGE * model.STEP +
+                     0.5 * (2 * model.EXCHANGE * model.STEP) ** 2) ** steps
+            expected = (15.0 - 5.0 * decay, 15.0 + 5.0 * decay)
+            self.assertLess(max(abs(value - expected[species])
+                                for species, field in enumerate(actual)
+                                for value in field), 2e-12)
+            self.assertLess(abs(sum(actual[0]) + sum(actual[1]) -
+                                30 * model.COUNT), 2e-9)
+        self.assertEqual(fields, baseline)
+        self.assertEqual(model.direct_integrate(fields, 0), fields)
+
+    def test_seeded_translation_equivariance_and_invalid_numbers(self):
+        rng = random.Random(73129)
+        fields = tuple([mean + rng.uniform(-0.25, 0.25)
+                        for _ in range(model.COUNT)] for mean in model.MEANS)
+
+        def shifted(field):
+            return [field[((y - 5) % model.SIDE) * model.SIDE +
+                          (x - 3) % model.SIDE]
+                    for y in range(model.SIDE) for x in range(model.SIDE)]
+
+        original = model.direct_integrate(fields, 32)
+        translated = model.direct_integrate(tuple(map(shifted, fields)), 32)
+        self.assertLess(max(abs(a - b)
+                            for a_field, b_field in zip(
+                                translated, tuple(map(shifted, original)))
+                            for a, b in zip(a_field, b_field)), 2e-12)
+        self.assertTrue(all(value > 0 for field in original for value in field))
+        for invalid in (float("nan"), float("inf"), -float("inf"), True, "1"):
+            corrupted = (fields[0][:], fields[1][:])
+            corrupted[0][5] = invalid
+            with self.assertRaisesRegex(ValueError, "finite"):
+                model.direct_integrate(corrupted, 0)
+            with self.assertRaisesRegex(ValueError, "finite"):
+                model.verify_result({"u": corrupted[0], "v": corrupted[1]})
+        for invalid_steps in (-1, 65, True, 1.5):
+            with self.assertRaises(ValueError):
+                model.direct_integrate(fields, invalid_steps)
+            with self.assertRaises(ValueError):
+                model.expected_fields(invalid_steps)
+
+
 if __name__ == "__main__":
     unittest.main()

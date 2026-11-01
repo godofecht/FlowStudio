@@ -26,6 +26,13 @@ requests. The 131,072 species-cell-step ceiling, 128 KiB source budget,
 finite-number validation, 15-second R process deadline and deterministic
 initial state are explicit.
 
+A second production HTTP pass uses deterministic seed 73129 and arbitrary
+non-Fourier 32×32 fields. The real R midpoint output is checked against a
+separate direct Python stencil for all 2,048 cells and total mass, catching
+mode-specific implementations. Additional local tests cover uniform exchange,
+zero-step identity, translation equivariance, non-finite inputs and typed
+step bounds. These new checks require fresh exact-head CI qualification.
+
 Run `python3 -m unittest tests/test_coupled_interop_oracle.py -v` for the
 independent standard-library Python direct-stencil, semigroup, replay, seeded
 conservation, negative-input and resource-bound checks. Run

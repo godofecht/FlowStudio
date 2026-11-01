@@ -824,3 +824,26 @@ acceptance programs execute a 32-term scalar sum (63 postfix instructions),
 65-instruction programs and 65 nested parentheses without silently truncating
 expressions. This remains a bounded scalar dialect, not upstream mathematical
 grammar integration, static dimensional inference, or general PDE execution.
+
+
+## Native five-through-eight component dot contractions
+
+The bounded executable Flow 2.0 mathematical source compiler supports
+`dot5(a1,a2,a3,a4,a5,b1,b2,b3,b4,b5)` through
+`dot8(a1,...,a8,b1,...,b8)`. These lower to native typed postfix IR
+opcodes 62–65 and execute through the same checked numerical contraction
+loop as `dot2`, `dot3` and `dot4`. Each operand vector must have
+homogeneous SI dimensions; the result has their product dimension.
+Boolean operands, incorrect arity, invalid dimensions and intermediate
+numeric overflow fail closed with source-byte diagnostics.
+
+`src/math_dot_smoke.flow` executes 18 additional numbered native
+assertions for analytical 5–8 component contractions, physical dimensions,
+static inference, equation residuals, source spans and invalid inputs.
+`src/math_expression_source_http_smoke.flow` executes three corresponding
+production HTTP assertions. Existing Linux/macOS CI also runs the
+checked-in Navier–Stokes dialect and analytical PDE regressions.
+
+These are scalar contractions over explicitly enumerated components, **not**
+a general tensor value type, arbitrary-rank array lowering, or integration
+with upstream Flow's general grammar.

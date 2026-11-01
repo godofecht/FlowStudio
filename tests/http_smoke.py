@@ -1031,7 +1031,7 @@ def main() -> None:
     # both successful execution and corrupted assertions must be observable.
     pair_files = static_files[:-1] + (
         "src/math_dimension_pair.flow",
-        "src/math_dimension_pair_smoke.flow",
+        "src/math_dimension_pair_http_smoke.flow",
     )
     native_pair = "\n".join(
         "\n".join(

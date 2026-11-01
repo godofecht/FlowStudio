@@ -92,3 +92,23 @@ in an environment with the pinned production Flow toolchain. CI qualification
 and independent macOS physical-browser execution must be reported separately.
 This remains array-backed PDE execution, not generalized compiler-generated
 multidimensional `field` lowering or full RStudio parity.
+
+## Exact periodic impulse and stability-edge acceptance
+
+The native 3D solver now checks the closed-form one-step Green function for
+an impulse at the (0,0,0) corner with Courant ratio 0.5 and unit diffusion
+along each axis separately. Exactly two voxels at periodic neighbors must
+contain 0.5, and the other 1,022 species-voxels must be zero. The six
+expected neighbor coordinates are x=(1,7), y=(8,56), z=(64,448) in the
+native flat index. A tiny excess coefficient sum (1.01 at ratio 0.5)
+must reject without modifying the input. Zero-diffusion identity, exact
+two-step 0.25 interspecies exchange (U=0.625, V=0.375 at the impulse),
+and constant but unequal species fixed points are also checked in the
+production Flow main. The independent Python test reconstructs the exact
+Green functions and compares both direct and sparse operators; these
+checks add no unbounded loops or new output frames.
+
+These assertions run as part of the existing native Flow/HTTP/Chromium
+acceptance because they are embedded in the same production executable.
+Local Python tests alone do not establish native Flow execution; consult
+the exact-head Linux/macOS CI result before claiming that acceptance passed.

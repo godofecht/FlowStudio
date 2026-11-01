@@ -238,6 +238,27 @@ function main() -> i32 {
     }
     let zeroRatio: SolveResult = integrate(seeded, coefficient, 0.0, 48)
     if not zeroRatio.valid or maximumDifference(zeroRatio.grid, seeded) != 0.0 { return 23 }
+    # Deterministic, bounded scientific trace from the same native stencil.
+    # Every energy sample is computed after its actual update, not copied
+    # from the independent Python/Chromium oracle.
+    println("FLOWSTUDIO_ENERGY_TRACE_V1 48 2")
+    let mut traceU: Grid = initial
+    let mut traceS: Grid = seeded
+    print("U")
+    for step in 0 to 48 {
+        traceU = advance(traceU, coefficient, ratio)
+        print(" ")
+        print(quadraticEnergy(traceU))
+    }
+    println("")
+    print("S")
+    for step in 0 to 48 {
+        traceS = advance(traceS, coefficient, ratio)
+        print(" ")
+        print(quadraticEnergy(traceS))
+    }
+    println("")
+    println("FLOWSTUDIO_ENERGY_TRACE_END")
     println("native-variable-diffusion16-ok")
     println("FLOWSTUDIO_GRID_V1 16 16 1")
     print("U")

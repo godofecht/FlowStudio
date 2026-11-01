@@ -1,3 +1,33 @@
+## 2026-11-01: native parallel streaming Welford merge and Flow/R/Python HTTP (verified)
+
+[PR #362](https://github.com/godofecht/FlowStudio/pull/362) merged as
+[4a5a5810](https://github.com/godofecht/FlowStudio/commit/4a5a5810111c1dc128c1d3217b449a906f09b7c3).
+The production Flow 2.0 module now supports pairwise merge of disjoint
+Welford summaries. The real compiler executes 1,024 deterministic large-offset
+samples split into four interleaved partitions, checking balanced, left-fold
+and permuted merges against serial/reversed Welford accumulation, exact
+mean/variance, extrema, empty identities and a small analytical case.
+A separate exact-rational Python oracle checks all 1,024 values and a
+4,096-observation work ceiling. The production Flow HTTP check/run endpoints
+execute the same inlined module, compare against persistent base-R and CPython
+statistics, require HTTP 422 for a corrupted numerical expectation, and test
+both interpreter recovery paths. [Reproduction](PARALLEL_STREAMING_STATS.md).
+
+**Passed:** [exact-head CI #41351751990](https://github.com/godofecht/FlowStudio/actions/runs/41351751990)
+passed all 4 Ubuntu 24.04/macOS 15 jobs, including real Flow compilation,
+native HTTP, persistent R/Python numerical checks, R/C FlowJIT and Ubuntu
+physical Chromium. Each source platform passed 1,201 JavaScript tests
+(12 skipped) and ran 479 Python tests (13 skipped).
+**Failed:** zero final exact-head jobs; an earlier run failed a fixed IDE
+outline expectation, and the next run exposed Flow's `elif` spelling; both
+were corrected before final verification. **Cancelled:** superseded runs,
+not counted as passes. **Skipped:** optional and platform-inapplicable tests.
+**Unexecuted:** independent macOS physical-browser interaction and local
+native Flow/R execution. **Pending:** post-merge main CI.
+Only the necessary native smoke invocation was added to the hosted CI workflow;
+no other workflow configuration changed. This is not compiler-generated
+multidimensional `field` lowering or complete RStudio parity.
+
 ## 2026-11-01: seeded native SI median/MAD HTTP qualification (4/4 CI passed)
 
 [PR #357](https://github.com/godofecht/FlowStudio/pull/357) merged as

@@ -4,6 +4,7 @@ from pathlib import Path
 
 from http_smoke import request, compact_native_math_line
 from http_finite_difference_interop import verify_fd_interop
+from test_laplacian3_oracle import manufactured_laplacian3_cases, inject_laplacian3_assertions
 from test_finite_difference_oracle import (
     finite_difference_cases, inject_finite_difference_assertions,
     manufactured_refinement_cases, inject_manufactured_refinement_assertions,
@@ -57,6 +58,21 @@ def verify_finite_differences() -> None:
     status, body = request("POST", "/api/run/flow", refined, headers)
     assert status == 200 and "native-math-finite-difference-ok" in body, (
         "refinement native execution", status, body)
+    # Independent 3D anisotropic polynomial manufactured solutions are
+    # executed through the same production native Flow HTTP compiler.
+    assert len(manufactured_laplacian3_cases()) == 3
+    three_dimensional = inject_laplacian3_assertions(base)
+    assert len(three_dimensional.encode("utf-8")) <= 131072, "3D HTTP source budget"
+    status, body = request("POST", "/api/check/flow", three_dimensional, headers)
+    assert status == 200, ("3D Laplacian compile", status, body)
+    status, body = request("POST", "/api/run/flow", three_dimensional, headers)
+    assert status == 200 and "native-math-finite-difference-ok" in body, (
+        "3D Laplacian numerical execution", status, body)
+    sabotaged_3d = inject_laplacian3_assertions(base, sabotage=True)
+    status, body = request("POST", "/api/check/flow", sabotaged_3d, headers)
+    assert status == 200, ("sabotaged 3D compiles", status, body)
+    status, body = request("POST", "/api/run/flow", sabotaged_3d, headers)
+    assert status == 422, ("sabotaged 3D numerical expectation", status, body)
     corrupted_refinement = inject_manufactured_refinement_assertions(
         base, sabotage=True)
     status, body = request("POST", "/api/check/flow", corrupted_refinement, headers)
@@ -69,8 +85,8 @@ def verify_finite_differences() -> None:
     status, body = request("POST", "/api/run/flow", corrupted, headers)
     assert status == 422, ("corrupted numerical expectation must fail", status, body)
     verify_fd_interop(request, headers)
-    print("PASS: 27 exact polynomial cases plus 3 manufactured 4:1 refinement "
-          "tests through native Flow HTTP, SI checks, and deliberate HTTP 422")
+    print("PASS: 27 exact polynomial cases, 3 planar and 3 spatial 4:1 "
+          "manufactured refinements through native Flow HTTP and deliberate HTTP 422")
 
 
 if __name__ == "__main__":

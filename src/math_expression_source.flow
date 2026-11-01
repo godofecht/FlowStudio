@@ -644,6 +644,16 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
            bytes[index + 1] == 136 and bytes[index + 2] == 154 { # √
             unary_opcode = 21
             unary_width = 3
+        } elif c == 226 and index + 3 < length and
+               bytes[index + 1] == 136 and bytes[index + 2] == 145 and
+               bytes[index + 3] == 40 { # ∑(, bounded variadic summation
+            unary_opcode = 73
+            unary_width = 3
+        } elif c == 226 and index + 3 < length and
+               bytes[index + 1] == 136 and bytes[index + 2] == 143 and
+               bytes[index + 3] == 40 { # ∏(, bounded variadic product
+            unary_opcode = 74
+            unary_width = 3
         } elif c == 226 and index + 2 < length and
                bytes[index + 1] == 136 and bytes[index + 2] == 155 { # ∛
             unary_opcode = 44

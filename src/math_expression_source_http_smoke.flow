@@ -388,6 +388,32 @@ function main() -> i32 {
     if parse_math_expression("2ζ").valid { return 143 }
     if parse_math_expression("2true").valid { return 144 }
 
+    # Real HTTP compilation/execution of native signum with physical units.
+    result = evaluate_math_expression("sign(-2m)")
+    if not result.valid or not close(result.result.value, -1.0) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 145 }
+    result = evaluate_math_expression("sgn(0K)")
+    if not result.valid or result.result.value != 0.0 { return 146 }
+    result = evaluate_math_expression("sign(3m/2s)")
+    if not result.valid or result.result.value != 1.0 { return 147 }
+    result = evaluate_math_expression("sign(0m)")
+    if not result.valid or result.result.value != 0.0 { return 148 }
+    result = evaluate_math_expression("sign(true)")
+    if result.valid or result.failed_at != 0 { return 149 }
+    result = evaluate_math_expression("sign(2m)+1m")
+    if result.valid or result.failed_at != 8 { return 150 }
+    result = evaluate_math_expression("sign(3m)*2s")
+    if not result.valid or result.result.value != 2.0 or
+       not same_dimension(result.result.dimension, time_dimension()) { return 151 }
+    result = evaluate_math_expression("sign(-0.0001)")
+    if not result.valid or result.result.value != -1.0 { return 152 }
+    if parse_math_expression("sign()").valid { return 153 }
+    let sign_span: ParsedMathExpression = parse_math_expression("sign(2m)")
+    if not sign_span.valid or sign_span.program.count != 2 or
+       sign_span.program.instructions[1].opcode != 57 or
+       sign_span.program.instructions[1].source_start != 0 or
+       sign_span.program.instructions[1].source_end != 4 { return 154 }
+
     println("native-math-source-ok")
     return 0
 }

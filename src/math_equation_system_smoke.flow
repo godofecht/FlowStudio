@@ -406,6 +406,22 @@ function main() -> i32 {
     system = parse_math_equation_system("2ζ=0")
     if system.valid { return 93 }
 
+    # Native signum equations retain typed dimensionless residuals.
+    system = parse_math_equation_system("sign(-2m)=-1;sgn(0K)=0")
+    if not system.valid or system.count != 2 { return 94 }
+    tolerances.count = 2
+    tolerances.values[0] = quantity(0.0, dimensionless())
+    tolerances.values[1] = quantity(0.0, dimensionless())
+    result = evaluate_math_equation_system(system, tolerances)
+    if not result.valid or not result.satisfied or
+       not near(result.results[0].residual.value, 0.0) or
+       not near(result.results[1].residual.value, 0.0) { return 95 }
+    system = parse_math_equation_system("sign(3m)=3m")
+    if not system.valid { return 96 }
+    tolerances.count = 1
+    result = evaluate_math_equation_system(system, tolerances)
+    if result.valid { return 97 }
+
     println("native-math-equation-system-ok")
     return 0
 }

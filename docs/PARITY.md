@@ -20,8 +20,10 @@ HTTP 422/recovery and native R/C FlowJIT. Ubuntu physical Chromium acceptance
 also passed. **Failed:** zero final exact-head jobs.
 **Skipped:** 12 JS, 13 Python and platform-inapplicable CI steps.
 **Unexecuted:** independent macOS physical browser and local native Flow/R.
-**Pending:** post-merge main CI. Superseded branch runs were cancelled, not
-counted as passes. No hosted CI workflow configuration changed. This is not
+**Passed post-merge:** [main CI #41323896230](https://github.com/godofecht/FlowStudio/actions/runs/41323896230),
+4/4 Linux/macOS jobs on documentation descendant `9bf61906` containing
+merge `42b16c47`. Superseded branch and immediate-merge runs were cancelled,
+not counted as passes. No hosted CI workflow configuration changed. This is not
 generalized multidimensional `field` lowering or RStudio parity.
 
 ## 2026-11-01: native SI determinant metamorphic HTTP qualification (4/4 exact-head CI passed)

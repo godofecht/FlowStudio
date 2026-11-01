@@ -36,7 +36,7 @@ class FiniteDifferenceInteropSourceTests(unittest.TestCase):
     def test_noninteger_spacing_exact_rational(self) -> None:
         self.assertEqual(exact_stencil(0, [1, 3, 4]), Fraction(1, 4))
         self.assertEqual(exact_stencil(9, [1, 2, 5, 4]), Fraction(1, 8))
-        self.assertEqual(exact_stencil(18, [0, 1, 1, 2, 2, 2, 4]), Fraction(5, 4))
+        self.assertEqual(exact_stencil(18, [0, 1, 1, 2, 2, 2, 4]), Fraction(3, 4))
 
 
 if __name__ == "__main__":

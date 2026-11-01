@@ -507,6 +507,68 @@ try {
     previousSpatialEnergy = actualEnergies3d[step];
   }
 
+
+  // A separate non-Fourier seed exercises all six periodic 3D directions.
+  // Independently assemble the sparse transition operator in the physical
+  // browser and compare 1,024 native voxels plus 64 intermediate energies.
+  const seededFrame3d = fullVolumeBody.match(
+    /FLOWSTUDIO_VOLUME_SEEDED_V1 8 8 8 2\r?\nU ([^\r\n]+)\r?\nV ([^\r\n]+)\r?\nFLOWSTUDIO_VOLUME_SEEDED_END/);
+  const seededEnergyFrame3d = fullVolumeBody.match(
+    /FLOWSTUDIO_VOLUME_SEEDED_ENERGY_V1 64 1\r?\nE ([^\r\n]+)\r?\nFLOWSTUDIO_VOLUME_SEEDED_ENERGY_END/);
+  assert.ok(seededFrame3d && seededEnergyFrame3d,
+    'Seeded 3D numerical frames missing from real Chromium HTTP response');
+  const index3d = (x, y, z) =>
+    ((x + 8) % 8) + 8*((y + 8) % 8) + 64*((z + 8) % 8);
+  const seededCoefficients3d = [[.10, .08, .06], [.04, .07, .05]];
+  const seededRows3d = seededCoefficients3d.map(([ax, ay, az]) =>
+    Array.from({length:512}, (_, i) => {
+      const x = i % 8, y = Math.floor(i / 8) % 8, z = Math.floor(i / 64);
+      return [
+        [i, 1 - .4*(ax + ay + az)],
+        [index3d(x-1,y,z), .2*ax], [index3d(x+1,y,z), .2*ax],
+        [index3d(x,y-1,z), .2*ay], [index3d(x,y+1,z), .2*ay],
+        [index3d(x,y,z-1), .2*az], [index3d(x,y,z+1), .2*az]
+      ];
+    }));
+  let seededExpected3d = [[], []];
+  for (let z = 0; z < 8; z++) for (let y = 0; y < 8; y++)
+    for (let x = 0; x < 8; x++) {
+      const residue = (9137 + 71*x + 113*y + 157*z +
+        17*x*y + 19*y*z + 23*z*x) % 251;
+      seededExpected3d[0].push(30 + .1*residue);
+      seededExpected3d[1].push(10 + .07*((3*residue + 41) % 251));
+    }
+  const seededEnergySamples3d = seededEnergyFrame3d[1].trim().split(/\s+/).map(Number);
+  assert.equal(seededEnergySamples3d.length, 64);
+  let previousSeededEnergy3d = Infinity;
+  for (let step = 0; step < 64; step++) {
+    const diffused = seededRows3d.map((rows, species) => rows.map(row =>
+      row.reduce((sum, [j, weight]) => sum + weight*seededExpected3d[species][j], 0)));
+    seededExpected3d = [
+      diffused[0].map((u, i) => .97*u + .03*diffused[1][i]),
+      diffused[0].map((u, i) => .03*u + .97*diffused[1][i])
+    ];
+    const expectedEnergy = seededExpected3d.reduce((sum, field) => {
+      const mean = field.reduce((total, value) => total + value, 0) / 512;
+      return sum + field.reduce((total, value) => total + (value - mean)**2, 0);
+    }, 0);
+    const tolerance = .05 + .0001*expectedEnergy;
+    assert.ok(Number.isFinite(seededEnergySamples3d[step]) &&
+      Math.abs(seededEnergySamples3d[step] - expectedEnergy) < tolerance,
+      'Seeded native 3D Chromium energy mismatch at step ' + (step + 1));
+    assert.ok(seededEnergySamples3d[step] <= previousSeededEnergy3d + tolerance,
+      'Seeded native 3D Chromium energy increased at step ' + (step + 1));
+    previousSeededEnergy3d = seededEnergySamples3d[step];
+  }
+  for (const [species, name] of ['U', 'V'].entries()) {
+    const actual = seededFrame3d[species + 1].trim().split(/\s+/).map(Number);
+    assert.equal(actual.length, 512);
+    for (let i = 0; i < 512; i++)
+      assert.ok(Number.isFinite(actual[i]) &&
+        Math.abs(actual[i] - seededExpected3d[species][i]) < .002,
+        'Seeded native 3D Chromium sparse oracle mismatch at ' + name + '[' + i + ']');
+  }
+
   // Upstream field/boundary/laplacian syntax: physical Chromium Monaco Run,
   // native HTTP and compiler-generated 32-cell Dirichlet Euler solver.
   await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),

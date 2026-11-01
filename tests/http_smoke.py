@@ -202,6 +202,56 @@ def main() -> None:
         assert measured <= previous_energy + tolerance, (
             "native 3D energy increased", step)
         previous_energy = measured
+
+    # The same actual 3D compiler execution must also evolve an asymmetric
+    # seed-9137 state, which cannot be validated by the Fourier-mode oracle.
+    # Reassemble independent sparse transition rows and check all 1,024 values.
+    from test_native_coupled_volume8_oracle import seeded_initial, sparse_oracle
+    seeded_markers = [i for i, line in enumerate(volume_lines)
+                      if line == "FLOWSTUDIO_VOLUME_SEEDED_V1 8 8 8 2"]
+    assert len(seeded_markers) == 1, ("seeded native 3D frame", body[-500:])
+    seeded_at = seeded_markers[0]
+    assert volume_lines[seeded_at + 3] == "FLOWSTUDIO_VOLUME_SEEDED_END"
+    seeded_expected = sparse_oracle(seeded_initial(), 64)
+    for offset, name in enumerate(("U", "V")):
+        tokens = volume_lines[seeded_at + 1 + offset].split()
+        assert tokens[0] == name and len(tokens) == 513, (
+            "seeded native 3D field", name, len(tokens))
+        actual = [float(token) for token in tokens[1:]]
+        assert all(math.isfinite(value) for value in actual)
+        assert max(abs(a - b) for a, b in zip(actual, seeded_expected[offset])) < .002, (
+            "seeded non-Fourier 3D sparse oracle", name, actual[:4], seeded_expected[offset][:4])
+    seeded_energy_markers = [i for i, line in enumerate(volume_lines)
+                             if line == "FLOWSTUDIO_VOLUME_SEEDED_ENERGY_V1 64 1"]
+    assert len(seeded_energy_markers) == 1
+    seeded_energy_at = seeded_energy_markers[0]
+    assert volume_lines[seeded_energy_at + 2] == "FLOWSTUDIO_VOLUME_SEEDED_ENERGY_END"
+    seeded_energy_tokens = volume_lines[seeded_energy_at + 1].split()
+    assert seeded_energy_tokens[0] == "E" and len(seeded_energy_tokens) == 65
+    seeded_state = seeded_initial()
+    previous_seeded_energy = spatial_energy(seeded_state)
+    for step, token in enumerate(seeded_energy_tokens[1:], start=1):
+        seeded_state = sparse_oracle(seeded_state, 1)
+        measured = float(token)
+        expected_energy = spatial_energy(seeded_state)
+        tolerance = .05 + .0001 * expected_energy
+        assert math.isfinite(measured) and abs(measured - expected_energy) < tolerance, (
+            "seeded 3D intermediate energy", step, measured, expected_energy)
+        assert measured <= previous_seeded_energy + tolerance, (
+            "seeded 3D energy increased", step)
+        previous_seeded_energy = measured
+    # A sign-flipped seeded invariant still conserves mass and can leave the
+    # Fourier checks intact; production runtime must fail closed with 422.
+    inverted_seeded_energy = volume_source.replace(
+        "if energy > previousSeededEnergy + 0.0000001 { return 24 }",
+        "if energy < previousSeededEnergy + 0.0000001 { return 24 }", 1)
+    assert inverted_seeded_energy != volume_source
+    status, negative_body = request("POST", "/api/check/flow",
+                                    inverted_seeded_energy, accepted_headers)
+    assert status == 200, ("seeded 3D inverted energy compile", status, negative_body[:500])
+    status, negative_body = request("POST", "/api/run/flow",
+                                    inverted_seeded_energy, accepted_headers)
+    assert status == 422, ("seeded 3D inverted energy rejection", status, negative_body[:500])
     # This mutation preserves the computed final field and mass, but inverts
     # a real native intermediate invariant; execution must fail with HTTP 422.
     reversed_energy = volume_source.replace(

@@ -43,6 +43,77 @@ def initial() -> tuple[list[float], list[float]]:
     return state
 
 
+
+def seeded_initial() -> tuple[list[float], list[float]]:
+    """Independent seed-9137, three-axis asymmetric residue construction."""
+    fields = ([], [])
+    for z in range(SIDE):
+        for y in range(SIDE):
+            for x in range(SIDE):
+                residue = (9137 + 71*x + 113*y + 157*z +
+                           17*x*y + 19*y*z + 23*z*x) % 251
+                fields[0].append(30 + .1 * residue)
+                fields[1].append(10 + .07 * ((3*residue + 41) % 251))
+    return fields
+
+
+def sparse_oracle(state: tuple[list[float], list[float]], steps: int,
+                  ratio: float = RATIO, exchange: float = EXCHANGE,
+                  diffusion=DIFFUSION) -> tuple[list[float], list[float]]:
+    """Assemble sparse Markov rows, then apply a separate exchange matrix.
+
+    This does not call the direct stencil or the Fourier reference. Every
+    periodic edge is represented by an explicit row weight.
+    """
+    if type(steps) is not int or not 0 <= steps <= 256:
+        raise ValueError("invalid voxel-step budget")
+    if not math.isfinite(ratio) or not 0 <= ratio <= .5:
+        raise ValueError("invalid ratio")
+    if not math.isfinite(exchange) or not 0 <= exchange <= .25:
+        raise ValueError("invalid exchange")
+    if len(state) != 2 or any(len(field) != COUNT for field in state):
+        raise ValueError("invalid state shape")
+    if any(not math.isfinite(v) or not -1000 <= v <= 1000
+           for field in state for v in field):
+        raise ValueError("invalid state values")
+    if len(diffusion) != 2 or any(len(tensor) != 3 for tensor in diffusion):
+        raise ValueError("invalid tensor shape")
+    if any(not math.isfinite(a) or not 0 <= a <= 1
+           for tensor in diffusion for a in tensor):
+        raise ValueError("invalid tensor")
+    if any(ratio * sum(tensor) > .5 for tensor in diffusion):
+        raise ValueError("unstable explicit stencil")
+
+    rows = []
+    for ax, ay, az in diffusion:
+        species_rows = []
+        for z in range(SIDE):
+            for y in range(SIDE):
+                for x in range(SIDE):
+                    weights = {index(x, y, z): 1 - 2*ratio*(ax+ay+az)}
+                    for left, right, weight in (
+                        (index(x-1, y, z), index(x+1, y, z), ratio*ax),
+                        (index(x, y-1, z), index(x, y+1, z), ratio*ay),
+                        (index(x, y, z-1), index(x, y, z+1), ratio*az),
+                    ):
+                        weights[left] = weights.get(left, 0) + weight
+                        weights[right] = weights.get(right, 0) + weight
+                    species_rows.append(tuple(weights.items()))
+        rows.append(species_rows)
+
+    current = (state[0][:], state[1][:])
+    for _ in range(steps):
+        diffused = tuple([
+            sum(weight * current[species][neighbor]
+                for neighbor, weight in rows[species][i])
+            for i in range(COUNT)
+        ] for species in range(2))
+        current = (
+            [(1-exchange)*u + exchange*v for u, v in zip(*diffused)],
+            [exchange*u + (1-exchange)*v for u, v in zip(*diffused)],
+        )
+    return current
+
 def direct(state: tuple[list[float], list[float]], steps: int,
            ratio: float = RATIO, exchange: float = EXCHANGE,
            diffusion=DIFFUSION) -> tuple[list[float], list[float]]:
@@ -197,6 +268,64 @@ class NativeCoupledVolumeOracle(unittest.TestCase):
         self.assertLess(previous_energy, spatial_energy(initial()))
         self.assertEqual(sum(len(field) for field in state), 1024)
 
+
+    def test_seeded_non_fourier_all_1024_voxels_against_sparse_oracle(self):
+        state = seeded_initial()
+        self.assertEqual(tuple(map(len, state)), (512, 512))
+        self.assertTrue(all(10 <= v <= 55 for field in state for v in field))
+        for steps in (0, 8, 32, 64):
+            with self.subTest(steps=steps):
+                actual = direct(state, steps)
+                expected = sparse_oracle(state, steps)
+                self.assertLess(maximum_error(actual, expected), 2e-10)
+                self.assertAlmostEqual(sum(map(sum, actual)),
+                                       sum(map(sum, state)), delta=1e-8)
+        self.assertEqual(direct(state, 64), direct(state, 64))
+        self.assertLess(maximum_error(
+            sparse_oracle(sparse_oracle(state, 32), 32),
+            sparse_oracle(state, 64)), 2e-11)
+        altered = ((.03, .08, .06), DIFFUSION[1])
+        self.assertGreater(maximum_error(
+            sparse_oracle(state, 32, diffusion=altered),
+            sparse_oracle(state, 32)), .01)
+
+    def test_seeded_all_64_intermediate_energies_and_maximum_principle(self):
+        initial_state = seeded_initial()
+        state = initial_state
+        mass = sum(map(sum, state))
+        low = min(min(field) for field in state)
+        high = max(max(field) for field in state)
+        previous = spatial_energy(state)
+        for step in range(1, 65):
+            state = sparse_oracle(state, 1)
+            energy = spatial_energy(state)
+            self.assertLessEqual(energy, previous + 1e-7, step)
+            self.assertAlmostEqual(sum(map(sum, state)), mass, delta=1e-8)
+            self.assertGreaterEqual(min(min(field) for field in state), low-1e-9)
+            self.assertLessEqual(max(max(field) for field in state), high+1e-9)
+            previous = energy
+        self.assertLess(previous, spatial_energy(initial_state))
+        self.assertLess(maximum_error(state, direct(initial_state, 64)), 2e-10)
+
+    def test_seeded_sparse_negative_inputs_and_work_budget(self):
+        state = seeded_initial()
+        malformed = (state[0][:-1], state[1])
+        bad = (state[0][:], state[1][:])
+        bad[1][511] = float("nan")
+        for fields, steps, ratio, exchange, coefficients in (
+            (state, -1, RATIO, EXCHANGE, DIFFUSION),
+            (state, 257, RATIO, EXCHANGE, DIFFUSION),
+            (state, 64, -.01, EXCHANGE, DIFFUSION),
+            (state, 64, RATIO, .26, DIFFUSION),
+            (state, 64, float("nan"), EXCHANGE, DIFFUSION),
+            (state, 64, RATIO, EXCHANGE, ((2, .08, .06), DIFFUSION[1])),
+            (bad, 64, RATIO, EXCHANGE, DIFFUSION),
+            (malformed, 64, RATIO, EXCHANGE, DIFFUSION),
+        ):
+            with self.subTest(steps=steps, ratio=ratio):
+                with self.assertRaises(ValueError):
+                    sparse_oracle(fields, steps, ratio, exchange, coefficients)
+
     def test_native_source_contract_and_plot_slice(self):
         source = SOURCE.read_text(encoding="utf-8")
         self.assertLess(len(source.encode("utf-8")), 128*1024)
@@ -205,6 +334,9 @@ class NativeCoupledVolumeOracle(unittest.TestCase):
                          "FLOWSTUDIO_GRID_V1 8 8 2",
                          "FLOWSTUDIO_VOLUME_FIELDS_V1 8 8 8 2",
                          "FLOWSTUDIO_VOLUME_ENERGY_V1 64 1",
+                         "FLOWSTUDIO_VOLUME_SEEDED_V1 8 8 8 2",
+                         "FLOWSTUDIO_VOLUME_SEEDED_ENERGY_V1 64 1",
+                         "seededInitialState",
                          "native-coupled-volume8-ok", "index3(x, y, 0)"):
             self.assertIn(fragment, source)
         self.assertEqual(len(z_slice(spectral(64))[0]), 64)

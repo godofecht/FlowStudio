@@ -1,7 +1,7 @@
 # Compact HTTP acceptance fixture for the real native mathematical source parser.
 # The comprehensive 70KB+ source regression runs separately via flow run.
 # flow run src/math_expression_source_http_smoke.flow
-import .math_dimensions { Dimension, dimensionless, length_dimension, time_dimension, quotient_dimension, product_dimension, same_dimension }
+import .math_dimensions { Dimension, dimensionless, length_dimension, time_dimension, temperature_dimension, quotient_dimension, product_dimension, same_dimension }
 import .math_expression_ir { MathResult }
 import .math_expression_source { ParsedMathExpression, parse_math_expression, evaluate_math_expression }
 
@@ -522,6 +522,16 @@ function main() -> i32 {
     result = evaluate_math_expression("quantile(0.5,1m,2s)")
     if result.valid or result.failed_at != 0 { return 197 }
     if parse_math_expression("quantile(0.5)").valid { return 198 }
+    # The real Monaco/HTTP source-to-IR compiler executes 3D PDE stencils.
+    result = evaluate_math_expression("laplacian3(0K,1K,1K,8K,8K,27K,27K,1m,2m,3m)")
+    if not result.valid or not close(result.result.value,12.0) or
+       not same_dimension(result.result.dimension,
+           quotient_dimension(quotient_dimension(temperature_dimension(),
+               length_dimension()), length_dimension())) { return 199 }
+    result = evaluate_math_expression("laplacian3(0K,1K,1K,8K,8K,27K,27K,1m,2m,0m)")
+    if result.valid or result.failed_at != 0 { return 200 }
+    parsed = parse_math_expression("laplacian3(0K,1K,1K,8K,8K,27K,27K,1m,2m,3m)")
+    if not parsed.valid or parsed.program.instructions[10].opcode != 87 { return 201 }
     println("native-math-source-ok")
     return 0
 }

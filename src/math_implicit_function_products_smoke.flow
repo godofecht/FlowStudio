@@ -1,0 +1,113 @@
+# Real native Flow 2.0 source lowering of implicit multiplication before calls.
+# flow run src/math_implicit_function_products_smoke.flow
+import .math_dimensions { Dimension, dimensionless, length_dimension, time_dimension, quotient_dimension, same_dimension, quantity }
+import .math_expression_ir { MathResult }
+import .math_expression_source { ParsedMathExpression, parse_math_expression, evaluate_math_expression }
+import .math_static { MathInferredType, infer_math_expression_source }
+import .math_equation { MathEquationResult, evaluate_math_equation_source }
+
+function near(actual: f64, expected: f64) -> bool {
+    let mut difference: f64 = actual - expected
+    if difference < 0.0 { difference = -difference }
+    return difference < 0.00000000001
+}
+
+function main() -> i32 {
+    let mut result: MathResult = evaluate_math_expression("2sin(π/2)")
+    if not result.valid or not near(result.result.value, 2.0) or
+       not same_dimension(result.result.dimension, dimensionless()) { return 1 }
+    result = evaluate_math_expression("3mcos(0)")
+    if not result.valid or not near(result.result.value, 3.0) or
+       not same_dimension(result.result.dimension, length_dimension()) { return 2 }
+    result = evaluate_math_expression("(1+2)sin(π/2)")
+    if not result.valid or not near(result.result.value, 3.0) { return 3 }
+    result = evaluate_math_expression("sin(π/2)cos(0)")
+    if not result.valid or not near(result.result.value, 1.0) { return 4 }
+    result = evaluate_math_expression("2sin(π/2)cos(0)")
+    if not result.valid or not near(result.result.value, 2.0) { return 5 }
+    result = evaluate_math_expression("2sin(π/2)^2")
+    if not result.valid or not near(result.result.value, 2.0) { return 6 }
+    result = evaluate_math_expression("2sin(π/2)²")
+    if not result.valid or not near(result.result.value, 2.0) { return 7 }
+    result = evaluate_math_expression("2/2sin(π/2)")
+    if not result.valid or not near(result.result.value, 1.0) { return 8 }
+    result = evaluate_math_expression("-2sin(π/2)")
+    if not result.valid or not near(result.result.value, -2.0) { return 9 }
+    result = evaluate_math_expression("2sin(π/2)+3")
+    if not result.valid or not near(result.result.value, 5.0) { return 10 }
+    result = evaluate_math_expression("2sqrt(9*1m²)")
+    if not result.valid or not near(result.result.value, 6.0) or
+       not same_dimension(result.result.dimension, length_dimension()) { return 11 }
+    result = evaluate_math_expression("3norm(3m,4m)")
+    if not result.valid or not near(result.result.value, 15.0) or
+       not same_dimension(result.result.dimension, length_dimension()) { return 12 }
+    result = evaluate_math_expression("2min(1m,3m)")
+    if not result.valid or not near(result.result.value, 2.0) or
+       not same_dimension(result.result.dimension, length_dimension()) { return 13 }
+    result = evaluate_math_expression("2where(true,3m,4m)")
+    if not result.valid or not near(result.result.value, 6.0) or
+       not same_dimension(result.result.dimension, length_dimension()) { return 14 }
+    result = evaluate_math_expression("2clamp(4m,0m,3m)")
+    if not result.valid or not near(result.result.value, 6.0) { return 15 }
+    result = evaluate_math_expression("2dot2(1m,2m,3,4)")
+    if not result.valid or not near(result.result.value, 22.0) or
+       not same_dimension(result.result.dimension, length_dimension()) { return 16 }
+    result = evaluate_math_expression("2sign(-3m)")
+    if not result.valid or not near(result.result.value, -2.0) { return 17 }
+    result = evaluate_math_expression("2smootherstep(0,1,0.5)")
+    if not result.valid or not near(result.result.value, 1.0) { return 18 }
+    result = evaluate_math_expression("2factorial(3)")
+    if not result.valid or not near(result.result.value, 12.0) { return 19 }
+    result = evaluate_math_expression("2sin(π/2)+2cos(0)")
+    if not result.valid or not near(result.result.value, 4.0) { return 20 }
+    result = evaluate_math_expression("2m/2scos(0)")
+    if not result.valid or not near(result.result.value, 1.0) or
+       not same_dimension(result.result.dimension,
+           quotient_dimension(length_dimension(), time_dimension())) { return 21 }
+
+    let parsed: ParsedMathExpression = parse_math_expression("2sin(π/2)")
+    if not parsed.valid or parsed.program.count != 6 or
+       parsed.program.instructions[4].opcode != 28 or
+       parsed.program.instructions[4].source_start != 1 or
+       parsed.program.instructions[4].source_end != 4 or
+       parsed.program.instructions[5].opcode != 3 or
+       parsed.program.instructions[5].source_start != 1 or
+       parsed.program.instructions[5].source_end != 1 { return 22 }
+    parsed = parse_math_expression("2sin(π/2)cos(0)")
+    if not parsed.valid or parsed.program.count != 9 or
+       parsed.program.instructions[8].opcode != 3 { return 23 }
+    if parse_math_expression("2sin()").valid { return 24 }
+    if parse_math_expression("2sin(1,2)").valid { return 25 }
+    if parse_math_expression("2unknown(1)").valid { return 26 }
+    if parse_math_expression("2sin(π/2)3").valid { return 27 }
+    if parse_math_expression("2sin(π/2)cos()").valid { return 28 }
+
+    result = evaluate_math_expression("2sin(1m)")
+    if result.valid or result.failed_at != 1 { return 29 }
+    result = evaluate_math_expression("2sin(true)")
+    if result.valid or result.failed_at != 1 { return 30 }
+    result = evaluate_math_expression("2min(1m,1s)")
+    if result.valid or result.failed_at != 1 { return 31 }
+    result = evaluate_math_expression("2where(true,3m,4s)")
+    if result.valid or result.failed_at != 1 { return 32 }
+
+    let mut inferred: MathInferredType = infer_math_expression_source("2mcos(0)")
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension, length_dimension()) { return 33 }
+    inferred = infer_math_expression_source("2sin(π/2)cos(0)")
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension, dimensionless()) { return 34 }
+    inferred = infer_math_expression_source("2sqrt(9*1m²)")
+    if not inferred.valid or not same_dimension(inferred.dimension, length_dimension()) { return 35 }
+    inferred = infer_math_expression_source("2sin(1m)")
+    if inferred.valid or inferred.failed_at != 1 { return 36 }
+    inferred = infer_math_expression_source("2where(true,3m,4s)")
+    if inferred.valid or inferred.failed_at != 1 { return 37 }
+
+    let equation: MathEquationResult = evaluate_math_equation_source(
+        "2sin(π/2)*1m=2m", quantity(0.00000001, length_dimension()))
+    if not equation.valid or not equation.satisfied or
+       not near(equation.residual.value, 0.0) { return 38 }
+    println("native-implicit-function-products-ok")
+    return 0
+}

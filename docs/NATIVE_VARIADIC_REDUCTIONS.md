@@ -54,3 +54,20 @@ The full production HTTP test is part of
 General equation ASTs, arbitrary-rank tensor types, native
 Navier–Stokes and computed multidimensional visualization remain
 separate unfinished work.
+
+## Unicode mathematical reduction calls
+
+The native Flow 2.0 scalar source parser also accepts `∑(a,b,...)` and
+`∏(a,b,...)` as exact UTF-8 aliases of `sum(...)` and `product(...)`.
+These lower to the **same executable postfix opcodes** (73 and 74), retain
+UTF-8 source byte spans, infer SI dimensions, and work inside equations,
+implicit products and nested calls. One through eight arguments are allowed.
+
+These are finite argument-list reductions, **not** indexed or integral
+summation notation. In particular, `∑` without a call and unbounded
+`∑_{i=1}^n` remain unsupported rather than being silently reinterpreted.
+Greek `Σ` and `Π` remain valid explicitly bound symbol names; no alias
+may shadow those variables. The checked-in
+`src/math_variadic_reductions_smoke.flow` exercises 19 additional
+numerical, static, equation, source-span and negative assertions, both
+with `flow run` and inside the production HTTP smoke bundle.

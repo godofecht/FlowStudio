@@ -71,3 +71,27 @@ may shadow those variables. The checked-in
 `src/math_variadic_reductions_smoke.flow` exercises 19 additional
 numerical, static, equation, source-span and negative assertions, both
 with `flow run` and inside the production HTTP smoke bundle.
+
+## Independent Unicode HTTP qualification
+
+The seeded Unicode oracle in `tests/unicode_variadic_oracle.py` adds 48
+deterministic seed-20261102 cases to the checked-in Flow 2.0 native
+compiler/runtime. Forty valid expressions cover reversed summation and
+product arguments, SI-dimensional products and nested `∑(∏(...),∏(...))`
+expressions. The eight negative cases cover malformed/over-arity calls,
+dimension/predicate rejection and runtime-only overflow. Explicit native
+postfix assertions verify UTF-8 byte offsets for consecutive Unicode
+operators and implicit multiplication.
+
+The production HTTP acceptance runs this battery **separately** from the
+48 seeded ASCII cases so that each full compiler source stays within the
+128 KiB request limit. Both Unicode and ASCII batteries compile, execute,
+and independently corrupt one expected integer; the corrupted programs
+must compile but fail at runtime with HTTP 422. No mocked HTTP or parser
+substitute is involved. The source/oracle tests can be run with
+`python3 -m unittest discover -s tests -p 'test_unicode_variadic_oracle.py' -v`;
+the native Flow and HTTP checks require
+`python3 scripts/verify_native.py --require-r`.
+
+These tests do not establish general indexed reductions, tensor reduction
+syntax, arbitrary-rank fields or RStudio parity.

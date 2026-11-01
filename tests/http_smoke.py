@@ -1272,9 +1272,9 @@ def main() -> None:
     # unmodified module. Keep the real 128 KiB transport limit enforced.
     native_variable_four = native_variable_four.replace(
         "solve_math_equations_variable_constraints_four_unknown_dimensions",
-        "solve_four_dimensions",
+        "solve4",
     )
-    assert "function solve_four_dimensions(" in native_variable_four
+    assert "function solve4(" in native_variable_four
     assert "function determinant4(" in native_variable_four
     assert 'sys.count = 16' in native_variable_four
     assert "native-math-variable-four-constraints-ok" in native_variable_four

@@ -123,7 +123,7 @@ export async function runThreeSpeciesRestartBrowser({page, setNotebookSource, re
     'assign("flowstudio_three_restart_state", corrupt, envir=.GlobalEnv)'
   ].join('\n');
   await execute(cell(corruption) + cell(restart) +
-    cell('flowstudio_three_restart_unexpected <- TRUE'),
+    cell('assign("flowstudio_three_restart_unexpected", TRUE, envir=.GlobalEnv)'),
     'Notebook stopped after 2 cells:', 2);
   assert.match(await page.locator('#notebookOutput').innerText(), /restart checkpoint changed/);
   let state = await native('r', 'stopifnot(identical(flowstudio_three_restart_phase, 1L), ' +
@@ -133,7 +133,7 @@ export async function runThreeSpeciesRestartBrowser({page, setNotebookSource, re
   assert.match(state.body, /restart-rejection-ok/);
 
   // Invalid serialized snapshots are also rejected without advancing.
-  await execute(cell(restore + '\nflowstudio_three_restart_snapshot <- 1L') +
+  await execute(cell(restore + '\nassign("flowstudio_three_restart_snapshot", 1L, envir=.GlobalEnv)') +
     cell(restart), 'Notebook stopped after 2 cells:', 2);
   assert.match(await page.locator('#notebookOutput').innerText(), /restart checkpoint changed/);
   state = await native('r', 'stopifnot(identical(flowstudio_three_restart_phase, 1L)); ' +
@@ -163,7 +163,7 @@ export async function runThreeSpeciesRestartBrowser({page, setNotebookSource, re
   assert.match(saved.results[1].output, /FLOWSTUDIO_THREE_RESTART_V1 2 /);
 
   await execute(cell(restart) +
-    cell('flowstudio_three_restart_forbidden <- TRUE'),
+    cell('assign("flowstudio_three_restart_forbidden", TRUE, envir=.GlobalEnv)'),
     'Notebook stopped after 1 cells:', 1);
   assert.match(await page.locator('#notebookOutput').innerText(), /restart phase invalid/);
   state = await native('r', 'stopifnot(identical(flowstudio_three_restart_phase, 2L), ' +

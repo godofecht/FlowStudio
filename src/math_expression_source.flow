@@ -559,7 +559,10 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
         # These source-level unary operations lower to the already validated
         # native typed IR (absolute: 20, physical square root: 21). Function
         # spellings require a parenthesized argument; √ is also a prefix.
-        if expect_operand {
+        # A recognized function following a complete scalar primary is an
+        # implicit typed product: 2sin(x), 3mcos(x), sin(x)cos(y).
+        # Unknown names still fail closed; only recognized calls enter here.
+        {
             let mut unary_opcode: i32 = 0
             let mut unary_width: i32 = 0
             if c == 226 and index + 2 < length and
@@ -788,12 +791,31 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
                 unary_width = 5
             }
             if unary_opcode != 0 {
+                if not expect_operand {
+                    # Same left-associative precedence and typed opcode as
+                    # explicit '*' and implicit parenthesized products.
+                    while top > 0 and operators[top - 1] != -1 and
+                          precedence(operators[top - 1]) >= precedence(3) {
+                        top = top - 1
+                        if count >= 64 { return source_error(index, length) }
+                        instructions[count] = make_instruction(operators[top],
+                            quantity(0.0, dimensionless()),
+                            positions[top], positions[top] + widths[top])
+                        count = count + 1
+                    }
+                    if top >= 63 { return source_error(index, length) }
+                    operators[top] = 3
+                    positions[top] = index
+                    widths[top] = 0
+                    top = top + 1
+                }
                 if top >= 64 { return source_error(index, length) }
                 operators[top] = unary_opcode
                 positions[top] = index
                 widths[top] = unary_width
                 top = top + 1
                 index = index + unary_width
+                expect_operand = true
                 continue
             }
         }

@@ -68,7 +68,7 @@ The new six-cell scenario is **not** separately exercised through physical
 Chromium. Its Linux/macOS CI status must be established on the exact commit
 before treating it as verified.
 
-## Physical Chromium notebook acceptance (pending CI qualification)
+## Physical Chromium notebook acceptance (exact-head CI verified)
 
 `tests/native_three_species_browser.mjs` is invoked by the existing
 `tests/native_ui.mjs` production Playwright path. Native Python HTTP creates
@@ -86,5 +86,9 @@ python3 scripts/verify_native.py --require-r
 
 The existing six-cell Python/R/Flow HTTP controller test is distinct from
 this five-cell physical browser case. This addition is not a browser Python
-kernel acceptance, and no physical Chromium result should be claimed until
-CI runs the new exact commit.
+kernel acceptance. [Exact-head CI #41270555580](https://github.com/godofecht/FlowStudio/actions/runs/41270555580)
+passed all four Linux/macOS jobs; the Ubuntu native job logged successful
+physical Chromium three-species execution, all 3,072-cell Python oracle
+assertions, R PNG decoding, failure isolation and .fsnb restoration.
+Independent macOS physical-browser interaction and local native Flow/R
+remain unexecuted.

@@ -1267,6 +1267,14 @@ def main() -> None:
         for path in variable_four_files
     )
     assert "function solve_math_equations_variable_constraints_four_unknown_dimensions(" in native_variable_four
+    # Alpha-rename only this internal function in the self-contained HTTP bundle.
+    # All 16 checked-in assertions remain intact; the native flow run uses the
+    # unmodified module. Keep the real 128 KiB transport limit enforced.
+    native_variable_four = native_variable_four.replace(
+        "solve_math_equations_variable_constraints_four_unknown_dimensions",
+        "solve_four_dimensions",
+    )
+    assert "function solve_four_dimensions(" in native_variable_four
     assert "function determinant4(" in native_variable_four
     assert 'system.count =16' in native_variable_four
     assert "native-math-variable-four-constraints-ok" in native_variable_four

@@ -6,16 +6,16 @@ dt <- 0.1
 exchange <- 0.07
 diffusion_x <- c(0.08, 0.13, 0.19)
 diffusion_y <- c(0.17, 0.09, 0.05)
-names <- c("a", "b", "c")
+species_names <- c("a", "b", "c")
 if (3L * n * n * steps > 147456L) stop("three-species PDE resource limit exceeded")
-for (name in names) {
+for (name in species_names) {
     variable <- paste0("flowstudio_three_initial_", name)
     if (!exists(variable, inherits = TRUE)) stop("three-species input missing")
     values <- get(variable, inherits = TRUE)
     if (!is.double(values) || length(values) != n * n || any(!is.finite(values)))
         stop("three-species input must be finite 32x32 doubles")
 }
-state <- lapply(names, function(name) {
+state <- lapply(species_names, function(name) {
     matrix(get(paste0("flowstudio_three_initial_", name), inherits = TRUE),
            nrow = n, byrow = TRUE)
 })
@@ -40,7 +40,7 @@ if (any(!vapply(state, function(f) all(is.finite(f)), logical(1L))) ||
     abs(sum(vapply(state, sum, numeric(1L))) - initial_mass) > 3e-9)
     stop("three-species conservation or finiteness failed")
 for (s in seq_len(3L)) {
-    assign(paste0("flowstudio_three_final_", names[s]),
+    assign(paste0("flowstudio_three_final_", species_names[s]),
            as.vector(t(state[[s]])), envir = .GlobalEnv)
 }
 image(seq_len(n), seq_len(n), t(state[[1L]]), col = heat.colors(32L),

@@ -21,10 +21,11 @@
 #          51 norm4(x, y, z, w), stable four-component Euclidean norm with matched units.
 #          52-55 norm5(x1,..,x5)..norm8(x1,..,x8), scale-stable physical vector norms.
 #          56 factorial(x) / postfix !, dimensionless integer 0..20.
+#          57 sign/sgn, 58 dot2(ax,ay,bx,by), 59 dot3(ax,ay,az,bx,by,bz).
 # Predicate values are dimensionless 0/1 with a separate runtime type bit.
 # where and logical operators evaluate operands eagerly (no short circuit).
 # Unsupported instructions and type mismatches fail closed.
-import .math_dimensions { Dimension, Quantity, CheckedQuantity, dimensionless, quantity, quantity_add, quantity_subtract, quantity_multiply, quantity_divide, same_dimension }
+import .math_dimensions { Dimension, Quantity, CheckedQuantity, dimensionless, quantity, quantity_add, quantity_subtract, quantity_multiply, quantity_divide, same_dimension, product_dimension }
 
 export struct MathInstruction {
     opcode: i32,
@@ -845,6 +846,37 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
             depth = depth - 1
             stack[depth - 1] = result.quantity
             predicate[depth - 1] = result_predicate
+        } elif opcode == 58 or opcode == 59 {
+            # Native physical dot products. The first half of the arguments
+            # forms one vector and the second half forms the other. Both
+            # vectors must be internally dimensionally homogeneous.
+            let mut components: i32 = 2
+            if opcode == 59 { components = 3 }
+            let arity: i32 = components * 2
+            if depth < arity { return failed(instruction.source_start) }
+            let first: Quantity = stack[depth - arity]
+            let second: Quantity = stack[depth - components]
+            let output_dimension: Dimension = product_dimension(first.dimension, second.dimension)
+            if not bounded_dimension(output_dimension) { return failed(instruction.source_start) }
+            let mut sum: f64 = 0.0
+            let mut component: i32 = 0
+            while component < components {
+                let left_index: i32 = depth - arity + component
+                let right_index: i32 = depth - components + component
+                let left: Quantity = stack[left_index]
+                let right: Quantity = stack[right_index]
+                if predicate[left_index] or predicate[right_index] or
+                   not same_dimension(left.dimension, first.dimension) or
+                   not same_dimension(right.dimension, second.dimension) {
+                    return failed(instruction.source_start)
+                }
+                sum = sum + left.value * right.value
+                if not bounded_value(sum) { return failed(instruction.source_start) }
+                component = component + 1
+            }
+            depth = depth - arity + 1
+            stack[depth - 1] = quantity(sum, output_dimension)
+            predicate[depth - 1] = false
         } elif opcode >= 52 and opcode <= 55 {
             # Bounded five-through-eight component vector norms. Scale before
             # squaring to avoid overflow/underflow in the intermediate sum.

@@ -1,7 +1,7 @@
 # Compact HTTP acceptance fixture for the real native mathematical source parser.
 # The comprehensive 70KB+ source regression runs separately via flow run.
 # flow run src/math_expression_source_http_smoke.flow
-import .math_dimensions { Dimension, dimensionless, length_dimension, time_dimension, quotient_dimension, same_dimension }
+import .math_dimensions { Dimension, dimensionless, length_dimension, time_dimension, quotient_dimension, product_dimension, same_dimension }
 import .math_expression_ir { MathResult }
 import .math_expression_source { ParsedMathExpression, parse_math_expression, evaluate_math_expression }
 

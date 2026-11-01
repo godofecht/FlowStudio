@@ -45,3 +45,21 @@ no boundary conditions, arbitrary tensor ASTs, symbolic differential
 equations, adaptive grids, native Navier–Stokes solver or general
 upstream Flow grammar integration. The Python-backed Navier–Stokes
 dialect remains separate and opt-in. Tracks #198.
+
+## Manufactured-solution refinement qualification
+
+The checked-in independent `Fraction` oracle also generates three
+non-quadratic manufactured fields. At the origin, `x³+2x`,
+`3x²+x⁴`, and `3x²+2y²+x⁴+2y⁴` have exact first derivative,
+second derivative and Laplacian values 2, 6 and 10 respectively.
+Coarse/fine native stencil outputs are 6/3, 14/8 and 54/21;
+halving each relevant grid spacing reduces the nonzero truncation error
+by **exactly four** in each case. The anisotropic Laplacian uses
+`(dx,dy)=(2m,3m)` and `(1m,1.5m)`.
+
+These six numerical evaluations and the 4:1 ratios are executed by the
+production native Flow HTTP compiler/runtime, with a deliberately corrupted
+coarse-grid expectation required to return HTTP 422. The Python test
+independently derives the expected values using exact rational arithmetic.
+This is a second-order *stencil* convergence check, not evidence of a
+general PDE solver, symbolic derivative AST, or mesh-refinement framework.

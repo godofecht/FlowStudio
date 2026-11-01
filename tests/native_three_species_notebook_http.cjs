@@ -127,7 +127,7 @@ async function run({post, routes, flow, read, parseCells, create, format}) {
   assert.deepEqual(await threeRunner.run(
     "# %% [r]\n" + restart +
     "\n# %% [r]\nflowstudio_three_notebook_unexpected <- TRUE\n", "python"),
-    {ok:false, executed:1});
+    {ok:false, executed:1, failedIndex:0, error:"Cell execution failed."});
   assert.deepEqual(threeCalls.slice(failedBefore), ["r"]);
   const noMutation = await post(routes.r,
     "stopifnot(!exists('flowstudio_three_notebook_unexpected', inherits=TRUE)); " +

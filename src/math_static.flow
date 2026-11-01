@@ -2,7 +2,7 @@
 # Operates on opcode structure and SI exponents without evaluating numeric values.
 # It does not perform value-range analysis, symbolic algebra, or PDE inference.
 import .math_dimensions { Dimension, dimensionless, same_dimension, quantity, product_dimension }
-import .math_expression_ir { MathInstruction, MathProgram }
+import .math_expression_ir { MathInstruction, MathProgram, MathPermutation4, math_permutation4 }
 import .math_expression_source { MathSymbol, MathBindings, ParsedMathExpression, parse_math_expression_with_bindings, empty_math_bindings }
 import .math_equation { MathEquation, parse_math_equation_with_bindings }
 
@@ -263,9 +263,10 @@ export function infer_math_ir(program: MathProgram) -> MathInferredType {
             depth = depth - arity + 1
             dimensions[depth - 1] = output_dimension
             predicates[depth - 1] = false
-        } elif opcode == 70 or opcode == 71 {
+        } elif opcode == 70 or opcode == 71 or opcode == 72 {
             let mut arity: i32 = 4
             if opcode == 71 { arity = 9 }
+            if opcode == 72 { arity = 16 }
             if depth < arity { return static_error(instruction.source_start) }
             let base: i32 = depth - arity
             let mut component: i32 = 0
@@ -283,7 +284,7 @@ export function infer_math_ir(program: MathProgram) -> MathInferredType {
                 if not same_dimension(output_dimension, alternative) {
                     return static_error(instruction.source_start)
                 }
-            } else {
+            } elif opcode == 71 {
                 let permutations: array<i32, 18> = [
                     0,4,8, 0,5,7, 1,3,8, 1,5,6, 2,3,7, 2,4,6
                 ]
@@ -294,6 +295,24 @@ export function infer_math_ir(program: MathProgram) -> MathInferredType {
                         product_dimension(dimensions[base + permutations[offset]],
                             dimensions[base + permutations[offset + 1]]),
                         dimensions[base + permutations[offset + 2]])
+                    if term_index == 0 {
+                        output_dimension = term_dimension
+                    } elif not same_dimension(output_dimension, term_dimension) {
+                        return static_error(instruction.source_start)
+                    }
+                    term_index = term_index + 1
+                }
+            } else {
+                let mut term_index: i32 = 0
+                while term_index < 24 {
+                    let permutation: MathPermutation4 = math_permutation4(term_index)
+                    let mut term_dimension: Dimension = dimensionless()
+                    let mut row: i32 = 0
+                    while row < 4 {
+                        term_dimension = product_dimension(term_dimension,
+                            dimensions[base + row * 4 + permutation.columns[row]])
+                        row = row + 1
+                    }
                     if term_index == 0 {
                         output_dimension = term_dimension
                     } elif not same_dimension(output_dimension, term_dimension) {

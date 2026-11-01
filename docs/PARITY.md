@@ -1,3 +1,35 @@
+## 2026-11-01: stepwise native PDE energy trace (qualification pending)
+
+The compiler-executed 16×16 heterogeneous Flow solver now emits 96
+bounded post-step variance samples (48 each for the Fourier and seed-9137
+fields) through a versioned stdout protocol. The production HTTP test
+and actual Ubuntu Chromium Monaco Run reassemble an independent sparse
+Markov operator and compare **every sample** to the emitted native
+trajectory. The solver also retains all 512 final-grid oracle checks,
+stepwise energy/maximum-principle assertions, HTTP 422 anti-diffusion
+negative control, R/C FlowJIT and notebook acceptance.
+
+**Pending:** exact-head Linux/macOS CI and post-merge CI for the new trace.
+**Unexecuted:** local native Flow/R and independent macOS physical browser.
+This is observable array-backed numerical evolution, not generalized
+compiler-generated multidimensional `field` lowering or RStudio parity.
+
+## 2026-11-01: stepwise heterogeneous PDE energy and maximum principle (4/4 CI verified)
+
+[PR #333](https://github.com/godofecht/FlowStudio/pull/333)
+merged at [e0966f83](https://github.com/godofecht/FlowStudio/commit/e0966f839bfae0b41b1624c04ea10ee90b2272ed).
+[Exact-head CI #41286104819](https://github.com/godofecht/FlowStudio/actions/runs/41286104819)
+passed all four Ubuntu 24.04/macOS 15 jobs. Both source/transport
+platforms executed the two additional independent Python oracle tests;
+native Flow compilation, real HTTP negative-flux 422, R/C FlowJIT and
+physical Ubuntu Chromium baseline passed. The native solver checks both
+256-cell fields after every one of 48 steps for variance contraction and
+maximum principle, and verifies constant/zero-ratio fixed points.
+**Skipped:** platform-inapplicable installation/browser steps and optional
+source-job dependencies as recorded in CI. **Unexecuted:** independent
+macOS physical-browser interaction and local native Flow/R. Post-merge
+main CI is not independently established by the exact-head run.
+
 ## 2026-11-01: seeded non-Fourier native heterogeneous PDE (4/4 exact-head and post-merge CI)
 
 The 16×16 periodic discontinuous-conductivity native Flow solver now

@@ -43,8 +43,8 @@ async function run({post, routes, flow, read, parseCells, create, format}) {
     [name, threeValues.slice(i * 1024, (i + 1) * 1024)]));
   const checkThree = async result => {
     const payload = JSON.stringify(result);
-    const code = "import json\nverify_result(json.loads(" + JSON.stringify(payload) +
-      "))\nprint('notebook-three-species-oracle-ok')";
+    const code = "import json\nnotebook_three_error = verify_result(json.loads(" + JSON.stringify(payload) +
+      "))\nprint('notebook-three-species-oracle-ok', notebook_three_error)";
     assert.ok(Buffer.byteLength(code, "utf8") < 131072);
     return post(routes.python, code);
   };

@@ -1259,7 +1259,7 @@ def main() -> None:
     variable_four_files = static_files[:-1] + (
         "src/math_dimension_four.flow",
         "src/math_dimension_variable_four.flow",
-        "src/math_dimension_variable_four_smoke.flow",
+        "src/math_dimension_variable_four_http_smoke.flow",
     )
     assert compact_native_math_line(' x: f64, y: i32 # comment') == 'x:f64,y:i32'
     assert compact_native_math_line('let s = "a, b: c # literal" # trailing') == (

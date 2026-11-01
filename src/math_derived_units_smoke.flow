@@ -1,7 +1,7 @@
 # Native mathematical Flow: SI-derived unit literals are typed at source lowering.
 # Run: flow run src/math_derived_units_smoke.flow
 # These execute through the real parser, postfix IR, static inference and equation runtime.
-import .math_dimensions { Dimension, dimensionless, length_dimension, same_dimension, quantity }
+import .math_dimensions { Dimension, dimensionless, length_dimension, mass_dimension, temperature_dimension, same_dimension, quantity }
 import .math_expression_ir { MathResult }
 import .math_expression_source { ParsedMathExpression, parse_math_expression, evaluate_math_expression }
 import .math_static { MathInferredType, infer_math_expression_source }

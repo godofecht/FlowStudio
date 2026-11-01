@@ -1,3 +1,22 @@
+## 2026-11-01: physical Chromium three-species notebook numerical acceptance (qualification pending)
+
+The production Playwright workbench now has a dedicated five-cell **native Flow/R**
+three-species 32×32 anisotropic PDE scenario, with 3,072 deterministic seed-9137
+initial values generated through the actual persistent native Python HTTP
+kernel. The physical browser runs one Flow cell and four real R cells, then
+checks all 3,072 computed values against the persistent Python direct-stencil
+oracle with tolerance 5e-11. It asserts actual PNG decoding, portable
+`.fsnb` plot/output export and no-execution import, a deliberately corrupted
+R field rejection, and prevention of a subsequent R side effect. The
+existing six-cell Flow/Python/R controller+HTTP acceptance remains separate;
+the browser scenario does not claim browser Python execution.
+
+**Pending:** exact-head Linux/macOS CI and Ubuntu physical Chromium execution.
+**Unexecuted:** independent macOS physical-browser interaction and local
+native Flow/R. This is not generalized compiler-generated multidimensional
+`field` lowering or RStudio parity. No hosted workflow changes.
+
+
 ## 2026-11-01: directed anisotropic three-species Python/R PDE (4/4 CI verified)
 
 Checked-in `examples/coupled_three_species_python.py` and

@@ -129,7 +129,7 @@ export function infer_math_ir(program: MathProgram) -> MathInferredType {
         } elif opcode == 5 or opcode == 6 or opcode == 18 or opcode == 20 or opcode == 21 or opcode == 25 or
              opcode == 26 or opcode == 27 or opcode == 28 or opcode == 29 or opcode == 30 or opcode == 31 or
              opcode == 33 or opcode == 34 or opcode == 35 or opcode == 36 or opcode == 37 or
-             opcode == 38 or opcode == 39 or opcode == 40 or opcode == 42 or opcode == 43 or opcode == 44 or opcode == 46 or (opcode >= 47 and opcode <= 50) {
+             opcode == 38 or opcode == 39 or opcode == 40 or opcode == 42 or opcode == 43 or opcode == 44 or opcode == 46 or opcode == 56 or (opcode >= 47 and opcode <= 50) {
             if depth < 1 { return static_error(instruction.source_start) }
             let input: Dimension = dimensions[depth - 1]
             if opcode == 18 {
@@ -165,7 +165,7 @@ export function infer_math_ir(program: MathProgram) -> MathInferredType {
                     dimensions[depth - 1] = static_third_dimension(input)
                 } elif opcode == 25 or opcode == 26 or opcode == 27 or opcode == 28 or opcode == 29 or opcode == 30 or opcode == 31 or
                        opcode == 33 or opcode == 34 or opcode == 35 or opcode == 36 or opcode == 37 or
-                       opcode == 38 or opcode == 39 or opcode == 40 or opcode == 42 or opcode == 43 {
+                       opcode == 38 or opcode == 39 or opcode == 40 or opcode == 42 or opcode == 43 or opcode == 56 {
                     if not same_dimension(input, dimensionless()) {
                         return static_error(instruction.source_start)
                     }

@@ -475,7 +475,7 @@ function main() -> i32 {
     result = evaluate_math_expression("1=1")
     if result.valid or result.failed_at != 1 { return 153 }
     result = evaluate_math_expression("1!1")
-    if result.valid or result.failed_at != 1 { return 154 }
+    if result.valid or result.failed_at != 2 { return 154 }
     result = evaluate_math_expression("1<=")
     if result.valid or result.failed_at != 3 { return 155 }
     result = evaluate_math_expression("<=2")
@@ -1377,6 +1377,45 @@ function main() -> i32 {
     result = evaluate_math_expression_with_bindings("e", e_bindings)
     if not result.valid or not near(result.result.value, 3.0) or
        not same_dimension(result.result.dimension, length) { return 510 }
+
+    # Native factorial postfix and function calls share typed opcode 56.
+    result = evaluate_math_expression("0!")
+    if not result.valid or not near(result.result.value, 1.0) { return 511 }
+    result = evaluate_math_expression("5!")
+    if not result.valid or not near(result.result.value, 120.0) { return 512 }
+    result = evaluate_math_expression("factorial(6)")
+    if not result.valid or not near(result.result.value, 720.0) { return 513 }
+    result = evaluate_math_expression("3!²")
+    if not result.valid or not near(result.result.value, 36.0) { return 514 }
+    result = evaluate_math_expression("-3!")
+    if not result.valid or not near(result.result.value, -6.0) { return 515 }
+    result = evaluate_math_expression("20!")
+    if not result.valid or result.result.value != 2432902008176640000.0 { return 516 }
+    result = evaluate_math_expression("3!=4")
+    if not result.valid or not result.is_predicate or result.result.value != 1.0 { return 517 }
+    result = evaluate_math_expression("3.5!")
+    if result.valid or result.failed_at != 3 { return 518 }
+    result = evaluate_math_expression("(-3)!")
+    if result.valid or result.failed_at != 4 { return 519 }
+    result = evaluate_math_expression("21!")
+    if result.valid or result.failed_at != 2 { return 520 }
+    result = evaluate_math_expression("2m!")
+    if result.valid or result.failed_at != 2 { return 521 }
+    result = evaluate_math_expression("true!")
+    if result.valid or result.failed_at != 4 { return 522 }
+    let factorial_source: ParsedMathExpression = parse_math_expression("5!")
+    if not factorial_source.valid or factorial_source.program.count != 2 or
+       factorial_source.program.instructions[1].opcode != 56 or
+       factorial_source.program.instructions[1].source_start != 1 or
+       factorial_source.program.instructions[1].source_end != 2 { return 523 }
+    factorial_source = parse_math_expression("factorial(5)")
+    if not factorial_source.valid or factorial_source.program.count != 2 or
+       factorial_source.program.instructions[1].opcode != 56 or
+       factorial_source.program.instructions[1].source_start != 0 or
+       factorial_source.program.instructions[1].source_end != 9 { return 524 }
+    if parse_math_expression("factorial()").valid { return 525 }
+    if parse_math_expression("factorial(1,2)").valid { return 526 }
+    if parse_math_expression("!5").valid { return 527 }
 
     println("native-math-source-ok")
     return 0

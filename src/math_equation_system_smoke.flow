@@ -339,6 +339,25 @@ function main() -> i32 {
     result = evaluate_math_equation_system(system, tolerances)
     if result.valid or result.failed_at != 4 { return 71 }
 
+    # Executable factorial equation ASTs share native scalar dimensional checks.
+    system = parse_math_equation_system("factorial(5)=120;3!²=36;0! =1")
+    if not system.valid or system.count != 3 { return 72 }
+    tolerances.count = 3
+    tolerances.values[0] = quantity(0.0, dimensionless())
+    tolerances.values[1] = quantity(0.0, dimensionless())
+    tolerances.values[2] = quantity(0.0, dimensionless())
+    result = evaluate_math_equation_system(system, tolerances)
+    if not result.valid or not result.satisfied or result.count != 3 { return 73 }
+    system = parse_math_equation_system("5! =120m")
+    if not system.valid { return 74 }
+    tolerances.count = 1
+    result = evaluate_math_equation_system(system, tolerances)
+    if result.valid { return 75 }
+    system = parse_math_equation_system("factorial(21)=0")
+    if not system.valid { return 76 }
+    result = evaluate_math_equation_system(system, tolerances)
+    if result.valid { return 77 }
+
     println("native-math-equation-system-ok")
     return 0
 }

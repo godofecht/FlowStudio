@@ -317,6 +317,24 @@ function main() -> i32 {
     result = evaluate_math_expression("90°+1m")
     if result.valid or result.failed_at != 4 { return 114 }
 
+    # Production native HTTP route compiles and evaluates factorial notation.
+    result = evaluate_math_expression("5!")
+    if not result.valid or not close(result.result.value, 120.0) { return 115 }
+    result = evaluate_math_expression("factorial(6)")
+    if not result.valid or not close(result.result.value, 720.0) { return 116 }
+    result = evaluate_math_expression("3!²")
+    if not result.valid or not close(result.result.value, 36.0) { return 117 }
+    result = evaluate_math_expression("20!")
+    if not result.valid or result.result.value != 2432902008176640000.0 { return 118 }
+    result = evaluate_math_expression("3!=4")
+    if not result.valid or not result.is_predicate or result.result.value != 1.0 { return 119 }
+    result = evaluate_math_expression("2m!")
+    if result.valid or result.failed_at != 2 { return 120 }
+    result = evaluate_math_expression("3.5!")
+    if result.valid or result.failed_at != 3 { return 121 }
+    result = evaluate_math_expression("21!")
+    if result.valid or result.failed_at != 2 { return 122 }
+
     println("native-math-source-ok")
     return 0
 }

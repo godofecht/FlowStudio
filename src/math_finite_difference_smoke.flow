@@ -91,9 +91,9 @@ function main() -> i32 {
     if inferred.valid or inferred.failed_at != 0 { return 30 }
     inferred = infer_math_expression_source("laplacian2(0K,1K,1K,1K,1K,1s,1m)")
     if inferred.valid or inferred.failed_at != 0 { return 31 }
-    inferred = infer_math_equation_source("fd1(1m,3m,1s) = 1m/s")
+    inferred = infer_math_equation_source("fd1(1m,3m,1s) = 1m/1s")
     if not inferred.valid or not same_dimension(inferred.dimension,velocity) { return 32 }
-    inferred = infer_math_equation_source("laplacian2(0K,1K,1K,8K,8K,1m,2m) = 6K/m²")
+    inferred = infer_math_equation_source("laplacian2(0K,1K,1K,8K,8K,1m,2m) = 6K/1m²")
     if not inferred.valid or not same_dimension(inferred.dimension,curvature) { return 33 }
     inferred = infer_math_equation_source("fd1(1m,3m,1s) = 1m")
     if inferred.valid { return 34 }

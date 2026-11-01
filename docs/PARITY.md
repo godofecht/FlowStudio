@@ -1,4 +1,4 @@
-## 2026-11-01: physical Chromium three-species notebook numerical acceptance (qualification pending)
+## 2026-11-01: physical Chromium three-species notebook numerical acceptance (4/4 CI verified)
 
 The production Playwright workbench now has a dedicated five-cell **native Flow/R**
 three-species 32×32 anisotropic PDE scenario, with 3,072 deterministic seed-9137
@@ -11,9 +11,12 @@ R field rejection, and prevention of a subsequent R side effect. The
 existing six-cell Flow/Python/R controller+HTTP acceptance remains separate;
 the browser scenario does not claim browser Python execution.
 
-**Pending:** exact-head Linux/macOS CI and Ubuntu physical Chromium execution.
-**Unexecuted:** independent macOS physical-browser interaction and local
-native Flow/R. This is not generalized compiler-generated multidimensional
+**Verified:** [PR #323](https://github.com/godofecht/FlowStudio/pull/323)
+[exact-head CI #41270555580](https://github.com/godofecht/FlowStudio/actions/runs/41270555580)
+passed all four Linux/macOS jobs, including actual Ubuntu physical Chromium.
+The native browser job explicitly logged the 3,072-cell oracle, R PNG,
+fail-closed corruption and .fsnb restoration acceptance. **Unexecuted:**
+independent macOS physical-browser interaction and local native Flow/R. This is not generalized compiler-generated multidimensional
 `field` lowering or RStudio parity. No hosted workflow changes.
 
 

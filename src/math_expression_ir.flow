@@ -29,7 +29,7 @@
 #          67 smoothstep(edge0, edge1, x): cubic C1 transition, dimensionless output.
 #          68 smootherstep(edge0, edge1, x): quintic C2 transition, dimensionless output.
 #          69 approx(a, b, tolerance): typed absolute-tolerance predicate, same SI units.
-#          70 det2(a,b,c,d), 71 det3(a,b,c,d,e,f,g,h,i): row-major determinants.
+#          70 det2, 71 det3, 72 det4: row-major SI-aware matrix determinants.
 #          Every permutation product must have the same SI dimension.
 # Predicate values are dimensionless 0/1 with a separate runtime type bit.
 # where and logical operators evaluate operands eagerly (no short circuit).
@@ -55,6 +55,47 @@ export struct MathResult {
     result: Quantity,
     failed_at: i32,
     is_predicate: bool
+}
+
+# Shared exact lexicographic permutation and parity for 4x4 determinants.
+# Static inference and native execution use identical column selections.
+export struct MathPermutation4 {
+    columns: array<i32, 4>,
+    negative: bool
+}
+
+export function math_permutation4(index: i32) -> MathPermutation4 {
+    let mut available: array<i32, 4> = [0, 1, 2, 3]
+    let mut columns: array<i32, 4> = [0]
+    let mut rank: i32 = index
+    let mut row: i32 = 0
+    while row < 4 {
+        let mut divisor: i32 = 1
+        if row == 0 { divisor = 6 }
+        elif row == 1 { divisor = 2 }
+        let choice: i32 = rank / divisor
+        rank = rank % divisor
+        columns[row] = available[choice]
+        let mut shift: i32 = choice
+        while shift < 3 - row {
+            available[shift] = available[shift + 1]
+            shift = shift + 1
+        }
+        row = row + 1
+    }
+    let mut inversions: i32 = 0
+    let mut first: i32 = 0
+    while first < 4 {
+        let mut second: i32 = first + 1
+        while second < 4 {
+            if columns[first] > columns[second] {
+                inversions = inversions + 1
+            }
+            second = second + 1
+        }
+        first = first + 1
+    }
+    return MathPermutation4 { columns: columns, negative: inversions % 2 != 0 }
 }
 
 function magnitude(value: f64) -> f64 {
@@ -901,12 +942,13 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
             depth = depth - arity + 1
             stack[depth - 1] = quantity(sum, output_dimension)
             predicate[depth - 1] = false
-        } elif opcode == 70 or opcode == 71 {
+        } elif opcode == 70 or opcode == 71 or opcode == 72 {
             # Determinants are scalar contractions of row-major matrices.
             # Unlike dot products, entries may have different dimensions:
             # only the complete signed permutation products must agree.
             let mut arity: i32 = 4
             if opcode == 71 { arity = 9 }
+            if opcode == 72 { arity = 16 }
             if depth < arity { return failed(instruction.source_start) }
             let base: i32 = depth - arity
             let mut component: i32 = 0
@@ -933,7 +975,7 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
                     return failed(instruction.source_start)
                 }
                 determinant = positive - negative
-            } else {
+            } elif opcode == 71 {
                 # Six permutations of columns 0,1,2, with their parity.
                 # Each intermediate multiplication is bounded independently.
                 let permutations: array<i32, 18> = [
@@ -960,6 +1002,39 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
                         determinant = determinant + term
                     } else {
                         determinant = determinant - term
+                    }
+                    if not bounded_value(determinant) {
+                        return failed(instruction.source_start)
+                    }
+                    term_index = term_index + 1
+                }
+            } else {
+                # All 24 signed permutations, including zero-valued terms:
+                # dimensions are structural, never inferred from runtime zeros.
+                let mut term_index: i32 = 0
+                while term_index < 24 {
+                    let permutation: MathPermutation4 = math_permutation4(term_index)
+                    let mut term_dimension: Dimension = dimensionless()
+                    let mut term: f64 = 1.0
+                    let mut row: i32 = 0
+                    while row < 4 {
+                        let entry: Quantity = stack[base + row * 4 + permutation.columns[row]]
+                        term_dimension = product_dimension(term_dimension, entry.dimension)
+                        term = term * entry.value
+                        if not bounded_value(term) {
+                            return failed(instruction.source_start)
+                        }
+                        row = row + 1
+                    }
+                    if term_index == 0 {
+                        output_dimension = term_dimension
+                    } elif not same_dimension(output_dimension, term_dimension) {
+                        return failed(instruction.source_start)
+                    }
+                    if permutation.negative {
+                        determinant = determinant - term
+                    } else {
+                        determinant = determinant + term
                     }
                     if not bounded_value(determinant) {
                         return failed(instruction.source_start)

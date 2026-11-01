@@ -48,7 +48,10 @@ Two additional standard-library Python tests independently assemble the
 sparse Markov transition matrix, compare every timestep against the
 separate direct finite-volume stencil, check both invariants, and prove
 the energy check discriminates a deliberately sign-reversed
-anti-diffusion step even though it still conserves mass.
+anti-diffusion step even though it still conserves mass. The production
+HTTP suite also compiles a source-mutated negative-flux variant through
+the real Flow compiler and requires the actual native run to return
+HTTP 422 from the intermediate energy assertion.
 
 **Qualification pending:** exact-head Linux/macOS native compiler,
 production HTTP, Ubuntu Chromium and post-merge CI. The Python oracle

@@ -113,14 +113,24 @@ def inject_native_assertions(source: str, sabotage: bool = False) -> str:
         raise ValueError("missing or ambiguous native determinant main marker")
     statements = []
     for index, (function, rows, expected) in enumerate(matrix_cases()):
-        arguments = ",".join(str(value) for row in rows for value in row)
+        # Alternate dimensionless matrices with SI row-typed matrices.
+        # Every signed permutation then has the same product dimension.
+        unitful = index % 2 == 0
+        suffixes = ("m", "s", "K")[:len(rows)] if unitful else ("",) * len(rows)
+        arguments = ",".join(
+            f"{value}{suffixes[row_index]}"
+            for row_index, row in enumerate(rows) for value in row
+        )
+        expected_dimension = (
+            "space_time" if len(rows) == 2 else "volume_time_temperature"
+        ) if unitful else "dimensionless()"
         wanted = expected + (1 if sabotage and index == 0 else 0)
         statements.append(
             f'result = evaluate_math_expression("{function}({arguments})")'
         )
         statements.append(
             f'if not result.valid or not near(result.result.value, {wanted}.0) or '
-            'not same_dimension(result.result.dimension, dimensionless()) '
+            f'not same_dimension(result.result.dimension, {expected_dimension}) '
             '{ return 70 }'
         )
     expanded = source.replace(marker, "\n".join(statements) + "\n" + marker, 1)

@@ -185,6 +185,7 @@ def main() -> None:
     from test_native_variable_diffusion_oracle import (
         conductivity as variable_conductivity, initial as variable_initial,
         matrix_oracle as variable_matrix_oracle,
+        seeded_initial as variable_seeded_initial,
     )
     variable_source = (Path(__file__).resolve().parents[1] /
                        "examples/native_variable_diffusion16.flow").read_text(encoding="utf-8")
@@ -208,6 +209,29 @@ def main() -> None:
     expected = variable_matrix_oracle(variable_initial(), variable_conductivity(), 48)
     assert max(abs(a - b) for a, b in zip(actual, expected)) < 0.002, (
         "native heterogeneous 256-cell independent oracle", actual[:4], expected[:4])
+    # Second native output is seeded, asymmetric and non-Fourier. Check all
+    # 256 actual compiler-computed cells against an independently assembled
+    # sparse Markov operator rather than only testing the Fourier mode.
+    seeded_markers = [i for i, line in enumerate(lines)
+                      if line == "FLOWSTUDIO_SEEDED_GRID_V1 16 16 1"]
+    assert len(seeded_markers) == 1, ("seeded native grid marker", body[-500:])
+    seeded_start = seeded_markers[0]
+    assert lines[seeded_start + 2] == "FLOWSTUDIO_SEEDED_GRID_END"
+    seeded_tokens = lines[seeded_start + 1].split()
+    assert seeded_tokens[0] == "S" and len(seeded_tokens) == 257, (
+        "seeded native grid values", len(seeded_tokens))
+    seeded_actual = [float(token) for token in seeded_tokens[1:]]
+    assert all(math.isfinite(value) for value in seeded_actual)
+    seeded_expected = variable_matrix_oracle(
+        variable_seeded_initial(), variable_conductivity(), 48)
+    assert max(abs(a - b) for a, b in zip(seeded_actual, seeded_expected)) < 0.002, (
+        "seeded 256-cell sparse oracle", seeded_actual[:4], seeded_expected[:4])
+    corrupted_seeded = variable_source.replace(
+        "if absolute(totalMass(seededFirst.grid) - totalMass(seeded)) > 0.000000001",
+        "if absolute(totalMass(seededFirst.grid) - totalMass(seeded)) > -1.0", 1)
+    assert corrupted_seeded != variable_source
+    status, body = request("POST", "/api/run/flow", corrupted_seeded, accepted_headers)
+    assert status == 422, ("seeded mass assertion corruption", status, body[:500])
     corrupted_variable = variable_source.replace(
         "if absolute(totalMass(first.grid) - originalMass) > 0.000000001",
         "if absolute(totalMass(first.grid) - originalMass) > -1.0", 1)

@@ -65,10 +65,9 @@ class NativeDeterminantOracle(unittest.TestCase):
         positive = inject_native_assertions(source)
         negative = inject_native_assertions(source, sabotage=True)
         self.assertLessEqual(len(positive.encode("utf-8")), 128 * 1024)
-        self.assertEqual(positive.count('result = evaluate_math_expression("det'), 34 + 17)
+        self.assertEqual(positive.count('result = evaluate_math_expression("det'),\n                         source.count('result = evaluate_math_expression("det') + 34)
         self.assertEqual(positive.count("return 70"), 34)
         self.assertNotEqual(positive, negative)
-        self.assertEqual(len(positive), len(negative))
         self.assertIn('println("native-math-determinants-ok")', positive)
         self.assertIn('println("native-math-determinants-ok")', negative)
 

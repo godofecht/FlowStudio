@@ -475,7 +475,7 @@ function main() -> i32 {
     result = evaluate_math_expression("1=1")
     if result.valid or result.failed_at != 1 { return 153 }
     result = evaluate_math_expression("1!1")
-    if result.valid or result.failed_at != 1 { return 154 }
+    if result.valid or result.failed_at != 2 { return 154 }
     result = evaluate_math_expression("1<=")
     if result.valid or result.failed_at != 3 { return 155 }
     result = evaluate_math_expression("<=2")

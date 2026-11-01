@@ -50,12 +50,12 @@ def compact_native_math_line(line: str) -> str:
     for char in source:
         if not quoted and char == "#":
             break
-        if not quoted and char in " \\t" and result and result[-1] in ",:":
+        if not quoted and char in " \t" and result and result[-1] in ",:":
             continue
         result.append(char)
         if char == '"' and not escaped:
             quoted = not quoted
-        if quoted and char == "\\\\" and not escaped:
+        if quoted and char == "\\" and not escaped:
             escaped = True
         else:
             escaped = False

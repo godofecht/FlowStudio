@@ -91,6 +91,18 @@ function main() -> i32 {
     if not result.valid or result.result.value != 0.0 { return 33 }
     result = evaluate_math_expression("median(1m,1m,1m,1m,1m,1m,1m,1m)")
     if not result.valid or result.result.value != 1.0 { return 34 }
+    # Type-7 quantile must participate in compiler-wide static SI inference.
+    inferred = infer_math_expression_source("quantile(0.25,1km,500m)")
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension,length) { return 35 }
+    inferred = infer_math_expression_source("quantile(0.5,1m,3m)")
+    if not inferred.valid or not same_dimension(inferred.dimension,length) { return 36 }
+    inferred = infer_math_expression_source("quantile(0.5m,1m,2m)")
+    if inferred.valid or inferred.failed_at != 0 { return 37 }
+    inferred = infer_math_expression_source("quantile(true,1m,2m)")
+    if inferred.valid or inferred.failed_at != 0 { return 38 }
+    inferred = infer_math_expression_source("quantile(0.5,1m,2s)")
+    if inferred.valid or inferred.failed_at != 0 { return 39 }
     println("native-math-robust-statistics-ok")
     return 0
 }

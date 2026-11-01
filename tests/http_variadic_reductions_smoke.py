@@ -6,6 +6,7 @@ from http_smoke import request, compact_native_math_line
 from variadic_oracle import inject_variadic_assertions, variadic_cases
 from unicode_variadic_oracle import inject_unicode_variadic_assertions, unicode_variadic_cases
 from http_robust_statistics_smoke import verify_robust_statistics
+from http_quantile_smoke import verify_quantiles
 from http_dispersion_smoke import verify_dispersion
 
 
@@ -74,6 +75,7 @@ def main() -> None:
     status, body = request("POST", "/api/run/flow", unicode_tampered, headers)
     assert status == 422, ("tampered Unicode native execution must fail", status, body)
     verify_robust_statistics()
+    verify_quantiles()
     verify_dispersion()
     print(f"PASS: native SI reductions over real HTTP, 50 baseline "
           f"+ {len(variadic_cases())} ASCII and "

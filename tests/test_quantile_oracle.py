@@ -1,5 +1,7 @@
 """Independent deterministic rational Type-7 quantile and HTTP source tests."""
 from fractions import Fraction
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
 import random
 import statistics
@@ -51,6 +53,25 @@ class QuantileOracleTests(unittest.TestCase):
             self.assertEqual(a[2], type7(a[4], tuple(Fraction(x) for x in a[5])))
         self.assertTrue(any("km" in row[1] for row in cases))
         self.assertTrue(any("s" in row[1] for row in cases))
+
+    def test_persistent_python_oracle_detects_corruption_and_recovers(self):
+        cases = quantile_cases()[:VALID_COUNT]
+        observed = [float(row[2]) for row in cases]
+        namespace = {"user_value": 9137}
+        output = StringIO()
+        with redirect_stdout(output):
+            exec(_python_verifier(cases, observed), namespace)
+        self.assertIn("quantile-r-python-oracle-ok", output.getvalue())
+        self.assertEqual(namespace["user_value"], 9137)
+        self.assertNotIn("flowstudio_quantile_check", namespace)
+        with self.assertRaisesRegex(AssertionError, "quantile numerical mismatch"):
+            exec(_python_verifier(cases, observed, corrupt=True), namespace)
+        with self.assertRaisesRegex(AssertionError, "quantile frame invalid"):
+            exec(_python_verifier(cases, observed[:-1]), namespace)
+        with redirect_stdout(StringIO()):
+            exec(_python_verifier(cases, observed), namespace)
+        self.assertEqual(namespace["user_value"], 9137)
+        self.assertNotIn("flowstudio_quantile_check", namespace)
 
     def test_native_source_and_r_python_budget(self):
         from http_robust_statistics_smoke import bundled_source

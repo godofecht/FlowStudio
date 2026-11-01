@@ -306,6 +306,18 @@ export function infer_math_ir(program: MathProgram) -> MathInferredType {
             depth = depth - 2
             dimensions[depth - 1] = first
             predicates[depth - 1] = false
+        } elif opcode == 67 or opcode == 68 {
+            if depth < 3 { return static_error(instruction.source_start) }
+            let lower: Dimension = dimensions[depth - 3]
+            let upper: Dimension = dimensions[depth - 2]
+            let sample: Dimension = dimensions[depth - 1]
+            if predicates[depth - 3] or predicates[depth - 2] or predicates[depth - 1] or
+               not same_dimension(lower, upper) or not same_dimension(lower, sample) {
+                return static_error(instruction.source_start)
+            }
+            depth = depth - 2
+            dimensions[depth - 1] = dimensionless()
+            predicates[depth - 1] = false
         } elif opcode == 66 {
             if depth < 3 { return static_error(instruction.source_start) }
             let first: Dimension = dimensions[depth - 3]

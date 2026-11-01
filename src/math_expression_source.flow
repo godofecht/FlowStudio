@@ -320,7 +320,7 @@ function function_arity(opcode: i32) -> i32 {
        opcode == 33 or opcode == 34 or opcode == 35 or opcode == 36 or opcode == 37 or
         opcode == 38 or opcode == 39 or opcode == 40 or opcode == 42 or opcode == 43 or opcode == 44 or opcode == 46 or opcode == 56 or opcode == 57 or (opcode >= 47 and opcode <= 50) { return 1 }
     if opcode == 7 or opcode == 8 or opcode == 22 or opcode == 32 { return 2 }
-    if opcode == 9 or opcode == 19 or opcode == 45 or opcode == 66 { return 3 }
+    if opcode == 9 or opcode == 19 or opcode == 45 or opcode == 66 or opcode == 67 or opcode == 68 { return 3 }
     if opcode == 51 or opcode == 58 or opcode == 60 { return 4 }
     if opcode == 59 { return 6 }
     if opcode == 61 { return 8 }
@@ -766,6 +766,14 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
                    identifier_matches(bytes, index, index + 4, "norm") {
                 unary_opcode = 22
                 unary_width = 4
+            } elif index + 12 < length and bytes[index + 12] == 40 and
+                   identifier_matches(bytes, index, index + 12, "smootherstep") {
+                unary_opcode = 68
+                unary_width = 12
+            } elif index + 10 < length and bytes[index + 10] == 40 and
+                   identifier_matches(bytes, index, index + 10, "smoothstep") {
+                unary_opcode = 67
+                unary_width = 10
             } elif index + 4 < length and bytes[index + 4] == 40 and
                    identifier_matches(bytes, index, index + 4, "lerp") {
                 unary_opcode = 66

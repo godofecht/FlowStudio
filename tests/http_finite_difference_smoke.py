@@ -2,7 +2,8 @@
 """Execute native Flow centered differences through the production HTTP router."""
 from pathlib import Path
 
-from http_smoke import request, compact_native_math_line
+from http_smoke import compact_native_math_line
+from http_finite_difference_interop import verify_fd_interop
 from test_finite_difference_oracle import (
     finite_difference_cases, inject_finite_difference_assertions,
 )
@@ -32,7 +33,7 @@ def bundled_source(root: Path) -> str:
     )
 
 
-def verify_finite_differences() -> None:
+def verify_finite_differences(request) -> None:
     base = bundled_source(Path(__file__).resolve().parents[1])
     headers = {"X-FlowStudio-Intent": "run"}
     assert len(finite_difference_cases()) == 27
@@ -49,9 +50,11 @@ def verify_finite_differences() -> None:
     assert status == 200, ("corrupted expectation compiles", status, body)
     status, body = request("POST", "/api/run/flow", corrupted, headers)
     assert status == 422, ("corrupted numerical expectation must fail", status, body)
+    verify_fd_interop(request, headers)
     print("PASS: 27 exact polynomial finite-difference cases through native Flow "
           "HTTP, analytical SI checks, and deliberate HTTP 422")
 
 
 if __name__ == "__main__":
-    verify_finite_differences()
+    from http_smoke import request
+    verify_finite_differences(request)

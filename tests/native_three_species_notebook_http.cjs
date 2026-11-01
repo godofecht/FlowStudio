@@ -91,8 +91,10 @@ async function run({post, routes, flow, read, parseCells, create, format}) {
   const runCheckpointNotebook = async () => {
     const callsBefore = threeCalls.length;
     const entriesBefore = threeEntries.length;
-    assert.deepEqual(await threeRunner.run(restartSource, "python"),
-      {ok:true, executed:3});
+    const checkpointRun = await threeRunner.run(restartSource, "python");
+    assert.deepEqual(checkpointRun, {ok:true, executed:3},
+      JSON.stringify(threeEntries.slice(entriesBefore).map(entry =>
+        ({language:entry.language, output:String(entry.output).slice(0, 500)}))));
     assert.deepEqual(threeCalls.slice(callsBefore), ["r", "r", "r"]);
     const outputs = threeEntries.slice(entriesBefore);
     assert.equal(outputs.length, 3);

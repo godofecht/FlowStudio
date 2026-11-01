@@ -34,7 +34,8 @@
 #          75 mean, 76 population variance, 77 RMS: 1..8 same-unit operands.
 #          78 median, 79 median absolute deviation: 1..8 same-unit operands.
 #          80 quantile(p, x1, ..., xn): Type-7 linear quantile, 1..7 samples.
-#          81-83 reserved for native dispersion statistics (PR #361).
+#          81 sample_variance, 82 sample_stddev, 83 stddev: SI-aware dispersion.
+#          Sample estimators require 2..8 operands (Bessel correction).
 #          84 fd1(left, right, step): centered first derivative.
 #          85 fd2(left, center, right, step): centered second derivative.
 #          86 laplacian2(center, left, right, down, up, dx, dy): 2D five-point stencil.
@@ -986,12 +987,17 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
             depth = base + 1
             stack[base] = quantity(output_value, output_dimension)
             predicate[base] = false
-        } elif opcode == 75 or opcode == 76 or opcode == 77 {
-            # Bounded physical statistics: mean, population variance and RMS.
+        } elif opcode == 75 or opcode == 76 or opcode == 77 or
+               opcode == 81 or opcode == 82 or opcode == 83 {
+            # Bounded physical statistics: mean, population/sample variance,
+            # population/sample standard deviation and RMS.
             # Scaling by the largest absolute component prevents premature
             # overflow in intermediate sums and square accumulations.
             let arity: i32 = instruction.exponent
             if arity < 1 or arity > 8 or depth < arity {
+                return failed(instruction.source_start)
+            }
+            if (opcode == 81 or opcode == 82) and arity < 2 {
                 return failed(instruction.source_start)
             }
             let base: i32 = depth - arity
@@ -1020,19 +1026,21 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
             }
             let mut output_value: f64 = normalized_mean * scale
             let mut output_dimension: Dimension = input_dimension
-            if opcode == 76 or opcode == 77 {
+            if opcode == 76 or opcode == 77 or opcode == 81 or opcode == 82 or opcode == 83 {
                 let mut normalized_squares: f64 = 0.0
                 if scale > 0.0 {
                     component = 0
                     while component < arity {
                         let mut normalized: f64 = stack[base + component].value / scale
-                        if opcode == 76 { normalized = normalized - normalized_mean }
+                        if opcode != 77 { normalized = normalized - normalized_mean }
                         normalized_squares = normalized_squares + normalized * normalized
                         component = component + 1
                     }
                 }
-                let normalized_second_moment: f64 = normalized_squares / (arity as f64)
-                if opcode == 76 {
+                let mut denominator: f64 = arity as f64
+                if opcode == 81 or opcode == 82 { denominator = (arity - 1) as f64 }
+                let normalized_second_moment: f64 = normalized_squares / denominator
+                if opcode == 76 or opcode == 81 {
                     output_dimension = product_dimension(input_dimension, input_dimension)
                     output_value = (scale * normalized_second_moment) * scale
                 } else {

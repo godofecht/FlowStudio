@@ -1,0 +1,105 @@
+# Native Flow 2.0 dispersion: real source lowering, typed IR and static SI inference.
+# flow run src/math_dispersion_smoke.flow
+import .math_dimensions { Dimension, length_dimension, product_dimension, same_dimension }
+import .math_expression_ir { MathResult }
+import .math_expression_source { ParsedMathExpression, parse_math_expression, evaluate_math_expression }
+import .math_static { MathInferredType, infer_math_expression_source, infer_math_equation_source }
+
+function near(actual: f64, expected: f64) -> bool {
+    let mut delta: f64 = actual - expected
+    if delta < 0.0 { delta = -delta }
+    return delta <= 0.00000000001
+}
+
+function main() -> i32 {
+    let length: Dimension = length_dimension()
+    let area: Dimension = product_dimension(length, length)
+    let mut result: MathResult = evaluate_math_expression("stddev(1m,3m)")
+    if not result.valid or not near(result.result.value,1.0) or
+       not same_dimension(result.result.dimension,length) { return 1 }
+    result = evaluate_math_expression("sample_variance(1m,3m)")
+    if not result.valid or not near(result.result.value,2.0) or
+       not same_dimension(result.result.dimension,area) { return 2 }
+    result = evaluate_math_expression("sample_stddev(1m,3m)")
+    if not result.valid or not near(result.result.value,1.4142135623730951) or
+       not same_dimension(result.result.dimension,length) { return 3 }
+    result = evaluate_math_expression("sample_variance(1m,2m,3m)")
+    if not result.valid or not near(result.result.value,1.0) { return 4 }
+    result = evaluate_math_expression("sample_stddev(1m,2m,3m)")
+    if not result.valid or not near(result.result.value,1.0) { return 5 }
+    result = evaluate_math_expression("stddev(1m,2m,3m)")
+    if not result.valid or not near(result.result.value,0.816496580927726) { return 6 }
+    result = evaluate_math_expression("stddev(7m)")
+    if not result.valid or result.result.value != 0.0 { return 7 }
+    result = evaluate_math_expression("sample_variance(7m)")
+    if result.valid or result.failed_at != 0 { return 8 }
+    result = evaluate_math_expression("sample_stddev(7m)")
+    if result.valid or result.failed_at != 0 { return 9 }
+    result = evaluate_math_expression("sample_variance(1km,3km)")
+    if not result.valid or not near(result.result.value / 1000000.0,2.0) or
+       not same_dimension(result.result.dimension,area) { return 10 }
+    result = evaluate_math_expression("stddev(1km,3km)")
+    if not result.valid or not near(result.result.value,1000.0) { return 11 }
+    result = evaluate_math_expression("2stddev(1m,3m)")
+    if not result.valid or not near(result.result.value,2.0) { return 12 }
+    result = evaluate_math_expression("sample_variance(1m,3m)+1m²")
+    if not result.valid or not near(result.result.value,3.0) { return 13 }
+    result = evaluate_math_expression("sample_stddev(1m,3m)+1m")
+    if not result.valid or not near(result.result.value,2.414213562373095) { return 14 }
+    result = evaluate_math_expression("stddev(1e30,1e30)")
+    if not result.valid or result.result.value != 0.0 { return 15 }
+    result = evaluate_math_expression("sample_variance(1e30,1e30)")
+    if not result.valid or result.result.value != 0.0 { return 16 }
+    result = evaluate_math_expression("stddev(1e20,-1e20)")
+    if not result.valid or not near(result.result.value / 1e20,1.0) { return 17 }
+    result = evaluate_math_expression("sample_variance(1e20,-1e20)")
+    if result.valid or result.failed_at != 0 { return 18 }
+    result = evaluate_math_expression("sample_variance(1m,2s)")
+    if result.valid or result.failed_at != 0 { return 19 }
+    result = evaluate_math_expression("stddev(true,1)")
+    if result.valid or result.failed_at != 0 { return 20 }
+    result = evaluate_math_expression("sample_stddev(1m,false)")
+    if result.valid or result.failed_at != 0 { return 21 }
+    let mut parsed: ParsedMathExpression = parse_math_expression("sample_variance(1m,3m)")
+    if not parsed.valid or parsed.program.count != 3 or
+       parsed.program.instructions[2].opcode != 81 or
+       parsed.program.instructions[2].exponent != 2 or
+       parsed.program.instructions[2].source_start != 0 or
+       parsed.program.instructions[2].source_end != 15 { return 22 }
+    parsed = parse_math_expression("sample_stddev(1m,3m)")
+    if not parsed.valid or parsed.program.instructions[2].opcode != 82 or
+       parsed.program.instructions[2].source_end != 13 { return 23 }
+    parsed = parse_math_expression("stddev(1m,3m)")
+    if not parsed.valid or parsed.program.instructions[2].opcode != 83 or
+       parsed.program.instructions[2].source_end != 6 { return 24 }
+    if parse_math_expression("stddev()").valid or
+       parse_math_expression("sample_variance(1,)").valid or
+       parse_math_expression("sample_stddev(,1)").valid or
+       parse_math_expression("sample_stddev(1,2").valid { return 25 }
+    if parse_math_expression("sample_variance(1,2,3,4,5,6,7,8,9)").valid or
+       parse_math_expression("sample_stddev(1,2,3,4,5,6,7,8,9)").valid or
+       parse_math_expression("stddev(1,2,3,4,5,6,7,8,9)").valid { return 26 }
+    let mut inferred: MathInferredType = infer_math_expression_source("sample_variance(1m,3m)")
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension,area) { return 27 }
+    inferred = infer_math_expression_source("sample_stddev(1m,3m)")
+    if not inferred.valid or not same_dimension(inferred.dimension,length) { return 28 }
+    inferred = infer_math_expression_source("stddev(1m,3m)")
+    if not inferred.valid or not same_dimension(inferred.dimension,length) { return 29 }
+    inferred = infer_math_expression_source("sample_variance(7m)")
+    if inferred.valid or inferred.failed_at != 0 { return 30 }
+    inferred = infer_math_expression_source("sample_stddev(7m)")
+    if inferred.valid or inferred.failed_at != 0 { return 31 }
+    inferred = infer_math_expression_source("stddev(1m,2s)")
+    if inferred.valid or inferred.failed_at != 0 { return 32 }
+    inferred = infer_math_expression_source("sample_stddev(true,3)")
+    if inferred.valid or inferred.failed_at != 0 { return 33 }
+    inferred = infer_math_equation_source("sample_variance(1m,3m)=2m²")
+    if not inferred.valid or not same_dimension(inferred.dimension,area) { return 34 }
+    inferred = infer_math_equation_source("sample_variance(1m,3m)=2m")
+    if inferred.valid { return 35 }
+    inferred = infer_math_equation_source("sample_stddev(1m,3m)=1m")
+    if not inferred.valid or not same_dimension(inferred.dimension,length) { return 36 }
+    println("native-math-dispersion-ok")
+    return 0
+}

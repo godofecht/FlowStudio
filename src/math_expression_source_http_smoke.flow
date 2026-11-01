@@ -487,6 +487,22 @@ function main() -> i32 {
     if not result.valid or not close(result.result.value, -1.0) { return 183 }
     result = evaluate_math_expression("det4(true,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1)")
     if result.valid or result.failed_at != 0 { return 184 }
+    # Real native HTTP and Monaco Run execute physical statistics, not snippets.
+    result = evaluate_math_expression("mean(1km,500m)")
+    if not result.valid or result.result.value != 750.0 or
+       not same_dimension(result.result.dimension, length_dimension()) { return 185 }
+    result = evaluate_math_expression("variance(1m,3m)")
+    if not result.valid or not close(result.result.value, 1.0) or
+       not same_dimension(result.result.dimension,
+           product_dimension(length_dimension(), length_dimension())) { return 186 }
+    result = evaluate_math_expression("rms(3m,4m)")
+    if not result.valid or not close(result.result.value, 3.5355339059327378) { return 187 }
+    result = evaluate_math_expression("mean(true,3)")
+    if result.valid or result.failed_at != 0 { return 188 }
+    result = evaluate_math_expression("variance(1m,3s)")
+    if result.valid or result.failed_at != 0 { return 189 }
+    result = evaluate_math_expression("mean(1e30,1e30)")
+    if not result.valid or not close(result.result.value / 1e30, 1.0) { return 190 }
     println("native-math-source-ok")
     return 0
 }

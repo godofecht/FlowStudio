@@ -1279,8 +1279,8 @@ def main() -> None:
     status, body = request("POST", "/api/run/flow", corrupted_variable_four, accepted_headers)
     assert status == 422, ("native four-variable corrupted assertion", status, body)
     malformed_variable_four = native_variable_four.replace(
-        "function constraint_failure(index: i32, position: i32) -> MathFourDimensionSolution {",
-        "function constraint_failure(index: i32, position: i32 -> MathFourDimensionSolution {",
+        "function constraint_failure(index:i32,position:i32) -> MathFourDimensionSolution {",
+        "function constraint_failure(index:i32,position:i32 -> MathFourDimensionSolution {",
         1,
     )
     assert malformed_variable_four != native_variable_four

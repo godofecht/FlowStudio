@@ -284,6 +284,23 @@ function main() -> i32 {
     if not inferred.valid or inferred.is_predicate or
        not same_dimension(inferred.dimension, dimensionless()) { return 88 }
 
+    # Factorial has a statically dimensionless type; integer range is runtime-only.
+    inferred = infer_math_expression_source("5!")
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension, dimensionless()) { return 89 }
+    inferred = infer_math_expression_source("factorial(3.5)")
+    if not inferred.valid or evaluate_math_expression("factorial(3.5)").valid { return 90 }
+    inferred = infer_math_expression_source("21!")
+    if not inferred.valid or evaluate_math_expression("21!").valid { return 91 }
+    inferred = infer_math_expression_source("2m!")
+    if inferred.valid or inferred.failed_at != 2 { return 92 }
+    inferred = infer_math_expression_source("true!")
+    if inferred.valid or inferred.failed_at != 4 { return 93 }
+    inferred = infer_math_equation_source("5! = 120")
+    if not inferred.valid or not same_dimension(inferred.dimension, dimensionless()) { return 94 }
+    inferred = infer_math_equation_source("5! = 120m")
+    if inferred.valid { return 95 }
+
     println("native-math-static-ok")
     return 0
 }

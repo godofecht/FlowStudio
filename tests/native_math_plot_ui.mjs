@@ -770,7 +770,7 @@ try {
       // brace-delimited, so one cosmetic indentation level can be removed
       // alongside comments/blank lines to respect the real 128 KiB limit.
       .filter(line => line.trim() && !line.trimStart().startsWith('#'))
-      .map(line => line.replace(/^export /, '').replace(/^ {4}/, '')).join('\n')
+      .map(line => line.trimStart().replace(/^export /, '')).join('\n')
   ).join('\n');
   assert.ok(Buffer.byteLength(nativeVariableFourSource, 'utf8') < 128 * 1024);
   assert.match(nativeVariableFourSource, /system\.count = 16/);

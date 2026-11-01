@@ -122,6 +122,50 @@ function main() -> i32 {
         "cross2(3m,4m,2/1s,1/1s)=-5m/1s", quantity(0.00000001, speed))
     if not cross_equation.valid or not cross_equation.satisfied or
        not near(cross_equation.residual.value, 0.0) { return 46 }
+    # Extended bounded native contractions share one typed loop for 5..8 components.
+    result = evaluate_math_expression("dot5(1,2,3,4,5,5,4,3,2,1)")
+    if not result.valid or result.result.value != 35.0 { return 47 }
+    result = evaluate_math_expression("dot6(1,2,3,4,5,6,6,5,4,3,2,1)")
+    if not result.valid or result.result.value != 56.0 { return 48 }
+    result = evaluate_math_expression("dot7(1,2,3,4,5,6,7,7,6,5,4,3,2,1)")
+    if not result.valid or result.result.value != 84.0 { return 49 }
+    result = evaluate_math_expression("dot8(1,2,3,4,5,6,7,8,8,7,6,5,4,3,2,1)")
+    if not result.valid or result.result.value != 120.0 { return 50 }
+    result = evaluate_math_expression("dot8(1m,2m,3m,4m,5m,6m,7m,8m,8/1s,7/1s,6/1s,5/1s,4/1s,3/1s,2/1s,1/1s)")
+    if not result.valid or result.result.value != 120.0 or
+       not same_dimension(result.result.dimension, speed) { return 51 }
+    result = evaluate_math_expression("dot5(1m,2s,3m,4m,5m,5kg,4kg,3kg,2kg,1kg)")
+    if result.valid or result.failed_at != 0 { return 52 }
+    result = evaluate_math_expression("dot8(1m,2m,3m,4m,5m,6m,7m,8m,8s,7s,6s,5s,4s,3s,2s,1m)")
+    if result.valid or result.failed_at != 0 { return 53 }
+    result = evaluate_math_expression("dot8(true,2,3,4,5,6,7,8,8,7,6,5,4,3,2,1)")
+    if result.valid or result.failed_at != 0 { return 54 }
+    result = evaluate_math_expression("dot5(1e20,1,1,1,1,1e20,1,1,1,1)")
+    if result.valid or result.failed_at != 0 { return 55 }
+    if parse_math_expression("dot5(1,2,3,4,5,6,7,8,9)").valid { return 56 }
+    if parse_math_expression("dot8(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17)").valid { return 57 }
+    let dot5_source: ParsedMathExpression = parse_math_expression("dot5(1,2,3,4,5,6,7,8,9,10)")
+    if not dot5_source.valid or dot5_source.program.count != 11 or
+       dot5_source.program.instructions[10].opcode != 62 or
+       dot5_source.program.instructions[10].source_start != 0 or
+       dot5_source.program.instructions[10].source_end != 4 { return 58 }
+    let dot8_source: ParsedMathExpression = parse_math_expression("dot8(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16)")
+    if not dot8_source.valid or dot8_source.program.count != 17 or
+       dot8_source.program.instructions[16].opcode != 65 or
+       dot8_source.program.instructions[16].source_end != 4 { return 59 }
+    inferred = infer_math_expression_source("dot8(1m,2m,3m,4m,5m,6m,7m,8m,8/1s,7/1s,6/1s,5/1s,4/1s,3/1s,2/1s,1/1s)")
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension, speed) { return 60 }
+    inferred = infer_math_expression_source("dot5(1m,2s,3m,4m,5m,5kg,4kg,3kg,2kg,1kg)")
+    if inferred.valid or inferred.failed_at != 0 { return 61 }
+    inferred = infer_math_expression_source("dot8(true,2,3,4,5,6,7,8,8,7,6,5,4,3,2,1)")
+    if inferred.valid or inferred.failed_at != 0 { return 62 }
+    let dot5_equation: MathEquationResult = evaluate_math_equation_source(
+        "dot5(1,2,3,4,5,5,4,3,2,1)=35", quantity(0.00000001, dimensionless()))
+    if not dot5_equation.valid or not dot5_equation.satisfied or
+       not near(dot5_equation.residual.value, 0.0) { return 63 }
+    result = evaluate_math_expression("dot5(1,2,3,4,5,5,4,3,2,1)+5")
+    if not result.valid or result.result.value != 40.0 { return 64 }
     println("native-math-dot-ok")
     return 0
 }

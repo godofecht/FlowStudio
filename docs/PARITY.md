@@ -1,3 +1,22 @@
+## 2026-11-01: seeded native SI median/MAD production HTTP qualification (verification pending)
+
+A deterministic seed-20261103 rational oracle generates 48 exact-value
+median/unscaled-MAD assertions (including order metamorphisms, odd/even
+arity, negative values, outliers, mixed km/m scales and SI inference)
+and 12 malformed-arity, dimension or predicate negative cases.
+Three 20-case source batches must compile and run through the actual
+Flow 2.0 compiler and production HTTP server; a deliberately incorrect
+numerical expectation must compile but return HTTP 422. The existing
+native variadic HTTP acceptance invokes this additional gate.
+Source budget: 128 KiB per request. Reproduction:
+[robust statistics HTTP guide](NATIVE_ROBUST_STATISTICS_HTTP.md).
+
+**Passed:** two isolated local Python oracle checks (rational cases and
+standard-library comparison). **Unexecuted:** local native Flow/R/HTTP
+and physical Chromium; full Linux/macOS CI is pending.
+**Not claimed:** compiler-generated multidimensional field lowering or
+full RStudio parity. Hosted workflow configuration unchanged.
+
 ## 2026-11-01: native 3D Flow/R/Python volume interoperability (4/4 exact-head CI passed)
 
 [PR #355](https://github.com/godofecht/FlowStudio/pull/355) merged as

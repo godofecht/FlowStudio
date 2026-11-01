@@ -45,3 +45,25 @@ real HTTP runtime, rather than mocked kernels. Linux/macOS CI qualification
 and physical-browser checks must be reported separately. This is a
 cross-language numerical acceptance test, **not** generalized native
 multidimensional Flow `field` lowering or complete RStudio parity.
+
+## Real mixed-language notebook acceptance
+
+The same checked-in numerical programs also run as **six executable cells**
+through the production notebook controller in
+`tests/native_mixed_notebook_http.cjs` and
+`tests/native_three_species_notebook_http.cjs`. The sequence is native Flow,
+persistent Python, three separate R input-transfer cells and an R midpoint
+integration/plot cell. The notebook does not pretend Python and R share a
+namespace: all 3,072 seed values are explicitly serialized into bounded R
+assignments. The 3,072 returned R values are checked by the persistent
+Python stencil, with a single-cell mutation required to return HTTP 422.
+Real R SVG/PDF graphics, complete `.fsnb` output restoration and recovery
+of both persistent kernels are asserted. Each cell remains within the 64 KiB
+notebook source limit, and the verifier payload stays below 128 KiB.
+
+This path is invoked by the existing `tests/http_smoke.py` under
+`python3 scripts/verify_native.py --require-r`; it requires a running
+production FlowStudio server and real Flow, Python and R runtimes.
+The new six-cell scenario is **not** separately exercised through physical
+Chromium. Its Linux/macOS CI status must be established on the exact commit
+before treating it as verified.

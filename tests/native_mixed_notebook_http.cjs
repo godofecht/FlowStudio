@@ -116,6 +116,10 @@ async function main() {
   const pyRecovery = await post(routes.python, "print(len(initial_field()))");
   assert.equal(pyRecovery.status, 200, pyRecovery.body);
   assert.equal(pyRecovery.body.trim(), "256");
+  await require("./native_three_species_notebook_http.cjs").run({
+    post, routes, flow, read, parseCells, create, format
+  });
   console.log("PASS: real Flow/Python/R notebook, 256-cell Fourier oracle, R plot, persistent kernels, portable restore, negative and resource gates");
+  console.log("PASS: real six-cell Flow/Python/R notebook, 3072-cell R anisotropic PDE, Python oracle, graphics, persistence and recovery");
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

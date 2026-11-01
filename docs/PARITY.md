@@ -5294,3 +5294,20 @@ merged as [6468094](https://github.com/godofecht/FlowStudio/commit/64680943968fb
 acceptance remain unverified.** Package updates/removal, dependency conflict
 resolution and multi-user installation isolation remain unimplemented. No
 hosted CI configuration was changed.
+
+## 2026-11-01: native SI robust-statistics R/Python interoperability (pending verification)
+
+[PR #358](https://github.com/godofecht/FlowStudio/pull/358) adds a real
+persistent R/Python HTTP cross-check for the 48 valid seeded native Flow
+median and unscaled MAD cases. R uses `mad(..., constant=1)` rather than its
+scaled default, converts kilometres to metres, and emits bounded numbered
+frames. A separate persistent Python `Fraction`/`statistics.median` oracle
+recomputes the numerical expectations and must reject finite corruption and
+truncation with HTTP 422; both kernels must recover. This gate is invoked by
+the existing native HTTP verification without workflow edits.
+
+**Passed:** none claimed for this PR yet. **Failed:** none observed yet.
+**Skipped:** not yet known. **Unexecuted:** local native Flow/R/HTTP and
+independent macOS physical Chromium. **Pending:** Linux/macOS exact-head
+source/native/HTTP/Chromium CI and post-merge CI. This does not establish
+compiler-generated multidimensional `field` lowering or full RStudio parity.

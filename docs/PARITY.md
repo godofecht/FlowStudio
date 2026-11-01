@@ -1,3 +1,23 @@
+## 2026-11-01: directed anisotropic three-species Python/R PDE (qualification pending)
+
+Checked-in `examples/coupled_three_species_python.py` and
+`examples/coupled_three_species_r.R` add a deterministic seed-9137,
+three-species 32×32 reaction-diffusion problem with distinct x/y
+diffusion coefficients and non-reversible conservative directed exchange.
+The production HTTP test transfers 3,072 values through actual persistent
+Python and R kernels, checks all R midpoint results with a separate Python
+stencil, verifies actual R graphics, five HTTP 422 negative cases and
+persistent-kernel recovery. A separate Fourier 3×3 matrix oracle checks
+the full 3,072-cell solution at 0/24/48 steps, alongside replay,
+semigroup, conservation, orientation, typed-invalid and resource-limit
+cases. [Reproduction](COUPLED_THREE_SPECIES_PDE_HTTP.md).
+
+**Pending:** exact-head Linux/macOS native Flow/HTTP/R/Chromium CI and
+post-merge qualification. **Unexecuted:** independent macOS physical
+browser and a dedicated physical-browser visualization of this case.
+This is not generalized compiler-generated multidimensional Flow
+`field` lowering or RStudio parity. Hosted CI is unchanged.
+
 ## 2026-11-01: production 32×32 Python → R → Python coupled PDE (4/4 exact-head and post-merge CI)
 
 Checked-in `examples/coupled_interop_python.py` and

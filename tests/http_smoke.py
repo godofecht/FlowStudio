@@ -240,6 +240,19 @@ def main() -> None:
         assert measured <= previous_seeded_energy + tolerance, (
             "seeded 3D energy increased", step)
         previous_seeded_energy = measured
+    # The same actual Flow executable must reject an incorrect periodic
+    # impulse Green function even though the 64-step Fourier/seeded fields,
+    # final masses and plots remain numerically unchanged.
+    corrupted_impulse = volume_source.replace(
+        "if i == left or i == right { expected = 0.5 }",
+        "if i == left or i == right { expected = 0.4 }", 1)
+    assert corrupted_impulse != volume_source
+    status, negative_body = request("POST", "/api/check/flow",
+                                    corrupted_impulse, accepted_headers)
+    assert status == 200, ("3D impulse negative compile", status, negative_body[:500])
+    status, negative_body = request("POST", "/api/run/flow",
+                                    corrupted_impulse, accepted_headers)
+    assert status == 422, ("3D impulse invariant rejection", status, negative_body[:500])
     # A sign-flipped seeded invariant still conserves mass and can leave the
     # Fourier checks intact; production runtime must fail closed with 422.
     inverted_seeded_energy = volume_source.replace(

@@ -629,262 +629,260 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
         # A recognized function following a complete scalar primary is an
         # implicit typed product: 2sin(x), 3mcos(x), sin(x)cos(y).
         # Unknown names still fail closed; only recognized calls enter here.
-        {
-            let mut unary_opcode: i32 = 0
-            let mut unary_width: i32 = 0
-            if c == 226 and index + 2 < length and
-               bytes[index + 1] == 136 and bytes[index + 2] == 154 { # √
-                unary_opcode = 21
-                unary_width = 3
-            } elif c == 226 and index + 2 < length and
-                   bytes[index + 1] == 136 and bytes[index + 2] == 155 { # ∛
-                unary_opcode = 44
-                unary_width = 3
-            } elif c == 226 and index + 2 < length and
-                   bytes[index + 1] == 136 and bytes[index + 2] == 156 { # ∜
-                unary_opcode = 46
-                unary_width = 3
-            } elif c == 97 and index + 3 < length and
-                   bytes[index + 1] == 98 and bytes[index + 2] == 115 and
-                   bytes[index + 3] == 40 { # abs(
-                unary_opcode = 20
-                unary_width = 3
-            } elif c == 115 and index + 4 < length and
-                   bytes[index + 1] == 113 and bytes[index + 2] == 114 and
-                   bytes[index + 3] == 116 and bytes[index + 4] == 40 { # sqrt(
-                unary_opcode = 21
-                unary_width = 4
-            } elif index + 4 < length and bytes[index + 4] == 40 and
-                   identifier_matches(bytes, index, index + 4, "cbrt") {
-                unary_opcode = 44
-                unary_width = 4
-            } elif index + 5 < length and bytes[index + 5] == 40 and
-                   identifier_matches(bytes, index, index + 5, "root4") {
-                unary_opcode = 46
-                unary_width = 5
-            } elif index + 9 < length and bytes[index + 9] == 40 and
-                   identifier_matches(bytes, index, index + 9, "factorial") {
-                unary_opcode = 56
-                unary_width = 9
-            } elif index + 5 < length and bytes[index + 5] == 40 and
-                   identifier_matches(bytes, index, index + 5, "root5") {
-                unary_opcode = 47
-                unary_width = 5
-            } elif index + 5 < length and bytes[index + 5] == 40 and
-                   identifier_matches(bytes, index, index + 5, "root6") {
-                unary_opcode = 48
-                unary_width = 5
-            } elif index + 5 < length and bytes[index + 5] == 40 and
-                   identifier_matches(bytes, index, index + 5, "root7") {
-                unary_opcode = 49
-                unary_width = 5
-            } elif index + 5 < length and bytes[index + 5] == 40 and
-                   identifier_matches(bytes, index, index + 5, "root8") {
-                unary_opcode = 50
-                unary_width = 5
-            } elif c == 101 and index + 3 < length and
-                   bytes[index + 1] == 120 and bytes[index + 2] == 112 and
-                   bytes[index + 3] == 40 { # exp(
-                unary_opcode = 25
-                unary_width = 3
-            } elif index + 4 < length and bytes[index + 4] == 40 and
-                   identifier_matches(bytes, index, index + 4, "sign") {
-                # Native signed direction for upwind fluxes; physical units cancel.
-                unary_opcode = 57
-                unary_width = 4
-            } elif index + 3 < length and bytes[index + 3] == 40 and
-                   identifier_matches(bytes, index, index + 3, "sgn") {
-                unary_opcode = 57
-                unary_width = 3
-            } elif index + 3 < length and bytes[index + 3] == 40 and
-                   identifier_matches(bytes, index, index + 3, "sin") {
-                unary_opcode = 28
-                unary_width = 3
-            } elif index + 3 < length and bytes[index + 3] == 40 and
-                   identifier_matches(bytes, index, index + 3, "cos") {
-                unary_opcode = 29
-                unary_width = 3
-            } elif index + 3 < length and bytes[index + 3] == 40 and
-                   identifier_matches(bytes, index, index + 3, "tan") {
-                unary_opcode = 30
-                unary_width = 3
-            } elif index + 4 < length and bytes[index + 4] == 40 and
-                   identifier_matches(bytes, index, index + 4, "sinh") {
-                unary_opcode = 35
-                unary_width = 4
-            } elif index + 4 < length and bytes[index + 4] == 40 and
-                   identifier_matches(bytes, index, index + 4, "cosh") {
-                unary_opcode = 36
-                unary_width = 4
-            } elif index + 4 < length and bytes[index + 4] == 40 and
-                   identifier_matches(bytes, index, index + 4, "tanh") {
-                unary_opcode = 37
-                unary_width = 4
-            } elif index + 5 < length and bytes[index + 5] == 40 and
-                   identifier_matches(bytes, index, index + 5, "asinh") {
-                unary_opcode = 38
-                unary_width = 5
-            } elif index + 5 < length and bytes[index + 5] == 40 and
-                   identifier_matches(bytes, index, index + 5, "acosh") {
-                unary_opcode = 39
-                unary_width = 5
-            } elif index + 5 < length and bytes[index + 5] == 40 and
-                   identifier_matches(bytes, index, index + 5, "atanh") {
-                unary_opcode = 40
-                unary_width = 5
-            } elif index + 4 < length and bytes[index + 4] == 40 and
-                   identifier_matches(bytes, index, index + 4, "asin") {
-                unary_opcode = 33
-                unary_width = 4
-            } elif index + 4 < length and bytes[index + 4] == 40 and
-                   identifier_matches(bytes, index, index + 4, "acos") {
-                unary_opcode = 34
-                unary_width = 4
-            } elif index + 4 < length and bytes[index + 4] == 40 and
-                   identifier_matches(bytes, index, index + 4, "atan") {
-                unary_opcode = 31
-                unary_width = 4
-            } elif index + 5 < length and bytes[index + 5] == 40 and
-                   identifier_matches(bytes, index, index + 5, "atan2") {
-                unary_opcode = 32
-                unary_width = 5
-            } elif index + 2 < length and bytes[index + 2] == 40 and
-                   identifier_matches(bytes, index, index + 2, "ln") {
-                unary_opcode = 26
-                unary_width = 2
-            } elif index + 5 < length and bytes[index + 5] == 40 and
-                   identifier_matches(bytes, index, index + 5, "log10") {
-                unary_opcode = 27
-                unary_width = 5
-            } elif index + 5 < length and bytes[index + 5] == 40 and
-                   identifier_matches(bytes, index, index + 5, "log1p") {
-                unary_opcode = 42
-                unary_width = 5
-            } elif index + 5 < length and bytes[index + 5] == 40 and
-                   identifier_matches(bytes, index, index + 5, "expm1") {
-                unary_opcode = 43
-                unary_width = 5
-            } elif index + 3 < length and bytes[index + 3] == 40 and
-                   identifier_matches(bytes, index, index + 3, "log") {
-                unary_opcode = 26
-                unary_width = 3
-            } elif index + 3 < length and bytes[index + 3] == 40 and
-                   identifier_matches(bytes, index, index + 3, "min") {
-                unary_opcode = 7
-                unary_width = 3
-            } elif index + 3 < length and bytes[index + 3] == 40 and
-                   identifier_matches(bytes, index, index + 3, "max") {
-                unary_opcode = 8
-                unary_width = 3
-            } elif index + 5 < length and bytes[index + 5] == 40 and
-                   identifier_matches(bytes, index, index + 5, "norm8") {
-                unary_opcode = 55
-                unary_width = 5
-            } elif index + 5 < length and bytes[index + 5] == 40 and
-                   identifier_matches(bytes, index, index + 5, "norm7") {
-                unary_opcode = 54
-                unary_width = 5
-            } elif index + 5 < length and bytes[index + 5] == 40 and
-                   identifier_matches(bytes, index, index + 5, "norm6") {
-                unary_opcode = 53
-                unary_width = 5
-            } elif index + 5 < length and bytes[index + 5] == 40 and
-                   identifier_matches(bytes, index, index + 5, "norm5") {
-                unary_opcode = 52
-                unary_width = 5
-            } elif index + 4 < length and bytes[index + 4] == 40 and
-                   identifier_matches(bytes, index, index + 4, "dot8") {
-                unary_opcode = 65
-                unary_width = 4
-            } elif index + 4 < length and bytes[index + 4] == 40 and
-                   identifier_matches(bytes, index, index + 4, "dot7") {
-                unary_opcode = 64
-                unary_width = 4
-            } elif index + 4 < length and bytes[index + 4] == 40 and
-                   identifier_matches(bytes, index, index + 4, "dot6") {
-                unary_opcode = 63
-                unary_width = 4
-            } elif index + 4 < length and bytes[index + 4] == 40 and
-                   identifier_matches(bytes, index, index + 4, "dot5") {
-                unary_opcode = 62
-                unary_width = 4
-            } elif index + 4 < length and bytes[index + 4] == 40 and
-                   identifier_matches(bytes, index, index + 4, "dot2") {
-                unary_opcode = 58
-                unary_width = 4
-            } elif index + 4 < length and bytes[index + 4] == 40 and
-                   identifier_matches(bytes, index, index + 4, "dot3") {
-                unary_opcode = 59
-                unary_width = 4
-            } elif index + 4 < length and bytes[index + 4] == 40 and
-                   identifier_matches(bytes, index, index + 4, "dot4") {
-                unary_opcode = 61
-                unary_width = 4
-            } elif index + 6 < length and bytes[index + 6] == 40 and
-                   identifier_matches(bytes, index, index + 6, "cross2") {
-                unary_opcode = 60
-                unary_width = 6
-            } elif index + 5 < length and bytes[index + 5] == 40 and
-                   identifier_matches(bytes, index, index + 5, "norm4") {
-                unary_opcode = 51
-                unary_width = 5
-            } elif index + 5 < length and bytes[index + 5] == 40 and
-                   identifier_matches(bytes, index, index + 5, "norm3") {
-                unary_opcode = 45
-                unary_width = 5
-            } elif index + 4 < length and bytes[index + 4] == 40 and
-                   identifier_matches(bytes, index, index + 4, "norm") {
-                unary_opcode = 22
-                unary_width = 4
-            } elif index + 12 < length and bytes[index + 12] == 40 and
-                   identifier_matches(bytes, index, index + 12, "smootherstep") {
-                unary_opcode = 68
-                unary_width = 12
-            } elif index + 10 < length and bytes[index + 10] == 40 and
-                   identifier_matches(bytes, index, index + 10, "smoothstep") {
-                unary_opcode = 67
-                unary_width = 10
-            } elif index + 4 < length and bytes[index + 4] == 40 and
-                   identifier_matches(bytes, index, index + 4, "lerp") {
-                unary_opcode = 66
-                unary_width = 4
-            } elif index + 5 < length and bytes[index + 5] == 40 and
-                   identifier_matches(bytes, index, index + 5, "clamp") {
-                unary_opcode = 9
-                unary_width = 5
-            } elif index + 5 < length and bytes[index + 5] == 40 and
-                   identifier_matches(bytes, index, index + 5, "where") {
-                unary_opcode = 19
-                unary_width = 5
-            }
-            if unary_opcode != 0 {
-                if not expect_operand {
-                    # Same left-associative precedence and typed opcode as
-                    # explicit '*' and implicit parenthesized products.
-                    while top > 0 and operators[top - 1] != -1 and
-                          precedence(operators[top - 1]) >= precedence(3) {
-                        top = top - 1
-                        if count >= 64 { return source_error(index, length) }
-                        instructions[count] = make_instruction(operators[top],
-                            quantity(0.0, dimensionless()),
-                            positions[top], positions[top] + widths[top])
-                        count = count + 1
-                    }
-                    if top >= 63 { return source_error(index, length) }
-                    operators[top] = 3
-                    positions[top] = index
-                    widths[top] = 0
-                    top = top + 1
+        let mut unary_opcode: i32 = 0
+        let mut unary_width: i32 = 0
+        if c == 226 and index + 2 < length and
+           bytes[index + 1] == 136 and bytes[index + 2] == 154 { # √
+            unary_opcode = 21
+            unary_width = 3
+        } elif c == 226 and index + 2 < length and
+               bytes[index + 1] == 136 and bytes[index + 2] == 155 { # ∛
+            unary_opcode = 44
+            unary_width = 3
+        } elif c == 226 and index + 2 < length and
+               bytes[index + 1] == 136 and bytes[index + 2] == 156 { # ∜
+            unary_opcode = 46
+            unary_width = 3
+        } elif c == 97 and index + 3 < length and
+               bytes[index + 1] == 98 and bytes[index + 2] == 115 and
+               bytes[index + 3] == 40 { # abs(
+            unary_opcode = 20
+            unary_width = 3
+        } elif c == 115 and index + 4 < length and
+               bytes[index + 1] == 113 and bytes[index + 2] == 114 and
+               bytes[index + 3] == 116 and bytes[index + 4] == 40 { # sqrt(
+            unary_opcode = 21
+            unary_width = 4
+        } elif index + 4 < length and bytes[index + 4] == 40 and
+               identifier_matches(bytes, index, index + 4, "cbrt") {
+            unary_opcode = 44
+            unary_width = 4
+        } elif index + 5 < length and bytes[index + 5] == 40 and
+               identifier_matches(bytes, index, index + 5, "root4") {
+            unary_opcode = 46
+            unary_width = 5
+        } elif index + 9 < length and bytes[index + 9] == 40 and
+               identifier_matches(bytes, index, index + 9, "factorial") {
+            unary_opcode = 56
+            unary_width = 9
+        } elif index + 5 < length and bytes[index + 5] == 40 and
+               identifier_matches(bytes, index, index + 5, "root5") {
+            unary_opcode = 47
+            unary_width = 5
+        } elif index + 5 < length and bytes[index + 5] == 40 and
+               identifier_matches(bytes, index, index + 5, "root6") {
+            unary_opcode = 48
+            unary_width = 5
+        } elif index + 5 < length and bytes[index + 5] == 40 and
+               identifier_matches(bytes, index, index + 5, "root7") {
+            unary_opcode = 49
+            unary_width = 5
+        } elif index + 5 < length and bytes[index + 5] == 40 and
+               identifier_matches(bytes, index, index + 5, "root8") {
+            unary_opcode = 50
+            unary_width = 5
+        } elif c == 101 and index + 3 < length and
+               bytes[index + 1] == 120 and bytes[index + 2] == 112 and
+               bytes[index + 3] == 40 { # exp(
+            unary_opcode = 25
+            unary_width = 3
+        } elif index + 4 < length and bytes[index + 4] == 40 and
+               identifier_matches(bytes, index, index + 4, "sign") {
+            # Native signed direction for upwind fluxes; physical units cancel.
+            unary_opcode = 57
+            unary_width = 4
+        } elif index + 3 < length and bytes[index + 3] == 40 and
+               identifier_matches(bytes, index, index + 3, "sgn") {
+            unary_opcode = 57
+            unary_width = 3
+        } elif index + 3 < length and bytes[index + 3] == 40 and
+               identifier_matches(bytes, index, index + 3, "sin") {
+            unary_opcode = 28
+            unary_width = 3
+        } elif index + 3 < length and bytes[index + 3] == 40 and
+               identifier_matches(bytes, index, index + 3, "cos") {
+            unary_opcode = 29
+            unary_width = 3
+        } elif index + 3 < length and bytes[index + 3] == 40 and
+               identifier_matches(bytes, index, index + 3, "tan") {
+            unary_opcode = 30
+            unary_width = 3
+        } elif index + 4 < length and bytes[index + 4] == 40 and
+               identifier_matches(bytes, index, index + 4, "sinh") {
+            unary_opcode = 35
+            unary_width = 4
+        } elif index + 4 < length and bytes[index + 4] == 40 and
+               identifier_matches(bytes, index, index + 4, "cosh") {
+            unary_opcode = 36
+            unary_width = 4
+        } elif index + 4 < length and bytes[index + 4] == 40 and
+               identifier_matches(bytes, index, index + 4, "tanh") {
+            unary_opcode = 37
+            unary_width = 4
+        } elif index + 5 < length and bytes[index + 5] == 40 and
+               identifier_matches(bytes, index, index + 5, "asinh") {
+            unary_opcode = 38
+            unary_width = 5
+        } elif index + 5 < length and bytes[index + 5] == 40 and
+               identifier_matches(bytes, index, index + 5, "acosh") {
+            unary_opcode = 39
+            unary_width = 5
+        } elif index + 5 < length and bytes[index + 5] == 40 and
+               identifier_matches(bytes, index, index + 5, "atanh") {
+            unary_opcode = 40
+            unary_width = 5
+        } elif index + 4 < length and bytes[index + 4] == 40 and
+               identifier_matches(bytes, index, index + 4, "asin") {
+            unary_opcode = 33
+            unary_width = 4
+        } elif index + 4 < length and bytes[index + 4] == 40 and
+               identifier_matches(bytes, index, index + 4, "acos") {
+            unary_opcode = 34
+            unary_width = 4
+        } elif index + 4 < length and bytes[index + 4] == 40 and
+               identifier_matches(bytes, index, index + 4, "atan") {
+            unary_opcode = 31
+            unary_width = 4
+        } elif index + 5 < length and bytes[index + 5] == 40 and
+               identifier_matches(bytes, index, index + 5, "atan2") {
+            unary_opcode = 32
+            unary_width = 5
+        } elif index + 2 < length and bytes[index + 2] == 40 and
+               identifier_matches(bytes, index, index + 2, "ln") {
+            unary_opcode = 26
+            unary_width = 2
+        } elif index + 5 < length and bytes[index + 5] == 40 and
+               identifier_matches(bytes, index, index + 5, "log10") {
+            unary_opcode = 27
+            unary_width = 5
+        } elif index + 5 < length and bytes[index + 5] == 40 and
+               identifier_matches(bytes, index, index + 5, "log1p") {
+            unary_opcode = 42
+            unary_width = 5
+        } elif index + 5 < length and bytes[index + 5] == 40 and
+               identifier_matches(bytes, index, index + 5, "expm1") {
+            unary_opcode = 43
+            unary_width = 5
+        } elif index + 3 < length and bytes[index + 3] == 40 and
+               identifier_matches(bytes, index, index + 3, "log") {
+            unary_opcode = 26
+            unary_width = 3
+        } elif index + 3 < length and bytes[index + 3] == 40 and
+               identifier_matches(bytes, index, index + 3, "min") {
+            unary_opcode = 7
+            unary_width = 3
+        } elif index + 3 < length and bytes[index + 3] == 40 and
+               identifier_matches(bytes, index, index + 3, "max") {
+            unary_opcode = 8
+            unary_width = 3
+        } elif index + 5 < length and bytes[index + 5] == 40 and
+               identifier_matches(bytes, index, index + 5, "norm8") {
+            unary_opcode = 55
+            unary_width = 5
+        } elif index + 5 < length and bytes[index + 5] == 40 and
+               identifier_matches(bytes, index, index + 5, "norm7") {
+            unary_opcode = 54
+            unary_width = 5
+        } elif index + 5 < length and bytes[index + 5] == 40 and
+               identifier_matches(bytes, index, index + 5, "norm6") {
+            unary_opcode = 53
+            unary_width = 5
+        } elif index + 5 < length and bytes[index + 5] == 40 and
+               identifier_matches(bytes, index, index + 5, "norm5") {
+            unary_opcode = 52
+            unary_width = 5
+        } elif index + 4 < length and bytes[index + 4] == 40 and
+               identifier_matches(bytes, index, index + 4, "dot8") {
+            unary_opcode = 65
+            unary_width = 4
+        } elif index + 4 < length and bytes[index + 4] == 40 and
+               identifier_matches(bytes, index, index + 4, "dot7") {
+            unary_opcode = 64
+            unary_width = 4
+        } elif index + 4 < length and bytes[index + 4] == 40 and
+               identifier_matches(bytes, index, index + 4, "dot6") {
+            unary_opcode = 63
+            unary_width = 4
+        } elif index + 4 < length and bytes[index + 4] == 40 and
+               identifier_matches(bytes, index, index + 4, "dot5") {
+            unary_opcode = 62
+            unary_width = 4
+        } elif index + 4 < length and bytes[index + 4] == 40 and
+               identifier_matches(bytes, index, index + 4, "dot2") {
+            unary_opcode = 58
+            unary_width = 4
+        } elif index + 4 < length and bytes[index + 4] == 40 and
+               identifier_matches(bytes, index, index + 4, "dot3") {
+            unary_opcode = 59
+            unary_width = 4
+        } elif index + 4 < length and bytes[index + 4] == 40 and
+               identifier_matches(bytes, index, index + 4, "dot4") {
+            unary_opcode = 61
+            unary_width = 4
+        } elif index + 6 < length and bytes[index + 6] == 40 and
+               identifier_matches(bytes, index, index + 6, "cross2") {
+            unary_opcode = 60
+            unary_width = 6
+        } elif index + 5 < length and bytes[index + 5] == 40 and
+               identifier_matches(bytes, index, index + 5, "norm4") {
+            unary_opcode = 51
+            unary_width = 5
+        } elif index + 5 < length and bytes[index + 5] == 40 and
+               identifier_matches(bytes, index, index + 5, "norm3") {
+            unary_opcode = 45
+            unary_width = 5
+        } elif index + 4 < length and bytes[index + 4] == 40 and
+               identifier_matches(bytes, index, index + 4, "norm") {
+            unary_opcode = 22
+            unary_width = 4
+        } elif index + 12 < length and bytes[index + 12] == 40 and
+               identifier_matches(bytes, index, index + 12, "smootherstep") {
+            unary_opcode = 68
+            unary_width = 12
+        } elif index + 10 < length and bytes[index + 10] == 40 and
+               identifier_matches(bytes, index, index + 10, "smoothstep") {
+            unary_opcode = 67
+            unary_width = 10
+        } elif index + 4 < length and bytes[index + 4] == 40 and
+               identifier_matches(bytes, index, index + 4, "lerp") {
+            unary_opcode = 66
+            unary_width = 4
+        } elif index + 5 < length and bytes[index + 5] == 40 and
+               identifier_matches(bytes, index, index + 5, "clamp") {
+            unary_opcode = 9
+            unary_width = 5
+        } elif index + 5 < length and bytes[index + 5] == 40 and
+               identifier_matches(bytes, index, index + 5, "where") {
+            unary_opcode = 19
+            unary_width = 5
+        }
+        if unary_opcode != 0 {
+            if not expect_operand {
+                # Same left-associative precedence and typed opcode as
+                # explicit '*' and implicit parenthesized products.
+                while top > 0 and operators[top - 1] != -1 and
+                      precedence(operators[top - 1]) >= precedence(3) {
+                    top = top - 1
+                    if count >= 64 { return source_error(index, length) }
+                    instructions[count] = make_instruction(operators[top],
+                        quantity(0.0, dimensionless()),
+                        positions[top], positions[top] + widths[top])
+                    count = count + 1
                 }
-                if top >= 64 { return source_error(index, length) }
-                operators[top] = unary_opcode
+                if top >= 63 { return source_error(index, length) }
+                operators[top] = 3
                 positions[top] = index
-                widths[top] = unary_width
+                widths[top] = 0
                 top = top + 1
-                index = index + unary_width
-                expect_operand = true
-                continue
             }
+            if top >= 64 { return source_error(index, length) }
+            operators[top] = unary_opcode
+            positions[top] = index
+            widths[top] = unary_width
+            top = top + 1
+            index = index + unary_width
+            expect_operand = true
+            continue
         }
         let initial_width: i32 = identifier_start_width(bytes, index, length)
         if initial_width > 0 {

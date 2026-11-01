@@ -24,6 +24,7 @@
 #          57 sign/sgn, 58 dot2(ax,ay,bx,by), 59 dot3(ax,ay,az,bx,by,bz).
 #          60 cross2(ax,ay,bx,by): signed 2D exterior product.
 #          61 dot4(ax,ay,az,aw,bx,by,bz,bw): four-component contraction.
+#          62-65 dot5..dot8: five-through-eight-component typed contractions.
 # Predicate values are dimensionless 0/1 with a separate runtime type bit.
 # where and logical operators evaluate operands eagerly (no short circuit).
 # Unsupported instructions and type mismatches fail closed.
@@ -848,13 +849,15 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
             depth = depth - 1
             stack[depth - 1] = result.quantity
             predicate[depth - 1] = result_predicate
-        } elif opcode == 58 or opcode == 59 or opcode == 60 or opcode == 61 {
+        } elif opcode == 58 or opcode == 59 or opcode == 60 or opcode == 61 or
+             (opcode >= 62 and opcode <= 65) {
             # Native physical contractions. The first half of the arguments
             # forms one vector and the second half forms the other. Both
             # vectors must be internally dimensionally homogeneous.
             let mut components: i32 = 2
             if opcode == 59 { components = 3 }
             if opcode == 61 { components = 4 }
+            if opcode >= 62 and opcode <= 65 { components = opcode - 57 }
             let arity: i32 = components * 2
             if depth < arity { return failed(instruction.source_start) }
             let first: Quantity = stack[depth - arity]

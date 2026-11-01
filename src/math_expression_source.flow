@@ -324,6 +324,7 @@ function function_arity(opcode: i32) -> i32 {
     if opcode == 51 or opcode == 58 or opcode == 60 { return 4 }
     if opcode == 59 { return 6 }
     if opcode == 61 { return 8 }
+    if opcode >= 62 and opcode <= 65 { return (opcode - 57) * 2 }
     if opcode >= 52 and opcode <= 55 { return opcode - 47 }
     return 0
 }
@@ -721,6 +722,22 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
                    identifier_matches(bytes, index, index + 5, "norm5") {
                 unary_opcode = 52
                 unary_width = 5
+            } elif index + 4 < length and bytes[index + 4] == 40 and
+                   identifier_matches(bytes, index, index + 4, "dot8") {
+                unary_opcode = 65
+                unary_width = 4
+            } elif index + 4 < length and bytes[index + 4] == 40 and
+                   identifier_matches(bytes, index, index + 4, "dot7") {
+                unary_opcode = 64
+                unary_width = 4
+            } elif index + 4 < length and bytes[index + 4] == 40 and
+                   identifier_matches(bytes, index, index + 4, "dot6") {
+                unary_opcode = 63
+                unary_width = 4
+            } elif index + 4 < length and bytes[index + 4] == 40 and
+                   identifier_matches(bytes, index, index + 4, "dot5") {
+                unary_opcode = 62
+                unary_width = 4
             } elif index + 4 < length and bytes[index + 4] == 40 and
                    identifier_matches(bytes, index, index + 4, "dot2") {
                 unary_opcode = 58

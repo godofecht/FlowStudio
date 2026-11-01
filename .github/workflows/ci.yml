@@ -116,6 +116,7 @@ jobs:
           flow run src/math_norm3_smoke.flow
           flow run src/math_norm4_smoke.flow
           flow run src/math_norm_extended_smoke.flow
+          flow run src/math_dot_smoke.flow
           flow run src/math_physical_ode_smoke.flow
           flow run examples/native_math_bootstrap.flow
           flow run examples/native_periodic_heat.flow

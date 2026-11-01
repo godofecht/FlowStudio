@@ -58,7 +58,9 @@ def compact_native_math_line(line: str, *, tighten_equals: bool = False,
             or (tighten_equals and result[-1] == "=")
             # Flow's lexer can absorb adjacent slash or star into a token;
             # keep their surrounding spaces when compacting native bundles.
-            or (tighten_math_ops and (
+            or (tighten_math_ops and not (
+                result[-1] in "<>!=+-" and source[index + 1:index + 2] in "=+"
+            ) and (
                 result[-1] in "=+" or source[index + 1:index + 2] in "=+"
             ))
         ):
@@ -1268,6 +1270,10 @@ def main() -> None:
     assert compact_native_math_line(
         'value: a.value * b.value', tighten_math_ops=True
     ) == 'value:a.value * b.value'
+    assert compact_native_math_line(
+        'let a: array<i32, 4> = [0, 1]',
+        tighten_equals=True, tighten_math_ops=True
+    ) == 'let a:array<i32,4> =[0,1]'
     native_variable_four = "\n".join(
         "\n".join(
             compact_native_math_line(line, tighten_equals=True, tighten_math_ops=True)

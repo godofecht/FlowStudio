@@ -1,3 +1,28 @@
+## 2026-11-01: native SI determinant metamorphic HTTP qualification (4/4 exact-head CI passed)
+
+[PR #347](https://github.com/godofecht/FlowStudio/pull/347) merged as
+[b5f78ed2](https://github.com/godofecht/FlowStudio/commit/b5f78ed2d0f5e1d692b2d7a02688e4ae5719c56b).
+The production Flow 2.0 determinant runtime now receives 34 deterministic
+seed-20261101 exact-integer test matrices (17 each for det2/det3, including
+transpose, row swap, row addition and singular cases), alternating
+dimensionless and SI row-typed inputs. An independent fraction-free Bareiss
+oracle cross-checks every result against a separate signed permutation
+oracle. The actual native Flow HTTP compiler and executor enforce all 34
+assertions under the 128 KiB source limit; a deliberately incorrect numerical
+expectation must compile but fail execution with HTTP 422. The original
+dimension mismatches, malformed arities, predicates and overflow tests remain.
+
+**Passed:** [exact-head CI #41318513495](https://github.com/godofecht/FlowStudio/actions/runs/41318513495),
+all four Ubuntu 24.04/macOS 15 source and native jobs, including real Flow,
+HTTP, R/C FlowJIT and Ubuntu physical Chromium acceptance.
+**Failed:** zero final exact-head jobs; an earlier syntax error was fixed and
+its superseded run cancelled. **Skipped:** platform-inapplicable CI steps and
+pre-existing optional tests. **Unexecuted:** independent macOS physical
+Chromium and local native Flow/R. **Pending:** post-merge main CI.
+No hosted CI workflow configuration changed. This is numerical and SI
+runtime qualification, not generalized multidimensional `field` lowering
+or complete RStudio parity.
+
 ## 2026-11-01: exact 3D periodic Green-function and CFL-edge native acceptance (verified)
 
 [PR #345](https://github.com/godofecht/FlowStudio/pull/345) merged as

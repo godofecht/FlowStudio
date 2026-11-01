@@ -1,3 +1,29 @@
+## 2026-11-01: physical Chromium R checkpoint/restart and corruption isolation (4/4 exact-head CI passed)
+
+[PR #338](https://github.com/godofecht/FlowStudio/pull/338) merged at
+[09c6130e](https://github.com/godofecht/FlowStudio/commit/09c6130ee007351d04356b359dfc04747ea4ee0a).
+[Exact-head CI #41299812914](https://github.com/godofecht/FlowStudio/actions/runs/41299812914)
+passed all four Ubuntu 24.04/macOS 15 jobs on
+`d59118bb599d3614bdef9c8988074de37f4ca588`.
+The Ubuntu native job executed actual Chromium notebook controls, six real R
+initialization/checkpoint cells, two separate 24-step persistent R integrations,
+and a persistent Python direct-stencil oracle checking 3,072 cells at each
+checkpoint (6,144 comparisons). The browser verified mass-preserving two-cell
+corruption and malformed serialized checkpoint rejection, phase/side-effect
+nonmutation, forbidden 25-step and third chunks, recovery, and `.fsnb`
+output restoration without executing imported code. Source, frame, serialized
+snapshot and CPU work budgets are asserted. Existing native Flow compiler,
+production HTTP, Python/R notebook, R/C FlowJIT and Chromium suites also passed.
+
+**Passed:** four exact-head CI jobs, including physical Ubuntu Chromium.
+**Failed:** zero final exact-head jobs.
+**Skipped:** platform-inapplicable CI steps as recorded by the runner.
+**Unexecuted:** independent macOS physical browser, local native Flow/R,
+and post-merge main CI for merge `09c6130e` (not yet independently verified).
+This is session-local R checkpoint integrity, not authenticated or durable
+persistence, generalized multidimensional `field` lowering, or RStudio parity.
+No hosted workflow configuration was modified.
+
 ## 2026-11-01: stepwise native PDE energy trace (4/4 exact-head CI passed)
 
 The compiler-executed 16×16 heterogeneous Flow solver now emits 96

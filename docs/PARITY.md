@@ -1,3 +1,26 @@
+## 2026-11-01: seeded non-Fourier native heterogeneous PDE (PR #331; qualification pending)
+
+The 16×16 periodic discontinuous-conductivity native Flow solver now
+also evolves an independently seeded (9137) asymmetric, non-Fourier field.
+Its 48-step, 24+24 restart, mass/positivity, coefficient mutation and
+rejection nonmutation checks execute inside actual Flow. A distinct
+`FLOWSTUDIO_SEEDED_GRID_V1` response lets production HTTP compare all
+256 additional computed values with a separately assembled Python sparse
+Markov operator, and reject a corrupted seeded mass assertion with HTTP 422.
+Physical Ubuntu Chromium acceptance now inspects all 256 seeded values
+from the actual browser-triggered Flow HTTP response while retaining the
+original 256-cell SVG heatmap oracle. Reproduction:
+[NATIVE_VARIABLE_DIFFUSION16.md](NATIVE_VARIABLE_DIFFUSION16.md).
+
+**Locally executed:** independent Python direct-stencil versus sparse
+Markov 0/8/24/48-step maximum errors 0, 8.88e-15, 2.31e-14 and 3.55e-14;
+mass drift zero; coefficient-transposition discrepancy 0.4923.
+**Pending:** exact-head Linux/macOS source, native Flow, production HTTP,
+R/C FlowJIT and physical Ubuntu Chromium CI. **Unexecuted:** local native
+Flow/R and independent macOS physical-browser interaction. No hosted CI
+workflow changes. This does not implement generalized compiler-generated
+multidimensional `field` lowering or establish RStudio parity.
+
 ## 2026-11-01: native heterogeneous 16×16 conservative PDE (4/4 exact-head and post-merge CI)
 
 Added `examples/native_variable_diffusion16.flow` with real Flow 2.0

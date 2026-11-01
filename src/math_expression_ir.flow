@@ -22,6 +22,8 @@
 #          52-55 norm5(x1,..,x5)..norm8(x1,..,x8), scale-stable physical vector norms.
 #          56 factorial(x) / postfix !, dimensionless integer 0..20.
 #          57 sign/sgn, 58 dot2(ax,ay,bx,by), 59 dot3(ax,ay,az,bx,by,bz).
+#          60 cross2(ax,ay,bx,by): signed 2D exterior product.
+#          61 dot4(ax,ay,az,aw,bx,by,bz,bw): four-component contraction.
 # Predicate values are dimensionless 0/1 with a separate runtime type bit.
 # where and logical operators evaluate operands eagerly (no short circuit).
 # Unsupported instructions and type mismatches fail closed.
@@ -846,12 +848,13 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
             depth = depth - 1
             stack[depth - 1] = result.quantity
             predicate[depth - 1] = result_predicate
-        } elif opcode == 58 or opcode == 59 {
-            # Native physical dot products. The first half of the arguments
+        } elif opcode == 58 or opcode == 59 or opcode == 60 or opcode == 61 {
+            # Native physical contractions. The first half of the arguments
             # forms one vector and the second half forms the other. Both
             # vectors must be internally dimensionally homogeneous.
             let mut components: i32 = 2
             if opcode == 59 { components = 3 }
+            if opcode == 61 { components = 4 }
             let arity: i32 = components * 2
             if depth < arity { return failed(instruction.source_start) }
             let first: Quantity = stack[depth - arity]
@@ -870,9 +873,21 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
                    not same_dimension(right.dimension, second.dimension) {
                     return failed(instruction.source_start)
                 }
-                sum = sum + left.value * right.value
-                if not bounded_value(sum) { return failed(instruction.source_start) }
+                if opcode != 60 {
+                    sum = sum + left.value * right.value
+                    if not bounded_value(sum) { return failed(instruction.source_start) }
+                }
                 component = component + 1
+            }
+            if opcode == 60 {
+                # ax*by - ay*bx, rejecting overflow in either intermediate.
+                let positive: f64 = stack[depth - 4].value * stack[depth - 1].value
+                let negative: f64 = stack[depth - 3].value * stack[depth - 2].value
+                if not bounded_value(positive) or not bounded_value(negative) {
+                    return failed(instruction.source_start)
+                }
+                sum = positive - negative
+                if not bounded_value(sum) { return failed(instruction.source_start) }
             }
             depth = depth - arity + 1
             stack[depth - 1] = quantity(sum, output_dimension)

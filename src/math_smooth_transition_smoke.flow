@@ -1,0 +1,83 @@
+# Native Flow 2.0 analytical and dimensional acceptance for cubic/quintic transitions.
+# These expressions are compiled and evaluated, not editor-only snippets.
+import .math_dimensions { Dimension, dimensionless, length_dimension, time_dimension, same_dimension }
+import .math_expression_ir { MathResult }
+import .math_expression_source { ParsedMathExpression, parse_math_expression, evaluate_math_expression }
+import .math_static { MathInferredType, infer_math_expression_source }
+
+function close(actual: f64, expected: f64) -> bool {
+    let mut difference: f64 = actual - expected
+    if difference < 0.0 { difference = -difference }
+    return difference < 0.00000000001
+}
+
+function main() -> i32 {
+    let mut result: MathResult = evaluate_math_expression("smoothstep(0m,10m,5m)")
+    if not result.valid or not close(result.result.value, 0.5) or
+       not same_dimension(result.result.dimension, dimensionless()) or result.is_predicate { return 1 }
+    result = evaluate_math_expression("smootherstep(0m,10m,5m)")
+    if not result.valid or not close(result.result.value, 0.5) { return 2 }
+    result = evaluate_math_expression("smoothstep(0m,10m,2.5m)")
+    if not result.valid or not close(result.result.value, 0.15625) { return 3 }
+    result = evaluate_math_expression("smootherstep(0m,10m,2.5m)")
+    if not result.valid or not close(result.result.value, 0.103515625) { return 4 }
+    result = evaluate_math_expression("smoothstep(0m,10m,-1m)")
+    if not result.valid or result.result.value != 0.0 { return 5 }
+    result = evaluate_math_expression("smootherstep(0m,10m,11m)")
+    if not result.valid or result.result.value != 1.0 { return 6 }
+    result = evaluate_math_expression("smoothstep(0,1,0)")
+    if not result.valid or result.result.value != 0.0 { return 7 }
+    result = evaluate_math_expression("smootherstep(0,1,1)")
+    if not result.valid or result.result.value != 1.0 { return 8 }
+    result = evaluate_math_expression("smoothstep(0s,2s,1s)+smootherstep(0s,2s,1s)")
+    if not result.valid or not close(result.result.value, 1.0) { return 9 }
+    result = evaluate_math_expression("smoothstep(0,2π,π)")
+    if not result.valid or not close(result.result.value, 0.5) { return 10 }
+    result = evaluate_math_expression("smoothstep(0m,10m,5s)")
+    if result.valid or result.failed_at != 0 { return 11 }
+    result = evaluate_math_expression("smootherstep(0m,10s,5m)")
+    if result.valid or result.failed_at != 0 { return 12 }
+    result = evaluate_math_expression("smoothstep(1m,1m,1m)")
+    if result.valid or result.failed_at != 0 { return 13 }
+    result = evaluate_math_expression("smootherstep(2m,1m,1.5m)")
+    if result.valid or result.failed_at != 0 { return 14 }
+    result = evaluate_math_expression("smoothstep(true,1,0.5)")
+    if result.valid or result.failed_at != 0 { return 15 }
+    result = evaluate_math_expression("smootherstep(0,1,false)")
+    if result.valid or result.failed_at != 0 { return 16 }
+    if parse_math_expression("smoothstep(0,1)").valid { return 17 }
+    if parse_math_expression("smootherstep(0,1,2,3)").valid { return 18 }
+    if parse_math_expression("smoothstep(,1,2)").valid { return 19 }
+    if parse_math_expression("smootherstep(0,1,)").valid { return 20 }
+    let cubic: ParsedMathExpression = parse_math_expression("smoothstep(0m,1m,0.5m)")
+    if not cubic.valid or cubic.program.count != 4 or
+       cubic.program.instructions[3].opcode != 67 or
+       cubic.program.instructions[3].source_start != 0 or
+       cubic.program.instructions[3].source_end != 10 { return 21 }
+    let quintic: ParsedMathExpression = parse_math_expression("smootherstep(0,2π,π)")
+    if not quintic.valid or quintic.program.count != 6 or
+       quintic.program.instructions[5].opcode != 68 or
+       quintic.program.instructions[5].source_start != 0 or
+       quintic.program.instructions[5].source_end != 12 { return 22 }
+    let mut inferred: MathInferredType = infer_math_expression_source("smoothstep(0m,10m,5m)")
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension, dimensionless()) { return 23 }
+    inferred = infer_math_expression_source("smootherstep(0m,10m,5m)*3s")
+    if not inferred.valid or not same_dimension(inferred.dimension, time_dimension()) { return 24 }
+    inferred = infer_math_expression_source("smoothstep(0m,10s,5m)")
+    if inferred.valid or inferred.failed_at != 0 { return 25 }
+    inferred = infer_math_expression_source("smootherstep(true,1,0.5)")
+    if inferred.valid or inferred.failed_at != 0 { return 26 }
+    # Static inference checks units and types; ordering is a runtime condition.
+    inferred = infer_math_expression_source("smoothstep(2m,1m,1.5m)")
+    if not inferred.valid or not same_dimension(inferred.dimension, dimensionless()) { return 27 }
+    result = evaluate_math_expression("smoothstep(0,2π,π)+1m")
+    if result.valid or result.failed_at != 20 { return 28 }
+    result = evaluate_math_expression("smootherstep(0,1,0.5)*4m")
+    if not result.valid or not close(result.result.value, 2.0) or
+       not same_dimension(result.result.dimension, length_dimension()) { return 29 }
+    result = evaluate_math_expression("smoothstep(0,1,0.25)-smootherstep(0,1,0.25)")
+    if not result.valid or not close(result.result.value, 0.052734375) { return 30 }
+    println("native-smooth-transitions-ok")
+    return 0
+}

@@ -26,6 +26,8 @@
 #          61 dot4(ax,ay,az,aw,bx,by,bz,bw): four-component contraction.
 #          62-65 dot5..dot8: five-through-eight-component typed contractions.
 #          66 lerp(a, b, t): bounded physical linear interpolation, 0 <= t <= 1.
+#          67 smoothstep(edge0, edge1, x): cubic C1 transition, dimensionless output.
+#          68 smootherstep(edge0, edge1, x): quintic C2 transition, dimensionless output.
 # Predicate values are dimensionless 0/1 with a separate runtime type bit.
 # where and logical operators evaluate operands eagerly (no short circuit).
 # Unsupported instructions and type mismatches fail closed.
@@ -989,6 +991,36 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
             if not bounded_value(norm) { return failed(instruction.source_start) }
             depth = depth - 2
             stack[depth - 1] = quantity(norm, first.dimension)
+            predicate[depth - 1] = false
+        } elif opcode == 67 or opcode == 68 {
+            # Dimensioned transition coordinates, dimensionless result. The
+            # endpoint tests ensure exact saturation and avoid cancellation.
+            # Both polynomials are monotone on [0,1], with zero endpoint
+            # derivatives (C1 cubic; C2 quintic).
+            if depth < 3 { return failed(instruction.source_start) }
+            let lower: Quantity = stack[depth - 3]
+            let upper: Quantity = stack[depth - 2]
+            let sample: Quantity = stack[depth - 1]
+            if predicate[depth - 3] or predicate[depth - 2] or predicate[depth - 1] or
+               not same_dimension(lower.dimension, upper.dimension) or
+               not same_dimension(lower.dimension, sample.dimension) or
+               upper.value <= lower.value {
+                return failed(instruction.source_start)
+            }
+            let mut value: f64 = 0.0
+            if sample.value >= upper.value {
+                value = 1.0
+            } elif sample.value > lower.value {
+                let t: f64 = (sample.value - lower.value) / (upper.value - lower.value)
+                if opcode == 67 {
+                    value = t * t * (3.0 - 2.0 * t)
+                } else {
+                    value = t * t * t * (t * (6.0 * t - 15.0) + 10.0)
+                }
+            }
+            if not bounded_value(value) { return failed(instruction.source_start) }
+            depth = depth - 2
+            stack[depth - 1] = quantity(value, dimensionless())
             predicate[depth - 1] = false
         } elif opcode == 66 {
             # Convex interpolation avoids forming b-a, which may overflow

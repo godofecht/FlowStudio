@@ -118,3 +118,13 @@ by `python3 scripts/verify_native.py --require-r`. Local native R and
 independent physical Chromium execution of the checkpoint scenario are
 **unexecuted** until separately qualified. It does not implement
 compiler-generated multidimensional Flow `field` lowering.
+
+The same 24+24 R restart script also runs as three **real notebook cells**
+(reset, checkpoint, resume) in
+`tests/native_three_species_notebook_http.cjs`. Both checkpoint frames are
+checked for phase and shape, the final 3,072 cells are verified through the
+persistent Python kernel, and `.fsnb` export/import must preserve all cell
+outputs. A forbidden extra chunk must stop the notebook before a later R
+side effect. A fresh notebook replay must reproduce the exact final frame.
+This controller path is exercised through the existing native HTTP acceptance,
+not a mocked notebook executor.

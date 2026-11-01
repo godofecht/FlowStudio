@@ -1473,6 +1473,40 @@ function main() -> i32 {
     result = evaluate_math_expression("2(3)!²")
     if not result.valid or not near(result.result.value, 72.0) { return 551 }
 
+    # Adjacent resolved symbols are executable implicit products, including
+    # unbound constants, explicit physical bindings and powers.
+    result = evaluate_math_expression("2π")
+    if not result.valid or not near(result.result.value, 6.283185307179586) { return 552 }
+    result = evaluate_math_expression("(2+1)π")
+    if not result.valid or not near(result.result.value, 9.42477796076938) { return 553 }
+    result = evaluate_math_expression("2π²")
+    if not result.valid or not near(result.result.value, 19.739208802178716) { return 554 }
+    result = evaluate_math_expression("1/2π")
+    if not result.valid or not near(result.result.value, 1.5707963267948966) { return 555 }
+    result = evaluate_math_expression("2τ")
+    if not result.valid or not near(result.result.value, 12.566370614359172) { return 556 }
+    result = evaluate_math_expression_with_bindings("3ρ", greek_bindings)
+    if not result.valid or not near(result.result.value, 6.0) or
+       not same_dimension(result.result.dimension, mass_dimension()) { return 557 }
+    result = evaluate_math_expression_with_bindings("2mρ", greek_bindings)
+    if not result.valid or not near(result.result.value, 4.0) or
+       not same_dimension(result.result.dimension, product_dimension(length, mass_dimension())) { return 558 }
+    result = evaluate_math_expression_with_bindings("2π", greek_bindings)
+    if not result.valid or not near(result.result.value, 6.0) { return 559 }
+    result = evaluate_math_expression("2π(3)")
+    if not result.valid or not near(result.result.value, 18.84955592153876) { return 560 }
+    let symbol_product: ParsedMathExpression = parse_math_expression("2π")
+    if not symbol_product.valid or symbol_product.program.count != 3 or
+       symbol_product.program.instructions[1].source_start != 1 or
+       symbol_product.program.instructions[1].source_end != 3 or
+       symbol_product.program.instructions[2].opcode != 3 or
+       symbol_product.program.instructions[2].source_start != 1 or
+       symbol_product.program.instructions[2].source_end != 1 { return 561 }
+    result = evaluate_math_expression("2π+1m")
+    if result.valid or result.failed_at != 3 { return 562 }
+    if parse_math_expression("2ζ").valid { return 563 }
+    if parse_math_expression("2true").valid { return 564 }
+
     println("native-math-source-ok")
     return 0
 }

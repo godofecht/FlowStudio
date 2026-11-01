@@ -39,7 +39,8 @@ def request(method: str, path: str, body: str | None = None,
         return exc.code, exc.read().decode("utf-8")
 
 
-def compact_native_math_line(line: str, *, tighten_equals: bool = False,\n                             tighten_math_ops: bool = False) -> str:
+def compact_native_math_line(line: str, *, tighten_equals: bool = False,
+                             tighten_math_ops: bool = False) -> str:
     """Compact only code whitespace/comments, preserving string literals.
 
     The native Flow HTTP endpoint deliberately enforces a 128 KiB request

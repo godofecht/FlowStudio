@@ -1,16 +1,99 @@
 # Run: flow run src/stats_smoke.flow
-import .stats { NumericSummary, summary_empty, summary_add, summary_variance }
+# Deterministic 1024-sample, four-shard, large-offset numerical acceptance.
+import .stats { NumericSummary, summary_empty, summary_add, summary_merge, summary_variance }
+
+function close(actual: f64, expected: f64, tolerance: f64) -> bool {
+    let mut error: f64 = actual - expected
+    if error < 0.0 { error = -error }
+    return error <= tolerance
+}
 
 function main() -> i32 {
-    let mut s: NumericSummary = summary_empty()
-    s = summary_add(s, 1.0)
-    s = summary_add(s, 2.0)
-    s = summary_add(s, 3.0)
-    s = summary_add(s, 4.0)
-    if s.count != 4 { return 1 }
-    if s.mean < 2.499999 or s.mean > 2.500001 { return 2 }
-    if s.minimum != 1.0 or s.maximum != 4.0 { return 3 }
-    let v: f64 = summary_variance(s)
-    if v < 1.666665 or v > 1.666668 { return 4 }
+    let mut simple: NumericSummary = summary_empty()
+    simple = summary_add(simple, 1.0)
+    simple = summary_add(simple, 2.0)
+    simple = summary_add(simple, 3.0)
+    simple = summary_add(simple, 4.0)
+    if simple.count != 4 or not close(simple.mean, 2.5, 0.0000000001) {
+        return 1
+    }
+    if simple.minimum != 1.0 or simple.maximum != 4.0 or
+       not close(summary_variance(simple), 1.6666666666666667, 0.0000000001) {
+        return 2
+    }
+    let empty: NumericSummary = summary_empty()
+    if summary_merge(empty, simple).count != 4 or
+       summary_merge(simple, empty).mean != simple.mean { return 3 }
+    let singleton: NumericSummary = summary_add(empty, 9.0)
+    if summary_variance(singleton) != 0.0 or
+       summary_merge(singleton, empty).minimum != 9.0 { return 4 }
+
+    let mut serial: NumericSummary = empty
+    let mut reverse: NumericSummary = empty
+    let mut a: NumericSummary = empty
+    let mut b: NumericSummary = empty
+    let mut c: NumericSummary = empty
+    let mut d: NumericSummary = empty
+    for index in 0 to 1024 {
+        let residue: i32 = (index * 37 + 19) % 251
+        let value: f64 = 1000000000.0 + (residue as f64) / 8.0
+        serial = summary_add(serial, value)
+        let bucket: i32 = index % 4
+        if bucket == 0 {
+            a = summary_add(a, value)
+        } else if bucket == 1 {
+            b = summary_add(b, value)
+        } else if bucket == 2 {
+            c = summary_add(c, value)
+        } else {
+            d = summary_add(d, value)
+        }
+        let reversed: i32 = 1023 - index
+        let reverse_residue: i32 = (reversed * 37 + 19) % 251
+        reverse = summary_add(reverse,
+            1000000000.0 + (reverse_residue as f64) / 8.0)
+    }
+    let balanced: NumericSummary = summary_merge(
+        summary_merge(a, b), summary_merge(c, d))
+    let left_fold: NumericSummary = summary_merge(
+        summary_merge(summary_merge(a, b), c), d)
+    let permuted: NumericSummary = summary_merge(
+        summary_merge(d, b), summary_merge(c, a))
+    if serial.count != 1024 or balanced.count != 1024 or
+       left_fold.count != 1024 or permuted.count != 1024 { return 5 }
+    if a.count != 256 or b.count != 256 or c.count != 256 or
+       d.count != 256 { return 6 }
+    if not close(serial.mean, 1000000015.6422119, 0.0001) or
+       not close(summary_variance(serial), 82.06557894918343, 0.001) {
+        return 7
+    }
+    if not close(balanced.mean, serial.mean, 0.0001) or
+       not close(left_fold.mean, serial.mean, 0.0001) or
+       not close(permuted.mean, serial.mean, 0.0001) or
+       not close(reverse.mean, serial.mean, 0.0001) { return 8 }
+    if not close(summary_variance(balanced), summary_variance(serial), 0.001) or
+       not close(summary_variance(left_fold), summary_variance(serial), 0.001) or
+       not close(summary_variance(permuted), summary_variance(serial), 0.001) or
+       not close(summary_variance(reverse), summary_variance(serial), 0.001) {
+        return 9
+    }
+    if balanced.minimum != 1000000000.0 or
+       balanced.maximum != 1000000031.25 { return 10 }
+    if not close(summary_merge(simple, singleton).mean, 3.8, 0.0000000001) or
+       not close(summary_variance(summary_merge(simple, singleton)), 9.7,
+                 0.0000000001) { return 11 }
+
+    println("FLOWSTUDIO_STREAM_STATS_V1 1024")
+    print("S ")
+    print(balanced.count)
+    print(" ")
+    print(balanced.mean)
+    print(" ")
+    print(summary_variance(balanced))
+    print(" ")
+    print(balanced.minimum)
+    print(" ")
+    println(balanced.maximum)
+    println("FLOWSTUDIO_STREAM_STATS_END")
     return 0
 }

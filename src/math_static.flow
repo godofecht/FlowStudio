@@ -292,22 +292,32 @@ export function infer_math_ir(program: MathProgram) -> MathInferredType {
             depth = base + 1
             dimensions[base] = output_dimension
             predicates[base] = false
-        } elif opcode >= 75 and opcode <= 79 {
-            # Infer physical statistical reductions without evaluating inputs.
+        } elif (opcode >= 75 and opcode <= 79) or opcode == 80 {
+            # Infer statistical reductions without evaluating inputs.
+            # Type-7 quantile takes a dimensionless, non-predicate probability
+            # followed by physical observations of one common SI dimension.
             let arity: i32 = instruction.exponent
-            if arity < 1 or arity > 8 or depth < arity {
+            if arity < 1 or arity > 8 or depth < arity or
+               (opcode == 80 and arity < 2) {
                 return static_error(instruction.source_start)
             }
             let base: i32 = depth - arity
-            let input_dimension: Dimension = dimensions[base]
-            let mut component: i32 = 0
-            while component < arity {
-                let position: i32 = base + component
+            let mut first_sample: i32 = base
+            if opcode == 80 {
+                if predicates[base] or
+                   not same_dimension(dimensions[base], dimensionless()) {
+                    return static_error(instruction.source_start)
+                }
+                first_sample = base + 1
+            }
+            let input_dimension: Dimension = dimensions[first_sample]
+            let mut position: i32 = first_sample
+            while position < depth {
                 if predicates[position] or
                    not same_dimension(dimensions[position], input_dimension) {
                     return static_error(instruction.source_start)
                 }
-                component = component + 1
+                position = position + 1
             }
             let mut output_dimension: Dimension = input_dimension
             if opcode == 76 {

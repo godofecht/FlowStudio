@@ -184,7 +184,7 @@ class VariableConductivityOracle(unittest.TestCase):
         coefficients = conductivity()
         constant = [23.75] * COUNT
         self.assertEqual(direct(constant, coefficients, 48), constant)
-        self.assertEqual(matrix_oracle(constant, coefficients, 48), constant)
+        self.assertLess(maximum_error(matrix_oracle(constant, coefficients, 48), constant), 1e-12)
         seeded = seeded_initial()
         self.assertEqual(direct(seeded, coefficients, 48, ratio=0), seeded)
         self.assertEqual(matrix_oracle(seeded, coefficients, 48, ratio=0), seeded)

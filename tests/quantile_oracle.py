@@ -105,6 +105,7 @@ def inject_quantile_assertions(source: str, *, start: int, stop: int,
         else:
             statements.append(f'if evaluate_math_expression("{expression}").valid '
                               '{ return 93 }')
+        statements.append(f'println("quantile-case-{index}-ok")')
     result = source.replace(marker, "\n".join(statements) + "\n" + marker, 1)
     if len(result.encode("utf-8")) >= MAX_SOURCE_BYTES:
         raise ValueError("quantile Flow HTTP source exceeds 128 KiB")

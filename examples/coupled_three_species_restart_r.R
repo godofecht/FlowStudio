@@ -18,9 +18,9 @@ if (!identical(phase, 0L) && !identical(phase, 1L))
 if (phase == 0L) {
     inputs <- lapply(species_names, function(name) {
         variable <- paste0("flowstudio_three_initial_", name)
-        if (!exists(variable, envir = .GlobalEnv, inherits = FALSE))
+        if (!exists(variable, inherits = TRUE))
             stop("three-species restart input missing")
-        values <- get(variable, envir = .GlobalEnv, inherits = FALSE)
+        values <- get(variable, inherits = TRUE)
         if (!is.double(values) || length(values) != n * n || any(!is.finite(values)))
             stop("three-species restart input invalid")
         matrix(values, nrow = n, byrow = TRUE)

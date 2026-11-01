@@ -1,22 +1,29 @@
-## 2026-11-01: directed anisotropic three-species Python/R PDE (qualification pending)
+## 2026-11-01: directed anisotropic three-species Python/R PDE (4/4 CI verified)
 
 Checked-in `examples/coupled_three_species_python.py` and
-`examples/coupled_three_species_r.R` add a deterministic seed-9137,
-three-species 32×32 reaction-diffusion problem with distinct x/y
-diffusion coefficients and non-reversible conservative directed exchange.
-The production HTTP test transfers 3,072 values through actual persistent
-Python and R kernels, checks all R midpoint results with a separate Python
-stencil, verifies actual R graphics, five HTTP 422 negative cases and
-persistent-kernel recovery. A separate Fourier 3×3 matrix oracle checks
-the full 3,072-cell solution at 0/24/48 steps, alongside replay,
-semigroup, conservation, orientation, typed-invalid and resource-limit
-cases. [Reproduction](COUPLED_THREE_SPECIES_PDE_HTTP.md).
+`examples/coupled_three_species_r.R` evolve three distinct 32×32
+seed-9137 fields with unequal x/y diffusion and conservative,
+non-reversible directed exchange. Actual persistent Python/R HTTP transfers
+and R midpoint integration produce 3,072 values, all checked by a separate
+Python direct stencil. A 3×3 Fourier matrix oracle independently verifies
+every cell at 0/24/48 steps. Tests cover replay, semigroup, mass conservation,
+axis transposition, five HTTP 422 corrupt/malformed frames, recovery, real
+R graphics, typed-invalid inputs and the 147,456 species-cell-step ceiling.
+[Reproduction](COUPLED_THREE_SPECIES_PDE_HTTP.md).
 
-**Pending:** exact-head Linux/macOS native Flow/HTTP/R/Chromium CI and
-post-merge qualification. **Unexecuted:** independent macOS physical
-browser and a dedicated physical-browser visualization of this case.
-This is not generalized compiler-generated multidimensional Flow
-`field` lowering or RStudio parity. Hosted CI is unchanged.
+**Verified:** [PR #319](https://github.com/godofecht/FlowStudio/pull/319)
+merged as [b7990ff4](https://github.com/godofecht/FlowStudio/commit/b7990ff4c12fbc8187294b40db6a359764a1b9cd).
+[Exact-head CI #41264307093](https://github.com/godofecht/FlowStudio/actions/runs/41264307093)
+and [post-merge CI #41264626813](https://github.com/godofecht/FlowStudio/actions/runs/41264626813)
+each passed all four Linux/macOS jobs. Both platforms passed 1,201
+JavaScript tests (12 skipped) and 437 Python tests (13 skipped), including
+all four new three-species oracle tests. Native Flow compilation, production
+Python/R HTTP, R/C FlowJIT and Ubuntu physical Chromium acceptance passed.
+The new numerical HTTP case itself was not separately rendered in physical
+Chromium. Flow MLIR was skipped where LLVM tools were absent.
+**Unexecuted:** independent macOS physical browser and local native Flow/R.
+No hosted CI workflow changed. This is not generalized compiler-generated
+multidimensional Flow `field` lowering or complete RStudio parity.
 
 ## 2026-11-01: production 32×32 Python → R → Python coupled PDE (4/4 exact-head and post-merge CI)
 

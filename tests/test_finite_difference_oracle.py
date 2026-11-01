@@ -80,6 +80,13 @@ class ExactFiniteDifferenceOracle(unittest.TestCase):
         self.assertEqual(correct.count("evaluate_math_expression"), 9)
         self.assertEqual(sabotaged.count("evaluate_math_expression"), 9)
 
+    def test_injection_accepts_compacted_http_marker(self) -> None:
+        # Production HTTP bundles strip indentation from native Flow lines.
+        base = 'println("native-math-finite-difference-ok")'
+        source = inject_finite_difference_assertions(base, start=18, stop=27)
+        self.assertEqual(source.count("evaluate_math_expression"), 9)
+        self.assertEqual(source.count("native-math-finite-difference-ok"), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

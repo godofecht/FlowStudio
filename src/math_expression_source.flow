@@ -146,12 +146,32 @@ function base_source_unit(bytes: ptr<u8>, index: i32, length: i32) -> SourceUnit
     let mut scale: f64 = 1.0
     let mut end: i32 = index
     if index < length {
-        if index + 1 < length and bytes[index] == 80 and bytes[index + 1] == 97 { # Pa
+        # Exact multi-byte practical units precede single-byte SI bases.
+        # Coherent values are expressed in m, kg, s, K before typed IR.
+        if index + 2 < length and bytes[index] == 109 and
+           bytes[index + 1] == 105 and bytes[index + 2] == 110 { # min
+            dimension = time_dimension()
+            scale = 60.0
+            end = index + 3
+        } elif index + 2 < length and bytes[index] == 98 and
+             bytes[index + 1] == 97 and bytes[index + 2] == 114 { # bar
+            dimension = Dimension { length: -1, mass: 1, time: -2, temperature: 0 }
+            scale = 100000.0
+            end = index + 3
+        } elif index + 1 < length and bytes[index] == 80 and bytes[index + 1] == 97 { # Pa
             dimension = Dimension { length: -1, mass: 1, time: -2, temperature: 0 }
             end = index + 2
         } elif index + 1 < length and bytes[index] == 72 and bytes[index + 1] == 122 { # Hz
             dimension = Dimension { length: 0, mass: 0, time: -1, temperature: 0 }
             end = index + 2
+        } elif bytes[index] == 76 { # L = 0.001 m³
+            dimension = Dimension { length: 3, mass: 0, time: 0, temperature: 0 }
+            scale = 0.001
+            end = index + 1
+        } elif bytes[index] == 104 { # h = 3600 s
+            dimension = time_dimension()
+            scale = 3600.0
+            end = index + 1
         } elif bytes[index] == 109 { # m
             dimension = length_dimension()
             end = index + 1
@@ -183,7 +203,27 @@ function source_unit(bytes: ptr<u8>, index: i32, length: i32) -> SourceUnit {
     let mut prefix_width: i32 = 0
     let mut prefix_scale: f64 = 1.0
     if index < length {
-        if bytes[index] == 107 { # kilo
+        # The exact two-byte da prefix must be checked before deci.
+        if index + 1 < length and bytes[index] == 100 and
+           bytes[index + 1] == 97 { # deca
+            prefix_width = 2
+            prefix_scale = 10.0
+        } elif bytes[index] == 100 { # deci
+            prefix_width = 1
+            prefix_scale = 0.1
+        } elif bytes[index] == 104 { # hecto
+            prefix_width = 1
+            prefix_scale = 100.0
+        } elif bytes[index] == 84 { # tera
+            prefix_width = 1
+            prefix_scale = 1000000000000.0
+        } elif bytes[index] == 112 { # pico
+            prefix_width = 1
+            prefix_scale = 0.000000000001
+        } elif bytes[index] == 102 { # femto
+            prefix_width = 1
+            prefix_scale = 0.000000000000001
+        } elif bytes[index] == 107 { # kilo
             prefix_width = 1
             prefix_scale = 1000.0
         } elif bytes[index] == 77 { # mega

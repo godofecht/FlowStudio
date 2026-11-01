@@ -384,7 +384,7 @@ try {
   // intermediate native PDE energies. Independently reconstruct the sparse
   // transition and compare every sample, not just the final heatmap.
   const energyFrame = variableHttpBody.match(
-    /FLOWSTUDIO_ENERGY_TRACE_V1 48 2\\r?\\nU ([^\\r\\n]+)\\r?\\nS ([^\\r\\n]+)\\r?\\nFLOWSTUDIO_ENERGY_TRACE_END/);
+    /FLOWSTUDIO_ENERGY_TRACE_V1 48 2\r?\nU ([^\r\n]+)\r?\nS ([^\r\n]+)\r?\nFLOWSTUDIO_ENERGY_TRACE_END/);
   assert.ok(energyFrame, 'Native PDE energy trace absent from browser HTTP');
   for (const [name, field, row] of [
     ['U', Array.from({length:256}, (_, i) => {
@@ -397,7 +397,7 @@ try {
       return 1 + .1 * ((9137 + 71 * x + 113 * y + 17 * x * y) % 251);
     }), 2]
   ]) {
-    const samples = energyFrame[row].trim().split(/\\s+/).map(Number);
+    const samples = energyFrame[row].trim().split(/\s+/).map(Number);
     assert.equal(samples.length, 48);
     let state = field, previous = Infinity;
     for (let step = 0; step < 48; step++) {

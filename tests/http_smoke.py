@@ -99,7 +99,7 @@ def compact_native_math_identifiers(source: str) -> str:
         ("term_dimension", "termdim"),
         ("input_dimension", "indim"),
     ):
-        source = re.sub(r"\\b" + old + r"\\b", short, source)
+        source = re.sub(r"\b" + old + r"\b", short, source)
     return source
 
 

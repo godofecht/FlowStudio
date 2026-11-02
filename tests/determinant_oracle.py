@@ -101,7 +101,8 @@ def matrix_cases() -> tuple[tuple[str, tuple[tuple[int, ...], ...], int], ...]:
     return tuple(result)
 
 
-def inject_native_assertions(source: str, sabotage: bool = False) -> str:
+def inject_native_assertions(source: str, *, start: int, stop: int,
+                             sabotage: bool = False) -> str:
     """Append actual Flow runtime assertions inside the existing native main.
 
     The tampered variant deliberately expects the wrong first determinant;
@@ -111,8 +112,11 @@ def inject_native_assertions(source: str, sabotage: bool = False) -> str:
     marker = 'println("native-math-determinants-ok")'
     if source.count(marker) != 1:
         raise ValueError("missing or ambiguous native determinant main marker")
+    if not (0 <= start < stop <= MAX_CASES):
+        raise ValueError("invalid determinant batch bounds")
     statements = []
-    for index, (function, rows, expected) in enumerate(matrix_cases()):
+    for index in range(start, stop):
+        function, rows, expected = matrix_cases()[index]
         # Alternate dimensionless matrices with SI row-typed matrices.
         # Every signed permutation then has the same product dimension.
         unitful = index % 2 == 0
@@ -127,7 +131,7 @@ def inject_native_assertions(source: str, sabotage: bool = False) -> str:
              "four_dimensional_product")
             if unitful else "dimensionless()"
         )
-        wanted = expected + (1 if sabotage and index == 0 else 0)
+        wanted = expected + (1 if sabotage and index == start else 0)
         statements.append(
             f'result = evaluate_math_expression("{function}({arguments})")'
         )

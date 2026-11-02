@@ -38,7 +38,7 @@ function main() -> i32 {
     if result.valid or result.failed_at != 2 { return 12 }
     result = evaluate_math_expression("2m⩾3s")
     if result.valid or result.failed_at != 2 { return 13 }
-    let malformed: ParsedMathExpression = parse_math_expression("≦2m")
+    let mut malformed: ParsedMathExpression = parse_math_expression("≦2m")
     if malformed.valid or malformed.failed_at != 0 { return 14 }
     malformed = parse_math_expression("2m⩽")
     if malformed.valid or malformed.failed_at != 5 { return 15 }

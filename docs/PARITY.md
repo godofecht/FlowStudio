@@ -1,17 +1,47 @@
-## 2026-11-02: compiler-generated 2D RK4 cross-runtime HTTP (proposed)
+## 2026-11-02: bounded PDE duration overrides (proposed)
 
-The existing native Flow 2D anisotropic evolution program now emits all four
-computed 64-step RK4 states. Mandatory Linux/macOS production HTTP acceptance
-compares them against independent persistent base-R Fourier and CPython
-matrix-RK4 calculations, with replay, HTTP 422 corruption/syntax controls,
-persistent recovery and 128 KiB source / 24 KiB response limits.
+Both NumPy-backed mathematical Flow PDE solvers now reject malformed and
+unrepresentable duration overrides, step-ratio overflow, and more than
+200,000 steps before integration. Checked-in tests execute deterministic
+16×16 Navier–Stokes and heat models for 5 and 50 steps, with finite numerical
+assertions, replay and invalid-type/NaN/Inf/huge-integer negative controls.
+[PR #416](https://github.com/godofecht/FlowStudio/pull/416);
+[reproduction](MATH_DURATION_RESOURCE_LIMITS.md).
+**Unverified:** exact-head source/native Linux/macOS CI, production HTTP
+and physical Chromium on this revision. **Unexecuted:** local native
+Flow/R and independent physical macOS Chromium. No hosted CI changes.
+
+## 2026-11-02: fail-closed PDE declarations and grid overrides (verified)
+
+[PR #415](https://github.com/godofecht/FlowStudio/pull/415)
+merged as [8a912de3](https://github.com/godofecht/FlowStudio/commit/8a912de3b6d361bcc0ad77133e3c34d44231eccc).
+Duplicate Navier–Stokes model constants and fields now fail closed, and
+both numerical backends require exact bounded integer grid overrides.
+Navier–Stokes also rejects malformed/nonfinite duration overrides.
+**Passed:** [exact-head CI #41527811284](https://github.com/godofecht/FlowStudio/actions/runs/41527811284),
+all **4/4** Linux/macOS source/native jobs, including real Flow/R/Python HTTP,
+numerical PDE acceptance and Ubuntu Chromium. Ubuntu source passed **1,223**
+JavaScript tests and ran **569** Python tests (**13 skipped**).
+**Failed:** zero final exact-head jobs. **Post-merge main CI:** not yet
+verified. **Unexecuted:** local native Flow/R and physical macOS Chromium.
+
+## 2026-11-02: compiler-generated 2D RK4 cross-runtime HTTP (verified)
+
+[PR #414](https://github.com/godofecht/FlowStudio/pull/414)
+merged as [e79ec2fb](https://github.com/godofecht/FlowStudio/commit/e79ec2fba2e584a3c45b98ebdedb438f6a1696b6).
+The native Flow anisotropic evolution program emits all four computed
+64-step RK4 states. Production HTTP acceptance compares them against
+independent persistent base-R Fourier and CPython matrix-RK4 calculations,
+with replay, HTTP 422 corruption/syntax controls, persistent recovery
+and 128 KiB source / 24 KiB response limits.
 [Reproduction](NATIVE_HEAT2D_CROSSRUNTIME.md).
-
-**Unverified:** exact-head Linux/macOS source/native CI, production Flow/R/Python
-HTTP and Ubuntu Chromium on this revision. **Unexecuted:** local native
-Flow/R and independent macOS Chromium. No hosted CI changes. This is
-compiler-generated four-state evolution, not generalized multidimensional
-field lowering or complete RStudio parity.
+**Passed:** [exact-head CI #41523327947](https://github.com/godofecht/FlowStudio/actions/runs/41523327947)
+and [post-merge main CI #41527634018](https://github.com/godofecht/FlowStudio/actions/runs/41527634018),
+each **4/4** Linux/macOS source/native jobs including production Flow/R/Python
+HTTP and Ubuntu Chromium. **Failed:** zero final jobs.
+**Unexecuted:** local native Flow/R and independent macOS Chromium.
+This is compiler-generated four-state evolution, not generalized
+multidimensional field lowering or complete RStudio parity.
 
 ## 2026-11-02: native field/grid plot UTF-8 transport budget (verified)
 

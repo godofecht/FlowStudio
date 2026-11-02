@@ -65,6 +65,7 @@ export function parse_math_equation_with_bindings(source: string, bindings: Math
     let mut open_widths: array<i32, 64> = [0]
     let mut depth: i32 = 0
     let mut equality: i32 = -1
+    let mut equality_width: i32 = 1
     let mut i: i32 = 0
     while i < length {
         let opening: i32 = math_open_width(bytes, i, length)
@@ -84,22 +85,37 @@ export function parse_math_equation_with_bindings(source: string, bindings: Math
             i = i + closing
             continue
         }
+        # ASCII '=' is an equation boundary unless it belongs to ==, !=,
+        # <= or >=. U+FF1D FULLWIDTH EQUALS SIGN is an equation boundary
+        # only at top level; nested usage remains a scalar predicate.
+        let mut operator_width: i32 = 0
         if bytes[i] == 61 {
-            let mut comparison: bool = false
-            if i > 0 {
-                let previous: u8 = bytes[i - 1]
-                comparison = previous == 61 or previous == 33 or previous == 60 or previous == 62
+            operator_width = 1
+        } elif i + 2 < length and bytes[i] == 239 and
+             bytes[i + 1] == 188 and bytes[i + 2] == 157 {
+            operator_width = 3
+        }
+        if operator_width > 0 {
+            let mut comparison: bool = operator_width == 3 and depth > 0
+            if operator_width == 1 {
+                if i > 0 {
+                    let previous: u8 = bytes[i - 1]
+                    comparison = previous == 61 or previous == 33 or previous == 60 or previous == 62
+                }
+                if i + 1 < length and bytes[i + 1] == 61 { comparison = true }
             }
-            if i + 1 < length and bytes[i + 1] == 61 { comparison = true }
             if not comparison {
                 if depth != 0 or equality >= 0 { return equation_error(i, length) }
                 equality = i
+                equality_width = operator_width
             }
+            i = i + operator_width
+        } else {
+            i = i + 1
         }
-        i = i + 1
     }
     if depth != 0 { return equation_error(length, length) }
-    if equality <= 0 or equality >= length - 1 { return equation_error(0, length) }
+    if equality <= 0 or equality + equality_width >= length { return equation_error(0, length) }
 
     let mut left_bytes: array<u8, 513> = []
     let mut right_bytes: array<u8, 513> = []
@@ -110,7 +126,7 @@ export function parse_math_equation_with_bindings(source: string, bindings: Math
     }
     left_bytes[equality] = 0
     let mut right_length: i32 = 0
-    i = equality + 1
+    i = equality + equality_width
     while i < length {
         right_bytes[right_length] = bytes[i]
         right_length = right_length + 1
@@ -124,7 +140,7 @@ export function parse_math_equation_with_bindings(source: string, bindings: Math
     let right_parsed: ParsedMathExpression = parse_math_expression_with_bindings(
         (&right_bytes[0]) as string, bindings)
     if not right_parsed.valid {
-        return equation_error(equality + 1 + right_parsed.failed_at, length)
+        return equation_error(equality + equality_width + right_parsed.failed_at, length)
     }
     let mut left: MathProgram = left_parsed.program
     let mut right: MathProgram = right_parsed.program
@@ -132,8 +148,8 @@ export function parse_math_equation_with_bindings(source: string, bindings: Math
     right.source_length = length
     i = 0
     while i < right.count {
-        right.instructions[i].source_start = right.instructions[i].source_start + equality + 1
-        right.instructions[i].source_end = right.instructions[i].source_end + equality + 1
+        right.instructions[i].source_start = right.instructions[i].source_start + equality + equality_width
+        right.instructions[i].source_end = right.instructions[i].source_end + equality + equality_width
         i = i + 1
     }
     return MathEquation {

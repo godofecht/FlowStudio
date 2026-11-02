@@ -44,6 +44,8 @@
 #          89 diffusion3(center, left, right, down, up, back, front,
 #             kleft, kright, kdown, kup, kback, kfront, dx, dy, dz):
 #             conservative 3D heterogeneous face-flux divergence; k in m²/s.
+#          90 diffusion2(center, left, right, down, up, kleft, kright, kdown, kup, dx, dy):
+#             conservative 2D heterogeneous face-flux divergence; k in m²/s.
 #          The instruction exponent stores the actual variadic arity.
 #          Every permutation product must have the same SI dimension.
 # Predicate values are dimensionless 0/1 with a separate runtime type bit.
@@ -1273,19 +1275,22 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
             depth = base + 1
             stack[base] = quantity(output_value, output_dimension)
             predicate[base] = false
-        } elif opcode == 89 {
-            # Conservative anisotropic 3D divergence of face diffusivity times
-            # the temperature gradient. Shared face coefficients give equal
-            # and opposite fluxes in adjacent cells on a uniform grid.
-            if depth < 16 { return failed(instruction.source_start) }
-            let base: i32 = depth - 16
+        } elif opcode == 89 or opcode == 90 {
+            # Conservative anisotropic 2D/3D face-flux divergence. A shared
+            # coefficient gives equal and opposite fluxes across each face.
+            let mut axes: i32 = 3
+            if opcode == 90 { axes = 2 }
+            let fields: i32 = 1 + 2 * axes
+            let arity: i32 = fields + 3 * axes
+            if depth < arity { return failed(instruction.source_start) }
+            let base: i32 = depth - arity
             let field_dimension: Dimension = stack[base].dimension
             let coefficient_dimension: Dimension = Dimension {
                 length: 2, mass: 0, time: -1, temperature: 0
             }
             let mut field_scale: f64 = 0.0
             let mut component: i32 = 0
-            while component < 7 {
+            while component < fields {
                 let sample: Quantity = stack[base + component]
                 if predicate[base + component] or
                    not same_dimension(sample.dimension, field_dimension) or
@@ -1298,8 +1303,8 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
             }
             let mut coefficient_scale: f64 = 0.0
             component = 0
-            while component < 6 {
-                let position: i32 = base + 7 + component
+            while component < 2 * axes {
+                let position: i32 = base + fields + component
                 let coefficient: Quantity = stack[position]
                 if predicate[position] or
                    not same_dimension(coefficient.dimension, coefficient_dimension) or
@@ -1312,8 +1317,8 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
                 component = component + 1
             }
             component = 0
-            while component < 3 {
-                let position: i32 = base + 13 + component
+            while component < axes {
+                let position: i32 = base + fields + 2 * axes + component
                 let spacing: Quantity = stack[position]
                 if predicate[position] or
                    not same_dimension(spacing.dimension, length_dimension()) or
@@ -1331,12 +1336,12 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
                 let center: f64 = stack[base].value / field_scale
                 let mut total: f64 = 0.0
                 let mut axis: i32 = 0
-                while axis < 3 {
+                while axis < axes {
                     let left: f64 = stack[base + 1 + 2 * axis].value / field_scale
                     let right: f64 = stack[base + 2 + 2 * axis].value / field_scale
-                    let kl: f64 = stack[base + 7 + 2 * axis].value / coefficient_scale
-                    let kr: f64 = stack[base + 8 + 2 * axis].value / coefficient_scale
-                    let spacing: f64 = stack[base + 13 + axis].value
+                    let kl: f64 = stack[base + fields + 2 * axis].value / coefficient_scale
+                    let kr: f64 = stack[base + fields + 1 + 2 * axis].value / coefficient_scale
+                    let spacing: f64 = stack[base + fields + 2 * axes + axis].value
                     total = total + ((kr * (right - center) -
                         kl * (center - left)) / spacing) / spacing
                     axis = axis + 1

@@ -108,6 +108,15 @@ def main() -> None:
         assert status == 422 and not rejected["ok"] and rejected["state"] == "idle", (
             expression, status, body)
 
+    # CPython splitlines() excludes a phantom line after a terminal newline.
+    # These negative cases exercise the real native HTTP debugger, not a mock.
+    for source in ("terminal_line = 1\\n", "terminal_line = 1\\r\\n"):
+        status, body = request("/api/debug/python/start", json.dumps({
+            "source": source, "breakpoints": [2]}))
+        rejected = json.loads(body)
+        assert status == 422 and not rejected["ok"] and rejected["state"] == "idle", (
+            source, status, body)
+
     status, body = request("/api/run/python", "print(iteration)")
     assert status == 200 and body.strip() == str(iteration), (status, body)
     print("PASS: real CPython scientific breakpoint on 64-cell heat evolution, "

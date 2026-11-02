@@ -35,7 +35,7 @@ def expression(values: tuple[Fraction, ...]) -> str:
     assert len(values) == 16
     return "diffusion3(" + ",".join(
         [_decimal(v) + "K" for v in values[:7]] +
-        ["(" + _decimal(v) + "m²/1s)" for v in values[7:13]] +
+        ["(" + _decimal(v) + "*1m²/1s)" for v in values[7:13]] +
         [_decimal(v) + "m" for v in values[13:]]
     ) + ")"
 

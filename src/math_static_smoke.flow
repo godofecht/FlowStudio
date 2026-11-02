@@ -317,6 +317,18 @@ function main() -> i32 {
     inferred = infer_math_equation_source("sign(-2m) = -1")
     if not inferred.valid or not same_dimension(inferred.dimension, dimensionless()) { return 101 }
 
+
+    # Static inference agrees with runtime XOR typing, without evaluating values.
+    inferred = infer_math_expression_source("2m<3m ⊻ 1s>2s")
+    if not inferred.valid or not inferred.is_predicate or
+       not same_dimension(inferred.dimension, dimensionless()) { return 102 }
+    inferred = infer_math_expression_source("true xor false")
+    if not inferred.valid or not inferred.is_predicate { return 103 }
+    inferred = infer_math_expression_source("2m ⊻ true")
+    if inferred.valid or inferred.failed_at != 3 { return 104 }
+    inferred = infer_math_expression_source("1m<2s xor true")
+    if inferred.valid or inferred.failed_at != 2 { return 105 }
+
     println("native-math-static-ok")
     return 0
 }

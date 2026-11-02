@@ -5,6 +5,7 @@ from pathlib import Path
 from http_smoke import request, compact_native_math_identifiers
 from http_finite_difference_smoke import bundled_source
 from test_diffusion1_long_horizon import CASE_COUNT, inject_assertions
+from http_diffusion1_long_horizon_interop import verify_long_horizon_interop
 
 
 def verify_long_horizon() -> None:
@@ -27,6 +28,7 @@ def verify_long_horizon() -> None:
     assert status == 200, ("sabotaged long-horizon compiles", status, body)
     status, body = request("POST", "/api/run/flow", sabotaged, headers)
     assert status == 422, ("sabotaged long-horizon must fail", status, body)
+    verify_long_horizon_interop(request, headers)
     print(f"PASS: {CASE_COUNT} exact 64-step-trajectory native diffusion1 "
           "HTTP rates and deliberate HTTP 422")
 

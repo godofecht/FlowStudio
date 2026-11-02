@@ -20,10 +20,12 @@ The same test exercises a real `web/plot_figures.js` import, not a copy of the
 validation implementation.
 
 The production `/api/plot/r` and `/api/plot/python` POST routes are used by
-`FlowStudioPlotFigures.show` with `X-FlowStudio-Intent: run`. The test
-substitutes deterministic HTTP responses at the fetch boundary, while the
-existing native HTTP and physical Chromium CI suites continue to exercise
-the actual Flow-owned server and browser.
+`FlowStudioPlotFigures.show` with `X-FlowStudio-Intent: run`. In addition to
+controlled response failures, a real localhost Node HTTP server verifies
+actual POST transport, streaming response decoding and both capture routes
+through the production browser module. This test server is **not** the
+Flow-owned server; the existing native HTTP and physical Chromium CI suites
+continue to exercise the actual Flow-owned server and browser.
 
 ## Resource and failure contract
 

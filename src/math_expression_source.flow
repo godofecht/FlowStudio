@@ -79,7 +79,7 @@ function identifier_part_width(bytes: ptr<u8>, index: i32, length: i32) -> i32 {
     return greek_letter_width(bytes, index, length)
 }
 
-function identifier_matches(bytes: ptr<u8>, start: i32, end: i32, name: string) -> bool {
+function id_eq(bytes: ptr<u8>, start: i32, end: i32, name: string) -> bool {
     let length: i32 = strlen(name) as i32
     if length != end - start { return false }
     let name_bytes: ptr<u8> = name as ptr<u8>
@@ -97,14 +97,14 @@ function valid_symbol_name(name: string) -> bool {
     let bytes: ptr<u8> = name as ptr<u8>
     let mut i: i32 = identifier_start_width(bytes, 0, length)
     if i == 0 { return false }
-    if identifier_matches(bytes, 0, length, "and") or
-       identifier_matches(bytes, 0, length, "or") or
-       identifier_matches(bytes, 0, length, "xor") or
-       identifier_matches(bytes, 0, length, "implies") or
-       identifier_matches(bytes, 0, length, "iff") or
-       identifier_matches(bytes, 0, length, "not") or
-       identifier_matches(bytes, 0, length, "true") or
-       identifier_matches(bytes, 0, length, "false") { return false }
+    if id_eq(bytes, 0, length, "and") or
+       id_eq(bytes, 0, length, "or") or
+       id_eq(bytes, 0, length, "xor") or
+       id_eq(bytes, 0, length, "implies") or
+       id_eq(bytes, 0, length, "iff") or
+       id_eq(bytes, 0, length, "not") or
+       id_eq(bytes, 0, length, "true") or
+       id_eq(bytes, 0, length, "false") { return false }
     while i < length {
         let width: i32 = identifier_part_width(bytes, i, length)
         if width == 0 { return false }
@@ -123,7 +123,7 @@ function valid_bindings(bindings: MathBindings) -> bool {
         let length: i32 = strlen(name) as i32
         let mut j: i32 = 0
         while j < i {
-            if identifier_matches(bytes, 0, length, bindings.symbols[j].name) {
+            if id_eq(bytes, 0, length, bindings.symbols[j].name) {
                 return false
             }
             j = j + 1
@@ -326,86 +326,86 @@ function function_call_after_number(bytes: ptr<u8>, start: i32, length: i32) -> 
         end = end + 1
     }
     if math_open_width(bytes, end, length) == 0 { return false }
-    return identifier_matches(bytes, start, end, "abs") or
-        identifier_matches(bytes, start, end, "sqrt") or
-        identifier_matches(bytes, start, end, "cbrt") or
-        identifier_matches(bytes, start, end, "root4") or
-        identifier_matches(bytes, start, end, "root5") or
-        identifier_matches(bytes, start, end, "root6") or
-        identifier_matches(bytes, start, end, "root7") or
-        identifier_matches(bytes, start, end, "root8") or
-        identifier_matches(bytes, start, end, "factorial") or
-        identifier_matches(bytes, start, end, "sign") or
-        identifier_matches(bytes, start, end, "sgn") or
-        identifier_matches(bytes, start, end, "sin") or
-        identifier_matches(bytes, start, end, "cos") or
-        identifier_matches(bytes, start, end, "tan") or
-        identifier_matches(bytes, start, end, "sinh") or
-        identifier_matches(bytes, start, end, "cosh") or
-        identifier_matches(bytes, start, end, "tanh") or
-        identifier_matches(bytes, start, end, "asinh") or
-        identifier_matches(bytes, start, end, "acosh") or
-        identifier_matches(bytes, start, end, "atanh") or
-        identifier_matches(bytes, start, end, "asin") or
-        identifier_matches(bytes, start, end, "acos") or
-        identifier_matches(bytes, start, end, "atan") or
-        identifier_matches(bytes, start, end, "atan2") or
-        identifier_matches(bytes, start, end, "ln") or
-        identifier_matches(bytes, start, end, "log") or
-        identifier_matches(bytes, start, end, "log10") or
-        identifier_matches(bytes, start, end, "log1p") or
-        identifier_matches(bytes, start, end, "expm1") or
-        identifier_matches(bytes, start, end, "exp") or
-        identifier_matches(bytes, start, end, "min") or
-        identifier_matches(bytes, start, end, "max") or
-        identifier_matches(bytes, start, end, "norm") or
-        identifier_matches(bytes, start, end, "norm3") or
-        identifier_matches(bytes, start, end, "norm4") or
-        identifier_matches(bytes, start, end, "norm5") or
-        identifier_matches(bytes, start, end, "norm6") or
-        identifier_matches(bytes, start, end, "norm7") or
-        identifier_matches(bytes, start, end, "norm8") or
-        identifier_matches(bytes, start, end, "dot2") or
-        identifier_matches(bytes, start, end, "dot3") or
-        identifier_matches(bytes, start, end, "dot4") or
-        identifier_matches(bytes, start, end, "dot5") or
-        identifier_matches(bytes, start, end, "dot6") or
-        identifier_matches(bytes, start, end, "dot7") or
-        identifier_matches(bytes, start, end, "dot8") or
-        identifier_matches(bytes, start, end, "cross2") or
-        identifier_matches(bytes, start, end, "det2") or
-        identifier_matches(bytes, start, end, "det3") or
-        identifier_matches(bytes, start, end, "det4") or
-        identifier_matches(bytes, start, end, "sum") or
-        identifier_matches(bytes, start, end, "product") or
-        identifier_matches(bytes, start, end, "mean") or
-        identifier_matches(bytes, start, end, "variance") or
-        identifier_matches(bytes, start, end, "sample_variance") or
-        identifier_matches(bytes, start, end, "sample_stddev") or
-        identifier_matches(bytes, start, end, "stddev") or
-        identifier_matches(bytes, start, end, "rms") or
-        identifier_matches(bytes, start, end, "median") or
-        identifier_matches(bytes, start, end, "mad") or
-        identifier_matches(bytes, start, end, "quantile") or
-        identifier_matches(bytes, start, end, "fd1") or
-        identifier_matches(bytes, start, end, "fd2") or
-        identifier_matches(bytes, start, end, "fd3") or
-        identifier_matches(bytes, start, end, "fd4") or
-        identifier_matches(bytes, start, end, "fdxy") or
-        identifier_matches(bytes, start, end, "laplacian2") or
-        identifier_matches(bytes, start, end, "laplacian3") or
-        identifier_matches(bytes, start, end, "diffusion3") or
-        identifier_matches(bytes, start, end, "diffusion2") or
-        identifier_matches(bytes, start, end, "diffusion1") or
-        identifier_matches(bytes, start, end, "fluxdiv1") or
-        identifier_matches(bytes, start, end, "fluxdiv2") or
-        identifier_matches(bytes, start, end, "fluxdiv3") or
-        identifier_matches(bytes, start, end, "lerp") or
-        identifier_matches(bytes, start, end, "approx") or
-        identifier_matches(bytes, start, end, "clamp") or
-        identifier_matches(bytes, start, end, "where") or
-        identifier_matches(bytes, start, end, "smoothstep") or
-        identifier_matches(bytes, start, end, "smootherstep")
+    return id_eq(bytes, start, end, "abs") or
+        id_eq(bytes, start, end, "sqrt") or
+        id_eq(bytes, start, end, "cbrt") or
+        id_eq(bytes, start, end, "root4") or
+        id_eq(bytes, start, end, "root5") or
+        id_eq(bytes, start, end, "root6") or
+        id_eq(bytes, start, end, "root7") or
+        id_eq(bytes, start, end, "root8") or
+        id_eq(bytes, start, end, "factorial") or
+        id_eq(bytes, start, end, "sign") or
+        id_eq(bytes, start, end, "sgn") or
+        id_eq(bytes, start, end, "sin") or
+        id_eq(bytes, start, end, "cos") or
+        id_eq(bytes, start, end, "tan") or
+        id_eq(bytes, start, end, "sinh") or
+        id_eq(bytes, start, end, "cosh") or
+        id_eq(bytes, start, end, "tanh") or
+        id_eq(bytes, start, end, "asinh") or
+        id_eq(bytes, start, end, "acosh") or
+        id_eq(bytes, start, end, "atanh") or
+        id_eq(bytes, start, end, "asin") or
+        id_eq(bytes, start, end, "acos") or
+        id_eq(bytes, start, end, "atan") or
+        id_eq(bytes, start, end, "atan2") or
+        id_eq(bytes, start, end, "ln") or
+        id_eq(bytes, start, end, "log") or
+        id_eq(bytes, start, end, "log10") or
+        id_eq(bytes, start, end, "log1p") or
+        id_eq(bytes, start, end, "expm1") or
+        id_eq(bytes, start, end, "exp") or
+        id_eq(bytes, start, end, "min") or
+        id_eq(bytes, start, end, "max") or
+        id_eq(bytes, start, end, "norm") or
+        id_eq(bytes, start, end, "norm3") or
+        id_eq(bytes, start, end, "norm4") or
+        id_eq(bytes, start, end, "norm5") or
+        id_eq(bytes, start, end, "norm6") or
+        id_eq(bytes, start, end, "norm7") or
+        id_eq(bytes, start, end, "norm8") or
+        id_eq(bytes, start, end, "dot2") or
+        id_eq(bytes, start, end, "dot3") or
+        id_eq(bytes, start, end, "dot4") or
+        id_eq(bytes, start, end, "dot5") or
+        id_eq(bytes, start, end, "dot6") or
+        id_eq(bytes, start, end, "dot7") or
+        id_eq(bytes, start, end, "dot8") or
+        id_eq(bytes, start, end, "cross2") or
+        id_eq(bytes, start, end, "det2") or
+        id_eq(bytes, start, end, "det3") or
+        id_eq(bytes, start, end, "det4") or
+        id_eq(bytes, start, end, "sum") or
+        id_eq(bytes, start, end, "product") or
+        id_eq(bytes, start, end, "mean") or
+        id_eq(bytes, start, end, "variance") or
+        id_eq(bytes, start, end, "sample_variance") or
+        id_eq(bytes, start, end, "sample_stddev") or
+        id_eq(bytes, start, end, "stddev") or
+        id_eq(bytes, start, end, "rms") or
+        id_eq(bytes, start, end, "median") or
+        id_eq(bytes, start, end, "mad") or
+        id_eq(bytes, start, end, "quantile") or
+        id_eq(bytes, start, end, "fd1") or
+        id_eq(bytes, start, end, "fd2") or
+        id_eq(bytes, start, end, "fd3") or
+        id_eq(bytes, start, end, "fd4") or
+        id_eq(bytes, start, end, "fdxy") or
+        id_eq(bytes, start, end, "laplacian2") or
+        id_eq(bytes, start, end, "laplacian3") or
+        id_eq(bytes, start, end, "diffusion3") or
+        id_eq(bytes, start, end, "diffusion2") or
+        id_eq(bytes, start, end, "diffusion1") or
+        id_eq(bytes, start, end, "fluxdiv1") or
+        id_eq(bytes, start, end, "fluxdiv2") or
+        id_eq(bytes, start, end, "fluxdiv3") or
+        id_eq(bytes, start, end, "lerp") or
+        id_eq(bytes, start, end, "approx") or
+        id_eq(bytes, start, end, "clamp") or
+        id_eq(bytes, start, end, "where") or
+        id_eq(bytes, start, end, "smoothstep") or
+        id_eq(bytes, start, end, "smootherstep")
 }
 
 function blank_instruction() -> MathInstruction {
@@ -762,31 +762,31 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
             unary_opcode = 21
             unary_width = 4
         } elif index + 4 < length and math_open_width(bytes, index + 4, length) > 0 and
-               identifier_matches(bytes, index, index + 4, "cbrt") {
+               id_eq(bytes, index, index + 4, "cbrt") {
             unary_opcode = 44
             unary_width = 4
         } elif index + 5 < length and math_open_width(bytes, index + 5, length) > 0 and
-               identifier_matches(bytes, index, index + 5, "root4") {
+               id_eq(bytes, index, index + 5, "root4") {
             unary_opcode = 46
             unary_width = 5
         } elif index + 9 < length and math_open_width(bytes, index + 9, length) > 0 and
-               identifier_matches(bytes, index, index + 9, "factorial") {
+               id_eq(bytes, index, index + 9, "factorial") {
             unary_opcode = 56
             unary_width = 9
         } elif index + 5 < length and math_open_width(bytes, index + 5, length) > 0 and
-               identifier_matches(bytes, index, index + 5, "root5") {
+               id_eq(bytes, index, index + 5, "root5") {
             unary_opcode = 47
             unary_width = 5
         } elif index + 5 < length and math_open_width(bytes, index + 5, length) > 0 and
-               identifier_matches(bytes, index, index + 5, "root6") {
+               id_eq(bytes, index, index + 5, "root6") {
             unary_opcode = 48
             unary_width = 5
         } elif index + 5 < length and math_open_width(bytes, index + 5, length) > 0 and
-               identifier_matches(bytes, index, index + 5, "root7") {
+               id_eq(bytes, index, index + 5, "root7") {
             unary_opcode = 49
             unary_width = 5
         } elif index + 5 < length and math_open_width(bytes, index + 5, length) > 0 and
-               identifier_matches(bytes, index, index + 5, "root8") {
+               id_eq(bytes, index, index + 5, "root8") {
             unary_opcode = 50
             unary_width = 5
         } elif c == 101 and index + 3 < length and
@@ -795,284 +795,284 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
             unary_opcode = 25
             unary_width = 3
         } elif index + 4 < length and math_open_width(bytes, index + 4, length) > 0 and
-               identifier_matches(bytes, index, index + 4, "sign") {
+               id_eq(bytes, index, index + 4, "sign") {
             # Native signed direction for upwind fluxes; physical units cancel.
             unary_opcode = 57
             unary_width = 4
         } elif index + 3 < length and math_open_width(bytes, index + 3, length) > 0 and
-               identifier_matches(bytes, index, index + 3, "sgn") {
+               id_eq(bytes, index, index + 3, "sgn") {
             unary_opcode = 57
             unary_width = 3
         } elif index + 3 < length and math_open_width(bytes, index + 3, length) > 0 and
-               identifier_matches(bytes, index, index + 3, "sin") {
+               id_eq(bytes, index, index + 3, "sin") {
             unary_opcode = 28
             unary_width = 3
         } elif index + 3 < length and math_open_width(bytes, index + 3, length) > 0 and
-               identifier_matches(bytes, index, index + 3, "cos") {
+               id_eq(bytes, index, index + 3, "cos") {
             unary_opcode = 29
             unary_width = 3
         } elif index + 3 < length and math_open_width(bytes, index + 3, length) > 0 and
-               identifier_matches(bytes, index, index + 3, "tan") {
+               id_eq(bytes, index, index + 3, "tan") {
             unary_opcode = 30
             unary_width = 3
         } elif index + 4 < length and math_open_width(bytes, index + 4, length) > 0 and
-               identifier_matches(bytes, index, index + 4, "sinh") {
+               id_eq(bytes, index, index + 4, "sinh") {
             unary_opcode = 35
             unary_width = 4
         } elif index + 4 < length and math_open_width(bytes, index + 4, length) > 0 and
-               identifier_matches(bytes, index, index + 4, "cosh") {
+               id_eq(bytes, index, index + 4, "cosh") {
             unary_opcode = 36
             unary_width = 4
         } elif index + 4 < length and math_open_width(bytes, index + 4, length) > 0 and
-               identifier_matches(bytes, index, index + 4, "tanh") {
+               id_eq(bytes, index, index + 4, "tanh") {
             unary_opcode = 37
             unary_width = 4
         } elif index + 5 < length and math_open_width(bytes, index + 5, length) > 0 and
-               identifier_matches(bytes, index, index + 5, "asinh") {
+               id_eq(bytes, index, index + 5, "asinh") {
             unary_opcode = 38
             unary_width = 5
         } elif index + 5 < length and math_open_width(bytes, index + 5, length) > 0 and
-               identifier_matches(bytes, index, index + 5, "acosh") {
+               id_eq(bytes, index, index + 5, "acosh") {
             unary_opcode = 39
             unary_width = 5
         } elif index + 5 < length and math_open_width(bytes, index + 5, length) > 0 and
-               identifier_matches(bytes, index, index + 5, "atanh") {
+               id_eq(bytes, index, index + 5, "atanh") {
             unary_opcode = 40
             unary_width = 5
         } elif index + 4 < length and math_open_width(bytes, index + 4, length) > 0 and
-               identifier_matches(bytes, index, index + 4, "asin") {
+               id_eq(bytes, index, index + 4, "asin") {
             unary_opcode = 33
             unary_width = 4
         } elif index + 4 < length and math_open_width(bytes, index + 4, length) > 0 and
-               identifier_matches(bytes, index, index + 4, "acos") {
+               id_eq(bytes, index, index + 4, "acos") {
             unary_opcode = 34
             unary_width = 4
         } elif index + 4 < length and math_open_width(bytes, index + 4, length) > 0 and
-               identifier_matches(bytes, index, index + 4, "atan") {
+               id_eq(bytes, index, index + 4, "atan") {
             unary_opcode = 31
             unary_width = 4
         } elif index + 5 < length and math_open_width(bytes, index + 5, length) > 0 and
-               identifier_matches(bytes, index, index + 5, "atan2") {
+               id_eq(bytes, index, index + 5, "atan2") {
             unary_opcode = 32
             unary_width = 5
         } elif index + 2 < length and math_open_width(bytes, index + 2, length) > 0 and
-               identifier_matches(bytes, index, index + 2, "ln") {
+               id_eq(bytes, index, index + 2, "ln") {
             unary_opcode = 26
             unary_width = 2
         } elif index + 5 < length and math_open_width(bytes, index + 5, length) > 0 and
-               identifier_matches(bytes, index, index + 5, "log10") {
+               id_eq(bytes, index, index + 5, "log10") {
             unary_opcode = 27
             unary_width = 5
         } elif index + 5 < length and math_open_width(bytes, index + 5, length) > 0 and
-               identifier_matches(bytes, index, index + 5, "log1p") {
+               id_eq(bytes, index, index + 5, "log1p") {
             unary_opcode = 42
             unary_width = 5
         } elif index + 5 < length and math_open_width(bytes, index + 5, length) > 0 and
-               identifier_matches(bytes, index, index + 5, "expm1") {
+               id_eq(bytes, index, index + 5, "expm1") {
             unary_opcode = 43
             unary_width = 5
         } elif index + 3 < length and math_open_width(bytes, index + 3, length) > 0 and
-               identifier_matches(bytes, index, index + 3, "log") {
+               id_eq(bytes, index, index + 3, "log") {
             unary_opcode = 26
             unary_width = 3
         } elif index + 3 < length and math_open_width(bytes, index + 3, length) > 0 and
-               identifier_matches(bytes, index, index + 3, "min") {
+               id_eq(bytes, index, index + 3, "min") {
             unary_opcode = 7
             unary_width = 3
         } elif index + 3 < length and math_open_width(bytes, index + 3, length) > 0 and
-               identifier_matches(bytes, index, index + 3, "max") {
+               id_eq(bytes, index, index + 3, "max") {
             unary_opcode = 8
             unary_width = 3
         } elif index + 5 < length and math_open_width(bytes, index + 5, length) > 0 and
-               identifier_matches(bytes, index, index + 5, "norm8") {
+               id_eq(bytes, index, index + 5, "norm8") {
             unary_opcode = 55
             unary_width = 5
         } elif index + 5 < length and math_open_width(bytes, index + 5, length) > 0 and
-               identifier_matches(bytes, index, index + 5, "norm7") {
+               id_eq(bytes, index, index + 5, "norm7") {
             unary_opcode = 54
             unary_width = 5
         } elif index + 5 < length and math_open_width(bytes, index + 5, length) > 0 and
-               identifier_matches(bytes, index, index + 5, "norm6") {
+               id_eq(bytes, index, index + 5, "norm6") {
             unary_opcode = 53
             unary_width = 5
         } elif index + 5 < length and math_open_width(bytes, index + 5, length) > 0 and
-               identifier_matches(bytes, index, index + 5, "norm5") {
+               id_eq(bytes, index, index + 5, "norm5") {
             unary_opcode = 52
             unary_width = 5
         } elif index + 4 < length and math_open_width(bytes, index + 4, length) > 0 and
-               identifier_matches(bytes, index, index + 4, "dot8") {
+               id_eq(bytes, index, index + 4, "dot8") {
             unary_opcode = 65
             unary_width = 4
         } elif index + 4 < length and math_open_width(bytes, index + 4, length) > 0 and
-               identifier_matches(bytes, index, index + 4, "dot7") {
+               id_eq(bytes, index, index + 4, "dot7") {
             unary_opcode = 64
             unary_width = 4
         } elif index + 4 < length and math_open_width(bytes, index + 4, length) > 0 and
-               identifier_matches(bytes, index, index + 4, "dot6") {
+               id_eq(bytes, index, index + 4, "dot6") {
             unary_opcode = 63
             unary_width = 4
         } elif index + 4 < length and math_open_width(bytes, index + 4, length) > 0 and
-               identifier_matches(bytes, index, index + 4, "dot5") {
+               id_eq(bytes, index, index + 4, "dot5") {
             unary_opcode = 62
             unary_width = 4
         } elif index + 4 < length and math_open_width(bytes, index + 4, length) > 0 and
-               identifier_matches(bytes, index, index + 4, "dot2") {
+               id_eq(bytes, index, index + 4, "dot2") {
             unary_opcode = 58
             unary_width = 4
         } elif index + 4 < length and math_open_width(bytes, index + 4, length) > 0 and
-               identifier_matches(bytes, index, index + 4, "dot3") {
+               id_eq(bytes, index, index + 4, "dot3") {
             unary_opcode = 59
             unary_width = 4
         } elif index + 4 < length and math_open_width(bytes, index + 4, length) > 0 and
-               identifier_matches(bytes, index, index + 4, "dot4") {
+               id_eq(bytes, index, index + 4, "dot4") {
             unary_opcode = 61
             unary_width = 4
         } elif index + 4 < length and math_open_width(bytes, index + 4, length) > 0 and
-               identifier_matches(bytes, index, index + 4, "det2") {
+               id_eq(bytes, index, index + 4, "det2") {
             unary_opcode = 70
             unary_width = 4
         } elif index + 4 < length and math_open_width(bytes, index + 4, length) > 0 and
-               identifier_matches(bytes, index, index + 4, "det3") {
+               id_eq(bytes, index, index + 4, "det3") {
             unary_opcode = 71
             unary_width = 4
         } elif index + 4 < length and math_open_width(bytes, index + 4, length) > 0 and
-               identifier_matches(bytes, index, index + 4, "det4") {
+               id_eq(bytes, index, index + 4, "det4") {
             unary_opcode = 72
             unary_width = 4
         } elif index + 6 < length and math_open_width(bytes, index + 6, length) > 0 and
-               identifier_matches(bytes, index, index + 6, "cross2") {
+               id_eq(bytes, index, index + 6, "cross2") {
             unary_opcode = 60
             unary_width = 6
         } elif index + 5 < length and math_open_width(bytes, index + 5, length) > 0 and
-               identifier_matches(bytes, index, index + 5, "norm4") {
+               id_eq(bytes, index, index + 5, "norm4") {
             unary_opcode = 51
             unary_width = 5
         } elif index + 5 < length and math_open_width(bytes, index + 5, length) > 0 and
-               identifier_matches(bytes, index, index + 5, "norm3") {
+               id_eq(bytes, index, index + 5, "norm3") {
             unary_opcode = 45
             unary_width = 5
         } elif index + 4 < length and math_open_width(bytes, index + 4, length) > 0 and
-               identifier_matches(bytes, index, index + 4, "norm") {
+               id_eq(bytes, index, index + 4, "norm") {
             unary_opcode = 22
             unary_width = 4
         } elif index + 12 < length and math_open_width(bytes, index + 12, length) > 0 and
-               identifier_matches(bytes, index, index + 12, "smootherstep") {
+               id_eq(bytes, index, index + 12, "smootherstep") {
             unary_opcode = 68
             unary_width = 12
         } elif index + 10 < length and math_open_width(bytes, index + 10, length) > 0 and
-               identifier_matches(bytes, index, index + 10, "smoothstep") {
+               id_eq(bytes, index, index + 10, "smoothstep") {
             unary_opcode = 67
             unary_width = 10
         } elif index + 3 < length and math_open_width(bytes, index + 3, length) > 0 and
-               identifier_matches(bytes, index, index + 3, "sum") {
+               id_eq(bytes, index, index + 3, "sum") {
             unary_opcode = 73
             unary_width = 3
         } elif index + 7 < length and math_open_width(bytes, index + 7, length) > 0 and
-               identifier_matches(bytes, index, index + 7, "product") {
+               id_eq(bytes, index, index + 7, "product") {
             unary_opcode = 74
             unary_width = 7
         } elif index + 4 < length and math_open_width(bytes, index + 4, length) > 0 and
-               identifier_matches(bytes, index, index + 4, "mean") {
+               id_eq(bytes, index, index + 4, "mean") {
             unary_opcode = 75
             unary_width = 4
         } elif index + 8 < length and math_open_width(bytes, index + 8, length) > 0 and
-               identifier_matches(bytes, index, index + 8, "variance") {
+               id_eq(bytes, index, index + 8, "variance") {
             unary_opcode = 76
             unary_width = 8
         } elif index + 15 < length and math_open_width(bytes, index + 15, length) > 0 and
-               identifier_matches(bytes, index, index + 15, "sample_variance") {
+               id_eq(bytes, index, index + 15, "sample_variance") {
             unary_opcode = 81
             unary_width = 15
         } elif index + 13 < length and math_open_width(bytes, index + 13, length) > 0 and
-               identifier_matches(bytes, index, index + 13, "sample_stddev") {
+               id_eq(bytes, index, index + 13, "sample_stddev") {
             unary_opcode = 82
             unary_width = 13
         } elif index + 6 < length and math_open_width(bytes, index + 6, length) > 0 and
-               identifier_matches(bytes, index, index + 6, "stddev") {
+               id_eq(bytes, index, index + 6, "stddev") {
             unary_opcode = 83
             unary_width = 6
         } elif index + 3 < length and math_open_width(bytes, index + 3, length) > 0 and
-               identifier_matches(bytes, index, index + 3, "rms") {
+               id_eq(bytes, index, index + 3, "rms") {
             unary_opcode = 77
             unary_width = 3
         } elif index + 6 < length and math_open_width(bytes, index + 6, length) > 0 and
-               identifier_matches(bytes, index, index + 6, "median") {
+               id_eq(bytes, index, index + 6, "median") {
             unary_opcode = 78
             unary_width = 6
         } elif index + 3 < length and math_open_width(bytes, index + 3, length) > 0 and
-               identifier_matches(bytes, index, index + 3, "mad") {
+               id_eq(bytes, index, index + 3, "mad") {
             unary_opcode = 79
             unary_width = 3
         } elif index + 8 < length and math_open_width(bytes, index + 8, length) > 0 and
-               identifier_matches(bytes, index, index + 8, "quantile") {
+               id_eq(bytes, index, index + 8, "quantile") {
             unary_opcode = 80
             unary_width = 8
         } elif index + 3 < length and math_open_width(bytes, index + 3, length) > 0 and
-               identifier_matches(bytes, index, index + 3, "fd1") {
+               id_eq(bytes, index, index + 3, "fd1") {
             unary_opcode = 84
             unary_width = 3
         } elif index + 3 < length and math_open_width(bytes, index + 3, length) > 0 and
-               identifier_matches(bytes, index, index + 3, "fd2") {
+               id_eq(bytes, index, index + 3, "fd2") {
             unary_opcode = 85
             unary_width = 3
         } elif index + 3 < length and math_open_width(bytes, index + 3, length) > 0 and
-               identifier_matches(bytes, index, index + 3, "fd3") {
+               id_eq(bytes, index, index + 3, "fd3") {
             unary_opcode = 92
             unary_width = 3
         } elif index + 3 < length and math_open_width(bytes, index + 3, length) > 0 and
-               identifier_matches(bytes, index, index + 3, "fd4") {
+               id_eq(bytes, index, index + 3, "fd4") {
             unary_opcode = 93
             unary_width = 3
         } elif index + 4 < length and math_open_width(bytes, index + 4, length) > 0 and
-               identifier_matches(bytes, index, index + 4, "fdxy") {
+               id_eq(bytes, index, index + 4, "fdxy") {
             unary_opcode = 88
             unary_width = 4
         } elif index + 10 < length and math_open_width(bytes, index + 10, length) > 0 and
-               identifier_matches(bytes, index, index + 10, "laplacian2") {
+               id_eq(bytes, index, index + 10, "laplacian2") {
             unary_opcode = 86
             unary_width = 10
         } elif index + 10 < length and math_open_width(bytes, index + 10, length) > 0 and
-               identifier_matches(bytes, index, index + 10, "laplacian3") {
+               id_eq(bytes, index, index + 10, "laplacian3") {
             unary_opcode = 87
             unary_width = 10
         } elif index + 10 < length and math_open_width(bytes, index + 10, length) > 0 and
-               identifier_matches(bytes, index, index + 10, "diffusion3") {
+               id_eq(bytes, index, index + 10, "diffusion3") {
             unary_opcode = 89
             unary_width = 10
         } elif index + 10 < length and math_open_width(bytes, index + 10, length) > 0 and
-               identifier_matches(bytes, index, index + 10, "diffusion2") {
+               id_eq(bytes, index, index + 10, "diffusion2") {
             unary_opcode = 90
             unary_width = 10
         } elif index + 10 < length and math_open_width(bytes, index + 10, length) > 0 and
-               identifier_matches(bytes, index, index + 10, "diffusion1") {
+               id_eq(bytes, index, index + 10, "diffusion1") {
             unary_opcode = 91
             unary_width = 10
         } elif index + 8 < length and math_open_width(bytes, index + 8, length) > 0 and
-               identifier_matches(bytes, index, index + 8, "fluxdiv1") {
+               id_eq(bytes, index, index + 8, "fluxdiv1") {
             unary_opcode = 94
             unary_width = 8
         } elif index + 8 < length and math_open_width(bytes, index + 8, length) > 0 and
-               identifier_matches(bytes, index, index + 8, "fluxdiv2") {
+               id_eq(bytes, index, index + 8, "fluxdiv2") {
             unary_opcode = 95
             unary_width = 8
         } elif index + 8 < length and math_open_width(bytes, index + 8, length) > 0 and
-               identifier_matches(bytes, index, index + 8, "fluxdiv3") {
+               id_eq(bytes, index, index + 8, "fluxdiv3") {
             unary_opcode = 96
             unary_width = 8
         } elif index + 4 < length and math_open_width(bytes, index + 4, length) > 0 and
-               identifier_matches(bytes, index, index + 4, "lerp") {
+               id_eq(bytes, index, index + 4, "lerp") {
             unary_opcode = 66
             unary_width = 4
         } elif index + 6 < length and math_open_width(bytes, index + 6, length) > 0 and
-               identifier_matches(bytes, index, index + 6, "approx") {
+               id_eq(bytes, index, index + 6, "approx") {
             unary_opcode = 69
             unary_width = 6
         } elif index + 5 < length and math_open_width(bytes, index + 5, length) > 0 and
-               identifier_matches(bytes, index, index + 5, "clamp") {
+               id_eq(bytes, index, index + 5, "clamp") {
             unary_opcode = 9
             unary_width = 5
         } elif index + 5 < length and math_open_width(bytes, index + 5, length) > 0 and
-               identifier_matches(bytes, index, index + 5, "where") {
+               id_eq(bytes, index, index + 5, "where") {
             unary_opcode = 19
             unary_width = 5
         }
@@ -1119,7 +1119,7 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
             }
             # Keywords lower directly to the existing native predicate IR.
             # They are reserved and cannot be shadowed by caller bindings.
-            if identifier_matches(bytes, start, index, "not") {
+            if id_eq(bytes, start, index, "not") {
                 if not expect_operand or top >= 64 { return source_error(start, length) }
                 operators[top] = 18
                 positions[top] = start
@@ -1127,17 +1127,17 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
                 top = top + 1
                 continue
             }
-            if identifier_matches(bytes, start, index, "and") or
-               identifier_matches(bytes, start, index, "xor") or
-               identifier_matches(bytes, start, index, "or") or
-               identifier_matches(bytes, start, index, "implies") or
-               identifier_matches(bytes, start, index, "iff") {
+            if id_eq(bytes, start, index, "and") or
+               id_eq(bytes, start, index, "xor") or
+               id_eq(bytes, start, index, "or") or
+               id_eq(bytes, start, index, "implies") or
+               id_eq(bytes, start, index, "iff") {
                 if expect_operand { return source_error(start, length) }
                 let mut logical: i32 = 16
-                if identifier_matches(bytes, start, index, "xor") { logical = 97 }
-                if identifier_matches(bytes, start, index, "or") { logical = 17 }
-                if identifier_matches(bytes, start, index, "implies") { logical = 98 }
-                if identifier_matches(bytes, start, index, "iff") { logical = 99 }
+                if id_eq(bytes, start, index, "xor") { logical = 97 }
+                if id_eq(bytes, start, index, "or") { logical = 17 }
+                if id_eq(bytes, start, index, "implies") { logical = 98 }
+                if id_eq(bytes, start, index, "iff") { logical = 99 }
                 while top > 0 and operators[top - 1] != -1 and
                       (precedence(operators[top - 1]) > precedence(logical) or
                        (precedence(operators[top - 1]) == precedence(logical) and logical != 98)) {
@@ -1157,11 +1157,11 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
             }
             # Boolean keywords are typed predicate literals in the native IR.
             # They cannot be shadowed by caller-supplied numeric symbols.
-            if identifier_matches(bytes, start, index, "true") or
-               identifier_matches(bytes, start, index, "false") {
+            if id_eq(bytes, start, index, "true") or
+               id_eq(bytes, start, index, "false") {
                 if not expect_operand or count >= 64 { return source_error(start, length) }
                 let mut boolean_value: f64 = 0.0
-                if identifier_matches(bytes, start, index, "true") {
+                if id_eq(bytes, start, index, "true") {
                     boolean_value = 1.0
                 }
                 instructions[count] = make_instruction(24,
@@ -1178,7 +1178,7 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
             let mut value: Quantity = quantity(0.0, dimensionless())
             let mut symbol_index: i32 = 0
             while symbol_index < bindings.count {
-                if identifier_matches(bytes, start, index, bindings.symbols[symbol_index].name) {
+                if id_eq(bytes, start, index, bindings.symbols[symbol_index].name) {
                     value = bindings.symbols[symbol_index].value
                     found = true
                     break
@@ -1189,15 +1189,15 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
             # constants. This preserves Greek symbolic variables (including
             # physical τ and π) while providing unbound pi/π, tau/τ and e.
             if not found {
-                if identifier_matches(bytes, start, index, "pi") or
-                   identifier_matches(bytes, start, index, "π") {
+                if id_eq(bytes, start, index, "pi") or
+                   id_eq(bytes, start, index, "π") {
                     value = quantity(3.14159265358979323846, dimensionless())
                     found = true
-                } elif identifier_matches(bytes, start, index, "tau") or
-                     identifier_matches(bytes, start, index, "τ") {
+                } elif id_eq(bytes, start, index, "tau") or
+                     id_eq(bytes, start, index, "τ") {
                     value = quantity(6.28318530717958647692, dimensionless())
                     found = true
-                } elif identifier_matches(bytes, start, index, "e") {
+                } elif id_eq(bytes, start, index, "e") {
                     value = quantity(2.71828182845904523536, dimensionless())
                     found = true
                 }

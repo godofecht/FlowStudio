@@ -1411,10 +1411,13 @@ def main() -> None:
     status, body = request("POST", "/api/run/flow", native_hyperbolic, accepted_headers)
     assert status == 200 and "native-math-hyperbolic-ok" in body, (
         "native hyperbolic HTTP execution", status, body)
-    broken_hyperbolic = native_hyperbolic.replace(
-        "function bounded_hyperbolic(value: f64, opcode: i32) -> f64 {",
-        "function bounded_hyperbolic(value: f64, opcode: i32 -> f64 {",
-        1,
+    # The HTTP bundle compactor removes spaces around type annotations.
+    # Match the actual compiled signature rather than its un-compacted form.
+    broken_hyperbolic = re.sub(
+        r"(\bfunction\s+bounded_hyperbolic\s*\([^)]*)\)",
+        r"\1",
+        native_hyperbolic,
+        count=1,
     )
     assert broken_hyperbolic != native_hyperbolic
     status, body = request("POST", "/api/check/flow", broken_hyperbolic, accepted_headers)

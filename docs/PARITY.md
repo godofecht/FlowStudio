@@ -1,3 +1,26 @@
+## 2026-11-02: native 3D Laplacian and Flow/R/Python interoperability (qualification pending)
+
+[PR #368](https://github.com/godofecht/FlowStudio/pull/368) merged as
+[2a5457f1](https://github.com/godofecht/FlowStudio/commit/2a5457f10fc09ead8d7c7c34d03734331f5b9118).
+Its native SI-aware anisotropic 3D seven-point Laplacian and manufactured
+second-order convergence gate passed all four source/native Linux/macOS jobs
+in [post-merge CI #41367963166](https://github.com/godofecht/FlowStudio/actions/runs/41367963166).
+
+[PR #369](https://github.com/godofecht/FlowStudio/pull/369) adds 24
+seed-20261102 native Flow 3D stencil cases in three bounded production HTTP
+batches, with 12 axis-swap metamorphic pairs, plus the six manufactured
+coarse/fine cases. All 30 cases are independently evaluated in persistent
+base R and exact-rational CPython HTTP. Source/oracle tests check deterministic
+samples, exact 4:1 refinement, malformed spacing, 128 KiB/24 KiB limits,
+numerical corruption, truncated frames, HTTP 422 and recovery.
+[Reproduction](NATIVE_LAPLACIAN3_INTEROP.md).
+
+**PR #369 status:** exact-head Linux/macOS CI and native Flow/R/Python/Chromium
+acceptance are pending; no passing result is claimed for this PR yet.
+**Unexecuted:** local native Flow/R and independent physical macOS Chromium.
+This remains bounded scalar stencil execution, not compiler-generated
+heterogeneous multidimensional `field` lowering or full RStudio parity.
+
 ## 2026-11-02: native SI dispersion and real Flow/R/Python seeded acceptance (verified)
 
 [PR #367](https://github.com/godofecht/FlowStudio/pull/367) merged as

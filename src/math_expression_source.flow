@@ -99,6 +99,7 @@ function valid_symbol_name(name: string) -> bool {
     if i == 0 { return false }
     if identifier_matches(bytes, 0, length, "and") or
        identifier_matches(bytes, 0, length, "or") or
+       identifier_matches(bytes, 0, length, "xor") or
        identifier_matches(bytes, 0, length, "not") or
        identifier_matches(bytes, 0, length, "true") or
        identifier_matches(bytes, 0, length, "false") { return false }
@@ -429,10 +430,11 @@ function precedence(opcode: i32) -> i32 {
     if opcode == 1 or opcode == 2 { return 1 }
     # Comparisons bind below arithmetic and lower to typed predicate IR.
     if opcode >= 10 and opcode <= 15 { return 0 }
-    # Logical precedence: comparisons > not > and > or.
+    # Logical precedence: comparisons > not > and > xor > or.
     if opcode == 18 { return -1 }
     if opcode == 16 { return -2 }
-    if opcode == 17 { return -3 }
+    if opcode == 97 { return -3 }
+    if opcode == 17 { return -4 }
     return 0
 }
 
@@ -501,7 +503,7 @@ function math_space_width(bytes: ptr<u8>, position: i32, length: i32) -> i32 {
 }
 
 # Operators are recognized only at exact byte sequences. Supported UTF-8
-# spellings include ×, ·, ⋅, ∙, ∗, ÷, ∕, ⁄, ／, ＋, －, ＊, ＜, ＞, ＝, −, ≤, ≥, ≦, ≧, ⩽, ⩾, ≠, ≡, ≢, ∧ and ∨.
+# spellings include ×, ·, ⋅, ∙, ∗, ÷, ∕, ⁄, ／, ＋, －, ＊, ＜, ＞, ＝, −, ≤, ≥, ≦, ≧, ⩽, ⩾, ≠, ≡, ≢, ∧, ∨ and ⊻.
 # Prefix ¬ is handled separately to enforce unary placement.
 # Unsupported Unicode cannot be silently normalized to another operation.
 function source_operator(bytes: ptr<u8>, position: i32, length: i32) -> i32 {
@@ -528,6 +530,7 @@ function source_operator(bytes: ptr<u8>, position: i32, length: i32) -> i32 {
     if c == 226 and position + 2 < length {
         if bytes[position + 1] == 129 and bytes[position + 2] == 132 { return 4 } # U+2044 ⁄ FRACTION SLASH
         if bytes[position + 1] == 139 and bytes[position + 2] == 133 { return 3 } # ⋅
+        if bytes[position + 1] == 138 and bytes[position + 2] == 187 { return 97 } # ⊻
         if bytes[position + 1] == 136 {
             if bytes[position + 2] == 149 { return 4 } # ∕
             if bytes[position + 2] == 151 { return 3 } # ∗
@@ -1118,9 +1121,11 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
                 continue
             }
             if identifier_matches(bytes, start, index, "and") or
+               identifier_matches(bytes, start, index, "xor") or
                identifier_matches(bytes, start, index, "or") {
                 if expect_operand { return source_error(start, length) }
                 let mut logical: i32 = 16
+                if identifier_matches(bytes, start, index, "xor") { logical = 97 }
                 if identifier_matches(bytes, start, index, "or") { logical = 17 }
                 while top > 0 and operators[top - 1] != -1 and
                       precedence(operators[top - 1]) >= precedence(logical) {

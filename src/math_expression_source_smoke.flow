@@ -565,7 +565,7 @@ function main() -> i32 {
     result = evaluate_math_expression("not")
     if result.valid or result.failed_at != 3 { return 189 }
     result = evaluate_math_expression("1<2 xor 2<3")
-    if result.valid or result.failed_at != 4 { return 190 }
+    if not result.valid or not result.is_predicate or result.result.value != 0.0 { return 190 }
     result = evaluate_math_expression("1<2 and (2<3")
     if result.valid or result.failed_at != 8 { return 191 }
     result = evaluate_math_expression("1<2 and 2m<3s")
@@ -1659,6 +1659,37 @@ function main() -> i32 {
     result = evaluate_math_expression("min（1m，2s）")
     if result.valid { return 626 }
     if parse_math_expression("min（1、2，3）").valid { return 627 }
+
+
+    # Native typed XOR: Boolean truth table, precedence, SI gating, and UTF-8 spans.
+    result = evaluate_math_expression("true xor false")
+    if not result.valid or not result.is_predicate or result.result.value != 1.0 { return 628 }
+    result = evaluate_math_expression("true xor true")
+    if not result.valid or not result.is_predicate or result.result.value != 0.0 { return 629 }
+    result = evaluate_math_expression("false ⊻ true")
+    if not result.valid or not result.is_predicate or result.result.value != 1.0 { return 630 }
+    result = evaluate_math_expression("false ⊻ false")
+    if not result.valid or not result.is_predicate or result.result.value != 0.0 { return 631 }
+    result = evaluate_math_expression("true or true xor true")
+    if not result.valid or result.result.value != 1.0 { return 632 }
+    result = evaluate_math_expression("true xor true and false")
+    if not result.valid or result.result.value != 1.0 { return 633 }
+    result = evaluate_math_expression("not true xor false")
+    if not result.valid or result.result.value != 0.0 { return 634 }
+    result = evaluate_math_expression("where(2m>1m ⊻ 3m<2m,5m,7m)")
+    if not result.valid or not near(result.result.value, 5.0) or
+       not same_dimension(result.result.dimension, length) { return 635 }
+    let xor_span: ParsedMathExpression = parse_math_expression("true⊻false")
+    if not xor_span.valid or xor_span.program.count != 3 or
+       xor_span.program.instructions[2].opcode != 97 or
+       xor_span.program.instructions[2].source_start != 4 or
+       xor_span.program.instructions[2].source_end != 7 { return 636 }
+    result = evaluate_math_expression("1 xor true")
+    if result.valid or result.failed_at != 2 { return 637 }
+    result = evaluate_math_expression("1m ⊻ 2m")
+    if result.valid or result.failed_at != 3 { return 638 }
+    if parse_math_expression("⊻true").valid { return 639 }
+    if parse_math_expression("true⊻").valid { return 640 }
 
     println("native-math-source-ok")
     return 0

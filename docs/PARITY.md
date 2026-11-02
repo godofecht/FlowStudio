@@ -1,3 +1,25 @@
+## 2026-11-02: shared-face 3D periodic diffusion qualification (PR #376; CI pending)
+
+[PR #376](https://github.com/godofecht/FlowStudio/pull/376) adds
+27 seed-20261102 conservative heterogeneous 3D periodic face-flux cells
+through the actual Flow 2.0 `diffusion3` compiler and production check/run
+HTTP endpoints. An independent exact-Fraction oracle checks mass conservation,
+strict energy dissipation, cyclic translation covariance, and a stable
+forward-Euler step preserving mass and the maximum principle. Persistent
+base R and CPython HTTP independently cross-check all 27 derivatives,
+with HTTP 422 corruption/truncation controls and interpreter recovery.
+The seven native batches contain at most four assertions each and enforce
+a 128 KiB Flow source ceiling; R/Python frames are limited to 24 KiB.
+[Reproduction](NATIVE_PERIODIC_DIFFUSION3.md).
+
+**Locally passed:** three exact-oracle unit tests and direct CPython
+execution of the generated 27-cell verifier; injected numerical corruption
+and truncated frames raised the expected assertions. **Unexecuted:**
+local native Flow/R HTTP, independent physical macOS Chromium and exact-head
+Linux/macOS CI (pending). No CI pass or complete RStudio parity is claimed.
+This remains compiler-executed scalar stencils assembled into a conservative
+grid, not generalized multidimensional `field` lowering.
+
 ## 2026-11-02: shared R/Python figure history and bounded streamed capture (verified)
 
 [PR #375](https://github.com/godofecht/FlowStudio/pull/375) merged as

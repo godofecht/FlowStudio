@@ -107,6 +107,32 @@ def compact_native_math_identifiers(source: str,
         "left_dimension": "ldim",
         "right_dimension": "rdim",
         "result_dimension": "resdim",
+        # All executable native HTTP bundles share the mathematical lexer.
+        # Shorten only internal identifiers, never strings or source glyphs.
+        "math_open_width": "opw",
+        "math_close_width": "clw",
+        "math_comma_width": "cmw",
+        "instructions": "insts",
+        "argument_counts": "argc",
+        "dimensionless": "dimless",
+        "identifier_start_width": "idstartw",
+        "identifier_part_width": "idpartw",
+        "source_operator": "srcop",
+        "source_unit": "srcunit",
+        "math_space_width": "spw",
+        "function_arity": "fary",
+        "operator_bytes": "opb",
+        "identifier_matches": "idm",
+        "source_unit": "su",
+        "MathInstruction": "MIns",
+        "MathBindings": "MBind",
+        "MathSymbol": "MSym",
+        "SourceUnit": "SU",
+        "MathEquationResult": "MEqR",
+        "instruction": "m_inst",
+        "component": "mcomp",
+        "unary_width": "uwidth",
+        "predicates": "mpreds",
     }
 
     if extra_aliases:
@@ -903,6 +929,8 @@ def main() -> None:
     )
     # String-safe compaction preserves all literal UTF-8 glyphs and assertions
     # while retaining the production HTTP transport's strict 128 KiB ceiling.
+    # The same string-safe aliases apply to source, static inference and
+    # equation-system bundles without omitting any executable assertions.
     native_math_source = compact_native_math_identifiers(native_math_source)
     assert len(native_math_source.encode("utf-8")) < 128 * 1024
     assert "function parse_math_expression(" in native_math_source
@@ -1196,6 +1224,10 @@ def main() -> None:
             "MathInstruction": "MIns",
             "MathEquationResult": "MEqR",
             "quotient_dimension": "qdim",
+            "MathProgram": "MPr",
+            "MathResult": "MRs",
+            "MathBindings": "MBind",
+            "MathSymbol": "MSym",
         })
     assert "function solve_math_equations_four_constraints_three_unknown_dimensions(" in native_overdetermined
     assert len(native_overdetermined.encode("utf-8")) < 128 * 1024
@@ -1264,6 +1296,8 @@ def main() -> None:
             "MathDimensionBindings": "MDB",
             "MathDimensionSymbol": "MDS",
             "static_bounded_dimension": "sbdim",
+            "MathProgram": "MPr",
+            "MathResult": "MRs",
         })
     assert "function solve_math_equations_variable_constraints_three_unknown_dimensions(" in native_variable
     assert 'system.count=16' in native_variable
@@ -1325,6 +1359,8 @@ def main() -> None:
         "MathDimensionBindings": "MDB",
         "MathDimensionSymbol": "MDS",
         "static_bounded_dimension": "sbdim",
+            "MathProgram": "MPr",
+            "MathResult": "MRs",
     })
     assert "function solve_math_equations_four_unknown_dimensions(" in native_four
     assert "function determinant4(" in native_four
@@ -1411,6 +1447,8 @@ def main() -> None:
         "MathDimensionBindings": "MDB",
         "MathDimensionSymbol": "MDS",
         "static_bounded_dimension": "sbdim",
+            "MathProgram": "MPr",
+            "MathResult": "MRs",
     })
     assert "function solve_math_equations_variable_constraints_four_unknown_dimensions(" in native_variable_four
     assert "function determinant4(" in native_variable_four

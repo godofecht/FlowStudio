@@ -2,7 +2,7 @@
 """Execute native Flow centered differences through the production HTTP router."""
 from pathlib import Path
 
-from http_smoke import request, compact_native_math_line
+from http_smoke import request, compact_native_math_line, compact_native_math_identifiers
 from http_finite_difference_interop import verify_fd_interop
 from http_laplacian3_interop import verify_laplacian3_interop
 from http_diffusion3_interop import verify_diffusion3_interop
@@ -39,7 +39,7 @@ def bundled_source(root: Path, smoke_file: str = "src/math_finite_difference_smo
         "src/math_static.flow",
         smoke_file,
     )
-    return "\n".join(
+    return compact_native_math_identifiers("\n".join(
         "\n".join(
             compact_native_math_line(line, tighten_math_ops=True)
             for line in (root / path).read_text(encoding="utf-8").splitlines()
@@ -51,7 +51,7 @@ def bundled_source(root: Path, smoke_file: str = "src/math_finite_difference_smo
             and not line.startswith("import .math_static {")
         )
         for path in paths
-    )
+    ))
 
 
 def verify_diffusion1() -> None:

@@ -165,6 +165,30 @@ class ExactFiniteDifferenceOracle(unittest.TestCase):
         self.assertEqual(source.count("native-math-finite-difference-ok"), 1)
 
 
+    def test_production_http_bundle_remains_under_transport_budget(self) -> None:
+        # The real Flow parser grows with each supported mathematical glyph.
+        # Preserve all 27 native assertions while keeping each HTTP request
+        # under the production 128 KiB ceiling, including corruption controls.
+        from pathlib import Path
+        from http_finite_difference_smoke import bundled_source
+
+        root = Path(__file__).resolve().parents[1]
+        base = bundled_source(root)
+        self.assertLessEqual(len(base.encode("utf-8")), 131072)
+        for start in (0, 9, 18):
+            with self.subTest(start=start):
+                source = inject_finite_difference_assertions(
+                    base, start=start, stop=start + 9)
+                self.assertEqual(
+                    source.count("evaluate_math_expression") -
+                    base.count("evaluate_math_expression"), 9)
+                self.assertLessEqual(len(source.encode("utf-8")), 131072)
+        corrupted = inject_finite_difference_assertions(
+            base, start=0, stop=9, sabotage=True)
+        self.assertLessEqual(len(corrupted.encode("utf-8")), 131072)
+        refined = inject_manufactured_refinement_assertions(base)
+        self.assertLessEqual(len(refined.encode("utf-8")), 131072)
+
     def test_manufactured_second_order_refinement(self) -> None:
         cases = manufactured_refinement_cases()
         self.assertEqual(len(cases), 3)

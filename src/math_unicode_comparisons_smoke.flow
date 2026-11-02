@@ -77,6 +77,41 @@ function main() -> i32 {
     if malformed.valid or malformed.failed_at != 0 { return 28 }
     malformed = parse_math_expression("2m＞")
     if malformed.valid or malformed.failed_at != 5 { return 29 }
+    # Scalar equality glyphs lower to exact native SI-checked predicate opcodes.
+    result = evaluate_math_expression("2m＝2m")
+    if not result.valid or not result.is_predicate or result.result.value != 1.0 { return 30 }
+    result = evaluate_math_expression("2m≡3m")
+    if not result.valid or result.result.value != 0.0 { return 31 }
+    result = evaluate_math_expression("2m≢3m")
+    if not result.valid or result.result.value != 1.0 { return 32 }
+    result = evaluate_math_expression("2m≢2m")
+    if not result.valid or result.result.value != 0.0 { return 33 }
+    result = evaluate_math_expression("where(2m＝2m,1s,2s)")
+    if not result.valid or result.is_predicate or result.result.value != 1.0 { return 34 }
+    result = evaluate_math_expression("2m≡2s")
+    if result.valid or result.failed_at != 2 { return 35 }
+    result = evaluate_math_expression("2m≢2s")
+    if result.valid or result.failed_at != 2 { return 36 }
+    let exact: ParsedMathExpression = parse_math_expression("2m≡2m")
+    if not exact.valid or exact.program.count != 3 or
+       exact.program.instructions[2].opcode != 14 or
+       exact.program.instructions[2].source_start != 2 or
+       exact.program.instructions[2].source_end != 5 { return 37 }
+    exact = parse_math_expression("2m≢3m")
+    if not exact.valid or exact.program.instructions[2].opcode != 15 or
+       exact.program.instructions[2].source_start != 2 or
+       exact.program.instructions[2].source_end != 5 { return 38 }
+    exact = parse_math_expression("2m＝2m")
+    if not exact.valid or exact.program.instructions[2].opcode != 14 or
+       exact.program.instructions[2].source_start != 2 or
+       exact.program.instructions[2].source_end != 5 { return 39 }
+    malformed = parse_math_expression("≡2m")
+    if malformed.valid or malformed.failed_at != 0 { return 40 }
+    malformed = parse_math_expression("2m＝")
+    if malformed.valid or malformed.failed_at != 5 { return 41 }
+    result = evaluate_math_expression("3m≡3m ∧ 3m≢2m")
+    if not result.valid or not result.is_predicate or result.result.value != 1.0 { return 42 }
+
     println("native-math-unicode-comparisons-ok")
     return 0
 }

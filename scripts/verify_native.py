@@ -317,6 +317,7 @@ def verify(root: Path, port: int = 8751, build_timeout: int = 180,
                 ("http_quantile_smoke.py", 120),
                 ("http_finite_difference_smoke.py", 240),
                 ("http_fd34_smoke.py", 120),
+                ("http_diffusion1_long_horizon.py", 120),
             ):
                 suite = root / "tests" / script_name
                 if not suite.is_file():

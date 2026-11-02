@@ -1178,7 +1178,11 @@ def main() -> None:
     # transport ceiling as shared mathematical operators expand.
     for old, short in (("same_dimension", "samedim"),
                        ("source_start", "srcstart"),
-                       ("output_dimension", "outdim")):
+                       ("output_dimension", "outdim"),
+                       ("identifier_matches", "idmatches"),
+                       ("unary_opcode", "unop"),
+                       ("static_error", "sterr"),
+                       ("source_error", "srcerr")):
         native_variable = re.sub(r"\b" + old + r"\b", short, native_variable)
     assert "function solve_math_equations_variable_constraints_three_unknown_dimensions(" in native_variable
     assert 'system.count =16' in native_variable

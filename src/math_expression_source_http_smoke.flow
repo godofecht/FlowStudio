@@ -585,6 +585,21 @@ function main() -> i32 {
     result = evaluate_math_expression("2m＞3s")
     if result.valid or result.failed_at != 2 { return 221 }
 
+    # Real HTTP source compilation executes UTF-8 grouping and separators.
+    result = evaluate_math_expression("2（3＋4）")
+    if not result.valid or not close(result.result.value, 14.0) { return 222 }
+    result = evaluate_math_expression("min（2m，3m）")
+    if not result.valid or not close(result.result.value, 2.0) { return 223 }
+    result = evaluate_math_expression("sum（1m、2m，3m）")
+    if not result.valid or not close(result.result.value, 6.0) { return 224 }
+    result = evaluate_math_expression("2min（3m，4m）")
+    if not result.valid or not close(result.result.value, 6.0) { return 225 }
+    if parse_math_expression("（2+3)").valid { return 226 }
+    if parse_math_expression("(2+3）").valid { return 227 }
+    if parse_math_expression("min（1，）").valid { return 228 }
+    result = evaluate_math_expression("min（1m，2s）")
+    if result.valid { return 229 }
+
     println("native-math-source-ok")
     return 0
 }

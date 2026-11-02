@@ -387,17 +387,21 @@ export function infer_math_ir(program: MathProgram) -> MathInferredType {
             depth = base + 1
             dimensions[base] = output_dimension
             predicates[base] = false
-        } elif opcode == 89 {
-            # Heterogeneous diffusion has seven same-unit field samples,
-            # six SI diffusivities (m²/s), and three spatial grid spacings.
-            if depth < 16 { return static_error(instruction.source_start) }
-            let base: i32 = depth - 16
+        } elif opcode == 89 or opcode == 90 {
+            # Heterogeneous diffusion uses 2 or 3 spatial axes with paired
+            # face coefficients (m²/s), scalar samples and length spacings.
+            let mut axes: i32 = 3
+            if opcode == 90 { axes = 2 }
+            let fields: i32 = 1 + 2 * axes
+            let arity: i32 = fields + 3 * axes
+            if depth < arity { return static_error(instruction.source_start) }
+            let base: i32 = depth - arity
             let field_dimension: Dimension = dimensions[base]
             let coefficient_dimension: Dimension = Dimension {
                 length: 2, mass: 0, time: -1, temperature: 0
             }
             let mut component: i32 = 0
-            while component < 7 {
+            while component < fields {
                 let position: i32 = base + component
                 if predicates[position] or
                    not same_dimension(dimensions[position], field_dimension) {
@@ -406,8 +410,8 @@ export function infer_math_ir(program: MathProgram) -> MathInferredType {
                 component = component + 1
             }
             component = 0
-            while component < 6 {
-                let position: i32 = base + 7 + component
+            while component < 2 * axes {
+                let position: i32 = base + fields + component
                 if predicates[position] or
                    not same_dimension(dimensions[position], coefficient_dimension) {
                     return static_error(instruction.source_start)
@@ -415,8 +419,8 @@ export function infer_math_ir(program: MathProgram) -> MathInferredType {
                 component = component + 1
             }
             component = 0
-            while component < 3 {
-                let position: i32 = base + 13 + component
+            while component < axes {
+                let position: i32 = base + fields + 2 * axes + component
                 if predicates[position] or
                    not same_dimension(dimensions[position], length_dimension()) {
                     return static_error(instruction.source_start)

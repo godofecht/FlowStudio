@@ -1,0 +1,51 @@
+# Executable native SI-aware conservative heterogeneous 2D diffusion.
+# flow run src/math_diffusion2_smoke.flow
+import .math_dimensions { Dimension, temperature_dimension, time_dimension, same_dimension, quotient_dimension }
+import .math_expression_ir { MathResult }
+import .math_expression_source { ParsedMathExpression, parse_math_expression, evaluate_math_expression }
+import .math_static { MathInferredType, infer_math_expression_source, infer_math_equation_source }
+
+function near(actual: f64, expected: f64) -> bool {
+    let mut difference: f64 = actual - expected
+    if difference < 0.0 { difference = -difference }
+    return difference < 0.00000000001
+}
+
+function main() -> i32 {
+    let rate: Dimension = quotient_dimension(temperature_dimension(), time_dimension())
+    let mut result: MathResult = evaluate_math_expression("diffusion2(0K,1K,1K,8K,8K,(2*1m²/1s),(2*1m²/1s),(2*1m²/1s),(2*1m²/1s),1m,2m)")
+    if not result.valid or not near(result.result.value,12.0) or
+       not same_dimension(result.result.dimension,rate) { return 1 }
+    result = evaluate_math_expression("diffusion2(0K,1K,2K,3K,4K,(1*1m²/1s),(2*1m²/1s),(3*1m²/1s),(4*1m²/1s),1m,2m)")
+    if not result.valid or not near(result.result.value,11.25) { return 2 }
+    result = evaluate_math_expression("diffusion2(7K,7K,7K,7K,7K,(1*1m²/1s),(2*1m²/1s),(3*1m²/1s),(4*1m²/1s),1m,2m)")
+    if not result.valid or result.result.value != 0.0 { return 3 }
+    result = evaluate_math_expression("diffusion2(0K,1K,1K,8K,8K,(0*1m²/1s),(0*1m²/1s),(0*1m²/1s),(0*1m²/1s),1m,2m)")
+    if not result.valid or result.result.value != 0.0 { return 4 }
+    result = evaluate_math_expression("diffusion2(0K,1K,1K,8K,8K,(-2*1m²/1s),(2*1m²/1s),(2*1m²/1s),(2*1m²/1s),1m,2m)")
+    if result.valid or result.failed_at != 0 { return 5 }
+    result = evaluate_math_expression("diffusion2(0K,1K,1K,8K,8K,(2*1m²/1s),(2*1m²/1s),(2*1m²/1s),(2*1m²/1s),0m,2m)")
+    if result.valid or result.failed_at != 0 { return 6 }
+    result = evaluate_math_expression("diffusion2(0K,1K,1K,8K,8K,(2m/1s),(2*1m²/1s),(2*1m²/1s),(2*1m²/1s),1m,2m)")
+    if result.valid or result.failed_at != 0 { return 7 }
+    result = evaluate_math_expression("diffusion2(0K,1K,true,8K,8K,(2*1m²/1s),(2*1m²/1s),(2*1m²/1s),(2*1m²/1s),1m,2m)")
+    if result.valid or result.failed_at != 0 { return 8 }
+    let parsed: ParsedMathExpression = parse_math_expression("diffusion2(0K,1K,1K,8K,8K,(2*1m²/1s),(2*1m²/1s),(2*1m²/1s),(2*1m²/1s),1m,2m)")
+    if not parsed.valid or parsed.program.instructions[parsed.program.count - 1].opcode != 90 or
+       parsed.program.instructions[parsed.program.count - 1].source_start != 0 or
+       parsed.program.instructions[parsed.program.count - 1].source_end != 10 { return 9 }
+    if parse_math_expression("diffusion2(0K,1K,1K,8K,8K,(2*1m²/1s),(2*1m²/1s),(2*1m²/1s),(2*1m²/1s),1m)").valid { return 10 }
+    let mut inferred: MathInferredType = infer_math_expression_source("diffusion2(0K,1K,1K,8K,8K,(2*1m²/1s),(2*1m²/1s),(2*1m²/1s),(2*1m²/1s),1m,2m)")
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension,rate) { return 11 }
+    inferred = infer_math_expression_source("diffusion2(0K,1K,1K,8K,8K,(2m/1s),(2*1m²/1s),(2*1m²/1s),(2*1m²/1s),1m,2m)")
+    if inferred.valid or inferred.failed_at != 0 { return 12 }
+    inferred = infer_math_expression_source("diffusion2(0K,1K,1K,8K,8K,(2*1m²/1s),(2*1m²/1s),(2*1m²/1s),(2*1m²/1s),0m,2m)")
+    if not inferred.valid { return 13 }
+    inferred = infer_math_equation_source("diffusion2(0K,1K,1K,8K,8K,(2*1m²/1s),(2*1m²/1s),(2*1m²/1s),(2*1m²/1s),1m,2m) = 12K/1s")
+    if not inferred.valid or not same_dimension(inferred.dimension,rate) { return 14 }
+    inferred = infer_math_equation_source("diffusion2(0K,1K,1K,8K,8K,(2*1m²/1s),(2*1m²/1s),(2*1m²/1s),(2*1m²/1s),1m,2m) = 12K")
+    if inferred.valid { return 15 }
+    println("native-math-diffusion2-ok")
+    return 0
+}

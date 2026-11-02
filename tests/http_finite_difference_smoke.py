@@ -6,6 +6,8 @@ from http_smoke import request, compact_native_math_line
 from http_finite_difference_interop import verify_fd_interop
 from http_laplacian3_interop import verify_laplacian3_interop
 from http_diffusion3_interop import verify_diffusion3_interop
+from http_diffusion3_periodic import verify_periodic_diffusion3_interop
+from test_diffusion3_periodic import CELL_COUNT, inject_periodic_assertions, periodic_cases
 from test_diffusion3_oracle import seeded_diffusion3_cases, inject_diffusion3_assertions
 from test_laplacian3_oracle import (
     manufactured_laplacian3_cases, inject_laplacian3_assertions,
@@ -136,6 +138,26 @@ def verify_finite_differences() -> None:
     assert status == 200, ("corrupted diffusion compiles", status, body)
     status, body = request("POST", "/api/run/flow", corrupted_diffusion, headers)
     assert status == 422, ("corrupted diffusion numerical expectation", status, body)
+    # A 3x3x3 periodic grid uses the same diffusivity on both sides of each
+    # shared face. Every cell rate is executed by the production Flow compiler;
+    # the independent exact-rational oracle checks global mass and energy.
+    assert len(periodic_cases()) == CELL_COUNT == 27
+    for start in range(0, CELL_COUNT, 4):
+        stop = min(start + 4, CELL_COUNT)
+        source = inject_periodic_assertions(base, start=start, stop=stop)
+        assert len(source.encode("utf-8")) <= 131072, "periodic 3D HTTP source budget"
+        status, body = request("POST", "/api/check/flow", source, headers)
+        assert status == 200, ("periodic 3D compile", start, status, body)
+        status, body = request("POST", "/api/run/flow", source, headers)
+        assert status == 200 and "native-math-finite-difference-ok" in body, (
+            "periodic 3D numerical execution", start, status, body)
+    corrupted_periodic = inject_periodic_assertions(
+        base, start=4, stop=8, sabotage=True)
+    assert len(corrupted_periodic.encode("utf-8")) <= 131072
+    status, body = request("POST", "/api/check/flow", corrupted_periodic, headers)
+    assert status == 200, ("corrupted periodic 3D compiles", status, body)
+    status, body = request("POST", "/api/run/flow", corrupted_periodic, headers)
+    assert status == 422, ("corrupted periodic 3D expectation", status, body)
     corrupted_refinement = inject_manufactured_refinement_assertions(
         base, sabotage=True)
     status, body = request("POST", "/api/check/flow", corrupted_refinement, headers)
@@ -150,6 +172,7 @@ def verify_finite_differences() -> None:
     verify_fd_interop(request, headers)
     verify_laplacian3_interop(request, headers)
     verify_diffusion3_interop(request, headers)
+    verify_periodic_diffusion3_interop(request, headers)
     verify_mixed_derivative()
     print("PASS: 27 exact polynomial cases, 3 planar and 3 spatial 4:1 "
           "manufactured refinements through native Flow HTTP and deliberate HTTP 422")

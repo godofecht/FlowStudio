@@ -25,6 +25,34 @@ class MathematicalFlowTest(unittest.TestCase):
         self.assertAlmostEqual(model.viscosity, 0.001)
         self.assertEqual(model.until, 10)
 
+    def test_shared_pde_lexer_recognizes_all_logical_line_boundaries(self):
+        # The same source grammar is used by the Navier and heat executors.
+        heat = (ROOT / "examples/heat_piecewise_forcing.flow").read_text(encoding="utf-8")
+        for separator in ("\\n", "\\r\\n", "\\r", "\\u0085", "\\u2028", "\\u2029"):
+            with self.subTest(separator=repr(separator)):
+                navier = parse(SMOKE.replace("\\n", separator))
+                thermal = parse(heat.replace("\\n", separator))
+                self.assertEqual((navier.width, navier.height), (16, 16))
+                self.assertEqual((thermal.width, thermal.height), (32, 32))
+                tokens = lex("# a comment" + separator +
+                             "domain FluidDomain {" + separator + "grid = 16 × 16")
+                self.assertEqual([(token.text, token.line, token.column)
+                                  for token in tokens[:3]],
+                                 [("domain", 2, 1), ("FluidDomain", 2, 8),
+                                  ("{", 2, 20)])
+                self.assertEqual((tokens[3].text, tokens[3].line, tokens[3].column),
+                                 ("grid", 3, 1))
+
+    def test_fractional_grid_axes_fail_before_numerical_execution(self):
+        heat = (ROOT / "examples/heat_piecewise_forcing.flow").read_text(encoding="utf-8")
+        for source, axes in ((SMOKE, "16 × 16"), (heat, "32 × 32")):
+            for replacement in ("16.5 × 16", "16 × 16.25", "7.5 × 16",
+                                "512.5 × 16"):
+                with self.subTest(original=axes, replacement=replacement):
+                    with self.assertRaisesRegex(FlowMathError,
+                                                "grid dimensions must be integers|Grid dimensions must be integers"):
+                        parse(source.replace(axes, replacement))
+
     def test_rejects_unsupported_equation(self):
         with self.assertRaisesRegex(FlowMathError, "Unsupported dynamics"):
             parse(SOURCE.replace("kinematicViscosity ∇²velocity",

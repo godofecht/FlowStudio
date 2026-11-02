@@ -5,7 +5,7 @@
 # is compiled by the existing typed native expression/equation compiler.
 # This is not upstream Flow grammar integration or PDE lowering.
 import .math_dimensions { Quantity, quantity, dimensionless }
-import .math_expression_source { MathBindings, empty_math_bindings, math_open_width, math_close_width }
+import .math_expression_source { MathBindings, empty_math_bindings, math_open_width, math_close_width, math_space_width }
 import .math_equation { MathEquation, MathEquationResult, parse_math_equation, parse_math_equation_with_bindings, evaluate_math_equation }
 
 extern {
@@ -169,14 +169,15 @@ export function parse_math_equation_system_with_bindings(
             # Every compiled instruction still refers to its original byte.
             let mut fragment_end: i32 = index
             if comment_at >= 0 { fragment_end = comment_at }
+            # The equation splitter and scalar lexer must agree about
+            # Unicode White_Space. Never classify an unrecognized UTF-8
+            # format control as a blank line.
             let mut blank: bool = true
             let mut scan: i32 = start
-            while scan < fragment_end {
-                if bytes[scan] != 32 and bytes[scan] != 9 and
-                   bytes[scan] != 10 and bytes[scan] != 13 {
-                    blank = false
-                }
-                scan = scan + 1
+            while scan < fragment_end and blank {
+                let space_width: i32 = math_space_width(bytes, scan, fragment_end)
+                if space_width == 0 { blank = false }
+                else { scan = scan + space_width }
             }
             if blank {
                 if delimiter == 1 or (delimiter == 0 and (count == 0 or last_semicolon)) {

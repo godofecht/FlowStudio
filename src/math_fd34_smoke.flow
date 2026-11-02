@@ -44,7 +44,7 @@ function main() -> i32 {
     if result.valid or result.failed_at != 0 { return 12 }
     if parse_math_expression("fd3(1K,2K,3K,1m)").valid { return 13 }
     if parse_math_expression("fd4(1K,2K,3K,4K,1m)").valid { return 14 }
-    let parsed: ParsedMathExpression = parse_math_expression("fd3(-8K,-1K,1K,8K,1m)")
+    let mut parsed: ParsedMathExpression = parse_math_expression("fd3(-8K,-1K,1K,8K,1m)")
     if not parsed.valid or parsed.program.instructions[parsed.program.count - 1].opcode != 92 or
        parsed.program.instructions[parsed.program.count - 1].source_start != 0 or
        parsed.program.instructions[parsed.program.count - 1].source_end != 3 { return 15 }

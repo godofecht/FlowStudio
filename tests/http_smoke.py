@@ -107,6 +107,19 @@ def compact_native_math_identifiers(source: str,
         "left_dimension": "ldim",
         "right_dimension": "rdim",
         "result_dimension": "resdim",
+        # All executable native HTTP bundles share the mathematical lexer.
+        # Shorten only internal identifiers, never strings or source glyphs.
+        "math_open_width": "opw",
+        "math_close_width": "clw",
+        "math_comma_width": "cmw",
+        "instructions": "insts",
+        "argument_counts": "argc",
+        "dimensionless": "dimless",
+        "identifier_start_width": "idstartw",
+        "identifier_part_width": "idpartw",
+        "source_operator": "srcop",
+        "source_unit": "srcunit",
+        "math_space_width": "spw",
     }
 
     if extra_aliases:
@@ -903,23 +916,9 @@ def main() -> None:
     )
     # String-safe compaction preserves all literal UTF-8 glyphs and assertions
     # while retaining the production HTTP transport's strict 128 KiB ceiling.
-    # The complete native Unicode parser remains below the real 128 KiB HTTP
-    # transport ceiling. These are string-safe internal identifier aliases;
-    # no numerical assertions or executable modules are omitted.
-    native_math_source = compact_native_math_identifiers(native_math_source, {
-        "math_open_width": "opw",
-        "math_close_width": "clw",
-        "math_comma_width": "cmw",
-        "instructions": "insts",
-        "argument_counts": "argc",
-        "MathInstruction": "MInstr",
-        "dimensionless": "dimless",
-        "identifier_start_width": "idstartw",
-        "identifier_part_width": "idpartw",
-        "source_operator": "srcop",
-        "source_unit": "srcunit",
-        "math_space_width": "spw",
-    })
+    # The same string-safe aliases apply to source, static inference and
+    # equation-system bundles without omitting any executable assertions.
+    native_math_source = compact_native_math_identifiers(native_math_source)
     assert len(native_math_source.encode("utf-8")) < 128 * 1024
     assert "function parse_math_expression(" in native_math_source
     assert "native-math-source-ok" in native_math_source

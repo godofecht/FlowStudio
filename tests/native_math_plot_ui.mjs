@@ -908,7 +908,7 @@ try {
     readFileSync(path, 'utf8').split(/\r?\n/)
       .filter(line => !/^import \.math_(dimensions|expression_ir|expression_source|equation|static|dimension_triple|dimension_variable) \{/.test(line))
       .filter(line => line.trim() && !line.trimStart().startsWith('#'))
-      .map(line => compactNativeMathLine(line, true)).join('\n')
+      .map(line => compactNativeMathLine(line, true, true)).join('\n')
   ).join('\n');
   nativeVariableSource = compactNativeMathIdentifiers(nativeVariableSource);
   assert.ok(Buffer.byteLength(nativeVariableSource, 'utf8') < 128 * 1024);
@@ -937,7 +937,7 @@ try {
     readFileSync(path, 'utf8').split(/\r?\n/)
       .filter(line => !/^import \.math_(dimensions|expression_ir|expression_source|equation|static|dimension_four) \{/.test(line))
       .filter(line => line.trim() && !line.trimStart().startsWith('#'))
-      .map(line => compactNativeMathLine(line, true)).join('\n')
+      .map(line => compactNativeMathLine(line, true, true)).join('\n')
   ).join('\n');
   nativeFourSource = compactNativeMathIdentifiers(nativeFourSource);
   assert.ok(Buffer.byteLength(nativeFourSource, 'utf8') < 128 * 1024);
@@ -973,7 +973,7 @@ try {
       // brace-delimited, so one cosmetic indentation level can be removed
       // alongside comments/blank lines to respect the real 128 KiB limit.
       .filter(line => line.trim() && !line.trimStart().startsWith('#'))
-      .map(line => compactNativeMathLine(line, true)).join('\n')
+      .map(line => compactNativeMathLine(line, true, true)).join('\n')
   ).join('\n')
     // Alpha-rename internal identifiers consistently in this self-contained
     // executable bundle; preserve every solver statement and assertion.

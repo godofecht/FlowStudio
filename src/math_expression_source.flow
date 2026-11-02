@@ -501,7 +501,7 @@ function math_space_width(bytes: ptr<u8>, position: i32, length: i32) -> i32 {
 }
 
 # Operators are recognized only at exact byte sequences. Supported UTF-8
-# spellings include ×, ·, ⋅, ∙, ∗, ÷, ∕, ⁄, ／, ＋, －, ＊, ＜, ＞, −, ≤, ≥, ≦, ≧, ⩽, ⩾, ≠, ∧ and ∨.
+# spellings include ×, ·, ⋅, ∙, ∗, ÷, ∕, ⁄, ／, ＋, －, ＊, ＜, ＞, ＝, −, ≤, ≥, ≦, ≧, ⩽, ⩾, ≠, ≡, ≢, ∧ and ∨.
 # Prefix ¬ is handled separately to enforce unary placement.
 # Unsupported Unicode cannot be silently normalized to another operation.
 function source_operator(bytes: ptr<u8>, position: i32, length: i32) -> i32 {
@@ -543,7 +543,8 @@ function source_operator(bytes: ptr<u8>, position: i32, length: i32) -> i32 {
             if bytes[position + 2] == 165 or bytes[position + 2] == 167 {
                 return 13 # ≥ or ≧ (greater-than-or-equal variants)
             }
-            if bytes[position + 2] == 160 { return 15 } # ≠
+            if bytes[position + 2] == 160 or bytes[position + 2] == 162 { return 15 } # ≠ or ≢
+            if bytes[position + 2] == 161 { return 14 } # ≡, exact SI-checked scalar equality
         }
         if bytes[position + 1] == 169 {
             if bytes[position + 2] == 189 { return 11 } # ⩽ slanted ≤
@@ -556,6 +557,7 @@ function source_operator(bytes: ptr<u8>, position: i32, length: i32) -> i32 {
         if bytes[position + 2] == 141 { return 2 } # U+FF0D － FULLWIDTH HYPHEN-MINUS
         if bytes[position + 2] == 143 { return 4 } # U+FF0F ／ FULLWIDTH SOLIDUS
         if bytes[position + 2] == 156 { return 10 } # U+FF1C ＜ FULLWIDTH LESS-THAN SIGN
+        if bytes[position + 2] == 157 { return 14 } # U+FF1D ＝ FULLWIDTH EQUALS SIGN
         if bytes[position + 2] == 158 { return 12 } # U+FF1E ＞ FULLWIDTH GREATER-THAN SIGN
     }
     return 0

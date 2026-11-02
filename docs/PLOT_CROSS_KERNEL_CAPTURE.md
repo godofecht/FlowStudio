@@ -29,12 +29,23 @@ continue to exercise the actual Flow-owned server and browser.
 
 ## Resource and failure contract
 
-A response has a maximum of 20 MiB of encoded bytes, allowing twelve maximum
-size PNG records plus JSON overhead. An excessive `Content-Length` is rejected
-before reading. A streamed body is decoded incrementally as strict UTF-8,
-cancelled on overflow, and rejected on malformed UTF-8. Legacy fetch mocks
-without a body stream are bounded after `text()`; this fallback cannot
-prevent an oversized in-memory allocation by the mock itself.
+A response has a maximum of 20 MiB of **UTF-8 encoded bytes**, allowing
+twelve maximum-size PNG records plus JSON overhead. An excessive
+`Content-Length` is rejected before reading and its available response body
+is cancelled. A streamed body is decoded incrementally as strict UTF-8;
+overflow, invalid chunks, malformed UTF-8 and transport failures abort and
+release unfinished readers. A fetch implementation without a body stream is
+bounded after `text()` using `TextEncoder` byte length, not UTF-16 string
+length. This fallback cannot prevent an oversized in-memory allocation by
+the fetch implementation itself.
+
+The regression includes valid JSON with approximately 10.49 million U+00E9
+characters: its UTF-16 string length is below 20 MiB but its UTF-8 byte
+length exceeds the cap. The production collector must reject this response
+without accepting its otherwise valid SVG plot. A smaller non-ASCII capture
+must succeed. Deterministic malformed-chunk, invalid UTF-8, read-error and
+oversized-header tests require cancellation and lock release; existing
+localhost HTTP tests still cover real streamed R/Python capture routes.
 
 A batch may contain at most twelve figures, with the existing individual
 60,000-character SVG, 120,000-character PDF-hex and 1,398,104-character

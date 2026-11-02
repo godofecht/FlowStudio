@@ -912,7 +912,7 @@ try {
   ).join('\n');
   nativeVariableSource = compactNativeMathIdentifiers(nativeVariableSource);
   assert.ok(Buffer.byteLength(nativeVariableSource, 'utf8') < 128 * 1024);
-  assert.match(nativeVariableSource, /system\.count =\s*16/);
+  assert.match(nativeVariableSource, /system\.count\s*=\s*16\b/);
   await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
     nativeVariableSource);
   await page.locator('#run').click();

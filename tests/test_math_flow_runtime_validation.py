@@ -53,5 +53,74 @@ class RuntimeValidationTest(unittest.TestCase):
                     simulate(model, until=duration)
 
 
+    def test_both_backends_reject_nonfinite_non_numeric_and_huge_durations(self):
+        from decimal import Decimal
+        bad_durations = (float("nan"), float("inf"), -float("inf"),
+                         0.0, -0.01, False, True, "0.01",
+                         Decimal("0.01"), 1 + 0j, [], {},
+                         10**1000, -(10**1000), 1e308)
+        for source in (NAVIER, HEAT):
+            model = parse(source)
+            for duration in bad_durations:
+                with self.subTest(model=type(model).__name__,
+                                  duration=type(duration).__name__):
+                    with self.assertRaisesRegex(FlowMathError,
+                                                "duration must be finite and positive|between 1 and 200000 steps"):
+                        simulate(model, grid=16, until=duration)
+
+    def test_both_backends_reject_excessive_finite_step_counts(self):
+        for source in (NAVIER, HEAT):
+            model = parse(source)
+            for duration in (model.step * 200001, 1e300):
+                with self.subTest(model=type(model).__name__, duration=duration):
+                    with self.assertRaisesRegex(FlowMathError,
+                                                "between 1 and 200000 steps"):
+                        simulate(model, grid=16, until=duration)
+
+    def test_both_backends_execute_deterministic_bounded_duration_override(self):
+        for source, expected_steps, observable in (
+            (NAVIER, 50, "kinetic_energy"),
+            (HEAT, 50, "mean_temperature"),
+        ):
+            model = parse(source)
+            first = simulate(model, grid=16, until=0.005)
+            second = simulate(model, grid=16, until=0.005)
+            self.assertEqual(first["steps"], expected_steps)
+            self.assertEqual(first["grid"], [16, 16])
+            self.assertEqual(first["time"], 0.005)
+            self.assertTrue(math.isfinite(first[observable]))
+            self.assertEqual(first[observable], second[observable])
+
+
+    def test_production_cli_executes_and_rejects_duration_overrides(self):
+        import json
+        import subprocess
+        for example, expected_steps, observable in (
+            ("navier_stokes_smoke.flow", 50, "kinetic_energy"),
+            ("heat_piecewise_forcing.flow", 50, "mean_temperature"),
+        ):
+            base = [sys.executable, str(ROOT / "src/math_flow.py"),
+                    str(ROOT / "examples" / example), "--grid", "16", "--until"]
+            with self.subTest(example=example, duration="0.005"):
+                completed = subprocess.run(base + ["0.005"], capture_output=True,
+                                           text=True, timeout=15, check=False)
+                self.assertEqual(completed.returncode, 0, completed.stderr)
+                result = json.loads(completed.stdout)
+                self.assertTrue(result["ok"])
+                self.assertEqual(result["steps"], expected_steps)
+                self.assertEqual(result["grid"], [16, 16])
+                self.assertEqual(result["time"], 0.005)
+                self.assertTrue(math.isfinite(result[observable]))
+            for invalid in ("nan", "inf", "-inf", "-0.01", "0", "1e308"):
+                with self.subTest(example=example, duration=invalid):
+                    completed = subprocess.run(base[:-1] + [f"--until={invalid}"], capture_output=True,
+                                               text=True, timeout=15, check=False)
+                    self.assertEqual(completed.returncode, 2, completed.stderr)
+                    failure = json.loads(completed.stderr)
+                    self.assertIs(failure["ok"], False)
+                    self.assertRegex(failure["error"],
+                                     "duration must be finite and positive|between 1 and 200000 steps")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -32,7 +32,9 @@ function compactNativeMathIdentifiers(source) {
     expect_operand: 'expectop', bounded_value: 'bvalue',
     product_dimension: 'proddim', output_value: 'outval',
     source_length: 'srclen', is_predicate: 'ispred',
-    term_dimension: 'termdim', input_dimension: 'indim'
+    term_dimension: 'termdim', input_dimension: 'indim',
+    dimensionless: 'dimless', quotient_dimension: 'quotdim',
+    MathInferredType: 'MIType', MathDimensionBindings: 'MDBind'
   };
   return source.replace(/"(?:\\.|[^"\\])*"|[A-Za-z_][A-Za-z0-9_]*/g,
     token => token.startsWith('"') ? token : (aliases[token] || token));

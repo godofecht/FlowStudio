@@ -56,7 +56,7 @@ class NativeDeterminantOracle(unittest.TestCase):
     def test_native_http_source_budget_and_deliberate_failure(self):
         source = "\n".join(
             "\n".join(
-                compact_native_math_line(line)
+                compact_native_math_line(line, tighten_math_ops=True)
                 for line in (ROOT / path).read_text(encoding="utf-8").splitlines()
                 if line.strip() and not line.lstrip().startswith("#")
                 if not line.startswith("import .math_dimensions {")

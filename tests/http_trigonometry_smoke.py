@@ -5,7 +5,7 @@ Run while ./build/flowstudio serves 127.0.0.1:8751.
 """
 from pathlib import Path
 
-from http_smoke import request
+from http_smoke import request, compact_native_math_line
 
 
 def main() -> None:
@@ -23,7 +23,7 @@ def main() -> None:
             # Preserve executable Flow tokens, trimming only comments,
             # blank lines and cosmetic brace-delimited indentation so the
             # production 128 KiB HTTP request budget remains enforced.
-            line.strip().removeprefix("export ")
+            compact_native_math_line(line)
             for line in (root / path).read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.lstrip().startswith("#")
             if not line.startswith("import .math_dimensions {")
@@ -34,7 +34,7 @@ def main() -> None:
         )
         for path in paths
     )
-    assert "native-math-trigonometry-ok" in source
+    # Fail locally before transport if the real executable bundle grows beyond\n    # the production request ceiling. Keep the full CLI smoke independently.\n    assert len(source.encode("utf-8")) <= 128 * 1024, "trigonometry HTTP source exceeds 128 KiB"\n    assert "native-math-trigonometry-ok" in source
     headers = {"X-FlowStudio-Intent": "run"}
     status, body = request("POST", "/api/check/flow", source, headers)
     assert status == 200, ("native trigonometry compiler", status, body)

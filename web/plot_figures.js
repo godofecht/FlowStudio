@@ -32,7 +32,13 @@ async function boundedText(response) {
   const declared = response.headers && typeof response.headers.get === "function"
     ? response.headers.get("content-length") : null;
   if (declared !== null && /^\d+$/.test(String(declared)) &&
-      Number(declared) > MAX_RESPONSE_BYTES) return null;
+      Number(declared) > MAX_RESPONSE_BYTES) {
+    // An oversized declared response must not leave its network stream open.
+    if (response.body && typeof response.body.cancel === "function") {
+      try { await response.body.cancel(); } catch (_) { /* already closed */ }
+    }
+    return null;
+  }
   const reader = response.body && typeof response.body.getReader === "function"
     ? response.body.getReader() : null;
   if (!reader) {

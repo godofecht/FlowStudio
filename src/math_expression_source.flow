@@ -290,7 +290,7 @@ function source_unit(bytes: ptr<u8>, index: i32, length: i32) -> SourceUnit {
 # UTF-8 delimiter widths are kept in the original source coordinate system.
 # Fullwidth parentheses must match one another; ASCII parentheses match ASCII.
 # These are lexical delimiters, never text-normalized into executable source.
-function math_open_width(bytes: ptr<u8>, position: i32, length: i32) -> i32 {
+export function math_open_width(bytes: ptr<u8>, position: i32, length: i32) -> i32 {
     if position < 0 or position >= length { return 0 }
     if bytes[position] == 40 { return 1 }
     if position + 2 < length and bytes[position] == 239 and
@@ -298,7 +298,7 @@ function math_open_width(bytes: ptr<u8>, position: i32, length: i32) -> i32 {
     return 0
 }
 
-function math_close_width(bytes: ptr<u8>, position: i32, length: i32) -> i32 {
+export function math_close_width(bytes: ptr<u8>, position: i32, length: i32) -> i32 {
     if position < 0 or position >= length { return 0 }
     if bytes[position] == 41 { return 1 }
     if position + 2 < length and bytes[position] == 239 and

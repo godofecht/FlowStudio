@@ -26,7 +26,8 @@ MAX_CONDITION = 80
 # Conditional breakpoints intentionally support only numeric local comparisons.
 # Never eval() user-supplied expressions or invoke custom comparison methods.
 _CONDITION = re.compile(
-    r"([A-Za-z_][A-Za-z_0-9]*)(==|!=|>=|<=|>|<)(-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?)\Z"
+    r"([A-Za-z_][A-Za-z_0-9]*)(==|!=|>=|<=|>|<)"
+    r"(-?(?:(?:0|[1-9][0-9]*)(?:\.[0-9]+)?|\.[0-9]+)(?:[eE][+-]?[0-9]{1,4})?)\Z"
 )
 _COMPARE = {"==": operator.eq, "!=": operator.ne, ">=": operator.ge,
             "<=": operator.le, ">": operator.gt, "<": operator.lt}
@@ -49,9 +50,18 @@ def _parse_breakpoints(points: object, line_count: int) -> dict[int, tuple[str, 
             if match is None:
                 raise ValueError("Condition must be a numeric local comparison, e.g. i>=3.")
             name, comparison, literal = match.groups()
-            number = float(literal) if "." in literal else int(literal)
-            if type(number) is float and not math.isfinite(number):
-                raise ValueError("Breakpoint condition must compare finite numbers.")
+            # Scientific thresholds are common in numerical debugging.
+            # Parse only a bounded numeric literal, never an expression.
+            number = (float(literal) if "." in literal or "e" in literal.lower()
+                      else int(literal))
+            if type(number) is float:
+                if not math.isfinite(number):
+                    raise ValueError("Breakpoint condition must compare finite numbers.")
+                # A nonzero decimal rounded to 0.0 silently changes the
+                # breakpoint predicate. Reject underflow rather than lie.
+                mantissa = literal.lower().split("e", 1)[0].lstrip("-").replace(".", "")
+                if number == 0.0 and any(digit != "0" for digit in mantissa):
+                    raise ValueError("Breakpoint condition underflows float precision.")
             condition = (name, comparison, number)
         else:
             raise ValueError("Invalid breakpoint entry.")

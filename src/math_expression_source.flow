@@ -472,7 +472,7 @@ function math_space_width(bytes: ptr<u8>, position: i32, length: i32) -> i32 {
 }
 
 # Operators are recognized only at exact byte sequences. Supported UTF-8
-# spellings include ×, ·, ⋅, ∙, ∗, ÷, ∕, ⁄, ／, ＋, －, ＊, −, ≤, ≥, ≠, ∧ and ∨.
+# spellings include ×, ·, ⋅, ∙, ∗, ÷, ∕, ⁄, ／, ＋, －, ＊, −, ≤, ≥, ≦, ≧, ⩽, ⩾, ≠, ∧ and ∨.
 # Prefix ¬ is handled separately to enforce unary placement.
 # Unsupported Unicode cannot be silently normalized to another operation.
 function source_operator(bytes: ptr<u8>, position: i32, length: i32) -> i32 {
@@ -508,9 +508,17 @@ function source_operator(bytes: ptr<u8>, position: i32, length: i32) -> i32 {
         }
         if bytes[position + 1] == 136 and bytes[position + 2] == 146 { return 2 } # −
         if bytes[position + 1] == 137 {
-            if bytes[position + 2] == 164 { return 11 } # ≤
-            if bytes[position + 2] == 165 { return 13 } # ≥
+            if bytes[position + 2] == 164 or bytes[position + 2] == 166 {
+                return 11 # ≤ or ≦ (less-than-or-equal variants)
+            }
+            if bytes[position + 2] == 165 or bytes[position + 2] == 167 {
+                return 13 # ≥ or ≧ (greater-than-or-equal variants)
+            }
             if bytes[position + 2] == 160 { return 15 } # ≠
+        }
+        if bytes[position + 1] == 169 {
+            if bytes[position + 2] == 189 { return 11 } # ⩽ slanted ≤
+            if bytes[position + 2] == 190 { return 13 } # ⩾ slanted ≥
         }
     }
     if c == 239 and position + 2 < length and bytes[position + 1] == 188 {

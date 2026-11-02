@@ -901,6 +901,10 @@ def main() -> None:
         )
         for path in math_source_files
     )
+    # String-safe compaction preserves all literal UTF-8 glyphs and assertions
+    # while retaining the production HTTP transport's strict 128 KiB ceiling.
+    native_math_source = compact_native_math_identifiers(native_math_source)
+    assert len(native_math_source.encode("utf-8")) < 128 * 1024
     assert "function parse_math_expression(" in native_math_source
     assert "native-math-source-ok" in native_math_source
     assert "1m + 2m" in native_math_source
@@ -983,6 +987,8 @@ def main() -> None:
         )
         for path in equation_system_files
     )
+    native_equation_system = compact_native_math_identifiers(native_equation_system)
+    assert len(native_equation_system.encode("utf-8")) < 128 * 1024
     assert "function parse_math_equation_system(" in native_equation_system
     assert "native-math-equation-system-ok" in native_equation_system
     assert "1m=1m 2s=2s" in native_equation_system

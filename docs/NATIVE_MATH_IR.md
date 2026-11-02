@@ -634,3 +634,23 @@ avoid premature overflow for mixed-sign values near the 1e30 runtime bound.
 on Linux and macOS, while the production HTTP source bundle executes both
 operations through the actual compiler and runtime. This does not add tensor
 or symbolic-indexed reductions to the upstream Flow grammar.
+
+## Native scalar equality glyphs (2026-11-02; CI qualification pending)
+
+The native `src/math_expression_source.flow` lexer lowers fullwidth `＝`
+(U+FF1D) and mathematical `≡` (U+2261) to exact numeric equality
+opcode 14, and `≢` (U+2262) to exact numeric inequality opcode 15.
+They retain three-byte UTF-8 operator source spans and use the existing
+native typed predicate evaluator, including SI-dimension matching and
+predicate/numeric separation. These spellings mean **exact equality of
+evaluated scalar quantities**, not symbolic identity, approximate equality,
+assignment, equation solving or a general equation AST. Neither operator
+performs floating-point tolerance comparison; use the existing explicit
+`approx(a,b,tolerance)` operation when a tolerance is required.
+
+The checked-in `src/math_unicode_comparisons_smoke.flow` exercises
+SI-aware truth values, dimensional rejection, exact byte spans, malformed
+source and composition with `where` and logical conjunction. The production
+`src/math_expression_source_http_smoke.flow` additionally requires native
+HTTP/Monaco compilation and execution of all three glyphs, byte spans and
+dimensional rejection. Linux/macOS CI is required before merging.

@@ -5,7 +5,7 @@
 # is compiled by the existing typed native expression/equation compiler.
 # This is not upstream Flow grammar integration or PDE lowering.
 import .math_dimensions { Quantity, quantity, dimensionless }
-import .math_expression_source { MathBindings, empty_math_bindings }
+import .math_expression_source { MathBindings, empty_math_bindings, math_open_width, math_close_width }
 import .math_equation { MathEquation, MathEquationResult, parse_math_equation, parse_math_equation_with_bindings, evaluate_math_equation }
 
 extern {
@@ -109,10 +109,12 @@ export function parse_math_equation_system_with_bindings(
     let mut count: i32 = 0
     let mut start: i32 = 0
     let mut depth: i32 = 0
+    let mut open_widths: array<i32, 64> = [0]
     let mut index: i32 = 0
     let mut last_semicolon: bool = false
     let mut comment_at: i32 = -1
     while index <= length {
+        let mut advance: i32 = 1
         let mut separator: bool = index == length
         let mut delimiter: i32 = 0 # 0: end, 1: semicolon, 2: line ending
         let mut break_width: i32 = 0
@@ -127,10 +129,19 @@ export function parse_math_equation_system_with_bindings(
             } elif bytes[index] == 35 and depth == 0 {
                 comment_at = index
             } else {
-                if bytes[index] == 40 { depth = depth + 1 }
-                if bytes[index] == 41 {
+                let opening: i32 = math_open_width(bytes, index, length)
+                let closing: i32 = math_close_width(bytes, index, length)
+                if opening > 0 {
+                    if depth >= 64 { return system_error(index, length, count) }
+                    open_widths[depth] = opening
+                    depth = depth + 1
+                    advance = opening
+                } elif closing > 0 {
+                    if depth == 0 or open_widths[depth - 1] != closing {
+                        return system_error(index, length, count)
+                    }
                     depth = depth - 1
-                    if depth < 0 { return system_error(index, length, count) }
+                    advance = closing
                 }
                 if bytes[index] == 59 {
                     if depth != 0 { return system_error(index, length, count) }
@@ -192,7 +203,7 @@ export function parse_math_equation_system_with_bindings(
             }
             start = index + 1
         }
-        index = index + 1
+        index = index + advance
     }
     if depth != 0 { return system_error(length, length, count) }
     return MathEquationSystem {

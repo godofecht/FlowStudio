@@ -345,7 +345,7 @@ function main() -> i32 {
     # Modulo preserves SI dimensions statically; its zero divisor is runtime-only.
     inferred = infer_math_expression_source("7m % 3m")
     if not inferred.valid or inferred.is_predicate or
-       not same_dimension(inferred.dimension, length) { return 111 }
+       not same_dimension(inferred.dimension, metres) { return 111 }
     inferred = infer_math_expression_source("mod(7m,3s)")
     if inferred.valid or inferred.failed_at != 0 { return 112 }
     inferred = infer_math_expression_source("true % false")
@@ -353,7 +353,7 @@ function main() -> i32 {
     inferred = infer_math_expression_source("mod(5m,0m)")
     if not inferred.valid or evaluate_math_expression("mod(5m,0m)").valid { return 114 }
     inferred = infer_math_equation_source("mod(7m,3m) = 1m")
-    if not inferred.valid or not same_dimension(inferred.dimension, length) { return 115 }
+    if not inferred.valid or not same_dimension(inferred.dimension, metres) { return 115 }
 
     println("native-math-static-ok")
     return 0

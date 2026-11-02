@@ -6,7 +6,11 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from python_debugger import DebugSession, encode
+from python_debugger import DebugSession, encode, _parse_breakpoints
+from debugger_scientific_fixture import (
+    BREAKPOINT, HEAT_SOURCE, MAX_STEPS, N, THRESHOLD,
+    expected_residual, expected_state, first_hit,
+)
 
 
 class Writer(io.TextIOBase):
@@ -178,6 +182,56 @@ class DebugTests(unittest.TestCase):
         self.assertLessEqual(len(result["stack"][0]["locals"]), 16)
         self.assertEqual(debugger.command("continue")["state"], "done")
         self.assertEqual(namespace["debug_value"], 42)
+
+    def test_scientific_breakpoint_executes_two_mode_heat_equation(self):
+        # Real CPython tracing, not a simulated debugger or numerical solver.
+        # The independent eigenmode oracle does not run the Euler stencil.
+        self.assertEqual(N * MAX_STEPS, 12288)
+        self.assertLess(len(HEAT_SOURCE.encode("utf-8")), 4096)
+        iteration = first_hit()
+        self.assertEqual(iteration, 160)
+        self.assertGreater(expected_residual(iteration - 1), THRESHOLD)
+        self.assertLessEqual(expected_residual(iteration), THRESHOLD)
+        debugger, namespace, result = self.start(HEAT_SOURCE, [BREAKPOINT])
+        self.assertEqual(result["state"], "paused")
+        self.assertEqual(result["stack"][0]["line"], BREAKPOINT["line"])
+        locals_ = result["stack"][0]["locals"]
+        self.assertEqual(locals_["iteration"]["value"], str(iteration))
+        self.assertAlmostEqual(float(locals_["residual"]["value"]),
+                               expected_residual(iteration), places=12)
+        result = debugger.command("continue")
+        self.assertEqual(result["state"], "done")
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["output"], f"{iteration}\n")
+        self.assertEqual(namespace["iteration"], iteration)
+        self.assertEqual(len(namespace["field"]), N + 1)
+        self.assertLess(max(abs(a - b) for a, b in zip(
+            namespace["field"], expected_state(iteration + 1))), 2e-12)
+        self.assertFalse(debugger.busy())
+
+    def test_scientific_threshold_grammar_and_fail_closed_underflow(self):
+        valid = {
+            "residual<=1e-3": 0.001,
+            "residual>=-2.5E+3": -2500.0,
+            "residual>.5e-8": 5e-9,
+            "residual==0e-9999": 0.0,
+            "residual<1e-320": 1e-320,
+            "residual<0.0001": 0.0001,
+            "residual<42": 42,
+        }
+        for expression, expected in valid.items():
+            with self.subTest(expression=expression):
+                parsed = _parse_breakpoints([{"line": 1, "condition": expression}], 1)
+                self.assertEqual(parsed[1][2], expected)
+        for expression in (
+            "residual<1e309", "residual<1e-9999", "residual<-1E-9999",
+            "residual<1e+99999", "residual<1e-3 or True",
+            "residual<1e-3*2", "residual<NaN", "residual<Inf",
+            "residual<1e-3;pass", "residual<01e-3",
+        ):
+            with self.subTest(expression=expression):
+                with self.assertRaises(ValueError):
+                    _parse_breakpoints([{"line": 1, "condition": expression}], 1)
 
     def test_encode_bounded(self):
         ok, payload = encode({"state": "done", "ok": True, "stack": [],

@@ -35,6 +35,7 @@ class NativeGateTest(unittest.TestCase):
         (self.root / "scripts/build.sh").write_text(build)
         (self.root / "tests/http_smoke.py").write_text(smoke)
         # A successful fake gate must also supply the new independent HTTP gate.
+        (self.root / "tests/http_debugger_scientific_smoke.py").write_text("pass\n")
         (self.root / "tests/http_trigonometry_smoke.py").write_text("pass\n")
         (self.root / "tests/http_determinant_smoke.py").write_text("pass\n")
         (self.root / "tests/http_variadic_reductions_smoke.py").write_text("pass\n")

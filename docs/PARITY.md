@@ -1,3 +1,26 @@
+## 2026-11-02: scientific CPython breakpoint and heat PDE R/Python parity (proposed, unverified)
+
+[Draft PR #404](https://github.com/godofecht/FlowStudio/pull/404)
+adds bounded scientific-notation breakpoint thresholds to the real persistent
+CPython debugger, including finite/subnormal validation and fail-closed
+underflow, overflow and expression-injection rejection. A deterministic
+64-interval, two-eigenmode Dirichlet heat trajectory has an independent
+analytical spectral oracle predicting its first residual<=1e-3 stop at
+iteration 160. The new mandatory native gate checks the real paused CPython
+frame, 65-cell evolution, persistent Python/R HTTP numerical agreement,
+HTTP 422 negative controls, and interpreter recovery with explicit 128 KiB
+request, 24 KiB response and 192-step budgets.
+[Reproduction](PYTHON_SCIENTIFIC_DEBUGGER.md).
+
+**Passed locally:** isolated previous-parser rejection and analytical
+first-hit calculation only. **Failed:** none established on this head.
+**Skipped:** not yet known. **Unexecuted/unverified:** full repository
+tests, native Flow/R/Python HTTP and physical browser on PR #404 until
+exact-head Linux/macOS CI completes. Do not count this proposed change as
+verified parity or merge before green native qualification. This is a
+scientific debugging improvement, not generalized Flow field lowering or
+complete RStudio parity. Hosted CI workflow configuration is unchanged.
+
 ## 2026-11-02: bounded R/Python plot capture over actual UTF-8 bytes (verified)
 
 [PR #396](https://github.com/godofecht/FlowStudio/pull/396) merged as

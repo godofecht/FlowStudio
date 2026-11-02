@@ -272,6 +272,21 @@ def verify(root: Path, port: int = 8751, build_timeout: int = 180,
                 print(smoke_result.stderr, end="", file=sys.stderr, flush=True)
             if smoke_result.returncode != 0:
                 raise VerificationError(f"HTTP smoke failed with exit code {smoke_result.returncode}")
+            # Mandatory live CPython scientific debugger and persistent R
+            # heat-equation oracle, through the actual Flow-owned HTTP router.
+            scientific_smoke = root / "tests/http_debugger_scientific_smoke.py"
+            if not scientific_smoke.is_file():
+                raise VerificationError("Missing scientific debugger HTTP acceptance")
+            scientific_result = _command(
+                [sys.executable, str(scientific_smoke)], root, 120)
+            if scientific_result.stdout:
+                print(scientific_result.stdout, end="", flush=True)
+            if scientific_result.stderr:
+                print(scientific_result.stderr, end="", file=sys.stderr, flush=True)
+            if scientific_result.returncode != 0:
+                raise VerificationError(
+                    f"Scientific debugger HTTP acceptance failed with exit "
+                    f"code {scientific_result.returncode}")
             trigonometry_smoke = root / "tests/http_trigonometry_smoke.py"
             if not trigonometry_smoke.is_file():
                 raise VerificationError("Missing native trigonometry HTTP acceptance")

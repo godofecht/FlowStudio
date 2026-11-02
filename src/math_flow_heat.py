@@ -305,11 +305,11 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
                   error_type: type[ValueError] = ValueError) -> dict:
     """Explicit RK2, centered periodic Laplacian; no hidden numerical fallback."""
     import numpy as np
-    nx = ny = grid if grid is not None else None
-    nx = nx or model.width
-    ny = ny or model.height
-    if not (isinstance(nx, int) and isinstance(ny, int) and 8 <= nx <= 512 and 8 <= ny <= 512):
-        raise error_type("Heat grid dimensions must be integers between 8 and 512")
+    from math_flow import validated_grid
+    try:
+        nx, ny = validated_grid(model.width, model.height, grid, heat=True)
+    except ValueError as exc:
+        raise error_type(str(exc)) from exc
     duration = until if until is not None else model.until
     if not math.isfinite(duration) or duration <= 0:
         raise error_type("Heat duration must be finite and positive")

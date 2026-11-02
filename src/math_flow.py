@@ -216,6 +216,16 @@ def grid_dimensions(tokens: list[str], *, heat: bool = False) -> tuple[int, int]
     return int(width), int(height)
 
 
+def validated_grid(width: int, height: int, grid: int | None, *, heat: bool = False) -> tuple[int, int]:
+    """Validate runtime resolution overrides without coercion or silent fallback."""
+    if grid is None:
+        return width, height
+    if type(grid) is not int or not 8 <= grid <= 512:
+        prefix = "Heat grid" if heat else "Grid"
+        raise FlowMathError(f"{prefix} override must be an integer between 8 and 512")
+    return grid, grid
+
+
 @dataclass(frozen=True)
 class Model:
     width: int
@@ -268,8 +278,12 @@ def parse(source: str) -> Model:
     fields = {}
     for stmt in model_statements:
         if len(stmt) >= 4 and stmt[0] == "const" and stmt[2] == "=":
+            if stmt[1] in consts:
+                raise FlowMathError(f"Duplicate model constant {stmt[1]}")
             consts[stmt[1]] = stmt[3:]
         elif len(stmt) >= 4 and stmt[0] == "field" and stmt[2] == ":":
+            if stmt[1] in fields:
+                raise FlowMathError(f"Duplicate model field {stmt[1]}")
             fields[stmt[1]] = stmt[3:]
         else:
             raise FlowMathError(f"Unsupported model declaration: {' '.join(stmt)}")
@@ -404,19 +418,17 @@ def simulate(model: Model, *, grid: int | None = None, until: float | None = Non
     if isinstance(model, HeatModel):
         return simulate_heat(model, grid=grid, until=until, error_type=FlowMathError)
     import numpy as np
-    nx = ny = grid if grid is not None else None
-    nx = nx or model.width
-    ny = ny or model.height
-    if min(nx, ny) < 8 or max(nx, ny) > 512:
-        raise FlowMathError("Grid override must be between 8 and 512")
+    nx, ny = validated_grid(model.width, model.height, grid)
     dx, dy = model.length_x / nx, model.length_y / ny
     x, y = np.meshgrid((np.arange(nx) + .5) * dx,
                        (np.arange(ny) + .5) * dy, indexing="ij")
     u = np.broadcast_to(initial_component(model.velocity_x, x, y), (nx, ny)).copy()
     v = np.broadcast_to(initial_component(model.velocity_y, x, y), (nx, ny)).copy()
     duration = until if until is not None else model.until
+    if type(duration) not in (int, float) or not math.isfinite(duration) or duration <= 0:
+        raise FlowMathError("Evolution duration must be finite and positive")
     steps = math.ceil(duration / model.step)
-    if not (0 < duration and 1 <= steps <= 200000):
+    if not 1 <= steps <= 200000:
         raise FlowMathError("Evolution must have between 1 and 200000 steps")
     dt = duration / steps
     if dt * max(np.max(np.abs(u)) / dx + np.max(np.abs(v)) / dy,

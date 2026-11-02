@@ -3,7 +3,7 @@
 # It is not upstream Flow grammar integration or symbolic equation solving.
 import .math_dimensions { Dimension, Quantity, CheckedQuantity, dimensionless, quantity, same_dimension, quantity_subtract }
 import .math_expression_ir { MathInstruction, MathProgram, MathResult, evaluate_math_ir }
-import .math_expression_source { MathBindings, ParsedMathExpression, parse_math_expression_with_bindings, empty_math_bindings }
+import .math_expression_source { MathBindings, ParsedMathExpression, parse_math_expression_with_bindings, empty_math_bindings, math_open_width, math_close_width }
 
 extern {
     function strlen(source: string) -> i64
@@ -60,17 +60,31 @@ export function parse_math_equation_with_bindings(source: string, bindings: Math
     let length: i32 = strlen(source) as i32
     if length < 3 or length > 512 { return equation_error(0, length) }
     let bytes: ptr<u8> = source as ptr<u8>
+    # Match the exact UTF-8 delimiter family recognized by the expression
+    # compiler. A nested single '=' is never a top-level equation separator.
+    let mut open_widths: array<i32, 64> = [0]
     let mut depth: i32 = 0
     let mut equality: i32 = -1
     let mut i: i32 = 0
     while i < length {
-        let c: u8 = bytes[i]
-        if c == 40 { depth = depth + 1 }
-        if c == 41 {
-            depth = depth - 1
-            if depth < 0 { return equation_error(i, length) }
+        let opening: i32 = math_open_width(bytes, i, length)
+        if opening > 0 {
+            if depth >= 64 { return equation_error(i, length) }
+            open_widths[depth] = opening
+            depth = depth + 1
+            i = i + opening
+            continue
         }
-        if c == 61 and depth == 0 {
+        let closing: i32 = math_close_width(bytes, i, length)
+        if closing > 0 {
+            if depth == 0 or open_widths[depth - 1] != closing {
+                return equation_error(i, length)
+            }
+            depth = depth - 1
+            i = i + closing
+            continue
+        }
+        if bytes[i] == 61 {
             let mut comparison: bool = false
             if i > 0 {
                 let previous: u8 = bytes[i - 1]
@@ -78,7 +92,7 @@ export function parse_math_equation_with_bindings(source: string, bindings: Math
             }
             if i + 1 < length and bytes[i + 1] == 61 { comparison = true }
             if not comparison {
-                if equality >= 0 { return equation_error(i, length) }
+                if depth != 0 or equality >= 0 { return equation_error(i, length) }
                 equality = i
             }
         }

@@ -1,6 +1,26 @@
-## 2026-11-02: scientific CPython breakpoint and heat PDE R/Python parity (proposed, unverified)
+## 2026-11-02: browser scientific breakpoint grammar parity (proposed)
 
-[Draft PR #404](https://github.com/godofecht/FlowStudio/pull/404)
+[Draft PR #406](https://github.com/godofecht/FlowStudio/pull/406)
+repairs a real frontend/backend mismatch left after #404: the native CPython
+kernel accepts bounded scientific-notation conditions, but both the browser
+breakpoint parser and the HTTP request validator rejected them before the
+request could reach the server. The native workspace now accepts
+`residual<=1e-3`, `delta>=-2.5E+3`, `epsilon>.5e-8` and finite
+subnormal literals, while rejecting malformed exponents, injection, and
+out-of-range exponent lengths. Checked-in Node tests assert the actual
+browser-to-HTTP request body. The production heat PDE/R/Python HTTP gate
+from #404 remains mandatory; hosted CI configuration is unchanged.
+
+**Passed locally:** 10 independent lexical accept/reject checks in the
+connector runtime. **Unverified:** exact-head Node suite, production
+Flow/R/Python HTTP and physical Ubuntu Chromium for #406 until CI completes.
+**Unexecuted:** independent physical macOS Chromium and local native Flow/R.
+This is not general Flow multidimensional `field` lowering or RStudio parity.
+
+## 2026-11-02: scientific CPython breakpoint and heat PDE R/Python parity (verified)
+
+[PR #404](https://github.com/godofecht/FlowStudio/pull/404) merged as
+[75afda1c](https://github.com/godofecht/FlowStudio/commit/75afda1c5d1897336174906271171647839a03f1)
 adds bounded scientific-notation breakpoint thresholds to the real persistent
 CPython debugger, including finite/subnormal validation and fail-closed
 underflow, overflow and expression-injection rejection. A deterministic
@@ -12,14 +32,16 @@ HTTP 422 negative controls, and interpreter recovery with explicit 128 KiB
 request, 24 KiB response and 192-step budgets.
 [Reproduction](PYTHON_SCIENTIFIC_DEBUGGER.md).
 
-**Passed locally:** isolated previous-parser rejection and analytical
-first-hit calculation only. **Failed:** none established on this head.
-**Skipped:** not yet known. **Unexecuted/unverified:** full repository
-tests, native Flow/R/Python HTTP and physical browser on PR #404 until
-exact-head Linux/macOS CI completes. Do not count this proposed change as
-verified parity or merge before green native qualification. This is a
-scientific debugging improvement, not generalized Flow field lowering or
-complete RStudio parity. Hosted CI workflow configuration is unchanged.
+**Passed:** [exact-head CI #41479789394](https://github.com/godofecht/FlowStudio/actions/runs/41479789394),
+all **4/4** Ubuntu 24.04/macOS 15 source/native jobs, including the
+mandatory real CPython debugger, persistent R heat oracle and Ubuntu physical
+Chromium. **Failed:** zero final exact-head jobs; an earlier superseded
+source run failed before correction and is not counted as passed.
+**Skipped:** platform-inapplicable installation and macOS Chromium steps.
+**Unexecuted:** local native Flow/R and independent physical macOS Chromium.
+**Post-merge main CI:** not independently verified. This improves scientific
+debugging, not generalized Flow field lowering or complete RStudio parity.
+Hosted CI configuration was unchanged.
 
 ## 2026-11-02: bounded R/Python plot capture over actual UTF-8 bytes (verified)
 

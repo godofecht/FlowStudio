@@ -329,7 +329,7 @@ export function infer_math_ir(program: MathProgram) -> MathInferredType {
             depth = base + 1
             dimensions[base] = output_dimension
             predicates[base] = false
-        } elif opcode == 84 or opcode == 85 or opcode == 86 {
+        } elif opcode == 84 or opcode == 85 or opcode == 86 or opcode == 87 {
             # Infer derivative dimensions without evaluating step sizes.
             let mut arity: i32 = 3
             let mut fields: i32 = 2
@@ -340,6 +340,10 @@ export function infer_math_ir(program: MathProgram) -> MathInferredType {
             if opcode == 86 {
                 arity = 7
                 fields = 5
+            }
+            if opcode == 87 {
+                arity = 10
+                fields = 7
             }
             if depth < arity { return static_error(instruction.source_start) }
             let base: i32 = depth - arity
@@ -356,11 +360,15 @@ export function infer_math_ir(program: MathProgram) -> MathInferredType {
             let step_position: i32 = base + fields
             let step_dimension: Dimension = dimensions[step_position]
             if predicates[step_position] { return static_error(instruction.source_start) }
-            if opcode == 86 {
-                if predicates[step_position + 1] or
-                   not same_dimension(step_dimension, length_dimension()) or
-                   not same_dimension(dimensions[step_position + 1], length_dimension()) {
-                    return static_error(instruction.source_start)
+            if opcode == 86 or opcode == 87 {
+                let mut axis: i32 = 0
+                while axis < arity - fields {
+                    let offset: i32 = step_position + axis
+                    if predicates[offset] or
+                       not same_dimension(dimensions[offset], length_dimension()) {
+                        return static_error(instruction.source_start)
+                    }
+                    axis = axis + 1
                 }
             }
             let mut output_dimension: Dimension = quotient_dimension(field_dimension, step_dimension)

@@ -1,0 +1,75 @@
+# Native Flow 2.0 anisotropic 3D seven-point Laplacian, not an editor-only snippet.
+# flow run src/math_laplacian3_smoke.flow
+import .math_dimensions { Dimension, length_dimension, temperature_dimension, quotient_dimension, same_dimension }
+import .math_expression_ir { MathResult }
+import .math_expression_source { ParsedMathExpression, parse_math_expression, evaluate_math_expression }
+import .math_static { MathInferredType, infer_math_expression_source, infer_math_equation_source }
+
+function near(actual: f64, expected: f64) -> bool {
+    let mut difference: f64 = actual - expected
+    if difference < 0.0 { difference = -difference }
+    return difference < 0.00000000001
+}
+
+function main() -> i32 {
+    let curvature: Dimension = quotient_dimension(
+        quotient_dimension(temperature_dimension(), length_dimension()), length_dimension())
+    let mut result: MathResult = evaluate_math_expression(
+        "laplacian3(0K,1K,1K,8K,8K,27K,27K,1m,2m,3m)")
+    if not result.valid or not near(result.result.value,12.0) or
+       not same_dimension(result.result.dimension,curvature) { return 1 }
+    result = evaluate_math_expression("laplacian3(5K,6K,6K,13K,13K,32K,32K,1m,2m,3m)")
+    if not result.valid or not near(result.result.value,12.0) { return 2 }
+    result = evaluate_math_expression("laplacian3(7K,7K,7K,7K,7K,7K,7K,1m,2m,3m)")
+    if not result.valid or result.result.value != 0.0 { return 3 }
+    result = evaluate_math_expression("laplacian3(0K,1K,-1K,2K,-2K,3K,-3K,1m,2m,3m)")
+    if not result.valid or result.result.value != 0.0 { return 4 }
+    result = evaluate_math_expression("2laplacian3(0K,1K,1K,8K,8K,27K,27K,1m,2m,3m)")
+    if not result.valid or not near(result.result.value,24.0) { return 5 }
+    result = evaluate_math_expression(
+        "laplacian3(0K,1K,1K,8K,8K,27K,27K,1m,2m,3m)+1K/1m²")
+    if not result.valid or not near(result.result.value,13.0) { return 6 }
+    result = evaluate_math_expression("laplacian3(0K,1K,1K,8K,8K,27K,27K,1m,2m,0m)")
+    if result.valid or result.failed_at != 0 { return 7 }
+    result = evaluate_math_expression("laplacian3(0K,1K,1K,8K,8K,27K,27K,1m,-2m,3m)")
+    if result.valid or result.failed_at != 0 { return 8 }
+    result = evaluate_math_expression("laplacian3(0K,1K,1K,8K,8K,27K,27K,1s,2m,3m)")
+    if result.valid or result.failed_at != 0 { return 9 }
+    result = evaluate_math_expression("laplacian3(0K,1K,1K,8K,8K,27K,27K,1m,2s,3m)")
+    if result.valid or result.failed_at != 0 { return 10 }
+    result = evaluate_math_expression("laplacian3(0K,1K,1K,8K,8K,27K,27K,1m,2m,3s)")
+    if result.valid or result.failed_at != 0 { return 11 }
+    result = evaluate_math_expression("laplacian3(0K,1K,1K,8K,8K,27K,27s,1m,2m,3m)")
+    if result.valid or result.failed_at != 0 { return 12 }
+    result = evaluate_math_expression("laplacian3(0K,1K,1K,8K,8K,true,27K,1m,2m,3m)")
+    if result.valid or result.failed_at != 0 { return 13 }
+    result = evaluate_math_expression("laplacian3(0K,1K,1K,8K,8K,27K,27K,1m,2m,true)")
+    if result.valid or result.failed_at != 0 { return 14 }
+    result = evaluate_math_expression("laplacian3(-1e30,1e30,1e30,1e30,1e30,1e30,1e30,1e-30m,1m,1m)")
+    if result.valid or result.failed_at != 0 { return 15 }
+    let parsed: ParsedMathExpression = parse_math_expression(
+        "laplacian3(0K,1K,1K,8K,8K,27K,27K,1m,2m,3m)")
+    if not parsed.valid or parsed.program.count != 11 or
+       parsed.program.instructions[10].opcode != 87 or
+       parsed.program.instructions[10].source_start != 0 or
+       parsed.program.instructions[10].source_end != 10 { return 16 }
+    if parse_math_expression("laplacian3(0K,1K,1K,8K,8K,27K,27K,1m,2m)").valid { return 17 }
+    if parse_math_expression("laplacian3(0K,1K,1K,8K,8K,27K,27K,1m,2m,3m,)").valid { return 18 }
+    if parse_math_expression("laplacian3(0K,1K,1K,8K,,27K,27K,1m,2m,3m)").valid { return 19 }
+    let mut inferred: MathInferredType = infer_math_expression_source(
+        "laplacian3(0K,1K,1K,8K,8K,27K,27K,1m,2m,3m)")
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension,curvature) { return 20 }
+    inferred = infer_math_expression_source("laplacian3(0K,1K,1K,8K,8K,27K,27K,1m,2s,3m)")
+    if inferred.valid or inferred.failed_at != 0 { return 21 }
+    inferred = infer_math_expression_source("laplacian3(0K,1K,1K,8K,8K,27K,27K,1m,0m,3m)")
+    if not inferred.valid { return 22 }
+    inferred = infer_math_equation_source(
+        "laplacian3(0K,1K,1K,8K,8K,27K,27K,1m,2m,3m) = 12K/1m²")
+    if not inferred.valid or not same_dimension(inferred.dimension,curvature) { return 23 }
+    inferred = infer_math_equation_source(
+        "laplacian3(0K,1K,1K,8K,8K,27K,27K,1m,2m,3m) = 12K")
+    if inferred.valid { return 24 }
+    println("native-math-laplacian3-ok")
+    return 0
+}

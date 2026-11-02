@@ -358,6 +358,7 @@ function function_call_after_number(bytes: ptr<u8>, start: i32, length: i32) -> 
         identifier_matches(bytes, start, end, "fd1") or
         identifier_matches(bytes, start, end, "fd2") or
         identifier_matches(bytes, start, end, "laplacian2") or
+        identifier_matches(bytes, start, end, "laplacian3") or
         identifier_matches(bytes, start, end, "lerp") or
         identifier_matches(bytes, start, end, "approx") or
         identifier_matches(bytes, start, end, "clamp") or
@@ -413,6 +414,7 @@ function function_arity(opcode: i32) -> i32 {
     if opcode == 72 { return 16 }
     if opcode == 59 { return 6 }
     if opcode == 86 { return 7 }
+    if opcode == 87 { return 10 }
     if opcode == 61 { return 8 }
     if opcode >= 62 and opcode <= 65 { return (opcode - 57) * 2 }
     if opcode >= 52 and opcode <= 55 { return opcode - 47 }
@@ -943,6 +945,10 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
         } elif index + 10 < length and bytes[index + 10] == 40 and
                identifier_matches(bytes, index, index + 10, "laplacian2") {
             unary_opcode = 86
+            unary_width = 10
+        } elif index + 10 < length and bytes[index + 10] == 40 and
+               identifier_matches(bytes, index, index + 10, "laplacian3") {
+            unary_opcode = 87
             unary_width = 10
         } elif index + 4 < length and bytes[index + 4] == 40 and
                identifier_matches(bytes, index, index + 4, "lerp") {

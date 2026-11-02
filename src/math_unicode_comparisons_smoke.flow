@@ -48,6 +48,35 @@ function main() -> i32 {
     if result.valid { return 17 }
     result = evaluate_math_expression("2m⩾2m ∨ 4m≦3m")
     if not result.valid or result.result.value != 1.0 { return 18 }
+    # Fullwidth relations use strict < and >, not inclusive predicates.
+    result = evaluate_math_expression("2m＜3m")
+    if not result.valid or not result.is_predicate or result.result.value != 1.0 { return 19 }
+    result = evaluate_math_expression("3m＜3m")
+    if not result.valid or result.result.value != 0.0 { return 20 }
+    result = evaluate_math_expression("3m＞2m")
+    if not result.valid or result.result.value != 1.0 { return 21 }
+    result = evaluate_math_expression("2m＞3m")
+    if not result.valid or result.result.value != 0.0 { return 22 }
+    result = evaluate_math_expression("2m＜3m ∧ 3m＞2m")
+    if not result.valid or result.result.value != 1.0 { return 23 }
+    result = evaluate_math_expression("where(3m＞2m,1s,2s)")
+    if not result.valid or result.is_predicate or result.result.value != 1.0 { return 24 }
+    let strict_less: ParsedMathExpression = parse_math_expression("2m＜3m")
+    if not strict_less.valid or strict_less.program.count != 3 or
+       strict_less.program.instructions[2].opcode != 10 or
+       strict_less.program.instructions[2].source_start != 2 or
+       strict_less.program.instructions[2].source_end != 5 { return 25 }
+    let strict_greater: ParsedMathExpression = parse_math_expression("3m＞2m")
+    if not strict_greater.valid or strict_greater.program.count != 3 or
+       strict_greater.program.instructions[2].opcode != 12 or
+       strict_greater.program.instructions[2].source_start != 2 or
+       strict_greater.program.instructions[2].source_end != 5 { return 26 }
+    result = evaluate_math_expression("2m＜3s")
+    if result.valid or result.failed_at != 2 { return 27 }
+    malformed = parse_math_expression("＜2m")
+    if malformed.valid or malformed.failed_at != 0 { return 28 }
+    malformed = parse_math_expression("2m＞")
+    if malformed.valid or malformed.failed_at != 5 { return 29 }
     println("native-math-unicode-comparisons-ok")
     return 0
 }

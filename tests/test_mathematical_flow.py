@@ -58,6 +58,16 @@ class MathematicalFlowTest(unittest.TestCase):
                                                 "grid dimensions must be integers|Grid dimensions must be integers"):
                         parse(source.replace(axes, replacement))
 
+    def test_exact_integer_grid_literals_allow_decimal_and_exponent_notation(self):
+        for source, original in ((SMOKE, "16 × 16"),
+                                 ((ROOT / "examples/heat_piecewise_forcing.flow").read_text(encoding="utf-8"),
+                                  "32 × 32")):
+            with self.subTest(original=original):
+                expected = 16 if original.startswith("16") else 32
+                replacement = f"{expected}.0 × {expected}e0"
+                model = parse(source.replace(original, replacement))
+                self.assertEqual((model.width, model.height), (expected, expected))
+
     def test_rejects_unsupported_equation(self):
         with self.assertRaisesRegex(FlowMathError, "Unsupported dynamics"):
             parse(SOURCE.replace("kinematicViscosity ∇²velocity",

@@ -50,6 +50,11 @@ class SpatialNumericsTest(unittest.TestCase):
         spatial = result["spatial"]
         self.assertEqual(spatial["source_grid"], [32, 32])
         self.assertEqual(spatial["grid"], [24, 24])
+        # Verify metadata comes from the actual simulated heat response, not
+        # only from the isolated spatial sampler fixture above.
+        expected_indices = np.linspace(0, 31, 24).astype(np.int64).tolist()
+        self.assertEqual(spatial["sample_indices"],
+                         {"x": expected_indices, "y": expected_indices})
         values = np.array(spatial["fields"]["temperature"])
         self.assertEqual(values.shape, (24, 24))
         self.assertTrue(np.all(np.isfinite(values)))
@@ -72,6 +77,11 @@ class SpatialNumericsTest(unittest.TestCase):
         result = simulate(parse(source))
         spatial = result["spatial"]
         self.assertEqual(spatial["grid"], [16, 16])
+        # The real Navier solver has no downsampling at this resolution:
+        # every emitted vector and vorticity value retains its cell index.
+        self.assertEqual(spatial["source_grid"], [16, 16])
+        self.assertEqual(spatial["sample_indices"],
+                         {"x": list(range(16)), "y": list(range(16))})
         self.assertEqual(set(spatial["fields"]), {"velocity_x", "velocity_y", "vorticity"})
         for field in spatial["fields"].values():
             self.assertTrue(np.all(np.isfinite(np.array(field))))

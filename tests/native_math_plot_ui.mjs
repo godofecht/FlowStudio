@@ -919,8 +919,9 @@ try {
     /native-math-dimension-four-ok/);
 
   // Actual Chromium -> Monaco Run -> native HTTP -> Flow 2.0.
-  // Run all 16 bounded four-unknown constraint assertions, including the
-  // late contradiction, Unicode identifiers, rank deficiency and radicals.
+  // The complete 20-case native CLI suite is executed separately in CI.
+  // Chromium uses the checked-in 16-constraint HTTP fixture so the full
+  // production compiler bundle stays under its real 128 KiB request limit.
   const nativeVariableFourFiles = [
     'src/math_dimensions.flow',
     'src/math_expression_ir.flow',
@@ -929,7 +930,7 @@ try {
     'src/math_static.flow',
     'src/math_dimension_four.flow',
     'src/math_dimension_variable_four.flow',
-    'src/math_dimension_variable_four_smoke.flow'
+    'src/math_dimension_variable_four_http_smoke.flow'
   ];
   const nativeVariableFourSource = nativeVariableFourFiles.map(path =>
     readFileSync(path, 'utf8').split(/\r?\n/)
@@ -945,8 +946,6 @@ try {
     .replaceAll(/\bidentifier_matches\b/g, 'idmatch')
     .replaceAll(/\bsolve_math_equations_variable_constraints_four_unknown_dimensions\b/g, 'solve4')
     .replaceAll(/\boutput_dimension\b/g, 'outdim')
-    // Preserve the entire executable native solver, including every check;
-    // shorten only identifiers in this isolated HTTP acceptance bundle.
     .replaceAll(/\bsame_dimension\b/g, 'samedim')
     .replaceAll(/\bsource_start\b/g, 'srcstart')
     .replaceAll(/\bsource_error\b/g, 'srcerr')

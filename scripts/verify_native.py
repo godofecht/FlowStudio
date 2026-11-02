@@ -308,6 +308,18 @@ def verify(root: Path, port: int = 8751, build_timeout: int = 180,
             if variadic_result.returncode != 0:
                 raise VerificationError(
                     f"Native variadic HTTP failed with exit code {variadic_result.returncode}")
+            dispersion_smoke = root / "tests/http_dispersion_smoke.py"
+            if not dispersion_smoke.is_file():
+                raise VerificationError("Missing native SI dispersion HTTP acceptance")
+            dispersion_result = _command(
+                [sys.executable, str(dispersion_smoke)], root, 120)
+            if dispersion_result.stdout:
+                print(dispersion_result.stdout, end="", flush=True)
+            if dispersion_result.stderr:
+                print(dispersion_result.stderr, end="", file=sys.stderr, flush=True)
+            if dispersion_result.returncode != 0:
+                raise VerificationError(
+                    f"Native SI dispersion HTTP failed with exit code {dispersion_result.returncode}")
             if proc.poll() is not None:
                 raise VerificationError(f"Server exited during HTTP smoke (code {proc.returncode})")
             print("PASS: native build, live health and HTTP smoke", flush=True)

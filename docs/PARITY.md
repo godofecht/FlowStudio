@@ -1,3 +1,40 @@
+## 2026-11-02: native SI dispersion and real Flow/R/Python seeded acceptance (verified)
+
+[PR #367](https://github.com/godofecht/FlowStudio/pull/367) merged as
+[6234039d](https://github.com/godofecht/FlowStudio/commit/6234039d3c113d7cb2af20e62521a5515e5c97c8).
+The production Flow 2.0 parser, typed postfix IR and static SI inference now
+execute population `stddev`, Bessel-corrected `sample_variance` and
+`sample_stddev`, with bounded 1–8/2–8 arity, physical dimensions,
+finite magnitude and fail-closed invalid inputs. Native smoke checks 36
+analytical, negative, source-span and equation cases. A separate seed-20261101
+exact-rational Python oracle generates **48 valid permutation-paired cases**
+and **12 malformed/arity/units/predicate/overflow negatives**, all compiled
+and executed in four bounded real Flow HTTP batches. Deliberately corrupted
+numerical expectations compile but return HTTP 422. The same 48 valid cases
+are independently checked by persistent base R `sd`/`var`/population SD
+and a separate persistent CPython exact-Fraction HTTP kernel, with HTTP 422
+corruption and interpreter recovery. Sources are limited to 128 KiB and
+R/Python response frames to 24 KiB. Five focused local Python tests passed.
+[Reproduction](NATIVE_DISPERSION.md).
+
+**Passed:** [exact-head CI #41364214522](https://github.com/godofecht/FlowStudio/actions/runs/41364214522),
+all **4/4** Ubuntu 24.04/macOS 15 source and native jobs, including native
+Flow compilation, real Flow/R/Python HTTP, R/C FlowJIT, checked-in PDE/heat
+programs and Ubuntu physical Chromium. Each source platform passed 1,201
+JavaScript tests (12 skipped), and ran 492 Python tests (13 skipped).
+**Failed:** zero final exact-head jobs. The initial
+[CI #41363382888](https://github.com/godofecht/FlowStudio/actions/runs/41363382888)
+failed Ubuntu Chromium because the four-unknown bundle grew to 131,207 bytes,
+exceeding the real 128 KiB HTTP limit. The checked-in compact 16-constraint
+HTTP fixture reduced it to 126,274 bytes without dropping the complete
+separately executed native CLI assertions. Superseded CI runs were cancelled,
+not counted as passes. **Skipped:** 12 JS, 13 Python, optional/platform-inapplicable
+steps. **Unexecuted:** independent macOS physical-browser interaction and local
+native Flow/R. **Post-merge main CI:** not yet verified. The PR added the
+necessary native smoke invocations to existing hosted CI, without unrelated
+workflow changes. Compiler-generated heterogeneous multidimensional `field`
+lowering and full RStudio parity remain incomplete.
+
 ## 2026-11-01: native SI finite differences, manufactured refinement and real Flow/R/Python HTTP (verified)
 
 [PR #363](https://github.com/godofecht/FlowStudio/pull/363) merged as

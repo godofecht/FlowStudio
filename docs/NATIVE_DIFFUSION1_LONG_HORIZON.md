@@ -34,3 +34,34 @@ native verification. An isolated Python pass does not establish native
 compilation, HTTP execution, physical-browser coverage or RStudio parity.
 General compiler-generated multidimensional `field` lowering and boundary
 semantics remain separate milestones.
+
+## Full-trajectory R/Python HTTP qualification
+
+The mandatory native HTTP runner also evolves **all 65 five-cell states**
+(initial plus 64 updates) in the persistent base-R interpreter, using a
+direct conservative shared-face stencil. It checks finite values, conserved
+mass and nonincreasing quadratic energy after every update, and emits a
+bounded, ordered 65-frame trace. The host independently checks every
+reported value against the exact-Fraction Python trajectory.
+
+A separate persistent CPython HTTP execution constructs the five-by-five
+doubly stochastic transition matrix from the seeded coefficients and
+verifies **all 325 values** using exact rational matrix-vector updates.
+Deliberate step-32 numerical corruption and a truncated frame must each
+return HTTP 422. Both interpreter sessions are checked for recovery.
+Sources are capped at 128 KiB and output frames at 24 KiB; the
+three isolated payload tests execute the generated Python program in a
+real CPython subprocess with a 15-second timeout.
+
+This supplements, but does not replace, the 20 native Flow mathematical
+stencil executions. The 64-step integration is executed by base R and
+independently by Python, **not by the native Flow PDE time integrator**.
+The distinction matters for parity claims.
+
+```sh
+python3 -m unittest discover -s tests -p 'test_diffusion1_long_horizon_interop.py' -v
+python3 scripts/verify_native.py --require-r
+```
+
+Linux/macOS native CI must pass before claiming real R/Python HTTP
+qualification. No hosted CI workflow changes are necessary.

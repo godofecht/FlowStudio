@@ -1766,6 +1766,29 @@ function main() -> i32 {
     result = evaluate_math_expression("mod(1m,1s)")
     if result.valid or result.failed_at != 0 { return 669 }
 
+    # Short logical arrows lower to the same typed IR as ⇒ and ⇔.
+    result = evaluate_math_expression("false → true → false")
+    if not result.valid or not result.is_predicate or result.result.value != 1.0 { return 670 }
+    result = evaluate_math_expression("true ↔ false")
+    if not result.valid or not result.is_predicate or result.result.value != 0.0 { return 671 }
+    result = evaluate_math_expression("where(2m>1m → 3m<2m,5m,7m)")
+    if not result.valid or not near(result.result.value, 7.0) or
+       not same_dimension(result.result.dimension, length) { return 672 }
+    let short_arrow: ParsedMathExpression = parse_math_expression("true→false")
+    if not short_arrow.valid or short_arrow.program.count != 3 or
+       short_arrow.program.instructions[2].opcode != 98 or
+       short_arrow.program.instructions[2].source_start != 4 or
+       short_arrow.program.instructions[2].source_end != 7 { return 673 }
+    let short_iff: ParsedMathExpression = parse_math_expression("false↔true")
+    if not short_iff.valid or short_iff.program.count != 3 or
+       short_iff.program.instructions[2].opcode != 99 or
+       short_iff.program.instructions[2].source_start != 5 or
+       short_iff.program.instructions[2].source_end != 8 { return 674 }
+    result = evaluate_math_expression("1m → true")
+    if result.valid or result.failed_at != 3 { return 675 }
+    if parse_math_expression("→true").valid or
+       parse_math_expression("true↔").valid { return 676 }
+
     println("native-math-source-ok")
     return 0
 }

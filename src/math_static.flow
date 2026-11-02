@@ -387,11 +387,12 @@ export function infer_math_ir(program: MathProgram) -> MathInferredType {
             depth = base + 1
             dimensions[base] = output_dimension
             predicates[base] = false
-        } elif opcode == 89 or opcode == 90 {
-            # Heterogeneous diffusion uses 2 or 3 spatial axes with paired
+        } elif opcode == 89 or opcode == 90 or opcode == 91 {
+            # Heterogeneous diffusion uses 1, 2 or 3 spatial axes with paired
             # face coefficients (m²/s), scalar samples and length spacings.
             let mut axes: i32 = 3
             if opcode == 90 { axes = 2 }
+            if opcode == 91 { axes = 1 }
             let fields: i32 = 1 + 2 * axes
             let arity: i32 = fields + 3 * axes
             if depth < arity { return static_error(instruction.source_start) }

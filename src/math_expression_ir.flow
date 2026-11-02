@@ -46,6 +46,8 @@
 #             conservative 3D heterogeneous face-flux divergence; k in m²/s.
 #          90 diffusion2(center, left, right, down, up, kleft, kright, kdown, kup, dx, dy):
 #             conservative 2D heterogeneous face-flux divergence; k in m²/s.
+#          91 diffusion1(center, left, right, kleft, kright, dx):
+#             conservative 1D heterogeneous face-flux divergence; k in m²/s.
 #          The instruction exponent stores the actual variadic arity.
 #          Every permutation product must have the same SI dimension.
 # Predicate values are dimensionless 0/1 with a separate runtime type bit.
@@ -1275,11 +1277,12 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
             depth = base + 1
             stack[base] = quantity(output_value, output_dimension)
             predicate[base] = false
-        } elif opcode == 89 or opcode == 90 {
-            # Conservative anisotropic 2D/3D face-flux divergence. A shared
+        } elif opcode == 89 or opcode == 90 or opcode == 91 {
+            # Conservative 1D/2D/3D face-flux divergence. A shared
             # coefficient gives equal and opposite fluxes across each face.
             let mut axes: i32 = 3
             if opcode == 90 { axes = 2 }
+            if opcode == 91 { axes = 1 }
             let fields: i32 = 1 + 2 * axes
             let arity: i32 = fields + 3 * axes
             if depth < arity { return failed(instruction.source_start) }

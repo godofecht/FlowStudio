@@ -161,7 +161,8 @@ class ExactFiniteDifferenceOracle(unittest.TestCase):
         # Production HTTP bundles strip indentation from native Flow lines.
         base = 'println("native-math-finite-difference-ok")'
         source = inject_finite_difference_assertions(base, start=18, stop=27)
-        self.assertEqual(source.count("evaluate_math_expression"), 9)
+        self.assertEqual(source.count("evaluate_math_expression") -
+                                 base.count("evaluate_math_expression"), 9)
         self.assertEqual(source.count("native-math-finite-difference-ok"), 1)
 
 

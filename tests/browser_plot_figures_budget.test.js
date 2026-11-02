@@ -128,3 +128,30 @@ test("fallback text body and malformed stream UTF-8 fail closed", async () => {
   });
   assert.deepEqual(await collect("r", fetcher), []);
 });
+
+test("actual localhost HTTP transports R and Python captures through the production reader", async t => {
+  const http = require("node:http");
+  const svg = "<svg><text>R</text></svg>";
+  const server = http.createServer((request, reply) => {
+    if (request.method !== "POST" ||
+        request.headers["x-flowstudio-intent"] !== "run") {
+      reply.writeHead(400).end();
+      return;
+    }
+    reply.setHeader("Content-Type", "application/json; charset=utf-8");
+    if (request.url === "/api/plot/r") {
+      reply.write('{"svg":"<svg>');
+      reply.end('<text>R</text></svg>"}');
+    } else if (request.url === "/api/plot/python") {
+      reply.end(JSON.stringify({plots:[{number:2,png:PNG}]}));
+    } else {
+      reply.writeHead(404).end();
+    }
+  });
+  await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  const base = "http://127.0.0.1:" + server.address().port;
+  const fetcher = (path, options) => fetch(base + path, options);
+  assert.deepEqual(await collect("r", fetcher), [{number:1,svg}]);
+  assert.deepEqual(await collect("python", fetcher), [{number:2,png:PNG}]);
+});

@@ -308,6 +308,28 @@ def verify(root: Path, port: int = 8751, build_timeout: int = 180,
             if variadic_result.returncode != 0:
                 raise VerificationError(
                     f"Native variadic HTTP failed with exit code {variadic_result.returncode}")
+            # Each acceptance suite has its own bounded process lifetime.
+            # Previously variadic invoked robust, quantile and all PDE tests
+            # transitively, exhausting one shared 120-second Linux timeout.
+            # Keep every real HTTP assertion and deliberate 422 rejection.
+            for script_name, timeout_seconds in (
+                ("http_robust_statistics_smoke.py", 120),
+                ("http_quantile_smoke.py", 120),
+                ("http_finite_difference_smoke.py", 240),
+            ):
+                suite = root / "tests" / script_name
+                if not suite.is_file():
+                    raise VerificationError(f"Missing native HTTP acceptance: {script_name}")
+                suite_result = _command(
+                    [sys.executable, str(suite)], root, timeout_seconds)
+                if suite_result.stdout:
+                    print(suite_result.stdout, end="", flush=True)
+                if suite_result.stderr:
+                    print(suite_result.stderr, end="", file=sys.stderr, flush=True)
+                if suite_result.returncode != 0:
+                    raise VerificationError(
+                        f"Native HTTP acceptance failed: {script_name} "
+                        f"(exit {suite_result.returncode})")
             dispersion_smoke = root / "tests/http_dispersion_smoke.py"
             if not dispersion_smoke.is_file():
                 raise VerificationError("Missing native SI dispersion HTTP acceptance")

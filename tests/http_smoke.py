@@ -1047,7 +1047,7 @@ def main() -> None:
     )
     native_dimension_solver = "\n".join(
         "\n".join(
-            line.strip().removeprefix("export ")
+            compact_native_math_line(line, tighten_math_ops=True)
             for line in (Path(__file__).resolve().parents[1] / path)
                 .read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.lstrip().startswith("#")
@@ -1070,16 +1070,16 @@ def main() -> None:
     assert status == 200 and "native-math-unknown-dimension-constraints-ok" in body, (
         "native rational SI constraint execution", status, body)
     corrupted_root = native_dimension_solver.replace(
-        '"sqrt(x) = 1m", empty, "x"',
-        '"sqrt(x) = 1s", empty, "x"',
+        compact_native_math_line('"sqrt(x) = 1m", empty, "x"', tighten_math_ops=True),
+        compact_native_math_line('"sqrt(x) = 1s", empty, "x"', tighten_math_ops=True),
         1,
     )
     assert corrupted_root != native_dimension_solver
     status, body = request("POST", "/api/run/flow", corrupted_root, accepted_headers)
     assert status == 422, ("native rational SI corrupted assertion rejection", status, body)
     malformed_solver = native_dimension_solver.replace(
-        "function normalise_affine(a: AffineDimension) -> AffineDimension {",
-        "function normalise_affine(a: AffineDimension -> AffineDimension {",
+        compact_native_math_line("function normalise_affine(a: AffineDimension) -> AffineDimension {", tighten_math_ops=True),
+        compact_native_math_line("function normalise_affine(a: AffineDimension -> AffineDimension {", tighten_math_ops=True),
         1,
     )
     assert malformed_solver != native_dimension_solver

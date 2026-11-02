@@ -1174,6 +1174,12 @@ def main() -> None:
         )
         for path in variable_files
     )
+    # Preserve native executable SI constraint coverage within the 128 KiB
+    # transport ceiling as shared mathematical operators expand.
+    for old, short in (("same_dimension", "samedim"),
+                       ("source_start", "srcstart"),
+                       ("output_dimension", "outdim")):
+        native_variable = re.sub(r"\b" + old + r"\b", short, native_variable)
     assert "function solve_math_equations_variable_constraints_three_unknown_dimensions(" in native_variable
     assert 'system.count =16' in native_variable
     assert 'system.equations[15] ="x = 1s"' in native_variable

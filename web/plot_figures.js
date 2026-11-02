@@ -6,6 +6,8 @@ const LIMIT = 12;
 const MAX_SVG_CHARS = 60000;
 const MAX_PDF_CHARS = 120000;
 const MAX_PNG_CHARS = 1398104;
+// Twelve maximum-size PNG snapshots plus JSON overhead, bounded before parsing.
+const MAX_RESPONSE_BYTES = 20 * 1024 * 1024;
 
 function validEntry(plot) {
   if (!plot || typeof plot !== "object" || !Number.isSafeInteger(plot.number) ||
@@ -26,6 +28,40 @@ function validEntry(plot) {
   return null;
 }
 
+async function boundedText(response) {
+  const declared = response.headers && typeof response.headers.get === "function"
+    ? response.headers.get("content-length") : null;
+  if (declared !== null && /^\\d+$/.test(String(declared)) &&
+      Number(declared) > MAX_RESPONSE_BYTES) return null;
+  const reader = response.body && typeof response.body.getReader === "function"
+    ? response.body.getReader() : null;
+  if (!reader) {
+    const text = await response.text();
+    return typeof text === "string" && text.length <= MAX_RESPONSE_BYTES ? text : null;
+  }
+  const decoder = new TextDecoder("utf-8", {fatal:true});
+  let text = "", bytes = 0, exceeded = false;
+  try {
+    for (;;) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      if (!(chunk.value instanceof Uint8Array)) return null;
+      bytes += chunk.value.byteLength;
+      if (bytes > MAX_RESPONSE_BYTES) {
+        exceeded = true;
+        return null;
+      }
+      text += decoder.decode(chunk.value, {stream:true});
+    }
+    return text + decoder.decode();
+  } finally {
+    if (exceeded && typeof reader.cancel === "function") {
+      try { await reader.cancel(); } catch (_) { /* already closed */ }
+    }
+    if (typeof reader.releaseLock === "function") reader.releaseLock();
+  }
+}
+
 async function collect(language, fetcher) {
   if (!(language === "r" || language === "python")) return [];
   const fetchFn = typeof fetcher === "function" ? fetcher :
@@ -38,11 +74,14 @@ async function collect(language, fetcher) {
       body: ""
     });
     if (!response.ok) return [];
-    const text = await response.text();
+    const text = await boundedText(response);
+    if (text === null) return [];
     const data = JSON.parse(text);
     if (!data) return [];
-    if (Array.isArray(data.plots))
+    if (Array.isArray(data.plots)) {
+      if (data.plots.length > LIMIT) return [];
       return data.plots.map(validEntry).filter(Boolean);
+    }
     // The R kernel still answers with one snapshot: {svg, pdf, warning}.
     if (typeof data.svg === "string" || typeof data.pdf === "string")
       return [validEntry({number: 1, svg: data.svg, pdf: data.pdf})].filter(Boolean);
@@ -123,7 +162,7 @@ function create(doc, host) {
   }
   return Object.freeze({
     append(plots) {
-      if (!Array.isArray(plots)) return 0;
+      if (!Array.isArray(plots) || plots.length > LIMIT) return 0;
       let added = 0;
       for (const plot of plots) {
         const valid = validEntry(plot);
@@ -148,7 +187,8 @@ async function show(root, doc, language, status) {
   const plots = await collect(language);
   if (!plots.length) return false;
   const host = doc.getElementById("plotFigures");
-  const panelKey = "__flowstudioPlotPanel:" + language;
+  // R and Python must share one figure history in the same Plots tab.
+  const panelKey = "__flowstudioPlotPanel";
   let panel = root[panelKey];
   if (!panel) {
     panel = create(doc, host);
@@ -165,7 +205,7 @@ async function show(root, doc, language, status) {
   return true;
 }
 
-const api = Object.freeze({ ROUTES, LIMIT, validEntry, collect, create, show, figureElement });
+const api = Object.freeze({ ROUTES, LIMIT, MAX_RESPONSE_BYTES, validEntry, collect, create, show, figureElement });
 global.FlowStudioPlotFigures = api;
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(globalThis);

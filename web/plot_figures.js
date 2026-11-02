@@ -31,7 +31,7 @@ function validEntry(plot) {
 async function boundedText(response) {
   const declared = response.headers && typeof response.headers.get === "function"
     ? response.headers.get("content-length") : null;
-  if (declared !== null && /^\\d+$/.test(String(declared)) &&
+  if (declared !== null && /^\d+$/.test(String(declared)) &&
       Number(declared) > MAX_RESPONSE_BYTES) return null;
   const reader = response.body && typeof response.body.getReader === "function"
     ? response.body.getReader() : null;

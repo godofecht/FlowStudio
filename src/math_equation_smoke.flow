@@ -190,6 +190,30 @@ function main() -> i32 {
         quantity(0.000000000001, dimensionless()))
     if result.valid { return 65 }
 
+    # Equation AST must use the same fullwidth delimiter family as native
+    # scalar source lowering; every diagnostic is an original UTF-8 byte index.
+    let grouped: MathEquation = parse_math_equation("（1m+2m） = 3m")
+    if not grouped.valid or grouped.equality_at != 12 or
+       grouped.right.instructions[0].source_start != 14 { return 66 }
+    result = evaluate_math_equation(grouped, exact_m)
+    if not result.valid or not result.satisfied { return 67 }
+    result = evaluate_math_equation_source(
+        "where（1==1，3m，4m） = 3m", exact_m)
+    if not result.valid or not result.satisfied { return 68 }
+    result = evaluate_math_equation_source(
+        "（1m+(2m)） = 3m", exact_m)
+    if not result.valid or not result.satisfied { return 69 }
+    let nested_equal: MathEquation = parse_math_equation("（1m=1m）")
+    if nested_equal.valid or nested_equal.failed_at != 5 { return 70 }
+    let mismatched_ascii: MathEquation = parse_math_equation("（1m+2m) = 3m")
+    if mismatched_ascii.valid or mismatched_ascii.failed_at != 8 { return 71 }
+    let mismatched_fullwidth: MathEquation = parse_math_equation("(1m+2m） = 3m")
+    if mismatched_fullwidth.valid or mismatched_fullwidth.failed_at != 6 { return 72 }
+    let unclosed_fullwidth: MathEquation = parse_math_equation("1m = （2m+3m")
+    if unclosed_fullwidth.valid or unclosed_fullwidth.failed_at != 13 { return 73 }
+    let nested_right: MathEquation = parse_math_equation("1m = （2m=2m）")
+    if nested_right.valid or nested_right.failed_at != 10 { return 74 }
+
     println("native-math-equation-ok")
     return 0
 }

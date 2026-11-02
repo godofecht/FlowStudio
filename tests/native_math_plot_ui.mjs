@@ -52,6 +52,10 @@ function compactNativeMathIdentifiers(source) {
     // Keep the combined Unicode parser and full SI solver below the
     // production HTTP byte cap; only rename unquoted internal tokens.
     instruction: 'insn', math_open_width: 'mopw',
+    math_close_width: 'mclw', open_widths: 'opws',
+    equation_error: 'eqerr',
+    parse_math_equation_with_bindings: 'parseEqB',
+    evaluate_math_equation_source_with_bindings: 'evalEqB',
     unary_width: 'uwid', component: 'cmpn', temperature: 'tempv'
   };
   return source.replace(/"(?:\\.|[^"\\])*"|[A-Za-z_][A-Za-z0-9_]*/g,

@@ -986,7 +986,7 @@ try {
     .replaceAll(/\bdimensionless\b/g, 'dimless');
   nativeVariableFourSource = compactNativeMathIdentifiers(nativeVariableFourSource);
   assert.ok(Buffer.byteLength(nativeVariableFourSource, 'utf8') < 128 * 1024);
-  assert.match(nativeVariableFourSource, /system\.count =\s*16/);
+  assert.match(nativeVariableFourSource, /system\.count\s*=\s*16\b/);
   assert.match(nativeVariableFourSource, /native-math-variable-four-constraints-ok/);
   await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
     nativeVariableFourSource);

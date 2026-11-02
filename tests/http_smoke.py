@@ -75,6 +75,37 @@ def compact_native_math_line(line: str, *, tighten_equals: bool = False,
     return "".join(result).rstrip()
 
 
+def compact_native_math_identifiers(source: str) -> str:
+    """Shorten only internal Flow identifiers, never quoted source literals.
+
+    The production 128 KiB transport limit remains enforced. Every module
+    still compiles and executes natively, with no numerical test omitted.
+    """
+    aliases = {
+        "same_dimension": "samedim",
+        "source_start": "srcstart",
+        "output_dimension": "outdim",
+        "identifier_matches": "idmatches",
+        "unary_opcode": "unop",
+        "static_error": "sterr",
+        "source_error": "srcerr",
+        "expect_operand": "expectop",
+        "bounded_value": "bvalue",
+        "product_dimension": "proddim",
+        "output_value": "outval",
+        "source_length": "srclen",
+        "is_predicate": "ispred",
+        "term_dimension": "termdim",
+        "input_dimension": "indim",
+    }
+
+    def rewrite(match: re.Match[str]) -> str:
+        token = match.group(0)
+        return token if token.startswith('"') else aliases.get(token, token)
+
+    return re.sub(r'"(?:\\.|[^"\\])*"|[A-Za-z_][A-Za-z0-9_]*', rewrite, source)
+
+
 def oversized_body_status() -> int:
     """Exercise header-level 413 without racing an early-close against sendall.
 
@@ -975,6 +1006,7 @@ def main() -> None:
         )
         for path in static_files
     )
+    native_static = compact_native_math_identifiers(native_static)
     assert len(native_static.encode("utf-8")) <= 131072, "Native static HTTP bundle exceeds 128 KiB"
     assert "function infer_math_ir(" in native_static
     assert "native-math-static-ok" in native_static
@@ -1015,6 +1047,7 @@ def main() -> None:
         )
         for path in dimension_solver_files
     )
+    native_dimension_solver = compact_native_math_identifiers(native_dimension_solver)
     assert "function solve_math_equation_unknown_dimension(" in native_dimension_solver
     assert "sqrt(cbrt(x)) = 1m" in native_dimension_solver
     assert len(native_dimension_solver.encode("utf-8")) < 128 * 1024
@@ -1063,6 +1096,7 @@ def main() -> None:
         )
         for path in pair_files
     )
+    native_pair = compact_native_math_identifiers(native_pair)
     assert "function solve_math_equations_two_unknown_dimensions(" in native_pair
     assert len(native_pair.encode("utf-8")) < 128 * 1024
     status, body = request("POST", "/api/check/flow", native_pair, accepted_headers)
@@ -1125,6 +1159,7 @@ def main() -> None:
                        ("source_start", "srcstart"),
                        ("output_dimension", "outdim")):
         native_overdetermined = re.sub(r"\b" + old + r"\b", short, native_overdetermined)
+    native_overdetermined = compact_native_math_identifiers(native_overdetermined)
     assert "function solve_math_equations_four_constraints_three_unknown_dimensions(" in native_overdetermined
     assert len(native_overdetermined.encode("utf-8")) < 128 * 1024
     status, body = request("POST", "/api/check/flow", native_overdetermined, accepted_headers)
@@ -1174,14 +1209,17 @@ def main() -> None:
         )
         for path in variable_files
     )
-    # Keep the executable native SI solver below the transport ceiling as
-    # the shared mathematical parser gains additional real operators.
-    # These are consistent identifier-only aliases across the checked-in
-    # modules, not replacement calculations or skipped assertions.
+    # Preserve native executable SI constraint coverage within the 128 KiB
+    # transport ceiling as shared mathematical operators expand.
     for old, short in (("same_dimension", "samedim"),
                        ("source_start", "srcstart"),
-                       ("output_dimension", "outdim")):
+                       ("output_dimension", "outdim"),
+                       ("identifier_matches", "idmatches"),
+                       ("unary_opcode", "unop"),
+                       ("static_error", "sterr"),
+                       ("source_error", "srcerr")):
         native_variable = re.sub(r"\b" + old + r"\b", short, native_variable)
+    native_variable = compact_native_math_identifiers(native_variable)
     assert "function solve_math_equations_variable_constraints_three_unknown_dimensions(" in native_variable
     assert 'system.count =16' in native_variable
     assert 'system.equations[15] ="x = 1s"' in native_variable
@@ -1235,6 +1273,7 @@ def main() -> None:
         )
         for path in four_files
     )
+    native_four = compact_native_math_identifiers(native_four)
     assert "function solve_math_equations_four_unknown_dimensions(" in native_four
     assert "function determinant4(" in native_four
     assert "native-math-dimension-four-ok" in native_four
@@ -1273,6 +1312,12 @@ def main() -> None:
         "src/math_dimension_variable_four.flow",
         "src/math_dimension_variable_four_http_smoke.flow",
     )
+    assert compact_native_math_identifiers(
+        'let label = "same_dimension source_start"; same_dimension'
+    ) == 'let label = "same_dimension source_start"; samedim'
+    assert compact_native_math_identifiers(
+        'let label = "escaped \\" same_dimension"; source_start'
+    ) == 'let label = "escaped \\" same_dimension"; srcstart'
     assert compact_native_math_line(' x: f64, y: i32 # comment') == 'x:f64,y:i32'
     assert compact_native_math_line('let s = "a, b: c # literal" # trailing') == (
         'let s = "a, b: c # literal"'
@@ -1307,6 +1352,7 @@ def main() -> None:
                        ("source_start", "srcstart"),
                        ("output_dimension", "outdim")):
         native_variable_four = re.sub(r"\b" + old + r"\b", short, native_variable_four)
+    native_variable_four = compact_native_math_identifiers(native_variable_four)
     assert "function solve_math_equations_variable_constraints_four_unknown_dimensions(" in native_variable_four
     assert "function determinant4(" in native_variable_four
     assert 'system.count=16' in native_variable_four
@@ -1344,7 +1390,7 @@ def main() -> None:
     hyperbolic_files = static_files[:-1] + ("src/math_hyperbolic_smoke.flow",)
     native_hyperbolic = "\n".join(
         "\n".join(
-            line.strip().removeprefix("export ")
+            compact_native_math_line(line, tighten_equals=True)
             for line in (Path(__file__).resolve().parents[1] / path)
                 .read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.lstrip().startswith("#")
@@ -1356,6 +1402,8 @@ def main() -> None:
         )
         for path in hyperbolic_files
     )
+    native_hyperbolic = compact_native_math_identifiers(native_hyperbolic)
+    assert len(native_hyperbolic.encode("utf-8")) < 128 * 1024
     assert "function bounded_hyperbolic(" in native_hyperbolic
     assert "native-math-hyperbolic-ok" in native_hyperbolic
     status, body = request("POST", "/api/check/flow", native_hyperbolic, accepted_headers)
@@ -1363,10 +1411,13 @@ def main() -> None:
     status, body = request("POST", "/api/run/flow", native_hyperbolic, accepted_headers)
     assert status == 200 and "native-math-hyperbolic-ok" in body, (
         "native hyperbolic HTTP execution", status, body)
-    broken_hyperbolic = native_hyperbolic.replace(
-        "function bounded_hyperbolic(value: f64, opcode: i32) -> f64 {",
-        "function bounded_hyperbolic(value: f64, opcode: i32 -> f64 {",
-        1,
+    # The HTTP bundle compactor removes spaces around type annotations.
+    # Match the actual compiled signature rather than its un-compacted form.
+    broken_hyperbolic = re.sub(
+        r"(\bfunction\s+bounded_hyperbolic\s*\([^)]*)\)",
+        r"\1",
+        native_hyperbolic,
+        count=1,
     )
     assert broken_hyperbolic != native_hyperbolic
     status, body = request("POST", "/api/check/flow", broken_hyperbolic, accepted_headers)

@@ -16,7 +16,7 @@ def bundled_source(root: Path) -> str:
     )
     source = "\n".join(
         "\n".join(
-            compact_native_math_line(line)
+            compact_native_math_line(line, tighten_math_ops=True)
             for line in (root / path).read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.lstrip().startswith("#")
             and not line.startswith("import .math_dimensions {")

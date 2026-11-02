@@ -23,6 +23,21 @@ function compactNativeMathLine(line, tightenEquals = false) {
   return result.trimEnd();
 }
 
+// Alpha-rename internal tokens only. Quoted Flow literals are preserved.
+function compactNativeMathIdentifiers(source) {
+  const aliases = {
+    same_dimension: 'samedim', source_start: 'srcstart',
+    output_dimension: 'outdim', identifier_matches: 'idmatches',
+    unary_opcode: 'unop', static_error: 'sterr', source_error: 'srcerr',
+    expect_operand: 'expectop', bounded_value: 'bvalue',
+    product_dimension: 'proddim', output_value: 'outval',
+    source_length: 'srclen', is_predicate: 'ispred',
+    term_dimension: 'termdim', input_dimension: 'indim'
+  };
+  return source.replace(/"(?:\\.|[^"\\])*"|[A-Za-z_][A-Za-z0-9_]*/g,
+    token => token.startsWith('"') ? token : (aliases[token] || token));
+}
+
 const browser = await chromium.launch({ headless: true });
 try {
   const page = await browser.newPage();
@@ -782,7 +797,7 @@ try {
     'src/math_expression_source.flow',
     'src/math_expression_source_http_smoke.flow'
   ];
-  const nativeMathSource = mathSourceFiles.map(path =>
+  let nativeMathSource = mathSourceFiles.map(path =>
     readFileSync(path, 'utf8').split(/\r?\n/)
       .filter(line => !line.startsWith('import .math_dimensions {') &&
         !line.startsWith('import .math_expression_ir {') &&
@@ -790,6 +805,7 @@ try {
       .filter(line => line.trim() && !line.trimStart().startsWith('#'))
       .map(line => compactNativeMathLine(line)).join('\n')
   ).join('\n');
+  nativeMathSource = compactNativeMathIdentifiers(nativeMathSource);
   assert.ok(Buffer.byteLength(nativeMathSource, 'utf8') < 128 * 1024,
     'Native mathematical browser source must fit the production HTTP limit');
   await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
@@ -810,7 +826,7 @@ try {
     'src/math_static.flow',
     'src/math_trigonometry_smoke.flow'
   ];
-  const nativeTrigSource = nativeTrigFiles.map(path =>
+  let nativeTrigSource = nativeTrigFiles.map(path =>
     readFileSync(path, 'utf8').split(/\r?\n/)
       .filter(line => !line.startsWith('import .math_dimensions {') &&
         !line.startsWith('import .math_expression_ir {') &&
@@ -820,6 +836,7 @@ try {
       .filter(line => line.trim() && !line.trimStart().startsWith('#'))
       .map(line => compactNativeMathLine(line)).join('\n')
   ).join('\n');
+  nativeTrigSource = compactNativeMathIdentifiers(nativeTrigSource);
   assert.ok(Buffer.byteLength(nativeTrigSource, 'utf8') <= 128 * 1024,
     'Native trigonometry browser source exceeds the production HTTP limit');
   await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
@@ -840,7 +857,7 @@ try {
     'src/math_static.flow',
     'src/math_hyperbolic_smoke.flow'
   ];
-  const nativeHyperbolicSource = nativeHyperbolicFiles.map(path =>
+  let nativeHyperbolicSource = nativeHyperbolicFiles.map(path =>
     readFileSync(path, 'utf8').split(/\r?\n/)
       .filter(line => !line.startsWith('import .math_dimensions {') &&
         !line.startsWith('import .math_expression_ir {') &&
@@ -850,6 +867,7 @@ try {
       .filter(line => line.trim() && !line.trimStart().startsWith('#'))
       .map(line => compactNativeMathLine(line)).join('\n')
   ).join('\n');
+  nativeHyperbolicSource = compactNativeMathIdentifiers(nativeHyperbolicSource);
   assert.ok(Buffer.byteLength(nativeHyperbolicSource, 'utf8') <= 128 * 1024,
     'Native hyperbolic browser source exceeds the production HTTP limit');
   await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
@@ -876,15 +894,13 @@ try {
   ];
   // Strip indentation in this brace-delimited Flow source bundle. The
   // 128-KiB production HTTP cap is intentional; whitespace is not syntax.
-  const nativeVariableSource = nativeVariableFiles.map(path =>
+  let nativeVariableSource = nativeVariableFiles.map(path =>
     readFileSync(path, 'utf8').split(/\r?\n/)
       .filter(line => !/^import \.math_(dimensions|expression_ir|expression_source|equation|static|dimension_triple|dimension_variable) \{/.test(line))
       .filter(line => line.trim() && !line.trimStart().startsWith('#'))
       .map(line => compactNativeMathLine(line, true)).join('\n')
-  ).join('\n')
-    .replaceAll(/\bsame_dimension\b/g, 'samedim')
-    .replaceAll(/\bsource_start\b/g, 'srcstart')
-    .replaceAll(/\boutput_dimension\b/g, 'outdim');
+  ).join('\n');
+  nativeVariableSource = compactNativeMathIdentifiers(nativeVariableSource);
   assert.ok(Buffer.byteLength(nativeVariableSource, 'utf8') < 128 * 1024);
   assert.match(nativeVariableSource, /system\.count =\s*16/);
   await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
@@ -907,12 +923,13 @@ try {
     'src/math_dimension_four.flow',
     'src/math_dimension_four_smoke.flow'
   ];
-  const nativeFourSource = nativeFourFiles.map(path =>
+  let nativeFourSource = nativeFourFiles.map(path =>
     readFileSync(path, 'utf8').split(/\r?\n/)
       .filter(line => !/^import \.math_(dimensions|expression_ir|expression_source|equation|static|dimension_four) \{/.test(line))
       .filter(line => line.trim() && !line.trimStart().startsWith('#'))
       .map(line => compactNativeMathLine(line, true)).join('\n')
   ).join('\n');
+  nativeFourSource = compactNativeMathIdentifiers(nativeFourSource);
   assert.ok(Buffer.byteLength(nativeFourSource, 'utf8') < 128 * 1024);
   assert.match(nativeFourSource, /function determinant4\(/);
   assert.match(nativeFourSource, /native-math-dimension-four-ok/);
@@ -939,7 +956,7 @@ try {
     'src/math_dimension_variable_four.flow',
     'src/math_dimension_variable_four_http_smoke.flow'
   ];
-  const nativeVariableFourSource = nativeVariableFourFiles.map(path =>
+  let nativeVariableFourSource = nativeVariableFourFiles.map(path =>
     readFileSync(path, 'utf8').split(/\r?\n/)
       .filter(line => !/^import \.math_(dimensions|expression_ir|expression_source|equation|static|dimension_four|dimension_variable_four) \{/.test(line))
       // Preserve all executable tokens and assertions. Flow blocks are
@@ -957,6 +974,7 @@ try {
     .replaceAll(/\bsource_start\b/g, 'srcstart')
     .replaceAll(/\bsource_error\b/g, 'srcerr')
     .replaceAll(/\bdimensionless\b/g, 'dimless');
+  nativeVariableFourSource = compactNativeMathIdentifiers(nativeVariableFourSource);
   assert.ok(Buffer.byteLength(nativeVariableFourSource, 'utf8') < 128 * 1024);
   assert.match(nativeVariableFourSource, /system\.count =\s*16/);
   assert.match(nativeVariableFourSource, /native-math-variable-four-constraints-ok/);

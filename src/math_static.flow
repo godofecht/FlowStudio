@@ -387,6 +387,51 @@ export function infer_math_ir(program: MathProgram) -> MathInferredType {
             depth = base + 1
             dimensions[base] = output_dimension
             predicates[base] = false
+        } elif opcode == 89 {
+            # Heterogeneous diffusion has seven same-unit field samples,
+            # six SI diffusivities (m²/s), and three spatial grid spacings.
+            if depth < 16 { return static_error(instruction.source_start) }
+            let base: i32 = depth - 16
+            let field_dimension: Dimension = dimensions[base]
+            let coefficient_dimension: Dimension = Dimension {
+                length: 2, mass: 0, time: -1, temperature: 0
+            }
+            let mut component: i32 = 0
+            while component < 7 {
+                let position: i32 = base + component
+                if predicates[position] or
+                   not same_dimension(dimensions[position], field_dimension) {
+                    return static_error(instruction.source_start)
+                }
+                component = component + 1
+            }
+            component = 0
+            while component < 6 {
+                let position: i32 = base + 7 + component
+                if predicates[position] or
+                   not same_dimension(dimensions[position], coefficient_dimension) {
+                    return static_error(instruction.source_start)
+                }
+                component = component + 1
+            }
+            component = 0
+            while component < 3 {
+                let position: i32 = base + 13 + component
+                if predicates[position] or
+                   not same_dimension(dimensions[position], length_dimension()) {
+                    return static_error(instruction.source_start)
+                }
+                component = component + 1
+            }
+            let output_dimension: Dimension = quotient_dimension(
+                quotient_dimension(product_dimension(field_dimension, coefficient_dimension),
+                    length_dimension()), length_dimension())
+            if not static_bounded_dimension(output_dimension) {
+                return static_error(instruction.source_start)
+            }
+            depth = base + 1
+            dimensions[base] = output_dimension
+            predicates[base] = false
         } elif opcode == 70 or opcode == 71 or opcode == 72 {
             let mut arity: i32 = 4
             if opcode == 71 { arity = 9 }

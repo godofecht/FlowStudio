@@ -59,6 +59,14 @@ class ConditionalBreakpointTests(unittest.TestCase):
         self.assertEqual(result["state"], "paused")
         self.assertEqual(session.command("continue")["state"], "done")
 
+    def test_scientific_notation_condition_is_valid_but_does_not_fire(self):
+        session, namespace, result = self.start(
+            "x = 1\ny = x + 1\n", [{"line": 2, "condition": "x>=1e9"}])
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["state"], "done")
+        self.assertEqual(namespace["y"], 2)
+        self.assertFalse(session.busy())
+
     def test_custom_comparison_is_never_invoked(self):
         source = ("class Hostile:\n"
                   "    def __ge__(self, other):\n"
@@ -89,7 +97,6 @@ class ConditionalBreakpointTests(unittest.TestCase):
             [{"line": 1, "condition": "__import__('os')"}],
             [{"line": 1, "condition": "x.__class__==3"}],
             [{"line": 1, "condition": "x==nan"}],
-            [{"line": 1, "condition": "x>=1e9"}],
             [{"line": 1, "condition": "x>=3", "extra": 1}],
             [{"line": 2, "condition": "x>=3"}],
             [{"line": 1, "condition": "x>=3" * 30}],

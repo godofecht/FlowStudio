@@ -79,7 +79,7 @@ class RuntimeValidationTest(unittest.TestCase):
 
     def test_both_backends_execute_deterministic_bounded_duration_override(self):
         for source, expected_steps, observable in (
-            (NAVIER, 5, "kinetic_energy"),
+            (NAVIER, 50, "kinetic_energy"),
             (HEAT, 50, "mean_temperature"),
         ):
             model = parse(source)
@@ -96,7 +96,7 @@ class RuntimeValidationTest(unittest.TestCase):
         import json
         import subprocess
         for example, expected_steps, observable in (
-            ("navier_stokes_smoke.flow", 5, "kinetic_energy"),
+            ("navier_stokes_smoke.flow", 50, "kinetic_energy"),
             ("heat_piecewise_forcing.flow", 50, "mean_temperature"),
         ):
             base = [sys.executable, str(ROOT / "src/math_flow.py"),
@@ -113,7 +113,7 @@ class RuntimeValidationTest(unittest.TestCase):
                 self.assertTrue(math.isfinite(result[observable]))
             for invalid in ("nan", "inf", "-inf", "-0.01", "0", "1e308"):
                 with self.subTest(example=example, duration=invalid):
-                    completed = subprocess.run(base + [invalid], capture_output=True,
+                    completed = subprocess.run(base[:-1] + [f"--until={invalid}"], capture_output=True,
                                                text=True, timeout=15, check=False)
                     self.assertEqual(completed.returncode, 2, completed.stderr)
                     failure = json.loads(completed.stderr)

@@ -1,17 +1,46 @@
-## 2026-11-02: complete 3D Dirichlet R/Python trajectory (qualification pending)
+## 2026-11-02: bounded R/Python plot capture over actual UTF-8 bytes (verified)
 
-The follow-on branch `test/dirichlet3-full-r-python-http-20261102` extends the
-existing 39 native Flow `fluxdiv3` HTTP assertions to all 25 heterogeneous
-3D Dirichlet evolution states (675 values) through persistent base R and
-independent exact-Fraction 27×27 CPython matrix execution over actual HTTP.
-It adds finite-frame/order checks, strict boundary mass and energy decay,
-128 KiB source and 24 KiB frame budgets, deliberate numerical corruption,
-truncation, HTTP 422 rejection and both interpreter recovery checks.
-Four isolated CPython tests passed locally against the deterministic seed
-fixture. Native Linux/macOS and real R HTTP remain **unverified** on this
-branch until exact-head CI completes. The native Flow compiler still executes
-scalar stencils, not a generated multidimensional `field` evolution solver;
-full RStudio parity remains incomplete.
+[PR #396](https://github.com/godofecht/FlowStudio/pull/396) merged as
+[3253dc1a](https://github.com/godofecht/FlowStudio/commit/3253dc1aba51c051eb7cfe5056642f31fc33618a).
+The production plot-capture reader now enforces the 20 MiB **encoded UTF-8
+byte** ceiling even when fetch exposes only `response.text()`. Previously,
+valid JSON containing non-ASCII text could pass the UTF-16 length check
+while exceeding the wire-byte budget. Oversized Content-Length and unfinished
+stream failures cancel the body/reader, with reader locks released.
+Deterministic regressions exercise accepted non-ASCII responses, oversized
+valid JSON, invalid chunks, invalid UTF-8, read errors, and the existing
+localhost streamed R/Python plot routes.
+
+**Passed:** [exact-head CI #41440537037](https://github.com/godofecht/FlowStudio/actions/runs/41440537037),
+**4/4** Ubuntu 24.04/macOS 15 source/native jobs, including production
+Flow/R/Python HTTP and actual Ubuntu Chromium. **Failed:** zero final
+exact-head jobs. **Skipped:** macOS physical Chromium and
+platform-inapplicable installation steps. **Unexecuted:** local native Flow/R
+and independent physical macOS Chromium. **Post-merge main CI:** not yet
+independently verified. No hosted CI configuration changed. This is a
+plot-transport correctness fix, not complete RStudio parity.
+
+## 2026-11-02: complete 3D Dirichlet R/Python trajectory (verified)
+
+[PR #393](https://github.com/godofecht/FlowStudio/pull/393) merged as
+[89a1bda9](https://github.com/godofecht/FlowStudio/commit/89a1bda9bcc993ce405300a87e2d96c5a4dba3f7).
+The production native Flow compiler executes 39 sampled heterogeneous
+3D Dirichlet `fluxdiv3` HTTP assertions; the same mandatory live HTTP gate
+runs all 25 heterogeneous 3D Dirichlet evolution states (675 cell values)
+through persistent base R and an independently assembled exact-Fraction
+27×27 CPython transition matrix. It checks ordered finite frames, strict
+boundary mass and energy decay, 128 KiB source and 24 KiB response limits,
+deliberate numerical corruption, truncation, HTTP 422 rejection and both
+interpreter recovery paths. [Reproduction](NATIVE_DIRICHLET_DIFFUSION3.md).
+
+**Passed:** [exact-head CI #41431288050](https://github.com/godofecht/FlowStudio/actions/runs/41431288050),
+all **4/4** Ubuntu 24.04/macOS 15 source/native jobs. **Failed:** zero
+final jobs. **Unexecuted:** local native Flow/R and independent physical
+macOS Chromium. **Post-merge main CI:** not independently verified for this
+specific merge. The native Flow compiler executes sampled scalar stencils;
+the complete trajectory is computed in R and checked by Python, **not**
+compiler-generated multidimensional `field` evolution. Full RStudio parity
+remains incomplete.
 
 ## 2026-11-02: complete 2D Neumann R/Python trajectory qualification (verified)
 
@@ -38,16 +67,22 @@ The complete trajectory is computed in R and verified in Python; this is
 not compiler-generated multidimensional Flow field lowering or RStudio parity.
 No hosted workflow configuration was changed.
 
-## 2026-11-02: heterogeneous 3D zero-Dirichlet qualification (pending)
+## 2026-11-02: heterogeneous 3D zero-Dirichlet qualification (verified)
 
-[PR #390](https://github.com/godofecht/FlowStudio/pull/390)
-adds an exact-Fraction 27-cell, 24-step zero-Dirichlet diffusion oracle
-with 54 internal and 54 external half-cell faces, independently assembled
-27×27 substochastic matrix, and 39 bounded native Flow `fluxdiv3` HTTP
-assertions. Seven local Python tests passed. The new production native HTTP
-gate and Linux/macOS CI remain **unverified** until exact-head jobs finish.
-[Reproduction](NATIVE_DIRICHLET_DIFFUSION3.md). No generalized field
-lowering or full RStudio parity is claimed.
+[PR #390](https://github.com/godofecht/FlowStudio/pull/390) merged as
+[1c1a28ff](https://github.com/godofecht/FlowStudio/commit/1c1a28ff46746a18a7b71fd40197166459cfe2a5).
+Its seed-20261102 exact-Fraction 27-cell, 24-step zero-Dirichlet
+diffusion oracle uses 54 internal and 54 exterior half-cell faces,
+an independently assembled 27×27 substochastic matrix, and 39 bounded
+native Flow `fluxdiv3` HTTP assertions. Seven local Python tests passed.
+[Reproduction](NATIVE_DIRICHLET_DIFFUSION3.md).
+
+**Passed:** [exact-head CI #41424199759](https://github.com/godofecht/FlowStudio/actions/runs/41424199759),
+**4/4** Ubuntu 24.04/macOS 15 source/native jobs. **Failed:** zero
+final jobs. **Unexecuted:** local native Flow/R and independent physical
+macOS Chromium. This verifies bounded scalar native stencils and an exact
+independent trajectory oracle, not general multidimensional field lowering
+or complete RStudio parity.
 
 ## 2026-11-02: exact 64-step heterogeneous diffusion and native HTTP probes (verified)
 

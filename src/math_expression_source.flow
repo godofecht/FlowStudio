@@ -348,6 +348,9 @@ function function_call_after_number(bytes: ptr<u8>, start: i32, length: i32) -> 
         identifier_matches(bytes, start, end, "product") or
         identifier_matches(bytes, start, end, "mean") or
         identifier_matches(bytes, start, end, "variance") or
+        identifier_matches(bytes, start, end, "sample_variance") or
+        identifier_matches(bytes, start, end, "sample_stddev") or
+        identifier_matches(bytes, start, end, "stddev") or
         identifier_matches(bytes, start, end, "rms") or
         identifier_matches(bytes, start, end, "median") or
         identifier_matches(bytes, start, end, "mad") or
@@ -397,7 +400,7 @@ function precedence(opcode: i32) -> i32 {
 # Fixed arities are positive; -2 denotes a bounded 1..8-argument reduction.
 # Commas are legal only inside recognized calls. All operands are eager.
 function function_arity(opcode: i32) -> i32 {
-    if opcode >= 73 and opcode <= 79 { return -2 }
+    if (opcode >= 73 and opcode <= 79) or (opcode >= 81 and opcode <= 83) { return -2 }
     if opcode == 80 { return -3 } # p followed by 1..7 observations
     if opcode == 20 or opcode == 21 or opcode == 25 or
        opcode == 26 or opcode == 27 or opcode == 28 or opcode == 29 or opcode == 30 or opcode == 31 or
@@ -901,6 +904,18 @@ export function parse_math_expression_with_bindings(source: string, bindings: Ma
                identifier_matches(bytes, index, index + 8, "variance") {
             unary_opcode = 76
             unary_width = 8
+        } elif index + 15 < length and bytes[index + 15] == 40 and
+               identifier_matches(bytes, index, index + 15, "sample_variance") {
+            unary_opcode = 81
+            unary_width = 15
+        } elif index + 13 < length and bytes[index + 13] == 40 and
+               identifier_matches(bytes, index, index + 13, "sample_stddev") {
+            unary_opcode = 82
+            unary_width = 13
+        } elif index + 6 < length and bytes[index + 6] == 40 and
+               identifier_matches(bytes, index, index + 6, "stddev") {
+            unary_opcode = 83
+            unary_width = 6
         } elif index + 3 < length and bytes[index + 3] == 40 and
                identifier_matches(bytes, index, index + 3, "rms") {
             unary_opcode = 77

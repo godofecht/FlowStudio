@@ -1,0 +1,36 @@
+# Compact production HTTP fixture for the actual native four-unknown SI solver.
+# The full twenty-case analytic suite remains in math_dimension_variable_four_smoke.flow.
+import .math_dimensions { Dimension, length_dimension, same_dimension }
+import .math_static { MathDimensionBindings, empty_math_dimension_bindings }
+import .math_dimension_four { MathFourDimensionSolution }
+import .math_dimension_variable_four { MathFourConstraintSystem, empty_math_four_constraint_system, solve_math_equations_variable_constraints_four_unknown_dimensions }
+
+function main() -> i32 {
+    let length: Dimension = length_dimension()
+    let known: MathDimensionBindings = empty_math_dimension_bindings()
+    let mut system: MathFourConstraintSystem = empty_math_four_constraint_system()
+    system.count = 16
+    system.equations[0] = "x*y*z*w = 1m*1m*1m*1m"
+    system.equations[1] = "x/y = 1"
+    system.equations[2] = "y/z = 1"
+    system.equations[3] = "z/w = 1"
+    let mut index: i32 = 4
+    while index < 16 {
+        system.equations[index] = "x+y = 2m"
+        index = index + 1
+    }
+    let mut result: MathFourDimensionSolution =
+        solve_math_equations_variable_constraints_four_unknown_dimensions(
+            system, known, "x", "y", "z", "w")
+    if not result.valid or result.failed_equation != -1 or
+       not same_dimension(result.first, length) or
+       not same_dimension(result.second, length) or
+       not same_dimension(result.third, length) or
+       not same_dimension(result.fourth, length) { return 1 }
+    system.equations[15] = "x+y = 2s"
+    result = solve_math_equations_variable_constraints_four_unknown_dimensions(
+        system, known, "x", "y", "z", "w")
+    if result.valid or result.failed_equation != 15 { return 2 }
+    println("native-math-variable-four-constraints-ok")
+    return 0
+}

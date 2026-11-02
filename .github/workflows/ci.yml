@@ -125,6 +125,8 @@ jobs:
           flow run src/math_variadic_reductions_smoke.flow
           flow run src/math_statistical_reductions_smoke.flow
           flow run src/math_robust_statistics_smoke.flow
+          flow run src/math_dispersion_smoke.flow
+          flow run src/math_dispersion_http_smoke.flow
           flow run src/math_finite_difference_smoke.flow
           flow run src/stats_smoke.flow
           flow run src/math_physical_ode_smoke.flow

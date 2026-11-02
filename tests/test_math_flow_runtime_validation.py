@@ -6,7 +6,8 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
-from math_flow import FlowMathError, parse, simulate, validated_grid
+from math_flow import (FlowMathError, parse, simulate, validated_grid,
+                       validated_pde_geometry, MAX_PDE_CELL_STEPS)
 
 NAVIER = (ROOT / "examples/navier_stokes_smoke.flow").read_text(encoding="utf-8")
 HEAT = (ROOT / "examples/heat_piecewise_forcing.flow").read_text(encoding="utf-8")
@@ -120,6 +121,62 @@ class RuntimeValidationTest(unittest.TestCase):
                     self.assertIs(failure["ok"], False)
                     self.assertRegex(failure["error"],
                                      "duration must be finite and positive|between 1 and 200000 steps")
+
+
+    def test_exact_cell_step_budget_boundary(self):
+        self.assertEqual(MAX_PDE_CELL_STEPS, 4_194_304)
+        self.assertEqual(validated_pde_geometry(1.0, 1.0, 512, 512, 16),
+                         (1 / 512, 1 / 512))
+        with self.assertRaisesRegex(FlowMathError, "cell-step budget"):
+            validated_pde_geometry(1.0, 1.0, 512, 512, 17)
+
+    def test_both_real_pde_backends_fail_closed_before_excessive_work(self):
+        for source in (NAVIER, HEAT):
+            model = parse(source)
+            with self.subTest(model=type(model).__name__):
+                with self.assertRaisesRegex(FlowMathError, "cell-step budget"):
+                    simulate(model, grid=512, until=0.005)
+
+    def test_both_real_pde_backends_reject_unresolvable_cell_geometry(self):
+        for source in (NAVIER, HEAT):
+            for axes in ("1e-300m × 1m", "1m × 1e-300m",
+                         "1e308m × 1m", "1m × 1e308m"):
+                with self.subTest(model="heat" if source == HEAT else "navier", axes=axes):
+                    altered = source.replace("extent     = 1m × 1m",
+                                             f"extent     = {axes}", 1)
+                    self.assertNotEqual(altered, source)
+                    model = parse(altered)
+                    with self.assertRaisesRegex(FlowMathError, "cell geometry"):
+                        simulate(model, grid=16, until=0.0001)
+
+    def test_production_cli_reports_structured_geometry_and_work_errors(self):
+        import json
+        import subprocess
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            for example, source in (("navier", NAVIER), ("heat", HEAT)):
+                altered = source.replace("extent     = 1m × 1m",
+                                         "extent     = 1e-300m × 1m", 1)
+                self.assertNotEqual(altered, source)
+                source_file = Path(directory) / f"{example}.flow"
+                source_file.write_text(altered, encoding="utf-8")
+                cases = (
+                    (source_file, "16", "0.0001", "cell geometry"),
+                    (ROOT / "examples" / ("navier_stokes_smoke.flow"
+                                          if example == "navier" else "heat_piecewise_forcing.flow"),
+                     "512", "0.005", "cell-step budget"),
+                )
+                for path, grid, until, expected in cases:
+                    with self.subTest(example=example, expected=expected):
+                        completed = subprocess.run(
+                            [sys.executable, str(ROOT / "src/math_flow.py"),
+                             str(path), "--grid", grid, "--until", until],
+                            capture_output=True, text=True, timeout=15, check=False)
+                        self.assertEqual(completed.returncode, 2, completed.stderr)
+                        self.assertEqual(completed.stdout, "")
+                        failure = json.loads(completed.stderr)
+                        self.assertIs(failure["ok"], False)
+                        self.assertIn(expected, failure["error"])
 
 
 if __name__ == "__main__":

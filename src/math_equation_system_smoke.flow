@@ -422,6 +422,30 @@ function main() -> i32 {
     result = evaluate_math_equation_system(system, tolerances)
     if result.valid { return 97 }
 
+    # Fullwidth grouping must survive system splitting, including line breaks,
+    # and mismatched UTF-8 delimiter families fail at original byte offsets.
+    system = parse_math_equation_system("（1m+2m）=3m;（2s+1s）=3s")
+    if not system.valid or system.count != 2 { return 98 }
+    tolerances.count = 2
+    tolerances.values[0] = quantity(0.0, length_dimension())
+    tolerances.values[1] = quantity(0.0, time_dimension())
+    result = evaluate_math_equation_system(system, tolerances)
+    if not result.valid or not result.satisfied { return 99 }
+    system = parse_math_equation_system("where（1==1，3m，4m）=3m;2s=2s")
+    if not system.valid or system.count != 2 { return 100 }
+    result = evaluate_math_equation_system(system, tolerances)
+    if not result.valid or not result.satisfied { return 101 }
+    system = parse_math_equation_system("（1m+\n2m）=3m;2s=2s")
+    if not system.valid or system.count != 2 { return 102 }
+    result = evaluate_math_equation_system(system, tolerances)
+    if not result.valid or not result.satisfied { return 103 }
+    system = parse_math_equation_system("（1m+2m) = 3m;2s=2s")
+    if system.valid or system.failed_at != 8 { return 104 }
+    system = parse_math_equation_system("(1m+2m）=3m")
+    if system.valid or system.failed_at != 6 { return 105 }
+    system = parse_math_equation_system("（1m+2m;）=3m")
+    if system.valid or system.failed_at != 8 { return 106 }
+
     println("native-math-equation-system-ok")
     return 0
 }

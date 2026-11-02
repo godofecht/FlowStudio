@@ -13,6 +13,11 @@ nonnegative face diffusivities must have SI dimension m²/s, and the three
 strictly positive spacings must have dimension m. The output dimension is
 the field dimension divided by time (K/s for temperature).
 
+For a diffusivity of 2 m²/s, write `(2*1m²/1s)` in the current native
+mathematical expression dialect. Its postfix `²` squares the preceding
+quantity, so `2m²` evaluates as `(2m)²` (4 m²), not 2 m². The fixtures
+explicitly multiply a scalar by `1m²` to preserve intended coefficients.
+
 Each axis uses the conservative flux difference
 `(k_plus*(u_plus-u_center)-k_minus*(u_center-u_minus))/h²`.
 Equal face coefficients on adjacent cells produce opposing fluxes, so the

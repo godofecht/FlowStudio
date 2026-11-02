@@ -31,13 +31,13 @@ test("real native field protocol parses exact species and cells", () => {
 
 test("native field and 2D grid stdout enforce exact UTF-8 byte limits", () => {
   const grid = ["FLOWSTUDIO_GRID_V1 3 3 1",
-    "T 0 1 2 3 4 5 6 7 8", "FLOWSTUDIO_GRID_END", ""].join("\\n");
+    "T 0 1 2 3 4 5 6 7 8", "FLOWSTUDIO_GRID_END", ""].join("\n");
   for (const payload of [good, grid]) {
     // Non-ASCII output makes the UTF-16 code-unit count smaller than
     // the transmitted UTF-8 byte count. Exercise the exact 128 KiB edge.
     const ascii = 131072 - Buffer.byteLength(payload, "utf8") - 2048 - 1;
     assert.ok(ascii > 0);
-    const atLimit = "é".repeat(1024) + "a".repeat(ascii) + "\\n" + payload;
+    const atLimit = "é".repeat(1024) + "a".repeat(ascii) + "\n" + payload;
     assert.equal(Buffer.byteLength(atLimit, "utf8"), 131072);
     assert.ok(atLimit.length < 131072);
     assert.ok(parse(atLimit));
@@ -50,7 +50,7 @@ test("native field and 2D grid stdout enforce exact UTF-8 byte limits", () => {
   // Ordinary Unicode stdout is not a plot, even when above the byte cap.
   assert.equal(parse("é".repeat(65537)), null);
   assert.equal(parse("é".repeat(65537) +
-    "\\nnot FLOWSTUDIO_GRID_V1 3 3 1\\n"), null);
+    "\nnot FLOWSTUDIO_GRID_V1 3 3 1\n"), null);
 });
 
 test("fail closed on malformed, spoofed, nonfinite and oversized field blocks", () => {

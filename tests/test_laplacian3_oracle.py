@@ -151,5 +151,22 @@ class ExactLaplacian3Oracle(unittest.TestCase):
         self.assertEqual(normal.count(marker), 1)
 
 
+    def test_seeded_axis_permutations_and_corruption(self) -> None:
+        cases = seeded_laplacian3_cases()
+        self.assertEqual(len(cases), 24)
+        self.assertEqual(len({expression for expression, _ in cases}), 24)
+        for index in range(0, 24, 2):
+            self.assertEqual(cases[index][1], cases[index + 1][1])
+        marker = 'println("native-math-finite-difference-ok")'
+        normal = inject_seeded_laplacian3_assertions(marker, start=0, stop=8)
+        broken = inject_seeded_laplacian3_assertions(
+            marker, start=0, stop=8, sabotage=True)
+        self.assertEqual(normal.count("evaluate_math_expression"), 8)
+        self.assertNotEqual(normal, broken)
+        self.assertEqual(normal.count(marker), 1)
+        with self.assertRaises(AssertionError):
+            inject_seeded_laplacian3_assertions(marker, start=0, stop=9)
+
+
 if __name__ == "__main__":
     unittest.main()

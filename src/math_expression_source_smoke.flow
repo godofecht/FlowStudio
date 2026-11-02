@@ -1620,6 +1620,46 @@ function main() -> i32 {
     if parse_math_expression("1＋＊2").valid { return 608 }
     if parse_math_expression("1－").valid { return 609 }
 
+    # Fullwidth grouping and comma variants are parsed, not preprocessed.
+    result = evaluate_math_expression("2（3＋4）")
+    if not result.valid or not near(result.result.value, 14.0) { return 610 }
+    result = evaluate_math_expression("（2m＋3m）（4s＋1s）")
+    if not result.valid or not near(result.result.value, 25.0) or
+       not same_dimension(result.result.dimension, product_dimension(length, time)) { return 611 }
+    result = evaluate_math_expression("min（2m，3m）")
+    if not result.valid or not near(result.result.value, 2.0) or
+       not same_dimension(result.result.dimension, length) { return 612 }
+    result = evaluate_math_expression("norm3（3m，4m，12m）")
+    if not result.valid or not near(result.result.value, 13.0) { return 613 }
+    result = evaluate_math_expression("sum（1m、2m，3m）")
+    if not result.valid or not near(result.result.value, 6.0) { return 614 }
+    result = evaluate_math_expression("2min（3m，4m）")
+    if not result.valid or not near(result.result.value, 6.0) { return 615 }
+    result = evaluate_math_expression("fd1（1m，5m，2s）")
+    if not result.valid or not near(result.result.value, 1.0) or
+       not same_dimension(result.result.dimension, speed) { return 616 }
+    result = evaluate_math_expression("abs（－3m）")
+    if not result.valid or not near(result.result.value, 3.0) { return 617 }
+    let wide_call: ParsedMathExpression = parse_math_expression("min（2m，3m）")
+    if not wide_call.valid or wide_call.program.count != 3 or
+       wide_call.program.instructions[2].opcode != 7 or
+       wide_call.program.instructions[2].source_start != 0 or
+       wide_call.program.instructions[2].source_end != 3 { return 618 }
+    let wide_group: ParsedMathExpression = parse_math_expression("2（3＋4）")
+    if not wide_group.valid or wide_group.program.count != 5 or
+       wide_group.program.instructions[4].opcode != 3 or
+       wide_group.program.instructions[4].source_start != 1 or
+       wide_group.program.instructions[4].source_end != 1 { return 619 }
+    if parse_math_expression("（2+3)").valid { return 620 }
+    if parse_math_expression("(2+3）").valid { return 621 }
+    if parse_math_expression("min（1，）").valid { return 622 }
+    if parse_math_expression("min（，2）").valid { return 623 }
+    if parse_math_expression("1，2").valid { return 624 }
+    if parse_math_expression("2（3+4").valid { return 625 }
+    result = evaluate_math_expression("min（1m，2s）")
+    if result.valid { return 626 }
+    if parse_math_expression("min（1、2，3）").valid { return 627 }
+
     println("native-math-source-ok")
     return 0
 }

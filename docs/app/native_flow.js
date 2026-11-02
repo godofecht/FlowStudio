@@ -5,6 +5,14 @@
 "use strict";
 const MAX_SOURCE_BYTES = 65536;
 const MAX_OUTPUT_BYTES = 131072;
+// Match CPython str.splitlines(): a final line separator does not create
+// an additional executable breakpoint line. CRLF counts as one separator.
+function pythonLineCount(source) {
+  if (!source) return 0;
+  const separators = /\r\n|[\n\r\v\f\u001c-\u001e\u0085\u2028\u2029]/;
+  const trailing = /(?:\r\n|[\n\r\v\f\u001c-\u001e\u0085\u2028\u2029])$/;
+  return source.split(separators).length - (trailing.test(source) ? 1 : 0);
+}
 function available(location = global.location) {
   return !!location && location.protocol === "http:" &&
     (location.hostname === "127.0.0.1" || location.hostname === "localhost") &&
@@ -120,7 +128,7 @@ async function debugPythonStart(source, breakpoints, pauseOnException = false) {
     throw new Error("Python debugger requires source and up to 64 valid breakpoint lines.");
   if (typeof pauseOnException !== "boolean")
     throw new Error("Pause on exception must be a boolean.");
-  const lineCount = source.split(/\r\n|\r|\n/).length;
+  const lineCount = pythonLineCount(source);
   const condition = /^[A-Za-z_][A-Za-z_0-9]*(?:==|!=|>=|<=|>|<)-?(?:(?:0|[1-9][0-9]*)(?:\.[0-9]+)?|\.[0-9]+)(?:[eE][+-]?[0-9]{1,4})?$/;
   const lines = breakpoints.map(point => {
     if (Number.isSafeInteger(point)) return point;

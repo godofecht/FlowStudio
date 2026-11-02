@@ -99,6 +99,20 @@ try {
   await page.waitForFunction(() =>
     document.getElementById('liveDebugOutput').textContent.includes('Python debugger: stopped'));
 
+  // A final newline is not a second executable Python line. Reject the
+  // phantom breakpoint in the real Chromium workspace before HTTP submission.
+  await page.evaluate(() => {
+    const source = document.getElementById('source');
+    source.value = 'terminal_line = 1\n';
+    source.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.locator('#liveDebugBreakpoints').fill('2');
+  await page.locator('#liveDebugStart').click();
+  await page.waitForFunction(() =>
+    document.getElementById('liveDebugOutput').textContent.includes('Breakpoint is outside source.'));
+  assert.match(await page.locator('#liveDebugOutput').innerText(),
+    /Native Python debugger error: Breakpoint is outside source/);
+
   // Actual native Chromium caret -> Flow HTTP -> persistent CPython one-shot
   // run-to-line. The target is executed, not emulated by editor navigation.
   await page.evaluate(() => {

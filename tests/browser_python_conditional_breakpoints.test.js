@@ -7,6 +7,21 @@ const native = require("../docs/app/native_flow.js");
 const paused = {state:"paused",ok:true,stack:[{line:2,function:"<module>",
   locals:{i:{type:"int",value:"3"}}}],output:"",message:""};
 
+test("browser source line accounting matches CPython splitlines including terminal separators", () => {
+  const fixtures = [
+    ["",0], ["x = 1",1], ["x = 1\n",1], ["x = 1\n\n",2],
+    ["x = 1\r\n",1], ["x = 1\r\nx = 2\r\n",2],
+    ["x = 1\r",1], ["x = 1\u2028",1], ["x = 1\u2028x = 2",2],
+    ["x = 1\v",1], ["x = 1\f",1], ["x = 1\u0085",1],
+    ["\n",1], ["\n\n",2], ["x = 1\r\n\n",2]
+  ];
+  for (const [source, expected] of fixtures)
+    assert.equal(panel.pythonLineCount(source), expected, JSON.stringify(source));
+  assert.throws(() => panel.parseBreakpoints("2", panel.pythonLineCount("x = 1\n")),
+    /outside source/);
+  assert.deepEqual(panel.parseBreakpoints("2", panel.pythonLineCount("x = 1\n\n")), [2]);
+});
+
 test("conditional breakpoint parser preserves plain lines and typed conditions", () => {
   assert.deepEqual(panel.parseBreakpoints("2?i>=3, 4 6?x<0.5", 6),
     [{line:2,condition:"i>=3"},4,{line:6,condition:"x<0.5"}]);
@@ -55,7 +70,14 @@ test("native debugger transmits conditions to the real Flow-owned route", async 
     ]) {
       await assert.rejects(native.debugPythonStart("i = 3\nprint(i)\n", invalid));
     }
-    assert.equal(calls.length, 2, "Invalid requests must not reach HTTP");
+    for (const source of ["x = 1\n", "x = 1\r\n", "x = 1\u2028"]) {
+      await assert.rejects(native.debugPythonStart(source, [2]),
+        /valid breakpoint lines/);
+    }
+    await native.debugPythonStart("x = 1\n\n", [2]);
+    assert.deepEqual(calls[2], {url:"/api/debug/python/start",
+      body:{source:"x = 1\n\n",breakpoints:[2]}, intent:"run"});
+    assert.equal(calls.length, 3, "Invalid requests must not reach HTTP");
   } finally {
     if (oldLocation === undefined) delete globalThis.location;
     else globalThis.location = oldLocation;

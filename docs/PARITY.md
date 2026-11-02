@@ -1,21 +1,38 @@
-## 2026-11-02: browser scientific breakpoint grammar parity (proposed)
+## 2026-11-02: browser/CPython breakpoint line-count parity (proposed)
 
-[Draft PR #406](https://github.com/godofecht/FlowStudio/pull/406)
-repairs a real frontend/backend mismatch left after #404: the native CPython
-kernel accepts bounded scientific-notation conditions, but both the browser
-breakpoint parser and the HTTP request validator rejected them before the
-request could reach the server. The native workspace now accepts
-`residual<=1e-3`, `delta>=-2.5E+3`, `epsilon>.5e-8` and finite
-subnormal literals, while rejecting malformed exponents, injection, and
-out-of-range exponent lengths. Checked-in Node tests assert the actual
-browser-to-HTTP request body. The production heat PDE/R/Python HTTP gate
-from #404 remains mandatory; hosted CI configuration is unchanged.
+The browser debugger previously counted an extra breakpoint line when Python
+source ended in a line separator, whereas the production CPython backend uses
+`str.splitlines()`. A breakpoint on that phantom line passed browser preflight
+but failed after reaching the real kernel. The proposed fix aligns both browser
+validation layers with CPython line counting, including CRLF, terminal blank
+lines, and Unicode line separators. Checked-in Node regressions assert 15
+line-count fixtures and that invalid terminal-line requests never reach HTTP;
+existing real Chromium/CPython scientific breakpoint acceptance stays mandatory.
 
-**Passed locally:** 10 independent lexical accept/reject checks in the
-connector runtime. **Unverified:** exact-head Node suite, production
-Flow/R/Python HTTP and physical Ubuntu Chromium for #406 until CI completes.
-**Unexecuted:** independent physical macOS Chromium and local native Flow/R.
-This is not general Flow multidimensional `field` lowering or RStudio parity.
+**Passed locally:** isolated Node and CPython line-count comparison for 13
+fixtures. **Unverified:** checked-in Node suite, exact-head Linux/macOS native
+HTTP and physical Chromium on this proposed revision. **Unexecuted:** local
+native Flow/R and independent macOS Chromium. No hosted CI changes.
+
+## 2026-11-02: browser scientific breakpoint grammar parity (verified)
+
+[PR #406](https://github.com/godofecht/FlowStudio/pull/406) merged as
+[4c0fdb16](https://github.com/godofecht/FlowStudio/commit/4c0fdb16aef1f6ba987e5888a0c4e95c31f3c812).
+It aligns both browser validators with the persistent CPython kernel's
+bounded scientific threshold syntax. Actual Chromium runs the native Flow
+HTTP server and pauses CPython at the first `residual<=1e-3` crossing,
+then stops the debugger. Existing heat PDE, R/Python spectral oracle,
+HTTP 422 rejection, interpreter recovery and resource gates remain mandatory.
+
+**Passed:** [exact-head CI #41485298109](https://github.com/godofecht/FlowStudio/actions/runs/41485298109),
+all **4/4** Ubuntu 24.04/macOS 15 source/native jobs. Ubuntu physical Chromium
+and both platforms' real Flow/R/Python HTTP passed. Ubuntu source reported
+**1,220 JavaScript passes (12 skipped)** and **558 Python tests run (13 skipped)**.
+**Failed:** zero final exact-head jobs. **Unexecuted:** local native Flow/R
+and independent physical macOS Chromium. **Post-merge main CI:**
+[run #41494149440](https://github.com/godofecht/FlowStudio/actions/runs/41494149440)
+was in progress when inspected, not counted as passed. Full RStudio parity and
+generalized multidimensional `field` lowering remain incomplete.
 
 ## 2026-11-02: scientific CPython breakpoint and heat PDE R/Python parity (verified)
 

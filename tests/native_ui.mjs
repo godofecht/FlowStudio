@@ -306,6 +306,26 @@ try {
       assert.equal(response.status(), 200);
       assert.equal(await notebookPage.evaluate(() =>
         globalThis.FlowStudioNativeFlow?.available?.() === true), true);
+      // Physical Chromium loads notebook_recovery.js before notebook_format.js.
+      // Exercise the actual served modules with a rich Jupyter output snapshot;
+      // no interpreter response or persistence API is mocked.
+      const richRecovery = await notebookPage.evaluate(() => {
+        const source = "# %% [python]\\nprint('figure')".replaceAll("\\n", "\n");
+        const entry = {index:0,kind:"code",language:"python",ok:true,
+          output:"before\\nfigure",truncated:false,plots:[],
+          jupyterOutputs:[
+            {output_type:"stream",name:"stdout",text:"before\\n"},
+            {output_type:"display_data",metadata:{},data:{"text/plain":"figure"}}
+          ]};
+        const saved = FlowStudioNotebookRecovery.save(localStorage, source, "python", [entry]);
+        const restored = FlowStudioNotebookRecovery.read(localStorage, source, "python");
+        FlowStudioNotebookRecovery.clear(localStorage);
+        return {saved, count:restored?.[0]?.jupyterOutputs?.length ?? 0,
+          language:restored?.[0]?.language ?? null,
+          text:restored?.[0]?.jupyterOutputs?.[1]?.data?.["text/plain"] ?? null};
+      });
+      assert.deepEqual(richRecovery,
+        {saved:true, count:2, language:"python", text:"figure"});
       // Physical Chromium regression on the served production notebook UI:
       // delay only File.text() completion; all decoding and DOM mutation use
       // the real controller. No interpreter or HTTP responses are mocked.

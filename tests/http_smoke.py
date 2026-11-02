@@ -75,7 +75,7 @@ def compact_native_math_line(line: str, *, tighten_equals: bool = False,
     return "".join(result).rstrip()
 
 
-def compact_native_math_identifiers(source: str) -> str:
+def compact_native_math_identifiers(source: str,\n                                    extra_aliases: dict[str, str] | None = None) -> str:
     """Shorten only internal Flow identifiers, never quoted source literals.
 
     The production 128 KiB transport limit remains enforced. Every module
@@ -99,7 +99,7 @@ def compact_native_math_identifiers(source: str) -> str:
         "input_dimension": "indim",
     }
 
-    def rewrite(match: re.Match[str]) -> str:
+    if extra_aliases:\n        aliases.update(extra_aliases)\n\n    def rewrite(match: re.Match[str]) -> str:
         token = match.group(0)
         return token if token.startswith('"') else aliases.get(token, token)
 
@@ -1159,7 +1159,17 @@ def main() -> None:
                        ("source_start", "srcstart"),
                        ("output_dimension", "outdim")):
         native_overdetermined = re.sub(r"\b" + old + r"\b", short, native_overdetermined)
-    native_overdetermined = compact_native_math_identifiers(native_overdetermined)
+    # The full three-unknown solver must remain below the real 128 KiB HTTP
+    # ceiling as the mathematical parser grows. Shorten internal identifiers
+    # lexically, never string literals, rather than dropping any constraints.
+    native_overdetermined = compact_native_math_identifiers(
+        native_overdetermined, {
+            "dimensionless": "dless",
+            "CheckedQuantity": "ChkQ",
+            "MathInferredType": "MInf",
+            "MathDimensionBindings": "MDB",
+            "static_bounded_dimension": "sbdim",
+        })
     assert "function solve_math_equations_four_constraints_three_unknown_dimensions(" in native_overdetermined
     assert len(native_overdetermined.encode("utf-8")) < 128 * 1024
     status, body = request("POST", "/api/check/flow", native_overdetermined, accepted_headers)

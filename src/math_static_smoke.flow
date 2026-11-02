@@ -355,6 +355,17 @@ function main() -> i32 {
     inferred = infer_math_equation_source("mod(7m,3m) = 1m")
     if not inferred.valid or not same_dimension(inferred.dimension, metres) { return 115 }
 
+    # Short Unicode arrows share static predicate typing with ⇒ and ⇔.
+    inferred = infer_math_expression_source("true → false")
+    if not inferred.valid or not inferred.is_predicate or
+       not same_dimension(inferred.dimension, dimensionless()) { return 116 }
+    inferred = infer_math_expression_source("2m<3m ↔ 1s>2s")
+    if not inferred.valid or not inferred.is_predicate { return 117 }
+    inferred = infer_math_expression_source("2m → true")
+    if inferred.valid or inferred.failed_at != 3 { return 118 }
+    inferred = infer_math_expression_source("true ↔ 2s")
+    if inferred.valid or inferred.failed_at != 5 { return 119 }
+
     println("native-math-static-ok")
     return 0
 }

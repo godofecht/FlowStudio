@@ -38,6 +38,9 @@ class NativeGateTest(unittest.TestCase):
         (self.root / "tests/http_trigonometry_smoke.py").write_text("pass\n")
         (self.root / "tests/http_determinant_smoke.py").write_text("pass\n")
         (self.root / "tests/http_variadic_reductions_smoke.py").write_text("pass\n")
+        (self.root / "tests/http_robust_statistics_smoke.py").write_text("pass\n")
+        (self.root / "tests/http_quantile_smoke.py").write_text("pass\n")
+        (self.root / "tests/http_finite_difference_smoke.py").write_text("pass\n")
         (self.root / "tests/http_dispersion_smoke.py").write_text("pass\n")
 
     def test_real_loopback_health_probe_rejects_wrong_body(self):

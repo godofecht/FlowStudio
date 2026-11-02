@@ -1,4 +1,36 @@
-## 2026-11-02: native 3D Laplacian and Flow/R/Python interoperability (qualification pending)
+## 2026-11-02: mixed Flow/R/Python notebook recovery and rich Jupyter browser reload (verified)
+
+[PR #370](https://github.com/godofecht/FlowStudio/pull/370) merged as
+[08251e47](https://github.com/godofecht/FlowStudio/commit/08251e47559010c6ec834fecb97c0606fd8d7751).
+The production browser loaded `notebook_recovery.js` before
+`notebook_format.js`; eager validator capture was null and rich imported
+Jupyter output snapshots could not be saved for browser recovery, even though
+Node tests passed. Recovery now resolves the validator lazily and binds
+every result to an actual nonempty code cell of the exact percent-cell source,
+validating and preserving explicit Flow/R/Python language identity. Markdown,
+empty, absent and mismatched-language results fail closed. Jupyter MIME
+records remain inert and are forbidden on Flow cells. Existing valid v1
+recovery records remain readable. Deterministic seed-20261102 exercises
+64 mixed-language cells, source drift and the 1 MiB storage ceiling; a separate
+VM regression executes the real browser script order. Actual served Chromium
+saves a rich Jupyter stream/display snapshot, reloads the entire page and
+recovers both MIME records without re-executing an interpreter. The existing
+real Flow/R/Python numerical, PDE, notebook, plotting and HTTP gates remain
+mandatory.
+
+**Passed:** [exact-head CI #41370886676](https://github.com/godofecht/FlowStudio/actions/runs/41370886676),
+all **4/4** Ubuntu 24.04/macOS 15 source/native jobs, including actual
+Ubuntu physical Chromium, native Flow compiler, real R/Python HTTP and
+R/C FlowJIT. Each source platform passed **1,204 JavaScript tests**
+(**12 skipped**) and ran **498 Python tests** (**13 skipped**).
+**Failed:** zero final exact-head jobs. **Skipped:** 12 JS, 13 Python and
+platform-inapplicable optional steps. **Unexecuted:** local native Flow/R
+and independent physical macOS Chromium. **Post-merge main CI:** not yet
+independently verified. No hosted CI workflow configuration was changed.
+This fixes notebook persistence correctness, not compiler-generated
+multidimensional `field` lowering or complete RStudio parity.
+
+## 2026-11-02: native 3D Laplacian and Flow/R/Python interoperability (verified)
 
 [PR #368](https://github.com/godofecht/FlowStudio/pull/368) merged as
 [2a5457f1](https://github.com/godofecht/FlowStudio/commit/2a5457f10fc09ead8d7c7c34d03734331f5b9118).
@@ -15,9 +47,14 @@ samples, exact 4:1 refinement, malformed spacing, 128 KiB/24 KiB limits,
 numerical corruption, truncated frames, HTTP 422 and recovery.
 [Reproduction](NATIVE_LAPLACIAN3_INTEROP.md).
 
-**PR #369 status:** exact-head Linux/macOS CI and native Flow/R/Python/Chromium
-acceptance are pending; no passing result is claimed for this PR yet.
+**Passed:** [PR #369](https://github.com/godofecht/FlowStudio/pull/369)
+merged as [fdcc1874](https://github.com/godofecht/FlowStudio/commit/fdcc1874a0e5a79b3ba08ca4725d40e46604e239)
+after [exact-head CI #41369528219](https://github.com/godofecht/FlowStudio/actions/runs/41369528219)
+passed **4/4** Ubuntu 24.04/macOS 15 source and native jobs. Both
+production Flow/R/Python HTTP and actual Ubuntu Chromium acceptance passed.
+**Failed:** zero final jobs. **Skipped:** optional/platform-inapplicable steps.
 **Unexecuted:** local native Flow/R and independent physical macOS Chromium.
+**Post-merge:** not independently verified.
 This remains bounded scalar stencil execution, not compiler-generated
 heterogeneous multidimensional `field` lowering or full RStudio parity.
 

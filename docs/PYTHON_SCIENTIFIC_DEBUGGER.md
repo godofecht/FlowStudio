@@ -80,9 +80,11 @@ as mandatory in `scripts/verify_native.py` on both Linux and macOS.
 The spectral source and oracle are checked in together in
 `tests/debugger_scientific_fixture.py`.
 
-**Qualification status:** local isolated numerical and grammar checks
-must not be confused with the complete repository tests, live native
-Flow/R/Python HTTP or physical browser. Those require exact-head CI and
-independent verification. This change improves scientific debugging and
-R/Python parity, not generalized compiler-generated multidimensional
-`field` lowering or full RStudio parity.
+**Qualification status:** [PR #404 exact-head CI](https://github.com/godofecht/FlowStudio/actions/runs/41479789394)
+passed all four Linux/macOS source/native jobs, including the production
+heat PDE/R/Python HTTP oracle and Ubuntu physical Chromium. The additional
+browser scientific-notation regression in PR #406 remains **unverified**
+until its own exact-head CI completes. Local native Flow/R and independent
+physical macOS Chromium remain unexecuted. These improvements are not
+generalized compiler-generated multidimensional `field` lowering or full
+RStudio parity.

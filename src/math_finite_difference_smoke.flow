@@ -102,7 +102,11 @@ function main() -> i32 {
     let rate: Dimension = quotient_dimension(temperature_dimension(), time_dimension())
     result = evaluate_math_expression("diffusion3(0K,1K,1K,8K,8K,27K,27K,(2*1m²/1s),(2*1m²/1s),(2*1m²/1s),(2*1m²/1s),(2*1m²/1s),(2*1m²/1s),1m,2m,3m)")
     if not result.valid { return 35 }
-    if not near(result.result.value,24.0) { return 48 }
+    if not near(result.result.value,24.0) {
+        print("diffusion3 homogeneous expected 24, got ")
+        println(result.result.value)
+        return 48
+    }
     if not same_dimension(result.result.dimension,rate) { return 49 }
     result = evaluate_math_expression("diffusion3(0K,1K,2K,3K,4K,5K,6K,(1*1m²/1s),(2*1m²/1s),(3*1m²/1s),(4*1m²/1s),(5*1m²/1s),(6*1m²/1s),1m,2m,4m)")
     if not result.valid or not near(result.result.value,15.0625) { return 36 }

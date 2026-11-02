@@ -57,14 +57,34 @@ npm test
 python3 -m unittest discover -s tests -p 'test_*.py'
 ```
 
+The browser breakpoint parser and the browser HTTP request validator
+must both accept the kernel's bounded scientific grammar. To reproduce the
+native-workspace regression from [PR #406](https://github.com/godofecht/FlowStudio/pull/406):
+
+```sh
+node --test tests/browser_python_conditional_breakpoints.test.js
+```
+
+The Node test verifies exponent signs, leading-dot mantissas, subnormal
+literals, malformed exponent and expression rejection, and the request body
+sent to `/api/debug/python/start`. Its fetch stub checks only transport
+construction. Separately, the existing mandatory `tests/native_ui.mjs`
+uses actual Chromium, the real Flow-owned HTTP server, and persistent CPython
+to pause on `4?residual<=1e-3` at the analytically predicted first crossing
+(iteration 2 for a geometric 0.5 initial residual). It then stops the real
+debugger before the next browser acceptance. Neither browser test substitutes
+for the full 65-cell heat PDE/R/Python HTTP oracle below.
+
 The HTTP test is `tests/http_debugger_scientific_smoke.py`, registered
 as mandatory in `scripts/verify_native.py` on both Linux and macOS.
 The spectral source and oracle are checked in together in
 `tests/debugger_scientific_fixture.py`.
 
-**Qualification status:** local isolated numerical and grammar checks
-must not be confused with the complete repository tests, live native
-Flow/R/Python HTTP or physical browser. Those require exact-head CI and
-independent verification. This change improves scientific debugging and
-R/Python parity, not generalized compiler-generated multidimensional
-`field` lowering or full RStudio parity.
+**Qualification status:** [PR #404 exact-head CI](https://github.com/godofecht/FlowStudio/actions/runs/41479789394)
+passed all four Linux/macOS source/native jobs, including the production
+heat PDE/R/Python HTTP oracle and Ubuntu physical Chromium. The additional
+browser scientific-notation regression in PR #406 remains **unverified**
+until its own exact-head CI completes. Local native Flow/R and independent
+physical macOS Chromium remain unexecuted. These improvements are not
+generalized compiler-generated multidimensional `field` lowering or full
+RStudio parity.

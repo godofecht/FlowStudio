@@ -121,7 +121,7 @@ async function debugPythonStart(source, breakpoints, pauseOnException = false) {
   if (typeof pauseOnException !== "boolean")
     throw new Error("Pause on exception must be a boolean.");
   const lineCount = source.split(/\r\n|\r|\n/).length;
-  const condition = /^[A-Za-z_][A-Za-z_0-9]*(?:==|!=|>=|<=|>|<)-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$/;
+  const condition = /^[A-Za-z_][A-Za-z_0-9]*(?:==|!=|>=|<=|>|<)-?(?:(?:0|[1-9][0-9]*)(?:\.[0-9]+)?|\.[0-9]+)(?:[eE][+-]?[0-9]{1,4})?$/;
   const lines = breakpoints.map(point => {
     if (Number.isSafeInteger(point)) return point;
     if (!point || typeof point !== "object" || Array.isArray(point) ||

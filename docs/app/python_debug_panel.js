@@ -40,7 +40,7 @@ function parseBreakpoints(input, lineCount) {
   const points = tokens.map(token => {
     // Syntax: line or line?numericLocalComparison, e.g. 4?counter>=3.
     // No expression evaluation in the browser or native interpreter.
-    const match = /^([1-9][0-9]*)(?:\?([A-Za-z_][A-Za-z_0-9]*(?:==|!=|>=|<=|>|<)-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?))?$/.exec(token);
+    const match = /^([1-9][0-9]*)(?:\?([A-Za-z_][A-Za-z_0-9]*(?:==|!=|>=|<=|>|<)-?(?:(?:0|[1-9][0-9]*)(?:\.[0-9]+)?|\.[0-9]+)(?:[eE][+-]?[0-9]{1,4})?))?$/.exec(token);
     if (!match) throw Error("Use line or line?name>=number (no spaces).");
     const line = Number(match[1]);
     if (!Number.isSafeInteger(line) || line > lineCount) throw Error("Breakpoint is outside source.");

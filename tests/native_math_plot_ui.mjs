@@ -48,7 +48,11 @@ function compactNativeMathIdentifiers(source) {
     field_dimension: 'fdim', coefficient_scale: 'kscale',
     field_scale: 'fscale', MathInstruction: 'MInstr',
     ParsedMathExpression: 'PMExpr', MathBindings: 'MBinds',
-    MathInferredType: 'MIType', MathDimensionBindings: 'MDBind'
+    MathInferredType: 'MIType', MathDimensionBindings: 'MDBind',
+    // Keep the combined Unicode parser and full SI solver below the
+    // production HTTP byte cap; only rename unquoted internal tokens.
+    instruction: 'insn', math_open_width: 'mopw',
+    unary_width: 'uwid', component: 'cmpn', temperature: 'tempv'
   };
   return source.replace(/"(?:\\.|[^"\\])*"|[A-Za-z_][A-Za-z0-9_]*/g,
     token => token.startsWith('"') ? token : (aliases[token] || token));
@@ -881,7 +885,7 @@ try {
         !line.startsWith('import .math_equation {') &&
         !line.startsWith('import .math_static {'))
       .filter(line => line.trim() && !line.trimStart().startsWith('#'))
-      .map(line => compactNativeMathLine(line)).join('\n')
+      .map(line => compactNativeMathLine(line, false, true)).join('\n')
   ).join('\n');
   nativeHyperbolicSource = compactNativeMathIdentifiers(nativeHyperbolicSource);
   assert.ok(Buffer.byteLength(nativeHyperbolicSource, 'utf8') <= 128 * 1024,

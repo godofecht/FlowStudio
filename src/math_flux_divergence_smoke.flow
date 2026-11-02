@@ -1,0 +1,76 @@
+# Executable native SI-aware conservative flux divergence; no field AST implied.
+# flow run src/math_flux_divergence_smoke.flow
+import .math_dimensions { Dimension, temperature_dimension, length_dimension, quotient_dimension, same_dimension }
+import .math_expression_ir { MathResult }
+import .math_expression_source { ParsedMathExpression, parse_math_expression, evaluate_math_expression }
+import .math_static { MathInferredType, infer_math_expression_source, infer_math_equation_source }
+
+function near(actual: f64, expected: f64) -> bool {
+    let mut delta: f64 = actual - expected
+    if delta < 0.0 { delta = -delta }
+    return delta < 0.000000001
+}
+
+function main() -> i32 {
+    let expected: Dimension = quotient_dimension(temperature_dimension(), length_dimension())
+    let mut result: MathResult = evaluate_math_expression("fluxdiv1(1K,5K,2m)")
+    if not result.valid or not near(result.result.value,2.0) or
+       not same_dimension(result.result.dimension,expected) { return 1 }
+    result = evaluate_math_expression("fluxdiv2(1K,5K,2K,8K,2m,3m)")
+    if not result.valid or not near(result.result.value,4.0) or
+       not same_dimension(result.result.dimension,expected) { return 2 }
+    result = evaluate_math_expression("fluxdiv3(1K,5K,2K,8K,3K,9K,2m,3m,3m)")
+    if not result.valid or not near(result.result.value,6.0) or
+       not same_dimension(result.result.dimension,expected) { return 3 }
+    result = evaluate_math_expression("fluxdiv2(5K,1K,8K,2K,2m,3m)")
+    if not result.valid or not near(result.result.value,-4.0) { return 4 }
+    result = evaluate_math_expression("fluxdiv3(7K,7K,7K,7K,7K,7K,1m,2m,3m)")
+    if not result.valid or result.result.value != 0.0 { return 5 }
+    result = evaluate_math_expression("fluxdiv1(1K,5K,2m)+fluxdiv2(1K,5K,2K,8K,2m,3m)")
+    if not result.valid or not near(result.result.value,6.0) { return 6 }
+    result = evaluate_math_expression("fluxdiv1(1K,5K,0m)")
+    if result.valid or result.failed_at != 0 { return 7 }
+    result = evaluate_math_expression("fluxdiv2(1K,5K,2K,8K,-2m,3m)")
+    if result.valid or result.failed_at != 0 { return 8 }
+    result = evaluate_math_expression("fluxdiv3(1K,5K,2K,8K,3K,9K,2m,3m,0m)")
+    if result.valid or result.failed_at != 0 { return 9 }
+    result = evaluate_math_expression("fluxdiv1(1K,5s,2m)")
+    if result.valid or result.failed_at != 0 { return 10 }
+    result = evaluate_math_expression("fluxdiv2(1K,5K,2K,8s,2m,3m)")
+    if result.valid or result.failed_at != 0 { return 11 }
+    result = evaluate_math_expression("fluxdiv3(1K,5K,2K,8K,3K,9K,2m,3m,3s)")
+    if result.valid or result.failed_at != 0 { return 12 }
+    result = evaluate_math_expression("fluxdiv1(true,5K,2m)")
+    if result.valid or result.failed_at != 0 { return 13 }
+    if parse_math_expression("fluxdiv1(1K,5K)").valid { return 14 }
+    if parse_math_expression("fluxdiv2(1K,5K,2K,8K,2m)").valid { return 15 }
+    if parse_math_expression("fluxdiv3(1K,5K,2K,8K,3K,9K,2m,3m)").valid { return 16 }
+    if parse_math_expression("fluxdiv1(1K,5K,2m,3m)").valid { return 17 }
+    let mut parsed: ParsedMathExpression = parse_math_expression("fluxdiv1(1K,5K,2m)")
+    if not parsed.valid or parsed.program.instructions[parsed.program.count-1].opcode != 94 or
+       parsed.program.instructions[parsed.program.count-1].source_start != 0 or
+       parsed.program.instructions[parsed.program.count-1].source_end != 8 { return 18 }
+    parsed = parse_math_expression("fluxdiv2(1K,5K,2K,8K,2m,3m)")
+    if not parsed.valid or parsed.program.instructions[parsed.program.count-1].opcode != 95 { return 19 }
+    parsed = parse_math_expression("fluxdiv3(1K,5K,2K,8K,3K,9K,2m,3m,3m)")
+    if not parsed.valid or parsed.program.instructions[parsed.program.count-1].opcode != 96 { return 20 }
+    let mut inferred: MathInferredType = infer_math_expression_source("fluxdiv1(1K,5K,2m)")
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension,expected) { return 21 }
+    inferred = infer_math_expression_source("fluxdiv2(1K,5K,2K,8K,2m,3m)")
+    if not inferred.valid or not same_dimension(inferred.dimension,expected) { return 22 }
+    inferred = infer_math_expression_source("fluxdiv3(1K,5K,2K,8K,3K,9K,2m,3m,3m)")
+    if not inferred.valid or not same_dimension(inferred.dimension,expected) { return 23 }
+    inferred = infer_math_expression_source("fluxdiv1(1K,5K,0m)")
+    if not inferred.valid { return 24 }
+    inferred = infer_math_expression_source("fluxdiv1(1K,5K,2s)")
+    if inferred.valid or inferred.failed_at != 0 { return 25 }
+    inferred = infer_math_expression_source("fluxdiv3(1K,5K,2K,8K,3s,9K,2m,3m,3m)")
+    if inferred.valid or inferred.failed_at != 0 { return 26 }
+    inferred = infer_math_equation_source("fluxdiv2(1K,5K,2K,8K,2m,3m) = 4K/1m")
+    if not inferred.valid or not same_dimension(inferred.dimension,expected) { return 27 }
+    inferred = infer_math_equation_source("fluxdiv1(1K,5K,2m) = 2K")
+    if inferred.valid { return 28 }
+    println("native-math-flux-divergence-ok")
+    return 0
+}

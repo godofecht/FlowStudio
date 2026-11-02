@@ -100,6 +100,8 @@ def inject_robust_assertions(source: str, *, start: int, stop: int,
                 '{ return 93 }'
             )
     expanded = source.replace(marker, "\n".join(statements) + "\n" + marker, 1)
+    from http_smoke import compact_native_math_identifiers
+    expanded = compact_native_math_identifiers(expanded)
     if len(expanded.encode("utf-8")) > MAX_SOURCE_BYTES:
         raise ValueError("robust-statistics source exceeds production 128 KiB budget")
     return expanded

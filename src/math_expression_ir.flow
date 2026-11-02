@@ -50,6 +50,7 @@
 #             conservative 1D heterogeneous face-flux divergence; k in m²/s.
 #          92 fd3(f--, f-, f+, f++, step): centered third derivative.
 #          93 fd4(f--, f-, f0, f+, f++, step): centered fourth derivative.
+#          94-96 fluxdiv1/2/3: conservative face-flux divergence, 1-3 axes.
 #          The instruction exponent stores the actual variadic arity.
 #          Every permutation product must have the same SI dimension.
 # Predicate values are dimensionless 0/1 with a separate runtime type bit.
@@ -1387,6 +1388,58 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
                     axis = axis + 1
                 }
                 output_value = (total * coefficient_scale) * field_scale
+            }
+            if not bounded_value(output_value) { return failed(instruction.source_start) }
+            depth = base + 1
+            stack[base] = quantity(output_value, output_dimension)
+            predicate[base] = false
+        } elif opcode >= 94 and opcode <= 96 {
+            # Divergence of paired outward-oriented Cartesian face fluxes.
+            # Inputs: (left,right[,down,up[,back,front]], dx[,dy[,dz]]).
+            # No assumption of diffusivity, boundary conditions or PDE solver.
+            let axes: i32 = opcode - 93
+            let fluxes: i32 = axes * 2
+            let arity: i32 = axes * 3
+            if depth < arity { return failed(instruction.source_start) }
+            let base: i32 = depth - arity
+            let flux_dimension: Dimension = stack[base].dimension
+            let mut scale: f64 = 0.0
+            let mut component: i32 = 0
+            while component < fluxes {
+                let position: i32 = base + component
+                let flux: Quantity = stack[position]
+                if predicate[position] or not same_dimension(flux.dimension, flux_dimension) or
+                   not bounded_value(flux.value) {
+                    return failed(instruction.source_start)
+                }
+                let absolute: f64 = magnitude(flux.value)
+                if absolute > scale { scale = absolute }
+                component = component + 1
+            }
+            component = 0
+            while component < axes {
+                let position: i32 = base + fluxes + component
+                let spacing: Quantity = stack[position]
+                if predicate[position] or not same_dimension(spacing.dimension, length_dimension()) or
+                   not bounded_value(spacing.value) or spacing.value <= 0.0 {
+                    return failed(instruction.source_start)
+                }
+                component = component + 1
+            }
+            let output_dimension: Dimension = quotient_dimension(flux_dimension, length_dimension())
+            if not bounded_dimension(output_dimension) { return failed(instruction.source_start) }
+            let mut output_value: f64 = 0.0
+            if scale > 0.0 {
+                let mut normalized: f64 = 0.0
+                component = 0
+                while component < axes {
+                    let left: f64 = stack[base + 2 * component].value / scale
+                    let right: f64 = stack[base + 2 * component + 1].value / scale
+                    let spacing: f64 = stack[base + fluxes + component].value
+                    normalized = normalized + (right - left) / spacing
+                    component = component + 1
+                }
+                output_value = normalized * scale
             }
             if not bounded_value(output_value) { return failed(instruction.source_start) }
             depth = base + 1

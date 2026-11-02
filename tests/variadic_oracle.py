@@ -114,6 +114,8 @@ def inject_variadic_assertions(source: str, sabotage: bool = False,
                 '{ return 74 }'
             )
     expanded = source.replace(marker, "\n".join(statements) + "\n" + marker, 1)
+    from http_smoke import compact_native_math_identifiers
+    expanded = compact_native_math_identifiers(expanded)
     if len(expanded.encode("utf-8")) > MAX_SOURCE_BYTES:
         raise ValueError("seeded variadic source exceeds production 128 KiB budget")
     return expanded

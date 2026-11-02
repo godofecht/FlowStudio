@@ -141,6 +141,8 @@ def inject_native_assertions(source: str, *, start: int, stop: int,
             '{ return 70 }'
         )
     expanded = source.replace(marker, "\n".join(statements) + "\n" + marker, 1)
+    from http_smoke import compact_native_math_identifiers
+    expanded = compact_native_math_identifiers(expanded)
     if len(expanded.encode("utf-8")) > 128 * 1024:
         raise ValueError("determinant HTTP source exceeds production 128 KiB limit")
     return expanded

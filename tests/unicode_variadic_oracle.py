@@ -129,6 +129,8 @@ def inject_unicode_variadic_assertions(source: str, sabotage: bool = False,
         'parse_math_expression("∏(1,2))").valid { return 87 }',
     ))
     expanded = source.replace(marker, "\n".join(statements) + "\n" + marker, 1)
+    from http_smoke import compact_native_math_identifiers
+    expanded = compact_native_math_identifiers(expanded)
     if len(expanded.encode("utf-8")) > MAX_SOURCE_BYTES:
         raise ValueError("Unicode variadic source exceeds production 128 KiB budget")
     return expanded

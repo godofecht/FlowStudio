@@ -6,15 +6,23 @@ import { readFileSync } from 'node:fs';
 
 // Compact executable Flow source without changing quoted strings. The native
 // HTTP endpoint enforces a 128 KiB source limit for Monaco Run as well.
-function compactNativeMathLine(line, tightenEquals = false) {
+function compactNativeMathLine(line, tightenEquals = false, tightenMathOps = false) {
   const source = line.trim().replace(/^export /, '');
   let result = '';
   let quoted = false;
   let escaped = false;
-  for (const char of source) {
+  for (let index = 0; index < source.length; index++) {
+    const char = source[index];
     if (!quoted && char === '#') break;
+    const next = source[index + 1] || '';
+    // Flow's lexer can absorb adjacent slash/star or paired comparison
+    // operators. Compact only safe +/= spacing outside quoted expressions.
+    const safeMathSpace = tightenMathOps &&
+      !(/[<>!=+\-]$/.test(result) && /^[=+]/.test(next)) &&
+      (/[=+]$/.test(result) || /^[=+]/.test(next));
     if (!quoted && /[ \t]/.test(char) &&
-        (/[,:]$/.test(result) || (tightenEquals && result.endsWith('=')))) continue;
+        (/[,:]$/.test(result) || (tightenEquals && result.endsWith('=')) ||
+         safeMathSpace)) continue;
     result += char;
     if (char === '"' && !escaped) quoted = !quoted;
     if (quoted && char === '\\' && !escaped) escaped = true;
@@ -836,7 +844,7 @@ try {
         !line.startsWith('import .math_equation {') &&
         !line.startsWith('import .math_static {'))
       .filter(line => line.trim() && !line.trimStart().startsWith('#'))
-      .map(line => compactNativeMathLine(line)).join('\n')
+      .map(line => compactNativeMathLine(line, false, true)).join('\n')
   ).join('\n');
   nativeTrigSource = compactNativeMathIdentifiers(nativeTrigSource);
   assert.ok(Buffer.byteLength(nativeTrigSource, 'utf8') <= 128 * 1024,
@@ -900,11 +908,11 @@ try {
     readFileSync(path, 'utf8').split(/\r?\n/)
       .filter(line => !/^import \.math_(dimensions|expression_ir|expression_source|equation|static|dimension_triple|dimension_variable) \{/.test(line))
       .filter(line => line.trim() && !line.trimStart().startsWith('#'))
-      .map(line => compactNativeMathLine(line, true)).join('\n')
+      .map(line => compactNativeMathLine(line, true, true)).join('\n')
   ).join('\n');
   nativeVariableSource = compactNativeMathIdentifiers(nativeVariableSource);
   assert.ok(Buffer.byteLength(nativeVariableSource, 'utf8') < 128 * 1024);
-  assert.match(nativeVariableSource, /system\.count =\s*16/);
+  assert.match(nativeVariableSource, /system\.count\s*=\s*16\b/);
   await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
     nativeVariableSource);
   await page.locator('#run').click();
@@ -929,7 +937,7 @@ try {
     readFileSync(path, 'utf8').split(/\r?\n/)
       .filter(line => !/^import \.math_(dimensions|expression_ir|expression_source|equation|static|dimension_four) \{/.test(line))
       .filter(line => line.trim() && !line.trimStart().startsWith('#'))
-      .map(line => compactNativeMathLine(line, true)).join('\n')
+      .map(line => compactNativeMathLine(line, true, true)).join('\n')
   ).join('\n');
   nativeFourSource = compactNativeMathIdentifiers(nativeFourSource);
   assert.ok(Buffer.byteLength(nativeFourSource, 'utf8') < 128 * 1024);
@@ -965,7 +973,7 @@ try {
       // brace-delimited, so one cosmetic indentation level can be removed
       // alongside comments/blank lines to respect the real 128 KiB limit.
       .filter(line => line.trim() && !line.trimStart().startsWith('#'))
-      .map(line => compactNativeMathLine(line, true)).join('\n')
+      .map(line => compactNativeMathLine(line, true, true)).join('\n')
   ).join('\n')
     // Alpha-rename internal identifiers consistently in this self-contained
     // executable bundle; preserve every solver statement and assertion.
@@ -978,7 +986,7 @@ try {
     .replaceAll(/\bdimensionless\b/g, 'dimless');
   nativeVariableFourSource = compactNativeMathIdentifiers(nativeVariableFourSource);
   assert.ok(Buffer.byteLength(nativeVariableFourSource, 'utf8') < 128 * 1024);
-  assert.match(nativeVariableFourSource, /system\.count =\s*16/);
+  assert.match(nativeVariableFourSource, /system\.count\s*=\s*16\b/);
   assert.match(nativeVariableFourSource, /native-math-variable-four-constraints-ok/);
   await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
     nativeVariableFourSource);

@@ -1007,7 +1007,7 @@ def main() -> None:
     )
     native_static = "\n".join(
         "\n".join(
-            compact_native_math_line(line)
+            compact_native_math_line(line, tighten_math_ops=True)
             for line in (Path(__file__).resolve().parents[1] / path)
                 .read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.lstrip().startswith("#")
@@ -1047,7 +1047,7 @@ def main() -> None:
     )
     native_dimension_solver = "\n".join(
         "\n".join(
-            line.strip().removeprefix("export ")
+            compact_native_math_line(line, tighten_math_ops=True)
             for line in (Path(__file__).resolve().parents[1] / path)
                 .read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.lstrip().startswith("#")
@@ -1070,16 +1070,16 @@ def main() -> None:
     assert status == 200 and "native-math-unknown-dimension-constraints-ok" in body, (
         "native rational SI constraint execution", status, body)
     corrupted_root = native_dimension_solver.replace(
-        '"sqrt(x) = 1m", empty, "x"',
-        '"sqrt(x) = 1s", empty, "x"',
+        compact_native_math_line('"sqrt(x) = 1m", empty, "x"', tighten_math_ops=True),
+        compact_native_math_line('"sqrt(x) = 1s", empty, "x"', tighten_math_ops=True),
         1,
     )
     assert corrupted_root != native_dimension_solver
     status, body = request("POST", "/api/run/flow", corrupted_root, accepted_headers)
     assert status == 422, ("native rational SI corrupted assertion rejection", status, body)
     malformed_solver = native_dimension_solver.replace(
-        "function normalise_affine(a: AffineDimension) -> AffineDimension {",
-        "function normalise_affine(a: AffineDimension -> AffineDimension {",
+        compact_native_math_line("function normalise_affine(a: AffineDimension) -> AffineDimension {", tighten_math_ops=True),
+        compact_native_math_line("function normalise_affine(a: AffineDimension -> AffineDimension {", tighten_math_ops=True),
         1,
     )
     assert malformed_solver != native_dimension_solver
@@ -1096,7 +1096,7 @@ def main() -> None:
     )
     native_pair = "\n".join(
         "\n".join(
-            compact_native_math_line(line)
+            compact_native_math_line(line, tighten_math_ops=True)
             for line in (Path(__file__).resolve().parents[1] / path)
                 .read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.lstrip().startswith("#")
@@ -1154,7 +1154,7 @@ def main() -> None:
     )
     native_overdetermined = "\n".join(
         "\n".join(
-            compact_native_math_line(line, tighten_equals=True)
+            compact_native_math_line(line, tighten_equals=True, tighten_math_ops=True)
             for line in (Path(__file__).resolve().parents[1] / path)
                 .read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.lstrip().startswith("#")
@@ -1217,7 +1217,7 @@ def main() -> None:
     )
     native_variable = "\n".join(
         "\n".join(
-            compact_native_math_line(line, tighten_equals=True)
+            compact_native_math_line(line, tighten_equals=True, tighten_math_ops=True)
             for line in (Path(__file__).resolve().parents[1] / path)
                 .read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.lstrip().startswith("#")
@@ -1251,8 +1251,8 @@ def main() -> None:
             "static_bounded_dimension": "sbdim",
         })
     assert "function solve_math_equations_variable_constraints_three_unknown_dimensions(" in native_variable
-    assert 'system.count =16' in native_variable
-    assert 'system.equations[15] ="x = 1s"' in native_variable
+    assert 'system.count=16' in native_variable
+    assert 'system.equations[15]="x = 1s"' in native_variable
     assert len(native_variable.encode("utf-8")) < 128 * 1024
     status, body = request("POST", "/api/check/flow", native_variable, accepted_headers)
     assert status == 200, ("native variable SI HTTP compile", status, body)
@@ -1263,8 +1263,8 @@ def main() -> None:
     # Change that equation to a consistent one; the negative assertion in the
     # real Flow program must then reject execution, not silently succeed.
     corrupted_variable = native_variable.replace(
-        'system.equations[15] ="x = 1s"',
-        'system.equations[15] ="x = 1m"',
+        'system.equations[15]="x = 1s"',
+        'system.equations[15]="x = 1m"',
         1,
     )
     assert corrupted_variable != native_variable
@@ -1290,7 +1290,7 @@ def main() -> None:
     )
     native_four = "\n".join(
         "\n".join(
-            compact_native_math_line(line, tighten_equals=True)
+            compact_native_math_line(line, tighten_equals=True, tighten_math_ops=True)
             for line in (Path(__file__).resolve().parents[1] / path)
                 .read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.lstrip().startswith("#")

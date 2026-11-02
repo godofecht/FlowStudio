@@ -33,8 +33,8 @@ class UnicodeVariadicOracleTests(unittest.TestCase):
                          f"near(result.result.value, {expected + 1}.0)", 1), bad)
         self.assertEqual(good.count('result = evaluate_math_expression("'), 40)
         self.assertEqual(good.count('inferred = infer_math_expression_source("'), 40)
-        self.assertIn('source_start != 9', good)
-        self.assertIn('source_end != 12', good)
+        self.assertIn('srcstart != 9', good)
+        self.assertIn('srcend != 12', good)
         self.assertLess(len(good.encode("utf-8")), MAX_SOURCE_BYTES)
 
     def test_marker_and_source_ceiling(self):

@@ -56,7 +56,11 @@ function compactNativeMathIdentifiers(source) {
     equation_error: 'eqerr',
     parse_math_equation_with_bindings: 'parseEqB',
     evaluate_math_equation_source_with_bindings: 'evalEqB',
-    unary_width: 'uwid', component: 'cmpn', temperature: 'tempv'
+    unary_width: 'uwid', component: 'cmpn', temperature: 'tempv',
+    // Token-aware compression keeps all executable Flow bundles below the
+    // existing 128 KiB HTTP limit without changing their numerical programs.
+    operators: 'ops', positions: 'pos', instructions: 'insns',
+    remainder: 'remval', truncated: 'truncq', quotient: 'qval'
   };
   return source.replace(/"(?:\\.|[^"\\])*"|[A-Za-z_][A-Za-z0-9_]*/g,
     token => token.startsWith('"') ? token : (aliases[token] || token));

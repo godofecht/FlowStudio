@@ -1730,6 +1730,42 @@ function main() -> i32 {
     if parse_math_expression("⇒true").valid or
        parse_math_expression("true⇔").valid { return 655 }
 
+    # Euclidean modulo is executed by the typed native IR, not a text rewrite.
+    result = evaluate_math_expression("7m % 3m")
+    if not result.valid or not near(result.result.value, 1.0) or
+       not same_dimension(result.result.dimension, length) { return 656 }
+    result = evaluate_math_expression("mod(-7m,3m)")
+    if not result.valid or not near(result.result.value, 2.0) { return 657 }
+    result = evaluate_math_expression("mod(-7m,-3m)")
+    if not result.valid or not near(result.result.value, 2.0) { return 658 }
+    result = evaluate_math_expression("mod(7.5m,2m)")
+    if not result.valid or not near(result.result.value, 1.5) { return 659 }
+    result = evaluate_math_expression("5m + 7m % 3m")
+    if not result.valid or not near(result.result.value, 6.0) { return 660 }
+    result = evaluate_math_expression("mod(3m,3m)")
+    if not result.valid or not near(result.result.value, 0.0) { return 661 }
+    result = evaluate_math_expression("mod(-0.25m,1m)")
+    if not result.valid or not near(result.result.value, 0.75) { return 662 }
+    result = evaluate_math_expression("mod(7m,3s)")
+    if result.valid or result.failed_at != 0 { return 663 }
+    result = evaluate_math_expression("7m % 0m")
+    if result.valid or result.failed_at != 3 { return 664 }
+    result = evaluate_math_expression("true % false")
+    if result.valid or result.failed_at != 5 { return 665 }
+    result = evaluate_math_expression("mod(1e20m,1m)")
+    if result.valid or result.failed_at != 0 { return 666 }
+    let modulo_span: ParsedMathExpression = parse_math_expression("7m%3m")
+    if not modulo_span.valid or modulo_span.program.count != 3 or
+       modulo_span.program.instructions[2].opcode != 100 or
+       modulo_span.program.instructions[2].source_start != 2 or
+       modulo_span.program.instructions[2].source_end != 3 { return 667 }
+    if parse_math_expression("%3m").valid or
+       parse_math_expression("3m%").valid or
+       parse_math_expression("mod(1m)").valid or
+       parse_math_expression("mod(1m,2m,3m)").valid { return 668 }
+    result = evaluate_math_expression("mod(1m,1s)")
+    if result.valid or result.failed_at != 0 { return 669 }
+
     println("native-math-source-ok")
     return 0
 }

@@ -134,6 +134,14 @@ def compact_native_math_identifiers(source: str,
         "component": "mcomp",
         "unary_width": "uwidth",
         "predicates": "mpreds",
+        # Preserve the exact 128 KiB production cap for the growing native
+        # parser, while rewriting identifiers only outside string literals.
+        "operators": "ops",
+        "positions": "pos",
+        "remainder": "remval",
+        "truncated": "truncq",
+        "quotient": "qval",
+        "period": "periodv",
     }
 
     if extra_aliases:
@@ -933,7 +941,8 @@ def main() -> None:
     # The same string-safe aliases apply to source, static inference and
     # equation-system bundles without omitting any executable assertions.
     native_math_source = compact_native_math_identifiers(native_math_source)
-    assert len(native_math_source.encode("utf-8")) < 128 * 1024
+    assert len(native_math_source.encode("utf-8")) < 128 * 1024, (
+        "native source bundle bytes", len(native_math_source.encode("utf-8")))
     assert "function parse_math_expression(" in native_math_source
     assert "native-math-source-ok" in native_math_source
     assert "1m + 2m" in native_math_source

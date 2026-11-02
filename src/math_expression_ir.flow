@@ -54,6 +54,8 @@
 #          97 typed logical exclusive-or (xor / ⊻), requiring two predicates.
 #          98 logical implication (implies / ⇒), right-associative in source.
 #          99 logical equivalence (iff / ⇔), left-associative in source.
+#          100 mod(a,b) / a % b: Euclidean physical remainder with matched SI dimensions.
+#          Quotient magnitude is bounded to avoid lossy integer conversion.
 #          The instruction exponent stores the actual variadic arity.
 #          Every permutation product must have the same SI dimension.
 # Predicate values are dimensionless 0/1 with a separate runtime type bit.
@@ -825,7 +827,7 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
                 return failed(instruction.source_start)
             }
         } elif (opcode >= 1 and opcode <= 4) or opcode == 7 or opcode == 8 or
-             (opcode >= 10 and opcode <= 17) or (opcode >= 97 and opcode <= 99) or opcode == 22 or opcode == 32 {
+             (opcode >= 10 and opcode <= 17) or (opcode >= 97 and opcode <= 100) or opcode == 22 or opcode == 32 {
             if depth < 2 { return failed(instruction.source_start) }
             let right: Quantity = stack[depth - 1]
             let left: Quantity = stack[depth - 2]
@@ -905,6 +907,21 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
                     result = CheckedQuantity { valid: true, quantity: quantity_multiply(left, right) }
                 }
                 if opcode == 4 { result = quantity_divide(left, right) }
+                if opcode == 100 {
+                    if not same_dimension(left.dimension, right.dimension) or right.value == 0.0 {
+                        return failed(instruction.source_start)
+                    }
+                    let quotient: f64 = left.value / right.value
+                    if not bounded_value(quotient) or magnitude(quotient) > 1000000000.0 {
+                        return failed(instruction.source_start)
+                    }
+                    let truncated: i64 = quotient as i64
+                    let period: f64 = magnitude(right.value)
+                    let mut remainder: f64 = left.value - (truncated as f64) * right.value
+                    if remainder < 0.0 { remainder = remainder + period }
+                    if remainder >= period { remainder = remainder - period }
+                    result = CheckedQuantity { valid: true, quantity: quantity(remainder, left.dimension) }
+                }
                 if opcode == 7 or opcode == 8 {
                     if not same_dimension(left.dimension, right.dimension) {
                         return failed(instruction.source_start)

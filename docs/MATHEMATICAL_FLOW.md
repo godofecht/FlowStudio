@@ -1,3 +1,27 @@
+## Native physical Euclidean modulo (qualification pending)
+
+The bounded **executable** Flow 2.0 mathematical source compiler accepts
+`a % b` and `mod(a,b)`, lowering both to typed postfix opcode 100.
+Both operands must be numeric quantities with the **same coherent SI
+dimension**; the result retains that dimension and lies in
+`[0, abs(b))`. Negative dividends and divisors use Euclidean rather
+than truncating-remainder semantics. Modulo binds with multiplication
+and division, before addition. Zero divisors, Boolean operands,
+incompatible dimensions and quotient magnitudes exceeding `1e9`
+fail closed with original UTF-8 byte-position diagnostics. Static
+dimensional inference accepts a well-typed zero-divisor expression,
+but runtime evaluation rejects it.
+
+`src/math_expression_source_smoke.flow` and
+`src/math_static_smoke.flow` exercise numerical values, equation
+typing, negative/fractional inputs, arity, precedence and failures.
+`src/math_expression_source_http_smoke.flow` runs the same opcode
+through the actual native Flow HTTP/Monaco compilation path. Linux and
+macOS CI also run the checked-in Python-backed Navier–Stokes program,
+independent numerical oracles and real browser acceptance. This does
+**not** imply upstream Flow grammar integration, tensor/PDE ASTs,
+native Navier–Stokes or arbitrary multidimensional visualization.
+
 ## Native physical statistical reductions (CI qualification pending)
 
 The native Flow 2.0 mathematical source parser lowers `mean(...)`,

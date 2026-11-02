@@ -42,6 +42,12 @@ function compactNativeMathIdentifiers(source) {
     source_length: 'srclen', is_predicate: 'ispred',
     term_dimension: 'termdim', input_dimension: 'indim',
     dimensionless: 'dimless', quotient_dimension: 'quotdim',
+    // Keep the full physical solver in the 128 KiB Monaco HTTP budget.
+    // Rename only unquoted identifiers, never mathematical source literals.
+    source_end: 'srcend', coefficient_dimension: 'kdim',
+    field_dimension: 'fdim', coefficient_scale: 'kscale',
+    field_scale: 'fscale', MathInstruction: 'MInstr',
+    ParsedMathExpression: 'PMExpr', MathBindings: 'MBinds',
     MathInferredType: 'MIType', MathDimensionBindings: 'MDBind'
   };
   return source.replace(/"(?:\\.|[^"\\])*"|[A-Za-z_][A-Za-z0-9_]*/g,

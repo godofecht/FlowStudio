@@ -472,7 +472,7 @@ function math_space_width(bytes: ptr<u8>, position: i32, length: i32) -> i32 {
 }
 
 # Operators are recognized only at exact byte sequences. Supported UTF-8
-# spellings include ×, ·, ⋅, ∙, ∗, ÷, ∕, −, ≤, ≥, ≠, ∧ and ∨.
+# spellings include ×, ·, ⋅, ∙, ∗, ÷, ∕, ⁄, ／, −, ≤, ≥, ≠, ∧ and ∨.
 # Prefix ¬ is handled separately to enforce unary placement.
 # Unsupported Unicode cannot be silently normalized to another operation.
 function source_operator(bytes: ptr<u8>, position: i32, length: i32) -> i32 {
@@ -497,6 +497,7 @@ function source_operator(bytes: ptr<u8>, position: i32, length: i32) -> i32 {
         if bytes[position + 1] == 183 { return 4 } # ÷
     }
     if c == 226 and position + 2 < length {
+        if bytes[position + 1] == 129 and bytes[position + 2] == 132 { return 4 } # U+2044 ⁄ FRACTION SLASH
         if bytes[position + 1] == 139 and bytes[position + 2] == 133 { return 3 } # ⋅
         if bytes[position + 1] == 136 {
             if bytes[position + 2] == 149 { return 4 } # ∕
@@ -512,12 +513,14 @@ function source_operator(bytes: ptr<u8>, position: i32, length: i32) -> i32 {
             if bytes[position + 2] == 160 { return 15 } # ≠
         }
     }
+    if c == 239 and position + 2 < length and
+       bytes[position + 1] == 188 and bytes[position + 2] == 143 { return 4 } # U+FF0F ／ FULLWIDTH SOLIDUS
     return 0
 }
 
 function operator_bytes(bytes: ptr<u8>, position: i32, length: i32) -> i32 {
     if bytes[position] == 194 or bytes[position] == 195 { return 2 }
-    if bytes[position] == 226 { return 3 }
+    if bytes[position] == 226 or bytes[position] == 239 { return 3 }
     if (bytes[position] == 61 or bytes[position] == 33) and
        position + 1 < length and bytes[position + 1] == 61 { return 2 }
     if (bytes[position] == 60 or bytes[position] == 62) and

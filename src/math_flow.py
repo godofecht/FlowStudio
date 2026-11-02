@@ -226,6 +226,20 @@ def validated_grid(width: int, height: int, grid: int | None, *, heat: bool = Fa
     return grid, grid
 
 
+def validated_duration(duration: int | float, *, heat: bool = False) -> float:
+    """Reject nonnumeric, nonfinite and unrepresentable runtime durations."""
+    prefix = "Heat duration" if heat else "Evolution duration"
+    if type(duration) not in (int, float):
+        raise FlowMathError(f"{prefix} must be finite and positive")
+    try:
+        value = float(duration)
+    except (OverflowError, ValueError) as exc:
+        raise FlowMathError(f"{prefix} must be finite and positive") from exc
+    if not math.isfinite(value) or value <= 0:
+        raise FlowMathError(f"{prefix} must be finite and positive")
+    return value
+
+
 @dataclass(frozen=True)
 class Model:
     width: int
@@ -424,12 +438,11 @@ def simulate(model: Model, *, grid: int | None = None, until: float | None = Non
                        (np.arange(ny) + .5) * dy, indexing="ij")
     u = np.broadcast_to(initial_component(model.velocity_x, x, y), (nx, ny)).copy()
     v = np.broadcast_to(initial_component(model.velocity_y, x, y), (nx, ny)).copy()
-    duration = until if until is not None else model.until
-    if type(duration) not in (int, float) or not math.isfinite(duration) or duration <= 0:
-        raise FlowMathError("Evolution duration must be finite and positive")
-    steps = math.ceil(duration / model.step)
-    if not 1 <= steps <= 200000:
+    duration = validated_duration(until if until is not None else model.until)
+    step_ratio = duration / model.step
+    if not math.isfinite(step_ratio) or not 0 < step_ratio <= 200000:
         raise FlowMathError("Evolution must have between 1 and 200000 steps")
+    steps = math.ceil(step_ratio)
     dt = duration / steps
     if dt * max(np.max(np.abs(u)) / dx + np.max(np.abs(v)) / dy,
                 2 * model.viscosity * (1 / dx**2 + 1 / dy**2)) > .8:

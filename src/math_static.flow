@@ -178,7 +178,7 @@ export function infer_math_ir(program: MathProgram) -> MathInferredType {
                 return static_error(instruction.source_start)
             }
         } elif (opcode >= 1 and opcode <= 4) or opcode == 7 or opcode == 8 or
-             (opcode >= 10 and opcode <= 17) or (opcode >= 97 and opcode <= 99) or opcode == 22 or opcode == 32 {
+             (opcode >= 10 and opcode <= 17) or (opcode >= 97 and opcode <= 100) or opcode == 22 or opcode == 32 {
             if depth < 2 { return static_error(instruction.source_start) }
             let left: Dimension = dimensions[depth - 2]
             let right: Dimension = dimensions[depth - 1]

@@ -75,6 +75,34 @@ def compact_native_math_line(line: str, *, tighten_equals: bool = False,
     return "".join(result).rstrip()
 
 
+def compact_native_math_identifiers(source: str) -> str:
+    """Rename consistent internal identifiers in an executable HTTP bundle.
+
+    Flow's native 128 KiB transport limit is preserved; this rewrites only
+    identifier spellings in the same checked-in compiler/runtime modules.
+    The full native tests, diagnostics and numerical assertions still run.
+    """
+    for old, short in (
+        ("same_dimension", "samedim"),
+        ("source_start", "srcstart"),
+        ("output_dimension", "outdim"),
+        ("identifier_matches", "idmatches"),
+        ("unary_opcode", "unop"),
+        ("static_error", "sterr"),
+        ("source_error", "srcerr"),
+        ("expect_operand", "expectop"),
+        ("bounded_value", "bvalue"),
+        ("product_dimension", "proddim"),
+        ("output_value", "outval"),
+        ("source_length", "srclen"),
+        ("is_predicate", "ispred"),
+        ("term_dimension", "termdim"),
+        ("input_dimension", "indim"),
+    ):
+        source = re.sub(r"\\b" + old + r"\\b", short, source)
+    return source
+
+
 def oversized_body_status() -> int:
     """Exercise header-level 413 without racing an early-close against sendall.
 
@@ -975,6 +1003,7 @@ def main() -> None:
         )
         for path in static_files
     )
+    native_static = compact_native_math_identifiers(native_static)
     assert len(native_static.encode("utf-8")) <= 131072, "Native static HTTP bundle exceeds 128 KiB"
     assert "function infer_math_ir(" in native_static
     assert "native-math-static-ok" in native_static
@@ -1015,6 +1044,7 @@ def main() -> None:
         )
         for path in dimension_solver_files
     )
+    native_dimension_solver = compact_native_math_identifiers(native_dimension_solver)
     assert "function solve_math_equation_unknown_dimension(" in native_dimension_solver
     assert "sqrt(cbrt(x)) = 1m" in native_dimension_solver
     assert len(native_dimension_solver.encode("utf-8")) < 128 * 1024
@@ -1063,6 +1093,7 @@ def main() -> None:
         )
         for path in pair_files
     )
+    native_pair = compact_native_math_identifiers(native_pair)
     assert "function solve_math_equations_two_unknown_dimensions(" in native_pair
     assert len(native_pair.encode("utf-8")) < 128 * 1024
     status, body = request("POST", "/api/check/flow", native_pair, accepted_headers)
@@ -1125,6 +1156,7 @@ def main() -> None:
                        ("source_start", "srcstart"),
                        ("output_dimension", "outdim")):
         native_overdetermined = re.sub(r"\b" + old + r"\b", short, native_overdetermined)
+    native_overdetermined = compact_native_math_identifiers(native_overdetermined)
     assert "function solve_math_equations_four_constraints_three_unknown_dimensions(" in native_overdetermined
     assert len(native_overdetermined.encode("utf-8")) < 128 * 1024
     status, body = request("POST", "/api/check/flow", native_overdetermined, accepted_headers)
@@ -1184,6 +1216,7 @@ def main() -> None:
                        ("static_error", "sterr"),
                        ("source_error", "srcerr")):
         native_variable = re.sub(r"\b" + old + r"\b", short, native_variable)
+    native_variable = compact_native_math_identifiers(native_variable)
     assert "function solve_math_equations_variable_constraints_three_unknown_dimensions(" in native_variable
     assert 'system.count =16' in native_variable
     assert 'system.equations[15] ="x = 1s"' in native_variable
@@ -1237,6 +1270,7 @@ def main() -> None:
         )
         for path in four_files
     )
+    native_four = compact_native_math_identifiers(native_four)
     assert "function solve_math_equations_four_unknown_dimensions(" in native_four
     assert "function determinant4(" in native_four
     assert "native-math-dimension-four-ok" in native_four
@@ -1309,6 +1343,7 @@ def main() -> None:
                        ("source_start", "srcstart"),
                        ("output_dimension", "outdim")):
         native_variable_four = re.sub(r"\b" + old + r"\b", short, native_variable_four)
+    native_variable_four = compact_native_math_identifiers(native_variable_four)
     assert "function solve_math_equations_variable_constraints_four_unknown_dimensions(" in native_variable_four
     assert "function determinant4(" in native_variable_four
     assert 'system.count=16' in native_variable_four

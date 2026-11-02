@@ -79,7 +79,24 @@
             row.every(value => typeof value === "number" && Number.isFinite(value))))
         throw new TypeError("Spatial field values must be finite and match the grid.");
     }
-    return { grid, sourceGrid, extent, fields, names };
+    // Physical solver-cell locations are optional for legacy results. New
+    // numerical backends provide exact x/y sample indices, not an invented
+    // uniformly spaced display grid.
+    const sampleIndices = spatial.sample_indices;
+    if (sampleIndices !== undefined) {
+      if (!sampleIndices || typeof sampleIndices !== "object" ||
+          Object.keys(sampleIndices).sort().join(",") !== "x,y")
+        throw new TypeError("Invalid spatial sample indices.");
+      for (const [axis, index] of [["x", 0], ["y", 1]]) {
+        const values = sampleIndices[axis], count = grid[index], source = sourceGrid[index];
+        if (!Array.isArray(values) || values.length !== count ||
+            !values.every((value, i) => Number.isInteger(value) &&
+              value >= 0 && value < source && (i === 0 || value > values[i - 1])) ||
+            values[0] !== 0 || values.at(-1) !== source - 1)
+          throw new TypeError("Spatial sample indices must be ordered solver-cell locations.");
+      }
+    }
+    return { grid, sourceGrid, extent, fields, names, sampleIndices };
   }
   function renderSpatial(doc, result) {
     const spatial = prepareSpatial(result);
@@ -97,14 +114,25 @@
     svg.setAttribute("data-mathflow-spatial", "true");
     svg.setAttribute("aria-label", spatial.names[0] === "temperature" ?
       "Spatial temperature heatmap" : "Spatial vorticity heatmap and velocity vector field");
-    const cellWidth = 480 / nx, cellHeight = 480 / ny;
+    // Voronoi boundaries between actual sampled cell centers. This avoids
+    // stretching irregularly selected source-grid samples onto a false
+    // uniform physical lattice. Legacy results retain uniform rendering.
+    const axisBounds = (axis, index) => {
+      const indices = spatial.sampleIndices?.[axis];
+      if (!indices) return Array.from({length: spatial.grid[index] + 1},
+        (_, i) => i / spatial.grid[index]);
+      const source = spatial.sourceGrid[index];
+      return [0, ...indices.slice(1).map((value, i) =>
+        (indices[i] + value + 1) / (2 * source)), 1];
+    };
+    const xBounds = axisBounds("x", 0), yBounds = axisBounds("y", 1);
     for (let ix = 0; ix < nx; ix++) for (let iy = 0; iy < ny; iy++) {
       const normalized = Math.max(0, Math.min(1, (field[ix][iy] / scale - minimum / scale) / range));
       const cell = doc.createElementNS(NS, "rect");
-      cell.setAttribute("x", String(ix * cellWidth));
-      cell.setAttribute("y", String((ny - 1 - iy) * cellHeight));
-      cell.setAttribute("width", String(cellWidth + 0.05));
-      cell.setAttribute("height", String(cellHeight + 0.05));
+      cell.setAttribute("x", String(480 * xBounds[ix]));
+      cell.setAttribute("y", String(480 * (1 - yBounds[iy + 1])));
+      cell.setAttribute("width", String(480 * (xBounds[ix + 1] - xBounds[ix]) + 0.05));
+      cell.setAttribute("height", String(480 * (yBounds[iy + 1] - yBounds[iy]) + 0.05));
       cell.setAttribute("fill", "rgb(" + Math.round(30 + 210 * normalized) + "," +
         Math.round(55 + 90 * (1 - Math.abs(2 * normalized - 1))) + "," +
         Math.round(225 - 185 * normalized) + ")");
@@ -118,8 +146,15 @@
       for (let ix = 0; ix < nx; ix += stride) for (let iy = 0; iy < ny; iy += stride) {
         const speed = Math.hypot(u[ix][iy], v[ix][iy]);
         if (!speed) continue;
-        const x = (ix + 0.5) * cellWidth, y = (ny - iy - 0.5) * cellHeight;
-        const length = 0.38 * Math.min(cellWidth, cellHeight) * speed / maxSpeed;
+        const x = spatial.sampleIndices
+          ? 480 * (spatial.sampleIndices.x[ix] + 0.5) / spatial.sourceGrid[0]
+          : 480 * (ix + 0.5) / nx;
+        const y = spatial.sampleIndices
+          ? 480 * (1 - (spatial.sampleIndices.y[iy] + 0.5) / spatial.sourceGrid[1])
+          : 480 * (1 - (iy + 0.5) / ny);
+        const width = 480 * (xBounds[ix + 1] - xBounds[ix]);
+        const height = 480 * (yBounds[iy + 1] - yBounds[iy]);
+        const length = 0.38 * Math.min(width, height) * speed / maxSpeed;
         const arrow = doc.createElementNS(NS, "line");
         arrow.setAttribute("x1", String(x));
         arrow.setAttribute("y1", String(y));

@@ -65,11 +65,15 @@ native-workspace regression from [PR #406](https://github.com/godofecht/FlowStud
 node --test tests/browser_python_conditional_breakpoints.test.js
 ```
 
-The test verifies exponent signs, leading-dot mantissas, subnormal literals,
-malformed exponent and expression rejection, and the request body sent to
-`/api/debug/python/start`. This Node HTTP transport test stubs fetch to
-inspect the exact request; it is **not** itself a live server qualification.
-The separate native gate below executes the actual Flow-owned HTTP server.
+The Node test verifies exponent signs, leading-dot mantissas, subnormal
+literals, malformed exponent and expression rejection, and the request body
+sent to `/api/debug/python/start`. Its fetch stub checks only transport
+construction. Separately, the existing mandatory `tests/native_ui.mjs`
+uses actual Chromium, the real Flow-owned HTTP server, and persistent CPython
+to pause on `4?residual<=1e-3` at the analytically predicted first crossing
+(iteration 2 for a geometric 0.5 initial residual). It then stops the real
+debugger before the next browser acceptance. Neither browser test substitutes
+for the full 65-cell heat PDE/R/Python HTTP oracle below.
 
 The HTTP test is `tests/http_debugger_scientific_smoke.py`, registered
 as mandatory in `scripts/verify_native.py` on both Linux and macOS.

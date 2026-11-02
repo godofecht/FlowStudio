@@ -881,7 +881,10 @@ try {
       .filter(line => !/^import \.math_(dimensions|expression_ir|expression_source|equation|static|dimension_triple|dimension_variable) \{/.test(line))
       .filter(line => line.trim() && !line.trimStart().startsWith('#'))
       .map(line => compactNativeMathLine(line, true)).join('\n')
-  ).join('\n');
+  ).join('\n')
+    .replaceAll(/\bsame_dimension\b/g, 'samedim')
+    .replaceAll(/\bsource_start\b/g, 'srcstart')
+    .replaceAll(/\boutput_dimension\b/g, 'outdim');
   assert.ok(Buffer.byteLength(nativeVariableSource, 'utf8') < 128 * 1024);
   assert.match(nativeVariableSource, /system\.count =\s*16/);
   await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),

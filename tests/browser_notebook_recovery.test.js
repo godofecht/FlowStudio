@@ -33,8 +33,9 @@ test("completed cell outputs survive reload only for exact source and language",
 test("partial failed notebook runs retain ordered outputs and truncation", () => {
   const store = storage();
   const results = [entry(0), {...entry(2,"Traceback"),ok:false,truncated:true}];
-  assert.equal(recovery.save(store, "# %%\nx\n# %%\n1/0", "python", results), true);
-  assert.deepEqual(recovery.read(store, "# %%\nx\n# %%\n1/0", "python"), results);
+  const source = "# %%\nx\n# %%\npass\n# %%\n1/0";
+  assert.equal(recovery.save(store, source, "python", results), true);
+  assert.deepEqual(recovery.read(store, source, "python"), results);
 });
 test("rejects malformed, reordered, injected and excessive output", () => {
   const store = storage();
@@ -125,4 +126,87 @@ test("recovery rejects mismatched, unsupported and noncanonical Jupyter records"
   tampered.entries[0].jupyterOutputs[0].text = "changed";
   store.setItem(recovery.KEY,JSON.stringify(tampered));
   assert.equal(recovery.read(store,"x","python"),null);
+});
+
+test("recovery binds every output to a real executable Flow/R/Python source cell", () => {
+  const store = storage();
+  const source = [
+    "# %% [markdown]\\n# Numerical report\\n",
+    "# %% [flow]\\nfunction main() -> i32 { return 7 }\\n",
+    "# %% [r]\\nx <- 2; print(x)\\n",
+    "# %% [python]\\nprint(3)\\n",
+    "# %% [python]\\n   \\n"
+  ].join("").replaceAll("\\n", "\n");
+  const valid = [
+    {...entry(1,"flow-ok"),language:"flow"},
+    {...entry(2,"r-ok"),language:"r"},
+    {...entry(3,"python-ok"),language:"python"}
+  ];
+  assert.equal(recovery.save(store, source, "python", valid), true);
+  assert.deepEqual(recovery.read(store, source, "python"), valid);
+  assert.equal(recovery.save(store, source, "python", [entry(0)]), false,
+    "markdown must never receive executable output");
+  assert.equal(recovery.save(store, source, "python", [entry(4)]), false,
+    "whitespace-only code must never receive output");
+  assert.equal(recovery.save(store, source, "python", [entry(5)]), false,
+    "missing cell must never receive output");
+  assert.equal(recovery.save(store, source, "python", [{...entry(1),language:"r"}]), false,
+    "a Flow result must not be relabeled as R");
+  assert.equal(recovery.save(store, source, "python", [{...entry(3),language:"flow"}]), false,
+    "an untagged Python result must not be relabeled as Flow");
+  assert.deepEqual(recovery.read(store, source, "python"), valid);
+  const forged = JSON.parse(store.raw());
+  forged.entries[0].language = "python";
+  store.setItem(recovery.KEY, JSON.stringify(forged));
+  assert.equal(recovery.read(store, source, "python"), null);
+});
+
+test("late-loaded browser Jupyter validator preserves rich outputs across reload", () => {
+  // This is the real index.html load order: recovery precedes notebook_format.
+  // Node require() eagerly supplies the format, masking the browser defect.
+  const context = vm.createContext({TextEncoder});
+  for (const name of ["source_cells.js", "notebook_recovery.js", "notebook_format.js"]) {
+    const script = fs.readFileSync(path.join(__dirname, "../docs/app", name), "utf8");
+    vm.runInContext(script, context, {filename:name});
+  }
+  const store = storage();
+  const rich = {...entry(0,"before\\nfigure"),language:"python",
+    jupyterOutputs:[
+      {output_type:"stream",name:"stdout",text:"before\\n"},
+      {output_type:"display_data",metadata:{},data:{"text/plain":"figure"}}
+    ]};
+  const source = "# %% [python]\\nprint('figure')".replaceAll("\\n", "\n");
+  assert.equal(context.FlowStudioNotebookRecovery.save(store, source, "python", [rich]), true);
+  const restored = context.FlowStudioNotebookRecovery.read(store, source, "python");
+  assert.equal(restored.length, 1);
+  assert.equal(restored[0].language, "python");
+  assert.equal(restored[0].jupyterOutputs.length, 2);
+  assert.equal(restored[0].jupyterOutputs[1].data["text/plain"], "figure");
+  assert.equal(context.FlowStudioNotebookRecovery.save(store,
+    "# %% [flow]\\nfunction main() -> i32 { return 0 }".replaceAll("\\n", "\n"),
+    "flow", [{...rich,language:"flow"}]), false,
+    "Jupyter records cannot be attached to native Flow cells");
+});
+
+test("seeded 64-cell mixed notebook recovery stays bounded and rejects source drift", () => {
+  let seed = 20261102;
+  const next = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0);
+  const langs = ["flow", "r", "python"];
+  const parts = [], entries = [];
+  for (let index = 0; index < 64; index++) {
+    const language = langs[index % langs.length];
+    const value = next() % 100000;
+    parts.push("# %% [" + language + "]\\n" +
+      (language === "r" ? "print(" + value + ")\\n" :
+        language === "flow" ? "let value = " + value + "\\n" :
+          "print(" + value + ")\\n"));
+    entries.push({...entry(index, "λ=" + value),language});
+  }
+  const source = parts.join("").replaceAll("\\n", "\n");
+  const store = storage();
+  assert.equal(recovery.save(store, source, "python", entries), true);
+  assert.deepEqual(recovery.read(store, source, "python"), entries);
+  assert.equal(Buffer.byteLength(store.raw(), "utf8") < 1048576, true);
+  assert.equal(recovery.read(store, source.replace("print(", "cat("), "python"), null);
+  assert.equal(recovery.read(store, source + "# changed", "python"), null);
 });

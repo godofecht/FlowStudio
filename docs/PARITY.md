@@ -1,15 +1,32 @@
-## 2026-11-02: bounded PDE duration overrides (proposed)
+## 2026-11-02: finite PDE cell geometry and bounded work (proposed)
+
+Both production NumPy-backed PDE frontends now reject unrepresentable
+finite-difference cell spacings and more than 4,194,304 cell-steps before
+allocating state grids or integrating. Checked-in regression tests exercise
+both actual Navier–Stokes/heat backends, the exact 512×512×16/17 boundary,
+tiny/huge domain extents on either axis, and real subprocess CLI errors
+with 15-second timeouts.
+[PR #417](https://github.com/godofecht/FlowStudio/pull/417);
+[reproduction](MATH_PDE_CELL_BUDGET.md).
+**Unverified:** exact-head Linux/macOS source/native CI, production HTTP,
+and physical Chromium. **Unexecuted:** local native Flow/R and independent
+macOS Chromium. No hosted CI changes. Not generalized Flow field lowering.
+
+## 2026-11-02: bounded PDE duration overrides (verified)
 
 Both NumPy-backed mathematical Flow PDE solvers now reject malformed and
 unrepresentable duration overrides, step-ratio overflow, and more than
 200,000 steps before integration. Checked-in tests execute deterministic
 16×16 Navier–Stokes and heat models for 50 steps each, with finite numerical
 assertions, replay and invalid-type/NaN/Inf/huge-integer negative controls.
-[PR #416](https://github.com/godofecht/FlowStudio/pull/416);
+[PR #416](https://github.com/godofecht/FlowStudio/pull/416)
+merged as [ca46120f](https://github.com/godofecht/FlowStudio/commit/ca46120fcaa1b3bdece68161c15c861c643b108f);
 [reproduction](MATH_DURATION_RESOURCE_LIMITS.md).
-**Unverified:** exact-head source/native Linux/macOS CI, production HTTP
-and physical Chromium on this revision. **Unexecuted:** local native
-Flow/R and independent physical macOS Chromium. No hosted CI changes.
+**Passed:** [exact-head CI #41536276268](https://github.com/godofecht/FlowStudio/actions/runs/41536276268),
+all **4/4** Linux/macOS source/native jobs including native Flow/R/Python HTTP
+and Ubuntu Chromium. **Failed:** zero final exact-head jobs.
+**Unexecuted:** local native Flow/R and independent physical macOS Chromium.
+**Post-merge main CI:** not independently verified. No hosted CI changes.
 
 ## 2026-11-02: fail-closed PDE declarations and grid overrides (verified)
 

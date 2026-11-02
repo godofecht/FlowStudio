@@ -648,6 +648,14 @@ function main() -> i32 {
        modulo.program.instructions[2].source_start != 2 or
        modulo.program.instructions[2].source_end != 3 { return 246 }
 
+    # Actual native HTTP source compilation, not editor-only arrows.
+    result = evaluate_math_expression("false → true → false")
+    if not result.valid or not result.is_predicate or result.result.value != 1.0 { return 247 }
+    result = evaluate_math_expression("true ↔ false")
+    if not result.valid or result.result.value != 0.0 { return 248 }
+    result = evaluate_math_expression("1m → true")
+    if result.valid or result.failed_at != 3 { return 249 }
+
     println("native-math-source-ok")
     return 0
 }

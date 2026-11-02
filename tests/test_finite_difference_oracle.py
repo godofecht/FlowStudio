@@ -180,7 +180,9 @@ class ExactFiniteDifferenceOracle(unittest.TestCase):
             with self.subTest(start=start):
                 source = inject_finite_difference_assertions(
                     base, start=start, stop=start + 9)
-                self.assertEqual(source.count("evaluate_math_expression"), 9)
+                self.assertEqual(
+                    source.count("evaluate_math_expression") -
+                    base.count("evaluate_math_expression"), 9)
                 self.assertLessEqual(len(source.encode("utf-8")), 131072)
         corrupted = inject_finite_difference_assertions(
             base, start=0, stop=9, sabotage=True)

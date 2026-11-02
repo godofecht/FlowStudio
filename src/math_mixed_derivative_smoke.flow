@@ -30,7 +30,7 @@ function main() -> i32 {
     if not result.valid or not near(result.result.value,-1.0) { return 5 }
     result = evaluate_math_expression("2fdxy(6K,-6K,-6K,6K,2m,3m)")
     if not result.valid or not near(result.result.value,2.0) { return 6 }
-    result = evaluate_math_expression("fdxy(6K,-6K,-6K,6K,2m,3m)+1K/m²")
+    result = evaluate_math_expression("fdxy(6K,-6K,-6K,6K,2m,3m)+1K/1m²")
     if not result.valid or not near(result.result.value,2.0) { return 7 }
     result = evaluate_math_expression("fdxy(1K,2K,3K,5K,1m,1m)")
     if not result.valid or not near(result.result.value,0.25) { return 8 }
@@ -70,9 +70,9 @@ function main() -> i32 {
     if inferred.valid or inferred.failed_at != 0 { return 22 }
     inferred = infer_math_expression_source("fdxy(6K,-6K,false,6K,2m,3m)")
     if inferred.valid or inferred.failed_at != 0 { return 23 }
-    inferred = infer_math_equation_source("fdxy(6K,-6K,-6K,6K,2m,3m)=1K/m²")
+    inferred = infer_math_equation_source("fdxy(6K,-6K,-6K,6K,2m,3m)=1K/1m²")
     if not inferred.valid or not same_dimension(inferred.dimension,curvature) { return 24 }
-    inferred = infer_math_equation_source("fdxy(6K,-6K,-6K,6K,2m,3m)=1K/m")
+    inferred = infer_math_equation_source("fdxy(6K,-6K,-6K,6K,2m,3m)=1K/1m")
     if inferred.valid { return 25 }
     println("native-math-mixed-derivative-ok")
     return 0

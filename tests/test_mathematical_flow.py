@@ -34,6 +34,11 @@ class MathematicalFlowTest(unittest.TestCase):
                 thermal = parse(heat.replace("\\n", separator))
                 self.assertEqual((navier.width, navier.height), (16, 16))
                 self.assertEqual((thermal.width, thermal.height), (32, 32))
+                if separator in ("\r\n", "\u2028"):
+                    # Parse is not enough: execute the actual pressure projection.
+                    result = simulate(navier)
+                    self.assertEqual(result["steps"], 10)
+                    self.assertLess(result["max_divergence"], 1e-5)
                 tokens = lex("# a comment" + separator +
                              "domain FluidDomain {" + separator + "grid = 16 × 16")
                 self.assertEqual([(token.text, token.line, token.column)

@@ -92,12 +92,21 @@ async function debugRStart(source) {
     throw new Error("Native R debugger requires nonempty R source.");
   return debugRResponse("/api/debug/r/start", source);
 }
+// Match the R kernel's bounded numeric breakpoint grammar, including
+// scientific thresholds. Reject overflow and nonzero literals rounded to zero.
 function validRTargets(value) {
   if (typeof value !== "string" || value.length > 4096) return false;
   if (!value) return true;
   const tokens = value.split(",");
-  return tokens.length <= 64 && tokens.every(token =>
-    /^[1-9][0-9]{0,5}(?:\?[A-Za-z][A-Za-z0-9._]*(?:==|!=|>=|<=|>|<)-?(?:0|[1-9][0-9]{0,12})(?:\.[0-9]{1,12})?)?$/.test(token));
+  const pattern = /^([1-9][0-9]{0,5})(?:\?([A-Za-z][A-Za-z0-9._]*)(==|!=|>=|<=|>|<)(-?(?:(?:0|[1-9][0-9]{0,12})(?:\.[0-9]{1,12})?|\.[0-9]{1,12})(?:[eE][+-]?[0-9]{1,4})?))?$/;
+  return tokens.length <= 64 && tokens.every(token => {
+    const match = pattern.exec(token);
+    if (!match) return false;
+    if (!match[4]) return true;
+    const value = Number(match[4]);
+    const mantissa = match[4].split(/[eE]/)[0];
+    return Number.isFinite(value) && !(value === 0 && /[1-9]/.test(mantissa));
+  });
 }
 async function debugRCommand(action, targetLine = "", frameIndex = 0) {
   if (!["step", "continue", "evaluate", "stop", "status"].includes(action))

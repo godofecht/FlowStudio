@@ -1026,7 +1026,10 @@ def main() -> None:
         )
         for path in equation_system_files
     )
-    native_equation_system = compact_native_math_identifiers(native_equation_system)
+    native_equation_system = compact_native_math_identifiers(
+        native_equation_system,
+        {"tolerances": "tols", "failed_equation": "feq"},
+    )
     assert len(native_equation_system.encode("utf-8")) < 128 * 1024
     assert "function parse_math_equation_system(" in native_equation_system
     assert "native-math-equation-system-ok" in native_equation_system

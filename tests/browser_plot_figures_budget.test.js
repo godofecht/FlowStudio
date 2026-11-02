@@ -50,15 +50,17 @@ test("R and Python captures share one retained figure history", async () => {
   }
 });
 
-test("declared oversized HTTP body is rejected before reading", async () => {
-  let reads = 0;
+test("declared oversized HTTP body is cancelled before reading", async () => {
+  let reads = 0, cancelled = 0;
   const fetcher = async () => ({
     ok:true,
     headers:{get:() => String(MAX_RESPONSE_BYTES + 1)},
+    body:{cancel:async () => {cancelled++;}},
     text:async () => {reads++; throw new Error("must not read");}
   });
   assert.deepEqual(await collect("python", fetcher), []);
   assert.equal(reads, 0);
+  assert.equal(cancelled, 1);
 });
 
 test("streamed oversized body cancels without JSON parsing or unbounded retention", async () => {
@@ -127,6 +129,46 @@ test("fallback text body and malformed stream UTF-8 fail closed", async () => {
     })}
   });
   assert.deepEqual(await collect("r", fetcher), []);
+});
+
+test("fallback plot transport enforces actual UTF-8 bytes, not UTF-16 length", async () => {
+  const base = {plots:[{number:1, svg:"<svg></svg>"}]};
+  const modest = JSON.stringify({...base, padding:"é".repeat(1024)});
+  assert.deepEqual(await collect("r", async () => ({
+    ok:true, text:async () => modest
+  })), [{number:1, svg:"<svg></svg>"}]);
+
+  // A valid response with fewer than 20 MiB UTF-16 code units, but more
+  // than 20 MiB UTF-8 bytes, must not reach JSON parsing or plot history.
+  const oversized = JSON.stringify({
+    ...base, padding:"é".repeat(Math.floor(MAX_RESPONSE_BYTES / 2) + 64)
+  });
+  assert.ok(oversized.length < MAX_RESPONSE_BYTES);
+  assert.ok(new TextEncoder().encode(oversized).byteLength > MAX_RESPONSE_BYTES);
+  assert.deepEqual(await collect("r", async () => ({
+    ok:true, text:async () => oversized
+  })), []);
+});
+
+test("malformed and failed plot streams cancel and release their reader", async () => {
+  for (const mode of ["invalid-chunk", "invalid-utf8", "read-error"]) {
+    let cancelled = 0, released = 0;
+    const fetcher = async () => ({
+      ok:true,
+      body:{getReader:() => ({
+        read:async () => {
+          if (mode === "read-error") throw new Error("transport failed");
+          return {done:false, value:mode === "invalid-chunk"
+            ? "not bytes" : new Uint8Array([0xff])};
+        },
+        cancel:async () => {cancelled++;},
+        releaseLock:() => {released++;}
+      })}
+    });
+    assert.deepEqual(await collect("python", fetcher), [], mode);
+    assert.equal(cancelled, 1, mode);
+    assert.equal(released, 1, mode);
+  }
 });
 
 test("actual localhost HTTP transports R and Python captures through the production reader", async t => {

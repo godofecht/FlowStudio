@@ -7,6 +7,10 @@ from http_finite_difference_interop import verify_fd_interop
 from http_laplacian3_interop import verify_laplacian3_interop
 from http_diffusion3_interop import verify_diffusion3_interop
 from http_diffusion3_periodic import verify_periodic_diffusion3_interop
+from test_diffusion2_oracle import (
+    CELL_COUNT as DIFFUSION2_CELLS,
+    inject_periodic_assertions as inject_diffusion2_assertions,
+)
 from test_diffusion3_periodic import CELL_COUNT, inject_periodic_assertions, periodic_cases
 from test_diffusion3_oracle import seeded_diffusion3_cases, inject_diffusion3_assertions
 from test_laplacian3_oracle import (
@@ -41,6 +45,28 @@ def bundled_source(root: Path, smoke_file: str = "src/math_finite_difference_smo
         )
         for path in paths
     )
+
+
+def verify_diffusion2() -> None:
+    # Real native compiler and HTTP runtime, with exact-rational 2D periodic
+    # oracle values injected in bounded batches. Sabotage must fail at runtime.
+    root = Path(__file__).resolve().parents[1]
+    base = bundled_source(root, "src/math_diffusion2_smoke.flow")
+    headers = {"X-FlowStudio-Intent": "run"}
+    for start in range(0, DIFFUSION2_CELLS, 3):
+        source = inject_diffusion2_assertions(base, start=start, stop=start + 3)
+        assert len(source.encode("utf-8")) <= 131072, "diffusion2 HTTP source budget"
+        status, body = request("POST", "/api/check/flow", source, headers)
+        assert status == 200, ("diffusion2 compile", start, status, body)
+        status, body = request("POST", "/api/run/flow", source, headers)
+        assert status == 200 and "native-math-diffusion2-ok" in body, (
+            "diffusion2 native execution", start, status, body)
+    sabotaged = inject_diffusion2_assertions(base, sabotage=True)
+    assert len(sabotaged.encode("utf-8")) <= 131072
+    status, body = request("POST", "/api/check/flow", sabotaged, headers)
+    assert status == 200, ("sabotaged diffusion2 compiles", status, body)
+    status, body = request("POST", "/api/run/flow", sabotaged, headers)
+    assert status == 422, ("sabotaged diffusion2 expectation", status, body)
 
 
 def verify_mixed_derivative() -> None:
@@ -174,6 +200,7 @@ def verify_finite_differences() -> None:
     verify_diffusion3_interop(request, headers)
     verify_periodic_diffusion3_interop(request, headers)
     verify_mixed_derivative()
+    verify_diffusion2()
     print("PASS: 27 exact polynomial cases, 3 planar and 3 spatial 4:1 "
           "manufactured refinements through native Flow HTTP and deliberate HTTP 422")
 

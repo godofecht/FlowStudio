@@ -112,7 +112,10 @@
     if (typeof output !== "string")
       throw new TypeError("Native Flow output must be text.");
     // Ordinary Flow programs may print large outputs without a plot frame.
-    if (output.length > 131072) {
+    // The transport limit is in UTF-8 bytes, not JavaScript UTF-16 units.
+    // Avoid encoding already oversized strings; ordinary stdout remains valid.
+    if (output.length > 131072 ||
+        new TextEncoder().encode(output).byteLength > 131072) {
       // The marker must begin a logical line and end at a header separator.
       // Substrings inside ordinary large stdout must not become plot errors.
       if (!/(?:^|\r?\n)[^\S\r\n]*(?:FLOWSTUDIO_FIELD_V1|FLOWSTUDIO_GRID_V1)(?=[ \t\r\n]|$)/.test(output))

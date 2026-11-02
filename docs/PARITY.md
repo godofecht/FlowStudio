@@ -1,3 +1,63 @@
+## 2026-11-02: native third/fourth derivatives and 2D→3D diffusion reduction (verified)
+
+[PR #380](https://github.com/godofecht/FlowStudio/pull/380) merged as
+[4e548db2](https://github.com/godofecht/FlowStudio/commit/4e548db224190e33d1919a3e4d450875a2bd7ba5).
+The production Flow 2.0 mathematical source parser, typed postfix IR and
+static SI checker now execute centered `fd3`/`fd4` with 23 native analytical,
+type, arity, error and source-span checks. Twelve independent exact-Fraction
+manufactured polynomial cases compile and run through the real Flow HTTP
+check/run endpoints, including deliberate numerical corruption returning
+HTTP 422. This merge also incorporates [PR #379](https://github.com/godofecht/FlowStudio/pull/379)'s
+27 exact-rational 2D→3D conservative diffusion reduction expressions, covering
+both zero z-gradient and zero z-diffusivity embeddings. The production browser
+HTTP source-size regression was fixed without removing full numerical assertions.
+[Reproduction](NATIVE_FD34.md) and
+[dimensional reduction](NATIVE_DIFFUSION_DIMENSIONAL_REDUCTION.md).
+
+**Passed:** [exact-head CI #41390336821](https://github.com/godofecht/FlowStudio/actions/runs/41390336821)
+and [post-merge main CI #41391312231](https://github.com/godofecht/FlowStudio/actions/runs/41391312231),
+each **4/4** Ubuntu 24.04/macOS 15 source/native jobs. Per source platform,
+**1,211 JavaScript passed (12 skipped)** and **518 Python ran (13 skipped)**.
+Native Flow compilation, real R/Python HTTP, R/C FlowJIT, checked-in PDE and
+mixed-language notebook acceptance, and physical Ubuntu Chromium passed.
+**Failed:** zero final jobs. **Unexecuted:** independent physical macOS Chromium
+and local native Flow/R. PR #379 was closed as superseded. Hosted CI workflow
+changes in PR #380 were limited to registering the new native smoke gate.
+This is bounded scalar execution, not general compiler-generated
+multidimensional `field` lowering or complete RStudio parity.
+
+## 2026-11-02: exact 64-step heterogeneous diffusion and native HTTP probes (verified)
+
+[PR #381](https://github.com/godofecht/FlowStudio/pull/381) merged as
+[2c16f8bc](https://github.com/godofecht/FlowStudio/commit/2c16f8bcbdace2f3fa6fb01b24159e77fe0b952b).
+Seed 20261102 defines a five-cell heterogeneous shared-face periodic diffusion
+trajectory. Independent exact-Fraction Euler stepping and a separately assembled
+doubly stochastic transition matrix with binary exponentiation verify all 64
+steps, conservation, quadratic-energy decay, maximum principle, 32+32 restart,
+translation covariance and deterministic replay. At steps 1, 8, 32 and 64,
+the production Flow compiler and real check/run HTTP endpoints execute all
+five cell derivatives: **20 SI-aware native numerical assertions** in
+three-or-fewer-case batches under 128 KiB, including HTTP 422 corruption
+rejection. The 64-step evolution itself is checked independently in Python;
+native Flow executes the 20 sampled stencils, not a generalized field solver.
+[Reproduction](NATIVE_DIFFUSION1_LONG_HORIZON.md).
+
+**Passed:** three local exact-rational Python oracle tests and
+[exact-head CI #41391418504](https://github.com/godofecht/FlowStudio/actions/runs/41391418504),
+**4/4** Ubuntu 24.04/macOS 15 source/native jobs. Per source platform,
+**1,211 JavaScript passed (12 skipped)** and **521 Python ran (13 skipped)**.
+Both native jobs explicitly logged successful 20-case real Flow HTTP
+verification; persistent R/Python, R/C FlowJIT, checked-in PDE/notebook tests
+and physical Ubuntu Chromium also passed. **Failed:** zero final jobs.
+A superseded earlier CI revision failed an isolated fake-gate fixture; that
+fixture was fixed before final qualification and cancelled jobs were not
+counted as passes. **Unexecuted:** local native Flow/R and independent physical
+macOS Chromium. **Post-merge main CI:**
+[run #41392639833](https://github.com/godofecht/FlowStudio/actions/runs/41392639833)
+is in progress, not counted as passed. Hosted CI workflow configuration was
+unchanged by PR #381. General multidimensional compiler-generated field
+lowering and full RStudio parity remain incomplete.
+
 ## 2026-11-02: shared-face 3D periodic diffusion through real Flow/R/Python (verified)
 
 [PR #376](https://github.com/godofecht/FlowStudio/pull/376) merged as

@@ -92,5 +92,35 @@ class RuntimeValidationTest(unittest.TestCase):
             self.assertEqual(first[observable], second[observable])
 
 
+    def test_production_cli_executes_and_rejects_duration_overrides(self):
+        import json
+        import subprocess
+        for example, expected_steps, observable in (
+            ("navier_stokes_smoke.flow", 5, "kinetic_energy"),
+            ("heat_piecewise_forcing.flow", 50, "mean_temperature"),
+        ):
+            base = [sys.executable, str(ROOT / "src/math_flow.py"),
+                    str(ROOT / "examples" / example), "--grid", "16", "--until"]
+            with self.subTest(example=example, duration="0.005"):
+                completed = subprocess.run(base + ["0.005"], capture_output=True,
+                                           text=True, timeout=15, check=False)
+                self.assertEqual(completed.returncode, 0, completed.stderr)
+                result = json.loads(completed.stdout)
+                self.assertTrue(result["ok"])
+                self.assertEqual(result["steps"], expected_steps)
+                self.assertEqual(result["grid"], [16, 16])
+                self.assertEqual(result["time"], 0.005)
+                self.assertTrue(math.isfinite(result[observable]))
+            for invalid in ("nan", "inf", "-inf", "-0.01", "0", "1e308"):
+                with self.subTest(example=example, duration=invalid):
+                    completed = subprocess.run(base + [invalid], capture_output=True,
+                                               text=True, timeout=15, check=False)
+                    self.assertEqual(completed.returncode, 2, completed.stderr)
+                    failure = json.loads(completed.stderr)
+                    self.assertIs(failure["ok"], False)
+                    self.assertRegex(failure["error"],
+                                     "duration must be finite and positive|between 1 and 200000 steps")
+
+
 if __name__ == "__main__":
     unittest.main()

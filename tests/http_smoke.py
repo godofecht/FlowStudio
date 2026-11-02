@@ -97,6 +97,15 @@ def compact_native_math_identifiers(source: str) -> str:
         "is_predicate": "ispred",
         "term_dimension": "termdim",
         "input_dimension": "indim",
+        "coefficient_dimension": "kdim",
+        "field_dimension": "fdim",
+        "coefficient_scale": "kscale",
+        "field_scale": "fscale",
+        "source_end": "srcend",
+        "operand_dimension": "opdim",
+        "left_dimension": "ldim",
+        "right_dimension": "rdim",
+        "result_dimension": "resdim",
     }
 
     def rewrite(match: re.Match[str]) -> str:

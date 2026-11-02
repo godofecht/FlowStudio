@@ -44,6 +44,7 @@ class NativeGateTest(unittest.TestCase):
         (self.root / "tests/http_fd34_smoke.py").write_text("pass\n")
         (self.root / "tests/http_flux_divergence_smoke.py").write_text("pass\n")
         (self.root / "tests/http_flux_energy_smoke.py").write_text("pass\n")
+        (self.root / "tests/http_neumann_diffusion2_smoke.py").write_text("pass\n")
         (self.root / "tests/http_diffusion1_long_horizon.py").write_text("pass\n")
         (self.root / "tests/http_dispersion_smoke.py").write_text("pass\n")
 

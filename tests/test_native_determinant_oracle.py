@@ -67,15 +67,22 @@ class NativeDeterminantOracle(unittest.TestCase):
             )
             for path in MODULES
         )
-        positive = inject_native_assertions(source)
-        negative = inject_native_assertions(source, sabotage=True)
-        self.assertLessEqual(len(positive.encode("utf-8")), 128 * 1024)
-        self.assertEqual(positive.count('result = evaluate_math_expression("det'),
-                         source.count('result = evaluate_math_expression("det') + 43)
-        self.assertEqual(positive.count("return 70"), 43)
-        self.assertNotEqual(positive, negative)
-        self.assertIn('println("native-math-determinants-ok")', positive)
-        self.assertIn('println("native-math-determinants-ok")', negative)
+        total = 0
+        for start, stop in ((0, 21), (21, MAX_CASES)):
+            positive = inject_native_assertions(source, start=start, stop=stop)
+            negative = inject_native_assertions(source, start=start, stop=stop,
+                                                sabotage=True)
+            self.assertLessEqual(len(positive.encode("utf-8")), 128 * 1024)
+            self.assertEqual(positive.count('result = evaluate_math_expression("det'),
+                             source.count('result = evaluate_math_expression("det') + stop - start)
+            self.assertEqual(positive.count("return 70"), stop - start)
+            self.assertNotEqual(positive, negative)
+            self.assertIn('println("native-math-determinants-ok")', positive)
+            self.assertIn('println("native-math-determinants-ok")', negative)
+            total += stop - start
+        self.assertEqual(total, MAX_CASES)
+        with self.assertRaises(ValueError):
+            inject_native_assertions(source, start=21, stop=21)
 
 
 if __name__ == "__main__":

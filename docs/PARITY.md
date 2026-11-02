@@ -1,4 +1,18 @@
-## 2026-11-02: finite PDE cell geometry and bounded work (proposed)
+## 2026-11-02: physically indexed PDE spatial samples (proposed)
+
+[PR #418](https://github.com/godofecht/FlowStudio/pull/418) adds exact
+solver-cell sample indices to the real NumPy-backed heat/Navier results and
+uses them for native workbench SVG region boundaries and velocity positions.
+The checked-in tests now verify indices from both actual PDE simulation
+results as well as independent synthetic-array sampling, malformed metadata,
+and concrete SVG geometry. [Reproduction](MATH_SPATIAL_COORDINATES.md).
+**Passed:** source/transport CI on Ubuntu and macOS for superseded head
+`2ff67fa`. **Unverified:** final exact-head Linux/macOS source/native CI,
+real HTTP and physical Chromium on the updated head. **Unexecuted:** local
+native Flow/R and independent macOS physical Chromium. This does not add
+generalized upstream Flow field lowering or complete RStudio parity.
+
+## 2026-11-02: finite PDE cell geometry and bounded work (verified)
 
 Both production NumPy-backed PDE frontends now reject unrepresentable
 finite-difference cell spacings and more than 4,194,304 cell-steps before
@@ -6,11 +20,15 @@ allocating state grids or integrating. Checked-in regression tests exercise
 both actual Navier–Stokes/heat backends, the exact 512×512×16/17 boundary,
 tiny/huge domain extents on either axis, and real subprocess CLI errors
 with 15-second timeouts.
-[PR #417](https://github.com/godofecht/FlowStudio/pull/417);
+[PR #417](https://github.com/godofecht/FlowStudio/pull/417)
+merged as [a32322ac](https://github.com/godofecht/FlowStudio/commit/a32322ac8be925867a0e6946956dda6a1b4c88e5);
 [reproduction](MATH_PDE_CELL_BUDGET.md).
-**Unverified:** exact-head Linux/macOS source/native CI, production HTTP,
-and physical Chromium. **Unexecuted:** local native Flow/R and independent
-macOS Chromium. No hosted CI changes. Not generalized Flow field lowering.
+**Passed:** [exact-head CI #41540917622](https://github.com/godofecht/FlowStudio/actions/runs/41540917622),
+all **4/4** Linux/macOS source/native jobs, including native Flow/R/Python
+HTTP and Ubuntu Chromium. **Failed:** zero final exact-head jobs.
+**Unexecuted:** local native Flow/R and independent macOS Chromium.
+**Post-merge main CI:** not independently verified. No hosted CI changes.
+Not generalized Flow field lowering.
 
 ## 2026-11-02: bounded PDE duration overrides (verified)
 

@@ -48,7 +48,11 @@ function compactNativeMathIdentifiers(source) {
     field_dimension: 'fdim', coefficient_scale: 'kscale',
     field_scale: 'fscale', MathInstruction: 'MInstr',
     ParsedMathExpression: 'PMExpr', MathBindings: 'MBinds',
-    MathInferredType: 'MIType', MathDimensionBindings: 'MDBind'
+    MathInferredType: 'MIType', MathDimensionBindings: 'MDBind',
+    // Keep the combined Unicode parser and full SI solver below the
+    // production HTTP byte cap; only rename unquoted internal tokens.
+    instruction: 'insn', math_open_width: 'mopw',
+    unary_width: 'uwid', component: 'cmpn', temperature: 'tempv'
   };
   return source.replace(/"(?:\\.|[^"\\])*"|[A-Za-z_][A-Za-z0-9_]*/g,
     token => token.startsWith('"') ? token : (aliases[token] || token));

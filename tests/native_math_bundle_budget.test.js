@@ -34,7 +34,7 @@ const cases = [
 
 function browserBundle(files, tightenEquals, tightenMathOps, name) {
   const modules = files.slice(0, -1).map(path => path.slice(4, -5));
-  let source = files.map(path => readFileSync(require('node:path').join(__dirname, '..', path), 'utf8')
+  let source = files.map(file => readFileSync(path.join(__dirname, '..', file), 'utf8')
     .split(/\r?\n/)
     .filter(line => !modules.some(module => line.startsWith('import .' + module + ' {')))
     .filter(line => line.trim() && !line.trimStart().startsWith('#'))

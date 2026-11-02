@@ -28,10 +28,10 @@ class MathematicalFlowTest(unittest.TestCase):
     def test_shared_pde_lexer_recognizes_all_logical_line_boundaries(self):
         # The same source grammar is used by the Navier and heat executors.
         heat = (ROOT / "examples/heat_piecewise_forcing.flow").read_text(encoding="utf-8")
-        for separator in ("\\n", "\\r\\n", "\\r", "\\u0085", "\\u2028", "\\u2029"):
+        for separator in ("\n", "\r\n", "\r", "\u0085", "\u2028", "\u2029"):
             with self.subTest(separator=repr(separator)):
-                navier = parse(SMOKE.replace("\\n", separator))
-                thermal = parse(heat.replace("\\n", separator))
+                navier = parse(SMOKE.replace("\n", separator))
+                thermal = parse(heat.replace("\n", separator))
                 self.assertEqual((navier.width, navier.height), (16, 16))
                 self.assertEqual((thermal.width, thermal.height), (32, 32))
                 if separator in ("\r\n", "\u2028"):

@@ -446,6 +446,45 @@ function main() -> i32 {
     system = parse_math_equation_system("（1m+2m;）=3m")
     if system.valid or system.failed_at != 8 { return 106 }
 
+
+    # U+FF1B fullwidth semicolon separates complete equations, with byte spans.
+    system = parse_math_equation_system("1m=1m；2s=2s；3K=3K")
+    if not system.valid or system.count != 3 or system.source_length != 21 or
+       system.equations[1].equality_at != 10 or
+       system.equations[2].right.instructions[0].source_start != 19 { return 107 }
+    tolerances.count = 3
+    tolerances.values[0] = quantity(0.0, length_dimension())
+    tolerances.values[1] = quantity(0.0, time_dimension())
+    tolerances.values[2] = quantity(0.0, temperature_dimension())
+    result = evaluate_math_equation_system(system, tolerances)
+    if not result.valid or not result.satisfied or result.count != 3 { return 108 }
+    system = parse_math_equation_system("（1m+2m）=3m；2s=2s")
+    if not system.valid or system.count != 2 or
+       system.equations[0].equality_at != 11 or
+       system.equations[1].equality_at != 19 { return 109 }
+    tolerances.count = 2
+    result = evaluate_math_equation_system(system, tolerances)
+    if not result.valid or not result.satisfied { return 110 }
+    system = parse_math_equation_system("1m=1m；# inert；）\n2s=2s")
+    if not system.valid or system.count != 2 or
+       system.equations[1].equality_at != 24 { return 111 }
+    result = evaluate_math_equation_system(system, tolerances)
+    if not result.valid or not result.satisfied { return 112 }
+    system = parse_math_equation_system("1m=1m；；2s=2s")
+    if system.valid or system.failed_equation != 1 or system.failed_at != 8 { return 113 }
+    system = parse_math_equation_system("1m=1m；")
+    if system.valid or system.failed_equation != 1 or system.failed_at != 8 { return 114 }
+    system = parse_math_equation_system("1m=(1m；0m)")
+    if system.valid or system.failed_at != 6 { return 115 }
+    system = parse_math_equation_system("1m=1m；2s=2m")
+    if not system.valid { return 116 }
+    result = evaluate_math_equation_system(system, tolerances)
+    if result.valid or result.failed_equation != 1 or result.failed_at != 10 { return 117 }
+    system = parse_math_equation_system("1m=1m；\n2s=2s")
+    if not system.valid or system.count != 2 { return 118 }
+    result = evaluate_math_equation_system(system, tolerances)
+    if not result.valid or not result.satisfied { return 119 }
+
     println("native-math-equation-system-ok")
     return 0
 }

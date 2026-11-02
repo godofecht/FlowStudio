@@ -143,10 +143,20 @@ export function parse_math_equation_system_with_bindings(
                     depth = depth - 1
                     advance = closing
                 }
+                # ASCII and U+FF1B fullwidth semicolons delimit complete
+                # equations, preserving the original three-byte UTF-8 span.
+                let mut semicolon_width: i32 = 0
                 if bytes[index] == 59 {
+                    semicolon_width = 1
+                } elif index + 2 < length and bytes[index] == 239 and
+                     bytes[index + 1] == 188 and bytes[index + 2] == 155 {
+                    semicolon_width = 3
+                }
+                if semicolon_width > 0 {
                     if depth != 0 { return system_error(index, length, count) }
                     separator = true
                     delimiter = 1
+                    advance = semicolon_width
                 }
                 if depth == 0 and break_width > 0 {
                     separator = true
@@ -201,7 +211,7 @@ export function parse_math_equation_system_with_bindings(
                     index = index + break_width - 1
                 }
             }
-            start = index + 1
+            start = index + advance
         }
         index = index + advance
     }

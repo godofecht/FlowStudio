@@ -941,7 +941,8 @@ def main() -> None:
     # The same string-safe aliases apply to source, static inference and
     # equation-system bundles without omitting any executable assertions.
     native_math_source = compact_native_math_identifiers(native_math_source)
-    assert len(native_math_source.encode("utf-8")) < 128 * 1024, (\n        "native source bundle bytes", len(native_math_source.encode("utf-8")))
+    assert len(native_math_source.encode("utf-8")) < 128 * 1024, (
+        "native source bundle bytes", len(native_math_source.encode("utf-8")))
     assert "function parse_math_expression(" in native_math_source
     assert "native-math-source-ok" in native_math_source
     assert "1m + 2m" in native_math_source

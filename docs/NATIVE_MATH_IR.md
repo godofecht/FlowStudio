@@ -654,3 +654,27 @@ source and composition with `where` and logical conjunction. The production
 `src/math_expression_source_http_smoke.flow` additionally requires native
 HTTP/Monaco compilation and execution of all three glyphs, byte spans and
 dimensional rejection. Linux/macOS CI is required before merging.
+
+## Native typed implication and equivalence (2026-11-02; CI pending)
+
+The bounded executable native Flow source compiler recognizes `implies` / `⇒`
+(U+21D2) and `iff` / `⇔` (U+21D4), lowering to postfix opcodes 98
+and 99. Both operands must be typed predicates; SI-valued numerics are
+never implicitly converted to truth values. The runtime evaluates implication
+as `not left or right`, and equivalence as Boolean equality. The static
+type pass checks the same predicate contracts without evaluating values.
+
+Precedence is comparisons, `not`, `and`, `xor`, `or`, `implies`,
+then `iff`. Implication is **right-associative** (`a ⇒ b ⇒ c` means
+`a ⇒ (b ⇒ c)`); equivalence is left-associative. Both remain **eager**:
+even a false implication antecedent cannot suppress an invalid consequent.
+UTF-8 source offsets point to the exact three-byte glyph or ASCII keyword.
+`src/math_expression_source_smoke.flow`, `src/math_static_smoke.flow`,
+and the real HTTP/Monaco `src/math_expression_source_http_smoke.flow`
+exercise truth tables, precedence, right associativity, dimensions, malformed
+inputs, runtime failures and source positions.
+
+These are bounded scalar predicate operations, not a general theorem prover,
+symbolic implication engine, upstream Flow grammar change, tensor equation
+compiler or native Navier–Stokes solver. CI must pass before claiming
+native Linux/macOS or HTTP verification.

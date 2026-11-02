@@ -123,6 +123,7 @@ def compact_native_math_identifiers(source: str,
         "function_arity": "fary",
         "operator_bytes": "opb",
         "identifier_matches": "idm",
+        "id_eq": "idm",  # private matcher renamed in native Flow source
         "source_unit": "su",
         "MathInstruction": "MIns",
         "MathBindings": "MBind",

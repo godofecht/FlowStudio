@@ -175,10 +175,10 @@ function main() -> i32 {
     # The HTTP acceptance compares all four against independent R Fourier
     # and CPython matrix-RK4 calculations, not just embedded Flow assertions.
     println("FLOWSTUDIO_HEAT2D_RK4_V1 64")
-    printf("%.17g\\n", finest.state.northwest)
-    printf("%.17g\\n", finest.state.northeast)
-    printf("%.17g\\n", finest.state.southwest)
-    printf("%.17g\\n", finest.state.southeast)
+    printf("%.17g\n", finest.state.northwest)
+    printf("%.17g\n", finest.state.northeast)
+    printf("%.17g\n", finest.state.southwest)
+    printf("%.17g\n", finest.state.southeast)
     println("FLOWSTUDIO_HEAT2D_RK4_END")
     println("native-evolution-heat2d-ok")
     return 0

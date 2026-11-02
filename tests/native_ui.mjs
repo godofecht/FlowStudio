@@ -81,6 +81,24 @@ try {
     document.getElementById('liveDebugOutput').textContent.includes('Python debugger: done'));
   assert.match(await page.locator('#liveDebugOutput').innerText(), /Output:\n42/);
 
+  // Real Chromium -> native Flow HTTP -> persistent CPython scientific
+  // conditional breakpoint. The first hit is iteration 2 (0.5 * 0.1^3),
+  // not an editor-only parse or a replayed debugger frame.
+  await page.evaluate(() => {
+    const source = document.getElementById('source');
+    source.value = 'residual = 0.5\nfor iteration in range(8):\n    residual *= 0.1\n    observed = residual\nprint(observed)\n';
+    source.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.locator('#liveDebugBreakpoints').fill('4?residual<=1e-3');
+  await page.locator('#liveDebugStart').click();
+  await page.waitForFunction(() =>
+    document.getElementById('liveDebugOutput').textContent.includes('Python debugger: paused'));
+  assert.match(await page.locator('#liveDebugOutput').innerText(), /Line 4 in/);
+  assert.match(await page.locator('#liveDebugOutput').innerText(), /iteration: int = 2/);
+  await page.locator('#liveDebugStop').click();
+  await page.waitForFunction(() =>
+    document.getElementById('liveDebugOutput').textContent.includes('Python debugger: stopped'));
+
   // Actual native Chromium caret -> Flow HTTP -> persistent CPython one-shot
   // run-to-line. The target is executed, not emulated by editor navigation.
   await page.evaluate(() => {

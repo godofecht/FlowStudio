@@ -207,6 +207,6 @@ test("seeded 64-cell mixed notebook recovery stays bounded and rejects source dr
   assert.equal(recovery.save(store, source, "python", entries), true);
   assert.deepEqual(recovery.read(store, source, "python"), entries);
   assert.equal(Buffer.byteLength(store.raw(), "utf8") < 1048576, true);
-  assert.equal(recovery.read(store, source.replace("λ", "mu"), "python"), null);
+  assert.equal(recovery.read(store, source.replace("print(", "cat("), "python"), null);
   assert.equal(recovery.read(store, source + "# changed", "python"), null);
 });

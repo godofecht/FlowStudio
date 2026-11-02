@@ -23,7 +23,7 @@ def main() -> None:
             # Preserve executable Flow tokens, trimming only comments,
             # blank lines and cosmetic brace-delimited indentation so the
             # production 128 KiB HTTP request budget remains enforced.
-            compact_native_math_line(line)
+            compact_native_math_line(line, tighten_math_ops=True)
             for line in (root / path).read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.lstrip().startswith("#")
             if not line.startswith("import .math_dimensions {")

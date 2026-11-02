@@ -5,9 +5,6 @@ from pathlib import Path
 from http_smoke import request, compact_native_math_line
 from variadic_oracle import inject_variadic_assertions, variadic_cases
 from unicode_variadic_oracle import inject_unicode_variadic_assertions, unicode_variadic_cases
-from http_robust_statistics_smoke import verify_robust_statistics
-from http_quantile_smoke import verify_quantiles
-from http_finite_difference_smoke import verify_finite_differences
 
 
 def bundled_source(root: Path) -> str:
@@ -77,9 +74,6 @@ def main() -> None:
     assert status == 200, ("tampered Unicode source must compile", status, body)
     status, body = request("POST", "/api/run/flow", unicode_tampered, headers)
     assert status == 422, ("tampered Unicode native execution must fail", status, body)
-    verify_robust_statistics()
-    verify_quantiles()
-    verify_finite_differences()
     print(f"PASS: native SI reductions over real HTTP, 50 baseline "
           f"+ {len(variadic_cases())} ASCII and "
           f"{len(unicode_variadic_cases())} Unicode seeded cases, "

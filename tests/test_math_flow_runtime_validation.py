@@ -53,5 +53,44 @@ class RuntimeValidationTest(unittest.TestCase):
                     simulate(model, until=duration)
 
 
+    def test_both_backends_reject_nonfinite_non_numeric_and_huge_durations(self):
+        from decimal import Decimal
+        bad_durations = (float("nan"), float("inf"), -float("inf"),
+                         0.0, -0.01, False, True, "0.01",
+                         Decimal("0.01"), 1 + 0j, [], {},
+                         10**1000, -(10**1000), 1e308)
+        for source in (NAVIER, HEAT):
+            model = parse(source)
+            for duration in bad_durations:
+                with self.subTest(model=type(model).__name__,
+                                  duration=type(duration).__name__):
+                    with self.assertRaisesRegex(FlowMathError,
+                                                "duration must be finite and positive|between 1 and 200000 steps"):
+                        simulate(model, grid=16, until=duration)
+
+    def test_both_backends_reject_excessive_finite_step_counts(self):
+        for source in (NAVIER, HEAT):
+            model = parse(source)
+            for duration in (model.step * 200001, 1e300):
+                with self.subTest(model=type(model).__name__, duration=duration):
+                    with self.assertRaisesRegex(FlowMathError,
+                                                "between 1 and 200000 steps"):
+                        simulate(model, grid=16, until=duration)
+
+    def test_both_backends_execute_deterministic_bounded_duration_override(self):
+        for source, expected_steps, observable in (
+            (NAVIER, 5, "kinetic_energy"),
+            (HEAT, 50, "mean_temperature"),
+        ):
+            model = parse(source)
+            first = simulate(model, grid=16, until=0.005)
+            second = simulate(model, grid=16, until=0.005)
+            self.assertEqual(first["steps"], expected_steps)
+            self.assertEqual(first["grid"], [16, 16])
+            self.assertEqual(first["time"], 0.005)
+            self.assertTrue(math.isfinite(first[observable]))
+            self.assertEqual(first[observable], second[observable])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -57,6 +57,20 @@ npm test
 python3 -m unittest discover -s tests -p 'test_*.py'
 ```
 
+The browser breakpoint parser and the browser HTTP request validator
+must both accept the kernel's bounded scientific grammar. To reproduce the
+native-workspace regression from [PR #406](https://github.com/godofecht/FlowStudio/pull/406):
+
+```sh
+node --test tests/browser_python_conditional_breakpoints.test.js
+```
+
+The test verifies exponent signs, leading-dot mantissas, subnormal literals,
+malformed exponent and expression rejection, and the request body sent to
+`/api/debug/python/start`. This Node HTTP transport test stubs fetch to
+inspect the exact request; it is **not** itself a live server qualification.
+The separate native gate below executes the actual Flow-owned HTTP server.
+
 The HTTP test is `tests/http_debugger_scientific_smoke.py`, registered
 as mandatory in `scripts/verify_native.py` on both Linux and macOS.
 The spectral source and oracle are checked in together in

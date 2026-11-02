@@ -1,3 +1,20 @@
+## 2026-11-02: native field/grid plot UTF-8 transport budget (proposed)
+
+The native 1D field and 2D grid stdout plot parser previously checked
+JavaScript UTF-16 code units rather than encoded UTF-8 bytes. Non-ASCII
+program output could therefore exceed the 128 KiB plot budget while still
+being rendered. Both frame types now check actual encoded bytes; ordinary
+unframed output remains ordinary stdout. Checked-in deterministic tests
+exercise the exact 131,072-byte boundary, two-byte overflow before and
+after a valid frame, and large unframed Unicode output.
+
+**Passed locally:** independent Node UTF-8 boundary calculations for 1D
+and 2D fixtures. **Unverified:** checked-in Node suite, native Linux/macOS
+HTTP and Ubuntu Chromium on this revision until CI completes.
+**Unexecuted:** local native Flow/R and independent physical macOS Chromium.
+No hosted CI workflow configuration changes. This does not establish
+multidimensional compiler-generated Flow field lowering or full RStudio parity.
+
 ## 2026-11-02: native R scientific conditional breakpoint parity (proposed)
 
 The persistent Rscript debugger and both browser target validators now accept

@@ -1154,7 +1154,7 @@ def main() -> None:
     )
     native_overdetermined = "\n".join(
         "\n".join(
-            compact_native_math_line(line, tighten_equals=True)
+            compact_native_math_line(line, tighten_equals=True, tighten_math_ops=True)
             for line in (Path(__file__).resolve().parents[1] / path)
                 .read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.lstrip().startswith("#")
@@ -1217,7 +1217,7 @@ def main() -> None:
     )
     native_variable = "\n".join(
         "\n".join(
-            compact_native_math_line(line, tighten_equals=True)
+            compact_native_math_line(line, tighten_equals=True, tighten_math_ops=True)
             for line in (Path(__file__).resolve().parents[1] / path)
                 .read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.lstrip().startswith("#")
@@ -1251,8 +1251,8 @@ def main() -> None:
             "static_bounded_dimension": "sbdim",
         })
     assert "function solve_math_equations_variable_constraints_three_unknown_dimensions(" in native_variable
-    assert 'system.count =16' in native_variable
-    assert 'system.equations[15] ="x = 1s"' in native_variable
+    assert 'system.count=16' in native_variable
+    assert 'system.equations[15]="x = 1s"' in native_variable
     assert len(native_variable.encode("utf-8")) < 128 * 1024
     status, body = request("POST", "/api/check/flow", native_variable, accepted_headers)
     assert status == 200, ("native variable SI HTTP compile", status, body)
@@ -1263,8 +1263,8 @@ def main() -> None:
     # Change that equation to a consistent one; the negative assertion in the
     # real Flow program must then reject execution, not silently succeed.
     corrupted_variable = native_variable.replace(
-        'system.equations[15] ="x = 1s"',
-        'system.equations[15] ="x = 1m"',
+        'system.equations[15]="x = 1s"',
+        'system.equations[15]="x = 1m"',
         1,
     )
     assert corrupted_variable != native_variable
@@ -1290,7 +1290,7 @@ def main() -> None:
     )
     native_four = "\n".join(
         "\n".join(
-            compact_native_math_line(line, tighten_equals=True)
+            compact_native_math_line(line, tighten_equals=True, tighten_math_ops=True)
             for line in (Path(__file__).resolve().parents[1] / path)
                 .read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.lstrip().startswith("#")

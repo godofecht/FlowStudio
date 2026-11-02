@@ -107,7 +107,7 @@ test("physical solver-cell coordinates control computed SVG geometry", () => {
   assert.ok(Math.abs(Number(rects[2].attrs.x) - 480 * 2 / 7) < 1e-10);
   assert.ok(Math.abs(Number(rects[4].attrs.x) - 480 * 5 / 7) < 1e-10);
 
-  const vectors = {...sample, kinetic_energy: 1, spatial: {
+  const vectors = {ok: true, kinetic_energy: 1, spatial: {
     ...sample.spatial, fields: {
       vorticity: sample.spatial.fields.temperature,
       velocity_x: [[1, 1], [1, 1], [1, 1]],

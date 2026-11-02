@@ -1,3 +1,18 @@
+## 2026-11-02: complete 3D Dirichlet R/Python trajectory (qualification pending)
+
+The follow-on branch `test/dirichlet3-full-r-python-http-20261102` extends the
+existing 39 native Flow `fluxdiv3` HTTP assertions to all 25 heterogeneous
+3D Dirichlet evolution states (675 values) through persistent base R and
+independent exact-Fraction 27×27 CPython matrix execution over actual HTTP.
+It adds finite-frame/order checks, strict boundary mass and energy decay,
+128 KiB source and 24 KiB frame budgets, deliberate numerical corruption,
+truncation, HTTP 422 rejection and both interpreter recovery checks.
+Four isolated CPython tests passed locally against the deterministic seed
+fixture. Native Linux/macOS and real R HTTP remain **unverified** on this
+branch until exact-head CI completes. The native Flow compiler still executes
+scalar stencils, not a generated multidimensional `field` evolution solver;
+full RStudio parity remains incomplete.
+
 ## 2026-11-02: complete 2D Neumann R/Python trajectory qualification (verified)
 
 [PR #389](https://github.com/godofecht/FlowStudio/pull/389) merged as

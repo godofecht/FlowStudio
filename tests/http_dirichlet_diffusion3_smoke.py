@@ -5,6 +5,7 @@ from pathlib import Path
 from http_smoke import request, compact_native_math_identifiers
 from http_finite_difference_smoke import bundled_source
 from test_dirichlet_diffusion3 import CASES, inject
+from http_dirichlet_diffusion3_interop import verify_dirichlet_interop
 
 MAX_SOURCE_BYTES = 128 * 1024
 
@@ -33,8 +34,9 @@ def verify_dirichlet_diffusion3():
     status, body = request("POST", "/api/run/flow", recovered, headers)
     assert status == 200 and "native-math-flux-divergence-ok" in body, (
         "Dirichlet interpreter recovery", status, body[-500:])
+    verify_dirichlet_interop(request, headers)
     print(f"PASS: {len(CASES)} heterogeneous 3D Dirichlet fluxdiv3 native HTTP "
-          "stencils, 25-state exact/matrix oracle, HTTP 422 and recovery")
+          "stencils, 25-state R/Python exact matrix, HTTP 422 and recovery")
 
 
 if __name__ == "__main__":

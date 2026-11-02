@@ -573,6 +573,18 @@ function main() -> i32 {
     if result.valid or result.failed_at != 2 { return 216 }
     if parse_math_expression("⩾2m").valid { return 217 }
 
+    # Production HTTP/Monaco must execute fullwidth strict comparisons.
+    result = evaluate_math_expression("2m＜3m")
+    if not result.valid or not result.is_predicate or result.result.value != 1.0 { return 218 }
+    result = evaluate_math_expression("3m＞3m")
+    if not result.valid or result.result.value != 0.0 { return 219 }
+    let strict: ParsedMathExpression = parse_math_expression("2m＜3m")
+    if not strict.valid or strict.program.instructions[2].opcode != 10 or
+       strict.program.instructions[2].source_start != 2 or
+       strict.program.instructions[2].source_end != 5 { return 220 }
+    result = evaluate_math_expression("2m＞3s")
+    if result.valid or result.failed_at != 2 { return 221 }
+
     println("native-math-source-ok")
     return 0
 }

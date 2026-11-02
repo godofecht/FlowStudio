@@ -82,6 +82,57 @@ test("bounded real spatial grids are validated before SVG rendering", () => {
     spatial: {...sample.spatial, fields: {temperature: [[300, 301]]}}}), /finite/);
 });
 
+test("physical solver-cell coordinates control computed SVG geometry", () => {
+  const sample = {
+    ...heat,
+    spatial: {
+      grid: [3, 2], source_grid: [7, 5], extent: [2, 1],
+      sample_indices: {x: [0, 3, 6], y: [0, 4]},
+      fields: {temperature: [[300, 301], [302, 303], [304, 305]]}
+    }
+  };
+  const doc = {createElementNS(_ns, tag) {
+    return {tag, attrs: {}, children: [],
+      setAttribute(key, value) {this.attrs[key] = value;},
+      append(...children) {this.children.push(...children);}};
+  }};
+  const prepared = plots.prepareSpatial(sample);
+  assert.deepEqual(prepared.sampleIndices, sample.spatial.sample_indices);
+  const svg = plots.renderSpatial(doc, sample);
+  const rects = svg.children.filter(child => child.tag === "rect");
+  assert.equal(rects.length, 6);
+  assert.equal(Number(rects[0].attrs.x), 0);
+  assert.equal(Number(rects[0].attrs.y), 240);
+  assert.ok(Math.abs(Number(rects[0].attrs.width) - (480 * 2 / 7 + 0.05)) < 1e-10);
+  assert.ok(Math.abs(Number(rects[2].attrs.x) - 480 * 2 / 7) < 1e-10);
+  assert.ok(Math.abs(Number(rects[4].attrs.x) - 480 * 5 / 7) < 1e-10);
+
+  const vectors = {...sample, kinetic_energy: 1, spatial: {
+    ...sample.spatial, fields: {
+      vorticity: sample.spatial.fields.temperature,
+      velocity_x: [[1, 1], [1, 1], [1, 1]],
+      velocity_y: [[0, 0], [0, 0], [0, 0]]
+    }
+  }};
+  const vectorSvg = plots.renderSpatial(doc, vectors);
+  const arrow = vectorSvg.children.find(child => child.tag === "line");
+  assert.ok(arrow);
+  assert.ok(Math.abs(Number(arrow.attrs.x1) - 480 * 0.5 / 7) < 1e-10);
+  assert.ok(Math.abs(Number(arrow.attrs.y1) - 480 * (1 - 0.5 / 5)) < 1e-10);
+  for (const indices of [
+    {x: [0, 3, 3], y: [0, 4]},
+    {x: [0, 3, 7], y: [0, 4]},
+    {x: [0, 3, 5], y: [0, 4]},
+    {x: [0, 6], y: [0, 4]},
+    {x: [0, 3.5, 6], y: [0, 4]},
+    {x: [0, 3, 6], y: [1, 4]},
+    {x: [0, 3, 6]}
+  ]) {
+    assert.throws(() => plots.prepareSpatial({...sample,
+      spatial: {...sample.spatial, sample_indices: indices}}), /indices/);
+  }
+});
+
 test("real semantic RK2 trace is bounded and checked before rendering", () => {
   const term = {
     role: "diffusion", meaning: "Spatial redistribution driven by temperature curvature.",

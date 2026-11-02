@@ -128,6 +128,7 @@ jobs:
           flow run src/math_dispersion_smoke.flow
           flow run src/math_dispersion_http_smoke.flow
           flow run src/math_finite_difference_smoke.flow
+          flow run src/math_mixed_derivative_smoke.flow
           flow run src/math_laplacian3_smoke.flow
           flow run src/stats_smoke.flow
           flow run src/math_physical_ode_smoke.flow

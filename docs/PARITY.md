@@ -3,7 +3,7 @@
 Both NumPy-backed mathematical Flow PDE solvers now reject malformed and
 unrepresentable duration overrides, step-ratio overflow, and more than
 200,000 steps before integration. Checked-in tests execute deterministic
-16×16 Navier–Stokes and heat models for 5 and 50 steps, with finite numerical
+16×16 Navier–Stokes and heat models for 50 steps each, with finite numerical
 assertions, replay and invalid-type/NaN/Inf/huge-integer negative controls.
 [PR #416](https://github.com/godofecht/FlowStudio/pull/416);
 [reproduction](MATH_DURATION_RESOURCE_LIMITS.md).

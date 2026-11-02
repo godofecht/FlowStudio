@@ -27,4 +27,6 @@ def spatial_snapshot(fields: dict[str, "np.ndarray"], extent: tuple[float, float
     if not all(np.isfinite(extent)) or min(extent) <= 0:
         raise ValueError("Spatial extent must be positive and finite")
     return {"grid": [count_x, count_y], "source_grid": [nx, ny],
-            "extent": list(extent), "fields": sampled}
+            "extent": list(extent),
+            "sample_indices": {"x": ix.tolist(), "y": iy.tolist()},
+            "fields": sampled}

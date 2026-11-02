@@ -881,7 +881,7 @@ try {
         !line.startsWith('import .math_equation {') &&
         !line.startsWith('import .math_static {'))
       .filter(line => line.trim() && !line.trimStart().startsWith('#'))
-      .map(line => compactNativeMathLine(line)).join('\n')
+      .map(line => compactNativeMathLine(line, false, true)).join('\n')
   ).join('\n');
   nativeHyperbolicSource = compactNativeMathIdentifiers(nativeHyperbolicSource);
   assert.ok(Buffer.byteLength(nativeHyperbolicSource, 'utf8') <= 128 * 1024,

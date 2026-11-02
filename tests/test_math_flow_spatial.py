@@ -25,6 +25,25 @@ class SpatialNumericsTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             spatial_snapshot({"a": np.ones((8, 8)), "b": np.ones((7, 8))}, (1, 1))
 
+    def test_sampler_exposes_exact_physical_solver_cell_indices(self):
+        nx, ny = 64, 48
+        field = np.arange(nx * ny, dtype=float).reshape((nx, ny))
+        sample = spatial_snapshot({"temperature": field}, (2.0, 3.0))
+        indices = sample["sample_indices"]
+        ix = np.linspace(0, nx - 1, 24).astype(np.int64)
+        iy = np.linspace(0, ny - 1, 24).astype(np.int64)
+        self.assertEqual(indices, {"x": ix.tolist(), "y": iy.tolist()})
+        self.assertEqual(indices["x"][0], 0)
+        self.assertEqual(indices["x"][-1], nx - 1)
+        self.assertEqual(indices["y"][-1], ny - 1)
+        np.testing.assert_array_equal(
+            np.asarray(sample["fields"]["temperature"]), field[np.ix_(ix, iy)])
+        # The physical cell-center coordinates are generally not uniformly
+        # spaced even though the SVG display has 24 columns and rows.
+        physical_x = (ix + 0.5) * 2.0 / nx
+        self.assertFalse(np.allclose(np.diff(physical_x),
+                                     np.diff(physical_x)[0]))
+
     def test_heat_returns_actual_final_temperature_grid(self):
         source = (ROOT / "examples/heat_equation_smoke.flow").read_text(encoding="utf-8")
         result = simulate(parse(source))

@@ -31,16 +31,18 @@ def main() -> None:
     )
     assert "native-math-determinants-ok" in source
     base_source = source
-    source = inject_native_assertions(base_source)
     headers = {"X-FlowStudio-Intent": "run"}
-    status, body = request("POST", "/api/check/flow", source, headers)
-    assert status == 200, ("native determinant compile", status, body)
-    status, body = request("POST", "/api/run/flow", source, headers)
-    assert status == 200 and "native-math-determinants-ok" in body, (
-        "native determinant execution", status, body)
-    # This source differs in one expected numerical value only. It must still
-    # compile, but the real native main must fail and propagate HTTP 422.
-    tampered = inject_native_assertions(base_source, sabotage=True)
+    for start, stop in ((0, 21), (21, len(matrix_cases()))):
+        source = inject_native_assertions(base_source, start=start, stop=stop)
+        status, body = request("POST", "/api/check/flow", source, headers)
+        assert status == 200, ("native determinant compile", start, status, body)
+        status, body = request("POST", "/api/run/flow", source, headers)
+        assert status == 200 and "native-math-determinants-ok" in body, (
+            "native determinant execution", start, status, body)
+    # Deliberately change one numerical expectation without changing the
+    # source program. The real native runtime must propagate HTTP 422.
+    tampered = inject_native_assertions(base_source, start=0, stop=21,
+                                        sabotage=True)
     status, body = request("POST", "/api/check/flow", tampered, headers)
     assert status == 200, ("tampered determinant must compile", status, body)
     status, body = request("POST", "/api/run/flow", tampered, headers)

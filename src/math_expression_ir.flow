@@ -40,7 +40,8 @@
 #          85 fd2(left, center, right, step): centered second derivative.
 #          86 laplacian2(center, left, right, down, up, dx, dy): 2D five-point stencil.
 #          87 laplacian3(center, left, right, down, up, back, front, dx, dy, dz): 3D seven-point stencil.
-#          88 diffusion3(center, left, right, down, up, back, front,
+#          88 fdxy(f--, f+-, f-+, f++, dx, dy): anisotropic mixed partial derivative.
+#          89 diffusion3(center, left, right, down, up, back, front,
 #             kleft, kright, kdown, kup, kback, kfront, dx, dy, dz):
 #             conservative 3D heterogeneous face-flux divergence; k in m²/s.
 #          The instruction exponent stores the actual variadic arity.
@@ -1158,7 +1159,7 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
             depth = base + 1
             stack[base] = quantity(output_value, input_dimension)
             predicate[base] = false
-        } elif opcode == 84 or opcode == 85 or opcode == 86 or opcode == 87 {
+        } elif opcode == 84 or opcode == 85 or opcode == 86 or opcode == 87 or opcode == 88 {
             # Executable centered differences on physical scalar samples.
             # fd1/fd2 permit arbitrary physical step dimensions; laplacian2
             # requires two positive spatial lengths. No symbolic PDE claim.
@@ -1175,6 +1176,10 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
             if opcode == 87 {
                 arity = 10
                 fields = 7
+            }
+            if opcode == 88 {
+                arity = 6
+                fields = 4
             }
             if depth < arity { return failed(instruction.source_start) }
             let base: i32 = depth - arity
@@ -1197,7 +1202,7 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
             if predicate[step_position] or not bounded_value(step.value) or step.value <= 0.0 {
                 return failed(instruction.source_start)
             }
-            if opcode == 86 or opcode == 87 {
+            if opcode == 86 or opcode == 87 or opcode == 88 {
                 let mut axis: i32 = 0
                 while axis < arity - fields {
                     let offset: i32 = step_position + axis
@@ -1211,7 +1216,9 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
                 }
             }
             let mut output_dimension: Dimension = quotient_dimension(field_dimension, step.dimension)
-            if opcode != 84 {
+            if opcode == 88 {
+                output_dimension = quotient_dimension(output_dimension, stack[step_position + 1].dimension)
+            } elif opcode != 84 {
                 output_dimension = quotient_dimension(output_dimension, step.dimension)
             }
             if not bounded_dimension(output_dimension) { return failed(instruction.source_start) }
@@ -1227,6 +1234,16 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
                     let right: f64 = stack[base + 2].value / scale
                     output_value = ((((left - center) + (right - center)) /
                         step.value) / step.value) * scale
+                } elif opcode == 88 {
+                    # Four-corner central mixed derivative; the samples are
+                    # ordered (--, +-, -+, ++). Normalize before subtraction.
+                    let fmm: f64 = stack[base].value / scale
+                    let fpm: f64 = stack[base + 1].value / scale
+                    let fmp: f64 = stack[base + 2].value / scale
+                    let fpp: f64 = stack[base + 3].value / scale
+                    let dy: f64 = stack[step_position + 1].value
+                    output_value = (((fpp - fmp) - (fpm - fmm)) * 0.25 /
+                        step.value / dy) * scale
                 } else {
                     # Axis-pair differences share a normalized center and
                     # preserve physical SI curvature on anisotropic grids.
@@ -1256,7 +1273,7 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
             depth = base + 1
             stack[base] = quantity(output_value, output_dimension)
             predicate[base] = false
-        } elif opcode == 88 {
+        } elif opcode == 89 {
             # Conservative anisotropic 3D divergence of face diffusivity times
             # the temperature gradient. Shared face coefficients give equal
             # and opposite fluxes in adjacent cells on a uniform grid.

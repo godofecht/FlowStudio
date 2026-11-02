@@ -329,7 +329,7 @@ export function infer_math_ir(program: MathProgram) -> MathInferredType {
             depth = base + 1
             dimensions[base] = output_dimension
             predicates[base] = false
-        } elif opcode == 84 or opcode == 85 or opcode == 86 or opcode == 87 {
+        } elif opcode == 84 or opcode == 85 or opcode == 86 or opcode == 87 or opcode == 88 {
             # Infer derivative dimensions without evaluating step sizes.
             let mut arity: i32 = 3
             let mut fields: i32 = 2
@@ -344,6 +344,10 @@ export function infer_math_ir(program: MathProgram) -> MathInferredType {
             if opcode == 87 {
                 arity = 10
                 fields = 7
+            }
+            if opcode == 88 {
+                arity = 6
+                fields = 4
             }
             if depth < arity { return static_error(instruction.source_start) }
             let base: i32 = depth - arity
@@ -360,7 +364,7 @@ export function infer_math_ir(program: MathProgram) -> MathInferredType {
             let step_position: i32 = base + fields
             let step_dimension: Dimension = dimensions[step_position]
             if predicates[step_position] { return static_error(instruction.source_start) }
-            if opcode == 86 or opcode == 87 {
+            if opcode == 86 or opcode == 87 or opcode == 88 {
                 let mut axis: i32 = 0
                 while axis < arity - fields {
                     let offset: i32 = step_position + axis
@@ -372,7 +376,9 @@ export function infer_math_ir(program: MathProgram) -> MathInferredType {
                 }
             }
             let mut output_dimension: Dimension = quotient_dimension(field_dimension, step_dimension)
-            if opcode != 84 {
+            if opcode == 88 {
+                output_dimension = quotient_dimension(output_dimension, dimensions[step_position + 1])
+            } elif opcode != 84 {
                 output_dimension = quotient_dimension(output_dimension, step_dimension)
             }
             if not static_bounded_dimension(output_dimension) {
@@ -381,7 +387,7 @@ export function infer_math_ir(program: MathProgram) -> MathInferredType {
             depth = base + 1
             dimensions[base] = output_dimension
             predicates[base] = false
-        } elif opcode == 88 {
+        } elif opcode == 89 {
             # Heterogeneous diffusion has seven same-unit field samples,
             # six SI diffusivities (m²/s), and three spatial grid spacings.
             if depth < 16 { return static_error(instruction.source_start) }

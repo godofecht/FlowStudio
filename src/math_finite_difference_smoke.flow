@@ -119,7 +119,7 @@ function main() -> i32 {
     result = evaluate_math_expression("diffusion3(0K,1K,1K,8K,8K,true,27K,(2*1m²/1s),(2*1m²/1s),(2*1m²/1s),(2*1m²/1s),(2*1m²/1s),(2*1m²/1s),1m,2m,3m)")
     if result.valid or result.failed_at != 0 { return 40 }
     parsed = parse_math_expression("diffusion3(0K,1K,1K,8K,8K,27K,27K,(2*1m²/1s),(2*1m²/1s),(2*1m²/1s),(2*1m²/1s),(2*1m²/1s),(2*1m²/1s),1m,2m,3m)")
-    if not parsed.valid or parsed.program.instructions[parsed.program.count - 1].opcode != 88 or
+    if not parsed.valid or parsed.program.instructions[parsed.program.count - 1].opcode != 89 or
        parsed.program.instructions[parsed.program.count - 1].source_start != 0 or
        parsed.program.instructions[parsed.program.count - 1].source_end != 10 { return 41 }
     if parse_math_expression("diffusion3(0K,1K,1K,8K,8K,27K,27K,(2*1m²/1s),(2*1m²/1s),(2*1m²/1s),(2*1m²/1s),(2*1m²/1s),(2*1m²/1s),1m,2m)").valid { return 42 }

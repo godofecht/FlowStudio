@@ -17,14 +17,14 @@ from test_finite_difference_oracle import (
 )
 
 
-def bundled_source(root: Path) -> str:
+def bundled_source(root: Path, smoke_file: str = "src/math_finite_difference_smoke.flow") -> str:
     paths = (
         "src/math_dimensions.flow",
         "src/math_expression_ir.flow",
         "src/math_expression_source.flow",
         "src/math_equation.flow",
         "src/math_static.flow",
-        "src/math_finite_difference_smoke.flow",
+        smoke_file,
     )
     return "\n".join(
         "\n".join(
@@ -39,6 +39,27 @@ def bundled_source(root: Path) -> str:
         )
         for path in paths
     )
+
+
+def verify_mixed_derivative() -> None:
+    # Compile and execute the same checked-in native Flow smoke through the
+    # production HTTP compiler, not an editor snippet or Python calculation.
+    root = Path(__file__).resolve().parents[1]
+    source = bundled_source(root, "src/math_mixed_derivative_smoke.flow")
+    assert len(source.encode("utf-8")) <= 131072, "mixed partial HTTP source budget"
+    headers = {"X-FlowStudio-Intent": "run"}
+    status, body = request("POST", "/api/check/flow", source, headers)
+    assert status == 200, ("mixed partial native compilation", status, body)
+    status, body = request("POST", "/api/run/flow", source, headers)
+    assert status == 200 and "native-math-mixed-derivative-ok" in body, (
+        "mixed partial native numerical execution", status, body)
+    sabotaged = source.replace("not near(result.result.value,8.0)",
+                               "not near(result.result.value,9.0)", 1)
+    assert sabotaged != source
+    status, body = request("POST", "/api/check/flow", sabotaged, headers)
+    assert status == 200, ("sabotaged mixed partial compiles", status, body)
+    status, body = request("POST", "/api/run/flow", sabotaged, headers)
+    assert status == 422, ("sabotaged mixed partial must fail", status, body)
 
 
 def verify_finite_differences() -> None:
@@ -129,6 +150,7 @@ def verify_finite_differences() -> None:
     verify_fd_interop(request, headers)
     verify_laplacian3_interop(request, headers)
     verify_diffusion3_interop(request, headers)
+    verify_mixed_derivative()
     print("PASS: 27 exact polynomial cases, 3 planar and 3 spatial 4:1 "
           "manufactured refinements through native Flow HTTP and deliberate HTTP 422")
 

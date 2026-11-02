@@ -1083,7 +1083,7 @@ def main() -> None:
     )
     native_pair = "\n".join(
         "\n".join(
-            line.strip().removeprefix("export ")
+            compact_native_math_line(line)
             for line in (Path(__file__).resolve().parents[1] / path)
                 .read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.lstrip().startswith("#")
@@ -1106,24 +1106,24 @@ def main() -> None:
         "native paired SI execution", status, body)
     assert "function solve_math_equations_three_constraints_two_unknown_dimensions(" in native_pair
     corrupted_triple = native_pair.replace(
-        '"x*y = 1m²", "x*y = 1m²", "x/y = 1s²", known, "x", "y"',
-        '"x*y = 1m²", "x*y = 1m²", "x/y = 1m²", known, "x", "y"',
+        '"x*y = 1m²","x*y = 1m²","x/y = 1s²",known,"x","y"',
+        '"x*y = 1m²","x*y = 1m²","x/y = 1m²",known,"x","y"',
         1,
     )
     assert corrupted_triple != native_pair
     status, body = request("POST", "/api/run/flow", corrupted_triple, accepted_headers)
     assert status == 422, ("native overdetermined SI corrupted assertion", status, body)
     corrupted_pair = native_pair.replace(
-        '"x*y = 1m²", "x/y = 1s²", known, "x", "y"',
-        '"x*y = 1m²", "x/y = 1m", known, "x", "y"',
+        '"x*y = 1m²","x/y = 1s²",known,"x","y"',
+        '"x*y = 1m²","x/y = 1m",known,"x","y"',
         1,
     )
     assert corrupted_pair != native_pair
     status, body = request("POST", "/api/run/flow", corrupted_pair, accepted_headers)
     assert status == 422, ("native paired SI corrupted assertion", status, body)
     malformed_pair = native_pair.replace(
-        "function solve_axis(first: PairDimensionRow, second: PairDimensionRow,",
-        "function solve_axis(first: PairDimensionRow, second: PairDimensionRow",
+        "function solve_axis(first:PairDimensionRow,second:PairDimensionRow,",
+        "function solve_axis(first:PairDimensionRow,second:PairDimensionRow",
         1,
     )
     assert malformed_pair != native_pair

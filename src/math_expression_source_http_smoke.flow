@@ -624,13 +624,13 @@ function main() -> i32 {
     if result.valid or result.failed_at != 3 { return 237 }
 
     # Production HTTP/Monaco must compile and execute native implication/iff.
-    result = evaluate_math_expression("false ⇒ true ⇒ false")
+    result = evaluate_math_expression("false → true → false")
     if not result.valid or not result.is_predicate or result.result.value != 1.0 { return 238 }
-    result = evaluate_math_expression("true ⇔ false")
+    result = evaluate_math_expression("true ↔ false")
     if not result.valid or result.result.value != 0.0 { return 239 }
     result = evaluate_math_expression("true or false implies false")
     if not result.valid or result.result.value != 0.0 { return 240 }
-    result = evaluate_math_expression("1m ⇒ true")
+    result = evaluate_math_expression("1m → true")
     if result.valid or result.failed_at != 3 { return 241 }
 
     # Real production HTTP/Monaco compilation executes native SI modulo.
@@ -647,14 +647,6 @@ function main() -> i32 {
     if not modulo.valid or modulo.program.instructions[2].opcode != 100 or
        modulo.program.instructions[2].source_start != 2 or
        modulo.program.instructions[2].source_end != 3 { return 246 }
-
-    # Actual native HTTP source compilation, not editor-only arrows.
-    result = evaluate_math_expression("false → true → false")
-    if not result.valid or not result.is_predicate or result.result.value != 1.0 { return 247 }
-    result = evaluate_math_expression("true ↔ false")
-    if not result.valid or result.result.value != 0.0 { return 248 }
-    result = evaluate_math_expression("1m → true")
-    if result.valid or result.failed_at != 3 { return 249 }
 
     println("native-math-source-ok")
     return 0

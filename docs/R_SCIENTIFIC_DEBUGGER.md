@@ -19,7 +19,6 @@ not an instruction-level debugger.
 
 ```sh
 node --test tests/browser_native_r_debugger.test.js
-python3 tests/http_smoke.py --help
 python3 scripts/verify_native.py --require-r
 ```
 

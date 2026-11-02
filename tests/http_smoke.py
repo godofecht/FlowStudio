@@ -75,7 +75,8 @@ def compact_native_math_line(line: str, *, tighten_equals: bool = False,
     return "".join(result).rstrip()
 
 
-def compact_native_math_identifiers(source: str,\n                                    extra_aliases: dict[str, str] | None = None) -> str:
+def compact_native_math_identifiers(source: str,
+                                    extra_aliases: dict[str, str] | None = None) -> str:
     """Shorten only internal Flow identifiers, never quoted source literals.
 
     The production 128 KiB transport limit remains enforced. Every module
@@ -99,7 +100,10 @@ def compact_native_math_identifiers(source: str,\n                              
         "input_dimension": "indim",
     }
 
-    if extra_aliases:\n        aliases.update(extra_aliases)\n\n    def rewrite(match: re.Match[str]) -> str:
+    if extra_aliases:
+        aliases.update(extra_aliases)
+
+    def rewrite(match: re.Match[str]) -> str:
         token = match.group(0)
         return token if token.startswith('"') else aliases.get(token, token)
 

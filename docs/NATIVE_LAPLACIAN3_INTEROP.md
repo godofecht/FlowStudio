@@ -13,10 +13,15 @@ and exact 4:1 coarse/fine error ratios. The native Flow source is compiled
 and run through real `/api/check/flow` and `/api/run/flow` endpoints,
 including a sabotaged numerical assertion required to return HTTP 422.
 
-`tests/http_laplacian3_interop.py` independently parses the six samples
+The seed-20261102 LCG adds 12 independent 3D fields and 12 axis-swapped
+metamorphic equivalents. The native Flow compiler executes these 24 cases
+in three bounded eight-case HTTP batches and rejects a deliberately
+corrupted seeded expectation with HTTP 422.
+
+`tests/http_laplacian3_interop.py` independently parses all 30 samples
 and checks their values as rational numbers. The production persistent
 base-R HTTP kernel evaluates the same samples using a separate numerical
-seven-point expression, emits six bounded frames and checks expected
+seven-point expression, emits 30 bounded frames and checks expected
 values. The persistent CPython HTTP kernel reconstructs exact rational
 results, checks the R frames, refinement ratios, and rejects deliberate
 numerical corruption and truncation with HTTP 422. Both kernels must

@@ -618,6 +618,45 @@ def test_native_r_expression_debugger(page, timeout: int):
         "() => document.querySelector('#rDebugOutput').textContent.includes('R expression debugger: idle')",
         timeout=timeout)
 
+    # Physical Chromium -> browser validation -> native Flow HTTP ->
+    # persistent Rscript scientific breakpoint, with a deterministic
+    # exact binary-halving threshold and fail-closed underflow preflight.
+    scientific_source = "\n".join(
+        ["fs_r_browser_scientific <- 1.0"] +
+        ["fs_r_browser_scientific <- fs_r_browser_scientific * 0.5"] * 8 +
+        ["cat(fs_r_browser_scientific)"])
+    page.locator("#source").fill(scientific_source)
+    page.locator("#rDebugStart").click()
+    page.wait_for_function(
+        "() => document.querySelector('#rDebugOutput').textContent.includes('Next expression at line 1')",
+        timeout=timeout)
+    page.locator("#rDebugTargetLine").fill("8?fs_r_browser_scientific<=1e-9999")
+    page.locator("#rDebugContinue").click()
+    page.wait_for_function(
+        "() => document.querySelector('#rDebugOutput').textContent.includes('numeric conditions')",
+        timeout=timeout)
+    page.locator("#rDebugTargetLine").fill(
+        "8?fs_r_browser_scientific<=1e-2,9?fs_r_browser_scientific<=1e-2")
+    page.locator("#rDebugContinue").click()
+    page.wait_for_function(
+        "() => document.querySelector('#rDebugOutput').textContent.includes('Next expression at line 9')",
+        timeout=timeout)
+    page.locator("#rDebugWatch").fill("fs_r_browser_scientific")
+    page.locator("#rDebugEvaluate").click()
+    page.wait_for_function(
+        "() => document.querySelector('#rDebugOutput').textContent.includes('[1] 0.0078125')",
+        timeout=timeout)
+    page.locator("#rDebugTargetLine").fill("")
+    page.locator("#rDebugContinue").click()
+    page.wait_for_function(
+        "() => document.querySelector('#rDebugOutput').textContent.includes('R expression debugger: done')",
+        timeout=timeout)
+    assert "0.00390625" in page.locator("#rDebugOutput").inner_text()
+    page.locator("#rDebugStop").click()
+    page.wait_for_function(
+        "() => document.querySelector('#rDebugOutput').textContent.includes('R expression debugger: idle')",
+        timeout=timeout)
+
     # Real DOM caret -> Flow-owned HTTP -> persistent Rscript top-level target.
     # A separate typed conditional target must remain unchanged.
     page.locator("#source").fill(

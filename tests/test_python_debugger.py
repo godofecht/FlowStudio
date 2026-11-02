@@ -202,7 +202,7 @@ class DebugTests(unittest.TestCase):
         result = debugger.command("continue")
         self.assertEqual(result["state"], "done")
         self.assertTrue(result["ok"])
-        self.assertEqual(result["output"], f"{iteration}\\n")
+        self.assertEqual(result["output"], f"{iteration}\n")
         self.assertEqual(namespace["iteration"], iteration)
         self.assertEqual(len(namespace["field"]), N + 1)
         self.assertLess(max(abs(a - b) for a, b in zip(

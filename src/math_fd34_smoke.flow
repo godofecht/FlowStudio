@@ -1,0 +1,74 @@
+# Native centered third and fourth physical derivatives; compiled by Flow 2.0.
+# flow run src/math_fd34_smoke.flow
+import .math_dimensions { Dimension, temperature_dimension, length_dimension, time_dimension, same_dimension, quotient_dimension }
+import .math_expression_ir { MathResult }
+import .math_expression_source { ParsedMathExpression, parse_math_expression, evaluate_math_expression }
+import .math_static { MathInferredType, infer_math_expression_source, infer_math_equation_source }
+
+function near(actual: f64, expected: f64) -> bool {
+    let mut delta: f64 = actual - expected
+    if delta < 0.0 { delta = -delta }
+    return delta < 0.000000001
+}
+
+function main() -> i32 {
+    let third: Dimension = quotient_dimension(
+        quotient_dimension(quotient_dimension(temperature_dimension(),
+            length_dimension()), length_dimension()), length_dimension())
+    let fourth: Dimension = quotient_dimension(third, length_dimension())
+    let mut result: MathResult = evaluate_math_expression("fd3(-8K,-1K,1K,8K,1m)")
+    if not result.valid or not near(result.result.value,6.0) or
+       not same_dimension(result.result.dimension,third) { return 1 }
+    result = evaluate_math_expression("fd4(16K,1K,0K,1K,16K,1m)")
+    if not result.valid or not near(result.result.value,24.0) or
+       not same_dimension(result.result.dimension,fourth) { return 2 }
+    result = evaluate_math_expression("fd3(-1K,-0.125K,0.125K,1K,0.5m)")
+    if not result.valid or not near(result.result.value,6.0) { return 3 }
+    result = evaluate_math_expression("fd4(1K,0.0625K,0K,0.0625K,1K,0.5m)")
+    if not result.valid or not near(result.result.value,24.0) { return 4 }
+    result = evaluate_math_expression("fd3(-9K,2K,12K,23K,1m)")
+    if not result.valid or not near(result.result.value,6.0) { return 5 }
+    result = evaluate_math_expression("fd4(31K,10K,7K,10K,31K,1m)")
+    if not result.valid or not near(result.result.value,24.0) { return 6 }
+    result = evaluate_math_expression("fd3(7K,7K,7K,7K,1m)")
+    if not result.valid or result.result.value != 0.0 { return 7 }
+    result = evaluate_math_expression("fd4(7K,7K,7K,7K,7K,1m)")
+    if not result.valid or result.result.value != 0.0 { return 8 }
+    result = evaluate_math_expression("fd3(-8K,-1K,1K,8K,0m)")
+    if result.valid or result.failed_at != 0 { return 9 }
+    result = evaluate_math_expression("fd4(16K,1K,0K,1K,16K,-1m)")
+    if result.valid or result.failed_at != 0 { return 10 }
+    result = evaluate_math_expression("fd3(-8K,-1K,1s,8K,1m)")
+    if result.valid or result.failed_at != 0 { return 11 }
+    result = evaluate_math_expression("fd4(16K,1K,true,1K,16K,1m)")
+    if result.valid or result.failed_at != 0 { return 12 }
+    if parse_math_expression("fd3(1K,2K,3K,1m)").valid { return 13 }
+    if parse_math_expression("fd4(1K,2K,3K,4K,1m)").valid { return 14 }
+    let mut parsed: ParsedMathExpression = parse_math_expression("fd3(-8K,-1K,1K,8K,1m)")
+    if not parsed.valid or parsed.program.instructions[parsed.program.count - 1].opcode != 92 or
+       parsed.program.instructions[parsed.program.count - 1].source_start != 0 or
+       parsed.program.instructions[parsed.program.count - 1].source_end != 3 { return 15 }
+    parsed = parse_math_expression("fd4(16K,1K,0K,1K,16K,1m)")
+    if not parsed.valid or parsed.program.instructions[parsed.program.count - 1].opcode != 93 { return 16 }
+    let mut inferred: MathInferredType = infer_math_expression_source("fd3(-8K,-1K,1K,8K,1m)")
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension,third) { return 17 }
+    inferred = infer_math_expression_source("fd4(16K,1K,0K,1K,16K,1m)")
+    if not inferred.valid or not same_dimension(inferred.dimension,fourth) { return 18 }
+    inferred = infer_math_expression_source("fd3(-8K,-1K,1K,8K,0m)")
+    if not inferred.valid { return 19 }
+    inferred = infer_math_expression_source("fd4(16K,1K,0K,1K,16K,1s)")
+    let temporal_fourth: Dimension = quotient_dimension(
+        quotient_dimension(quotient_dimension(
+            quotient_dimension(temperature_dimension(), time_dimension()),
+            time_dimension()), time_dimension()), time_dimension())
+    if not inferred.valid or not same_dimension(inferred.dimension,temporal_fourth) { return 20 }
+    inferred = infer_math_expression_source("fd4(16K,1K,0K,1s,16K,1m)")
+    if inferred.valid or inferred.failed_at != 0 { return 21 }
+    inferred = infer_math_equation_source("fd3(-8K,-1K,1K,8K,1m) = 6K/1m³")
+    if not inferred.valid or not same_dimension(inferred.dimension,third) { return 22 }
+    inferred = infer_math_equation_source("fd4(16K,1K,0K,1K,16K,1m) = 24K")
+    if inferred.valid { return 23 }
+    println("native-math-fd34-ok")
+    return 0
+}

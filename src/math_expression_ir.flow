@@ -48,6 +48,8 @@
 #             conservative 2D heterogeneous face-flux divergence; k in m²/s.
 #          91 diffusion1(center, left, right, kleft, kright, dx):
 #             conservative 1D heterogeneous face-flux divergence; k in m²/s.
+#          92 fd3(f--, f-, f+, f++, step): centered third derivative.
+#          93 fd4(f--, f-, f0, f+, f++, step): centered fourth derivative.
 #          The instruction exponent stores the actual variadic arity.
 #          Every permutation product must have the same SI dimension.
 # Predicate values are dimensionless 0/1 with a separate runtime type bit.
@@ -1163,7 +1165,7 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
             depth = base + 1
             stack[base] = quantity(output_value, input_dimension)
             predicate[base] = false
-        } elif opcode == 84 or opcode == 85 or opcode == 86 or opcode == 87 or opcode == 88 {
+        } elif opcode == 84 or opcode == 85 or opcode == 86 or opcode == 87 or opcode == 88 or opcode == 92 or opcode == 93 {
             # Executable centered differences on physical scalar samples.
             # fd1/fd2 permit arbitrary physical step dimensions; laplacian2
             # requires two positive spatial lengths. No symbolic PDE claim.
@@ -1184,6 +1186,14 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
             if opcode == 88 {
                 arity = 6
                 fields = 4
+            }
+            if opcode == 92 {
+                arity = 5
+                fields = 4
+            }
+            if opcode == 93 {
+                arity = 6
+                fields = 5
             }
             if depth < arity { return failed(instruction.source_start) }
             let base: i32 = depth - arity
@@ -1224,6 +1234,12 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
                 output_dimension = quotient_dimension(output_dimension, stack[step_position + 1].dimension)
             } elif opcode != 84 {
                 output_dimension = quotient_dimension(output_dimension, step.dimension)
+                if opcode == 92 or opcode == 93 {
+                    output_dimension = quotient_dimension(output_dimension, step.dimension)
+                    if opcode == 93 {
+                        output_dimension = quotient_dimension(output_dimension, step.dimension)
+                    }
+                }
             }
             if not bounded_dimension(output_dimension) { return failed(instruction.source_start) }
             let mut output_value: f64 = 0.0
@@ -1238,6 +1254,27 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
                     let right: f64 = stack[base + 2].value / scale
                     output_value = ((((left - center) + (right - center)) /
                         step.value) / step.value) * scale
+                } elif opcode == 92 {
+                    # Third derivative of a centered five-position stencil
+                    # without the central sample. Normalize before differences.
+                    let fmm: f64 = stack[base].value / scale
+                    let fm: f64 = stack[base + 1].value / scale
+                    let fp: f64 = stack[base + 2].value / scale
+                    let fpp: f64 = stack[base + 3].value / scale
+                    output_value = ((((fpp - fmm) - 2.0 * (fp - fm)) * 0.5 /
+                        step.value) / step.value / step.value) * scale
+                } elif opcode == 93 {
+                    # Fourth derivative; pairwise centered differences reduce
+                    # cancellation and avoid intermediate 6*f0 overflow.
+                    let fmm: f64 = stack[base].value / scale
+                    let fm: f64 = stack[base + 1].value / scale
+                    let f0: f64 = stack[base + 2].value / scale
+                    let fp: f64 = stack[base + 3].value / scale
+                    let fpp: f64 = stack[base + 4].value / scale
+                    let outer: f64 = (fmm - fm) + (fpp - fp)
+                    let inner: f64 = (fm - f0) + (fp - f0)
+                    output_value = (((outer - 3.0 * inner) / step.value /
+                        step.value / step.value / step.value) * scale)
                 } elif opcode == 88 {
                     # Four-corner central mixed derivative; the samples are
                     # ordered (--, +-, -+, ++). Normalize before subtraction.

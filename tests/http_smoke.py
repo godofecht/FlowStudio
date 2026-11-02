@@ -75,7 +75,8 @@ def compact_native_math_line(line: str, *, tighten_equals: bool = False,
     return "".join(result).rstrip()
 
 
-def compact_native_math_identifiers(source: str) -> str:
+def compact_native_math_identifiers(source: str,
+                                    extra_aliases: dict[str, str] | None = None) -> str:
     """Shorten only internal Flow identifiers, never quoted source literals.
 
     The production 128 KiB transport limit remains enforced. Every module
@@ -107,6 +108,9 @@ def compact_native_math_identifiers(source: str) -> str:
         "right_dimension": "rdim",
         "result_dimension": "resdim",
     }
+
+    if extra_aliases:
+        aliases.update(extra_aliases)
 
     def rewrite(match: re.Match[str]) -> str:
         token = match.group(0)
@@ -1168,7 +1172,16 @@ def main() -> None:
                        ("source_start", "srcstart"),
                        ("output_dimension", "outdim")):
         native_overdetermined = re.sub(r"\b" + old + r"\b", short, native_overdetermined)
-    native_overdetermined = compact_native_math_identifiers(native_overdetermined)
+    # Lexical, string-safe compaction retains every SI constraint while
+    # keeping the real native compiler request below the 128 KiB limit.
+    native_overdetermined = compact_native_math_identifiers(
+        native_overdetermined, {
+            "dimensionless": "dless",
+            "CheckedQuantity": "ChkQ",
+            "MathInferredType": "MInf",
+            "MathDimensionBindings": "MDB",
+            "static_bounded_dimension": "sbdim",
+        })
     assert "function solve_math_equations_four_constraints_three_unknown_dimensions(" in native_overdetermined
     assert len(native_overdetermined.encode("utf-8")) < 128 * 1024
     status, body = request("POST", "/api/check/flow", native_overdetermined, accepted_headers)
@@ -1228,7 +1241,15 @@ def main() -> None:
                        ("static_error", "sterr"),
                        ("source_error", "srcerr")):
         native_variable = re.sub(r"\b" + old + r"\b", short, native_variable)
-    native_variable = compact_native_math_identifiers(native_variable)
+    native_variable = compact_native_math_identifiers(
+        native_variable, {
+            "dimensionless": "dless",
+            "CheckedQuantity": "ChkQ",
+            "MathInferredType": "MInf",
+            "MathDimensionBindings": "MDB",
+            "MathDimensionSymbol": "MDS",
+            "static_bounded_dimension": "sbdim",
+        })
     assert "function solve_math_equations_variable_constraints_three_unknown_dimensions(" in native_variable
     assert 'system.count =16' in native_variable
     assert 'system.equations[15] ="x = 1s"' in native_variable
@@ -1282,7 +1303,14 @@ def main() -> None:
         )
         for path in four_files
     )
-    native_four = compact_native_math_identifiers(native_four)
+    native_four = compact_native_math_identifiers(native_four, {
+        "dimensionless": "dless",
+        "CheckedQuantity": "ChkQ",
+        "MathInferredType": "MInf",
+        "MathDimensionBindings": "MDB",
+        "MathDimensionSymbol": "MDS",
+        "static_bounded_dimension": "sbdim",
+    })
     assert "function solve_math_equations_four_unknown_dimensions(" in native_four
     assert "function determinant4(" in native_four
     assert "native-math-dimension-four-ok" in native_four
@@ -1361,7 +1389,14 @@ def main() -> None:
                        ("source_start", "srcstart"),
                        ("output_dimension", "outdim")):
         native_variable_four = re.sub(r"\b" + old + r"\b", short, native_variable_four)
-    native_variable_four = compact_native_math_identifiers(native_variable_four)
+    native_variable_four = compact_native_math_identifiers(native_variable_four, {
+        "dimensionless": "dless",
+        "CheckedQuantity": "ChkQ",
+        "MathInferredType": "MInf",
+        "MathDimensionBindings": "MDB",
+        "MathDimensionSymbol": "MDS",
+        "static_bounded_dimension": "sbdim",
+    })
     assert "function solve_math_equations_variable_constraints_four_unknown_dimensions(" in native_variable_four
     assert "function determinant4(" in native_variable_four
     assert 'system.count=16' in native_variable_four
@@ -1411,7 +1446,14 @@ def main() -> None:
         )
         for path in hyperbolic_files
     )
-    native_hyperbolic = compact_native_math_identifiers(native_hyperbolic)
+    native_hyperbolic = compact_native_math_identifiers(native_hyperbolic, {
+        "dimensionless": "dless",
+        "CheckedQuantity": "ChkQ",
+        "MathInferredType": "MInf",
+        "MathDimensionBindings": "MDB",
+        "MathDimensionSymbol": "MDS",
+        "static_bounded_dimension": "sbdim",
+    })
     assert len(native_hyperbolic.encode("utf-8")) < 128 * 1024
     assert "function bounded_hyperbolic(" in native_hyperbolic
     assert "native-math-hyperbolic-ok" in native_hyperbolic

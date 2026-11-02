@@ -15,6 +15,9 @@ from test_diffusion2_oracle import (
     CELL_COUNT as DIFFUSION2_CELLS,
     inject_periodic_assertions as inject_diffusion2_assertions,
 )
+from test_diffusion_dimensional_reduction import (
+    CELL_COUNT as REDUCTION_CELLS, inject_reduction_assertions,
+)
 from test_diffusion3_periodic import CELL_COUNT, inject_periodic_assertions, periodic_cases
 from test_diffusion3_oracle import seeded_diffusion3_cases, inject_diffusion3_assertions
 from test_laplacian3_oracle import (
@@ -72,6 +75,29 @@ def verify_diffusion1() -> None:
     assert status == 200, ("sabotaged diffusion1 compiles", status, body)
     status, body = request("POST", "/api/run/flow", sabotaged, headers)
     assert status == 422, ("sabotaged diffusion1 expectation", status, body)
+
+
+def verify_dimensional_reduction() -> None:
+    # Each exact 2D periodic stencil is embedded in 3D with either a
+    # constant z field or zero z-face diffusivity, via the real HTTP compiler.
+    root = Path(__file__).resolve().parents[1]
+    base = bundled_source(root, "src/math_diffusion2_smoke.flow")
+    headers = {"X-FlowStudio-Intent": "run"}
+    for index in range(REDUCTION_CELLS):
+        source = inject_reduction_assertions(base, index=index)
+        assert len(source.encode("utf-8")) <= 131072, (
+            "dimensional reduction HTTP source budget", index)
+        status, body = request("POST", "/api/check/flow", source, headers)
+        assert status == 200, ("dimensional reduction compile", index, status, body)
+        status, body = request("POST", "/api/run/flow", source, headers)
+        assert status == 200 and "native-math-diffusion2-ok" in body, (
+            "dimensional reduction execution", index, status, body)
+    sabotaged = inject_reduction_assertions(base, index=0, sabotage=True)
+    assert len(sabotaged.encode("utf-8")) <= 131072
+    status, body = request("POST", "/api/check/flow", sabotaged, headers)
+    assert status == 200, ("sabotaged reduction compiles", status, body)
+    status, body = request("POST", "/api/run/flow", sabotaged, headers)
+    assert status == 422, ("sabotaged reduction must fail", status, body)
 
 
 def verify_diffusion2() -> None:
@@ -229,6 +255,7 @@ def verify_finite_differences() -> None:
     verify_mixed_derivative()
     verify_diffusion1()
     verify_diffusion2()
+    verify_dimensional_reduction()
     print("PASS: 27 exact polynomial cases, 3 planar and 3 spatial 4:1 "
           "manufactured refinements through native Flow HTTP and deliberate HTTP 422")
 

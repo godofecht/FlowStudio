@@ -214,6 +214,22 @@ function main() -> i32 {
     let nested_right: MathEquation = parse_math_equation("1m = （2m=2m）")
     if nested_right.valid or nested_right.failed_at != 10 { return 74 }
 
+    # Fullwidth equality is a native equation delimiter at top level,
+    # while a nested occurrence remains the existing scalar predicate.
+    let fullwidth: MathEquation = parse_math_equation("1m＝1m")
+    if not fullwidth.valid or fullwidth.equality_at != 2 or
+       fullwidth.right.instructions[0].source_start != 5 { return 75 }
+    result = evaluate_math_equation(fullwidth, exact_m)
+    if not result.valid or not result.satisfied { return 76 }
+    result = evaluate_math_equation_source("（1m+2m）＝3m", exact_m)
+    if not result.valid or not result.satisfied { return 77 }
+    result = evaluate_math_equation_source("where（1＝1，3m，4m）＝3m", exact_m)
+    if not result.valid or not result.satisfied { return 78 }
+    let chained: MathEquation = parse_math_equation("1m＝1m＝1m")
+    if chained.valid or chained.failed_at != 7 { return 79 }
+    result = evaluate_math_equation_source("1m＝2s", exact_m)
+    if result.valid or result.failed_at != 2 { return 80 }
+
     println("native-math-equation-ok")
     return 0
 }

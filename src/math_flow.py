@@ -240,6 +240,26 @@ def validated_duration(duration: int | float, *, heat: bool = False) -> float:
     return value
 
 
+
+MAX_PDE_CELL_STEPS = 4_194_304
+
+
+def validated_pde_geometry(length_x: float, length_y: float, nx: int, ny: int,
+                           steps: int, *, heat: bool = False) -> tuple[float, float]:
+    """Bound numerical work and reject unrepresentable finite-difference cells."""
+    prefix = "Heat" if heat else "Navier-Stokes"
+    if nx * ny * steps > MAX_PDE_CELL_STEPS:
+        raise FlowMathError(f"{prefix} cell-step budget exceeds {MAX_PDE_CELL_STEPS}")
+    dx, dy = length_x / nx, length_y / ny
+    for spacing in (dx, dy):
+        square = spacing * spacing
+        if (not math.isfinite(spacing) or spacing <= 0
+                or not math.isfinite(square) or square <= 0
+                or not math.isfinite(1.0 / square)):
+            raise FlowMathError(f"{prefix} cell geometry is not finite and resolvable")
+    return dx, dy
+
+
 @dataclass(frozen=True)
 class Model:
     width: int
@@ -433,17 +453,17 @@ def simulate(model: Model, *, grid: int | None = None, until: float | None = Non
         return simulate_heat(model, grid=grid, until=until, error_type=FlowMathError)
     import numpy as np
     nx, ny = validated_grid(model.width, model.height, grid)
-    dx, dy = model.length_x / nx, model.length_y / ny
-    x, y = np.meshgrid((np.arange(nx) + .5) * dx,
-                       (np.arange(ny) + .5) * dy, indexing="ij")
-    u = np.broadcast_to(initial_component(model.velocity_x, x, y), (nx, ny)).copy()
-    v = np.broadcast_to(initial_component(model.velocity_y, x, y), (nx, ny)).copy()
     duration = validated_duration(until if until is not None else model.until)
     step_ratio = duration / model.step
     if not math.isfinite(step_ratio) or not 0 < step_ratio <= 200000:
         raise FlowMathError("Evolution must have between 1 and 200000 steps")
     steps = math.ceil(step_ratio)
+    dx, dy = validated_pde_geometry(model.length_x, model.length_y, nx, ny, steps)
     dt = duration / steps
+    x, y = np.meshgrid((np.arange(nx) + .5) * dx,
+                       (np.arange(ny) + .5) * dy, indexing="ij")
+    u = np.broadcast_to(initial_component(model.velocity_x, x, y), (nx, ny)).copy()
+    v = np.broadcast_to(initial_component(model.velocity_y, x, y), (nx, ny)).copy()
     if dt * max(np.max(np.abs(u)) / dx + np.max(np.abs(v)) / dy,
                 2 * model.viscosity * (1 / dx**2 + 1 / dy**2)) > .8:
         raise FlowMathError("Time step violates conservative advection/diffusion stability bound")

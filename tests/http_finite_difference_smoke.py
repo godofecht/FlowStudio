@@ -5,7 +5,10 @@ from pathlib import Path
 from http_smoke import request, compact_native_math_line
 from http_finite_difference_interop import verify_fd_interop
 from http_laplacian3_interop import verify_laplacian3_interop
-from test_laplacian3_oracle import manufactured_laplacian3_cases, inject_laplacian3_assertions
+from test_laplacian3_oracle import (
+    manufactured_laplacian3_cases, inject_laplacian3_assertions,
+    seeded_laplacian3_cases, inject_seeded_laplacian3_assertions,
+)
 from test_finite_difference_oracle import (
     finite_difference_cases, inject_finite_difference_assertions,
     manufactured_refinement_cases, inject_manufactured_refinement_assertions,
@@ -74,6 +77,24 @@ def verify_finite_differences() -> None:
     assert status == 200, ("sabotaged 3D compiles", status, body)
     status, body = request("POST", "/api/run/flow", sabotaged_3d, headers)
     assert status == 422, ("sabotaged 3D numerical expectation", status, body)
+    # Twelve deterministic 3D fields and twelve axis-swapped metamorphic
+    # equivalents must compile and execute in bounded native HTTP batches.
+    assert len(seeded_laplacian3_cases()) == 24
+    for start in (0, 8, 16):
+        seeded = inject_seeded_laplacian3_assertions(
+            base, start=start, stop=start + 8)
+        assert len(seeded.encode("utf-8")) <= 131072, "seeded 3D source budget"
+        status, body = request("POST", "/api/check/flow", seeded, headers)
+        assert status == 200, ("seeded 3D compile", start, status, body)
+        status, body = request("POST", "/api/run/flow", seeded, headers)
+        assert status == 200 and "native-math-finite-difference-ok" in body, (
+            "seeded 3D execution", start, status, body)
+    sabotaged_seeded = inject_seeded_laplacian3_assertions(
+        base, start=0, stop=8, sabotage=True)
+    status, body = request("POST", "/api/check/flow", sabotaged_seeded, headers)
+    assert status == 200, ("sabotaged seeded 3D compiles", status, body)
+    status, body = request("POST", "/api/run/flow", sabotaged_seeded, headers)
+    assert status == 422, ("sabotaged seeded 3D expectation", status, body)
     corrupted_refinement = inject_manufactured_refinement_assertions(
         base, sabotage=True)
     status, body = request("POST", "/api/check/flow", corrupted_refinement, headers)

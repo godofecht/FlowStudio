@@ -4,6 +4,7 @@ Native Flow evaluates sampled fluxdiv2 stencils in http_neumann_diffusion2_smoke
 This independent oracle does not use the production parser or floating-point math.
 """
 from fractions import Fraction
+from decimal import Decimal, localcontext
 from itertools import product
 import random
 import unittest
@@ -155,6 +156,18 @@ class NeumannDiffusionTests(unittest.TestCase):
                 evolve(steps=steps)
         with self.assertRaises(ValueError):
             evolve({(0, 0): Fraction(1)}, 1)
+
+    def test_decimal_reconstruction_of_native_source_values(self):
+        # Independent decimal evaluation catches incorrect literal serialization.
+        with localcontext() as context:
+            context.prec = 50
+            for expression, expected in CASES:
+                tokens = expression.removeprefix("fluxdiv2(").removesuffix(")").split(",")
+                left, right, down, up = [Decimal(t[:-1]) for t in tokens[:4]]
+                dx, dy = [Decimal(t[:-1]) for t in tokens[4:]]
+                reconstructed = (right - left) / dx + (up - down) / dy
+                exact = Decimal(expected.numerator) / Decimal(expected.denominator)
+                self.assertLess(abs(reconstructed - exact), Decimal("1e-12"))
 
     def test_native_cases_and_corruption(self):
         self.assertEqual(len(CASES), 20)

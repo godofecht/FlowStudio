@@ -76,31 +76,34 @@ def compact_native_math_line(line: str, *, tighten_equals: bool = False,
 
 
 def compact_native_math_identifiers(source: str) -> str:
-    """Rename consistent internal identifiers in an executable HTTP bundle.
+    """Shorten only internal Flow identifiers, never quoted source literals.
 
-    Flow's native 128 KiB transport limit is preserved; this rewrites only
-    identifier spellings in the same checked-in compiler/runtime modules.
-    The full native tests, diagnostics and numerical assertions still run.
+    The production 128 KiB transport limit remains enforced. Every module
+    still compiles and executes natively, with no numerical test omitted.
     """
-    for old, short in (
-        ("same_dimension", "samedim"),
-        ("source_start", "srcstart"),
-        ("output_dimension", "outdim"),
-        ("identifier_matches", "idmatches"),
-        ("unary_opcode", "unop"),
-        ("static_error", "sterr"),
-        ("source_error", "srcerr"),
-        ("expect_operand", "expectop"),
-        ("bounded_value", "bvalue"),
-        ("product_dimension", "proddim"),
-        ("output_value", "outval"),
-        ("source_length", "srclen"),
-        ("is_predicate", "ispred"),
-        ("term_dimension", "termdim"),
-        ("input_dimension", "indim"),
-    ):
-        source = re.sub(r"\b" + old + r"\b", short, source)
-    return source
+    aliases = {
+        "same_dimension": "samedim",
+        "source_start": "srcstart",
+        "output_dimension": "outdim",
+        "identifier_matches": "idmatches",
+        "unary_opcode": "unop",
+        "static_error": "sterr",
+        "source_error": "srcerr",
+        "expect_operand": "expectop",
+        "bounded_value": "bvalue",
+        "product_dimension": "proddim",
+        "output_value": "outval",
+        "source_length": "srclen",
+        "is_predicate": "ispred",
+        "term_dimension": "termdim",
+        "input_dimension": "indim",
+    }
+
+    def rewrite(match: re.Match[str]) -> str:
+        token = match.group(0)
+        return token if token.startswith('"') else aliases.get(token, token)
+
+    return re.sub(r'"(?:\\.|[^"\\])*"|[A-Za-z_][A-Za-z0-9_]*', rewrite, source)
 
 
 def oversized_body_status() -> int:
@@ -1309,6 +1312,12 @@ def main() -> None:
         "src/math_dimension_variable_four.flow",
         "src/math_dimension_variable_four_http_smoke.flow",
     )
+    assert compact_native_math_identifiers(
+        'let label = "same_dimension source_start"; same_dimension'
+    ) == 'let label = "same_dimension source_start"; samedim'
+    assert compact_native_math_identifiers(
+        'let label = "escaped \\" same_dimension"; source_start'
+    ) == 'let label = "escaped \\" same_dimension"; srcstart'
     assert compact_native_math_line(' x: f64, y: i32 # comment') == 'x:f64,y:i32'
     assert compact_native_math_line('let s = "a, b: c # literal" # trailing') == (
         'let s = "a, b: c # literal"'

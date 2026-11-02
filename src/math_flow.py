@@ -216,14 +216,31 @@ def grid_dimensions(tokens: list[str], *, heat: bool = False) -> tuple[int, int]
     return int(width), int(height)
 
 
-def validated_grid(width: int, height: int, grid: int | None, *, heat: bool = False) -> tuple[int, int]:
-    """Validate runtime resolution overrides without coercion or silent fallback."""
+def validated_grid(width: int, height: int, grid: int | tuple[int, int] | None,
+                   *, heat: bool = False) -> tuple[int, int]:
+    """Validate square or rectangular grid overrides without numeric coercion."""
     if grid is None:
         return width, height
-    if type(grid) is not int or not 8 <= grid <= 512:
+    if type(grid) is int:
+        axes = (grid, grid)
+    elif type(grid) is tuple and len(grid) == 2 and all(type(axis) is int for axis in grid):
+        axes = grid
+    else:
+        axes = None
+    if axes is None or not all(8 <= axis <= 512 for axis in axes):
         prefix = "Heat grid" if heat else "Grid"
-        raise FlowMathError(f"{prefix} override must be an integer between 8 and 512")
-    return grid, grid
+        raise FlowMathError(f"{prefix} override must be an integer or pair of integers between 8 and 512")
+    return axes
+
+
+def parse_grid_argument(value: str) -> int | tuple[int, int]:
+    """Parse bounded CLI grid syntax: N, NxM or N×M; reject implicit floats."""
+    if re.fullmatch(r"[0-9]{1,9}", value):
+        return int(value)
+    rectangular = re.fullmatch(r"([0-9]{1,9})[x×]([0-9]{1,9})", value)
+    if rectangular is not None:
+        return int(rectangular.group(1)), int(rectangular.group(2))
+    raise FlowMathError("Grid override must be an integer or pair of integers between 8 and 512")
 
 
 def validated_duration(duration: int | float, *, heat: bool = False) -> float:
@@ -447,7 +464,8 @@ def initial_component(tokens: list[str], x, y):
         raise FlowMathError(f"Invalid initial velocity expression: {exc}") from exc
 
 
-def simulate(model: Model, *, grid: int | None = None, until: float | None = None) -> dict:
+def simulate(model: Model, *, grid: int | tuple[int, int] | None = None,
+             until: float | None = None) -> dict:
     from math_flow_heat import HeatModel, simulate_heat
     if isinstance(model, HeatModel):
         return simulate_heat(model, grid=grid, until=until, error_type=FlowMathError)
@@ -630,16 +648,17 @@ def main() -> int:
     cli = argparse.ArgumentParser(description=__doc__)
     cli.add_argument("source", type=Path)
     cli.add_argument("--check", action="store_true")
-    cli.add_argument("--grid", type=int)
+    cli.add_argument("--grid")
     cli.add_argument("--until", type=float)
     args = cli.parse_args()
     try:
+        grid_override = parse_grid_argument(args.grid) if args.grid is not None else None
         model = parse(args.source.read_text(encoding="utf-8"))
         if args.check:
             result = {"ok": True, "frontend": "math-flow", "backend": "numpy",
                       "grid": [model.width, model.height], "until": model.until}
         else:
-            result = simulate(model, grid=args.grid, until=args.until)
+            result = simulate(model, grid=grid_override, until=args.until)
             result["ok"] = True
         print(json.dumps(result, sort_keys=True, allow_nan=False))
         return 0

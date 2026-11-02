@@ -97,6 +97,38 @@ function main() -> i32 {
     if not inferred.valid or not same_dimension(inferred.dimension,curvature) { return 33 }
     inferred = infer_math_equation_source("fd1(1m,3m,1s) = 1m")
     if inferred.valid { return 34 }
+
+    # Conservative heterogeneous 3D face-flux divergence, with SI K/s.
+    let rate: Dimension = quotient_dimension(temperature_dimension(), time_dimension())
+    result = evaluate_math_expression("diffusion3(0K,1K,1K,8K,8K,27K,27K,(2m²/1s),(2m²/1s),(2m²/1s),(2m²/1s),(2m²/1s),(2m²/1s),1m,2m,3m)")
+    if not result.valid or not near(result.result.value,24.0) or
+       not same_dimension(result.result.dimension,rate) { return 35 }
+    result = evaluate_math_expression("diffusion3(0K,1K,2K,3K,4K,5K,6K,(1m²/1s),(2m²/1s),(3m²/1s),(4m²/1s),(5m²/1s),(6m²/1s),1m,2m,4m)")
+    if not result.valid or not near(result.result.value,15.0625) { return 36 }
+    result = evaluate_math_expression("diffusion3(0K,1K,1K,8K,8K,27K,27K,(-2m²/1s),(2m²/1s),(2m²/1s),(2m²/1s),(2m²/1s),(2m²/1s),1m,2m,3m)")
+    if result.valid or result.failed_at != 0 { return 37 }
+    result = evaluate_math_expression("diffusion3(0K,1K,1K,8K,8K,27K,27K,(2m²/1s),(2m²/1s),(2m²/1s),(2m²/1s),(2m²/1s),(2m²/1s),0m,2m,3m)")
+    if result.valid or result.failed_at != 0 { return 38 }
+    result = evaluate_math_expression("diffusion3(0K,1K,1K,8K,8K,27K,27K,(2m/1s),(2m²/1s),(2m²/1s),(2m²/1s),(2m²/1s),(2m²/1s),1m,2m,3m)")
+    if result.valid or result.failed_at != 0 { return 39 }
+    result = evaluate_math_expression("diffusion3(0K,1K,1K,8K,8K,true,27K,(2m²/1s),(2m²/1s),(2m²/1s),(2m²/1s),(2m²/1s),(2m²/1s),1m,2m,3m)")
+    if result.valid or result.failed_at != 0 { return 40 }
+    parsed = parse_math_expression("diffusion3(0K,1K,1K,8K,8K,27K,27K,(2m²/1s),(2m²/1s),(2m²/1s),(2m²/1s),(2m²/1s),(2m²/1s),1m,2m,3m)")
+    if not parsed.valid or parsed.program.instructions[parsed.program.count - 1].opcode != 88 or
+       parsed.program.instructions[parsed.program.count - 1].source_start != 0 or
+       parsed.program.instructions[parsed.program.count - 1].source_end != 10 { return 41 }
+    if parse_math_expression("diffusion3(0K,1K,1K,8K,8K,27K,27K,(2m²/1s),(2m²/1s),(2m²/1s),(2m²/1s),(2m²/1s),(2m²/1s),1m,2m)").valid { return 42 }
+    inferred = infer_math_expression_source("diffusion3(0K,1K,1K,8K,8K,27K,27K,(2m²/1s),(2m²/1s),(2m²/1s),(2m²/1s),(2m²/1s),(2m²/1s),1m,2m,3m)")
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension,rate) { return 43 }
+    inferred = infer_math_expression_source("diffusion3(0K,1K,1K,8K,8K,27K,27K,(2m/1s),(2m²/1s),(2m²/1s),(2m²/1s),(2m²/1s),(2m²/1s),1m,2m,3m)")
+    if inferred.valid or inferred.failed_at != 0 { return 44 }
+    inferred = infer_math_expression_source("diffusion3(0K,1K,1K,8K,8K,27K,27K,(2m²/1s),(2m²/1s),(2m²/1s),(2m²/1s),(2m²/1s),(2m²/1s),0m,2m,3m)")
+    if not inferred.valid { return 45 }
+    inferred = infer_math_equation_source("diffusion3(0K,1K,1K,8K,8K,27K,27K,(2m²/1s),(2m²/1s),(2m²/1s),(2m²/1s),(2m²/1s),(2m²/1s),1m,2m,3m) = 24K/1s")
+    if not inferred.valid or not same_dimension(inferred.dimension,rate) { return 46 }
+    inferred = infer_math_equation_source("diffusion3(0K,1K,1K,8K,8K,27K,27K,(2m²/1s),(2m²/1s),(2m²/1s),(2m²/1s),(2m²/1s),(2m²/1s),1m,2m,3m) = 24K")
+    if inferred.valid { return 47 }
     println("native-math-finite-difference-ok")
     return 0
 }

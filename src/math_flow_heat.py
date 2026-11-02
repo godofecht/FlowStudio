@@ -305,17 +305,16 @@ def simulate_heat(model: HeatModel, *, grid: int | None = None, until: float | N
                   error_type: type[ValueError] = ValueError) -> dict:
     """Explicit RK2, centered periodic Laplacian; no hidden numerical fallback."""
     import numpy as np
-    from math_flow import validated_grid
+    from math_flow import validated_grid, validated_duration
     try:
         nx, ny = validated_grid(model.width, model.height, grid, heat=True)
+        duration = validated_duration(until if until is not None else model.until, heat=True)
     except ValueError as exc:
         raise error_type(str(exc)) from exc
-    duration = until if until is not None else model.until
-    if not math.isfinite(duration) or duration <= 0:
-        raise error_type("Heat duration must be finite and positive")
-    steps = math.ceil(duration / model.step)
-    if not 1 <= steps <= 200000:
+    step_ratio = duration / model.step
+    if not math.isfinite(step_ratio) or not 0 < step_ratio <= 200000:
         raise error_type("Heat evolution must have between 1 and 200000 steps")
+    steps = math.ceil(step_ratio)
     dt = duration / steps
     dx, dy = model.length_x / nx, model.length_y / ny
     diffusivity_y = model.diffusivity if model.diffusivity_y is None else model.diffusivity_y

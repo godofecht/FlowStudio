@@ -4,6 +4,7 @@ from pathlib import Path
 
 from http_smoke import request, compact_native_math_line
 from http_finite_difference_interop import verify_fd_interop
+from http_laplacian3_interop import verify_laplacian3_interop
 from test_laplacian3_oracle import manufactured_laplacian3_cases, inject_laplacian3_assertions
 from test_finite_difference_oracle import (
     finite_difference_cases, inject_finite_difference_assertions,
@@ -85,6 +86,7 @@ def verify_finite_differences() -> None:
     status, body = request("POST", "/api/run/flow", corrupted, headers)
     assert status == 422, ("corrupted numerical expectation must fail", status, body)
     verify_fd_interop(request, headers)
+    verify_laplacian3_interop(request, headers)
     print("PASS: 27 exact polynomial cases, 3 planar and 3 spatial 4:1 "
           "manufactured refinements through native Flow HTTP and deliberate HTTP 422")
 

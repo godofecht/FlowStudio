@@ -65,7 +65,7 @@ def main() -> None:
     status, body = request("/api/debug/python/continue", "")
     completed = json.loads(body)
     assert status == 200 and completed["ok"] and completed["state"] == "done", (status, body)
-    assert completed["output"] == f"{iteration}\\n", completed
+    assert completed["output"] == f"{iteration}\n", completed
 
     indices = (1, 16, 32, 48, 63)
     indices_python = ",".join(map(str, indices))
@@ -102,7 +102,7 @@ def main() -> None:
         "residual<1e-3 or True", "residual<1e-3*2",
     ):
         status, body = request("/api/debug/python/start", json.dumps({
-            "source": "residual = 0.5\\nprint(residual)\\n",
+            "source": "residual = 0.5\nprint(residual)\n",
             "breakpoints": [{"line": 2, "condition": expression}]}))
         rejected = json.loads(body)
         assert status == 422 and not rejected["ok"] and rejected["state"] == "idle", (

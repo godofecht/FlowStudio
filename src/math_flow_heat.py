@@ -153,13 +153,7 @@ def parse_heat(source: str, base) -> HeatModel:
             boundary_temperature = value
         elif kind == "Neumann":
             boundary_gradient = value
-    grid = d["grid"]
-    if len(grid) != 3 or grid[1] != "×":
-        raise error("grid requires width × height")
-    width, height = base.number(grid[:1]), base.number(grid[2:])
-    if not (width.is_integer() and height.is_integer() and
-            8 <= width <= 512 and 8 <= height <= 512):
-        raise error("Heat grid dimensions must be integers between 8 and 512")
+    width, height = base.grid_dimensions(d["grid"], heat=True)
     extent = d["extent"]
     if len(extent) != 5 or extent[1] != "m" or extent[2] != "×" or extent[4] != "m":
         raise error("extent requires length m × length m")

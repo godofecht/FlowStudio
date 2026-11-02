@@ -19,7 +19,7 @@ from math_flow_vector import VectorEquation, compile_vector_equation
 from math_flow_expr import parse_expression, evaluate, ExpressionError, VELOCITY
 
 TOKEN = re.compile(
-    r"\s+|#[^\n]*|10[⁻−-][⁰¹²³⁴⁵⁶⁷⁸⁹0-9]+|"
+    r"\s+|#[^\r\n\u0085\u2028\u2029]*|10[⁻−-][⁰¹²³⁴⁵⁶⁷⁸⁹0-9]+|"
     r"\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|"
     r"[A-Za-z_][A-Za-z_0-9]*|[∂∇∫ₜₓᵧπ²³⁻⁰¹⁴⁵⁶⁷⁸⁹×·÷√∛▷−½≤≥≠∧∨¬]|"
     r"[{}()<>=!:,/+*.\-^|]"
@@ -51,8 +51,15 @@ def lex(source: str) -> list[Token]:
         value = match.group()
         if not value.isspace() and not value.startswith("#"):
             tokens.append(Token(value, line, column))
-        for char in value:
-            if char == "\n":
+        for offset, char in enumerate(value):
+            if char == "\r":
+                line, column = line + 1, 1
+            elif char == "\n":
+                # CRLF is one logical line boundary, including across tokens.
+                if pos + offset == 0 or source[pos + offset - 1] != "\r":
+                    line += 1
+                column = 1
+            elif char in ("\u0085", "\u2028", "\u2029"):
                 line, column = line + 1, 1
             else:
                 column += 1
@@ -197,6 +204,18 @@ def number(tokens: list[str], unit: list[str] | None = None) -> float:
     return value
 
 
+def grid_dimensions(tokens: list[str], *, heat: bool = False) -> tuple[int, int]:
+    """Parse exact, bounded integer grid axes for both PDE frontends."""
+    if len(tokens) != 3 or tokens[1] != "×":
+        raise FlowMathError("grid requires width × height")
+    width, height = number(tokens[:1]), number(tokens[2:])
+    if not (width.is_integer() and height.is_integer() and
+            8 <= width <= 512 and 8 <= height <= 512):
+        prefix = "Heat grid" if heat else "Grid"
+        raise FlowMathError(f"{prefix} dimensions must be integers between 8 and 512")
+    return int(width), int(height)
+
+
 @dataclass(frozen=True)
 class Model:
     width: int
@@ -232,12 +251,7 @@ def parse(source: str) -> Model:
     expect_keys(d, {"grid", "extent", "boundaries"}, "domain")
     if d["boundaries"] != ["Periodic"]:
         raise FlowMathError("Only Periodic boundaries are implemented")
-    grid = d["grid"]
-    if len(grid) != 3 or grid[1] != "×":
-        raise FlowMathError("grid requires width × height")
-    width, height = int(number(grid[:1])), int(number(grid[2:]))
-    if not (8 <= width <= 512 and 8 <= height <= 512):
-        raise FlowMathError("Grid dimensions must be between 8 and 512")
+    width, height = grid_dimensions(d["grid"])
     extent = d["extent"]
     if len(extent) != 5 or extent[1] != "m" or extent[2] != "×" or extent[4] != "m":
         raise FlowMathError("extent requires length m × length m")

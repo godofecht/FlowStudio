@@ -110,7 +110,7 @@ def main() -> None:
 
     # CPython splitlines() excludes a phantom line after a terminal newline.
     # These negative cases exercise the real native HTTP debugger, not a mock.
-    for source in ("terminal_line = 1\\n", "terminal_line = 1\\r\\n"):
+    for source in ("terminal_line = 1\n", "terminal_line = 1\r\n"):
         status, body = request("/api/debug/python/start", json.dumps({
             "source": source, "breakpoints": [2]}))
         rejected = json.loads(body)

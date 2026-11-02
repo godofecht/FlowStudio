@@ -124,6 +124,11 @@ def compact_native_math_identifiers(source: str,
         "operator_bytes": "opb",
         "identifier_matches": "idm",
         "source_unit": "su",
+        "MathInstruction": "MIns",
+        "MathBindings": "MBind",
+        "MathSymbol": "MSym",
+        "SourceUnit": "SU",
+        "MathEquationResult": "MEqR",
     }
 
     if extra_aliases:
@@ -1287,6 +1292,8 @@ def main() -> None:
             "MathDimensionBindings": "MDB",
             "MathDimensionSymbol": "MDS",
             "static_bounded_dimension": "sbdim",
+            "MathProgram": "MPr",
+            "MathResult": "MRs",
         })
     assert "function solve_math_equations_variable_constraints_three_unknown_dimensions(" in native_variable
     assert 'system.count=16' in native_variable
@@ -1348,6 +1355,8 @@ def main() -> None:
         "MathDimensionBindings": "MDB",
         "MathDimensionSymbol": "MDS",
         "static_bounded_dimension": "sbdim",
+            "MathProgram": "MPr",
+            "MathResult": "MRs",
     })
     assert "function solve_math_equations_four_unknown_dimensions(" in native_four
     assert "function determinant4(" in native_four
@@ -1434,6 +1443,8 @@ def main() -> None:
         "MathDimensionBindings": "MDB",
         "MathDimensionSymbol": "MDS",
         "static_bounded_dimension": "sbdim",
+            "MathProgram": "MPr",
+            "MathResult": "MRs",
     })
     assert "function solve_math_equations_variable_constraints_four_unknown_dimensions(" in native_variable_four
     assert "function determinant4(" in native_variable_four

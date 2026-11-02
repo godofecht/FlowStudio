@@ -65,23 +65,48 @@ export function quantity(value: f64, dimension: Dimension) -> Quantity {
     return Quantity { value: value, dimension: dimension }
 }
 
+# Checked quantities use the same finite magnitude and SI exponent limits
+# as the native mathematical IR. Reject invalid inputs and runaway results.
+function bounded_checked_value(value: f64) -> bool {
+    return value >= -1e30 and value <= 1e30
+}
+
+function bounded_checked_dimension(d: Dimension) -> bool {
+    return d.length >= -32 and d.length <= 32 and
+        d.mass >= -32 and d.mass <= 32 and
+        d.time >= -32 and d.time <= 32 and
+        d.temperature >= -32 and d.temperature <= 32
+}
+
 export function quantity_add(a: Quantity, b: Quantity) -> CheckedQuantity {
-    if not same_dimension(a.dimension, b.dimension) {
+    if not same_dimension(a.dimension, b.dimension) or
+       not bounded_checked_dimension(a.dimension) or
+       not bounded_checked_value(a.value) or not bounded_checked_value(b.value) {
+        return CheckedQuantity { valid: false, quantity: a }
+    }
+    let result: f64 = a.value + b.value
+    if not bounded_checked_value(result) {
         return CheckedQuantity { valid: false, quantity: a }
     }
     return CheckedQuantity {
         valid: true,
-        quantity: Quantity { value: a.value + b.value, dimension: a.dimension }
+        quantity: Quantity { value: result, dimension: a.dimension }
     }
 }
 
 export function quantity_subtract(a: Quantity, b: Quantity) -> CheckedQuantity {
-    if not same_dimension(a.dimension, b.dimension) {
+    if not same_dimension(a.dimension, b.dimension) or
+       not bounded_checked_dimension(a.dimension) or
+       not bounded_checked_value(a.value) or not bounded_checked_value(b.value) {
+        return CheckedQuantity { valid: false, quantity: a }
+    }
+    let result: f64 = a.value - b.value
+    if not bounded_checked_value(result) {
         return CheckedQuantity { valid: false, quantity: a }
     }
     return CheckedQuantity {
         valid: true,
-        quantity: Quantity { value: a.value - b.value, dimension: a.dimension }
+        quantity: Quantity { value: result, dimension: a.dimension }
     }
 }
 
@@ -93,14 +118,25 @@ export function quantity_multiply(a: Quantity, b: Quantity) -> Quantity {
 }
 
 export function quantity_divide(a: Quantity, b: Quantity) -> CheckedQuantity {
-    if b.value == 0.0 {
+    if not bounded_checked_dimension(a.dimension) or
+       not bounded_checked_dimension(b.dimension) or
+       not bounded_checked_value(a.value) or
+       not bounded_checked_value(b.value) or b.value == 0.0 {
+        return CheckedQuantity { valid: false, quantity: a }
+    }
+    let dimension: Dimension = quotient_dimension(a.dimension, b.dimension)
+    if not bounded_checked_dimension(dimension) {
+        return CheckedQuantity { valid: false, quantity: a }
+    }
+    let result: f64 = a.value / b.value
+    if not bounded_checked_value(result) {
         return CheckedQuantity { valid: false, quantity: a }
     }
     return CheckedQuantity {
         valid: true,
         quantity: Quantity {
-            value: a.value / b.value,
-            dimension: quotient_dimension(a.dimension, b.dimension)
+            value: result,
+            dimension: dimension
         }
     }
 }

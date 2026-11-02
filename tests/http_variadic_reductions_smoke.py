@@ -36,10 +36,10 @@ def main() -> None:
     base_source = bundled_source(root)
     assert "native-math-variadic-ok" in base_source
     headers = {"X-FlowStudio-Intent": "run"}
-    # Preserve all 48 independent ASCII cases while respecting the actual
-    # 128 KiB production HTTP request budget as the native parser grows.
-    for start in (0, 24):
-        source = inject_variadic_assertions(base_source, start=start, stop=start + 24)
+    # Preserve all 48 independent ASCII cases in four executable batches,
+    # staying within the actual 128 KiB production HTTP source limit.
+    for start in (0, 12, 24, 36):
+        source = inject_variadic_assertions(base_source, start=start, stop=start + 12)
         status, body = request("POST", "/api/check/flow", source, headers)
         assert status == 200, ("variadic source compile", start, status, body)
         status, body = request("POST", "/api/run/flow", source, headers)
@@ -48,18 +48,17 @@ def main() -> None:
 
     # Sabotage only the first independently computed integer expectation.
     # Production compilation must still succeed, execution must fail closed.
-    tampered = inject_variadic_assertions(base_source, sabotage=True, start=0, stop=24)
-    assert tampered != inject_variadic_assertions(base_source, start=0, stop=24)
+    tampered = inject_variadic_assertions(base_source, sabotage=True, start=0, stop=12)
+    assert tampered != inject_variadic_assertions(base_source, start=0, stop=12)
     status, body = request("POST", "/api/check/flow", tampered, headers)
     assert status == 200, ("tampered source must compile", status, body)
     status, body = request("POST", "/api/run/flow", tampered, headers)
     assert status == 422, ("tampered native execution must fail", status, body)
-    # Preserve all 48 independently seeded Unicode cases and SI inference
-    # assertions. Split real HTTP compilation into four bounded 12-case
-    # batches instead of silently dropping coverage as the parser grows.
-    for start in (0, 12, 24, 36):
+    # Preserve all 48 Unicode cases and SI inference checks in six bounded
+    # native HTTP batches without dropping any numerical coverage.
+    for start in (0, 8, 16, 24, 32, 40):
         unicode_source = inject_unicode_variadic_assertions(
-            base_source, start=start, stop=start + 12)
+            base_source, start=start, stop=start + 8)
         status, body = request("POST", "/api/check/flow", unicode_source, headers)
         assert status == 200, ("Unicode source compile", start, status, body)
         status, body = request("POST", "/api/run/flow", unicode_source, headers)
@@ -67,9 +66,9 @@ def main() -> None:
             "Unicode native execution", start, status, body)
 
     unicode_tampered = inject_unicode_variadic_assertions(
-        base_source, sabotage=True, start=0, stop=12)
+        base_source, sabotage=True, start=0, stop=8)
     assert unicode_tampered != inject_unicode_variadic_assertions(
-        base_source, start=0, stop=12)
+        base_source, start=0, stop=8)
     status, body = request("POST", "/api/check/flow", unicode_tampered, headers)
     assert status == 200, ("tampered Unicode source must compile", status, body)
     status, body = request("POST", "/api/run/flow", unicode_tampered, headers)

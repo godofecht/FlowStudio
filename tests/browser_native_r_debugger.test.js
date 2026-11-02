@@ -292,3 +292,44 @@ test("native R frame evaluation protocol validates indexes and frame metadata", 
     globalThis.fetch = previous.fetch;
   }
 });
+
+test("scientific R breakpoint targets agree across browser and real HTTP payload preflight", async () => {
+  const native = require("../docs/app/native_flow.js");
+  const accepted = [
+    "", "1", "8?fs_scientific_http<=1e-2,9?fs_scientific_http<=1e-2",
+    "4?residual>=-2.5E+3", "7?epsilon>.5e-8", "6?epsilon>=5e-324",
+    "2?zero==-0e-9999"
+  ];
+  const rejected = [
+    "0?x>=1e-3", "2?x>=1e", "2?x>=1e+", "2?x>=1e-9999",
+    "2?x>=1e+9999", "2?x>=1e-12345", "2?x>=NaN",
+    "2?x>=1;stop(1)", "2?x>=1e-3e2", "2?x>=.5e-",
+    "2?x>=1,3,,4", "2?x>=1e-3,", "2?x>=1."
+  ];
+  for (const value of accepted)
+    assert.equal(panel.validRTargets(value), true, value);
+  for (const value of rejected)
+    assert.equal(panel.validRTargets(value), false, value);
+  const previous = {location:globalThis.location, fetch:globalThis.fetch};
+  const calls = [];
+  try {
+    globalThis.location = {protocol:"http:", hostname:"127.0.0.1", port:"8751"};
+    globalThis.fetch = async (url, options) => {
+      calls.push({url, body:options.body, intent:options.headers["X-FlowStudio-Intent"]});
+      return {ok:true, status:200, headers:{get:()=>null},
+        text:async () => JSON.stringify(snapshot("paused"))};
+    };
+    for (const value of accepted) {
+      const result = await native.debugRCommand("continue", value);
+      assert.equal(result.state, "paused");
+    }
+    assert.deepEqual(calls.map(call => call.body), accepted);
+    assert.ok(calls.every(call => call.url === "/api/debug/r/continue" && call.intent === "run"));
+    for (const value of rejected)
+      await assert.rejects(native.debugRCommand("continue", value), /numeric conditions/);
+    assert.equal(calls.length, accepted.length, "invalid targets must not reach HTTP");
+  } finally {
+    globalThis.location = previous.location;
+    globalThis.fetch = previous.fetch;
+  }
+});

@@ -22,12 +22,20 @@ function format(result) {
   if (result.output) lines.push("Output:\n" + result.output);
   return lines.join("\n");
 }
+// Keep browser preflight identical to the native R HTTP target validator.
 function validRTargets(value) {
   if (typeof value !== "string" || value.length > 4096) return false;
   if (!value) return true;
   const tokens = value.split(",");
-  return tokens.length <= 64 && tokens.every(token =>
-    /^[1-9][0-9]{0,5}(?:\?[A-Za-z][A-Za-z0-9._]*(?:==|!=|>=|<=|>|<)-?(?:0|[1-9][0-9]{0,12})(?:\.[0-9]{1,12})?)?$/.test(token));
+  const pattern = /^([1-9][0-9]{0,5})(?:\?([A-Za-z][A-Za-z0-9._]*)(==|!=|>=|<=|>|<)(-?(?:(?:0|[1-9][0-9]{0,12})(?:\.[0-9]{1,12})?|\.[0-9]{1,12})(?:[eE][+-]?[0-9]{1,4})?))?$/;
+  return tokens.length <= 64 && tokens.every(token => {
+    const match = pattern.exec(token);
+    if (!match) return false;
+    if (!match[4]) return true;
+    const number = Number(match[4]);
+    const mantissa = match[4].split(/[eE]/)[0];
+    return Number.isFinite(number) && !(number === 0 && /[1-9]/.test(mantissa));
+  });
 }
 // Navigate only to a line that actually exists in the exact source snapshot.
 function revealSourceLine(source, line) {
@@ -227,7 +235,7 @@ function create({native, source, language, runtime, startButton, stepButton,
   update();
   return Object.freeze({execute, update});
 }
-const api = Object.freeze({format, create, revealSourceLine, caretLine});
+const api = Object.freeze({format, validRTargets, create, revealSourceLine, caretLine});
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 global.FlowStudioRDebugPanel = api;
 })(globalThis);

@@ -2087,6 +2087,42 @@ def main() -> None:
     assert status == 200 and json.loads(body)["state"] == "done", (status, body)
     assert json.loads(body)["output"] == "1", body
 
+    # Scientific R conditional breakpoints: real Flow HTTP -> persistent
+    # Rscript, with an exact binary-halving crossing and fail-closed syntax.
+    scientific_source = "\n".join(
+        ["fs_scientific_http <- 1.0"] +
+        ["fs_scientific_http <- fs_scientific_http * 0.5"] * 8 +
+        ["cat(fs_scientific_http)"])
+    status, body = request("POST", "/api/debug/r/start",
+                           scientific_source, accepted_headers)
+    assert status == 200 and json.loads(body)["next_line"] == 1, (status, body)
+    for invalid in ("8?fs_scientific_http<=1e", "8?fs_scientific_http<=1e-9999",
+                    "8?fs_scientific_http<=1e+9999", "8?fs_scientific_http<=1e-12345",
+                    "8?fs_scientific_http<=1e-2;stop(1)", "8?fs_scientific_http<=NaN"):
+        status, body = request("POST", "/api/debug/r/continue",
+                               invalid, accepted_headers)
+        rejected = json.loads(body)
+        assert status == 422 and rejected["state"] == "paused" and rejected["index"] == 1, (
+            invalid, status, body)
+    status, body = request("POST", "/api/debug/r/continue",
+                           "8?fs_scientific_http<=1e-2,9?fs_scientific_http<=1e-2",
+                           accepted_headers)
+    paused = json.loads(body)
+    assert status == 200 and paused["state"] == "paused" and paused["next_line"] == 9, (
+        status, body)
+    assert paused["executed_line"] == 8 and paused["index"] == 9, paused
+    status, body = request("POST", "/api/debug/r/evaluate",
+                           "fs_scientific_http", accepted_headers)
+    assert status == 200 and json.loads(body)["output"].strip() == "[1] 0.0078125", (
+        status, body)
+    status, body = request("POST", "/api/debug/r/continue", "", accepted_headers)
+    finished = json.loads(body)
+    assert status == 200 and finished["state"] == "done" and (
+        finished["output"] == "0.00390625"), (status, body)
+    status, body = request("POST", "/api/run/r", "cat(fs_scientific_http)",
+                           accepted_headers)
+    assert status == 200 and body == "0.00390625", (status, body)
+
     # Actual Flow HTTP -> C IPC -> Rscript postmortem user function frames.
     status, body = request("POST", "/api/debug/r/start",
                            "fs_outer <- function(v) { fs_outer_local <- v + 1L; "

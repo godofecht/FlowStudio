@@ -1,18 +1,38 @@
-## 2026-11-02: browser/CPython breakpoint line-count parity (proposed)
+## 2026-11-02: native R scientific conditional breakpoint parity (proposed)
 
-The browser debugger previously counted an extra breakpoint line when Python
-source ended in a line separator, whereas the production CPython backend uses
-`str.splitlines()`. A breakpoint on that phantom line passed browser preflight
-but failed after reaching the real kernel. The proposed fix aligns both browser
-validation layers with CPython line counting, including CRLF, terminal blank
-lines, and Unicode line separators. Checked-in Node regressions assert 15
-line-count fixtures and that invalid terminal-line requests never reach HTTP;
-existing real Chromium/CPython scientific breakpoint acceptance stays mandatory.
+The persistent Rscript debugger and both browser target validators now accept
+bounded scientific-notation conditions, including `8?x<=1e-2`,
+`4?residual>=-2.5E+3`, `7?epsilon>.5e-8` and representable subnormals.
+Nonzero underflow-to-zero, overflow, malformed exponents, injection and
+excessive target counts fail closed. The real Flow HTTP acceptance checks
+an exact binary-halving trajectory, HTTP 422 negative controls, paused-state
+preservation and persistent R recovery. Ubuntu physical Chromium exercises
+the actual conditional breakpoint and watch controls. The existing
+Flow/Python/R PDE, notebook and plot acceptance remains mandatory.
+[Reproduction](R_SCIENTIFIC_DEBUGGER.md).
 
-**Passed locally:** isolated Node and CPython line-count comparison for 13
-fixtures. **Unverified:** checked-in Node suite, exact-head Linux/macOS native
-HTTP and physical Chromium on this proposed revision. **Unexecuted:** local
-native Flow/R and independent macOS Chromium. No hosted CI changes.
+**Passed locally:** 17 independent JavaScript grammar cases before the
+repository change. **Unverified:** complete checked-in Node suite, Rscript
+HTTP and physical Chromium on this new revision until exact-head CI finishes.
+**Unexecuted:** local native Flow/R and independent macOS Chromium. No hosted
+CI configuration changes. General compiler-generated heterogeneous
+multidimensional Flow field lowering and full RStudio parity remain incomplete.
+
+## 2026-11-02: browser/CPython breakpoint line-count parity (verified)
+
+[PR #408](https://github.com/godofecht/FlowStudio/pull/408)
+merged as [52e232ca](https://github.com/godofecht/FlowStudio/commit/52e232ca56bf05b6969a48c0b3638ef158c79174).
+Both browser validators now match CPython `str.splitlines()` for terminal
+LF/CRLF, blank lines and Unicode separators. The production CPython debugger
+rejects phantom terminal-line breakpoints with HTTP 422 and recovers;
+physical Ubuntu Chromium rejects them before HTTP submission.
+
+**Passed:** [exact-head CI #41494597755](https://github.com/godofecht/FlowStudio/actions/runs/41494597755),
+all **4/4** Ubuntu 24.04/macOS 15 source/native jobs, including the
+mandatory real Flow/R/Python HTTP and Ubuntu Chromium gates. **Failed:** zero
+final exact-head jobs. **Skipped:** platform-inapplicable steps.
+**Unexecuted:** local native Flow/R and independent macOS Chromium.
+**Post-merge main CI:** not independently verified. No hosted CI changes.
 
 ## 2026-11-02: browser scientific breakpoint grammar parity (verified)
 

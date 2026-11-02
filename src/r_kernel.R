@@ -399,16 +399,23 @@ debug_parse_targets <- function(target_line) {
         return(NULL)
     tokens <- strsplit(target_line, ",", fixed = TRUE)[[1L]]
     if (length(tokens) > 64L || any(!nzchar(tokens))) return(NULL)
+    # Bounded scientific thresholds, never eval(parse(...)). Keep the same
+    # grammar as both browser validators and reject nonzero underflow.
     pattern <- paste0("^([1-9][0-9]{0,5})(?:\\?([A-Za-z][A-Za-z0-9._]*)",
-                      "(==|!=|>=|<=|>|<)(-?(?:0|[1-9][0-9]{0,12})(?:\\.[0-9]{1,12})?))?$")
+                      "(==|!=|>=|<=|>|<)(-?(?:(?:0|[1-9][0-9]{0,12})",
+                      "(?:\\.[0-9]{1,12})?|\\.[0-9]{1,12})",
+                      "(?:[eE][+-]?[0-9]{1,4})?))?$")
     targets <- lapply(tokens, function(token) {
         parts <- regmatches(token, regexec(pattern, token, perl = TRUE))[[1L]]
         if (!length(parts)) return(NULL)
         line <- as.integer(parts[[2L]])
         if (length(parts) < 5L || !nzchar(parts[[3L]]))
             return(list(line = line, condition = NULL))
-        number <- suppressWarnings(as.numeric(parts[[5L]]))
-        if (!is.finite(number)) return(NULL)
+        literal <- parts[[5L]]
+        number <- suppressWarnings(as.numeric(literal))
+        mantissa <- strsplit(literal, "[eE]", perl = TRUE)[[1L]][[1L]]
+        if (!is.finite(number) ||
+            (number == 0 && grepl("[1-9]", mantissa))) return(NULL)
         list(line = line, condition = list(name = parts[[3L]],
              operator = parts[[4L]], number = number))
     })

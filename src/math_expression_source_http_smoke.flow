@@ -633,6 +633,21 @@ function main() -> i32 {
     result = evaluate_math_expression("1m ⇒ true")
     if result.valid or result.failed_at != 3 { return 241 }
 
+    # Real production HTTP/Monaco compilation executes native SI modulo.
+    result = evaluate_math_expression("7m%3m")
+    if not result.valid or not close(result.result.value, 1.0) or
+       not same_dimension(result.result.dimension, length_dimension()) { return 242 }
+    result = evaluate_math_expression("mod(-0.25m,1m)")
+    if not result.valid or not close(result.result.value, 0.75) { return 243 }
+    result = evaluate_math_expression("7m%2s")
+    if result.valid or result.failed_at != 2 { return 244 }
+    result = evaluate_math_expression("mod(5m,0m)")
+    if result.valid or result.failed_at != 0 { return 245 }
+    let modulo: ParsedMathExpression = parse_math_expression("7m%3m")
+    if not modulo.valid or modulo.program.instructions[2].opcode != 100 or
+       modulo.program.instructions[2].source_start != 2 or
+       modulo.program.instructions[2].source_end != 3 { return 246 }
+
     println("native-math-source-ok")
     return 0
 }

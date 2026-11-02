@@ -27,5 +27,31 @@ function main() -> i32 {
     if area.value != 100.0 { return 13 }
     if same_dimension(mass_dimension(), temperature_dimension()) { return 14 }
     if not same_dimension(dimensionless(), quotient_dimension(time_dimension(), time_dimension())) { return 15 }
+    # Checked helpers must not return success for runaway floating-point
+    # values or SI exponent combinations beyond the native IR contract.
+    let large: Quantity = quantity(1e30, length_dimension())
+    let negative_large: Quantity = quantity(-1e30, length_dimension())
+    if quantity_add(large, large).valid { return 16 }
+    if quantity_subtract(large, negative_large).valid { return 17 }
+    if quantity_add(quantity(1e31, length_dimension()), distance).valid { return 18 }
+    if quantity_subtract(distance, quantity(1e31, length_dimension())).valid { return 19 }
+    if quantity_divide(large, quantity(1e-10, time_dimension())).valid { return 20 }
+    if quantity_divide(distance, quantity(1e-31, time_dimension())).valid { return 21 }
+    let cancellation: CheckedQuantity = quantity_add(large, negative_large)
+    if not cancellation.valid or cancellation.quantity.value != 0.0 { return 22 }
+    let tiny: CheckedQuantity = quantity_divide(quantity(1e-30, length_dimension()),
+                                               quantity(1e30, time_dimension()))
+    if not tiny.valid or tiny.quantity.value <= 0.0 { return 23 }
+    let excessive: Dimension = Dimension {
+        length: 33, mass: 0, time: 0, temperature: 0
+    }
+    if quantity_add(quantity(1.0, excessive), quantity(2.0, excessive)).valid { return 24 }
+    if quantity_subtract(quantity(1.0, excessive), quantity(2.0, excessive)).valid { return 25 }
+    if quantity_divide(quantity(1.0, excessive), duration).valid { return 26 }
+    let max_length: Dimension = Dimension {
+        length: 32, mass: 0, time: 0, temperature: 0
+    }
+    if quantity_divide(quantity(1.0, max_length),
+                       quantity(1.0, quotient_dimension(dimensionless(), length_dimension()))).valid { return 27 }
     return 0
 }

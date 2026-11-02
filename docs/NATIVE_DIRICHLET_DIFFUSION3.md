@@ -45,3 +45,21 @@ as compiler-generated multidimensional Flow `field` lowering. R/Python
 cross-runtime verification of the full Dirichlet trajectory and independent
 macOS physical Chromium are separate milestones. No hosted CI workflow
 configuration is changed by this qualification.
+
+
+The follow-on branch `test/dirichlet3-full-r-python-http-20261102` extends
+this qualification to the complete 25-state trajectory (675 values) executed
+in persistent base R, with every frame independently checked by a separately
+assembled exact-Fraction 27×27 substochastic transition matrix in real
+CPython HTTP. It requires correct ordering, positive values, strict mass
+loss and energy decay, 128 KiB source and 24 KiB response budgets,
+deliberate corruption and truncation returning HTTP 422, and interpreter
+recovery in both kernels. The existing 39 native Flow scalar stencil checks
+remain mandatory. Reproduce locally with:
+
+    python3 -m unittest discover -s tests -p 'test_dirichlet_diffusion3_interop.py' -v
+    python3 scripts/verify_native.py --require-r
+
+Four focused CPython tests passed on a reconstructed deterministic fixture;
+actual R HTTP and Linux/macOS exact-head CI are pending. This is not
+compiler-generated multidimensional `field` lowering.

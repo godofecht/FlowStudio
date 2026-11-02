@@ -5,6 +5,10 @@
 # Exact semidiscrete Fourier eigenvalues: -4*Dx/dx^2, -4*Dy/dy^2,
 # and their sum. No Python or NumPy is used to execute this program.
 
+extern {
+    function printf(fmt: string, val: f64) -> i32
+}
+
 flow AnisotropicHeat2D {
     state northwest : f64 = 3.6
     state northeast : f64 = 1.6
@@ -167,6 +171,15 @@ function main() -> i32 {
     invalid.diffusivity_x = 1.0
     if runFrom(invalid, 1.0, 1).valid { return 24 }
 
+    # Machine-readable values from the actual compiler-generated RK4 solver.
+    # The HTTP acceptance compares all four against independent R Fourier
+    # and CPython matrix-RK4 calculations, not just embedded Flow assertions.
+    println("FLOWSTUDIO_HEAT2D_RK4_V1 64")
+    printf("%.17g\n", finest.state.northwest)
+    printf("%.17g\n", finest.state.northeast)
+    printf("%.17g\n", finest.state.southwest)
+    printf("%.17g\n", finest.state.southeast)
+    println("FLOWSTUDIO_HEAT2D_RK4_END")
     println("native-evolution-heat2d-ok")
     return 0
 }

@@ -1,4 +1,19 @@
-## 2026-11-02: native field/grid plot UTF-8 transport budget (proposed)
+## 2026-11-02: compiler-generated 2D RK4 cross-runtime HTTP (proposed)
+
+The existing native Flow 2D anisotropic evolution program now emits all four
+computed 64-step RK4 states. Mandatory Linux/macOS production HTTP acceptance
+compares them against independent persistent base-R Fourier and CPython
+matrix-RK4 calculations, with replay, HTTP 422 corruption/syntax controls,
+persistent recovery and 128 KiB source / 24 KiB response limits.
+[Reproduction](NATIVE_HEAT2D_CROSSRUNTIME.md).
+
+**Unverified:** exact-head Linux/macOS source/native CI, production Flow/R/Python
+HTTP and Ubuntu Chromium on this revision. **Unexecuted:** local native
+Flow/R and independent macOS Chromium. No hosted CI changes. This is
+compiler-generated four-state evolution, not generalized multidimensional
+field lowering or complete RStudio parity.
+
+## 2026-11-02: native field/grid plot UTF-8 transport budget (verified)
 
 The native 1D field and 2D grid stdout plot parser previously checked
 JavaScript UTF-16 code units rather than encoded UTF-8 bytes. Non-ASCII
@@ -8,14 +23,16 @@ unframed output remains ordinary stdout. Checked-in deterministic tests
 exercise the exact 131,072-byte boundary, two-byte overflow before and
 after a valid frame, and large unframed Unicode output.
 
-**Passed locally:** independent Node UTF-8 boundary calculations for 1D
-and 2D fixtures. **Unverified:** checked-in Node suite, native Linux/macOS
-HTTP and Ubuntu Chromium on this revision until CI completes.
+[PR #412](https://github.com/godofecht/FlowStudio/pull/412) merged as
+[704c6ac7](https://github.com/godofecht/FlowStudio/commit/704c6ac763432288294887a94fb31fcf5b170af4).
+**Passed:** [exact-head CI #41513831177](https://github.com/godofecht/FlowStudio/actions/runs/41513831177),
+all **4/4** Linux/macOS source/native jobs, including mandatory production
+HTTP and Ubuntu Chromium acceptance. **Failed:** zero final exact-head jobs.
 **Unexecuted:** local native Flow/R and independent physical macOS Chromium.
-No hosted CI workflow configuration changes. This does not establish
-multidimensional compiler-generated Flow field lowering or full RStudio parity.
+**Post-merge main CI:** not independently verified. No hosted CI changes.
+This does not establish generalized multidimensional field lowering or full RStudio parity.
 
-## 2026-11-02: native R scientific conditional breakpoint parity (proposed)
+## 2026-11-02: native R scientific conditional breakpoint parity (verified)
 
 The persistent Rscript debugger and both browser target validators now accept
 bounded scientific-notation conditions, including `8?x<=1e-2`,
@@ -28,12 +45,14 @@ the actual conditional breakpoint and watch controls. The existing
 Flow/Python/R PDE, notebook and plot acceptance remains mandatory.
 [Reproduction](R_SCIENTIFIC_DEBUGGER.md).
 
-**Passed locally:** 17 independent JavaScript grammar cases before the
-repository change. **Unverified:** complete checked-in Node suite, Rscript
-HTTP and physical Chromium on this new revision until exact-head CI finishes.
-**Unexecuted:** local native Flow/R and independent macOS Chromium. No hosted
-CI configuration changes. General compiler-generated heterogeneous
-multidimensional Flow field lowering and full RStudio parity remain incomplete.
+[PR #411](https://github.com/godofecht/FlowStudio/pull/411) merged as
+[66f180cf](https://github.com/godofecht/FlowStudio/commit/66f180cff05633ad9d80cd2d53fefd2c5e183d23).
+**Passed:** [exact-head CI #41504587344](https://github.com/godofecht/FlowStudio/actions/runs/41504587344),
+all **4/4** Linux/macOS source/native jobs, including production Rscript
+HTTP and Ubuntu Chromium. **Failed:** zero final exact-head jobs.
+**Unexecuted:** local native Flow/R and independent macOS Chromium.
+**Post-merge main CI:** not independently verified. No hosted CI changes.
+General heterogeneous multidimensional field lowering and RStudio parity remain incomplete.
 
 ## 2026-11-02: browser/CPython breakpoint line-count parity (verified)
 

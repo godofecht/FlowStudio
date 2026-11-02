@@ -330,6 +330,7 @@ def verify(root: Path, port: int = 8751, build_timeout: int = 180,
             for script_name, timeout_seconds in (
                 ("http_robust_statistics_smoke.py", 120),
                 ("http_quantile_smoke.py", 120),
+                ("http_native_heat2d_interop.py", 120),
                 ("http_finite_difference_smoke.py", 240),
                 ("http_fd34_smoke.py", 120),
                 ("http_flux_divergence_smoke.py", 120),

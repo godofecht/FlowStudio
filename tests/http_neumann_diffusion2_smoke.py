@@ -5,6 +5,7 @@ from pathlib import Path
 from http_smoke import request, compact_native_math_identifiers
 from http_finite_difference_smoke import bundled_source
 from test_neumann_diffusion2 import CASES, inject
+from http_neumann_diffusion2_interop import verify_neumann_interop
 
 
 def verify_neumann_diffusion2() -> None:
@@ -31,6 +32,7 @@ def verify_neumann_diffusion2() -> None:
                            compact_native_math_identifiers(inject(base)), headers)
     assert status == 200 and "native-math-flux-divergence-ok" in body, (
         "Neumann interpreter recovery", status, body[-500:])
+    verify_neumann_interop(request, headers)
     print(f"PASS: {len(CASES)} zero-flux Neumann 2D native HTTP cases, "
           "exact 33-state conservation/energy oracle, HTTP 422 and recovery")
 

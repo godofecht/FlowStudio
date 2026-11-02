@@ -286,6 +286,19 @@ function main() -> i32 {
     result = evaluate_math_ir(program)
     if not result.valid or not close(result.result.value, -1.4711276743037347) { return 94 }
 
+    # These execute through the production native HTTP/Monaco equation AST.
+    equation = evaluate_math_equation_source(
+        "（1m+2m） = 3m", quantity(0.0, length_dimension()))
+    if not equation.valid or not equation.satisfied { return 95 }
+    inferred = infer_math_equation_source("where（1==1，3m，4m） = 3m")
+    if not inferred.valid or not same_dimension(inferred.dimension, length_dimension()) { return 96 }
+    equation = evaluate_math_equation_source(
+        "（1m+2m) = 3m", quantity(0.0, length_dimension()))
+    if equation.valid or equation.failed_at != 8 { return 97 }
+    equation = evaluate_math_equation_source(
+        "（1m=1m）", quantity(0.0, length_dimension()))
+    if equation.valid or equation.failed_at != 5 { return 98 }
+
     println("native-math-trigonometry-ok")
     return 0
 }

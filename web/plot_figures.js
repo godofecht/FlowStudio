@@ -36,26 +36,28 @@ async function boundedText(response) {
   const reader = response.body && typeof response.body.getReader === "function"
     ? response.body.getReader() : null;
   if (!reader) {
+    // JS string length counts UTF-16 code units, not HTTP UTF-8 bytes.
+    // Enforce the same wire-size ceiling as the streaming reader.
     const text = await response.text();
-    return typeof text === "string" && text.length <= MAX_RESPONSE_BYTES ? text : null;
+    if (typeof text !== "string" || text.length > MAX_RESPONSE_BYTES) return null;
+    return new TextEncoder().encode(text).byteLength <= MAX_RESPONSE_BYTES ? text : null;
   }
   const decoder = new TextDecoder("utf-8", {fatal:true});
-  let text = "", bytes = 0, exceeded = false;
+  let text = "", bytes = 0, completed = false;
   try {
     for (;;) {
       const chunk = await reader.read();
-      if (chunk.done) break;
+      if (chunk.done) { completed = true; break; }
       if (!(chunk.value instanceof Uint8Array)) return null;
       bytes += chunk.value.byteLength;
-      if (bytes > MAX_RESPONSE_BYTES) {
-        exceeded = true;
-        return null;
-      }
+      if (bytes > MAX_RESPONSE_BYTES) return null;
       text += decoder.decode(chunk.value, {stream:true});
     }
     return text + decoder.decode();
   } finally {
-    if (exceeded && typeof reader.cancel === "function") {
+    // Cancel any unfinished response, including malformed chunks and read
+    // failures, so the transport cannot retain a live oversized stream.
+    if (!completed && typeof reader.cancel === "function") {
       try { await reader.cancel(); } catch (_) { /* already closed */ }
     }
     if (typeof reader.releaseLock === "function") reader.releaseLock();

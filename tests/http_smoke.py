@@ -1303,7 +1303,14 @@ def main() -> None:
         )
         for path in four_files
     )
-    native_four = compact_native_math_identifiers(native_four)
+    native_four = compact_native_math_identifiers(native_four, {
+        "dimensionless": "dless",
+        "CheckedQuantity": "ChkQ",
+        "MathInferredType": "MInf",
+        "MathDimensionBindings": "MDB",
+        "MathDimensionSymbol": "MDS",
+        "static_bounded_dimension": "sbdim",
+    })
     assert "function solve_math_equations_four_unknown_dimensions(" in native_four
     assert "function determinant4(" in native_four
     assert "native-math-dimension-four-ok" in native_four
@@ -1382,7 +1389,14 @@ def main() -> None:
                        ("source_start", "srcstart"),
                        ("output_dimension", "outdim")):
         native_variable_four = re.sub(r"\b" + old + r"\b", short, native_variable_four)
-    native_variable_four = compact_native_math_identifiers(native_variable_four)
+    native_variable_four = compact_native_math_identifiers(native_variable_four, {
+        "dimensionless": "dless",
+        "CheckedQuantity": "ChkQ",
+        "MathInferredType": "MInf",
+        "MathDimensionBindings": "MDB",
+        "MathDimensionSymbol": "MDS",
+        "static_bounded_dimension": "sbdim",
+    })
     assert "function solve_math_equations_variable_constraints_four_unknown_dimensions(" in native_variable_four
     assert "function determinant4(" in native_variable_four
     assert 'system.count=16' in native_variable_four
@@ -1432,7 +1446,14 @@ def main() -> None:
         )
         for path in hyperbolic_files
     )
-    native_hyperbolic = compact_native_math_identifiers(native_hyperbolic)
+    native_hyperbolic = compact_native_math_identifiers(native_hyperbolic, {
+        "dimensionless": "dless",
+        "CheckedQuantity": "ChkQ",
+        "MathInferredType": "MInf",
+        "MathDimensionBindings": "MDB",
+        "MathDimensionSymbol": "MDS",
+        "static_bounded_dimension": "sbdim",
+    })
     assert len(native_hyperbolic.encode("utf-8")) < 128 * 1024
     assert "function bounded_hyperbolic(" in native_hyperbolic
     assert "native-math-hyperbolic-ok" in native_hyperbolic

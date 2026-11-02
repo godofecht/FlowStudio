@@ -1,24 +1,33 @@
-## 2026-11-02: shared-face 3D periodic diffusion qualification (PR #376; CI pending)
+## 2026-11-02: shared-face 3D periodic diffusion through real Flow/R/Python (verified)
 
-[PR #376](https://github.com/godofecht/FlowStudio/pull/376) adds
-27 seed-20261102 conservative heterogeneous 3D periodic face-flux cells
-through the actual Flow 2.0 `diffusion3` compiler and production check/run
-HTTP endpoints. An independent exact-Fraction oracle checks mass conservation,
-strict energy dissipation, cyclic translation covariance, and a stable
-forward-Euler step preserving mass and the maximum principle. Persistent
-base R and CPython HTTP independently cross-check all 27 derivatives,
-with HTTP 422 corruption/truncation controls and interpreter recovery.
-The seven native batches contain at most four assertions each and enforce
-a 128 KiB Flow source ceiling; R/Python frames are limited to 24 KiB.
-[Reproduction](NATIVE_PERIODIC_DIFFUSION3.md).
+[PR #376](https://github.com/godofecht/FlowStudio/pull/376) merged as
+[45c92f42](https://github.com/godofecht/FlowStudio/commit/45c92f42be7f2b180b7fa0c5e6f471bba2a8693d).
+Its seed-20261102 exact-rational 3×3×3 periodic grid contains 27
+heterogeneous shared-face flux stencils. The actual Flow 2.0 mathematical
+compiler and production check/run HTTP endpoints execute all 27 K/s
+derivatives in seven four-or-fewer-case batches with 128 KiB source limits.
+A corrupted expectation compiles but fails with HTTP 422. Independent
+Fraction arithmetic verifies zero global flux, strict energy dissipation,
+cyclic translation covariance and a forward-Euler step conserving mass,
+obeying the maximum principle and reducing quadratic energy. Persistent
+base R and CPython HTTP independently verify all 27 values with 24 KiB
+response limits, HTTP 422 corruption/truncation controls and interpreter
+recovery. [Reproduction](NATIVE_PERIODIC_DIFFUSION3.md).
 
-**Locally passed:** three exact-oracle unit tests and direct CPython
-execution of the generated 27-cell verifier; injected numerical corruption
-and truncated frames raised the expected assertions. **Unexecuted:**
-local native Flow/R HTTP, independent physical macOS Chromium and exact-head
-Linux/macOS CI (pending). No CI pass or complete RStudio parity is claimed.
-This remains compiler-executed scalar stencils assembled into a conservative
-grid, not generalized multidimensional `field` lowering.
+**Passed:** [exact-head CI #41379119514](https://github.com/godofecht/FlowStudio/actions/runs/41379119514)
+completed **4/4** Ubuntu 24.04/macOS 15 source and native jobs.
+Each source platform passed **1,211 JavaScript tests (12 skipped)** and
+ran **506 Python tests (13 skipped)**. Both native jobs logged the new
+27-cell Flow/R/Python HTTP verification as passed; native Flow compiler,
+R/C FlowJIT, checked-in PDE examples and actual Ubuntu Chromium passed.
+Three local exact-oracle tests and direct CPython execution of the generated
+27-cell checker also passed. **Failed:** zero final jobs.
+**Skipped:** 12 JS and 13 Python per source platform plus
+platform-inapplicable optional steps. **Unexecuted:** local native Flow/R
+and independent physical macOS Chromium. **Post-merge main CI:** pending
+independent verification. Hosted workflow configuration was unchanged.
+This does not implement generalized compiler-generated multidimensional
+`field` lowering or complete RStudio parity.
 
 ## 2026-11-02: shared R/Python figure history and bounded streamed capture (verified)
 

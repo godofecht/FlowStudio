@@ -1241,7 +1241,15 @@ def main() -> None:
                        ("static_error", "sterr"),
                        ("source_error", "srcerr")):
         native_variable = re.sub(r"\b" + old + r"\b", short, native_variable)
-    native_variable = compact_native_math_identifiers(native_variable)
+    native_variable = compact_native_math_identifiers(
+        native_variable, {
+            "dimensionless": "dless",
+            "CheckedQuantity": "ChkQ",
+            "MathInferredType": "MInf",
+            "MathDimensionBindings": "MDB",
+            "MathDimensionSymbol": "MDS",
+            "static_bounded_dimension": "sbdim",
+        })
     assert "function solve_math_equations_variable_constraints_three_unknown_dimensions(" in native_variable
     assert 'system.count =16' in native_variable
     assert 'system.equations[15] ="x = 1s"' in native_variable

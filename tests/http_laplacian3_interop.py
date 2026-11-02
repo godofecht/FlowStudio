@@ -10,7 +10,7 @@ from fractions import Fraction
 import json
 import math
 
-from test_laplacian3_oracle import manufactured_laplacian3_cases
+from test_laplacian3_oracle import manufactured_laplacian3_cases, seeded_laplacian3_cases
 
 MARKER = "FLOWSTUDIO_LAPLACIAN3_INTEROP_V1"
 MAX_SOURCE_BYTES = 128 * 1024
@@ -41,7 +41,18 @@ def sampled_laplacian3() -> list[tuple[int, list[Fraction], Fraction]]:
             assert stencil(values) == expected
             records.append((len(records), values, expected))
         assert coarse_value - exact == 4 * (fine_value - exact)
-    assert len(records) == 6
+    for expression, expected in seeded_laplacian3_cases():
+        assert expression.startswith("laplacian3(") and expression.endswith(")")
+        arguments = expression[len("laplacian3("):-1].split(",")
+        assert len(arguments) == 10
+        assert all(item.endswith("K") for item in arguments[:7])
+        assert all(item.endswith("m") for item in arguments[7:])
+        values = [Fraction(item[:-1]) for item in arguments]
+        assert stencil(values) == expected
+        records.append((len(records), values, expected))
+    assert len(records) == 30
+    assert all(records[index][2] == records[index + 1][2]
+               for index in range(6, 30, 2))
     return records
 
 
@@ -66,7 +77,7 @@ def r_source(records: list[tuple[int, list[Fraction], Fraction]]) -> str:
 def python_source(records: list[tuple[int, list[Fraction], Fraction]],
                   observed: list[float], *, sabotage: bool = False,
                   truncate: bool = False) -> str:
-    assert len(records) == len(observed) == 6
+    assert len(records) == len(observed) == 30
     frame = [[index, [str(value) for value in values], value]
              for (index, values, _), value in zip(records, observed)]
     if sabotage:
@@ -79,7 +90,7 @@ def python_source(records: list[tuple[int, list[Fraction], Fraction]],
         "import json, math\n"
         "from fractions import Fraction\n"
         "frame = json.loads(" + repr(payload) + ")\n"
-        "assert len(frame) == 6, 'laplacian3 frame invalid'\n"
+        "assert len(frame) == 30, 'laplacian3 frame invalid'\n"
         "results = []\n"
         "for index, values, observed in frame:\n"
         "    assert index == len(results) and len(values) == 10, 'laplacian3 frame invalid'\n"
@@ -93,6 +104,8 @@ def python_source(records: list[tuple[int, list[Fraction], Fraction]],
         "for group, true_value in enumerate((Fraction(0),Fraction(18),Fraction(6))):\n"
         "    assert results[2*group]-true_value == "
         "4*(results[2*group+1]-true_value), 'laplacian3 refinement mismatch'\n"
+        "for index in range(6,30,2):\n"
+        "    assert results[index] == results[index+1], 'laplacian3 axis-swap mismatch'\n"
         "print('laplacian3-r-python-oracle-ok')\n"
     )
     source = ("def flowstudio_laplacian3_check():\n"
@@ -110,7 +123,7 @@ def verify_laplacian3_interop(request, headers: dict[str, str]) -> None:
     assert len(body.encode("utf-8")) < MAX_FRAME_BYTES
     frames = [line.strip().split() for line in body.splitlines()
               if line.strip().startswith(MARKER + " ")]
-    assert len(frames) == 6, ("R 3D stencil frame count", len(frames))
+    assert len(frames) == 30, ("R 3D stencil frame count", len(frames))
     observed = []
     for index, fields in enumerate(frames):
         assert len(fields) == 3 and fields[0] == MARKER and int(fields[1]) == index
@@ -134,12 +147,12 @@ def verify_laplacian3_interop(request, headers: dict[str, str]) -> None:
         "3D truncated frame rejection", status, body[-500:])
     status, body = request(
         "POST", "/api/run/r",
-        "stopifnot(flowstudio_laplacian3_count == 6L); "
+        "stopifnot(flowstudio_laplacian3_count == 30L); "
         "cat('laplacian3-r-recovered\\n')", headers)
     assert status == 200 and "laplacian3-r-recovered" in body, (
         "persistent R recovery", status, body[-500:])
     status, body = check_python()
     assert status == 200 and "laplacian3-r-python-oracle-ok" in body, (
         "persistent Python recovery", status, body[-500:])
-    print("PASS: six 3D manufactured stencils in native Flow, persistent "
-          "base R and exact-rational Python; HTTP 422 corruption/truncation")
+    print("PASS: 6 manufactured plus 24 seeded 3D stencils through native Flow, "
+          "persistent base R and exact-rational Python; HTTP 422 negatives")

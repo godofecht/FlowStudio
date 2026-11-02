@@ -5,6 +5,8 @@ from pathlib import Path
 from http_smoke import request, compact_native_math_line
 from http_finite_difference_interop import verify_fd_interop
 from http_laplacian3_interop import verify_laplacian3_interop
+from http_diffusion3_interop import verify_diffusion3_interop
+from test_diffusion3_oracle import seeded_diffusion3_cases, inject_diffusion3_assertions
 from test_laplacian3_oracle import (
     manufactured_laplacian3_cases, inject_laplacian3_assertions,
     seeded_laplacian3_cases, inject_seeded_laplacian3_assertions,
@@ -95,6 +97,24 @@ def verify_finite_differences() -> None:
     assert status == 200, ("sabotaged seeded 3D compiles", status, body)
     status, body = request("POST", "/api/run/flow", sabotaged_seeded, headers)
     assert status == 422, ("sabotaged seeded 3D expectation", status, body)
+    # Heterogeneous face diffusivity is lowered and evaluated by native Flow,
+    # not by a Python substitute. Each bounded batch also checks SI K/s.
+    assert len(seeded_diffusion3_cases()) == 24
+    for start in range(0, 24, 4):
+        source = inject_diffusion3_assertions(base, start=start, stop=start + 4)
+        assert len(source.encode("utf-8")) <= 131072, "diffusion3 HTTP source budget"
+        status, body = request("POST", "/api/check/flow", source, headers)
+        assert status == 200, ("heterogeneous diffusion compile", start, status, body)
+        status, body = request("POST", "/api/run/flow", source, headers)
+        assert status == 200 and "native-math-finite-difference-ok" in body, (
+            "heterogeneous diffusion execution", start, status, body)
+    corrupted_diffusion = inject_diffusion3_assertions(
+        base, start=4, stop=8, sabotage=True)
+    assert len(corrupted_diffusion.encode("utf-8")) <= 131072
+    status, body = request("POST", "/api/check/flow", corrupted_diffusion, headers)
+    assert status == 200, ("corrupted diffusion compiles", status, body)
+    status, body = request("POST", "/api/run/flow", corrupted_diffusion, headers)
+    assert status == 422, ("corrupted diffusion numerical expectation", status, body)
     corrupted_refinement = inject_manufactured_refinement_assertions(
         base, sabotage=True)
     status, body = request("POST", "/api/check/flow", corrupted_refinement, headers)
@@ -108,6 +128,7 @@ def verify_finite_differences() -> None:
     assert status == 422, ("corrupted numerical expectation must fail", status, body)
     verify_fd_interop(request, headers)
     verify_laplacian3_interop(request, headers)
+    verify_diffusion3_interop(request, headers)
     print("PASS: 27 exact polynomial cases, 3 planar and 3 spatial 4:1 "
           "manufactured refinements through native Flow HTTP and deliberate HTTP 422")
 

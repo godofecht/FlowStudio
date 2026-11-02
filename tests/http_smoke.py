@@ -120,6 +120,10 @@ def compact_native_math_identifiers(source: str,
         "source_operator": "srcop",
         "source_unit": "srcunit",
         "math_space_width": "spw",
+        "function_arity": "fary",
+        "operator_bytes": "opb",
+        "identifier_matches": "idm",
+        "source_unit": "su",
     }
 
     if extra_aliases:
@@ -1211,6 +1215,10 @@ def main() -> None:
             "MathInstruction": "MIns",
             "MathEquationResult": "MEqR",
             "quotient_dimension": "qdim",
+            "MathProgram": "MPr",
+            "MathResult": "MRs",
+            "MathBindings": "MBind",
+            "MathSymbol": "MSym",
         })
     assert "function solve_math_equations_four_constraints_three_unknown_dimensions(" in native_overdetermined
     assert len(native_overdetermined.encode("utf-8")) < 128 * 1024

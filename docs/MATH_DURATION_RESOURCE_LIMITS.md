@@ -14,11 +14,11 @@ python3 -m unittest discover -s tests -p 'test_math_flow_runtime_validation.py' 
 python3 src/math_flow.py examples/navier_stokes_smoke.flow --grid 16 --until 0.005
 python3 src/math_flow.py examples/heat_piecewise_forcing.flow --grid 16 --until 0.005
 python3 src/math_flow.py examples/heat_piecewise_forcing.flow --grid 16 --until nan
-python3 src/math_flow.py examples/navier_stokes_smoke.flow --grid 16 --until inf
+python3 src/math_flow.py examples/navier_stokes_smoke.flow --grid 16 --until=-inf
 ```
 
-The first two CLI runs must return `ok: true`, with 5 and 50 numerical
-steps respectively, 16×16 grids and finite observables. The last two must
+The first two CLI runs must return `ok: true`, with 50 numerical
+steps each, 16×16 grids and finite observables. The last two must
 exit with status 2 and structured errors, without running the integrators.
 The checked-in Python tests independently execute each valid model twice,
 assert deterministic numerical observables and verify rejection of booleans,

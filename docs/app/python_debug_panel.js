@@ -4,6 +4,14 @@
 (function (global) {
 "use strict";
 const STATES = new Set(["idle", "running", "paused", "done", "stopped"]);
+// Match CPython str.splitlines(): a final line separator does not create
+// an additional executable breakpoint line. CRLF counts as one separator.
+function pythonLineCount(source) {
+  if (!source) return 0;
+  const separators = /\r\n|[\n\r\v\f\u001c-\u001e\u0085\u2028\u2029]/;
+  const trailing = /(?:\r\n|[\n\r\v\f\u001c-\u001e\u0085\u2028\u2029])$/;
+  return source.split(separators).length - (trailing.test(source) ? 1 : 0);
+}
 function validate(data) {
   if (!data || typeof data !== "object" || !STATES.has(data.state) ||
       typeof data.ok !== "boolean" || !Array.isArray(data.stack) ||
@@ -168,7 +176,7 @@ function create({native, source, language, breakpoints, pauseOnException, startB
         sourceSnapshot = source.value;
         documentSnapshot = getDocId();
         revisionSnapshot = sourceRevision;
-        const lines = sourceSnapshot.split(/\r\n|\r|\n/).length;
+        const lines = pythonLineCount(sourceSnapshot);
         result = await native.debugPythonStart(sourceSnapshot, parseBreakpoints(breakpoints.value, lines),
           !!(pauseOnException && pauseOnException.checked));
       } else if (action === "run-to-cursor") {
@@ -218,7 +226,7 @@ function create({native, source, language, breakpoints, pauseOnException, startB
   update();
   return Object.freeze({execute, supported, selectFrame, update});
 }
-const api = Object.freeze({validate, parseBreakpoints, caretLine, format, create});
+const api = Object.freeze({validate, parseBreakpoints, pythonLineCount, caretLine, format, create});
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 global.FlowStudioPythonDebugPanel = api;
 })(globalThis);

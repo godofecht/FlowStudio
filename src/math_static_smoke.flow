@@ -329,6 +329,19 @@ function main() -> i32 {
     inferred = infer_math_expression_source("1m<2s xor true")
     if inferred.valid or inferred.failed_at != 2 { return 105 }
 
+    # Static inference validates both new connectives without evaluating them.
+    inferred = infer_math_expression_source("true ⇒ false")
+    if not inferred.valid or not inferred.is_predicate or
+       not same_dimension(inferred.dimension, dimensionless()) { return 106 }
+    inferred = infer_math_expression_source("2m<3m iff 1s>2s")
+    if not inferred.valid or not inferred.is_predicate { return 107 }
+    inferred = infer_math_expression_source("2m implies true")
+    if inferred.valid or inferred.failed_at != 3 { return 108 }
+    inferred = infer_math_expression_source("true ⇔ 2s")
+    if inferred.valid or inferred.failed_at != 5 { return 109 }
+    inferred = infer_math_expression_source("1m<2s ⇒ true")
+    if inferred.valid or inferred.failed_at != 2 { return 110 }
+
     println("native-math-static-ok")
     return 0
 }

@@ -401,6 +401,39 @@ export function infer_math_ir(program: MathProgram) -> MathInferredType {
             depth = base + 1
             dimensions[base] = output_dimension
             predicates[base] = false
+        } elif opcode >= 94 and opcode <= 96 {
+            # Paired face fluxes share physical units; all spacings are lengths.
+            let axes: i32 = opcode - 93
+            let fluxes: i32 = 2 * axes
+            let arity: i32 = 3 * axes
+            if depth < arity { return static_error(instruction.source_start) }
+            let base: i32 = depth - arity
+            let flux_dimension: Dimension = dimensions[base]
+            let mut component: i32 = 0
+            while component < fluxes {
+                let position: i32 = base + component
+                if predicates[position] or
+                   not same_dimension(dimensions[position], flux_dimension) {
+                    return static_error(instruction.source_start)
+                }
+                component = component + 1
+            }
+            component = 0
+            while component < axes {
+                let position: i32 = base + fluxes + component
+                if predicates[position] or
+                   not same_dimension(dimensions[position], length_dimension()) {
+                    return static_error(instruction.source_start)
+                }
+                component = component + 1
+            }
+            let output_dimension: Dimension = quotient_dimension(flux_dimension, length_dimension())
+            if not static_bounded_dimension(output_dimension) {
+                return static_error(instruction.source_start)
+            }
+            depth = base + 1
+            dimensions[base] = output_dimension
+            predicates[base] = false
         } elif opcode == 89 or opcode == 90 or opcode == 91 {
             # Heterogeneous diffusion uses 1, 2 or 3 spatial axes with paired
             # face coefficients (m²/s), scalar samples and length spacings.

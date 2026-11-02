@@ -50,7 +50,7 @@ function main() -> i32 {
     if result.valid or result.failed_at != 0 { return 15 }
     result = evaluate_math_expression("fdxy(1e30K,-1e30K,-1e30K,1e30K,1e-30m,1m)")
     if result.valid or result.failed_at != 0 { return 16 }
-    let parsed: ParsedMathExpression = parse_math_expression("fdxy(6K,-6K,-6K,6K,2m,3m)")
+    let parsed: ParsedMathExpression = parse_math_expression("fdxy(1K,2K,3K,4K,2m,3m)")
     if not parsed.valid or parsed.program.count != 7 or
        parsed.program.instructions[6].opcode != 88 or
        parsed.program.instructions[6].source_start != 0 or

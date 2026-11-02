@@ -1554,6 +1554,37 @@ function main() -> i32 {
        not same_dimension(result.result.dimension, length) { return 583 }
     result = evaluate_math_expression("quantile(0.5,quantile(0.5,1m,3m),6m)")
     if not result.valid or not near(result.result.value, 4.0) { return 584 }
+    # Both UTF-8 slash spellings execute native typed SI division.
+    # Their operator spans are byte offsets, not Unicode codepoint offsets.
+    result = evaluate_math_expression("9m⁄3s")
+    if not result.valid or not near(result.result.value, 3.0) or
+       not same_dimension(result.result.dimension, speed) { return 585 }
+    result = evaluate_math_expression("8m／2s")
+    if not result.valid or not near(result.result.value, 4.0) or
+       not same_dimension(result.result.dimension, speed) { return 586 }
+    result = evaluate_math_expression("8⁄2×3")
+    if not result.valid or not near(result.result.value, 12.0) { return 587 }
+    result = evaluate_math_expression("9／3⁄3")
+    if not result.valid or not near(result.result.value, 1.0) { return 588 }
+    let fraction_slash: ParsedMathExpression = parse_math_expression("9m⁄3s")
+    if not fraction_slash.valid or fraction_slash.program.count != 3 or
+       fraction_slash.program.instructions[2].opcode != 4 or
+       fraction_slash.program.instructions[2].source_start != 2 or
+       fraction_slash.program.instructions[2].source_end != 5 { return 589 }
+    let fullwidth_slash: ParsedMathExpression = parse_math_expression("8m／2s")
+    if not fullwidth_slash.valid or fullwidth_slash.program.count != 3 or
+       fullwidth_slash.program.instructions[2].opcode != 4 or
+       fullwidth_slash.program.instructions[2].source_start != 2 or
+       fullwidth_slash.program.instructions[2].source_end != 5 { return 590 }
+    result = evaluate_math_expression("1⁄0")
+    if result.valid or result.failed_at != 1 { return 591 }
+    result = evaluate_math_expression("1m／2s+3m")
+    if result.valid or result.failed_at != 7 { return 592 }
+    if parse_math_expression("⁄2").valid { return 593 }
+    if parse_math_expression("／2").valid { return 594 }
+    if parse_math_expression("1⁄⁄2").valid { return 595 }
+    if parse_math_expression("1／").valid { return 596 }
+
     println("native-math-source-ok")
     return 0
 }

@@ -1390,7 +1390,7 @@ def main() -> None:
     hyperbolic_files = static_files[:-1] + ("src/math_hyperbolic_smoke.flow",)
     native_hyperbolic = "\n".join(
         "\n".join(
-            line.strip().removeprefix("export ")
+            compact_native_math_line(line, tighten_equals=True)
             for line in (Path(__file__).resolve().parents[1] / path)
                 .read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.lstrip().startswith("#")
@@ -1402,6 +1402,8 @@ def main() -> None:
         )
         for path in hyperbolic_files
     )
+    native_hyperbolic = compact_native_math_identifiers(native_hyperbolic)
+    assert len(native_hyperbolic.encode("utf-8")) < 128 * 1024
     assert "function bounded_hyperbolic(" in native_hyperbolic
     assert "native-math-hyperbolic-ok" in native_hyperbolic
     status, body = request("POST", "/api/check/flow", native_hyperbolic, accepted_headers)

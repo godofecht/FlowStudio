@@ -485,6 +485,23 @@ function main() -> i32 {
     result = evaluate_math_equation_system(system, tolerances)
     if not result.valid or not result.satisfied { return 119 }
 
+    # Fullwidth equality and fullwidth equation separators compose through
+    # the same native system AST, retaining global byte offsets.
+    system = parse_math_equation_system("1m＝1m；2s=2s")
+    if not system.valid or system.count != 2 or
+       system.equations[0].equality_at != 2 or
+       system.equations[1].equality_at != 12 { return 120 }
+    tolerances.count = 2
+    tolerances.values[0] = quantity(0.0, length_dimension())
+    tolerances.values[1] = quantity(0.0, time_dimension())
+    result = evaluate_math_equation_system(system, tolerances)
+    if not result.valid or not result.satisfied { return 121 }
+    system = parse_math_equation_system("1m＝1m；2s＝2m")
+    if not system.valid { return 122 }
+    result = evaluate_math_equation_system(system, tolerances)
+    if result.valid or result.failed_equation != 1 or
+       result.failed_at != 12 { return 123 }
+
     println("native-math-equation-system-ok")
     return 0
 }

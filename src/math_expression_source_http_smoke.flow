@@ -546,6 +546,15 @@ function main() -> i32 {
     result = evaluate_math_expression("1⁄0")
     if result.valid or result.failed_at != 1 { return 205 }
     if parse_math_expression("⁄2").valid { return 206 }
+    # The physical Monaco/HTTP compiler uses the same fullwidth operator IR.
+    result = evaluate_math_expression("2m＋3m")
+    if not result.valid or not close(result.result.value, 5.0) { return 207 }
+    result = evaluate_math_expression("3m＊4s")
+    if not result.valid or not close(result.result.value, 12.0) { return 208 }
+    result = evaluate_math_expression("－2m＋3m")
+    if not result.valid or not close(result.result.value, 1.0) { return 209 }
+    result = evaluate_math_expression("2m＋3s")
+    if result.valid or result.failed_at != 2 { return 210 }
 
     println("native-math-source-ok")
     return 0

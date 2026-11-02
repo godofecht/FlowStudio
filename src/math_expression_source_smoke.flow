@@ -1585,6 +1585,41 @@ function main() -> i32 {
     if parse_math_expression("1⁄⁄2").valid { return 595 }
     if parse_math_expression("1／").valid { return 596 }
 
+    # Fullwidth arithmetic is parsed as real typed Flow, not text substitution.
+    result = evaluate_math_expression("2m＋3m")
+    if not result.valid or not near(result.result.value, 5.0) or
+       not same_dimension(result.result.dimension, length) { return 597 }
+    result = evaluate_math_expression("9m－4m")
+    if not result.valid or not near(result.result.value, 5.0) or
+       not same_dimension(result.result.dimension, length) { return 598 }
+    result = evaluate_math_expression("3m＊4s")
+    if not result.valid or not near(result.result.value, 12.0) or
+       not same_dimension(result.result.dimension, product_dimension(length, time)) { return 599 }
+    result = evaluate_math_expression("－2m＋3m")
+    if not result.valid or not near(result.result.value, 1.0) or
+       not same_dimension(result.result.dimension, length) { return 600 }
+    result = evaluate_math_expression("2m＊(3s＋1s)")
+    if not result.valid or not near(result.result.value, 8.0) or
+       not same_dimension(result.result.dimension, product_dimension(length, time)) { return 601 }
+    result = evaluate_math_expression("12／3＊2")
+    if not result.valid or not near(result.result.value, 8.0) { return 602 }
+    let fullwidth_product: ParsedMathExpression = parse_math_expression("3m＊4s")
+    if not fullwidth_product.valid or fullwidth_product.program.count != 3 or
+       fullwidth_product.program.instructions[2].opcode != 3 or
+       fullwidth_product.program.instructions[2].source_start != 2 or
+       fullwidth_product.program.instructions[2].source_end != 5 { return 603 }
+    let fullwidth_negative: ParsedMathExpression = parse_math_expression("－2m")
+    if not fullwidth_negative.valid or fullwidth_negative.program.count != 2 or
+       fullwidth_negative.program.instructions[1].opcode != 5 or
+       fullwidth_negative.program.instructions[1].source_start != 0 or
+       fullwidth_negative.program.instructions[1].source_end != 3 { return 604 }
+    result = evaluate_math_expression("2m＋3s")
+    if result.valid or result.failed_at != 2 { return 605 }
+    if parse_math_expression("＊2").valid { return 606 }
+    if parse_math_expression("1＊").valid { return 607 }
+    if parse_math_expression("1＋＊2").valid { return 608 }
+    if parse_math_expression("1－").valid { return 609 }
+
     println("native-math-source-ok")
     return 0
 }

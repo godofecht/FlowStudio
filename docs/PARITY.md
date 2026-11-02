@@ -1,3 +1,39 @@
+## 2026-11-02: complete 2D Neumann R/Python trajectory qualification (verified)
+
+[PR #389](https://github.com/godofecht/FlowStudio/pull/389) merged as
+[24b50109](https://github.com/godofecht/FlowStudio/commit/24b50109cabb4d83a1698ef103f263e9a360344c).
+The production native Flow compiler evaluates 20 sampled heterogeneous
+zero-flux `fluxdiv2` stencils. The same mandatory live HTTP acceptance
+runs all 33 states (528 cell values) of a 4×4 anisotropic heterogeneous
+diffusion trajectory through persistent base R and checks them against an
+independently assembled exact-Fraction 16×16 stochastic transition matrix
+in real CPython HTTP. The gate verifies mass, energy, maximum principle,
+boundary indexing, ordered finite frames, 128 KiB source and 24 KiB frame
+budgets, deliberate corruption and truncation returning HTTP 422, and
+R/Python interpreter recovery. [Reproduction](NATIVE_NEUMANN_DIFFUSION2.md).
+
+**Passed:** [exact-head CI #41416461036](https://github.com/godofecht/FlowStudio/actions/runs/41416461036),
+all **4/4** Ubuntu 24.04/macOS 15 source/native jobs; both native logs
+explicitly report successful 528-value live R/Python HTTP qualification.
+Actual Ubuntu physical Chromium also passed. The preceding
+[post-merge main CI #41416187759](https://github.com/godofecht/FlowStudio/actions/runs/41416187759)
+passed **4/4** independently. **Failed:** zero final jobs.
+**Unexecuted:** local native Flow/R and independent physical macOS Chromium.
+The complete trajectory is computed in R and verified in Python; this is
+not compiler-generated multidimensional Flow field lowering or RStudio parity.
+No hosted workflow configuration was changed.
+
+## 2026-11-02: heterogeneous 3D zero-Dirichlet qualification (pending)
+
+[PR #390](https://github.com/godofecht/FlowStudio/pull/390)
+adds an exact-Fraction 27-cell, 24-step zero-Dirichlet diffusion oracle
+with 54 internal and 54 external half-cell faces, independently assembled
+27×27 substochastic matrix, and 39 bounded native Flow `fluxdiv3` HTTP
+assertions. Seven local Python tests passed. The new production native HTTP
+gate and Linux/macOS CI remain **unverified** until exact-head jobs finish.
+[Reproduction](NATIVE_DIRICHLET_DIFFUSION3.md). No generalized field
+lowering or full RStudio parity is claimed.
+
 ## 2026-11-02: exact 64-step heterogeneous diffusion and native HTTP probes (verified)
 
 [PR #381](https://github.com/godofecht/FlowStudio/pull/381) merged as

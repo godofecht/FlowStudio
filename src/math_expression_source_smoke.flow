@@ -1691,6 +1691,45 @@ function main() -> i32 {
     if parse_math_expression("⊻true").valid { return 639 }
     if parse_math_expression("true⊻").valid { return 640 }
 
+    # Implication and equivalence are typed, eager, and source-span preserving.
+    result = evaluate_math_expression("false implies false")
+    if not result.valid or not result.is_predicate or result.result.value != 1.0 { return 641 }
+    result = evaluate_math_expression("true implies false")
+    if not result.valid or result.result.value != 0.0 { return 642 }
+    result = evaluate_math_expression("false ⇒ true")
+    if not result.valid or result.result.value != 1.0 { return 643 }
+    result = evaluate_math_expression("true ⇒ true")
+    if not result.valid or result.result.value != 1.0 { return 644 }
+    result = evaluate_math_expression("true iff false")
+    if not result.valid or not result.is_predicate or result.result.value != 0.0 { return 645 }
+    result = evaluate_math_expression("false ⇔ false")
+    if not result.valid or result.result.value != 1.0 { return 646 }
+    result = evaluate_math_expression("false ⇒ true ⇒ false")
+    if not result.valid or result.result.value != 1.0 { return 647 }
+    result = evaluate_math_expression("true or false implies false")
+    if not result.valid or result.result.value != 0.0 { return 648 }
+    result = evaluate_math_expression("true iff false implies false")
+    if not result.valid or result.result.value != 1.0 { return 649 }
+    result = evaluate_math_expression("where(2m>1m ⇒ 3m<2m,5m,7m)")
+    if not result.valid or not near(result.result.value, 7.0) or
+       not same_dimension(result.result.dimension, length) { return 650 }
+    let implies_span: ParsedMathExpression = parse_math_expression("true⇒false")
+    if not implies_span.valid or implies_span.program.count != 3 or
+       implies_span.program.instructions[2].opcode != 98 or
+       implies_span.program.instructions[2].source_start != 4 or
+       implies_span.program.instructions[2].source_end != 7 { return 651 }
+    let iff_span: ParsedMathExpression = parse_math_expression("false⇔true")
+    if not iff_span.valid or iff_span.program.count != 3 or
+       iff_span.program.instructions[2].opcode != 99 or
+       iff_span.program.instructions[2].source_start != 5 or
+       iff_span.program.instructions[2].source_end != 8 { return 652 }
+    result = evaluate_math_expression("1m ⇒ true")
+    if result.valid or result.failed_at != 3 { return 653 }
+    result = evaluate_math_expression("false ⇒ 1/0>0")
+    if result.valid { return 654 }
+    if parse_math_expression("⇒true").valid or
+       parse_math_expression("true⇔").valid { return 655 }
+
     println("native-math-source-ok")
     return 0
 }

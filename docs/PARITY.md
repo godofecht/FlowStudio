@@ -1,3 +1,37 @@
+## 2026-11-02: shared R/Python figure history and bounded streamed capture (verified)
+
+[PR #375](https://github.com/godofecht/FlowStudio/pull/375) merged as
+[f2d22af8](https://github.com/godofecht/FlowStudio/commit/f2d22af8f982110799783ac7dc682448e9f57898).
+The production Plots tab previously used separate R and Python history
+objects that both cleared the same DOM host; switching kernel erased the
+previous kernel's visible figures. It now retains one shared twelve-figure
+history. The production capture reader rejects declared or actual responses
+over 20 MiB, cancels overflowing streams, decodes strict UTF-8 across chunk
+boundaries and rejects more than twelve figures per response. Per-image
+SVG/PDF/PNG limits remain in force.
+
+Deterministic seed-20261102 tests check twelve accepted and thirteen rejected
+figures, cross-kernel R/Python retention, oversized and malformed responses,
+stream cancellation, and actual localhost HTTP POST/streaming for both plot
+routes through the production browser module. The loopback fixture is not
+the Flow-owned server; separate existing native CI exercises the actual Flow
+compiler, production HTTP/R/Python and physical Ubuntu Chromium.
+[Reproduction](PLOT_CROSS_KERNEL_CAPTURE.md).
+
+**Passed:** [exact-head CI #41376645959](https://github.com/godofecht/FlowStudio/actions/runs/41376645959),
+all **4/4** Ubuntu 24.04/macOS 15 source and native jobs. Each source
+platform passed **1,211 JavaScript tests (12 skipped)** and ran
+**500 Python tests (13 skipped)**. Native Flow numerical and checked-in
+PDE programs, production HTTP, R/C FlowJIT and actual Ubuntu Chromium passed.
+**Failed:** zero final exact-head jobs. A superseded run
+[#41376324847](https://github.com/godofecht/FlowStudio/actions/runs/41376324847)
+exposed an escaped Content-Length regex; it was corrected before final
+verification, and cancelled superseded native jobs are not counted as passes.
+**Unexecuted:** local native Flow/R and independent physical macOS Chromium.
+**Post-merge main CI:** pending independent verification. Hosted workflow
+configuration was unchanged. General compiler-generated multidimensional
+`field` lowering and complete RStudio parity remain incomplete.
+
 ## 2026-11-02: mixed Flow/R/Python notebook recovery and rich Jupyter browser reload (verified)
 
 [PR #370](https://github.com/godofecht/FlowStudio/pull/370) merged as

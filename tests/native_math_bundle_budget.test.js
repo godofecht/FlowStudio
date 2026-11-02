@@ -1,10 +1,12 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+"use strict";
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { readFileSync } = require('node:fs');
+const path = require('node:path');
 
 // Exercise the real Chromium acceptance's compactor, not a duplicate alias
 // table. Catch a >128 KiB production HTTP bundle before native browser CI.
-const browserSource = readFileSync(new URL('./native_math_plot_ui.mjs', import.meta.url), 'utf8');
+const browserSource = readFileSync(path.join(__dirname, 'native_math_plot_ui.mjs'), 'utf8');
 const start = browserSource.indexOf('function compactNativeMathLine(');
 const end = browserSource.indexOf('const browser = await chromium.launch', start);
 assert.ok(start >= 0 && end > start, 'Browser source compactor was not found');
@@ -32,7 +34,7 @@ const cases = [
 
 function browserBundle(files, tightenEquals, tightenMathOps, name) {
   const modules = files.slice(0, -1).map(path => path.slice(4, -5));
-  let source = files.map(path => readFileSync(new URL('../' + path, import.meta.url), 'utf8')
+  let source = files.map(path => readFileSync(require('node:path').join(__dirname, '..', path), 'utf8')
     .split(/\r?\n/)
     .filter(line => !modules.some(module => line.startsWith('import .' + module + ' {')))
     .filter(line => line.trim() && !line.trimStart().startsWith('#'))

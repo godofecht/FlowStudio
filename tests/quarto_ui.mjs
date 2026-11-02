@@ -72,6 +72,38 @@ try {
   await page.locator('#rDebugStop').click();
   await page.waitForFunction(() =>
     document.querySelector('#rDebugOutput')?.textContent.includes('R expression debugger: idle'));
+  // Mandatory Ubuntu Chromium -> Flow HTTP -> persistent Rscript
+  // scientific breakpoint, not just browser-side lexical acceptance.
+  const scientificSource = [
+    'fs_r_browser_scientific <- 1.0',
+    ...Array(8).fill('fs_r_browser_scientific <- fs_r_browser_scientific * 0.5'),
+    'cat(fs_r_browser_scientific)'
+  ].join('\n');
+  await page.locator('#source').fill(scientificSource);
+  await page.locator('#rDebugStart').click();
+  await page.waitForFunction(() =>
+    document.querySelector('#rDebugOutput')?.textContent.includes('Next expression at line 1'));
+  await page.locator('#rDebugTargetLine').fill('8?fs_r_browser_scientific<=1e-9999');
+  await page.locator('#rDebugContinue').click();
+  await page.waitForFunction(() =>
+    document.querySelector('#rDebugOutput')?.textContent.includes('numeric conditions'));
+  await page.locator('#rDebugTargetLine').fill(
+    '8?fs_r_browser_scientific<=1e-2,9?fs_r_browser_scientific<=1e-2');
+  await page.locator('#rDebugContinue').click();
+  await page.waitForFunction(() =>
+    document.querySelector('#rDebugOutput')?.textContent.includes('Next expression at line 9'));
+  await page.locator('#rDebugWatch').fill('fs_r_browser_scientific');
+  await page.locator('#rDebugEvaluate').click();
+  await page.waitForFunction(() =>
+    document.querySelector('#rDebugOutput')?.textContent.includes('[1] 0.0078125'));
+  await page.locator('#rDebugTargetLine').fill('');
+  await page.locator('#rDebugContinue').click();
+  await page.waitForFunction(() =>
+    document.querySelector('#rDebugOutput')?.textContent.includes('R expression debugger: done'));
+  assert.match(await page.locator('#rDebugOutput').innerText(), /0\.00390625/);
+  await page.locator('#rDebugStop').click();
+  await page.waitForFunction(() =>
+    document.querySelector('#rDebugOutput')?.textContent.includes('R expression debugger: idle'));
   assert.deepEqual(errors, [], errors.join('\n'));
   console.log('PASS: real Chromium Quarto import/export and native R debugger source navigation');
 } finally {

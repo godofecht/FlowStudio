@@ -320,6 +320,7 @@ def verify(root: Path, port: int = 8751, build_timeout: int = 180,
                 ("http_flux_divergence_smoke.py", 120),
                 ("http_flux_energy_smoke.py", 120),
                 ("http_neumann_diffusion2_smoke.py", 120),
+                ("http_dirichlet_diffusion3_smoke.py", 120),
                 ("http_diffusion1_long_horizon.py", 120),
             ):
                 suite = root / "tests" / script_name

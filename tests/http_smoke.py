@@ -1181,6 +1181,15 @@ def main() -> None:
             "MathInferredType": "MInf",
             "MathDimensionBindings": "MDB",
             "static_bounded_dimension": "sbdim",
+            "bounded_checked_value": "bcval",
+            "bounded_checked_dimension": "bcdim",
+            "MathThreeDimensionSolution": "M3Sol",
+            "MathDimensionSymbol": "MDSym",
+            "TripleDimensionRow": "TDR",
+            "ParsedMathExpression": "PExpr",
+            "MathInstruction": "MIns",
+            "MathEquationResult": "MEqR",
+            "quotient_dimension": "qdim",
         })
     assert "function solve_math_equations_four_constraints_three_unknown_dimensions(" in native_overdetermined
     assert len(native_overdetermined.encode("utf-8")) < 128 * 1024

@@ -92,7 +92,7 @@ function main() -> i32 {
     if result.valid or result.failed_at != 2 { return 35 }
     result = evaluate_math_expression("2m≢2s")
     if result.valid or result.failed_at != 2 { return 36 }
-    let exact: ParsedMathExpression = parse_math_expression("2m≡2m")
+    let mut exact: ParsedMathExpression = parse_math_expression("2m≡2m")
     if not exact.valid or exact.program.count != 3 or
        exact.program.instructions[2].opcode != 14 or
        exact.program.instructions[2].source_start != 2 or

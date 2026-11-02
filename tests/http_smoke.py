@@ -975,6 +975,7 @@ def main() -> None:
     )
     assert "function parse_math_equation(" in native_equation
     assert "native-math-equation-ok" in native_equation
+    assert "1m＝1m" in native_equation
     status, body = request("POST", "/api/check/flow", native_equation, accepted_headers)
     assert status == 200, ("native mathematical equation compile", status, body)
     status, body = request("POST", "/api/run/flow", native_equation, accepted_headers)
@@ -1021,6 +1022,7 @@ def main() -> None:
     assert "native-math-equation-system-ok" in native_equation_system
     assert "1m=1m 2s=2s" in native_equation_system
     assert "1m=1m；2s=2s" in native_equation_system
+    assert "1m＝1m；2s=2s" in native_equation_system
     status, body = request("POST", "/api/check/flow", native_equation_system, accepted_headers)
     assert status == 200, ("native equation-system compile", status, body)
     status, body = request("POST", "/api/run/flow", native_equation_system, accepted_headers)

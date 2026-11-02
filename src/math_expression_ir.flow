@@ -52,6 +52,8 @@
 #          93 fd4(f--, f-, f0, f+, f++, step): centered fourth derivative.
 #          94-96 fluxdiv1/2/3: conservative face-flux divergence, 1-3 axes.
 #          97 typed logical exclusive-or (xor / ⊻), requiring two predicates.
+#          98 logical implication (implies / ⇒), right-associative in source.
+#          99 logical equivalence (iff / ⇔), left-associative in source.
 #          The instruction exponent stores the actual variadic arity.
 #          Every permutation product must have the same SI dimension.
 # Predicate values are dimensionless 0/1 with a separate runtime type bit.
@@ -823,7 +825,7 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
                 return failed(instruction.source_start)
             }
         } elif (opcode >= 1 and opcode <= 4) or opcode == 7 or opcode == 8 or
-             (opcode >= 10 and opcode <= 17) or opcode == 97 or opcode == 22 or opcode == 32 {
+             (opcode >= 10 and opcode <= 17) or (opcode >= 97 and opcode <= 99) or opcode == 22 or opcode == 32 {
             if depth < 2 { return failed(instruction.source_start) }
             let right: Quantity = stack[depth - 1]
             let left: Quantity = stack[depth - 2]
@@ -843,7 +845,7 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
                     valid: true,
                     quantity: quantity(bounded_arctangent2(left.value, right.value), dimensionless())
                 }
-            } elif opcode == 16 or opcode == 17 or opcode == 97 {
+            } elif opcode == 16 or opcode == 17 or (opcode >= 97 and opcode <= 99) {
                 if not left_predicate or not right_predicate {
                     return failed(instruction.source_start)
                 }
@@ -852,6 +854,8 @@ export function evaluate_math_ir(program: MathProgram) -> MathResult {
                 let mut truth: bool = left_true and right_true
                 if opcode == 17 { truth = left_true or right_true }
                 if opcode == 97 { truth = left_true != right_true }
+                if opcode == 98 { truth = (not left_true) or right_true }
+                if opcode == 99 { truth = left_true == right_true }
                 let mut numeric: f64 = 0.0
                 if truth { numeric = 1.0 }
                 result = CheckedQuantity { valid: true, quantity: quantity(numeric, dimensionless()) }

@@ -50,15 +50,17 @@ test("R and Python captures share one retained figure history", async () => {
   }
 });
 
-test("declared oversized HTTP body is rejected before reading", async () => {
-  let reads = 0;
+test("declared oversized HTTP body is cancelled before reading", async () => {
+  let reads = 0, cancelled = 0;
   const fetcher = async () => ({
     ok:true,
     headers:{get:() => String(MAX_RESPONSE_BYTES + 1)},
+    body:{cancel:async () => {cancelled++;}},
     text:async () => {reads++; throw new Error("must not read");}
   });
   assert.deepEqual(await collect("python", fetcher), []);
   assert.equal(reads, 0);
+  assert.equal(cancelled, 1);
 });
 
 test("streamed oversized body cancels without JSON parsing or unbounded retention", async () => {

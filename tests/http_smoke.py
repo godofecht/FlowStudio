@@ -129,6 +129,10 @@ def compact_native_math_identifiers(source: str,
         "MathSymbol": "MSym",
         "SourceUnit": "SU",
         "MathEquationResult": "MEqR",
+        "instruction": "m_inst",
+        "component": "mcomp",
+        "unary_width": "uwidth",
+        "predicates": "mpreds",
     }
 
     if extra_aliases:

@@ -502,6 +502,31 @@ function main() -> i32 {
     if result.valid or result.failed_equation != 1 or
        result.failed_at != 12 { return 123 }
 
+    # The scalar source lexer and equation-system splitter share complete
+    # UTF-8 whitespace recognition. Blank typographic lines are inert.
+    system = parse_math_equation_system("1m=1m\n  　\n2s=2s")
+    if not system.valid or system.count != 2 or system.source_length != 20 or
+       system.equations[1].equality_at != 17 { return 124 }
+    tolerances.count = 2
+    tolerances.values[0] = quantity(0.0, length_dimension())
+    tolerances.values[1] = quantity(0.0, time_dimension())
+    result = evaluate_math_equation_system(system, tolerances)
+    if not result.valid or not result.satisfied { return 125 }
+
+    # Whitespace preceding a comment does not create a phantom equation.
+    system = parse_math_equation_system("1m=1m\n # inert;\n2s=2s")
+    if not system.valid or system.count != 2 or system.source_length != 22 or
+       system.equations[1].equality_at != 19 { return 126 }
+    result = evaluate_math_equation_system(system, tolerances)
+    if not result.valid or not result.satisfied { return 127 }
+
+    # U+200B ZERO WIDTH SPACE is not Unicode White_Space and must fail
+    # closed; typographic whitespace cannot hide a trailing semicolon.
+    system = parse_math_equation_system("1m=1m\n​\n2s=2s")
+    if system.valid or system.failed_equation != 1 { return 128 }
+    system = parse_math_equation_system("1m=1m; ")
+    if system.valid or system.failed_equation != 1 { return 129 }
+
     println("native-math-equation-system-ok")
     return 0
 }

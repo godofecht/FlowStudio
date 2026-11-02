@@ -14,8 +14,8 @@ from http_laplacian3_interop import (
 class Laplacian3InteropTests(unittest.TestCase):
     def test_exact_3d_samples_and_resource_limits(self) -> None:
         records = sampled_laplacian3()
-        self.assertEqual(len(records), 6)
-        self.assertEqual([index for index, _, _ in records], list(range(6)))
+        self.assertEqual(len(records), 30)
+        self.assertEqual([index for index, _, _ in records], list(range(30)))
         for _, values, expected in records:
             self.assertEqual(stencil(values), expected)
             self.assertEqual(len(values), 10)
@@ -23,9 +23,11 @@ class Laplacian3InteropTests(unittest.TestCase):
         for index, exact in enumerate((Fraction(0), Fraction(18), Fraction(6))):
             self.assertEqual(records[2 * index][2] - exact,
                              4 * (records[2 * index + 1][2] - exact))
+        for index in range(6, 30, 2):
+            self.assertEqual(records[index][2], records[index + 1][2])
         source = r_source(records)
         self.assertLess(len(source.encode("utf-8")), 128 * 1024)
-        self.assertEqual(source.count("FLOWSTUDIO_LAPLACIAN3_INTEROP_V1"), 6)
+        self.assertEqual(source.count("FLOWSTUDIO_LAPLACIAN3_INTEROP_V1"), 30)
 
     def test_exact_python_oracle_corruption_and_truncation(self) -> None:
         records = sampled_laplacian3()

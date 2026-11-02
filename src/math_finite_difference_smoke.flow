@@ -101,8 +101,9 @@ function main() -> i32 {
     # Conservative heterogeneous 3D face-flux divergence, with SI K/s.
     let rate: Dimension = quotient_dimension(temperature_dimension(), time_dimension())
     result = evaluate_math_expression("diffusion3(0K,1K,1K,8K,8K,27K,27K,(2m²/1s),(2m²/1s),(2m²/1s),(2m²/1s),(2m²/1s),(2m²/1s),1m,2m,3m)")
-    if not result.valid or not near(result.result.value,24.0) or
-       not same_dimension(result.result.dimension,rate) { return 35 }
+    if not result.valid { return 35 }
+    if not near(result.result.value,24.0) { return 48 }
+    if not same_dimension(result.result.dimension,rate) { return 49 }
     result = evaluate_math_expression("diffusion3(0K,1K,2K,3K,4K,5K,6K,(1m²/1s),(2m²/1s),(3m²/1s),(4m²/1s),(5m²/1s),(6m²/1s),1m,2m,4m)")
     if not result.valid or not near(result.result.value,15.0625) { return 36 }
     result = evaluate_math_expression("diffusion3(0K,1K,1K,8K,8K,27K,27K,(-2m²/1s),(2m²/1s),(2m²/1s),(2m²/1s),(2m²/1s),(2m²/1s),1m,2m,3m)")

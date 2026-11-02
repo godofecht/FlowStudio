@@ -6,15 +6,23 @@ import { readFileSync } from 'node:fs';
 
 // Compact executable Flow source without changing quoted strings. The native
 // HTTP endpoint enforces a 128 KiB source limit for Monaco Run as well.
-function compactNativeMathLine(line, tightenEquals = false) {
+function compactNativeMathLine(line, tightenEquals = false, tightenMathOps = false) {
   const source = line.trim().replace(/^export /, '');
   let result = '';
   let quoted = false;
   let escaped = false;
-  for (const char of source) {
+  for (let index = 0; index < source.length; index++) {
+    const char = source[index];
     if (!quoted && char === '#') break;
+    const next = source[index + 1] || '';
+    // Flow's lexer can absorb adjacent slash/star or paired comparison
+    // operators. Compact only safe +/= spacing outside quoted expressions.
+    const safeMathSpace = tightenMathOps &&
+      !(/[<>!=+\-]$/.test(result) && /^[=+]/.test(next)) &&
+      (/[=+]$/.test(result) || /^[=+]/.test(next));
     if (!quoted && /[ \t]/.test(char) &&
-        (/[,:]$/.test(result) || (tightenEquals && result.endsWith('=')))) continue;
+        (/[,:]$/.test(result) || (tightenEquals && result.endsWith('=')) ||
+         safeMathSpace)) continue;
     result += char;
     if (char === '"' && !escaped) quoted = !quoted;
     if (quoted && char === '\\' && !escaped) escaped = true;
@@ -836,7 +844,7 @@ try {
         !line.startsWith('import .math_equation {') &&
         !line.startsWith('import .math_static {'))
       .filter(line => line.trim() && !line.trimStart().startsWith('#'))
-      .map(line => compactNativeMathLine(line)).join('\n')
+      .map(line => compactNativeMathLine(line, false, true)).join('\n')
   ).join('\n');
   nativeTrigSource = compactNativeMathIdentifiers(nativeTrigSource);
   assert.ok(Buffer.byteLength(nativeTrigSource, 'utf8') <= 128 * 1024,

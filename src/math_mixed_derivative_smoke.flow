@@ -1,0 +1,79 @@
+# Real Flow 2.0 mixed-partial stencil execution and dimensional inference.
+# The four samples are ordered f(x-dx,y-dy), f(x+dx,y-dy),
+# f(x-dx,y+dy), f(x+dx,y+dy). No editor-only implementation.
+import .math_dimensions { Dimension, length_dimension, temperature_dimension, quotient_dimension, same_dimension }
+import .math_expression_ir { MathResult }
+import .math_expression_source { ParsedMathExpression, parse_math_expression, evaluate_math_expression }
+import .math_static { MathInferredType, infer_math_expression_source, infer_math_equation_source }
+
+function near(actual: f64, expected: f64) -> bool {
+    let mut delta: f64 = actual - expected
+    if delta < 0.0 { delta = -delta }
+    return delta < 0.00000000001
+}
+
+function main() -> i32 {
+    let curvature: Dimension = quotient_dimension(
+        quotient_dimension(temperature_dimension(), length_dimension()), length_dimension())
+    let mut result: MathResult = evaluate_math_expression("fdxy(6K,-6K,-6K,6K,2m,3m)")
+    if not result.valid or not near(result.result.value,1.0) or
+       not same_dimension(result.result.dimension,curvature) { return 1 }
+    # Manufactured polynomial f(x,y)=x^2*y^2 at (1,2), dx=1/2, dy=1/4.
+    # Exact mixed derivative = 4*x*y = 8, independent of both grid spacings.
+    result = evaluate_math_expression("fdxy(0.765625K,6.890625K,1.265625K,11.390625K,0.5m,0.25m)")
+    if not result.valid or not near(result.result.value,8.0) { return 2 }
+    result = evaluate_math_expression("fdxy(7K,7K,7K,7K,1m,2m)")
+    if not result.valid or result.result.value != 0.0 { return 3 }
+    result = evaluate_math_expression("fdxy(6K,-6K,-6K,6K,3m,2m)")
+    if not result.valid or not near(result.result.value,1.0) { return 4 }
+    result = evaluate_math_expression("fdxy(-6K,6K,6K,-6K,2m,3m)")
+    if not result.valid or not near(result.result.value,-1.0) { return 5 }
+    result = evaluate_math_expression("2fdxy(6K,-6K,-6K,6K,2m,3m)")
+    if not result.valid or not near(result.result.value,2.0) { return 6 }
+    result = evaluate_math_expression("fdxy(6K,-6K,-6K,6K,2m,3m)+1K/m²")
+    if not result.valid or not near(result.result.value,2.0) { return 7 }
+    result = evaluate_math_expression("fdxy(1K,2K,3K,5K,1m,1m)")
+    if not result.valid or not near(result.result.value,0.25) { return 8 }
+    result = evaluate_math_expression("fdxy(1e30K,1e30K,1e30K,1e30K,1m,1m)")
+    if not result.valid or result.result.value != 0.0 { return 9 }
+    result = evaluate_math_expression("fdxy(6K,-6K,-6K,6s,2m,3m)")
+    if result.valid or result.failed_at != 0 { return 10 }
+    result = evaluate_math_expression("fdxy(true,-6K,-6K,6K,2m,3m)")
+    if result.valid or result.failed_at != 0 { return 11 }
+    result = evaluate_math_expression("fdxy(6K,-6K,-6K,6K,2s,3m)")
+    if result.valid or result.failed_at != 0 { return 12 }
+    result = evaluate_math_expression("fdxy(6K,-6K,-6K,6K,2m,3s)")
+    if result.valid or result.failed_at != 0 { return 13 }
+    result = evaluate_math_expression("fdxy(6K,-6K,-6K,6K,0m,3m)")
+    if result.valid or result.failed_at != 0 { return 14 }
+    result = evaluate_math_expression("fdxy(6K,-6K,-6K,6K,2m,-3m)")
+    if result.valid or result.failed_at != 0 { return 15 }
+    result = evaluate_math_expression("fdxy(1e30K,-1e30K,-1e30K,1e30K,1e-30m,1m)")
+    if result.valid or result.failed_at != 0 { return 16 }
+    let parsed: ParsedMathExpression = parse_math_expression("fdxy(6K,-6K,-6K,6K,2m,3m)")
+    if not parsed.valid or parsed.program.count != 7 or
+       parsed.program.instructions[6].opcode != 88 or
+       parsed.program.instructions[6].source_start != 0 or
+       parsed.program.instructions[6].source_end != 4 { return 17 }
+    if parse_math_expression("fdxy(1,2,3,4,5)").valid or
+       parse_math_expression("fdxy(1,2,3,4,5,6,7)").valid or
+       parse_math_expression("fdxy()").valid { return 18 }
+    if parse_math_expression("fdxy(1,2,3,4,5,)").valid or
+       parse_math_expression("fdxy(1,,2,3,4,5,6)").valid or
+       parse_math_expression("fdxy(1,2,3,4,5,6").valid { return 19 }
+    let mut inferred: MathInferredType = infer_math_expression_source("fdxy(6K,-6K,-6K,6K,2m,3m)")
+    if not inferred.valid or inferred.is_predicate or
+       not same_dimension(inferred.dimension,curvature) { return 20 }
+    inferred = infer_math_expression_source("fdxy(6K,-6K,-6K,6K,0m,3m)")
+    if not inferred.valid or not same_dimension(inferred.dimension,curvature) { return 21 }
+    inferred = infer_math_expression_source("fdxy(6K,-6K,-6K,6K,2m,3s)")
+    if inferred.valid or inferred.failed_at != 0 { return 22 }
+    inferred = infer_math_expression_source("fdxy(6K,-6K,false,6K,2m,3m)")
+    if inferred.valid or inferred.failed_at != 0 { return 23 }
+    inferred = infer_math_equation_source("fdxy(6K,-6K,-6K,6K,2m,3m)=1K/m²")
+    if not inferred.valid or not same_dimension(inferred.dimension,curvature) { return 24 }
+    inferred = infer_math_equation_source("fdxy(6K,-6K,-6K,6K,2m,3m)=1K/m")
+    if inferred.valid { return 25 }
+    println("native-math-mixed-derivative-ok")
+    return 0
+}

@@ -54,6 +54,10 @@ def energy(state):
 
 
 def evolve(initial=INITIAL, steps=STEPS):
+    if not isinstance(steps, int) or not 0 <= steps <= STEPS:
+        raise ValueError("Euler step budget exceeded")
+    if set(initial) != set(COORDS):
+        raise ValueError("Incomplete 4x4 state")
     state = dict(initial)
     states = [state]
     for _ in range(steps):
@@ -144,6 +148,13 @@ class NeumannDiffusionTests(unittest.TestCase):
                     transposed.get(nxt, transposed[tc]) - transposed[tc]) / swapped_spacing[axis]
                 rhs += (right - left) / swapped_spacing[axis]
             self.assertEqual(lhs, rhs)
+
+    def test_negative_resource_and_state_inputs(self):
+        for steps in (-1, STEPS + 1, 1.5):
+            with self.assertRaises(ValueError):
+                evolve(steps=steps)
+        with self.assertRaises(ValueError):
+            evolve({(0, 0): Fraction(1)}, 1)
 
     def test_native_cases_and_corruption(self):
         self.assertEqual(len(CASES), 20)

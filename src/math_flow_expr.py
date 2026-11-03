@@ -21,11 +21,11 @@ UNITS: dict[str, Dimension] = {
 SUPERSCRIPT = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁻−", "0123456789--")
 _NUMBER = r"(?:10[⁻−-][⁰¹²³⁴⁵⁶⁷⁸⁹0-9]+|(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)"
 _UNIT = r"(?:kg|Pa|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)?(?:/(?:kg|Pa|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*))?"
-_TOKEN = re.compile(rf"(?P<space>\s+)|(?P<quantity>{_NUMBER}(?:{_UNIT})?)|(?P<name>∂ₓᵧ|∂ᵧₓ|∂ₓ²|∂ᵧ²|∂ₓ|∂ᵧ|∇²|∫|[A-Za-z_][A-Za-z_0-9]*|π)|(?P<postfix>[²³⁴⁵⁶⁷⁸])|(?P<op>==|!=|[+\-−*/×·÷√∛(),^|<>≤≥≠∧∨¬])")
+_TOKEN = re.compile(rf"(?P<space>\s+)|(?P<quantity>{_NUMBER}(?:{_UNIT})?)|(?P<name>∂ₓᵧ|∂ᵧₓ|∂ₓ²|∂ᵧ²|∂ₓ|∂ᵧ|∇²|∫|[A-Za-z_][A-Za-z_0-9]*|π)|(?P<postfix>[²³⁴⁵⁶⁷⁸])|(?P<op>==|!=|[+\-−*/×·÷√∛(),^|<>≤≥≠∧∨¬⊻⇒⇔→↔])")
 _UNIT_PART = re.compile(r"(kg|Pa|m|s|K)([²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)\Z")
 
 
-PREDICATE_OPERATORS = frozenset(("lt", "le", "gt", "ge", "eq", "ne", "and", "or", "not"))
+PREDICATE_OPERATORS = frozenset(("lt", "le", "gt", "ge", "eq", "ne", "and", "or", "xor", "implies", "iff", "not"))
 
 
 class ExpressionError(ValueError):
@@ -214,8 +214,18 @@ class _Parser:
             nxt = self.peek()
             if stop_at_bar and nxt == "|":
                 break
-            if nxt in ("∧", "∨"):
-                operator, precedence = ("and", 4) if nxt == "∧" else ("or", 3)
+            if nxt in ("⇔", "↔", "iff"):
+                operator, precedence = "iff", 1
+            elif nxt in ("⇒", "→", "implies"):
+                operator, precedence = "implies", 2
+            elif nxt == "∨":
+                operator, precedence = "or", 3
+            elif nxt in ("⊻", "xor"):
+                # Between conjunction and disjunction without changing
+                # established arithmetic/comparison binding strengths.
+                operator, precedence = "xor", 3.5
+            elif nxt == "∧":
+                operator, precedence = "and", 4
             elif nxt in ("<", "≤", ">", "≥", "==", "!=", "≠"):
                 operator, precedence = {"<": "lt", "≤": "le", ">": "gt", "≥": "ge", "==": "eq", "!=": "ne", "≠": "ne"}[nxt], 5
             elif nxt in ("^", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸"):
@@ -246,10 +256,11 @@ class _Parser:
                 left = Expression("pow", (left, right),
                                   dimension=tuple(exponent * power for power in left.dimension))
                 continue
-            if nxt in ("+", "-", "−", "*", "×", "·", "/", "÷", "<", "≤", ">", "≥", "==", "!=", "≠", "∧", "∨"):
+            if nxt in ("+", "-", "−", "*", "×", "·", "/", "÷", "<", "≤", ">", "≥", "==", "!=", "≠", "∧", "∨", "⊻", "⇒", "→", "⇔", "↔", "xor", "implies", "iff"):
                 self.take()
-            right = self.expression(precedence + 1, depth + 1, stop_at_bar=stop_at_bar)
-            if operator in ("and", "or"):
+            right = self.expression(precedence if operator == "implies" else precedence + 1,
+                                    depth + 1, stop_at_bar=stop_at_bar)
+            if operator in ("and", "or", "xor", "implies", "iff"):
                 if left.operator not in PREDICATE_OPERATORS or right.operator not in PREDICATE_OPERATORS:
                     raise ExpressionError("Logical operators require comparison predicates")
                 dim = DIMENSIONLESS
@@ -281,7 +292,7 @@ def parse_expression(source: str, *, symbols: dict[str, Dimension] | None = None
     if symbols:
         for name, dimension in symbols.items():
             if (not re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", name)
-                    or name in ("x", "y", "pi", "sin", "cos", "asin", "acos", "atan", "atan2", "hypot", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "ln", "log10", "log1p", "sqrt", "cbrt", "tanh", "abs", "mean", "variance", "std", "rms", "integral", "min", "max", "where")
+                    or name in ("x", "y", "pi", "sin", "cos", "asin", "acos", "atan", "atan2", "hypot", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "ln", "log10", "log1p", "sqrt", "cbrt", "tanh", "abs", "mean", "variance", "std", "rms", "integral", "min", "max", "where", "xor", "implies", "iff")
                     or len(dimension) != 4 or any(type(power) is not int for power in dimension)):
                 raise ExpressionError(f"Invalid typed symbol {name!r}")
     parser = _Parser(tokenize(source), symbols)
@@ -293,7 +304,7 @@ def parse_expression(source: str, *, symbols: dict[str, Dimension] | None = None
             if not allowed:
                 raise ExpressionError("Boolean predicates are only valid as where predicates")
             for child in node.operands:
-                validate_predicates(child, allowed=node.operator in ("and", "or", "not"))
+                validate_predicates(child, allowed=node.operator in ("and", "or", "xor", "implies", "iff", "not"))
             return
         for index, child in enumerate(node.operands):
             validate_predicates(child, allowed=node.operator == "where" and index == 0)
@@ -512,8 +523,13 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
             return {"lt": np.less, "le": np.less_equal,
                     "gt": np.greater, "ge": np.greater_equal,
                     "eq": np.equal, "ne": np.not_equal}[node.operator](args[0], args[1])
-        if node.operator in ("and", "or"):
-            return (np.logical_and if node.operator == "and" else np.logical_or)(args[0], args[1])
+        if node.operator in ("and", "or", "xor"):
+            return {"and": np.logical_and, "or": np.logical_or,
+                    "xor": np.logical_xor}[node.operator](args[0], args[1])
+        if node.operator == "implies":
+            return np.logical_or(np.logical_not(args[0]), args[1])
+        if node.operator == "iff":
+            return np.equal(args[0], args[1])
         if node.operator == "not":
             return np.logical_not(args[0])
         if node.operator == "where":

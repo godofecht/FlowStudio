@@ -25,7 +25,7 @@ class MathematicalFlowGroupingTest(unittest.TestCase):
     def test_unclosed_parenthesis_fails_closed(self):
         for source in ("a = (1 + 2", "a = (1 + (2 * 3)", "a = (\n 1 + 2"):
             with self.subTest(source=source):
-                with self.assertRaisesRegex(FlowMathError, "Unclosed parenthesized expression"):
+                with self.assertRaisesRegex(FlowMathError, r"1:5: unclosed parenthesized expression"):
                     lines(lex(source))
 
     def test_balanced_nested_groups_and_operator_continuation(self):

@@ -278,7 +278,12 @@ def compile_heat_equation(tokens: list[str], *, reaction: bool = False,
     if "=" not in tokens:
         raise ExpressionError("Heat dynamics requires an assignment equality")
     assignment = tokens.index("=")
-    lhs, rhs_source = "".join(tokens[:assignment]), "".join(tokens[assignment + 1:])
+    lhs = "".join(tokens[:assignment])
+    # Preserve word-operator token boundaries. Blind concatenation turns
+    # "0.5m implies y" into the unknown identifier "impliesy".
+    rhs_source = "".join(
+        f" {token} " if token in ("xor", "implies", "iff") else token
+        for token in tokens[assignment + 1:])
     if lhs != "∂ₜtemperature":
         raise ExpressionError("Heat dynamics must evolve ∂ₜtemperature")
     symbols = {**SYMBOLS, **(REACTION_SYMBOLS if reaction else {}),

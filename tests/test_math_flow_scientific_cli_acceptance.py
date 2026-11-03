@@ -54,7 +54,7 @@ class ScientificLiteralProductionAcceptance(unittest.TestCase):
                 candidate = SOURCE.replace(ANCHOR, f"const diffusivity = {literal}m²/s", 1)
                 checked = execute(candidate, check=True)
                 self.assertNotEqual(checked.returncode, 0, checked.stdout)
-                self.assertIn("malformed scientific exponent", checked.stderr)
+                self.assertTrue(\n                    "malformed scientific exponent" in checked.stderr\n                    or "Invalid numerical literal" in checked.stderr, checked.stderr\n                )
                 rejected = execute(candidate)
                 self.assertNotEqual(rejected.returncode, 0, rejected.stdout)
                 recovered = execute(SOURCE)

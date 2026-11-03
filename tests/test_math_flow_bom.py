@@ -35,9 +35,10 @@ class MathFlowBomTest(unittest.TestCase):
         import math
 
         source = (ROOT / "examples/heat_piecewise_forcing.flow").read_text(encoding="utf-8")
-        plain = simulate(parse(source))
+        model = parse(source)
+        plain = simulate(model)
         with_bom = simulate(parse("\ufeff" + source))
-        expected = 300. + (1. - math.cos(2 * math.pi * 1.0)) / math.pi
+        expected = 300. + (1. - math.cos(2 * math.pi * model.until)) / math.pi
         self.assertEqual(with_bom["steps"], 100)
         self.assertAlmostEqual(with_bom["mean_temperature"], expected, delta=2e-8)
         self.assertAlmostEqual(with_bom["mean_temperature"], plain["mean_temperature"], delta=1e-12)

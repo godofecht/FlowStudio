@@ -31,6 +31,19 @@ class MathFlowBomTest(unittest.TestCase):
         self.assertEqual(result["steps"], 10)
         self.assertLess(result["max_divergence"], 1e-5)
 
+    def test_bom_heat_evolution_matches_analytic_mean(self):
+        import math
+
+        source = (ROOT / "examples/heat_piecewise_forcing.flow").read_text(encoding="utf-8")
+        model = parse(source)
+        plain = simulate(model)
+        with_bom = simulate(parse("\ufeff" + source))
+        expected = 300. + (1. - math.cos(2 * math.pi * model.until)) / math.pi
+        self.assertEqual(with_bom["steps"], 100)
+        self.assertAlmostEqual(with_bom["mean_temperature"], expected, delta=2e-8)
+        self.assertAlmostEqual(with_bom["mean_temperature"], plain["mean_temperature"], delta=1e-12)
+        self.assertAlmostEqual(with_bom["temperature_variance"], plain["temperature_variance"], delta=1e-12)
+
     def test_bom_preserves_token_locations_across_line_endings(self):
         for separator in ("\n", "\r\n", "\r", "\u0085", "\u2028", "\u2029"):
             with self.subTest(separator=repr(separator)):

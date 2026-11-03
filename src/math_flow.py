@@ -20,7 +20,7 @@ from math_flow_expr import parse_expression, evaluate, ExpressionError, VELOCITY
 
 TOKEN = re.compile(
     r"\s+|#[^\r\n\u0085\u2028\u2029]*|10[⁻−-][⁰¹²³⁴⁵⁶⁷⁸⁹0-9]+|"
-    r"\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|"
+    r"(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][+-]?\d+)?|"
     r"[A-Za-z_][A-Za-z_0-9]*|[∂∇∫ₜₓᵧπ²³⁻⁰¹⁴⁵⁶⁷⁸⁹×·÷√∛▷−½≤≥≠∧∨¬⊻⇒⇔→↔]|"
     r"[{}()<>=!:,/+*.\-^|]"
 )

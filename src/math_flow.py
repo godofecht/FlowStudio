@@ -133,27 +133,30 @@ def lines(tokens: list[Token]) -> list[list[str]]:
     result: list[list[str]] = []
     current: list[str] = []
     previous_line = tokens[0].line
-    depth = 0
+    opening_parentheses: list[Token] = []
     continuations = {"=", "+", "-", "−", "*", "/", "÷", "^", "·", "∇", "▷",
                      "∧", "∨", "⊻", "⇒", "⇔", "→", "↔"}
     for token in tokens:
-        if (token.line > previous_line and depth == 0 and current
+        if (token.line > previous_line and not opening_parentheses and current
                 and current[-1] not in continuations
                 and token.text not in {"+", "*", "/", "÷", "^", "·", "∧", "∨", "⊻", "⇒", "⇔", "→", "↔"}):
             result.append(current)
             current = []
         current.append(token.text)
         if token.text == "(":
-            depth += 1
+            opening_parentheses.append(token)
         elif token.text == ")":
-            if depth == 0:
+            if not opening_parentheses:
                 raise FlowMathError(
                     f"{token.line}:{token.column}: unmatched closing parenthesis"
                 )
-            depth -= 1
+            opening_parentheses.pop()
         previous_line = token.line
-    if depth:
-        raise FlowMathError("Unclosed parenthesized expression")
+    if opening_parentheses:
+        opening = opening_parentheses[-1]
+        raise FlowMathError(
+            f"{opening.line}:{opening.column}: unclosed parenthesized expression"
+        )
     if current:
         result.append(current)
     return result

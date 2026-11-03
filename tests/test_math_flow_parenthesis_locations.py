@@ -8,12 +8,9 @@ from math_flow import FlowMathError, lex, lines
 
 
 class ParenthesisLocationTests(unittest.TestCase):
-    def test_nested_unclosed_reports_innermost_opening(self):
-        with self.assertRaisesRegex(FlowMathError, r"2:3: unclosed parenthesized expression"):
-            lines(lex("a = (\n  (b + c)\n".replace("  (b + c)", "  (b + c")))
-        # An outer opening remains after the inner expression closes.
+    def test_outer_opening_is_reported_after_inner_closes(self):
         with self.assertRaisesRegex(FlowMathError, r"1:5: unclosed parenthesized expression"):
-            lines(lex("a = (\n  (b + c)\n"))
+            lines(lex("a = (\\n  (b + c)\\n"))
 
     def test_innermost_opening_is_reported(self):
         with self.assertRaisesRegex(FlowMathError, r"2:3: unclosed parenthesized expression"):

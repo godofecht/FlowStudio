@@ -57,6 +57,9 @@ class LogicalArrowsTest(unittest.TestCase):
         self.assertEqual(mixed.operands[0].operator, "or")
         self.assertEqual(mixed.operands[0].operands[1].operator, "xor")
         self.assertEqual(mixed.operands[0].operands[1].operands[1].operator, "and")
+        expected = self.a | (self.b ^ ((~self.a) & (~self.b)))
+        np.testing.assert_array_equal(
+            evaluate(mixed, self.x, self.y), np.where(expected, 1., 0.))
 
     def test_rejects_non_predicate_operands_and_invalid_dimensions(self):
         invalid = (

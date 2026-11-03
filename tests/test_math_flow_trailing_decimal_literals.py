@@ -20,10 +20,10 @@ class TrailingDecimalTests(unittest.TestCase):
     def test_invalid_exponent_is_not_silently_accepted(self):
         for literal in ("1.e", "1.e+", "1.e-"):
             with self.subTest(literal=literal):
-                tokens = lex(literal)
-                self.assertNotEqual([t.text for t in tokens], [literal])
-                with self.assertRaises(FlowMathError):
-                    number([t.text for t in tokens])
+                with self.assertRaisesRegex(
+                    FlowMathError, r"^1:1: malformed scientific exponent$"
+                ):
+                    lex(literal)
 
 
 if __name__ == "__main__":

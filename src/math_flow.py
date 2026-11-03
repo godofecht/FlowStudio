@@ -146,8 +146,14 @@ def lines(tokens: list[Token]) -> list[list[str]]:
         if token.text == "(":
             depth += 1
         elif token.text == ")":
+            if depth == 0:
+                raise FlowMathError(
+                    f"{token.line}:{token.column}: unmatched closing parenthesis"
+                )
             depth -= 1
         previous_line = token.line
+    if depth:
+        raise FlowMathError("Unclosed parenthesized expression")
     if current:
         result.append(current)
     return result

@@ -51,6 +51,12 @@ def lex(source: str) -> list[Token]:
         if match is None:
             raise FlowMathError(f"{line}:{column}: unexpected character {source[pos]!r}")
         value = match.group()
+        # A numeric literal followed by an incomplete exponent must not be
+        # silently tokenized as a number, identifier and operator.
+        if value and (value[0].isdigit() or value[0] == ".") and pos + len(value) < len(source):
+            suffix = source[pos + len(value):]
+            if suffix[0] in "eE" and (len(suffix) == 1 or suffix[1] in "+-" or suffix[1].isdigit()):
+                raise FlowMathError(f"{line}:{column}: malformed scientific exponent")
         if not value.isspace() and not value.startswith("#"):
             tokens.append(Token(value, line, column))
         for offset, char in enumerate(value):

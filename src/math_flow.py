@@ -134,7 +134,8 @@ def lines(tokens: list[Token]) -> list[list[str]]:
     current: list[str] = []
     previous_line = tokens[0].line
     depth = 0
-    continuations = {"=", "+", "-", "−", "*", "/", "÷", "^", "·", "∇", "▷"}
+    continuations = {"=", "+", "-", "−", "*", "/", "÷", "^", "·", "∇", "▷",
+                     "∧", "∨", "⊻", "⇒", "⇔", "→", "↔"}
     for token in tokens:
         if token.line > previous_line and depth == 0 and current and current[-1] not in continuations:
             result.append(current)

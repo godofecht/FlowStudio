@@ -98,6 +98,16 @@ class LogicalArrowsTest(unittest.TestCase):
         self.assertGreater(result["temperature_variance"], 0)
         self.assertIn("temperature", result["spatial"]["fields"])
 
+    def test_ascii_aliases_compile_through_actual_pde_source(self):
+        aliases = SOURCE.replace("⇒", "implies").replace("⇔", "iff").replace("⊻", "xor")
+        model = parse(aliases)
+        self.assertEqual(model.equation.rhs.dimension, TEMPERATURE_RATE)
+        result = simulate(model)
+        self.assertLess(abs(result["mean_temperature"] - 300.005), 1e-9)
+        arrow_aliases = SOURCE.replace("⇒", "→").replace("⇔", "↔")
+        result = simulate(parse(arrow_aliases))
+        self.assertLess(abs(result["mean_temperature"] - 300.005), 1e-9)
+
     def test_checked_in_pde_cli_compiles_and_executes(self):
         for flags in (["--check"], []):
             with self.subTest(flags=flags):

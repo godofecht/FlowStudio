@@ -1,6 +1,6 @@
-## 2026-11-03: executable typed logical connectives in PDE source (proposed)
+## 2026-11-03: executable typed logical connectives in PDE source (merged; final-head qualification incomplete)
 
-[PR #419](https://github.com/godofecht/FlowStudio/pull/419) adds typed
+[PR #419](https://github.com/godofecht/FlowStudio/pull/419) merged; it adds typed
 XOR, implication and equivalence to the actual bounded mathematical Flow
 PDE source lexer, scalar expression AST, NumPy evaluator and heat equation
 compiler. The checked-in RK2 heat program heats one spatial quadrant at

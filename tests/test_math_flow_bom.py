@@ -31,6 +31,25 @@ class MathFlowBomTest(unittest.TestCase):
         self.assertEqual(result["steps"], 10)
         self.assertLess(result["max_divergence"], 1e-5)
 
+    def test_bom_preserves_token_locations_across_line_endings(self):
+        for separator in ("\n", "\r\n", "\r", "\u0085", "\u2028", "\u2029"):
+            with self.subTest(separator=repr(separator)):
+                tokens = lex("\ufeffalpha" + separator + "# comment" + separator + "beta")
+                self.assertEqual(
+                    [(token.text, token.line, token.column) for token in tokens],
+                    [("alpha", 1, 1), ("beta", 3, 1)],
+                )
+                with self.assertRaisesRegex(
+                    FlowMathError, r"3:1: unexpected character"
+                ):
+                    lex("\ufeffalpha" + separator + "# comment" + separator + "@")
+
+    def test_bom_counts_toward_exact_utf8_source_limit(self):
+        from math_flow import MAX_SOURCE
+        self.assertEqual(lex("\ufeff" + " " * (MAX_SOURCE - 3)), [])
+        with self.assertRaisesRegex(FlowMathError, "Source exceeds"):
+            lex("\ufeff" + " " * (MAX_SOURCE - 2))
+
     def test_bom_does_not_bypass_source_size_limit(self):
         from math_flow import MAX_SOURCE
         with self.assertRaisesRegex(FlowMathError, "Source exceeds"):

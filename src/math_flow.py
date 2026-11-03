@@ -43,7 +43,9 @@ def lex(source: str) -> list[Token]:
     if len(source.encode("utf-8")) > MAX_SOURCE:
         raise FlowMathError("Source exceeds 256 KiB")
     tokens: list[Token] = []
-    pos, line, column = 0, 1, 1
+    # A UTF-8 BOM is a file signature only at byte zero, never a token.
+    # Preserve the original source for size checks and diagnostics.
+    pos, line, column = (1 if source.startswith("\ufeff") else 0), 1, 1
     while pos < len(source):
         match = TOKEN.match(source, pos)
         if match is None:

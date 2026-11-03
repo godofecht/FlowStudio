@@ -1,16 +1,33 @@
-## 2026-11-02: physically indexed PDE spatial samples (proposed)
+## 2026-11-03: executable typed logical connectives in PDE source (proposed)
 
-[PR #418](https://github.com/godofecht/FlowStudio/pull/418) adds exact
-solver-cell sample indices to the real NumPy-backed heat/Navier results and
-uses them for native workbench SVG region boundaries and velocity positions.
-The checked-in tests now verify indices from both actual PDE simulation
-results as well as independent synthetic-array sampling, malformed metadata,
-and concrete SVG geometry. [Reproduction](MATH_SPATIAL_COORDINATES.md).
-**Passed:** source/transport CI on Ubuntu and macOS for superseded head
-`2ff67fa`. **Unverified:** final exact-head Linux/macOS source/native CI,
-real HTTP and physical Chromium on the updated head. **Unexecuted:** local
-native Flow/R and independent macOS physical Chromium. This does not add
-generalized upstream Flow field lowering or complete RStudio parity.
+[PR #419](https://github.com/godofecht/FlowStudio/pull/419) adds typed
+XOR, implication and equivalence to the actual bounded mathematical Flow
+PDE source lexer, scalar expression AST, NumPy evaluator and heat equation
+compiler. The checked-in RK2 heat program heats one spatial quadrant at
+2 K/s for 0.01 s, predicting 300.005 K by mean conservation. Truth tables,
+operator associativity, invalid physical dimensions, source aliases and
+actual PDE CLI execution are tested. [Reproduction](MATH_LOGICAL_PDE.md).
+**Unverified:** exact-head Linux/macOS source/native CI, real HTTP and
+physical Chromium on this revision. **Unexecuted:** local native Flow/R
+and independent physical macOS Chromium. No hosted CI changes.
+This does not establish upstream Flow grammar or native Navier-Stokes.
+
+## 2026-11-02: physically indexed PDE spatial samples (verified)
+
+[PR #418](https://github.com/godofecht/FlowStudio/pull/418)
+merged as [a0720bd3](https://github.com/godofecht/FlowStudio/commit/a0720bd3cae3d3236e1b15673ff5f072cc36b957).
+Exact solver-cell sample indices from actual NumPy-backed heat/Navier
+results now drive workbench SVG region boundaries and velocity positions.
+Checked-in tests verify both PDE solver outputs, synthetic-array sampling,
+malformed metadata and concrete SVG geometry.
+[Reproduction](MATH_SPATIAL_COORDINATES.md).
+**Passed:** [exact-head CI #41547640253](https://github.com/godofecht/FlowStudio/actions/runs/41547640253),
+all **4/4** Linux/macOS source/native jobs, including checked-in Navier-Stokes,
+native Flow numerical/HTTP execution and Ubuntu physical Chromium.
+**Failed:** zero final exact-head jobs. **Post-merge main CI:** not
+independently verified. **Unexecuted:** local native Flow/R and independent
+macOS physical Chromium. This does not add generalized upstream Flow
+field lowering or complete RStudio parity.
 
 ## 2026-11-02: finite PDE cell geometry and bounded work (verified)
 

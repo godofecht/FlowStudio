@@ -33,7 +33,7 @@ class ProductionGroupingAcceptance(unittest.TestCase):
         self.assertGreater(baseline["temperature_variance"], 0)
         anchor = "where(((x < 0.5m ⇒ y < 0.5m) ⊻ (x < 0.5m ⇔ y < 0.5m)), 2K/s, 0K/s)"
         self.assertIn(anchor, SOURCE)
-        for newline in ("\\n", "\\r\\n", "\\r", "\\u0085", "\\u2028", "\\u2029"):
+        for newline in ("\n", "\r\n", "\r", "\u0085", "\u2028", "\u2029"):
             with self.subTest(newline=repr(newline)):
                 multiline = anchor.replace(" ⊻ ", newline + " ⊻ ")
                 source = SOURCE.replace(anchor, multiline)

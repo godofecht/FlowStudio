@@ -221,13 +221,13 @@ class _Parser:
             elif nxt == "∨":
                 operator, precedence = "or", 3
             elif nxt in ("⊻", "xor"):
-                # Between conjunction and disjunction without changing
-                # established arithmetic/comparison binding strengths.
-                operator, precedence = "xor", 3.5
+                # Between conjunction and disjunction; comparisons retain
+                # higher binding strength than every logical connective.
+                operator, precedence = "xor", 4
             elif nxt == "∧":
-                operator, precedence = "and", 4
+                operator, precedence = "and", 5
             elif nxt in ("<", "≤", ">", "≥", "==", "!=", "≠"):
-                operator, precedence = {"<": "lt", "≤": "le", ">": "gt", "≥": "ge", "==": "eq", "!=": "ne", "≠": "ne"}[nxt], 5
+                operator, precedence = {"<": "lt", "≤": "le", ">": "gt", "≥": "ge", "==": "eq", "!=": "ne", "≠": "ne"}[nxt], 6
             elif nxt in ("^", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸"):
                 operator, precedence = "pow", 40
             elif nxt in ("+", "-", "−"):

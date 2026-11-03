@@ -87,6 +87,16 @@ def tokenize(source: str) -> tuple[str, ...]:
         match = _TOKEN.match(source, offset)
         if match is None:
             raise ExpressionError(f"Unexpected character at offset {offset}: {source[offset]!r}")
+        if match.lastgroup == "quantity":
+            # Do not reinterpret an incomplete exponent as a valid scalar
+            # followed by an identifier or a binary sign.
+            suffix = source[match.end():]
+            if suffix.startswith(("e", "E")) and (
+                len(suffix) == 1 or suffix[1] in "+-" or suffix[1].isdigit()
+            ):
+                raise ExpressionError(
+                    f"Malformed scientific exponent at offset {offset}"
+                )
         if match.lastgroup != "space":
             tokens.append(match.group())
             if len(tokens) > 256:

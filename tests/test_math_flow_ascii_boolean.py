@@ -20,6 +20,18 @@ class AsciiBooleanOperatorsTests(unittest.TestCase):
         unicode_expression = parse_expression("where(x < 1m ∧ y ≥ 0m ∨ x == y, 2m, 3m)")
         self.assertEqual(ascii_expression, unicode_expression)
 
+    def test_ascii_negation_matches_unicode_ast(self):
+        ascii_expression = parse_expression("where(!(x < 1m), 2m, 3m)")
+        unicode_expression = parse_expression("where(¬(x < 1m), 2m, 3m)")
+        self.assertEqual(ascii_expression, unicode_expression)
+        self.assertEqual(tokenize("!(x < 1m)"), ("!", "(", "x", "<", "1m", ")"))
+
+    def test_ascii_negation_rejects_numeric_operands_and_top_level_predicates(self):
+        for source in ("where(!1, 2m, 3m)", "!(x < 1m)"):
+            with self.subTest(source=source):
+                with self.assertRaises(ExpressionError):
+                    parse_expression(source)
+
     def test_boolean_operators_reject_numeric_operands(self):
         for source in ("where(1 && x < 1m, 2m, 3m)", "where(x < 1m || 0, 2m, 3m)"):
             with self.subTest(source=source):

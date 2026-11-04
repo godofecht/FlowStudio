@@ -32,7 +32,7 @@ class GreekIdentifierTests(unittest.TestCase):
                     parse_expression(name, symbols={name: DIMENSIONLESS})
 
     def test_pi_remains_standalone_constant_with_greek_identifiers(self):
-        for source in ("πx", "π(x + 1)", "2π", "sin(2πx)"):
+        for source in ("πx", "π(x + 1m)", "2π", "sin(2πx/1m)"):
             with self.subTest(source=source):
                 self.assertIn("π", tokenize(source))
                 expr = parse_expression(source)

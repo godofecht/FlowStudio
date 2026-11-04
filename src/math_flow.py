@@ -141,7 +141,7 @@ def lines(tokens: list[Token]) -> list[list[str]]:
     previous_line = tokens[0].line
     opening_parentheses: list[Token] = []
     continuations = {"=", "+", "-", "−", "*", "/", "÷", "^", "·", "∇", "▷",
-                     "∧", "∨", "⊻", "⇒", "⇔", "→", "↔"}
+                     "∧", "∨", "⊻", "⇒", "⇔", "→", "↔", "∆", "∇²"}
     for token in tokens:
         if (token.line > previous_line and not opening_parentheses and current
                 and current[-1] not in continuations

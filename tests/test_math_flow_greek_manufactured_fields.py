@@ -16,7 +16,7 @@ class GreekManufacturedFieldTests(unittest.TestCase):
         x = np.linspace(0.0, 1.0, 24, endpoint=False)[:, None]
         y = np.linspace(0.0, 1.0, 40, endpoint=False)[None, :]
         expr = parse_expression(
-            "Α*sin(2πx) + β*cos(2πy)",
+            "Α*sin(2πx/1m) + β*cos(2πy/1m)",
             symbols={"Α": DIMENSIONLESS, "β": DIMENSIONLESS},
         )
         actual = evaluate(expr, x, y, values={"Α": 2.5, "β": -0.75})

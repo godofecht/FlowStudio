@@ -21,7 +21,7 @@ UNITS: dict[str, Dimension] = {
 SUPERSCRIPT = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁻−", "0123456789--")
 _NUMBER = r"(?:10[⁻−-][⁰¹²³⁴⁵⁶⁷⁸⁹0-9]+|(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)"
 _UNIT = r"(?:kg|Pa|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)?(?:/(?:kg|Pa|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*))?"
-_TOKEN = re.compile(rf"(?P<space>\s+)|(?P<quantity>{_NUMBER}(?:{_UNIT})?)|(?P<name>∂ₓᵧ|∂ᵧₓ|∂ₓ²|∂ᵧ²|∂ₓ|∂ᵧ|∇²|∫|[A-Za-z_αβγδεζηθικλμνξοπρστυφχψω][A-Za-z_0-9αβγδεζηθικλμνξοπρστυφχψω]*|π)|(?P<postfix>[²³⁴⁵⁶⁷⁸])|(?P<op><->|->|==|!=|<=|>=|\*\*|&&|\|\||[+\-−*/×·÷√∛(),^|<>≤≥≠∧∨¬!⊻⇒⇔→↔])")
+_TOKEN = re.compile(rf"(?P<space>\s+)|(?P<quantity>{_NUMBER}(?:{_UNIT})?)|(?P<name>∂ₓᵧ|∂ᵧₓ|∂ₓ²|∂ᵧ²|∂ₓ|∂ᵧ|∇²|∫|[A-Za-z_αβγδεζηθικλμνξορστυφχψω][A-Za-z_0-9αβγδεζηθικλμνξορστυφχψω]*|π)|(?P<postfix>[²³⁴⁵⁶⁷⁸])|(?P<op><->|->|==|!=|<=|>=|\*\*|&&|\|\||[+\-−*/×·÷√∛(),^|<>≤≥≠∧∨¬!⊻⇒⇔→↔])")
 _UNIT_PART = re.compile(r"(kg|Pa|m|s|K)([²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)\Z")
 
 
@@ -301,7 +301,7 @@ class _Parser:
 def parse_expression(source: str, *, symbols: dict[str, Dimension] | None = None) -> Expression:
     if symbols:
         for name, dimension in symbols.items():
-            if (not re.fullmatch(r"[A-Za-z_αβγδεζηθικλμνξοπρστυφχψω][A-Za-z_0-9αβγδεζηθικλμνξοπρστυφχψω]*", name)
+            if (not re.fullmatch(r"[A-Za-z_αβγδεζηθικλμνξορστυφχψω][A-Za-z_0-9αβγδεζηθικλμνξορστυφχψω]*", name)
                     or name in ("x", "y", "pi", "sin", "cos", "asin", "acos", "atan", "atan2", "hypot", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "ln", "log10", "log1p", "sqrt", "cbrt", "tanh", "abs", "mean", "variance", "std", "rms", "integral", "min", "max", "where", "xor", "implies", "iff")
                     or len(dimension) != 4 or any(type(power) is not int for power in dimension)):
                 raise ExpressionError(f"Invalid typed symbol {name!r}")

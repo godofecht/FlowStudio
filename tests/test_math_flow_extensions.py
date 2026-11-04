@@ -29,9 +29,10 @@ class MathematicalFlowExtensionTest(unittest.TestCase):
 
     def test_dimensions_and_unsafe_syntax_fail_closed(self):
         for source in ("sin(x)", "1m + 1s", "1m / 0m + 2s", "sqrt(1m)",
-                       "__import__('os')", "x.__class__", "x[0]", "x**2", "unknown"):
+                       "__import__('os')", "x.__class__", "x[0]", "x**y", "unknown"):
             with self.subTest(source=source), self.assertRaises(ExpressionError):
                 parse_expression(source)
+        self.assertEqual(parse_expression("x**2").dimension, (2, 0, 0, 0))
         with self.assertRaises(ExpressionError):
             evaluate(parse_expression("1m / 0s"), 0, 0)
         with self.assertRaises(ExpressionError):

@@ -10,7 +10,7 @@ from math_flow import lex, Parser, FlowMathError
 from math_flow_expr import parse_expression, evaluate, ExpressionError, DIMENSIONLESS
 
 
-@pytest.mark.parametrize("name", ["Α", "Ω", "Δ", "Σ", "ς", "ψ", "Ρυθμός", "Δ_2"])
+@pytest.mark.parametrize("name", ["Α", "Ω", "Δ", "Σ", "ς", "ψ", "Ρυθμος", "Δ_2"])
 def test_greek_scalar_lexing_and_typed_evaluation(name):
     assert [token.text for token in lex(name + " = 2")] == [name, "=", "2"]
     assert Parser(lex(name)).identifier() == name

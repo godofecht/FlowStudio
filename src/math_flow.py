@@ -21,7 +21,7 @@ from math_flow_expr import parse_expression, evaluate, ExpressionError, VELOCITY
 TOKEN = re.compile(
     r"\s+|#[^\r\n\u0085\u2028\u2029]*|10[⁻−-][⁰¹²³⁴⁵⁶⁷⁸⁹0-9]+|"
     r"(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?|"
-    r"[A-Za-z_][A-Za-z_0-9]*|[∂∇∫ₜₓᵧπ²³⁻⁰¹⁴⁵⁶⁷⁸⁹×·÷√∛▷−½≤≥≠∧∨¬⊻⇒⇔→↔]|"
+    r"[A-Za-z_αβγδεζηθικλμνξορστυφχψω][A-Za-z_0-9αβγδεζηθικλμνξορστυφχψω]*|[∂∇∫ₜₓᵧπ²³⁻⁰¹⁴⁵⁶⁷⁸⁹×·÷√∛▷−½≤≥≠∧∨¬⊻⇒⇔→↔]|"
     r"[{}()<>=!:,/+*.\-^|]"
 )
 SUPERSCRIPTS = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁻", "0123456789-")
@@ -96,7 +96,7 @@ class Parser:
 
     def identifier(self) -> str:
         value = self.pop()
-        if not re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", value):
+        if not re.fullmatch(r"[A-Za-z_αβγδεζηθικλμνξορστυφχψω][A-Za-z_0-9αβγδεζηθικλμνξορστυφχψω]*", value):
             raise FlowMathError(f"Expected identifier, got {value!r}")
         return value
 

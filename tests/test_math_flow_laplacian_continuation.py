@@ -12,7 +12,7 @@ class LaplacianContinuationTests(unittest.TestCase):
         for operator in ("∆", "∇²"):
             with self.subTest(operator=operator):
                 self.assertEqual(lines(lex("result = " + operator + "\nfield")),
-                                 [["result", "=", operator, "field"]])
+                                 [["result", "=", "∇", "²", "field"]] if operator == "∇²" else [["result", "=", "∆", "field"]])
 
     def test_next_assignment_remains_distinct(self):
         self.assertEqual(

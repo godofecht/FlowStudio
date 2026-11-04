@@ -22,7 +22,7 @@ class GreekTypedSymbolsTests(unittest.TestCase):
 
     def test_implicit_product(self):
         symbols = {"α": DIMENSIONLESS, "β": DIMENSIONLESS}
-        ast = parse_expression("αβ", symbols=symbols)
+        ast = parse_expression("α(β)", symbols=symbols)
         result = evaluate(ast, np.zeros((2, 2)), np.zeros((2, 2)),
                           values={"α": 4., "β": 5.})
         np.testing.assert_allclose(result, 20.)

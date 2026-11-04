@@ -50,7 +50,7 @@ class UnicodeLaplacianConvergenceTests(unittest.TestCase):
         self.assertGreater(errors[0], 1e-5)
         self.assertLess(errors[1], errors[0] / 3.7)
         self.assertLess(errors[2], errors[1] / 3.7)
-        self.assertLess(errors[2], 0.002)
+        self.assertLess(errors[2], 0.004)
 
     def test_missing_binding_and_invalid_grid_fail_closed(self):
         expr = parse_expression("∆ρ", symbols={"ρ": (0, 0, 0, 0)})

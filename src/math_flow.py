@@ -194,6 +194,8 @@ def assignments(tokens: list[Token]) -> dict[str, list[str]]:
     for line in lines(tokens):
         if len(line) < 3 or line[1] != "=":
             raise FlowMathError(f"Expected assignment, got {' '.join(line)}")
+        if not re.fullmatch(r"[A-Za-z_Α-Ωα-ορ-ω][A-Za-z_0-9Α-Ωα-ορ-ω]*", line[0]):
+            raise FlowMathError(f"Invalid assignment target {line[0]!r}")
         if line[0] in result:
             raise FlowMathError(f"Duplicate assignment {line[0]}")
         result[line[0]] = line[2:]

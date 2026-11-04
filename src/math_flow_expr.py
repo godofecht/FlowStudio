@@ -21,7 +21,7 @@ UNITS: dict[str, Dimension] = {
 SUPERSCRIPT = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁻−", "0123456789--")
 _NUMBER = r"(?:10[⁻−-][⁰¹²³⁴⁵⁶⁷⁸⁹0-9]+|(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)"
 _UNIT = r"(?:kg|Pa|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)?(?:/(?:kg|Pa|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*))?"
-_TOKEN = re.compile(rf"(?P<space>\s+)|(?P<quantity>{_NUMBER}(?:{_UNIT})?)|(?P<name>∂ₓᵧ|∂ᵧₓ|∂ₓ²|∂ᵧ²|∂ₓ|∂ᵧ|∇²|∫|[A-Za-z_][A-Za-z_0-9]*|π)|(?P<postfix>[²³⁴⁵⁶⁷⁸])|(?P<op>==|!=|<=|>=|\*\*|&&|\|\||[+\-−*/×·÷√∛(),^|<>≤≥≠∧∨¬!⊻⇒⇔→↔])")
+_TOKEN = re.compile(rf"(?P<space>\s+)|(?P<quantity>{_NUMBER}(?:{_UNIT})?)|(?P<name>∂ₓᵧ|∂ᵧₓ|∂ₓ²|∂ᵧ²|∂ₓ|∂ᵧ|∇²|∫|[A-Za-z_][A-Za-z_0-9]*|π)|(?P<postfix>[²³⁴⁵⁶⁷⁸])|(?P<op><->|->|==|!=|<=|>=|\*\*|&&|\|\||[+\-−*/×·÷√∛(),^|<>≤≥≠∧∨¬!⊻⇒⇔→↔])")
 _UNIT_PART = re.compile(r"(kg|Pa|m|s|K)([²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)\Z")
 
 
@@ -224,9 +224,9 @@ class _Parser:
             nxt = self.peek()
             if stop_at_bar and nxt == "|":
                 break
-            if nxt in ("⇔", "↔", "iff"):
+            if nxt in ("⇔", "↔", "<->", "iff"):
                 operator, precedence = "iff", 1
-            elif nxt in ("⇒", "→", "implies"):
+            elif nxt in ("⇒", "→", "->", "implies"):
                 operator, precedence = "implies", 2
             elif nxt in ("∨", "||"):
                 operator, precedence = "or", 3
@@ -266,7 +266,7 @@ class _Parser:
                 left = Expression("pow", (left, right),
                                   dimension=tuple(exponent * power for power in left.dimension))
                 continue
-            if nxt in ("+", "-", "−", "*", "**", "×", "·", "/", "÷", "<", "<=", "≤", ">", ">=", "≥", "==", "!=", "≠", "∧", "∨", "&&", "||", "⊻", "⇒", "→", "⇔", "↔", "xor", "implies", "iff"):
+            if nxt in ("+", "-", "−", "*", "**", "×", "·", "/", "÷", "<", "<=", "≤", ">", ">=", "≥", "==", "!=", "≠", "∧", "∨", "&&", "||", "⊻", "⇒", "→", "->", "⇔", "↔", "<->", "xor", "implies", "iff"):
                 self.take()
             right = self.expression(precedence if operator == "implies" else precedence + 1,
                                     depth + 1, stop_at_bar=stop_at_bar)

@@ -32,6 +32,48 @@ class AsciiBooleanOperatorsTests(unittest.TestCase):
                 with self.assertRaises(ExpressionError):
                     parse_expression(source)
 
+
+    def test_ascii_implication_and_equivalence_match_unicode_ast(self):
+        for ascii_source, unicode_source in (
+            ("where((x < 1m) -> (y >= 0m), 2m, 3m)",
+             "where((x < 1m) ⇒ (y ≥ 0m), 2m, 3m)"),
+            ("where((x < 1m) <-> (y >= 0m), 2m, 3m)",
+             "where((x < 1m) ⇔ (y ≥ 0m), 2m, 3m)"),
+        ):
+            with self.subTest(source=ascii_source):
+                self.assertEqual(parse_expression(ascii_source), parse_expression(unicode_source))
+
+    def test_ascii_arrows_tokenize_without_swallowing_comparisons(self):
+        self.assertEqual(
+            tokenize("x < 1m -> y >= 0m <-> x == y"),
+            ("x", "<", "1m", "->", "y", ">=", "0m", "<->", "x", "==", "y"),
+        )
+
+    def test_ascii_arrows_reject_numerical_operands_and_unscoped_predicates(self):
+        for source in (
+            "where(1 -> (x < 1m), 2m, 3m)",
+            "where((x < 1m) <-> 0, 2m, 3m)",
+            "(x < 1m) -> (y > 0m)",
+        ):
+            with self.subTest(source=source):
+                with self.assertRaises(ExpressionError):
+                    parse_expression(source)
+
+    def test_ascii_arrows_execute_independent_truth_tables(self):
+        import numpy as np
+        from math_flow_expr import evaluate
+
+        x = np.array([0.0, 0.0, 2.0, 2.0])
+        y = np.array([0.0, 2.0, 0.0, 2.0])
+        cases = (
+            ("where((x < 1m) -> (y < 1m), 2m, 3m)", [2.0, 3.0, 2.0, 2.0]),
+            ("where((x < 1m) <-> (y < 1m), 2m, 3m)", [2.0, 3.0, 3.0, 2.0]),
+        )
+        for source, expected in cases:
+            with self.subTest(source=source):
+                actual = evaluate(parse_expression(source), x, y)
+                np.testing.assert_array_equal(actual, expected)
+
     def test_boolean_operators_reject_numeric_operands(self):
         for source in ("where(1 && x < 1m, 2m, 3m)", "where(x < 1m || 0, 2m, 3m)"):
             with self.subTest(source=source):

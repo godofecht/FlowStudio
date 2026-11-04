@@ -18,7 +18,7 @@ class MixedFourierDerivativeTest(unittest.TestCase):
                 coordinates = (np.arange(n, dtype=float) + 0.5) * h
                 x, y = np.meshgrid(coordinates, coordinates, indexing="ij")
                 field = np.sin(2 * np.pi * x) * np.cos(4 * np.pi * y)
-                expected = -(np.sin(2 * np.pi / n) * np.sin(4 * np.pi / n) / h**2) * field
+                expected = -(np.sin(2 * np.pi / n) * np.sin(4 * np.pi / n) / h**2) * np.cos(2 * np.pi * x) * np.sin(4 * np.pi * y)
                 for source in ("∂ₓᵧ(u)", "∂ᵧₓ(u)", "∂ₓ(∂ᵧ(u))", "∂ᵧ(∂ₓ(u))"):
                     with self.subTest(expression=source):
                         expression = parse_expression(source, symbols={"u": (0, 0, 0, 1)})

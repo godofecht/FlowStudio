@@ -29,3 +29,11 @@ def test_unsupported_identifier_characters_rejected(name):
         lex(name)
     with pytest.raises(ExpressionError):
         parse_expression(name, symbols={name: DIMENSIONLESS})
+
+
+@pytest.mark.parametrize("source", ["πx", "π(x + 1)", "2π", "sin(2πx)"])
+def test_pi_remains_standalone_constant_with_greek_identifiers(source):
+    from math_flow_expr import tokenize
+    assert "π" in tokenize(source)
+    expr = parse_expression(source)
+    assert np.isfinite(evaluate(expr, 0.25, 0.0))

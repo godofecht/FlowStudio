@@ -21,7 +21,7 @@ UNITS: dict[str, Dimension] = {
 SUPERSCRIPT = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁻−", "0123456789--")
 _NUMBER = r"(?:10[⁻−-][⁰¹²³⁴⁵⁶⁷⁸⁹0-9]+|(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)"
 _UNIT = r"(?:kg|Pa|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)?(?:/(?:kg|Pa|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*))?"
-_TOKEN = re.compile(rf"(?P<space>\s+)|(?P<quantity>{_NUMBER}(?:{_UNIT})?)|(?P<name>∂ₓᵧ|∂ᵧₓ|∂ₓ²|∂ᵧ²|∂ₓ|∂ᵧ|∇²|∫|[A-Za-z_][A-Za-z_0-9]*|π)|(?P<postfix>[²³⁴⁵⁶⁷⁸])|(?P<op>==|!=|[+\-−*/×·÷√∛(),^|<>≤≥≠∧∨¬⊻⇒⇔→↔])")
+_TOKEN = re.compile(rf"(?P<space>\s+)|(?P<quantity>{_NUMBER}(?:{_UNIT})?)|(?P<name>∂ₓᵧ|∂ᵧₓ|∂ₓ²|∂ᵧ²|∂ₓ|∂ᵧ|∇²|∫|[A-Za-z_][A-Za-z_0-9]*|π)|(?P<postfix>[²³⁴⁵⁶⁷⁸])|(?P<op>==|!=|<=|>=|[+\-−*/×·÷√∛(),^|<>≤≥≠∧∨¬⊻⇒⇔→↔])")
 _UNIT_PART = re.compile(r"(kg|Pa|m|s|K)([²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)\Z")
 
 
@@ -236,8 +236,8 @@ class _Parser:
                 operator, precedence = "xor", 4
             elif nxt == "∧":
                 operator, precedence = "and", 5
-            elif nxt in ("<", "≤", ">", "≥", "==", "!=", "≠"):
-                operator, precedence = {"<": "lt", "≤": "le", ">": "gt", "≥": "ge", "==": "eq", "!=": "ne", "≠": "ne"}[nxt], 6
+            elif nxt in ("<", "<=", "≤", ">", ">=", "≥", "==", "!=", "≠"):
+                operator, precedence = {"<": "lt", "<=": "le", "≤": "le", ">": "gt", ">=": "ge", "≥": "ge", "==": "eq", "!=": "ne", "≠": "ne"}[nxt], 6
             elif nxt in ("^", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸"):
                 operator, precedence = "pow", 40
             elif nxt in ("+", "-", "−"):
@@ -266,7 +266,7 @@ class _Parser:
                 left = Expression("pow", (left, right),
                                   dimension=tuple(exponent * power for power in left.dimension))
                 continue
-            if nxt in ("+", "-", "−", "*", "×", "·", "/", "÷", "<", "≤", ">", "≥", "==", "!=", "≠", "∧", "∨", "⊻", "⇒", "→", "⇔", "↔", "xor", "implies", "iff"):
+            if nxt in ("+", "-", "−", "*", "×", "·", "/", "÷", "<", "<=", "≤", ">", ">=", "≥", "==", "!=", "≠", "∧", "∨", "⊻", "⇒", "→", "⇔", "↔", "xor", "implies", "iff"):
                 self.take()
             right = self.expression(precedence if operator == "implies" else precedence + 1,
                                     depth + 1, stop_at_bar=stop_at_bar)

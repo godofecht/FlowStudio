@@ -10,7 +10,7 @@ from math_flow import lex, Parser, FlowMathError
 from math_flow_expr import parse_expression, evaluate, ExpressionError, DIMENSIONLESS
 
 
-@pytest.mark.parametrize("name", ["Α", "Ω", "Δ", "Σ", "ς", "ψ", "Ρυθμος", "Δ_2"])
+@pytest.mark.parametrize("name", ["Α", "Ω", "Δ", "Σ", "ς", "ψ", "Ρυθμος", "Δ_2", "ΔΣ", "Ας", "Δ_Ω2", "ρς"])
 def test_greek_scalar_lexing_and_typed_evaluation(name):
     assert [token.text for token in lex(name + " = 2")] == [name, "=", "2"]
     assert Parser(lex(name)).identifier() == name
@@ -37,3 +37,9 @@ def test_pi_remains_standalone_constant_with_greek_identifiers(source):
     assert "π" in tokenize(source)
     expr = parse_expression(source)
     assert np.isfinite(evaluate(expr, 0.25, 0.0))
+
+
+@pytest.mark.parametrize("name", ["π", "Δπ", "πΔ"])
+def test_pi_is_reserved_and_not_a_scalar_identifier(name):
+    with pytest.raises(ExpressionError):
+        parse_expression(name + " + 1", symbols={name: DIMENSIONLESS})

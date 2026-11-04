@@ -21,7 +21,7 @@ class GreekDimensionalAcceptanceTests(unittest.TestCase):
 
     def test_distinct_upper_and_lowercase_bindings(self):
         symbols = {"Σ": DIMENSIONLESS, "σ": DIMENSIONLESS, "ς": DIMENSIONLESS}
-        expr = parse_expression("Σ + 2σ + 3ς", symbols=symbols)
+        expr = parse_expression("Σ + 2*σ + 3*ς", symbols=symbols)
         result = evaluate(expr, 0.0, 0.0, values={"Σ": 5.0, "σ": 7.0, "ς": 11.0})
         np.testing.assert_allclose(result, 52.0)
 

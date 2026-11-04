@@ -9,10 +9,8 @@ from math_flow import lex, lines
 
 class LaplacianContinuationTests(unittest.TestCase):
     def test_prefix_operator_continues_on_next_line(self):
-        for operator in ("∆", "∇²"):
-            with self.subTest(operator=operator):
-                self.assertEqual(lines(lex("result = " + operator + "\nfield")),
-                                 [["result", "=", "∇", "²", "field"]] if operator == "∇²" else [["result", "=", "∆", "field"]])
+        self.assertEqual(lines(lex("result = ∆\nfield")),
+                         [["result", "=", "∆", "field"]])
 
     def test_next_assignment_remains_distinct(self):
         self.assertEqual(

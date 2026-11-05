@@ -63,5 +63,14 @@ function main() -> i32 {
     result = evaluate_math_equation_source(
         "true = false", quantity(0.0, dimensionless()))
     if result.valid { return 12 }
+    # Fullwidth equality must lower through the executable native equation parser.
+    result = evaluate_math_equation_source("2m＝2m", exact_length)
+    if not result.valid or not result.satisfied { return 13 }
+    # Multiple top-level equation separators must not silently discard a clause.
+    result = evaluate_math_equation_source("1m = 1m = 1m", exact_length)
+    if result.valid { return 14 }
+    # Unbalanced grouping is rejected before compiling either expression.
+    result = evaluate_math_equation_source("(1m + 2m = 3m", exact_length)
+    if result.valid { return 15 }
     return 0
 }

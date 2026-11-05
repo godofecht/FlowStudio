@@ -99,6 +99,7 @@ jobs:
           flow run src/math_absolute_bars_smoke.flow
           flow run src/math_approx_smoke.flow
           flow run src/math_equation_smoke.flow
+          flow run src/math_equation_invariants_smoke.flow
           flow run src/math_equation_system_smoke.flow
           flow run src/math_static_smoke.flow
           flow run src/math_declared_dimensions_smoke.flow

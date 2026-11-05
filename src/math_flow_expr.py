@@ -21,7 +21,7 @@ UNITS: dict[str, Dimension] = {
 SUPERSCRIPT = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁻−", "0123456789--")
 _NUMBER = r"(?:10[⁻−-][⁰¹²³⁴⁵⁶⁷⁸⁹0-9]+|(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)"
 _UNIT = r"(?:kg|Pa|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)?(?:/(?:kg|Pa|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*))?"
-_TOKEN = re.compile(rf"(?P<space>\s+)|(?P<quantity>{_NUMBER}(?:{_UNIT})?)|(?P<name>∂ₓᵧ|∂ᵧₓ|∂ₓ²|∂ᵧ²|∂ₓ|∂ᵧ|∇²|∆|∫|π|[A-Za-z_Α-Ωα-ορ-ω][A-Za-z_0-9Α-Ωα-ορ-ω]*)|(?P<postfix>[²³⁴⁵⁶⁷⁸])|(?P<op><->|->|==|!=|<=|>=|\*\*|&&|\|\||[+\-−*/×·÷√∛(),^|<>≤≥≠∧∨¬!⊻⇒⇔→↔])")
+_TOKEN = re.compile(rf"(?P<space>\s+)|(?P<quantity>{_NUMBER}(?:{_UNIT})?)|(?P<name>∂ₓᵧ|∂ᵧₓ|∂ₓ²|∂ᵧ²|∂ₓ|∂ᵧ|∇²|∆|∫|∑|π|[A-Za-z_Α-Ωα-ορ-ω][A-Za-z_0-9Α-Ωα-ορ-ω]*)|(?P<postfix>[²³⁴⁵⁶⁷⁸])|(?P<op><->|->|==|!=|<=|>=|\*\*|&&|\|\||[+\-−*/×·÷√∛(),^|<>≤≥≠∧∨¬!⊻⇒⇔→↔])")
 _UNIT_PART = re.compile(r"(kg|Pa|m|s|K)([²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)\Z")
 
 
@@ -175,7 +175,7 @@ class _Parser:
                 raise ExpressionError(f"{first} requires matching physical dimensions")
             left = Expression(first, (first_arg, second_arg),
                               dimension=DIMENSIONLESS if first == "atan2" else first_arg.dimension)
-        elif first in ("sin", "cos", "asin", "acos", "atan", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "ln", "log10", "log1p", "sqrt", "cbrt", "√", "∛", "tanh", "abs", "mean", "variance", "std", "rms", "integral", "∫", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∂ₓᵧ", "∂ᵧₓ", "∇²", "∆"):
+        elif first in ("sin", "cos", "asin", "acos", "atan", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "ln", "log10", "log1p", "sqrt", "cbrt", "√", "∛", "tanh", "abs", "mean", "variance", "std", "rms", "integral", "∫", "sum", "∑", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∂ₓᵧ", "∂ᵧₓ", "∇²", "∆"):
             if first in ("∇²", "∆", "√", "∛") and self.peek() != "(":
                 # Prefix Unicode differential/radical operators bind more tightly than products.
                 arg = self.expression(30, depth + 1)
@@ -205,11 +205,11 @@ class _Parser:
                 dim = _plus(arg.dimension, arg.dimension)
             elif first in ("integral", "∫"):
                 dim = _plus(arg.dimension, (2, 0, 0, 0))
-            elif first in ("abs", "mean", "std", "rms"):
+            elif first in ("abs", "mean", "std", "rms", "sum", "∑"):
                 dim = arg.dimension
             else:
                 dim = DIMENSIONLESS
-            left = Expression({"√": "sqrt", "∛": "cbrt", "ln": "log", "∫": "integral", "∆": "∇²", "∂ᵧₓ": "∂ₓᵧ"}.get(first, first), (arg,), dimension=dim)
+            left = Expression({"√": "sqrt", "∛": "cbrt", "ln": "log", "∫": "integral", "∑": "sum", "∆": "∇²", "∂ᵧₓ": "∂ₓᵧ"}.get(first, first), (arg,), dimension=dim)
         elif first in ("x", "y", "π", "pi"):
             left = Expression("name", value="pi" if first in ("π", "pi") else first,
                               dimension=LENGTH if first in ("x", "y") else DIMENSIONLESS)
@@ -244,7 +244,7 @@ class _Parser:
                 operator, precedence = ("add" if nxt == "+" else "sub"), 10
             elif nxt in ("*", "×", "·", "/", "÷"):
                 operator, precedence = ("div" if nxt in ("/", "÷") else "mul"), 20
-            elif nxt in ("(", "|", "π", "pi", "x", "y", "sin", "cos", "asin", "acos", "atan", "atan2", "hypot", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "ln", "log10", "log1p", "sqrt", "cbrt", "√", "∛", "tanh", "abs", "mean", "variance", "std", "rms", "integral", "∫", "min", "max", "where", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∂ₓᵧ", "∂ᵧₓ", "∇²", "∆") or nxt in self.symbols or re.fullmatch(rf"{_NUMBER}(?:{_UNIT})?", nxt):
+            elif nxt in ("(", "|", "π", "pi", "x", "y", "sin", "cos", "asin", "acos", "atan", "atan2", "hypot", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "ln", "log10", "log1p", "sqrt", "cbrt", "√", "∛", "tanh", "abs", "mean", "variance", "std", "rms", "integral", "∫", "sum", "∑", "min", "max", "where", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∂ₓᵧ", "∂ᵧₓ", "∇²", "∆") or nxt in self.symbols or re.fullmatch(rf"{_NUMBER}(?:{_UNIT})?", nxt):
                 operator, precedence = "mul", 20
             else:
                 break
@@ -302,7 +302,7 @@ def parse_expression(source: str, *, symbols: dict[str, Dimension] | None = None
     if symbols:
         for name, dimension in symbols.items():
             if (not re.fullmatch(r"[A-Za-z_Α-Ωα-ορ-ω][A-Za-z_0-9Α-Ωα-ορ-ω]*", name)
-                    or name in ("x", "y", "pi", "sin", "cos", "asin", "acos", "atan", "atan2", "hypot", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "ln", "log10", "log1p", "sqrt", "cbrt", "tanh", "abs", "mean", "variance", "std", "rms", "integral", "min", "max", "where", "xor", "implies", "iff")
+                    or name in ("x", "y", "pi", "sin", "cos", "asin", "acos", "atan", "atan2", "hypot", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "ln", "log10", "log1p", "sqrt", "cbrt", "tanh", "abs", "mean", "variance", "std", "rms", "integral", "sum", "min", "max", "where", "xor", "implies", "iff")
                     or len(dimension) != 4 or any(type(power) is not int for power in dimension)):
                 raise ExpressionError(f"Invalid typed symbol {name!r}")
     parser = _Parser(tokenize(source), symbols)
@@ -558,10 +558,17 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
                 return 0.0
             return (scale * float(np.mean(field / scale))
                     * (shape[0] * spacing_x) * (shape[1] * spacing_y))
-        if node.operator in ("mean", "variance", "std", "rms"):
+        if node.operator in ("mean", "variance", "std", "rms", "sum"):
             field = np.asarray(args[0], dtype=np.float64)
             if field.size == 0:
                 raise ExpressionError("Spatial reduction requires a nonempty field")
+            if node.operator == "sum":
+                # Discrete sample summation; unlike integral, no cell-area factor.
+                # Scale the reduction to avoid intermediate overflow for finite fields.
+                scale = float(np.max(np.abs(field)))
+                if scale == 0:
+                    return 0.0
+                return scale * np.sum(field / scale)
             if node.operator == "mean":
                 return np.mean(field)
             if node.operator == "variance":

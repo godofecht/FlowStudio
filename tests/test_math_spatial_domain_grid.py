@@ -42,6 +42,22 @@ class SpatialDomainGridTests(unittest.TestCase):
                 self.assertGreater(float(np.ptp(actual)), 0.1)
                 np.testing.assert_array_equal(actual, self.calculate(source))
 
+    def test_two_axis_spatial_variation(self):
+        # Exercise both coordinate axes rather than broadcasting a 1D row.
+        cases = (
+            ("log(1+x/1m+y/1m)", np.log(1.0 + self.x + self.y)),
+            ("atanh((x+y)/4m)", np.arctanh((self.x + self.y) / 4.0)),
+            ("acosh(1+x/1m+y/1m)", np.arccosh(1.0 + self.x + self.y)),
+        )
+        for source, expected in cases:
+            with self.subTest(source=source):
+                actual = self.calculate(source)
+                self.assertEqual(actual.shape, (9, 13))
+                np.testing.assert_allclose(actual, expected, rtol=2e-14, atol=2e-14)
+                self.assertGreater(float(np.ptp(actual[:, 0])), 0.1)
+                self.assertGreater(float(np.ptp(actual[0, :])), 0.1)
+                np.testing.assert_array_equal(actual, self.calculate(source))
+
     def test_exact_singularity_in_one_grid_row_rejects_entire_result(self):
         # A single invalid row must not be silently replaced with NaN/Inf.
         for source in ("log(x/1m)", "atanh(x/1m)", "acosh(x/1m)"):

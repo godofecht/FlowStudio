@@ -94,6 +94,22 @@ function main() -> i32 {
     result = evaluate_math_expression(
         "laplacian3(0K,1K,1K,16K,16K,81K,81K,1m,1m,3m)")
     if not result.valid or near(result.result.value,28.0) { return 30 }
+    # Offset quartic manufactured solution at (1m,2m,3m):
+    # f=(x^4+y^4+z^4) K/m^4, exact Laplacian=168 K/m².
+    # The anisotropic centered stencil adds 2(dx²+dy²+dz²).
+    # Unlike the origin-only test, all seven samples are nonzero and
+    # the coarse/fine solutions converge to a nonzero exact curvature.
+    let offset_coarse: MathResult = evaluate_math_expression(
+        "laplacian3(98K,97K,113K,82K,338K,17K,1313K,1m,2m,3m)")
+    let offset_fine: MathResult = evaluate_math_expression(
+        "laplacian3(98K,97.0625K,102.0625K,83K,163K,22.0625K,427.0625K,0.5m,1m,1.5m)")
+    if not offset_coarse.valid or not offset_fine.valid { return 31 }
+    if not near(offset_coarse.result.value,196.0) or
+       not near(offset_fine.result.value,175.0) { return 32 }
+    if not near(offset_coarse.result.value - 168.0,
+                4.0 * (offset_fine.result.value - 168.0)) { return 33 }
+    if not same_dimension(offset_coarse.result.dimension,curvature) or
+       not same_dimension(offset_fine.result.dimension,curvature) { return 34 }
     println("native-math-laplacian3-ok")
     return 0
 }

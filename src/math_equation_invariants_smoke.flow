@@ -1,0 +1,67 @@
+# Native Flow 2.0 equation compiler invariants; no Python evaluator.
+# flow run src/math_equation_invariants_smoke.flow
+import .math_dimensions { Dimension, Quantity, dimensionless, length_dimension, time_dimension, quotient_dimension, quantity, same_dimension }
+import .math_expression_source { MathSymbol, MathBindings, empty_math_bindings }
+import .math_equation { MathEquationResult, evaluate_math_equation_source, evaluate_math_equation_source_with_bindings }
+
+function near(a: f64, b: f64) -> bool {
+    let mut difference: f64 = a - b
+    if difference < 0.0 { difference = -difference }
+    return difference < 0.00000000001
+}
+
+function main() -> i32 {
+    let metres: Dimension = length_dimension()
+    let seconds: Dimension = time_dimension()
+    let speed: Dimension = quotient_dimension(metres, seconds)
+    let exact_speed: Quantity = quantity(0.0, speed)
+    let exact_length: Quantity = quantity(0.0, metres)
+    let mut bindings: MathBindings = empty_math_bindings()
+    bindings.count = 3
+    bindings.symbols[0] = MathSymbol { name: "u₁", value: quantity(3.0, speed) }
+    bindings.symbols[1] = MathSymbol { name: "u₂", value: quantity(4.0, speed) }
+    bindings.symbols[2] = MathSymbol { name: "ρ", value: quantity(2.0, metres) }
+
+    # The native equation parser must preserve Greek/subscript symbol identity.
+    let mut result: MathEquationResult = evaluate_math_equation_source_with_bindings(
+        "u₁ + u₂ = 7m/1s", bindings, exact_speed)
+    if not result.valid or not result.satisfied or not near(result.residual.value, 0.0) { return 1 }
+    result = evaluate_math_equation_source_with_bindings(
+        "u₁ + u₁ = 7m/1s", bindings, exact_speed)
+    if not result.valid or result.satisfied or not near(result.residual.value, -1.0) { return 2 }
+
+    # A length is not a velocity, even when its numerical value matches.
+    result = evaluate_math_equation_source_with_bindings(
+        "ρ = 2m", bindings, exact_length)
+    if not result.valid or not result.satisfied { return 3 }
+    result = evaluate_math_equation_source_with_bindings(
+        "ρ = 2m/1s", bindings, exact_speed)
+    if result.valid { return 4 }
+
+    # Residual sign reverses when both sides of an equation are exchanged.
+    let forward: MathEquationResult = evaluate_math_equation_source(
+        "5m = 3m", exact_length)
+    let reverse: MathEquationResult = evaluate_math_equation_source(
+        "3m = 5m", exact_length)
+    if not forward.valid or not reverse.valid { return 5 }
+    if forward.satisfied or reverse.satisfied { return 6 }
+    if not near(forward.residual.value, 2.0) or
+       not near(reverse.residual.value, -2.0) { return 7 }
+    if not same_dimension(forward.residual.dimension, metres) or
+       not same_dimension(reverse.residual.dimension, metres) { return 8 }
+
+    # Unicode operators must lower through the same executable native path.
+    result = evaluate_math_equation_source(
+        "2×(3m−1m) = 4m", exact_length)
+    if not result.valid or not result.satisfied { return 9 }
+    result = evaluate_math_equation_source(
+        "where(¬(1<2) ∨ 3<4,3m,4m) = 3m", exact_length)
+    if not result.valid or not result.satisfied { return 10 }
+    result = evaluate_math_equation_source(
+        "1m⋅2s = 2m", exact_length)
+    if result.valid { return 11 }
+    result = evaluate_math_equation_source(
+        "true = false", quantity(0.0, dimensionless()))
+    if result.valid { return 12 }
+    return 0
+}

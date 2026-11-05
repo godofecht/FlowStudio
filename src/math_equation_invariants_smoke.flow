@@ -89,5 +89,17 @@ function main() -> i32 {
     if result.valid { return 21 }
     result = evaluate_math_equation_source("3m = 2m", quantity(1.0, seconds))
     if result.valid { return 22 }
+    # Both compiled operand programs must retain absolute UTF-8 source spans.
+    # This is checked on executable native IR, not editor tokenization.
+    parsed = parse_math_equation("2m＝3m")
+    if not parsed.valid or parsed.left.count != 1 or parsed.right.count != 1 { return 23 }
+    if parsed.left.instructions[0].source_start != 0 or
+       parsed.left.instructions[0].source_end != 2 { return 24 }
+    if parsed.right.instructions[0].source_start != 5 or
+       parsed.right.instructions[0].source_end != 7 { return 25 }
+    parsed = parse_math_equation("2m = 3m")
+    if not parsed.valid or parsed.right.count != 1 or
+       parsed.right.instructions[0].source_start != 5 or
+       parsed.right.instructions[0].source_end != 7 { return 26 }
     return 0
 }

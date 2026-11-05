@@ -70,6 +70,30 @@ function main() -> i32 {
     inferred = infer_math_equation_source(
         "laplacian3(0K,1K,1K,8K,8K,27K,27K,1m,2m,3m) = 12K")
     if inferred.valid { return 24 }
+    # Manufactured anisotropic quartic: f=(x^4+y^4+z^4) K/m^4.
+    # At the origin the exact continuous Laplacian is zero; the
+    # seven-point stencil has truncation error 2(dx^2+dy^2+dz^2).
+    # Halving all three spacings must reduce that error by exactly 4.
+    let quartic_coarse: MathResult = evaluate_math_expression(
+        "laplacian3(0K,1K,1K,16K,16K,81K,81K,1m,2m,3m)")
+    let quartic_fine: MathResult = evaluate_math_expression(
+        "laplacian3(0K,0.0625K,0.0625K,1K,1K,5.0625K,5.0625K,0.5m,1m,1.5m)")
+    if not quartic_coarse.valid or not quartic_fine.valid { return 25 }
+    if not near(quartic_coarse.result.value,28.0) or
+       not near(quartic_fine.result.value,7.0) { return 26 }
+    if not near(quartic_coarse.result.value,4.0 * quartic_fine.result.value) { return 27 }
+    if not same_dimension(quartic_coarse.result.dimension,curvature) or
+       not same_dimension(quartic_fine.result.dimension,curvature) { return 28 }
+    # Independent affine-field invariant: opposing first differences
+    # cancel even on unequal spacings, with a nonzero constant offset.
+    result = evaluate_math_expression(
+        "laplacian3(11K,13K,9K,17K,5K,20K,2K,1m,2m,3m)")
+    if not result.valid or not near(result.result.value,0.0) { return 29 }
+    # Changing one spacing without changing the manufactured samples
+    # must not accidentally preserve the reference curvature.
+    result = evaluate_math_expression(
+        "laplacian3(0K,1K,1K,16K,16K,81K,81K,1m,1m,3m)")
+    if not result.valid or near(result.result.value,28.0) { return 30 }
     println("native-math-laplacian3-ok")
     return 0
 }

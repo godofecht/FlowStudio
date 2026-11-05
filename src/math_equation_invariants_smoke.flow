@@ -101,5 +101,20 @@ function main() -> i32 {
     if not parsed.valid or parsed.right.count != 1 or
        parsed.right.instructions[0].source_start != 5 or
        parsed.right.instructions[0].source_end != 7 { return 26 }
+    # Approximate equality is executable native equation syntax, with
+    # explicit dimensioned tolerance rather than an implicit epsilon.
+    result = evaluate_math_equation_source("3m ≈ 2m", quantity(1.0, metres))
+    if not result.valid or not result.satisfied or not near(result.residual.value, 1.0) { return 27 }
+    result = evaluate_math_equation_source("3m ≈ 2m", quantity(0.5, metres))
+    if not result.valid or result.satisfied { return 28 }
+    result = evaluate_math_equation_source("3m ≈ 2m", quantity(1.0, seconds))
+    if result.valid { return 29 }
+    parsed = parse_math_equation("2m≈3m")
+    if not parsed.valid or parsed.equality_at != 2 or
+       parsed.right.instructions[0].source_start != 5 { return 30 }
+    result = evaluate_math_equation_source("1m ≈ 1s", quantity(1.0, metres))
+    if result.valid { return 31 }
+    parsed = parse_math_equation("1m ≈ 1m = 1m")
+    if parsed.valid or parsed.failed_at != 11 { return 32 }
     return 0
 }

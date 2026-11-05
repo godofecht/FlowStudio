@@ -116,5 +116,18 @@ function main() -> i32 {
     if result.valid { return 31 }
     parsed = parse_math_equation("1m ≈ 1m = 1m")
     if parsed.valid or parsed.failed_at != 10 { return 32 }
+    # U+2261 is another explicit equation delimiter, not a symbolic
+    # identity proof: it uses the same typed numerical residual evaluator.
+    result = evaluate_math_equation_source("3m ≡ 3m", exact_length)
+    if not result.valid or not result.satisfied { return 33 }
+    result = evaluate_math_equation_source("3m ≡ 2m", exact_length)
+    if not result.valid or result.satisfied or not near(result.residual.value, 1.0) { return 34 }
+    parsed = parse_math_equation("2m≡3m")
+    if not parsed.valid or parsed.equality_at != 2 or
+       parsed.right.instructions[0].source_start != 5 { return 35 }
+    result = evaluate_math_equation_source("1m ≡ 1s", exact_length)
+    if result.valid { return 36 }
+    parsed = parse_math_equation("1m ≡ 1m ≈ 1m")
+    if parsed.valid or parsed.failed_at != 10 { return 37 }
     return 0
 }

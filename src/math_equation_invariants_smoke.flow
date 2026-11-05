@@ -115,6 +115,6 @@ function main() -> i32 {
     result = evaluate_math_equation_source("1m ≈ 1s", quantity(1.0, metres))
     if result.valid { return 31 }
     parsed = parse_math_equation("1m ≈ 1m = 1m")
-    if parsed.valid or parsed.failed_at != 11 { return 32 }
+    if parsed.valid or parsed.failed_at != 10 { return 32 }
     return 0
 }

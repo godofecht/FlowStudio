@@ -2,7 +2,7 @@
 # flow run src/math_equation_invariants_smoke.flow
 import .math_dimensions { Dimension, Quantity, dimensionless, length_dimension, time_dimension, quotient_dimension, quantity, same_dimension }
 import .math_expression_source { MathSymbol, MathBindings, empty_math_bindings }
-import .math_equation { MathEquationResult, evaluate_math_equation_source, evaluate_math_equation_source_with_bindings }
+import .math_equation { MathEquation, MathEquationResult, parse_math_equation, evaluate_math_equation_source, evaluate_math_equation_source_with_bindings }
 
 function near(a: f64, b: f64) -> bool {
     let mut difference: f64 = a - b
@@ -72,5 +72,22 @@ function main() -> i32 {
     # Unbalanced grouping is rejected before compiling either expression.
     result = evaluate_math_equation_source("(1m + 2m = 3m", exact_length)
     if result.valid { return 15 }
+    # Native parser diagnostics retain byte offsets, including UTF-8 operators.
+    let parsed: MathEquation = parse_math_equation("2m＝2m")
+    if not parsed.valid or parsed.equality_at != 2 or parsed.failed_at != -1 { return 16 }
+    parsed = parse_math_equation("2m = 3m = 4m")
+    if parsed.valid or parsed.failed_at != 8 { return 17 }
+    parsed = parse_math_equation("2m = (3m")
+    if parsed.valid or parsed.failed_at != 8 { return 18 }
+
+    # The equation tolerance is a typed, nonnegative quantity.
+    result = evaluate_math_equation_source("3m = 2m", quantity(1.0, metres))
+    if not result.valid or not result.satisfied or not near(result.residual.value, 1.0) { return 19 }
+    result = evaluate_math_equation_source("3m = 2m", quantity(0.999, metres))
+    if not result.valid or result.satisfied { return 20 }
+    result = evaluate_math_equation_source("3m = 2m", quantity(-1.0, metres))
+    if result.valid { return 21 }
+    result = evaluate_math_equation_source("3m = 2m", quantity(1.0, seconds))
+    if result.valid { return 22 }
     return 0
 }

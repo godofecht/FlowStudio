@@ -568,7 +568,11 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
                 scale = float(np.max(np.abs(field)))
                 if scale == 0:
                     return 0.0
-                return scale * np.sum(field / scale)
+                # A finite input may have an unrepresentable finite-precision sum.
+                # Let the final finiteness check raise ExpressionError, not emit
+                # a NumPy overflow warning before that diagnostic.
+                with np.errstate(over="ignore", invalid="ignore"):
+                    return scale * np.sum(field / scale)
             if node.operator == "mean":
                 return np.mean(field)
             if node.operator == "variance":

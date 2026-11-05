@@ -78,7 +78,7 @@ function main() -> i32 {
     parsed = parse_math_equation("2m = 3m = 4m")
     if parsed.valid or parsed.failed_at != 8 { return 17 }
     parsed = parse_math_equation("2m = (3m")
-    if parsed.valid or parsed.failed_at != 9 { return 18 }
+    if parsed.valid or parsed.failed_at != 8 { return 18 }
 
     # The equation tolerance is a typed, nonnegative quantity.
     result = evaluate_math_equation_source("3m = 2m", quantity(1.0, metres))

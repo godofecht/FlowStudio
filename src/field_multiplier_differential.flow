@@ -27,6 +27,36 @@ function main() -> i32 {
        qn[2] < 0.199999999999 or qn[2] > 0.200000000001 or
        qn[3] < 0.599999999999 or qn[3] > 0.600000000001 or
        qn[4] < 0.199999999999 or qn[4] > 0.200000000001 { return 2 }
+    # Verify the complete spatial outputs, not just the perturbed cells.
+    let mut j: i32 = 2
+    while j <= 5 {
+        if vn[j] < 0.999999999999 or vn[j] > 1.000000000001 { return 3 }
+        j = j + 1
+    }
+    j = 1
+    while j <= 6 {
+        if j != 2 and j != 3 and j != 4 and qn[j] != 0.0 { return 4 }
+        j = j + 1
+    }
+
+    # Zero elapsed time must be an identity update, including fixed boundaries.
+    let vz: array<f64, 8> = [0.0]
+    V_field_step(v, vz, 0.0)
+    j = 0
+    while j < 8 {
+        if vz[j] != v[j] { return 5 }
+        j = j + 1
+    }
+
+    # Identical inputs and step size must give bit-identical results.
+    let vr: array<f64, 8> = [0.0]
+    V_field_step(v, vr, 0.4)
+    j = 0
+    while j < 8 {
+        if vr[j] != vn[j] { return 6 }
+        j = j + 1
+    }
+
     println("field-multiplier-ok")
     return 0
 }

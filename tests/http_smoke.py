@@ -142,6 +142,44 @@ def compact_native_math_identifiers(source: str,
         "truncated": "truncq",
         "quotient": "qval",
         "period": "periodv",
+        "expression_start": "exprstart",
+        "expression_length": "exprlen",
+        "expression_error": "exprerr",
+        "expected_dimension": "expdim",
+        "actual_dimension": "actdim",
+        "operand_value": "opval",
+        "result_value": "resval",
+        "dimension_index": "didx",
+        "constraint_index": "cidx",
+        "equation_index": "eidx",
+        "variable_index": "vidx",
+        "symbol_index": "sidx",
+        "left_value": "lval",
+        "right_value": "rval",
+        "numerator": "numv",
+        "denominator": "denv",
+        "expression_source": "exprsrc",
+        "operator_width": "opwidth",
+        "equality_width": "eqwidth",
+        "expression": "exprv",
+        "normalized": "normv",
+        "magnitude": "magv",
+        # Rename shared compiler internals outside quoted mathematical input.
+        "infer_math_expression_source": "imexprsrc",
+        "infer_math_expression_source_with_bindings": "imexprbind",
+        "infer_math_equation_source": "imeqsrc",
+        "infer_math_equation_source_with_bindings": "imeqbind",
+        "parse_math_expression_with_bindings": "pmexprbind",
+        "parse_math_equation_with_bindings": "pmeqbind",
+        "evaluate_math_expression": "evalmexpr",
+        "CheckedQuantity": "CQty",
+        "MathProgram": "MProg",
+        "empty_math_bindings": "emptyMB",
+        "static_bounded_dimension": "sbdim",
+        "bounded_checked_value": "bcval",
+        "positive_square_root": "psqrt",
+        "length_dimension": "lendim",
+        "make_instruction": "mkIns",
     }
 
     if extra_aliases:
@@ -1013,8 +1051,10 @@ def main() -> None:
     )
     native_equation_system = "\n".join(
         "\n".join(
-            line.strip().removeprefix("export ")
+            compact_native_math_line(line)
             # Preserve Unicode line-boundary literals during HTTP bundling.
+            # Tighten only whitespace after commas/colons outside strings;
+            # never change Flow operators or quoted mathematical sources.
             for line in (Path(__file__).resolve().parents[1] / path)
                 .read_text(encoding="utf-8").split("\n")
             if line.strip() and not line.lstrip().startswith("#")
@@ -1030,7 +1070,12 @@ def main() -> None:
         native_equation_system,
         {"tolerances": "tols", "failed_equation": "feq",
          "first_unsatisfied": "funs", "position": "epos",
-         "system": "esys", "CheckedQuantity": "CQty"},
+         "system": "esys", "CheckedQuantity": "CQty",
+         "normalized": "normx", "predicate": "predx",
+         "magnitude": "magx", "temperature": "tempx",
+         "equations": "eqnsx", "failed_at": "failx",
+         "dimension": "dimx", "operator_width": "opwidthx",
+         "unary_width": "unwidthx", "equality_width": "eqwidthx"},
     )
     assert len(native_equation_system.encode("utf-8")) < 128 * 1024
     assert "function parse_math_equation_system(" in native_equation_system
@@ -1080,10 +1125,10 @@ def main() -> None:
     status, body = request("POST", "/api/run/flow", native_static, accepted_headers)
     assert status == 200 and "native-math-static-ok" in body, (
         "native mathematical static inference execution", status, body)
+    # Corrupt the real compacted native function signature, independently
+    # of aliases for MathProgram and other compiler-internal type names.
     broken_static = native_static.replace(
-        "function infer_math_ir(program:MathProgram) -> MathInferredType {",
-        "function infer_math_ir(program:MathProgram -> MathInferredType {",
-        1,
+        "function infer_math_ir(", "function infer_math_ir", 1,
     )
     assert broken_static != native_static
     status, body = request("POST", "/api/check/flow", broken_static, accepted_headers)

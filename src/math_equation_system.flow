@@ -33,7 +33,8 @@ export struct MathEquationSystemResult {
     count: i32,
     failed_equation: i32,
     failed_at: i32,
-    first_unsatisfied: i32
+    first_unsatisfied: i32,
+    first_unsatisfied_at: i32
 }
 
 export function empty_math_equation_tolerances() -> MathEquationTolerances {
@@ -57,7 +58,7 @@ function evaluation_error(position: i32, equation_index: i32) -> MathEquationSys
     return MathEquationSystemResult {
         valid: false, satisfied: false, results: [blank], count: 0,
         failed_equation: equation_index, failed_at: position,
-        first_unsatisfied: -1
+        first_unsatisfied: -1, first_unsatisfied_at: -1
     }
 }
 
@@ -239,6 +240,7 @@ export function evaluate_math_equation_system(
     let mut results: array<MathEquationResult, 16> = [blank]
     let mut all_satisfied: bool = true
     let mut first_unsatisfied: i32 = -1
+    let mut first_unsatisfied_at: i32 = -1
     let mut i: i32 = 0
     while i < system.count {
         let evaluated: MathEquationResult =
@@ -247,13 +249,17 @@ export function evaluate_math_equation_system(
         results[i] = evaluated
         if not evaluated.satisfied {
             all_satisfied = false
-            if first_unsatisfied < 0 { first_unsatisfied = i }
+            if first_unsatisfied < 0 {
+                first_unsatisfied = i
+                first_unsatisfied_at = system.equations[i].equality_at
+            }
         }
         i = i + 1
     }
     return MathEquationSystemResult {
         valid: true, satisfied: all_satisfied, results: results,
         count: system.count, failed_equation: -1, failed_at: -1,
-        first_unsatisfied: first_unsatisfied
+        first_unsatisfied: first_unsatisfied,
+        first_unsatisfied_at: first_unsatisfied_at
     }
 }

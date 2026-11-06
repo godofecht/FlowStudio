@@ -14,6 +14,7 @@ import argparse
 import hashlib
 import json
 import os
+import resource
 from pathlib import Path
 import signal
 import subprocess
@@ -25,6 +26,10 @@ import time
 def execute(binary: Path, fixture: Path, root: Path, timeout: float, limit: int):
     # A temporary regular file prevents unbounded captured-output RAM usage.
     with tempfile.TemporaryFile() as output:
+        # Bound child output on disk, not merely the bytes read afterward.
+        def restrict_output():
+            resource.setrlimit(resource.RLIMIT_FSIZE, (limit + 1, limit + 1))
+
         start = time.monotonic()
         process = subprocess.Popen(
             [str(binary), "run", str(fixture)],
@@ -33,6 +38,7 @@ def execute(binary: Path, fixture: Path, root: Path, timeout: float, limit: int)
             stdout=output,
             stderr=subprocess.STDOUT,
             start_new_session=True,
+            preexec_fn=restrict_output,
         )
         timed_out = False
         try:
@@ -42,7 +48,7 @@ def execute(binary: Path, fixture: Path, root: Path, timeout: float, limit: int)
             os.killpg(process.pid, signal.SIGKILL)
             returncode = process.wait()
         elapsed = time.monotonic() - start
-        size = output.tell()
+        size = output.seek(0, os.SEEK_END)
         output.seek(0)
         digest = hashlib.sha256()
         remaining = limit + 1
@@ -57,7 +63,7 @@ def execute(binary: Path, fixture: Path, root: Path, timeout: float, limit: int)
             "timed_out": timed_out,
             "output_bytes": size,
             "output_sha256": digest.hexdigest() if size <= limit else None,
-            "output_over_limit": size > limit,
+            "output_over_limit": size > limit or returncode == -signal.SIGXFSZ,
             "elapsed_seconds": round(elapsed, 3),
         }
 

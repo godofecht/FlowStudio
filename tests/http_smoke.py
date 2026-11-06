@@ -164,6 +164,22 @@ def compact_native_math_identifiers(source: str,
         "expression": "exprv",
         "normalized": "normv",
         "magnitude": "magv",
+        # Rename shared compiler internals outside quoted mathematical input.
+        "infer_math_expression_source": "imexprsrc",
+        "infer_math_expression_source_with_bindings": "imexprbind",
+        "infer_math_equation_source": "imeqsrc",
+        "infer_math_equation_source_with_bindings": "imeqbind",
+        "parse_math_expression_with_bindings": "pmexprbind",
+        "parse_math_equation_with_bindings": "pmeqbind",
+        "evaluate_math_expression": "evalmexpr",
+        "CheckedQuantity": "CQty",
+        "MathProgram": "MProg",
+        "empty_math_bindings": "emptyMB",
+        "static_bounded_dimension": "sbdim",
+        "bounded_checked_value": "bcval",
+        "positive_square_root": "psqrt",
+        "length_dimension": "lendim",
+        "make_instruction": "mkIns",
     }
 
     if extra_aliases:

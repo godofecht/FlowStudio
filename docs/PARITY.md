@@ -1,4 +1,8 @@
-## 2026-11-03: executable typed logical connectives in PDE source (proposed)
+## 2026-11-03: executable PDE UTF-8 BOM (merged; verification outstanding)
+
+[PR #420](https://github.com/godofecht/FlowStudio/pull/420) merged as [11aa659b](https://github.com/godofecht/FlowStudio/commit/11aa659b3e07c9be8981ae88e6b66ddfcb2f2cab). The bounded mathematical Flow lexer now accepts a leading UTF-8 BOM and rejects misplaced BOMs without relaxing its byte limit. Checked-in tests exercise heat and Navier–Stokes parsing and numerical execution. **Unverified:** final exact-head and post-merge Linux/macOS CI, production HTTP and Chromium on this head. **Unexecuted here:** local native Flow/R and independent macOS browser. [PR #421](https://github.com/godofecht/FlowStudio/pull/421) has merged as [96dec1f](https://github.com/godofecht/FlowStudio/commit/96dec1f982cc24458ced8c349afef2b58907ad7e), adding byte-boundary and Unicode diagnostic regressions. [PR #423](https://github.com/godofecht/FlowStudio/pull/423) has merged as [d6ce32e](https://github.com/godofecht/FlowStudio/commit/d6ce32e5a506d84c1d485a3070d3b20de972082e), adding a numerical heat-mean oracle and BOM/plain-source equivalence assertions. Their final-head and post-merge Linux/macOS native/HTTP/browser CI remains independently unverified here. This is not upstream grammar integration.
+
+## 2026-11-03: executable typed logical connectives in PDE source (merged; final-head verification outstanding)
 
 [PR #419](https://github.com/godofecht/FlowStudio/pull/419) adds typed
 XOR, implication and equivalence to the actual bounded mathematical Flow
@@ -7,8 +11,9 @@ compiler. The checked-in RK2 heat program heats one spatial quadrant at
 2 K/s for 0.01 s, predicting 300.005 K by mean conservation. Truth tables,
 operator associativity, invalid physical dimensions, source aliases and
 actual PDE CLI execution are tested. [Reproduction](MATH_LOGICAL_PDE.md).
-**Unverified:** exact-head Linux/macOS source/native CI, real HTTP and
-physical Chromium on this revision. **Unexecuted:** local native Flow/R
+**Merged:** [commit e3410419](https://github.com/godofecht/FlowStudio/commit/e34104191df9b7897dbc574afc29caacdf31bd57) on 2026-11-03.
+The earlier [CI #41550966061](https://github.com/godofecht/FlowStudio/actions/runs/41550966061) failed an assertion on a superseded revision; the PR reports a subsequent precedence correction.
+**Unverified:** final exact-head Linux/macOS source/native CI, post-merge main CI, real HTTP and physical Chromium for the merged revision. **Unexecuted:** local native Flow/R
 and independent physical macOS Chromium. No hosted CI changes.
 This does not establish upstream Flow grammar or native Navier-Stokes.
 

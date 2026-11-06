@@ -83,6 +83,24 @@ function compactNativeMathIdentifiers(source) {
     expression: 'exprv',
     normalized: 'normv',
     magnitude: 'magv',
+    // Shared internal compiler symbols dominate the actual SI HTTP bundles.
+    // Lexical rewriting leaves quoted mathematical source untouched.
+    infer_math_expression_source: 'imexprsrc',
+    infer_math_expression_source_with_bindings: 'imexprbind',
+    infer_math_equation_source: 'imeqsrc',
+    infer_math_equation_source_with_bindings: 'imeqbind',
+    parse_math_expression_with_bindings: 'pmexprbind',
+    parse_math_equation_with_bindings: 'pmeqbind',
+    evaluate_math_expression: 'evalmexpr',
+    CheckedQuantity: 'CQty',
+    MathEquationResult: 'MEqR',
+    MathProgram: 'MProg',
+    empty_math_bindings: 'emptyMB',
+    static_bounded_dimension: 'sbdim',
+    bounded_checked_value: 'bcval',
+    positive_square_root: 'psqrt',
+    length_dimension: 'lendim',
+    make_instruction: 'mkIns',
   };
   return source.replace(/"(?:\\.|[^"\\])*"|[A-Za-z_][A-Za-z0-9_]*/g,
     token => token.startsWith('"') ? token : (aliases[token] || token));

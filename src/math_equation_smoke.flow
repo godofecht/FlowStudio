@@ -230,6 +230,26 @@ function main() -> i32 {
     result = evaluate_math_equation_source("1m＝2s", exact_m)
     if result.valid or result.failed_at != 2 { return 80 }
 
+    # Regression for IEEE-754 unordered values: a NaN tolerance must never
+    # satisfy an otherwise exact equation. Generate NaN at runtime rather
+    # than depending on a compiler-specific floating literal spelling.
+    let mut zero: f64 = 0.0
+    zero = zero + 0.0
+    let nan_value: f64 = zero / zero
+    if nan_value == nan_value { return 81 }
+    result = evaluate_math_equation_source("1m = 1m", quantity(nan_value, metres))
+    if result.valid or result.satisfied or result.failed_at != 3 { return 82 }
+    result = evaluate_math_equation_source("1m = 2m", quantity(nan_value, metres))
+    if result.valid or result.satisfied or result.failed_at != 3 { return 83 }
+
+    # A NaN propagated through the native residual path is invalid, not
+    # merely an unsatisfied equation or an accepted ordered comparison.
+    let mut unordered: MathBindings = empty_math_bindings()
+    unordered.count = 1
+    unordered.symbols[0] = MathSymbol { name: "bad", value: quantity(nan_value, metres) }
+    result = evaluate_math_equation_source_with_bindings("bad = 1m", unordered, exact_m)
+    if result.valid or result.satisfied { return 84 }
+
     println("native-math-equation-ok")
     return 0
 }

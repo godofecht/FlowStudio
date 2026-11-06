@@ -1030,7 +1030,12 @@ def main() -> None:
         native_equation_system,
         {"tolerances": "tols", "failed_equation": "feq",
          "first_unsatisfied": "funs", "position": "epos",
-         "system": "esys", "CheckedQuantity": "CQty"},
+         "system": "esys", "CheckedQuantity": "CQty",
+         "normalized": "normx", "predicate": "predx",
+         "magnitude": "magx", "temperature": "tempx",
+         "equations": "eqnsx", "failed_at": "failx",
+         "dimension": "dimx", "operator_width": "opwidthx",
+         "unary_width": "unwidthx", "equality_width": "eqwidthx"},
     )
     assert len(native_equation_system.encode("utf-8")) < 128 * 1024
     assert "function parse_math_equation_system(" in native_equation_system

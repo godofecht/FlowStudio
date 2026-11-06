@@ -71,6 +71,8 @@ def _quantity(raw: str) -> tuple[float, Dimension]:
             if found is None:
                 raise ExpressionError(f"Invalid unit {part!r}")
             name, exponent = found.groups()
+            if exponent and not re.fullmatch(r"[⁻−]?[⁰¹²³⁴⁵⁶⁷⁸⁹]+", exponent):
+                raise ExpressionError(f"Malformed unit exponent {exponent!r}")
             power = int(exponent.translate(SUPERSCRIPT)) if exponent else 1
             if abs(power) > 16:
                 raise ExpressionError("Unit exponent out of range")

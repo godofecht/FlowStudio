@@ -1028,7 +1028,9 @@ def main() -> None:
     )
     native_equation_system = compact_native_math_identifiers(
         native_equation_system,
-        {"tolerances": "tols", "failed_equation": "feq"},
+        {"tolerances": "tols", "failed_equation": "feq",
+         "first_unsatisfied": "funs", "position": "epos",
+         "system": "esys", "CheckedQuantity": "CQty"},
     )
     assert len(native_equation_system.encode("utf-8")) < 128 * 1024
     assert "function parse_math_equation_system(" in native_equation_system

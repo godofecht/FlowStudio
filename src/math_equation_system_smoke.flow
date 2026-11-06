@@ -502,6 +502,29 @@ function main() -> i32 {
     if result.valid or result.failed_equation != 1 or
        result.failed_at != 12 { return 123 }
 
+    # A numerically false constraint is not a compiler/runtime failure.
+    # Report its earliest index, independently of later unsatisfied clauses.
+    system = parse_math_equation_system("1m=1m;2s=3s;4K=5K")
+    tolerances.count = 3
+    tolerances.values[0] = quantity(0.0, length_dimension())
+    tolerances.values[1] = quantity(0.0, time_dimension())
+    tolerances.values[2] = quantity(0.0, temperature_dimension())
+    result = evaluate_math_equation_system(system, tolerances)
+    if not result.valid or result.satisfied or
+       result.first_unsatisfied != 1 or result.failed_equation != -1 { return 124 }
+    tolerances.values[1] = quantity(1.0, time_dimension())
+    result = evaluate_math_equation_system(system, tolerances)
+    if not result.valid or result.satisfied or
+       result.first_unsatisfied != 2 { return 125 }
+    tolerances.values[2] = quantity(1.0, temperature_dimension())
+    result = evaluate_math_equation_system(system, tolerances)
+    if not result.valid or not result.satisfied or
+       result.first_unsatisfied != -1 { return 126 }
+    tolerances.values[1] = quantity(0.0, length_dimension())
+    result = evaluate_math_equation_system(system, tolerances)
+    if result.valid or result.first_unsatisfied != -1 or
+       result.failed_equation != 1 { return 127 }
+
     println("native-math-equation-system-ok")
     return 0
 }

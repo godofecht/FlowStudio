@@ -60,7 +60,29 @@ function compactNativeMathIdentifiers(source) {
     // Token-aware compression keeps all executable Flow bundles below the
     // existing 128 KiB HTTP limit without changing their numerical programs.
     operators: 'ops', positions: 'pos', instructions: 'insns',
-    remainder: 'remval', truncated: 'truncq', quotient: 'qval'
+    remainder: 'remval', truncated: 'truncq', quotient: 'qval' ,
+    expression_start: 'exprstart',
+    expression_length: 'exprlen',
+    expression_error: 'exprerr',
+    expected_dimension: 'expdim',
+    actual_dimension: 'actdim',
+    operand_value: 'opval',
+    result_value: 'resval',
+    dimension_index: 'didx',
+    constraint_index: 'cidx',
+    equation_index: 'eidx',
+    variable_index: 'vidx',
+    symbol_index: 'sidx',
+    left_value: 'lval',
+    right_value: 'rval',
+    numerator: 'numv',
+    denominator: 'denv',
+    expression_source: 'exprsrc',
+    operator_width: 'opwidth',
+    equality_width: 'eqwidth',
+    expression: 'exprv',
+    normalized: 'normv',
+    magnitude: 'magv',
   };
   return source.replace(/"(?:\\.|[^"\\])*"|[A-Za-z_][A-Za-z0-9_]*/g,
     token => token.startsWith('"') ? token : (aliases[token] || token));

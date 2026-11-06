@@ -2,7 +2,7 @@
 # flow run src/math_equation_invariants_smoke.flow
 import .math_dimensions { Dimension, Quantity, dimensionless, length_dimension, time_dimension, quotient_dimension, quantity, same_dimension }
 import .math_expression_source { MathSymbol, MathBindings, empty_math_bindings }
-import .math_equation { MathEquation, MathEquationResult, parse_math_equation, evaluate_math_equation_source, evaluate_math_equation_source_with_bindings }
+import .math_equation { MathEquation, MathEquationResult, parse_math_equation, evaluate_math_equation_source, evaluate_math_equation_source_with_bindings, evaluate_math_equation_source_with_relative_tolerance }
 
 function near(a: f64, b: f64) -> bool {
     let mut difference: f64 = a - b
@@ -129,5 +129,24 @@ function main() -> i32 {
     if result.valid { return 36 }
     parsed = parse_math_equation("1m ≡ 1m ≈ 1m")
     if parsed.valid or parsed.failed_at != 10 { return 37 }
+    # Relative tolerance scales the larger operand, with typed absolute floor.
+    result = evaluate_math_equation_source_with_relative_tolerance(
+        "100m = 101m", quantity(0.0, metres), 0.01)
+    if not result.valid or not result.satisfied { return 38 }
+    result = evaluate_math_equation_source_with_relative_tolerance(
+        "100m = 101m", quantity(0.0, metres), 0.005)
+    if not result.valid or result.satisfied { return 39 }
+    result = evaluate_math_equation_source_with_relative_tolerance(
+        "100m = 101m", quantity(1.0, metres), 0.0)
+    if not result.valid or not result.satisfied { return 40 }
+    result = evaluate_math_equation_source_with_relative_tolerance(
+        "100m = 101m", quantity(1.0, seconds), 0.01)
+    if result.valid { return 41 }
+    result = evaluate_math_equation_source_with_relative_tolerance(
+        "100m = 101m", quantity(0.0, metres), -0.01)
+    if result.valid { return 42 }
+    result = evaluate_math_equation_source_with_relative_tolerance(
+        "100m = 101m", quantity(0.0, metres), 0.0)
+    if not result.valid or result.satisfied { return 43 }
     return 0
 }

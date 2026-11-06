@@ -8,13 +8,17 @@ import unittest
 
 
 def step(values, coefficient, dt, left, right, dx=1.0):
-    if len(values) < 3 or coefficient < 0 or dt < 0 or dx <= 0:
+    if (len(values) < 3 or not all(math.isfinite(x) for x in values) or
+            not all(math.isfinite(x) for x in (coefficient, dt, left, right, dx)) or
+            coefficient < 0 or dt < 0 or dx <= 0):
         raise ValueError("invalid field configuration")
     result = list(values)
     result[0], result[-1] = left, right
     factor = coefficient * dt / (dx * dx)
     for i in range(1, len(values) - 1):
         result[i] = values[i] + factor * (values[i - 1] - 2 * values[i] + values[i + 1])
+    if not all(math.isfinite(x) for x in result):
+        raise ValueError("non-finite field result")
     return result
 
 
@@ -58,7 +62,14 @@ class FieldMultiplierOracle(unittest.TestCase):
         for args in (([0, 0], 1, 0.1, 0, 0),
                      ([0, 0, 0], -1, 0.1, 0, 0),
                      ([0, 0, 0], 1, -0.1, 0, 0),
-                     ([0, 0, 0], 1, 0.1, 0, 0, 0)):
+                     ([0, 0, 0], 1, 0.1, 0, 0, 0),
+                     ([0, float("nan"), 0], 1, 0.1, 0, 0),
+                     ([0, 0, 0], float("nan"), 0.1, 0, 0),
+                     ([0, 0, 0], float("inf"), 0.1, 0, 0),
+                     ([0, 0, 0], 1, float("inf"), 0, 0),
+                     ([0, 0, 0], 1, 0.1, float("nan"), 0),
+                     ([0, 0, 0], 1, 0.1, 0, 0, float("inf")),
+                     ([0, 1e308, 0], 1e308, 0.1, 0, 0)):
             with self.subTest(args=args), self.assertRaises(ValueError):
                 step(*args)
 

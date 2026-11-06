@@ -53,7 +53,7 @@ def _quantity(raw: str) -> tuple[float, Dimension]:
     if match is None:
         raise ExpressionError(f"Invalid quantity {raw!r}")
     literal, unit = match.groups()
-    if literal.startswith("10") and any(c in literal for c in "⁻⁰¹²³⁴⁵⁶⁷⁸⁹"):
+    if re.fullmatch(r"10[⁻−-][⁰¹²³⁴⁵⁶⁷⁸⁹0-9]+", literal):
         exponent = int(literal[2:].translate(SUPERSCRIPT))
         if abs(exponent) > 300:
             raise ExpressionError("Power-of-ten exponent out of range")

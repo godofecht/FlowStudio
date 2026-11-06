@@ -42,11 +42,23 @@ def execute(binary: Path, fixture: Path, root: Path, timeout: float, limit: int)
         )
         timed_out = False
         try:
-            returncode = process.wait(timeout=timeout)
-        except subprocess.TimeoutExpired:
-            timed_out = True
-            os.killpg(process.pid, signal.SIGKILL)
-            returncode = process.wait()
+            try:
+                returncode = process.wait(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                timed_out = True
+                returncode = None
+        finally:
+            # Flow may launch compiler/runtime descendants that retain the
+            # inherited output descriptor after the direct child exits.
+            # Reap the whole isolated session before hashing its output.
+            # Also prevent timed-out descendants from surviving the runner.
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.wait()
+        if returncode is None:
+            returncode = process.returncode
         elapsed = time.monotonic() - start
         size = output.seek(0, os.SEEK_END)
         output.seek(0)
@@ -83,6 +95,10 @@ def main() -> int:
     for binary in binaries:
         if not binary.is_file() or not os.access(binary, os.X_OK):
             parser.error(f"Flow executable missing or not executable: {binary}")
+    # Comparing a binary against itself is guaranteed to produce a false
+    # compatibility pass. samefile also catches hard-linked executables.
+    if binaries[0].samefile(binaries[1]):
+        parser.error("baseline and candidate must be different executable files")
     fixtures = [path.resolve() for path in args.fixtures]
     for fixture in fixtures:
         if not fixture.is_file() or fixture.suffix != ".flow":

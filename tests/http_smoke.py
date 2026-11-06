@@ -1125,10 +1125,10 @@ def main() -> None:
     status, body = request("POST", "/api/run/flow", native_static, accepted_headers)
     assert status == 200 and "native-math-static-ok" in body, (
         "native mathematical static inference execution", status, body)
+    # Corrupt the real compacted native function signature, independently
+    # of aliases for MathProgram and other compiler-internal type names.
     broken_static = native_static.replace(
-        "function infer_math_ir(program:MathProgram) -> MathInferredType {",
-        "function infer_math_ir(program:MathProgram -> MathInferredType {",
-        1,
+        "function infer_math_ir(", "function infer_math_ir", 1,
     )
     assert broken_static != native_static
     status, body = request("POST", "/api/check/flow", broken_static, accepted_headers)

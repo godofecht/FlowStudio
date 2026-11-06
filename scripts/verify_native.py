@@ -265,7 +265,10 @@ def verify(root: Path, port: int = 8751, build_timeout: int = 180,
         try:
             _wait_health(proc, port, startup_timeout)
             print("Live native server: GET /health verified", flush=True)
-            # Native HTTP smoke compiles many checked-in mathematical Flow\n            # modules; 120s is too close to observed macOS execution time.\n            # Keep a strict 240s process limit and all per-request safeguards.\n            smoke_result = _command([sys.executable, str(smoke)], root, 240)
+            # Native HTTP smoke compiles many checked-in mathematical Flow
+            # modules; 120s is too close to observed macOS execution time.
+            # Keep a strict 240s process limit and all per-request safeguards.
+            smoke_result = _command([sys.executable, str(smoke)], root, 240)
             if smoke_result.stdout:
                 print(smoke_result.stdout, end="", flush=True)
             if smoke_result.stderr:

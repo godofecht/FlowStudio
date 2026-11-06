@@ -1013,8 +1013,10 @@ def main() -> None:
     )
     native_equation_system = "\n".join(
         "\n".join(
-            line.strip().removeprefix("export ")
+            compact_native_math_line(line)
             # Preserve Unicode line-boundary literals during HTTP bundling.
+            # Tighten only whitespace after commas/colons outside strings;
+            # never change Flow operators or quoted mathematical sources.
             for line in (Path(__file__).resolve().parents[1] / path)
                 .read_text(encoding="utf-8").split("\n")
             if line.strip() and not line.lstrip().startswith("#")

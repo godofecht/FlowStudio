@@ -206,3 +206,51 @@ export function evaluate_math_equation_source_with_bindings(source: string, bind
 export function evaluate_math_equation_source(source: string, tolerance: Quantity) -> MathEquationResult {
     return evaluate_math_equation(parse_math_equation(source), tolerance)
 }
+
+# Relative tolerance is dimensionless and scales the larger operand magnitude.
+# Absolute tolerance remains dimensioned; both are validated independently.
+# This is numerical comparison, not symbolic identity or a PDE solver.
+export function evaluate_math_equation_with_relative_tolerance(
+    equation: MathEquation, absolute_tolerance: Quantity, relative_tolerance: f64
+) -> MathEquationResult {
+    if not equation.valid { return result_error(equation.failed_at) }
+    if relative_tolerance < 0.0 or not bounded(relative_tolerance) {
+        return result_error(equation.equality_at)
+    }
+    let left: MathResult = evaluate_math_ir(equation.left)
+    if not left.valid { return result_error(left.failed_at) }
+    let right: MathResult = evaluate_math_ir(equation.right)
+    if not right.valid { return result_error(right.failed_at) }
+    if left.is_predicate or right.is_predicate or
+       not same_dimension(left.result.dimension, right.result.dimension) or
+       not same_dimension(left.result.dimension, absolute_tolerance.dimension) or
+       absolute_tolerance.value < 0.0 or not bounded(absolute_tolerance.value) or
+       not bounded(left.result.value) or not bounded(right.result.value) {
+        return result_error(equation.equality_at)
+    }
+    let difference: CheckedQuantity = quantity_subtract(left.result, right.result)
+    if not difference.valid or not bounded(difference.quantity.value) {
+        return result_error(equation.equality_at)
+    }
+    let mut left_magnitude: f64 = left.result.value
+    if left_magnitude < 0.0 { left_magnitude = -left_magnitude }
+    let mut right_magnitude: f64 = right.result.value
+    if right_magnitude < 0.0 { right_magnitude = -right_magnitude }
+    let mut scale: f64 = left_magnitude
+    if right_magnitude > scale { scale = right_magnitude }
+    let threshold: f64 = absolute_tolerance.value + relative_tolerance * scale
+    if not bounded(threshold) { return result_error(equation.equality_at) }
+    let mut residual_magnitude: f64 = difference.quantity.value
+    if residual_magnitude < 0.0 { residual_magnitude = -residual_magnitude }
+    return MathEquationResult {
+        valid: true, residual: difference.quantity,
+        satisfied: residual_magnitude <= threshold, failed_at: -1
+    }
+}
+
+export function evaluate_math_equation_source_with_relative_tolerance(
+    source: string, absolute_tolerance: Quantity, relative_tolerance: f64
+) -> MathEquationResult {
+    return evaluate_math_equation_with_relative_tolerance(
+        parse_math_equation(source), absolute_tolerance, relative_tolerance)
+}

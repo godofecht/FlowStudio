@@ -47,6 +47,9 @@ function result_error(position: i32) -> MathEquationResult {
 }
 
 function bounded(value: f64) -> bool {
+    # IEEE-754 NaN compares false against every ordered bound, so reject it
+    # explicitly before validating residuals or caller-supplied tolerances.
+    if value != value { return false }
     let mut absolute: f64 = value
     if absolute < 0.0 { absolute = -absolute }
     return absolute <= 1000000000000000000000000000000.0

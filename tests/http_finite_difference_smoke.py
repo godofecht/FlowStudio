@@ -2,7 +2,18 @@
 """Execute native Flow centered differences through the production HTTP router."""
 from pathlib import Path
 
-from http_smoke import request, compact_native_math_line, compact_native_math_identifiers
+from http_smoke import request as native_http_request, compact_native_math_line, compact_native_math_identifiers
+
+
+def request(method: str, route: str, body: str = "", headers=None):
+    # Oracle injectors append executable Flow assertions after the shared
+    # compiler bundle has been compacted. Apply the same lexical identifier
+    # lowering to those assertions before invoking the native HTTP compiler.
+    # This preserves the numerical oracles and the production request limit.
+    if method == "POST" and route in ("/api/check/flow", "/api/run/flow"):
+        body = compact_native_math_identifiers(body)
+        assert len(body.encode("utf-8")) <= 131072, "native Flow HTTP source budget"
+    return native_http_request(method, route, body, headers)
 from http_finite_difference_interop import verify_fd_interop
 from http_laplacian3_interop import verify_laplacian3_interop
 from http_diffusion3_interop import verify_diffusion3_interop

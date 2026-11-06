@@ -1,256 +1,219 @@
-# Native, dimension-checked scalar equation AST and residual evaluator.
-# This is a bounded source parser using the actual Flow 2.0 expression compiler.
-# It is not upstream Flow grammar integration or symbolic equation solving.
 import .math_dimensions { Dimension, Quantity, CheckedQuantity, dimensionless, quantity, same_dimension, quantity_subtract }
 import .math_expression_ir { MathInstruction, MathProgram, MathResult, evaluate_math_ir }
 import .math_expression_source { MathBindings, ParsedMathExpression, parse_math_expression_with_bindings, empty_math_bindings, math_open_width, math_close_width }
-
 extern {
-    function strlen(source: string) -> i64
+  function strlen(source: string) -> i64
 }
-
 export struct MathEquation {
-    valid: bool,
-    left: MathProgram,
-    right: MathProgram,
-    equality_at: i32,
-    failed_at: i32
+  valid: bool,
+  left: MathProgram,
+  right: MathProgram,
+  equality_at: i32,
+  failed_at: i32
 }
-
 export struct MathEquationResult {
-    valid: bool,
-    residual: Quantity,
-    satisfied: bool,
-    failed_at: i32
+  valid: bool,
+  residual: Quantity,
+  satisfied: bool,
+  failed_at: i32
 }
-
 function empty_program(length: i32) -> MathProgram {
-    let blank: MathInstruction = MathInstruction {
-        opcode: 0, literal: quantity(0.0, dimensionless()),
-        exponent: 0, source_start: 0, source_end: 0
-    }
-    return MathProgram { instructions: [blank], count: 0, source_length: length }
+  let blank: MathInstruction = MathInstruction {
+      opcode: 0, literal: quantity(0.0, dimensionless()),
+      exponent: 0, source_start: 0, source_end: 0
+  }
+  return MathProgram { instructions: [blank], count: 0, source_length: length }
 }
-
 function equation_error(position: i32, length: i32) -> MathEquation {
-    return MathEquation {
-        valid: false, left: empty_program(length), right: empty_program(length),
-        equality_at: -1, failed_at: position
-    }
+  return MathEquation {
+      valid: false, left: empty_program(length), right: empty_program(length),
+      equality_at: -1, failed_at: position
+  }
 }
-
 function result_error(position: i32) -> MathEquationResult {
-    return MathEquationResult {
-        valid: false, residual: quantity(0.0, dimensionless()),
-        satisfied: false, failed_at: position
-    }
+  return MathEquationResult {
+      valid: false, residual: quantity(0.0, dimensionless()),
+      satisfied: false, failed_at: position
+  }
 }
-
 function bounded(value: f64) -> bool {
-    # IEEE-754 NaN compares false against every ordered bound, so reject it
-    # explicitly before validating residuals or caller-supplied tolerances.
-    if value != value { return false }
-    let mut absolute: f64 = value
-    if absolute < 0.0 { absolute = -absolute }
-    return absolute <= 1000000000000000000000000000000.0
+  if value != value { return false }
+  let mut absolute: f64 = value
+  if absolute < 0.0 { absolute = -absolute }
+  return absolute <= 1000000000000000000000000000000.0
 }
-
-# Parse exactly one top-level assignment-style equality. The existing
-# comparison operators ==, !=, <=, >= remain legal inside either side.
-# A single '=' nested in parentheses is rejected by the scalar parser.
-# Both child programs carry original UTF-8 byte offsets.
 export function parse_math_equation_with_bindings(source: string, bindings: MathBindings) -> MathEquation {
-    let length: i32 = strlen(source) as i32
-    if length < 3 or length > 512 { return equation_error(0, length) }
-    let bytes: ptr<u8> = source as ptr<u8>
-    # Match the exact UTF-8 delimiter family recognized by the expression
-    # compiler. A nested single '=' is never a top-level equation separator.
-    let mut open_widths: array<i32, 64> = [0]
-    let mut depth: i32 = 0
-    let mut equality: i32 = -1
-    let mut equality_width: i32 = 1
-    let mut i: i32 = 0
-    while i < length {
-        let opening: i32 = math_open_width(bytes, i, length)
-        if opening > 0 {
-            if depth >= 64 { return equation_error(i, length) }
-            open_widths[depth] = opening
-            depth = depth + 1
-            i = i + opening
-            continue
-        }
-        let closing: i32 = math_close_width(bytes, i, length)
-        if closing > 0 {
-            if depth == 0 or open_widths[depth - 1] != closing {
-                return equation_error(i, length)
-            }
-            depth = depth - 1
-            i = i + closing
-            continue
-        }
-        # ASCII '=' is an equation boundary unless it belongs to ==, !=,
-        # <= or >=. U+FF1D FULLWIDTH EQUALS SIGN, U+2261 IDENTICAL
-        # TO, and U+2248 ALMOST EQUAL TO delimit equations at top level. Approximate
-        # equality uses the caller's explicitly dimensioned tolerance.
-        let mut operator_width: i32 = 0
-        if bytes[i] == 61 {
-            operator_width = 1
-        } elif i + 2 < length and bytes[i] == 239 and
-             bytes[i + 1] == 188 and bytes[i + 2] == 157 {
-            operator_width = 3 # U+FF1D FULLWIDTH EQUALS
-        } elif i + 2 < length and bytes[i] == 226 and
-             bytes[i + 1] == 137 and bytes[i + 2] == 136 {
-            operator_width = 3 # U+2248 ALMOST EQUAL TO
-        } elif i + 2 < length and bytes[i] == 226 and
-             bytes[i + 1] == 137 and bytes[i + 2] == 161 {
-            operator_width = 3 # U+2261 IDENTICAL TO
-        }
-        if operator_width > 0 {
-            let mut comparison: bool = operator_width == 3 and depth > 0
-            if operator_width == 1 {
-                if i > 0 {
-                    let previous: u8 = bytes[i - 1]
-                    comparison = previous == 61 or previous == 33 or previous == 60 or previous == 62
-                }
-                if i + 1 < length and bytes[i + 1] == 61 { comparison = true }
-            }
-            if not comparison {
-                if depth != 0 or equality >= 0 { return equation_error(i, length) }
-                equality = i
-                equality_width = operator_width
-            }
-            i = i + operator_width
-        } else {
-            i = i + 1
-        }
-    }
-    if depth != 0 { return equation_error(length, length) }
-    if equality <= 0 or equality + equality_width >= length { return equation_error(0, length) }
-
-    let mut left_bytes: array<u8, 513> = []
-    let mut right_bytes: array<u8, 513> = []
-    i = 0
-    while i < equality {
-        left_bytes[i] = bytes[i]
-        i = i + 1
-    }
-    left_bytes[equality] = 0
-    let mut right_length: i32 = 0
-    i = equality + equality_width
-    while i < length {
-        right_bytes[right_length] = bytes[i]
-        right_length = right_length + 1
-        i = i + 1
-    }
-    right_bytes[right_length] = 0
-
-    let left_parsed: ParsedMathExpression = parse_math_expression_with_bindings(
-        (&left_bytes[0]) as string, bindings)
-    if not left_parsed.valid { return equation_error(left_parsed.failed_at, length) }
-    let right_parsed: ParsedMathExpression = parse_math_expression_with_bindings(
-        (&right_bytes[0]) as string, bindings)
-    if not right_parsed.valid {
-        return equation_error(equality + equality_width + right_parsed.failed_at, length)
-    }
-    let mut left: MathProgram = left_parsed.program
-    let mut right: MathProgram = right_parsed.program
-    left.source_length = length
-    right.source_length = length
-    i = 0
-    while i < right.count {
-        right.instructions[i].source_start = right.instructions[i].source_start + equality + equality_width
-        right.instructions[i].source_end = right.instructions[i].source_end + equality + equality_width
-        i = i + 1
-    }
-    return MathEquation {
-        valid: true, left: left, right: right,
-        equality_at: equality, failed_at: -1
-    }
+  let length: i32 = strlen(source) as i32
+  if length < 3 or length > 512 { return equation_error(0, length) }
+  let bytes: ptr<u8> = source as ptr<u8>
+  let mut open_widths: array<i32, 64> = [0]
+  let mut depth: i32 = 0
+  let mut equality: i32 = -1
+  let mut equality_width: i32 = 1
+  let mut i: i32 = 0
+  while i < length {
+      let opening: i32 = math_open_width(bytes, i, length)
+      if opening > 0 {
+          if depth >= 64 { return equation_error(i, length) }
+          open_widths[depth] = opening
+          depth = depth + 1
+          i = i + opening
+          continue
+      }
+      let closing: i32 = math_close_width(bytes, i, length)
+      if closing > 0 {
+          if depth == 0 or open_widths[depth - 1] != closing {
+              return equation_error(i, length)
+          }
+          depth = depth - 1
+          i = i + closing
+          continue
+      }
+      let mut operator_width: i32 = 0
+      if bytes[i] == 61 {
+          operator_width = 1
+      } elif i + 2 < length and bytes[i] == 239 and
+           bytes[i + 1] == 188 and bytes[i + 2] == 157 {
+          operator_width = 3 # U+FF1D FULLWIDTH EQUALS
+      } elif i + 2 < length and bytes[i] == 226 and
+           bytes[i + 1] == 137 and bytes[i + 2] == 136 {
+          operator_width = 3 # U+2248 ALMOST EQUAL TO
+      } elif i + 2 < length and bytes[i] == 226 and
+           bytes[i + 1] == 137 and bytes[i + 2] == 161 {
+          operator_width = 3 # U+2261 IDENTICAL TO
+      }
+      if operator_width > 0 {
+          let mut comparison: bool = operator_width == 3 and depth > 0
+          if operator_width == 1 {
+              if i > 0 {
+                  let previous: u8 = bytes[i - 1]
+                  comparison = previous == 61 or previous == 33 or previous == 60 or previous == 62
+              }
+              if i + 1 < length and bytes[i + 1] == 61 { comparison = true }
+          }
+          if not comparison {
+              if depth != 0 or equality >= 0 { return equation_error(i, length) }
+              equality = i
+              equality_width = operator_width
+          }
+          i = i + operator_width
+      } else {
+          i = i + 1
+      }
+  }
+  if depth != 0 { return equation_error(length, length) }
+  if equality <= 0 or equality + equality_width >= length { return equation_error(0, length) }
+  let mut left_bytes: array<u8, 513> = []
+  let mut right_bytes: array<u8, 513> = []
+  i = 0
+  while i < equality {
+      left_bytes[i] = bytes[i]
+      i = i + 1
+  }
+  left_bytes[equality] = 0
+  let mut right_length: i32 = 0
+  i = equality + equality_width
+  while i < length {
+      right_bytes[right_length] = bytes[i]
+      right_length = right_length + 1
+      i = i + 1
+  }
+  right_bytes[right_length] = 0
+  let left_parsed: ParsedMathExpression = parse_math_expression_with_bindings(
+      (&left_bytes[0]) as string, bindings)
+  if not left_parsed.valid { return equation_error(left_parsed.failed_at, length) }
+  let right_parsed: ParsedMathExpression = parse_math_expression_with_bindings(
+      (&right_bytes[0]) as string, bindings)
+  if not right_parsed.valid {
+      return equation_error(equality + equality_width + right_parsed.failed_at, length)
+  }
+  let mut left: MathProgram = left_parsed.program
+  let mut right: MathProgram = right_parsed.program
+  left.source_length = length
+  right.source_length = length
+  i = 0
+  while i < right.count {
+      right.instructions[i].source_start = right.instructions[i].source_start + equality + equality_width
+      right.instructions[i].source_end = right.instructions[i].source_end + equality + equality_width
+      i = i + 1
+  }
+  return MathEquation {
+      valid: true, left: left, right: right,
+      equality_at: equality, failed_at: -1
+  }
 }
-
 export function parse_math_equation(source: string) -> MathEquation {
-    return parse_math_equation_with_bindings(source, empty_math_bindings())
+  return parse_math_equation_with_bindings(source, empty_math_bindings())
 }
-
-# The residual has the physical dimension of either side. Tolerance must
-# have that same dimension and be finite and nonnegative. No implicit unit
-# conversion, predicate equations, or floating-point exact-equality claim.
 export function evaluate_math_equation(equation: MathEquation, tolerance: Quantity) -> MathEquationResult {
-    if not equation.valid { return result_error(equation.failed_at) }
-    let left: MathResult = evaluate_math_ir(equation.left)
-    if not left.valid { return result_error(left.failed_at) }
-    let right: MathResult = evaluate_math_ir(equation.right)
-    if not right.valid { return result_error(right.failed_at) }
-    if left.is_predicate or right.is_predicate or
-       not same_dimension(left.result.dimension, right.result.dimension) or
-       not same_dimension(left.result.dimension, tolerance.dimension) or
-       tolerance.value < 0.0 or not bounded(tolerance.value) {
-        return result_error(equation.equality_at)
-    }
-    let difference: CheckedQuantity = quantity_subtract(left.result, right.result)
-    if not difference.valid or not bounded(difference.quantity.value) {
-        return result_error(equation.equality_at)
-    }
-    let mut absolute: f64 = difference.quantity.value
-    if absolute < 0.0 { absolute = -absolute }
-    return MathEquationResult {
-        valid: true, residual: difference.quantity,
-        satisfied: absolute <= tolerance.value, failed_at: -1
-    }
+  if not equation.valid { return result_error(equation.failed_at) }
+  let left: MathResult = evaluate_math_ir(equation.left)
+  if not left.valid { return result_error(left.failed_at) }
+  let right: MathResult = evaluate_math_ir(equation.right)
+  if not right.valid { return result_error(right.failed_at) }
+  if left.is_predicate or right.is_predicate or
+     not same_dimension(left.result.dimension, right.result.dimension) or
+     not same_dimension(left.result.dimension, tolerance.dimension) or
+     tolerance.value < 0.0 or not bounded(tolerance.value) {
+      return result_error(equation.equality_at)
+  }
+  let difference: CheckedQuantity = quantity_subtract(left.result, right.result)
+  if not difference.valid or not bounded(difference.quantity.value) {
+      return result_error(equation.equality_at)
+  }
+  let mut absolute: f64 = difference.quantity.value
+  if absolute < 0.0 { absolute = -absolute }
+  return MathEquationResult {
+      valid: true, residual: difference.quantity,
+      satisfied: absolute <= tolerance.value, failed_at: -1
+  }
 }
-
 export function evaluate_math_equation_source_with_bindings(source: string, bindings: MathBindings, tolerance: Quantity) -> MathEquationResult {
-    return evaluate_math_equation(parse_math_equation_with_bindings(source, bindings), tolerance)
+  return evaluate_math_equation(parse_math_equation_with_bindings(source, bindings), tolerance)
 }
-
 export function evaluate_math_equation_source(source: string, tolerance: Quantity) -> MathEquationResult {
-    return evaluate_math_equation(parse_math_equation(source), tolerance)
+  return evaluate_math_equation(parse_math_equation(source), tolerance)
 }
-
-# Relative tolerance is dimensionless and scales the larger operand magnitude.
-# Absolute tolerance remains dimensioned; both are validated independently.
-# This is numerical comparison, not symbolic identity or a PDE solver.
 export function evaluate_math_equation_with_relative_tolerance(
-    equation: MathEquation, absolute_tolerance: Quantity, relative_tolerance: f64
+  equation: MathEquation, absolute_tolerance: Quantity, relative_tolerance: f64
 ) -> MathEquationResult {
-    if not equation.valid { return result_error(equation.failed_at) }
-    if relative_tolerance < 0.0 or not bounded(relative_tolerance) {
-        return result_error(equation.equality_at)
-    }
-    let left: MathResult = evaluate_math_ir(equation.left)
-    if not left.valid { return result_error(left.failed_at) }
-    let right: MathResult = evaluate_math_ir(equation.right)
-    if not right.valid { return result_error(right.failed_at) }
-    if left.is_predicate or right.is_predicate or
-       not same_dimension(left.result.dimension, right.result.dimension) or
-       not same_dimension(left.result.dimension, absolute_tolerance.dimension) or
-       absolute_tolerance.value < 0.0 or not bounded(absolute_tolerance.value) or
-       not bounded(left.result.value) or not bounded(right.result.value) {
-        return result_error(equation.equality_at)
-    }
-    let difference: CheckedQuantity = quantity_subtract(left.result, right.result)
-    if not difference.valid or not bounded(difference.quantity.value) {
-        return result_error(equation.equality_at)
-    }
-    let mut left_magnitude: f64 = left.result.value
-    if left_magnitude < 0.0 { left_magnitude = -left_magnitude }
-    let mut right_magnitude: f64 = right.result.value
-    if right_magnitude < 0.0 { right_magnitude = -right_magnitude }
-    let mut scale: f64 = left_magnitude
-    if right_magnitude > scale { scale = right_magnitude }
-    let threshold: f64 = absolute_tolerance.value + relative_tolerance * scale
-    if not bounded(threshold) { return result_error(equation.equality_at) }
-    let mut residual_magnitude: f64 = difference.quantity.value
-    if residual_magnitude < 0.0 { residual_magnitude = -residual_magnitude }
-    return MathEquationResult {
-        valid: true, residual: difference.quantity,
-        satisfied: residual_magnitude <= threshold, failed_at: -1
-    }
+  if not equation.valid { return result_error(equation.failed_at) }
+  if relative_tolerance < 0.0 or not bounded(relative_tolerance) {
+      return result_error(equation.equality_at)
+  }
+  let left: MathResult = evaluate_math_ir(equation.left)
+  if not left.valid { return result_error(left.failed_at) }
+  let right: MathResult = evaluate_math_ir(equation.right)
+  if not right.valid { return result_error(right.failed_at) }
+  if left.is_predicate or right.is_predicate or
+     not same_dimension(left.result.dimension, right.result.dimension) or
+     not same_dimension(left.result.dimension, absolute_tolerance.dimension) or
+     absolute_tolerance.value < 0.0 or not bounded(absolute_tolerance.value) or
+     not bounded(left.result.value) or not bounded(right.result.value) {
+      return result_error(equation.equality_at)
+  }
+  let difference: CheckedQuantity = quantity_subtract(left.result, right.result)
+  if not difference.valid or not bounded(difference.quantity.value) {
+      return result_error(equation.equality_at)
+  }
+  let mut left_magnitude: f64 = left.result.value
+  if left_magnitude < 0.0 { left_magnitude = -left_magnitude }
+  let mut right_magnitude: f64 = right.result.value
+  if right_magnitude < 0.0 { right_magnitude = -right_magnitude }
+  let mut scale: f64 = left_magnitude
+  if right_magnitude > scale { scale = right_magnitude }
+  let threshold: f64 = absolute_tolerance.value + relative_tolerance * scale
+  if not bounded(threshold) { return result_error(equation.equality_at) }
+  let mut residual_magnitude: f64 = difference.quantity.value
+  if residual_magnitude < 0.0 { residual_magnitude = -residual_magnitude }
+  return MathEquationResult {
+      valid: true, residual: difference.quantity,
+      satisfied: residual_magnitude <= threshold, failed_at: -1
+  }
 }
-
 export function evaluate_math_equation_source_with_relative_tolerance(
-    source: string, absolute_tolerance: Quantity, relative_tolerance: f64
+  source: string, absolute_tolerance: Quantity, relative_tolerance: f64
 ) -> MathEquationResult {
-    return evaluate_math_equation_with_relative_tolerance(
-        parse_math_equation(source), absolute_tolerance, relative_tolerance)
+  return evaluate_math_equation_with_relative_tolerance(
+      parse_math_equation(source), absolute_tolerance, relative_tolerance)
 }

@@ -93,9 +93,13 @@ def run_flow(binary: Path, timeout: float) -> bytes:
 
 
 def verify(actual: list[float], expected: list[float], tolerance: float = 1e-9) -> None:
+    if not math.isfinite(tolerance) or tolerance < 0:
+        raise ValueError("tolerance must be finite and nonnegative")
     if len(actual) != len(expected):
         raise ValueError("spatial array length mismatch")
     for index, (observed, target) in enumerate(zip(actual, expected)):
+        if not math.isfinite(target):
+            raise ValueError(f"cell {index}: non-finite independent oracle value")
         if not math.isfinite(observed) or abs(observed - target) > tolerance:
             raise ValueError(
                 f"cell {index}: compiler={observed!r}, independent_oracle={target!r}"

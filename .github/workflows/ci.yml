@@ -147,8 +147,10 @@ jobs:
           flow run examples/native_evolution_ring.flow
           flow run examples/native_evolution_heat2d.flow
           flow run examples/native_evolution_heat3x3.flow
-      - name: Execute analytic Newton solver regression tests on native runners
-        run: PYTHONPATH=src python3 -m unittest discover -s tests -p 'test_math_flow_newton.py' -v
+      - name: Execute complete mathematical Flow Python regression suite on native runners
+        run: |
+          python3 -m compileall -q src/math_flow.py src/math_flow_expr.py src/math_flow_constraints.py src/math_flow_system.py src/math_flow_jacobian.py src/math_flow_newton.py
+          PYTHONPATH=src python3 -m unittest discover -s tests -p 'test_math_flow_*.py' -v
       - name: Execute checked-in Navier-Stokes and piecewise heat Flow programs
         run: |
           python3 src/math_flow.py --check examples/navier_stokes_smoke.flow

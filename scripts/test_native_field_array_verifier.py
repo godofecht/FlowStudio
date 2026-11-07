@@ -82,6 +82,27 @@ class NativeFieldArrayVerifierTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Flow output exceeded 16 KiB"):
             parse_output("é".encode("utf-8") * 8193)
 
+    def test_reject_python_specific_and_padded_numeric_tokens(self):
+        expected = expected_output()
+        for token in (" 0.5", "0.5 ", "0_5", "0x1p-1", "1j",
+                      "Infinity", "+nan", "1,0", "1e", "."):
+            lines = encode(expected).decode().splitlines()
+            lines[0] = token
+            with self.subTest(token=token), self.assertRaisesRegex(
+                ValueError, "non-canonical decimal"
+            ):
+                parse_output(("\n".join(lines) + "\n").encode())
+
+    def test_accept_canonical_decimal_spellings(self):
+        expected = expected_output()
+        for token, value in (("+5e-1", 0.5), (".5", 0.5),
+                             ("5.", 5.0), ("-0.0", -0.0),
+                             ("1E+2", 100.0)):
+            lines = encode(expected).decode().splitlines()
+            lines[0] = token
+            with self.subTest(token=token):
+                self.assertEqual(parse_output(("\n".join(lines) + "\n").encode())[0], value)
+
     def test_nonfinite_and_wrong_length(self):
         expected = expected_output()
         with self.assertRaises(ValueError):

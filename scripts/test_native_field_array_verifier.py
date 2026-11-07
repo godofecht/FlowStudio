@@ -73,6 +73,15 @@ class NativeFieldArrayVerifierTests(unittest.TestCase):
         lines[0] = "0e-9999"
         self.assertEqual(parse_output(("\n".join(lines) + "\n").encode())[0], 0.0)
 
+    def test_parser_enforces_utf8_byte_budget(self):
+        expected = expected_output()
+        valid = encode(expected)
+        self.assertLess(len(valid), 16384)
+        with self.assertRaisesRegex(ValueError, "Flow output exceeded 16 KiB"):
+            parse_output(valid + b" " * (16385 - len(valid)))
+        with self.assertRaisesRegex(ValueError, "Flow output exceeded 16 KiB"):
+            parse_output(b"\\xc3\\xa9" * 8193)
+
     def test_nonfinite_and_wrong_length(self):
         expected = expected_output()
         with self.assertRaises(ValueError):

@@ -64,7 +64,7 @@ def _quantity(raw: str) -> tuple[float, Dimension]:
         raise ExpressionError("Non-finite numerical literal")
     # Do not silently turn a nonzero scientific literal into zero.
     # This would invalidate small PDE coefficients and tolerances.
-    if value == 0.0 and re.search(r"[eE][+\\-−]?\\d+\\Z", literal):
+    if value == 0.0 and re.search(r"[eE][+\-−]?\d+\Z", literal):
         mantissa = re.split(r"[eE]", literal, maxsplit=1)[0]
         if any(d != "0" for d in mantissa if d.isdigit()):
             raise ExpressionError("Nonzero scientific literal underflows to zero")

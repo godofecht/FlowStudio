@@ -54,18 +54,20 @@ def expected_output() -> list[float]:
 def run_flow(binary: Path, timeout: float) -> bytes:
     if not binary.is_file() or not os.access(binary, os.X_OK):
         raise ValueError(f"Flow binary not executable: {binary}")
-    with tempfile.TemporaryFile() as output:
+    # File-backed streams avoid unbounded PIPE buffering on compiler errors.
+    # RLIMIT_FSIZE applies to both stdout and stderr on Linux/macOS.
+    with tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as errors:
         def limit_output() -> None:
             resource.setrlimit(resource.RLIMIT_FSIZE, (MAX_OUTPUT + 1, MAX_OUTPUT + 1))
 
         process = subprocess.Popen(
             [str(binary), "run", str(FIXTURE)],
             cwd=ROOT, stdin=subprocess.DEVNULL, stdout=output,
-            stderr=subprocess.PIPE, start_new_session=True, preexec_fn=limit_output,
+            stderr=errors, start_new_session=True, preexec_fn=limit_output,
         )
         try:
             try:
-                _, stderr = process.communicate(timeout=timeout)
+                process.wait(timeout=timeout)
             except subprocess.TimeoutExpired as exc:
                 raise ValueError("Flow compiler/runtime timed out") from exc
         finally:
@@ -75,12 +77,16 @@ def run_flow(binary: Path, timeout: float) -> bytes:
                 pass
             process.wait()
         size = output.seek(0, os.SEEK_END)
+        error_size = errors.seek(0, os.SEEK_END)
         if size > MAX_OUTPUT:
             raise ValueError("Flow output exceeded 16 KiB")
+        if error_size > MAX_OUTPUT:
+            raise ValueError("Flow stderr exceeded 16 KiB")
         if process.returncode != 0:
+            errors.seek(0)
             raise ValueError(
                 f"Flow returned {process.returncode}: "
-                + stderr[:2048].decode("utf-8", errors="replace")
+                + errors.read(2048).decode("utf-8", errors="replace")
             )
         output.seek(0)
         return output.read()

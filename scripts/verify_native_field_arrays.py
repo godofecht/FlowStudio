@@ -37,6 +37,16 @@ def parse_output(data: bytes) -> list[float]:
         values = [float(line) for line in lines[:-1]]
     except ValueError as exc:
         raise ValueError("Flow emitted a non-numerical spatial cell") from exc
+    # float() silently rounds tiny nonzero decimal values to zero. Reject
+    # that loss of information instead of accepting a zero oracle cell.
+    from decimal import Decimal, InvalidOperation
+    for index, (token, value) in enumerate(zip(lines[:-1], values)):
+        try:
+            exact = Decimal(token)
+        except InvalidOperation as exc:
+            raise ValueError(f"cell {index}: invalid decimal output") from exc
+        if exact.is_finite() and exact != 0 and value == 0:
+            raise ValueError(f"cell {index}: nonzero compiler output underflowed to zero")
     if not all(math.isfinite(x) for x in values):
         raise ValueError("Flow emitted non-finite spatial cells")
     return values

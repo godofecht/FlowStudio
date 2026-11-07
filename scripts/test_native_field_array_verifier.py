@@ -103,6 +103,22 @@ class NativeFieldArrayVerifierTests(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertEqual(parse_output(("\n".join(lines) + "\n").encode())[0], value)
 
+    def test_strict_lf_framing(self):
+        valid = encode(expected_output())
+        self.assertEqual(len(parse_output(valid)), 16)
+        for payload in (
+            valid.rstrip(b"\\n"),
+            valid.replace(b"\\n", b"\\r\\n"),
+            valid.replace(b"\\n", b"\\r"),
+            valid.replace(b"\\n", b"\\v"),
+            valid.replace(b"\\n", b"\\f"),
+            valid.replace(b"\\n", "\\u2028".encode("utf-8")),
+            valid.replace(b"\\n", "\\u2029".encode("utf-8")),
+            valid.replace(b"\\n", b"\\xc2\\x85"),
+        ):
+            with self.subTest(payload=payload[:24]), self.assertRaises(ValueError):
+                parse_output(payload)
+
     def test_nonfinite_and_wrong_length(self):
         expected = expected_output()
         with self.assertRaises(ValueError):

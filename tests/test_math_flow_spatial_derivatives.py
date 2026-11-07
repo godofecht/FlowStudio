@@ -53,6 +53,18 @@ class SpatialDerivativeTest(unittest.TestCase):
         self.assertLess(errors[1], errors[0] / 3)
         self.assertLess(errors[2], errors[1] / 3)
 
+    def test_unparenthesized_unicode_spatial_derivatives_execute(self):
+        import numpy as np
+        # The prefix forms must lower to the same checked numerical AST.
+        for prefix in ("∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∂ₓᵧ", "∂ᵧₓ"):
+            with self.subTest(prefix=prefix):
+                bare = parse_expression(f"{prefix} sin(2πx / 1m) * 1m³/s")
+                grouped = parse_expression(f"{prefix}(sin(2πx / 1m)) * 1m³/s")
+                self.assertEqual(bare.dimension, grouped.dimension)
+                x, y = self.grid(32)
+                np.testing.assert_allclose(evaluate(bare, x, y),
+                                           evaluate(grouped, x, y), atol=1e-10)
+
     def test_invalid_derivative_inputs_fail_closed(self):
         import numpy as np
         derivative = parse_expression("∂ₓ(1m²/s)")

@@ -57,6 +57,28 @@ function main() -> i32 {
         j = j + 1
     }
 
+    # Independent second-step explicit-Euler oracle, including every cell.
+    # This catches a correct first step followed by stale buffers, boundary
+    # drift, or an incorrect coefficient on subsequent calls.
+    let v2: array<f64, 8> = [0.0]
+    V_field_step(vn, v2, 0.4)
+    if v2[0] != 0.5 or v2[7] != 1.5 or
+       v2[1] < 0.894399999999 or v2[1] > 0.894400000001 or
+       v2[2] < 0.992799999999 or v2[2] > 0.992800000001 or
+       v2[3] != 1.0 or v2[4] != 1.0 or
+       v2[5] < 1.007199999999 or v2[5] > 1.007200000001 or
+       v2[6] < 1.105599999999 or v2[6] > 1.105600000001 { return 7 }
+
+    let q2: array<f64, 8> = [0.0]
+    Q_field_step(qn, q2, 0.1)
+    if q2[0] != 0.0 or q2[7] != 0.0 or
+       q2[1] < 0.039999999999 or q2[1] > 0.040000000001 or
+       q2[2] < 0.239999999999 or q2[2] > 0.240000000001 or
+       q2[3] < 0.279999999999 or q2[3] > 0.280000000001 or
+       q2[4] < 0.239999999999 or q2[4] > 0.240000000001 or
+       q2[5] < 0.039999999999 or q2[5] > 0.040000000001 or
+       q2[6] != 0.0 { return 8 }
+
     println("field-multiplier-ok")
     return 0
 }

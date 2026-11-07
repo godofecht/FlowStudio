@@ -16,7 +16,10 @@ import subprocess
 import sys
 import tempfile
 
-from test_field_multiplier_oracle import step
+try:
+    from scripts.test_field_multiplier_oracle import step
+except ModuleNotFoundError:
+    from test_field_multiplier_oracle import step
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "src" / "field_multiplier_differential.flow"

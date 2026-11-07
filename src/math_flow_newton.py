@@ -32,11 +32,12 @@ def solve_scalar_system(
     dimensions: dict[str, Dimension],
     tolerance: float = 1e-9,
     max_iterations: int = 40,
+    residual_scales: tuple[float, ...] | None = None,
 ) -> NewtonResult:
     """Solve a square system with backtracking; never silently accept divergence.
 
-    Residual magnitudes are compared numerically, so callers must nondimensionalize
-    equations before solving systems with substantially different physical scales.
+    Optional positive physical residual scales normalize each equation independently
+    for convergence and line search. Returned residuals retain their physical units.
     """
     count = len(variables)
     if not 1 <= count <= 32 or count != len(system.equations):
@@ -47,6 +48,15 @@ def solve_scalar_system(
         raise ExpressionError("Invalid Newton tolerance")
     if not isinstance(max_iterations, int) or not 1 <= max_iterations <= 1000:
         raise ExpressionError("Invalid Newton iteration limit")
+    if residual_scales is None:
+        scales = np.ones(count, dtype=float)
+    else:
+        if len(residual_scales) != count or any(
+            type(v) not in (int, float) or not math.isfinite(v) or v <= 0
+            for v in residual_scales
+        ):
+            raise ExpressionError("Expected one finite positive residual scale per equation")
+        scales = np.asarray(residual_scales, dtype=float)
     current = dict(values)
     for name in variables:
         if name not in current or name not in dimensions:
@@ -68,7 +78,7 @@ def solve_scalar_system(
     r = residual(current)
     completed_iterations = 0
     for iteration in range(max_iterations + 1):
-        norm = float(np.max(np.abs(r)))
+        norm = float(np.max(np.abs(r / scales)))
         if norm <= tolerance:
             return NewtonResult(
                 {name: current[name] for name in variables},
@@ -102,7 +112,7 @@ def solve_scalar_system(
             except (ExpressionError, ValueError, OverflowError, FloatingPointError):
                 alpha *= 0.5
                 continue
-            if float(np.max(np.abs(trial))) < norm:
+            if float(np.max(np.abs(trial / scales))) < norm:
                 current, r = candidate, trial
                 accepted = True
                 completed_iterations += 1

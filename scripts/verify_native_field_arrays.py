@@ -11,6 +11,7 @@ import math
 import os
 from pathlib import Path
 import resource
+import re
 import signal
 import subprocess
 import sys
@@ -24,6 +25,7 @@ except ModuleNotFoundError:
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "src" / "field_multiplier_differential.flow"
 MAX_OUTPUT = 16384
+DECIMAL_TOKEN = re.compile(r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?", re.ASCII)
 
 
 def parse_output(data: bytes) -> list[float]:
@@ -35,6 +37,8 @@ def parse_output(data: bytes) -> list[float]:
         raise ValueError("Flow emitted non-UTF-8 output") from exc
     if len(lines) != 17 or lines[-1] != "field-multiplier-ok":
         raise ValueError(f"expected 16 numerical values and success marker, got {len(lines)} lines")
+    if any(DECIMAL_TOKEN.fullmatch(line) is None for line in lines[:-1]):
+        raise ValueError("Flow emitted a non-canonical decimal spatial cell")
     try:
         values = [float(line) for line in lines[:-1]]
     except ValueError as exc:

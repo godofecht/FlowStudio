@@ -50,6 +50,30 @@ class NewtonTests(unittest.TestCase):
         self.assertEqual(result.iterations, 1)
         self.assertLess(abs(result.residuals[0]), 5.0)
 
+    def test_mixed_physical_dimensions_with_scaled_convergence(self):
+        symbols = {"a": LENGTH, "b": (0, 0, 1, 0)}
+        system = parse_constraint_system("a = 1m; b = 2s", symbols=symbols)
+        result = solve_scalar_system(
+            system, 0.0, 0.0, values={"a": 0.0, "b": 0.0},
+            variables=("a", "b"), dimensions=symbols,
+            residual_scales=(1e6, 1e-6), tolerance=1e-8,
+        )
+        self.assertTrue(result.converged)
+        self.assertAlmostEqual(result.values["a"], 1.0, places=6)
+        self.assertAlmostEqual(result.values["b"], 2.0, places=6)
+        self.assertLess(abs(result.residuals[1]) / 1e-6, 1e-8)
+
+    def test_rejects_invalid_residual_scales(self):
+        system = parse_constraint_system("a = 1m", symbols={"a": LENGTH})
+        for scales in ((), (0.0,), (-1.0,), (float("nan"),),
+                       (float("inf"),), (True,)):
+            with self.subTest(scales=scales), self.assertRaises(ExpressionError):
+                solve_scalar_system(
+                    system, 0.0, 0.0, values={"a": 0.0},
+                    variables=("a",), dimensions={"a": LENGTH},
+                    residual_scales=scales,
+                )
+
     def test_singular_jacobian(self):
         system = parse_constraint_system("a² = 1m²", symbols={"a": LENGTH})
         with self.assertRaises(ExpressionError):

@@ -107,14 +107,14 @@ class NativeFieldArrayVerifierTests(unittest.TestCase):
         valid = encode(expected_output())
         self.assertEqual(len(parse_output(valid)), 16)
         for payload in (
-            valid.rstrip(b"\\n"),
-            valid.replace(b"\\n", b"\\r\\n"),
-            valid.replace(b"\\n", b"\\r"),
-            valid.replace(b"\\n", b"\\v"),
-            valid.replace(b"\\n", b"\\f"),
-            valid.replace(b"\\n", "\\u2028".encode("utf-8")),
-            valid.replace(b"\\n", "\\u2029".encode("utf-8")),
-            valid.replace(b"\\n", b"\\xc2\\x85"),
+            valid[:-1],
+            valid.replace(b"\n", b"\r\n"),
+            valid.replace(b"\n", b"\r"),
+            valid.replace(b"\n", b"\v"),
+            valid.replace(b"\n", b"\f"),
+            valid.replace(b"\n", "\u2028".encode("utf-8")),
+            valid.replace(b"\n", "\u2029".encode("utf-8")),
+            valid.replace(b"\n", b"\xc2\x85"),
         ):
             with self.subTest(payload=payload[:24]), self.assertRaises(ValueError):
                 parse_output(payload)

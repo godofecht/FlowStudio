@@ -1,7 +1,7 @@
 """Analytic numerical acceptance for damped scalar constraint solving."""
 import unittest
 
-from math_flow_expr import LENGTH, TIME, ExpressionError
+from math_flow_expr import LENGTH, ExpressionError
 from math_flow_system import parse_constraint_system
 from math_flow_newton import solve_scalar_system
 
@@ -51,7 +51,7 @@ class NewtonTests(unittest.TestCase):
         self.assertLess(abs(result.residuals[0]), 5.0)
 
     def test_mixed_physical_dimensions_with_scaled_convergence(self):
-        symbols = {"a": LENGTH, "b": TIME}
+        symbols = {"a": LENGTH, "b": (0, 0, 1, 0)}
         system = parse_constraint_system("a = 1m; b = 2s", symbols=symbols)
         result = solve_scalar_system(
             system, 0.0, 0.0, values={"a": 0.0, "b": 0.0},

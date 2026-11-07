@@ -66,6 +66,7 @@ def solve_scalar_system(
         return result
 
     r = residual(current)
+    completed_iterations = 0
     for iteration in range(max_iterations + 1):
         norm = float(np.max(np.abs(r)))
         if norm <= tolerance:
@@ -88,6 +89,8 @@ def solve_scalar_system(
             delta = np.linalg.solve(matrix, -r)
         except np.linalg.LinAlgError as exc:
             raise ExpressionError("Singular Newton Jacobian") from exc
+        if not np.all(np.isfinite(delta)):
+            raise ExpressionError("Nonfinite Newton update")
         accepted = False
         alpha = 1.0
         for _ in range(24):
@@ -102,11 +105,12 @@ def solve_scalar_system(
             if float(np.max(np.abs(trial))) < norm:
                 current, r = candidate, trial
                 accepted = True
+                completed_iterations += 1
                 break
             alpha *= 0.5
         if not accepted:
             break
     return NewtonResult(
         {name: current[name] for name in variables},
-        tuple(float(v) for v in r), max_iterations, False,
+        tuple(float(v) for v in r), completed_iterations, False,
     )

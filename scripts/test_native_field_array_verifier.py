@@ -62,6 +62,17 @@ class NativeFieldArrayVerifierTests(unittest.TestCase):
                 verify(expected, expected, tolerance=bad)
         verify(expected, expected, tolerance=0.0)
 
+    def test_nonzero_decimal_underflow_rejected(self):
+        expected = expected_output()
+        for token in ("1e-9999", "-1e-9999", "0." + "0" * 400 + "1"):
+            lines = encode(expected).decode().splitlines()
+            lines[0] = token
+            with self.subTest(token=token[:24]), self.assertRaisesRegex(ValueError, "underflowed to zero"):
+                parse_output(("\n".join(lines) + "\n").encode())
+        lines = encode(expected).decode().splitlines()
+        lines[0] = "0e-9999"
+        self.assertEqual(parse_output(("\n".join(lines) + "\n").encode())[0], 0.0)
+
     def test_nonfinite_and_wrong_length(self):
         expected = expected_output()
         with self.assertRaises(ValueError):

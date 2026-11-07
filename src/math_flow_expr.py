@@ -19,7 +19,7 @@ UNITS: dict[str, Dimension] = {
     "Pa": (-1, 1, -2, 0), "K": TEMPERATURE,
 }
 SUPERSCRIPT = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁻−", "0123456789--")
-_NUMBER = r"(?:10[⁻−-][⁰¹²³⁴⁵⁶⁷⁸⁹0-9]+|(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)"
+_NUMBER = r"(?:10[⁻−-][⁰¹²³⁴⁵⁶⁷⁸⁹0-9]+|(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+\-−]?\d+)?)"
 _UNIT = r"(?:kg|Pa|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)?(?:/(?:kg|Pa|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*))?"
 _TOKEN = re.compile(rf"(?P<space>\s+)|(?P<quantity>{_NUMBER}(?:{_UNIT})?)|(?P<name>∂ₓᵧ|∂ᵧₓ|∂ₓ²|∂ᵧ²|∂ₓ|∂ᵧ|∇²|∆|∫|∑|π|[A-Za-z_Α-Ωα-ορ-ω][A-Za-z_0-9Α-Ωα-ορ-ω]*)|(?P<postfix>[²³⁴⁵⁶⁷⁸])|(?P<op><->|->|==|!=|<=|>=|\*\*|&&|\|\||[+\-−*/×·÷√∛(),^|<>≤≥≠∧∨¬!⊻⇒⇔→↔])")
 _UNIT_PART = re.compile(r"(kg|Pa|m|s|K)([²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)\Z")
@@ -59,7 +59,7 @@ def _quantity(raw: str) -> tuple[float, Dimension]:
             raise ExpressionError("Power-of-ten exponent out of range")
         value = 10.0 ** exponent
     else:
-        value = float(literal)
+        value = float(literal.replace("−", "-"))
     if not math.isfinite(value):
         raise ExpressionError("Non-finite numerical literal")
     dim = DIMENSIONLESS
@@ -94,7 +94,7 @@ def tokenize(source: str) -> tuple[str, ...]:
             # followed by an identifier or a binary sign.
             suffix = source[match.end():]
             if suffix.startswith(("e", "E")) and (
-                len(suffix) == 1 or suffix[1] in "+-" or suffix[1].isdigit()
+                len(suffix) == 1 or suffix[1] in "+-−" or suffix[1].isdigit()
             ):
                 raise ExpressionError(
                     f"Malformed scientific exponent at offset {offset}"

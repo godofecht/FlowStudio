@@ -310,7 +310,7 @@ def parse_expression(source: str, *, symbols: dict[str, Dimension] | None = None
     if symbols:
         for name, dimension in symbols.items():
             if (not re.fullmatch(r"[A-Za-z_Α-Ωα-ορ-ω][A-Za-z_0-9Α-Ωα-ορ-ω]*", name)
-                    or name in ("x", "y", "pi", "sin", "cos", "asin", "acos", "atan", "atan2", "hypot", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "ln", "log10", "log1p", "sqrt", "cbrt", "tanh", "abs", "mean", "variance", "std", "rms", "integral", "sum", "min", "max", "where", "xor", "implies", "iff")
+                    or name in ("x", "y", "pi", "π", "sin", "cos", "asin", "acos", "atan", "atan2", "hypot", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "ln", "log10", "log1p", "sqrt", "cbrt", "tanh", "abs", "mean", "variance", "std", "rms", "integral", "sum", "min", "max", "where", "xor", "implies", "iff")
                     or len(dimension) != 4 or any(type(power) is not int for power in dimension)):
                 raise ExpressionError(f"Invalid typed symbol {name!r}")
     parser = _Parser(tokenize(source), symbols)

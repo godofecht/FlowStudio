@@ -27,6 +27,8 @@ MAX_OUTPUT = 16384
 
 
 def parse_output(data: bytes) -> list[float]:
+    if len(data) > MAX_OUTPUT:
+        raise ValueError("Flow output exceeded 16 KiB")
     try:
         lines = data.decode("utf-8", errors="strict").splitlines()
     except UnicodeDecodeError as exc:

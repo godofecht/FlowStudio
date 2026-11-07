@@ -50,6 +50,18 @@ class NativeFieldArrayVerifierTests(unittest.TestCase):
             with self.subTest(payload=payload[:40]), self.assertRaises(ValueError):
                 parse_output(payload)
 
+    def test_invalid_oracle_targets_and_tolerances(self):
+        expected = expected_output()
+        for bad in (math.nan, math.inf, -math.inf):
+            target = expected.copy()
+            target[7] = bad
+            with self.subTest(target=bad), self.assertRaisesRegex(ValueError, "non-finite independent oracle"):
+                verify(expected, target)
+        for bad in (math.nan, math.inf, -math.inf, -1e-12):
+            with self.subTest(tolerance=bad), self.assertRaisesRegex(ValueError, "tolerance must be"):
+                verify(expected, expected, tolerance=bad)
+        verify(expected, expected, tolerance=0.0)
+
     def test_nonfinite_and_wrong_length(self):
         expected = expected_output()
         with self.assertRaises(ValueError):

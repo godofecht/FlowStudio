@@ -184,7 +184,7 @@ class _Parser:
             left = Expression(first, (first_arg, second_arg),
                               dimension=DIMENSIONLESS if first == "atan2" else first_arg.dimension)
         elif first in ("sin", "cos", "asin", "acos", "atan", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "ln", "log10", "log1p", "sqrt", "cbrt", "√", "∛", "tanh", "abs", "mean", "variance", "std", "rms", "integral", "∫", "sum", "∑", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∂ₓᵧ", "∂ᵧₓ", "∇²", "∆"):
-            if first in ("∇²", "∆", "√", "∛") and self.peek() != "(":
+            if first in ("∇²", "∆", "√", "∛", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∂ₓᵧ", "∂ᵧₓ") and self.peek() != "(":
                 # Prefix Unicode differential/radical operators bind more tightly than products.
                 arg = self.expression(30, depth + 1)
             else:

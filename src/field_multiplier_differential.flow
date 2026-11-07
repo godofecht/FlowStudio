@@ -1,0 +1,95 @@
+# Native upstream Flow Field DSL regression: non-unit diffusion coefficients.
+# Requires a compiler with field multiplier lowering (newer than Flow 2.0.0).
+# Run: flow run src/field_multiplier_differential.flow
+# Expected stdout: 16 spatial values (V then Q, second step) and field-multiplier-ok
+const alpha: f64 = 0.3
+
+field V : f64[8] on Line
+V evolves as laplacian(V) * alpha
+boundary V { left = 0.5 right = 1.5 }
+
+field Q : f64[8] on Line
+Q evolves as 2 * laplacian(Q)
+boundary Q { left = 0.0 right = 0.0 }
+
+function main() -> i32 {
+    let v: array<f64, 8> = [0.5, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.5]
+    let vn: array<f64, 8> = [0.0]
+    V_field_step(v, vn, 0.4)
+    if vn[0] != 0.5 or vn[7] != 1.5 or
+       vn[1] < 0.939999999999 or vn[1] > 0.940000000001 or
+       vn[6] < 1.059999999999 or vn[6] > 1.060000000001 { return 1 }
+
+    let q: array<f64, 8> = [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0]
+    let qn: array<f64, 8> = [0.0]
+    Q_field_step(q, qn, 0.1)
+    if qn[0] != 0.0 or qn[7] != 0.0 or
+       qn[2] < 0.199999999999 or qn[2] > 0.200000000001 or
+       qn[3] < 0.599999999999 or qn[3] > 0.600000000001 or
+       qn[4] < 0.199999999999 or qn[4] > 0.200000000001 { return 2 }
+    # Verify the complete spatial outputs, not just the perturbed cells.
+    let mut j: i32 = 2
+    while j <= 5 {
+        if vn[j] < 0.999999999999 or vn[j] > 1.000000000001 { return 3 }
+        j = j + 1
+    }
+    j = 1
+    while j <= 6 {
+        if j != 2 and j != 3 and j != 4 and qn[j] != 0.0 { return 4 }
+        j = j + 1
+    }
+
+    # Zero elapsed time must be an identity update, including fixed boundaries.
+    let vz: array<f64, 8> = [0.0]
+    V_field_step(v, vz, 0.0)
+    j = 0
+    while j < 8 {
+        if vz[j] != v[j] { return 5 }
+        j = j + 1
+    }
+
+    # Identical inputs and step size must give bit-identical results.
+    let vr: array<f64, 8> = [0.0]
+    V_field_step(v, vr, 0.4)
+    j = 0
+    while j < 8 {
+        if vr[j] != vn[j] { return 6 }
+        j = j + 1
+    }
+
+    # Independent second-step explicit-Euler oracle, including every cell.
+    # This catches a correct first step followed by stale buffers, boundary
+    # drift, or an incorrect coefficient on subsequent calls.
+    let v2: array<f64, 8> = [0.0]
+    V_field_step(vn, v2, 0.4)
+    if v2[0] != 0.5 or v2[7] != 1.5 or
+       v2[1] < 0.894399999999 or v2[1] > 0.894400000001 or
+       v2[2] < 0.992799999999 or v2[2] > 0.992800000001 or
+       v2[3] != 1.0 or v2[4] != 1.0 or
+       v2[5] < 1.007199999999 or v2[5] > 1.007200000001 or
+       v2[6] < 1.105599999999 or v2[6] > 1.105600000001 { return 7 }
+
+    let q2: array<f64, 8> = [0.0]
+    Q_field_step(qn, q2, 0.1)
+    if q2[0] != 0.0 or q2[7] != 0.0 or
+       q2[1] < 0.039999999999 or q2[1] > 0.040000000001 or
+       q2[2] < 0.239999999999 or q2[2] > 0.240000000001 or
+       q2[3] < 0.439999999999 or q2[3] > 0.440000000001 or
+       q2[4] < 0.239999999999 or q2[4] > 0.240000000001 or
+       q2[5] < 0.039999999999 or q2[5] > 0.040000000001 or
+       q2[6] != 0.0 { return 8 }
+
+    # Machine-readable computed states for an independent external oracle.
+    j = 0
+    while j < 8 {
+        println(v2[j])
+        j = j + 1
+    }
+    j = 0
+    while j < 8 {
+        println(q2[j])
+        j = j + 1
+    }
+    println("field-multiplier-ok")
+    return 0
+}

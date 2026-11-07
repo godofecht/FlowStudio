@@ -32,9 +32,14 @@ def parse_output(data: bytes) -> list[float]:
     if len(data) > MAX_OUTPUT:
         raise ValueError("Flow output exceeded 16 KiB")
     try:
-        lines = data.decode("utf-8", errors="strict").splitlines()
+        decoded = data.decode("utf-8", errors="strict")
     except UnicodeDecodeError as exc:
         raise ValueError("Flow emitted non-UTF-8 output") from exc
+    # splitlines() accepts CR, VT and Unicode separators, hiding malformed
+    # transport records. The compiler contract requires LF-only framing.
+    if not decoded.endswith("\n") or any(ch in decoded for ch in ("\r", "\v", "\f", "\x85", "\u2028", "\u2029")):
+        raise ValueError("Flow emitted noncanonical line framing")
+    lines = decoded[:-1].split("\n")
     if len(lines) != 17 or lines[-1] != "field-multiplier-ok":
         raise ValueError(f"expected 16 numerical values and success marker, got {len(lines)} lines")
     if any(DECIMAL_TOKEN.fullmatch(line) is None for line in lines[:-1]):

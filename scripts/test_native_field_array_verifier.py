@@ -80,7 +80,7 @@ class NativeFieldArrayVerifierTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Flow output exceeded 16 KiB"):
             parse_output(valid + b" " * (16385 - len(valid)))
         with self.assertRaisesRegex(ValueError, "Flow output exceeded 16 KiB"):
-            parse_output(b"\\xc3\\xa9" * 8193)
+            parse_output("é".encode("utf-8") * 8193)
 
     def test_nonfinite_and_wrong_length(self):
         expected = expected_output()

@@ -1,7 +1,7 @@
 # Native upstream Flow Field DSL regression: non-unit diffusion coefficients.
 # Requires a compiler with field multiplier lowering (newer than Flow 2.0.0).
 # Run: flow run src/field_multiplier_differential.flow
-# Expected stdout: field-multiplier-ok
+# Expected stdout: 16 spatial values (V then Q, second step) and field-multiplier-ok
 const alpha: f64 = 0.3
 
 field V : f64[8] on Line
@@ -79,6 +79,17 @@ function main() -> i32 {
        q2[5] < 0.039999999999 or q2[5] > 0.040000000001 or
        q2[6] != 0.0 { return 8 }
 
+    # Machine-readable computed states for an independent external oracle.
+    j = 0
+    while j < 8 {
+        println(v2[j])
+        j = j + 1
+    }
+    j = 0
+    while j < 8 {
+        println(q2[j])
+        j = j + 1
+    }
     println("field-multiplier-ok")
     return 0
 }

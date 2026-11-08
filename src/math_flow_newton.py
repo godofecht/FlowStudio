@@ -107,6 +107,11 @@ def solve_scalar_system(
             candidate = dict(current)
             for name, change in zip(variables, delta):
                 candidate[name] = current[name] + alpha * float(change)
+            # Never evaluate a mathematical expression with overflowed trial state.
+            # A finite Newton direction can still overflow when added to x.
+            if any(not math.isfinite(candidate[name]) for name in variables):
+                alpha *= 0.5
+                continue
             try:
                 trial = residual(candidate)
             except (ExpressionError, ValueError, OverflowError, FloatingPointError):

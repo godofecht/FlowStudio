@@ -1,5 +1,9 @@
 """Analytic numerical acceptance for damped scalar constraint solving."""
 import unittest
+import math
+from unittest.mock import patch
+
+import math_flow_newton
 
 from math_flow_expr import LENGTH, ExpressionError
 from math_flow_system import parse_constraint_system
@@ -73,6 +77,31 @@ class NewtonTests(unittest.TestCase):
                     variables=("a",), dimensions={"a": LENGTH},
                     residual_scales=scales,
                 )
+
+    def test_overflowed_trial_state_never_reaches_expression_evaluator(self):
+        system = parse_constraint_system("a = 0m", symbols={"a": LENGTH})
+        original = math_flow_newton.system_residuals
+        evaluated = []
+
+        def checked_residuals(*args, **kwargs):
+            value = kwargs["values"]["a"]
+            self.assertTrue(math.isfinite(value))
+            evaluated.append(value)
+            return original(*args, **kwargs)
+
+        # A deliberately reversed Jacobian produces a finite Newton direction
+        # that overflows when added to the already-large current iterate.
+        with patch.object(math_flow_newton, "system_jacobian", return_value=((-1.0,),)):
+            with patch.object(math_flow_newton, "system_residuals", side_effect=checked_residuals):
+                result = solve_scalar_system(
+                    system, 0.0, 0.0, values={"a": 1e308},
+                    variables=("a",), dimensions={"a": LENGTH},
+                    max_iterations=1,
+                )
+        self.assertFalse(result.converged)
+        self.assertEqual(result.iterations, 0)
+        self.assertTrue(evaluated)
+        self.assertTrue(all(math.isfinite(value) for value in evaluated))
 
     def test_singular_jacobian(self):
         system = parse_constraint_system("a² = 1m²", symbols={"a": LENGTH})

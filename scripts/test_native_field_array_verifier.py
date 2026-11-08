@@ -190,6 +190,39 @@ class NativeFieldArrayVerifierTests(unittest.TestCase):
         self.assertIn(b"Flow returned", result.stderr)
         self.assertNotIn(b"field-array-oracle-passed", result.stdout)
 
+    def test_cli_enforces_real_process_wall_clock_timeout(self):
+        # Exercise process-group termination with an actual OS process, not a
+        # patched subprocess API or a simulated compiler result.
+        verifier = Path(__file__).with_name("verify_native_field_arrays.py")
+        executable = shutil.which("sleep")
+        self.assertIsNotNone(executable)
+        result = subprocess.run(
+            [sys.executable, str(verifier), "--flow", executable,
+             "--repeats", "1", "--timeout", "0.1", "--total-timeout", "1"],
+            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, timeout=8, check=False,
+        )
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn(b"timed out", result.stderr)
+        self.assertNotIn(b"field-array-oracle-passed", result.stdout)
+
+    def test_cli_bounds_real_process_output(self):
+        # 'yes' writes indefinitely; the verifier must cap output and kill
+        # the process group instead of buffering unbounded data in memory.
+        verifier = Path(__file__).with_name("verify_native_field_arrays.py")
+        executable = shutil.which("yes")
+        if executable is None:
+            self.skipTest("system yes utility unavailable")
+        result = subprocess.run(
+            [sys.executable, str(verifier), "--flow", executable,
+             "--repeats", "1", "--timeout", "2", "--total-timeout", "3"],
+            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, timeout=8, check=False,
+        )
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn(b"Flow output exceeded 16 KiB", result.stderr)
+        self.assertNotIn(b"field-array-oracle-passed", result.stdout)
+
     def test_nonfinite_and_wrong_length(self):
         expected = expected_output()
         with self.assertRaises(ValueError):

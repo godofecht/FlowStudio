@@ -302,8 +302,8 @@ class NativeFieldArrayVerifierTests(unittest.TestCase):
             "wrong_cell": reference.replace("0.8944", "0.8954", 1),
             "nonfinite": reference.replace("0.8944", "nan", 1),
             "missing_marker": reference.replace("field-multiplier-ok", "wrong", 1),
-            "crlf": reference.replace("\\n", "\\r\\n"),
-            "trailing_record": reference + "extra\\n",
+            "crlf": reference.replace("\n", "\r\n"),
+            "trailing_record": reference + "extra\n",
         }
         for label, output in mutations.items():
             with self.subTest(case=label), tempfile.TemporaryDirectory() as directory:
@@ -311,9 +311,9 @@ class NativeFieldArrayVerifierTests(unittest.TestCase):
                 # Embed the payload as a Python string literal to avoid shell
                 # quoting, and use a real executable subprocess for every case.
                 executable.write_text(
-                    "#!" + sys.executable + "\\n"
-                    "import sys\\n"
-                    "sys.stdout.write(" + repr(output) + ")\\n",
+                    "#!" + sys.executable + "\n"
+                    "import sys\n"
+                    "sys.stdout.write(" + repr(output) + ")\n",
                     encoding="utf-8",
                 )
                 executable.chmod(0o700)

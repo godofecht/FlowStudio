@@ -3,6 +3,7 @@ import math
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 import unittest
 try:
@@ -191,17 +192,19 @@ class NativeFieldArrayVerifierTests(unittest.TestCase):
         self.assertNotIn(b"field-array-oracle-passed", result.stdout)
 
     def test_cli_enforces_real_process_wall_clock_timeout(self):
-        # Exercise process-group termination with an actual OS process, not a
-        # patched subprocess API or a simulated compiler result.
+        # Exercise process-group termination using a genuine long-lived OS
+        # subprocess; this is a negative resource test, not Flow qualification.
         verifier = Path(__file__).with_name("verify_native_field_arrays.py")
-        executable = shutil.which("sleep")
-        self.assertIsNotNone(executable)
-        result = subprocess.run(
-            [sys.executable, str(verifier), "--flow", executable,
-             "--repeats", "1", "--timeout", "0.1", "--total-timeout", "1"],
-            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE, timeout=8, check=False,
-        )
+        with tempfile.TemporaryDirectory() as directory:
+            executable = Path(directory) / "long_running"
+            executable.write_text("#!/bin/sh\\nsleep 5\\n".replace("\\\\n", "\\n"))
+            executable.chmod(0o700)
+            result = subprocess.run(
+                [sys.executable, str(verifier), "--flow", str(executable),
+                 "--repeats", "1", "--timeout", "0.1", "--total-timeout", "1"],
+                stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, timeout=8, check=False,
+            )
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn(b"timed out", result.stderr)
         self.assertNotIn(b"field-array-oracle-passed", result.stdout)

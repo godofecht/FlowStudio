@@ -25,7 +25,7 @@ UNITS: dict[str, Dimension] = {
 SUPERSCRIPT = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁻−", "0123456789--")
 _NUMBER = r"(?:10[⁻−-][⁰¹²³⁴⁵⁶⁷⁸⁹0-9]+|(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+\-−]?\d+)?)"
 _UNIT = r"(?:kg|rad|Pa|Hz|Bq|Gy|Sv|sr|N|J|W|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)?(?:/(?:kg|rad|Pa|Hz|Bq|Gy|Sv|sr|N|J|W|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*))?"
-_TOKEN = re.compile(rf"(?P<space>\s+)|(?P<quantity>{_NUMBER}(?:{_UNIT})?)|(?P<name>∂ₓᵧ|∂ᵧₓ|∂ₓ²|∂ᵧ²|∂ₓ|∂ᵧ|∇²|∆|∫|∑|π|[A-Za-z_Α-Ωα-ορ-ω][A-Za-z_0-9Α-Ωα-ορ-ω]*)|(?P<postfix>[²³⁴⁵⁶⁷⁸])|(?P<op><->|->|==|!=|<=|>=|\*\*|&&|\|\||[+\-−*/×·÷√∛(),^|<>≤≥≠∧∨¬!⊻⇒⇔→↔])")
+_TOKEN = re.compile(rf"(?P<space>\s+)|(?P<quantity>{_NUMBER}(?:{_UNIT})?)|(?P<name>∂ₓᵧ|∂ᵧₓ|∂ₓ²|∂ᵧ²|∂ₓ|∂ᵧ|∇²|∆|∫|∑|π|[A-Za-z_Α-Ωα-ορ-ω][A-Za-z_0-9Α-Ωα-ορ-ω]*)|(?P<postfix>[²³⁴⁵⁶⁷⁸])|(?P<op><->|->|==|!=|<=|>=|\*\*|&&|\|\||[+\-−*/×·⋅∗÷∕√∛(),^|<>≤≥≠∧∨¬!⊻⇒⇔→↔])")
 _UNIT_PART = re.compile(r"(kg|rad|Pa|Hz|Bq|Gy|Sv|sr|N|J|W|m|s|K)([²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)\Z")
 
 
@@ -254,8 +254,8 @@ class _Parser:
                 operator, precedence = "pow", 40
             elif nxt in ("+", "-", "−"):
                 operator, precedence = ("add" if nxt == "+" else "sub"), 10
-            elif nxt in ("*", "×", "·", "/", "÷"):
-                operator, precedence = ("div" if nxt in ("/", "÷") else "mul"), 20
+            elif nxt in ("*", "×", "·", "⋅", "∗", "/", "÷", "∕"):
+                operator, precedence = ("div" if nxt in ("/", "÷", "∕") else "mul"), 20
             elif nxt in ("(", "|", "π", "pi", "x", "y", "sin", "cos", "asin", "acos", "atan", "atan2", "hypot", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "ln", "log10", "log1p", "sqrt", "cbrt", "√", "∛", "tanh", "abs", "mean", "variance", "std", "rms", "integral", "∫", "sum", "∑", "min", "max", "where", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∂ₓᵧ", "∂ᵧₓ", "∇²", "∆") or nxt in self.symbols or re.fullmatch(rf"{_NUMBER}(?:{_UNIT})?", nxt):
                 operator, precedence = "mul", 20
             else:
@@ -278,7 +278,7 @@ class _Parser:
                 left = Expression("pow", (left, right),
                                   dimension=tuple(exponent * power for power in left.dimension))
                 continue
-            if nxt in ("+", "-", "−", "*", "**", "×", "·", "/", "÷", "<", "<=", "≤", ">", ">=", "≥", "==", "!=", "≠", "∧", "∨", "&&", "||", "⊻", "⇒", "→", "->", "⇔", "↔", "<->", "xor", "implies", "iff"):
+            if nxt in ("+", "-", "−", "*", "**", "×", "·", "⋅", "∗", "/", "÷", "∕", "<", "<=", "≤", ">", ">=", "≥", "==", "!=", "≠", "∧", "∨", "&&", "||", "⊻", "⇒", "→", "->", "⇔", "↔", "<->", "xor", "implies", "iff"):
                 self.take()
             right = self.expression(precedence if operator == "implies" else precedence + 1,
                                     depth + 1, stop_at_bar=stop_at_bar)

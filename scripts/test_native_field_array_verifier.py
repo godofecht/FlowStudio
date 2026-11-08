@@ -226,6 +226,29 @@ class NativeFieldArrayVerifierTests(unittest.TestCase):
         self.assertIn(b"Flow output exceeded 16 KiB", result.stderr)
         self.assertNotIn(b"field-array-oracle-passed", result.stdout)
 
+    def test_cli_bounds_real_process_stderr(self):
+        # The compiler may fail while flooding diagnostics. Its stderr must
+        # remain bounded independently of stdout and must never count as a pass.
+        verifier = Path(__file__).with_name("verify_native_field_arrays.py")
+        with tempfile.TemporaryDirectory() as directory:
+            executable = Path(directory) / "flood_stderr"
+            executable.write_text(
+                "#!/bin/sh\n"
+                "while :; do printf 'diagnostic-output\\n' >&2; done\n",
+                encoding="utf-8",
+            )
+            executable.chmod(0o700)
+            result = subprocess.run(
+                [sys.executable, str(verifier), "--flow", str(executable),
+                 "--repeats", "1", "--timeout", "2",
+                 "--total-timeout", "3"],
+                stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, timeout=8, check=False,
+            )
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn(b"Flow stderr exceeded 16 KiB", result.stderr)
+        self.assertNotIn(b"field-array-oracle-passed", result.stdout)
+
     def test_cli_rejects_nondeterministic_real_process_output(self):
         # This is a negative CLI contract test. It deliberately uses an OS
         # executable, not the Flow compiler; production qualification is separate.

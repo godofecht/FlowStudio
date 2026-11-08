@@ -19,12 +19,14 @@ UNITS: dict[str, Dimension] = {
     "Pa": (-1, 1, -2, 0), "K": TEMPERATURE,
     "Hz": (0, 0, -1, 0), "N": (1, 1, -2, 0),
     "J": (2, 1, -2, 0), "W": (2, 1, -3, 0),
+    "rad": DIMENSIONLESS, "sr": DIMENSIONLESS,
+    "Bq": (0, 0, -1, 0), "Gy": (2, 0, -2, 0), "Sv": (2, 0, -2, 0),
 }
 SUPERSCRIPT = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁻−", "0123456789--")
 _NUMBER = r"(?:10[⁻−-][⁰¹²³⁴⁵⁶⁷⁸⁹0-9]+|(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+\-−]?\d+)?)"
-_UNIT = r"(?:kg|Pa|Hz|N|J|W|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)?(?:/(?:kg|Pa|Hz|N|J|W|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*))?"
+_UNIT = r"(?:kg|rad|Pa|Hz|Bq|Gy|Sv|sr|N|J|W|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)?(?:/(?:kg|rad|Pa|Hz|Bq|Gy|Sv|sr|N|J|W|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*))?"
 _TOKEN = re.compile(rf"(?P<space>\s+)|(?P<quantity>{_NUMBER}(?:{_UNIT})?)|(?P<name>∂ₓᵧ|∂ᵧₓ|∂ₓ²|∂ᵧ²|∂ₓ|∂ᵧ|∇²|∆|∫|∑|π|[A-Za-z_Α-Ωα-ορ-ω][A-Za-z_0-9Α-Ωα-ορ-ω]*)|(?P<postfix>[²³⁴⁵⁶⁷⁸])|(?P<op><->|->|==|!=|<=|>=|\*\*|&&|\|\||[+\-−*/×·÷√∛(),^|<>≤≥≠∧∨¬!⊻⇒⇔→↔])")
-_UNIT_PART = re.compile(r"(kg|Pa|Hz|N|J|W|m|s|K)([²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)\Z")
+_UNIT_PART = re.compile(r"(kg|rad|Pa|Hz|Bq|Gy|Sv|sr|N|J|W|m|s|K)([²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)\Z")
 
 
 PREDICATE_OPERATORS = frozenset(("lt", "le", "gt", "ge", "eq", "ne", "and", "or", "xor", "implies", "iff", "not"))

@@ -226,6 +226,39 @@ class NativeFieldArrayVerifierTests(unittest.TestCase):
         self.assertIn(b"Flow output exceeded 16 KiB", result.stderr)
         self.assertNotIn(b"field-array-oracle-passed", result.stdout)
 
+    def test_cli_rejects_nondeterministic_real_process_output(self):
+        # This is a negative CLI contract test. It deliberately uses an OS
+        # executable, not the Flow compiler; production qualification is separate.
+        verifier = Path(__file__).with_name("verify_native_field_arrays.py")
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory) / "counter"
+            executable = Path(directory) / "changing_output"
+            values = encode(expected_output()).decode("ascii")
+            # A shell executable returns a valid oracle record on the first
+            # invocation and a different, still numerically valid spelling on
+            # the second. Both outputs pass the numerical oracle individually.
+            alternate = values.replace("0.5\\n", "5e-1\\n", 1)
+            self.assertNotEqual(values, alternate)
+            executable.write_text(
+                "#!/bin/sh\\n"
+                + "if [ -e '" + str(state) + "' ]; then\\n"
+                + "cat <<'SECOND'\\n" + alternate + "SECOND\\n"
+                + "else\\n"
+                + "touch '" + str(state) + "'\\n"
+                + "cat <<'FIRST'\\n" + values + "FIRST\\n"
+                + "fi\\n"
+            )
+            executable.chmod(0o700)
+            result = subprocess.run(
+                [sys.executable, str(verifier), "--flow", str(executable),
+                 "--repeats", "2", "--timeout", "2", "--total-timeout", "5"],
+                stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, timeout=8, check=False,
+            )
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn(b"nondeterministic Flow output on execution 2", result.stderr)
+        self.assertNotIn(b"field-array-oracle-passed", result.stdout)
+
     def test_nonfinite_and_wrong_length(self):
         expected = expected_output()
         with self.assertRaises(ValueError):

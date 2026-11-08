@@ -24,7 +24,7 @@ SUPERSCRIPT = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁻−", "0123456789--")
 _NUMBER = r"(?:10[⁻−-][⁰¹²³⁴⁵⁶⁷⁸⁹0-9]+|(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+\-−]?\d+)?)"
 _UNIT = r"(?:kg|Pa|Hz|N|J|W|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)?(?:/(?:kg|Pa|Hz|N|J|W|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*))?"
 _TOKEN = re.compile(rf"(?P<space>\s+)|(?P<quantity>{_NUMBER}(?:{_UNIT})?)|(?P<name>∂ₓᵧ|∂ᵧₓ|∂ₓ²|∂ᵧ²|∂ₓ|∂ᵧ|∇²|∆|∫|∑|π|[A-Za-z_Α-Ωα-ορ-ω][A-Za-z_0-9Α-Ωα-ορ-ω]*)|(?P<postfix>[²³⁴⁵⁶⁷⁸])|(?P<op><->|->|==|!=|<=|>=|\*\*|&&|\|\||[+\-−*/×·÷√∛(),^|<>≤≥≠∧∨¬!⊻⇒⇔→↔])")
-_UNIT_PART = re.compile(r"(kg|Pa|m|s|K)([²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)\Z")
+_UNIT_PART = re.compile(r"(kg|Pa|Hz|N|J|W|m|s|K)([²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)\Z")
 
 
 PREDICATE_OPERATORS = frozenset(("lt", "le", "gt", "ge", "eq", "ne", "and", "or", "xor", "implies", "iff", "not"))

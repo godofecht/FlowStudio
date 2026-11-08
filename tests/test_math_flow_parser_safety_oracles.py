@@ -16,10 +16,13 @@ class MathematicalParserSafetyOracles(unittest.TestCase):
         grid = np.zeros((2, 3), dtype=float)
         return ast.dimension, np.asarray(evaluate(ast, grid, grid))
 
-    def test_right_associative_integer_power(self):
-        dimension, result = self.scalar("2^3^2")
+    def test_literal_integer_power_and_reject_nested_power(self):
+        dimension, result = self.scalar("2^3")
         self.assertEqual(dimension, DIMENSIONLESS)
-        np.testing.assert_allclose(result, 512.0)
+        np.testing.assert_allclose(result, 8.0)
+        for source in ("2^3^2", "2^(3^2)", "2^9"):
+            with self.subTest(source=source), self.assertRaises(ExpressionError):
+                parse_expression(source)
 
     def test_unicode_division_and_multiplication_precedence(self):
         dimension, result = self.scalar("12 ∕ 3 ∙ 2 + 1")

@@ -1,5 +1,8 @@
 """Strict output-contract regressions; production compiler execution is separate."""
 import math
+import subprocess
+import sys
+from pathlib import Path
 import unittest
 try:
     from scripts.verify_native_field_arrays import expected_output, parse_output, verify
@@ -118,6 +121,44 @@ class NativeFieldArrayVerifierTests(unittest.TestCase):
         ):
             with self.subTest(payload=payload[:24]), self.assertRaises(ValueError):
                 parse_output(payload)
+
+    def test_cli_rejects_invalid_execution_budgets_before_compiler_launch(self):
+        verifier = Path(__file__).with_name("verify_native_field_arrays.py")
+        invalid = (
+            ("--timeout", "0"),
+            ("--timeout", "nan"),
+            ("--timeout", "301"),
+            ("--repeats", "0"),
+            ("--repeats", "6"),
+            ("--repeats", "1.5"),
+            ("--total-timeout", "0"),
+            ("--total-timeout", "inf"),
+            ("--total-timeout", "301"),
+        )
+        for flag, value in invalid:
+            with self.subTest(flag=flag, value=value):
+                result = subprocess.run(
+                    [sys.executable, str(verifier), "--flow",
+                     str(verifier), flag, value],
+                    stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE, timeout=10, check=False,
+                )
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertLess(len(result.stderr), 8192)
+                self.assertIn(b"error:", result.stderr)
+
+    def test_cli_missing_compiler_fails_without_false_success(self):
+        verifier = Path(__file__).with_name("verify_native_field_arrays.py")
+        missing = verifier.with_name("__missing_flow_compiler__")
+        result = subprocess.run(
+            [sys.executable, str(verifier), "--flow", str(missing),
+             "--repeats", "2", "--total-timeout", "1"],
+            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, timeout=10, check=False,
+        )
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertNotIn(b"field-array-oracle-passed", result.stdout)
+        self.assertIn(b"Flow binary not executable", result.stderr)
 
     def test_nonfinite_and_wrong_length(self):
         expected = expected_output()

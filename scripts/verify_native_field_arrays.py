@@ -16,6 +16,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import time
 
 try:
     from scripts.test_field_multiplier_oracle import step
@@ -133,16 +134,24 @@ def main() -> int:
     parser.add_argument("--timeout", type=float, default=60.0)
     parser.add_argument("--repeats", type=int, default=2,
                         help="independent production executions; 1-5 (default: 2)")
+    parser.add_argument("--total-timeout", type=float, default=120.0,
+                        help="cumulative wall-clock budget in seconds, maximum 300")
     args = parser.parse_args()
     if not math.isfinite(args.timeout) or not 0 < args.timeout <= 300:
         parser.error("timeout must be finite and in (0, 300]")
     if not 1 <= args.repeats <= 5:
         parser.error("repeats must be between 1 and 5")
+    if not math.isfinite(args.total_timeout) or not 0 < args.total_timeout <= 300:
+        parser.error("total-timeout must be finite and in (0, 300]")
     try:
         reference = expected_output()
         first_output = None
+        deadline = time.monotonic() + args.total_timeout
         for repetition in range(args.repeats):
-            output = run_flow(args.flow.resolve(), args.timeout)
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise ValueError("cumulative Flow compiler/runtime timeout exceeded")
+            output = run_flow(args.flow.resolve(), min(args.timeout, remaining))
             actual = parse_output(output)
             verify(actual, reference)
             if first_output is not None and output != first_output:

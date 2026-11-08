@@ -44,9 +44,9 @@ def solve_scalar_system(
         raise ExpressionError("Newton solver requires 1 to 32 equations and variables")
     if len(set(variables)) != count:
         raise ExpressionError("Newton variables must be distinct")
-    if not math.isfinite(tolerance) or not 0 < tolerance <= 0.1:
+    if type(tolerance) not in (int, float) or not math.isfinite(tolerance) or not 0 < tolerance <= 0.1:
         raise ExpressionError("Invalid Newton tolerance")
-    if not isinstance(max_iterations, int) or not 1 <= max_iterations <= 1000:
+    if type(max_iterations) is not int or not 1 <= max_iterations <= 1000:
         raise ExpressionError("Invalid Newton iteration limit")
     if residual_scales is None:
         scales = np.ones(count, dtype=float)

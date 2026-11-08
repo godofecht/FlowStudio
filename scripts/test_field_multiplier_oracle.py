@@ -4,6 +4,7 @@ Run: python3 -m unittest -v scripts/test_field_multiplier_oracle.py
 This validates expected arithmetic and convergence, NOT compiler execution.
 """
 import math
+import random
 import unittest
 
 
@@ -57,6 +58,33 @@ class FieldMultiplierOracle(unittest.TestCase):
         self.assertGreater(errors[0] / errors[1], 3.5)
         self.assertGreater(errors[1] / errors[2], 3.5)
         self.assertLess(errors[-1], 1e-5)
+
+    def test_deterministic_diffusion_maximum_principle(self):
+        # Stable explicit Euler updates are convex combinations.
+        rng = random.Random(20261108)
+        for n in (3, 8, 17, 65):
+            for coefficient in (0.3, 2.0):
+                dx = 0.125
+                dt = 0.4 * dx * dx / coefficient
+                values = [rng.uniform(-3.0, 5.0) for _ in range(n)]
+                left, right = values[0], values[-1]
+                low, high = min(values), max(values)
+                for iteration in range(20):
+                    updated = step(values, coefficient, dt, left, right, dx)
+                    with self.subTest(n=n, coefficient=coefficient, iteration=iteration):
+                        self.assertEqual(updated[0], left)
+                        self.assertEqual(updated[-1], right)
+                        self.assertTrue(all(low - 1e-12 <= x <= high + 1e-12
+                                            for x in updated))
+                    values = updated
+
+    def test_nonunit_grid_constant_field_and_zero_coefficient(self):
+        for dx in (0.01, 0.125, 1.0, 10.0):
+            values = [2.5] * 17
+            self.assertEqual(step(values, 2.0, 0.001, 2.5, 2.5, dx), values)
+            variable = [0.0, 3.0, -2.0, 5.0, 1.0]
+            self.assertEqual(step(variable, 0.0, 0.25, 0.0, 1.0, dx),
+                             [0.0, 3.0, -2.0, 5.0, 1.0])
 
     def test_invalid_configurations(self):
         for args in (([0, 0], 1, 0.1, 0, 0),

@@ -131,16 +131,27 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--flow", type=Path, required=True)
     parser.add_argument("--timeout", type=float, default=60.0)
+    parser.add_argument("--repeats", type=int, default=2,
+                        help="independent production executions; 1-5 (default: 2)")
     args = parser.parse_args()
     if not math.isfinite(args.timeout) or not 0 < args.timeout <= 300:
         parser.error("timeout must be finite and in (0, 300]")
+    if not 1 <= args.repeats <= 5:
+        parser.error("repeats must be between 1 and 5")
     try:
-        actual = parse_output(run_flow(args.flow.resolve(), args.timeout))
-        verify(actual, expected_output())
+        reference = expected_output()
+        first_output = None
+        for repetition in range(args.repeats):
+            output = run_flow(args.flow.resolve(), args.timeout)
+            actual = parse_output(output)
+            verify(actual, reference)
+            if first_output is not None and output != first_output:
+                raise ValueError(f"nondeterministic Flow output on execution {repetition + 1}")
+            first_output = output
     except (ValueError, OSError) as exc:
         print(f"field-array-oracle-failed: {exc}", file=sys.stderr)
         return 1
-    print("field-array-oracle-passed: 16 real compiler cells, two steps, two coefficients")
+    print(f"field-array-oracle-passed: 16 real compiler cells, two steps, two coefficients, {args.repeats} independent executions")
     return 0
 
 

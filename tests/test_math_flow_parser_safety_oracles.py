@@ -24,6 +24,10 @@ class MathematicalParserSafetyOracles(unittest.TestCase):
             with self.subTest(source=source), self.assertRaises(ExpressionError):
                 parse_expression(source)
 
+    def test_reject_nested_power_exceeding_bounded_exponent(self):
+        with self.assertRaisesRegex(ExpressionError, "between -8 and 8"):
+            parse_expression("2^3^2")
+
     def test_unicode_division_and_multiplication_precedence(self):
         dimension, result = self.scalar("12 ∕ 3 ∙ 2 + 1")
         self.assertEqual(dimension, DIMENSIONLESS)

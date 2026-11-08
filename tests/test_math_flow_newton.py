@@ -119,6 +119,27 @@ class NewtonTests(unittest.TestCase):
         self.assertTrue(evaluated)
         self.assertTrue(all(math.isfinite(value) for value in evaluated))
 
+    def test_rejects_compiled_symbol_dimension_mismatch(self):
+        # The equations are typed at parse time; passing a different Jacobian
+        # dimension must not silently override the compiled AST.
+        symbols = {"a": LENGTH}
+        system = parse_constraint_system("a = 1m", symbols=symbols)
+        for wrong in ((0, 0, 1, 0), (0, 0, 0, 0)):
+            with self.subTest(dimension=wrong), self.assertRaises(ExpressionError):
+                solve_scalar_system(
+                    system, 0.0, 0.0, values={"a": 0.0},
+                    variables=("a",), dimensions={"a": wrong},
+                )
+
+    def test_dimension_validation_checks_nested_references(self):
+        symbols = {"a": LENGTH}
+        system = parse_constraint_system("2*(a + 1m) = 4m", symbols=symbols)
+        with self.assertRaises(ExpressionError):
+            solve_scalar_system(
+                system, 0.0, 0.0, values={"a": 1.0},
+                variables=("a",), dimensions={"a": (0, 0, 1, 0)},
+            )
+
     def test_singular_jacobian(self):
         system = parse_constraint_system("a² = 1m²", symbols={"a": LENGTH})
         with self.assertRaises(ExpressionError):

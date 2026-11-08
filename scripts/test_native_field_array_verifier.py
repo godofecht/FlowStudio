@@ -1,5 +1,6 @@
 """Strict output-contract regressions; production compiler execution is separate."""
 import math
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -159,6 +160,35 @@ class NativeFieldArrayVerifierTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertNotIn(b"field-array-oracle-passed", result.stdout)
         self.assertIn(b"Flow binary not executable", result.stderr)
+
+    def test_cli_rejects_real_process_success_without_spatial_output(self):
+        # An actual executable exiting zero is not evidence of Flow numerics.
+        verifier = Path(__file__).with_name("verify_native_field_arrays.py")
+        executable = shutil.which("true")
+        self.assertIsNotNone(executable)
+        result = subprocess.run(
+            [sys.executable, str(verifier), "--flow", executable,
+             "--repeats", "1", "--timeout", "2", "--total-timeout", "3"],
+            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, timeout=8, check=False,
+        )
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn(b"expected 16 numerical values", result.stderr)
+        self.assertNotIn(b"field-array-oracle-passed", result.stdout)
+
+    def test_cli_rejects_real_process_failure_without_false_success(self):
+        verifier = Path(__file__).with_name("verify_native_field_arrays.py")
+        executable = shutil.which("false")
+        self.assertIsNotNone(executable)
+        result = subprocess.run(
+            [sys.executable, str(verifier), "--flow", executable,
+             "--repeats", "1", "--timeout", "2", "--total-timeout", "3"],
+            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, timeout=8, check=False,
+        )
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn(b"Flow returned", result.stderr)
+        self.assertNotIn(b"field-array-oracle-passed", result.stdout)
 
     def test_nonfinite_and_wrong_length(self):
         expected = expected_output()

@@ -70,7 +70,7 @@ class NewtonTests(unittest.TestCase):
     def test_rejects_invalid_residual_scales(self):
         system = parse_constraint_system("a = 1m", symbols={"a": LENGTH})
         for scales in ((), (0.0,), (-1.0,), (float("nan"),),
-                       (float("inf"),), (True,)):
+                       (float("inf"),), (True,), 1.0, "1", {"a": 1.0}):
             with self.subTest(scales=scales), self.assertRaises(ExpressionError):
                 solve_scalar_system(
                     system, 0.0, 0.0, values={"a": 0.0},

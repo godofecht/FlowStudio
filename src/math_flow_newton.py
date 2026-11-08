@@ -51,12 +51,14 @@ def solve_scalar_system(
     if residual_scales is None:
         scales = np.ones(count, dtype=float)
     else:
-        if len(residual_scales) != count or any(
+        if not isinstance(residual_scales, (tuple, list)) or len(residual_scales) != count or any(
             type(v) not in (int, float) or not math.isfinite(v) or v <= 0
             for v in residual_scales
         ):
             raise ExpressionError("Expected one finite positive residual scale per equation")
         scales = np.asarray(residual_scales, dtype=float)
+        if not np.all(np.isfinite(scales)) or np.any(scales <= 0):
+            raise ExpressionError("Residual scales must be representable as positive finite floats")
     current = dict(values)
     for name in variables:
         if name not in current or name not in dimensions:

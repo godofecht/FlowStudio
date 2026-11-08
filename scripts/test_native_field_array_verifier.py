@@ -197,7 +197,7 @@ class NativeFieldArrayVerifierTests(unittest.TestCase):
         verifier = Path(__file__).with_name("verify_native_field_arrays.py")
         with tempfile.TemporaryDirectory() as directory:
             executable = Path(directory) / "long_running"
-            executable.write_text("#!/bin/sh\\nsleep 5\\n".replace("\\\\n", "\\n"))
+            executable.write_text("#!/bin/sh\nsleep 5\n")
             executable.chmod(0o700)
             result = subprocess.run(
                 [sys.executable, str(verifier), "--flow", str(executable),

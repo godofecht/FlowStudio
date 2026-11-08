@@ -78,6 +78,22 @@ class NewtonTests(unittest.TestCase):
                     residual_scales=scales,
                 )
 
+    def test_rejects_boolean_and_non_numeric_solver_controls(self):
+        system = parse_constraint_system("a = 1m", symbols={"a": LENGTH})
+        for kwargs in (
+            {"tolerance": True},
+            {"tolerance": "1e-9"},
+            {"tolerance": None},
+            {"max_iterations": True},
+            {"max_iterations": 2.0},
+        ):
+            with self.subTest(kwargs=kwargs), self.assertRaises(ExpressionError):
+                solve_scalar_system(
+                    system, 0.0, 0.0, values={"a": 0.0},
+                    variables=("a",), dimensions={"a": LENGTH},
+                    **kwargs,
+                )
+
     def test_overflowed_trial_state_never_reaches_expression_evaluator(self):
         system = parse_constraint_system("a = 0m", symbols={"a": LENGTH})
         original = math_flow_newton.system_residuals

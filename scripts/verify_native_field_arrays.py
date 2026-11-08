@@ -157,6 +157,10 @@ def main() -> int:
             if first_output is not None and output != first_output:
                 raise ValueError(f"nondeterministic Flow output on execution {repetition + 1}")
             first_output = output
+            # Include parsing, independent oracle evaluation and comparison in
+            # the global budget, not just time spent waiting for subprocesses.
+            if time.monotonic() > deadline:
+                raise ValueError("cumulative Flow compiler/runtime timeout exceeded")
     except (ValueError, OSError) as exc:
         print(f"field-array-oracle-failed: {exc}", file=sys.stderr)
         return 1

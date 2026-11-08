@@ -293,5 +293,41 @@ class NativeFieldArrayVerifierTests(unittest.TestCase):
                 verify(observed, expected)
 
 
+    def test_cli_rejects_real_process_corrupted_spatial_cells(self):
+        # Exercise the verifier end-to-end, including OS execution and strict
+        # parsing. These negative executables are not a substitute for Flow.
+        verifier = Path(__file__).with_name("verify_native_field_arrays.py")
+        reference = encode(expected_output()).decode("ascii")
+        mutations = {
+            "wrong_cell": reference.replace("0.8944", "0.8954", 1),
+            "nonfinite": reference.replace("0.8944", "nan", 1),
+            "missing_marker": reference.replace("field-multiplier-ok", "wrong", 1),
+            "crlf": reference.replace("\\n", "\\r\\n"),
+            "trailing_record": reference + "extra\\n",
+        }
+        for label, output in mutations.items():
+            with self.subTest(case=label), tempfile.TemporaryDirectory() as directory:
+                executable = Path(directory) / "emit_invalid"
+                # Embed the payload as a Python string literal to avoid shell
+                # quoting, and use a real executable subprocess for every case.
+                executable.write_text(
+                    "#!" + sys.executable + "\\n"
+                    "import sys\\n"
+                    "sys.stdout.write(" + repr(output) + ")\\n",
+                    encoding="utf-8",
+                )
+                executable.chmod(0o700)
+                result = subprocess.run(
+                    [sys.executable, str(verifier), "--flow", str(executable),
+                     "--repeats", "1", "--timeout", "2",
+                     "--total-timeout", "3"],
+                    stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE, timeout=8, check=False,
+                )
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertIn(b"field-array-oracle-failed:", result.stderr)
+                self.assertNotIn(b"field-array-oracle-passed", result.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()

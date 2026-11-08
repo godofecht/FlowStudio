@@ -237,16 +237,16 @@ class NativeFieldArrayVerifierTests(unittest.TestCase):
             # A shell executable returns a valid oracle record on the first
             # invocation and a different, still numerically valid spelling on
             # the second. Both outputs pass the numerical oracle individually.
-            alternate = values.replace("0.5\\n", "5e-1\\n", 1)
+            alternate = values.replace("0.5\n", "5e-1\n", 1)
             self.assertNotEqual(values, alternate)
             executable.write_text(
-                "#!/bin/sh\\n"
-                + "if [ -e '" + str(state) + "' ]; then\\n"
-                + "cat <<'SECOND'\\n" + alternate + "SECOND\\n"
-                + "else\\n"
-                + "touch '" + str(state) + "'\\n"
-                + "cat <<'FIRST'\\n" + values + "FIRST\\n"
-                + "fi\\n"
+                "#!/bin/sh\n"
+                + "if [ -e '" + str(state) + "' ]; then\n"
+                + "cat <<'SECOND'\n" + alternate + "SECOND\n"
+                + "else\n"
+                + "touch '" + str(state) + "'\n"
+                + "cat <<'FIRST'\n" + values + "FIRST\n"
+                + "fi\n"
             )
             executable.chmod(0o700)
             result = subprocess.run(

@@ -59,6 +59,24 @@ def solve_scalar_system(
         scales = np.asarray(residual_scales, dtype=float)
         if not np.all(np.isfinite(scales)) or np.any(scales <= 0):
             raise ExpressionError("Residual scales must be representable as positive finite floats")
+    # The Jacobian consumes caller dimensions, while the compiled AST carries
+    # independently inferred dimensions. They must agree before differentiation.
+    def check_symbol_dimensions(node) -> None:
+        if node.operator == "name" and node.value in variables:
+            if node.dimension != dimensions[node.value]:
+                raise ExpressionError(
+                    f"Newton variable {node.value!r} has inconsistent physical dimensions"
+                )
+        for operand in node.operands:
+            check_symbol_dimensions(operand)
+
+    for name in variables:
+        if name not in dimensions:
+            raise ExpressionError("Missing Newton variable or dimension")
+    for equation in system.equations:
+        check_symbol_dimensions(equation.lhs)
+        check_symbol_dimensions(equation.rhs)
+
     current = dict(values)
     for name in variables:
         if name not in current or name not in dimensions:

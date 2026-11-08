@@ -259,6 +259,29 @@ class NativeFieldArrayVerifierTests(unittest.TestCase):
         self.assertIn(b"nondeterministic Flow output on execution 2", result.stderr)
         self.assertNotIn(b"field-array-oracle-passed", result.stdout)
 
+    def test_cli_cumulative_budget_across_repeated_real_processes(self):
+        # A process that completes within its individual timeout must still
+        # fail when repetitions exceed the shared wall-clock budget.
+        verifier = Path(__file__).with_name("verify_native_field_arrays.py")
+        with tempfile.TemporaryDirectory() as directory:
+            executable = Path(directory) / "slow_valid_output"
+            output = encode(expected_output()).decode("ascii")
+            executable.write_text(
+                "#!/bin/sh\n"
+                "sleep 0.3\n"
+                "cat <<'CELLS'\n" + output + "CELLS\n"
+            )
+            executable.chmod(0o700)
+            result = subprocess.run(
+                [sys.executable, str(verifier), "--flow", str(executable),
+                 "--repeats", "5", "--timeout", "2", "--total-timeout", "0.5"],
+                stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, timeout=8, check=False,
+            )
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn(b"timed out", result.stderr)
+        self.assertNotIn(b"field-array-oracle-passed", result.stdout)
+
     def test_nonfinite_and_wrong_length(self):
         expected = expected_output()
         with self.assertRaises(ValueError):

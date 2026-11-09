@@ -25,7 +25,8 @@ class PeriodicDerivativeOracles(unittest.TestCase):
         tree = parse_expression(source)
         self.assertEqual(tree.dimension, dimension)
         actual = evaluate(tree, self.x, self.y)
-        self.assertEqual(actual.shape, self.x.shape)
+        # A definite spatial integral is a scalar; local derivatives remain grids.
+        self.assertEqual(np.shape(actual), np.shape(oracle) if np.ndim(oracle) == 0 else self.x.shape)
         self.assertLess(
             np.max(np.abs(actual - oracle)) / max(1.0, np.max(np.abs(oracle))),
             tolerance,

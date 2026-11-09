@@ -174,6 +174,23 @@ class _Parser:
                 raise ExpressionError("where branches require matching physical dimensions")
             left = Expression("where", (predicate, when_true, when_false),
                               dimension=when_true.dimension)
+        elif first == "clamp":
+            if self.take() != "(":
+                raise ExpressionError("Expected '(' after clamp")
+            argument = self.expression(0, depth + 1)
+            if self.take() != ",":
+                raise ExpressionError("clamp requires exactly three arguments")
+            lower = self.expression(0, depth + 1)
+            if self.take() != ",":
+                raise ExpressionError("clamp requires exactly three arguments")
+            upper = self.expression(0, depth + 1)
+            if self.take() != ")":
+                raise ExpressionError("clamp requires exactly three arguments")
+            if any(node.operator in PREDICATE_OPERATORS for node in (argument, lower, upper)):
+                raise ExpressionError("clamp arguments must be numerical expressions")
+            if argument.dimension != lower.dimension or argument.dimension != upper.dimension:
+                raise ExpressionError("clamp requires matching physical dimensions")
+            left = Expression("clamp", (argument, lower, upper), dimension=argument.dimension)
         elif first in ("min", "max", "atan2", "hypot"):
             if self.take() != "(":
                 raise ExpressionError(f"Expected '(' after {first}")
@@ -258,7 +275,7 @@ class _Parser:
                 operator, precedence = ("add" if nxt == "+" else "sub"), 10
             elif nxt in ("*", "×", "·", "⋅", "∗", "∙", "/", "÷", "∕"):
                 operator, precedence = ("div" if nxt in ("/", "÷", "∕") else "mul"), 20
-            elif nxt in ("(", "|", "π", "pi", "x", "y", "sin", "cos", "asin", "acos", "atan", "atan2", "hypot", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "ln", "log10", "log1p", "sqrt", "cbrt", "√", "∛", "tanh", "abs", "floor", "ceil", "sign", "mean", "variance", "std", "rms", "integral", "∫", "sum", "∑", "min", "max", "where", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∂ₓᵧ", "∂ᵧₓ", "∇²", "∆") or nxt in self.symbols or re.fullmatch(rf"{_NUMBER}(?:{_UNIT})?", nxt):
+            elif nxt in ("(", "|", "π", "pi", "x", "y", "sin", "cos", "asin", "acos", "atan", "atan2", "hypot", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "ln", "log10", "log1p", "sqrt", "cbrt", "√", "∛", "tanh", "abs", "floor", "ceil", "sign", "mean", "variance", "std", "rms", "integral", "∫", "sum", "∑", "min", "max", "clamp", "where", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∂ₓᵧ", "∂ᵧₓ", "∇²", "∆") or nxt in self.symbols or re.fullmatch(rf"{_NUMBER}(?:{_UNIT})?", nxt):
                 operator, precedence = "mul", 20
             else:
                 break
@@ -316,7 +333,7 @@ def parse_expression(source: str, *, symbols: dict[str, Dimension] | None = None
     if symbols:
         for name, dimension in symbols.items():
             if (not re.fullmatch(r"[A-Za-z_Α-Ωα-ορ-ω][A-Za-z_0-9Α-Ωα-ορ-ω]*", name)
-                    or name in ("x", "y", "pi", "π", "sin", "cos", "asin", "acos", "atan", "atan2", "hypot", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "ln", "log10", "log1p", "sqrt", "cbrt", "tanh", "abs", "floor", "ceil", "sign", "mean", "variance", "std", "rms", "integral", "sum", "min", "max", "where", "xor", "implies", "iff")
+                    or name in ("x", "y", "pi", "π", "sin", "cos", "asin", "acos", "atan", "atan2", "hypot", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "ln", "log10", "log1p", "sqrt", "cbrt", "tanh", "abs", "floor", "ceil", "sign", "mean", "variance", "std", "rms", "integral", "sum", "min", "max", "clamp", "where", "xor", "implies", "iff")
                     or len(dimension) != 4 or any(type(power) is not int for power in dimension)):
                 raise ExpressionError(f"Invalid typed symbol {name!r}")
     parser = _Parser(tokenize(source), symbols)
@@ -610,6 +627,10 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
                 return np.divide(args[0], args[1])
         if node.operator == "neg": return -args[0]
         if node.operator == "pos": return args[0]
+        if node.operator == "clamp":
+            if np.any(np.asarray(args[1]) > np.asarray(args[2])):
+                raise ExpressionError("clamp lower bound exceeds upper bound")
+            return np.minimum(np.maximum(args[0], args[1]), args[2])
         if node.operator in ("min", "max"):
             return (np.minimum if node.operator == "min" else np.maximum)(args[0], args[1])
         if node.operator in ("atan2", "hypot"):

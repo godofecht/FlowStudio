@@ -204,7 +204,7 @@ class _Parser:
                 raise ExpressionError(f"{first} requires matching physical dimensions")
             left = Expression(first, (first_arg, second_arg),
                               dimension=DIMENSIONLESS if first == "atan2" else first_arg.dimension)
-        elif first in ("sin", "cos", "asin", "acos", "atan", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "ln", "log10", "log1p", "sqrt", "cbrt", "√", "∛", "tanh", "abs", "floor", "ceil", "sign", "mean", "variance", "std", "rms", "integral", "∫", "sum", "∑", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∂ₓᵧ", "∂ᵧₓ", "∇²", "∆"):
+        elif first in ("sin", "cos", "asin", "acos", "atan", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "ln", "log10", "log1p", "expm1", "sqrt", "cbrt", "√", "∛", "tanh", "abs", "floor", "ceil", "sign", "mean", "variance", "std", "rms", "integral", "∫", "sum", "∑", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∂ₓᵧ", "∂ᵧₓ", "∇²", "∆"):
             if first in ("∇²", "∆", "√", "∛", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∂ₓᵧ", "∂ᵧₓ") and self.peek() != "(":
                 # Prefix Unicode differential/radical operators bind more tightly than products.
                 arg = self.expression(30, depth + 1)
@@ -275,7 +275,7 @@ class _Parser:
                 operator, precedence = ("add" if nxt == "+" else "sub"), 10
             elif nxt in ("*", "×", "·", "⋅", "∗", "∙", "/", "÷", "∕"):
                 operator, precedence = ("div" if nxt in ("/", "÷", "∕") else "mul"), 20
-            elif nxt in ("(", "|", "π", "pi", "x", "y", "sin", "cos", "asin", "acos", "atan", "atan2", "hypot", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "ln", "log10", "log1p", "sqrt", "cbrt", "√", "∛", "tanh", "abs", "floor", "ceil", "sign", "mean", "variance", "std", "rms", "integral", "∫", "sum", "∑", "min", "max", "clamp", "where", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∂ₓᵧ", "∂ᵧₓ", "∇²", "∆") or nxt in self.symbols or re.fullmatch(rf"{_NUMBER}(?:{_UNIT})?", nxt):
+            elif nxt in ("(", "|", "π", "pi", "x", "y", "sin", "cos", "asin", "acos", "atan", "atan2", "hypot", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "ln", "log10", "log1p", "expm1", "sqrt", "cbrt", "√", "∛", "tanh", "abs", "floor", "ceil", "sign", "mean", "variance", "std", "rms", "integral", "∫", "sum", "∑", "min", "max", "clamp", "where", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∂ₓᵧ", "∂ᵧₓ", "∇²", "∆") or nxt in self.symbols or re.fullmatch(rf"{_NUMBER}(?:{_UNIT})?", nxt):
                 operator, precedence = "mul", 20
             else:
                 break
@@ -333,7 +333,7 @@ def parse_expression(source: str, *, symbols: dict[str, Dimension] | None = None
     if symbols:
         for name, dimension in symbols.items():
             if (not re.fullmatch(r"[A-Za-z_Α-Ωα-ορ-ω][A-Za-z_0-9Α-Ωα-ορ-ω]*", name)
-                    or name in ("x", "y", "pi", "π", "sin", "cos", "asin", "acos", "atan", "atan2", "hypot", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "ln", "log10", "log1p", "sqrt", "cbrt", "tanh", "abs", "floor", "ceil", "sign", "mean", "variance", "std", "rms", "integral", "sum", "min", "max", "clamp", "where", "xor", "implies", "iff")
+                    or name in ("x", "y", "pi", "π", "sin", "cos", "asin", "acos", "atan", "atan2", "hypot", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "ln", "log10", "log1p", "expm1", "sqrt", "cbrt", "tanh", "abs", "floor", "ceil", "sign", "mean", "variance", "std", "rms", "integral", "sum", "min", "max", "clamp", "where", "xor", "implies", "iff")
                     or len(dimension) != 4 or any(type(power) is not int for power in dimension)):
                 raise ExpressionError(f"Invalid typed symbol {name!r}")
     parser = _Parser(tokenize(source), symbols)
@@ -638,7 +638,7 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
                 raise ExpressionError("atan2 is undefined when both arguments are zero")
             with np.errstate(over="ignore", invalid="ignore"):
                 return (np.arctan2 if node.operator == "atan2" else np.hypot)(args[0], args[1])
-        if node.operator in ("sin", "cos", "asin", "acos", "atan", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "log10", "log1p", "sqrt", "cbrt", "tanh", "abs", "floor", "ceil", "sign"):
+        if node.operator in ("sin", "cos", "asin", "acos", "atan", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "log10", "log1p", "expm1", "sqrt", "cbrt", "tanh", "abs", "floor", "ceil", "sign"):
             with np.errstate(over="ignore", divide="ignore", invalid="ignore"):
                 return getattr(np, {"asin": "arcsin", "acos": "arccos", "atan": "arctan", "asinh": "arcsinh", "acosh": "arccosh", "atanh": "arctanh"}.get(node.operator, node.operator))(args[0])
         raise ExpressionError(f"Unsupported operator {node.operator!r}")

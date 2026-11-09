@@ -446,10 +446,10 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
         spacing_x = float(coordinates_x[1, 0] - coordinates_x[0, 0])
         spacing_y = float(coordinates_y[0, 1] - coordinates_y[0, 0])
         if (spacing_x <= 0 or spacing_y <= 0
-                or not np.allclose(coordinates_x, coordinates_x[:, :1], rtol=1e-12, atol=1e-12)
-                or not np.allclose(coordinates_y, coordinates_y[:1, :], rtol=1e-12, atol=1e-12)
-                or not np.allclose(np.diff(coordinates_x[:, 0]), spacing_x, rtol=1e-12, atol=1e-12)
-                or not np.allclose(np.diff(coordinates_y[0, :]), spacing_y, rtol=1e-12, atol=1e-12)):
+                or not np.allclose(coordinates_x, coordinates_x[:, :1], rtol=1e-12, atol=0)
+                or not np.allclose(coordinates_y, coordinates_y[:1, :], rtol=1e-12, atol=0)
+                or not np.allclose(np.diff(coordinates_x[:, 0]), spacing_x, rtol=1e-12, atol=0)
+                or not np.allclose(np.diff(coordinates_y[0, :]), spacing_y, rtol=1e-12, atol=0)):
             raise ExpressionError("Spatial derivatives require a uniformly spaced Cartesian grid")
         return coordinates_x.shape, spacing_x, spacing_y
 

@@ -37,15 +37,16 @@ test("the chip mirrors the language and backend selects", () => {
   const context = runDoc("flow", "");
   widget.mount(context.doc, { storage: fakeStorage() });
   assert.equal(context.runChipLang.textContent, "Flow");
-  assert.equal(context.runChipBackend.textContent, "C backend (default)");
+  assert.equal(context.runChipBackend.textContent, "C");
   context.language.value = "python";
   context.language.fire("change", {});
   assert.equal(context.runChipLang.textContent, "Python");
-  assert.equal(context.runChipBackend.textContent, "—");   // backend is Flow-only
+  assert.equal(context.runChipBackend.textContent, "");    // backend is Flow-only
+  assert.equal(context.runConfigChip.getAttribute("data-language"), "python");
   context.language.value = "flow";
   context.flowBackend.value = "mlir";
   context.flowBackend.fire("change", {});
-  assert.equal(context.runChipBackend.textContent, "MLIR backend (experimental)");
+  assert.equal(context.runChipBackend.textContent, "MLIR");
 });
 
 test("opening the dialog preselects the current configuration", () => {
@@ -102,7 +103,7 @@ test("the dialog query filters configurations and Enter applies the match", () =
   assert.equal(context.language.value, "flow");
   assert.equal(context.flowBackend.value, "mlir");
   assert.equal(controller.isOpen(), false);
-  assert.equal(context.runChipBackend.textContent, "MLIR backend (experimental)");
+  assert.equal(context.runChipBackend.textContent, "MLIR");
 });
 
 test("the chip click toggles the dialog and Escape dismisses it", () => {

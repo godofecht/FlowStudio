@@ -10,6 +10,7 @@ const LIMITS = Object.freeze({
   right: [200, 560],
   dock: [90, 620]
 });
+const TRAILING = new Set(["right", "dock"]);
 const DEFAULTS = Object.freeze({ sidebar: 260, right: 280, dock: 240 });
 
 function clamp(panel, value) {
@@ -60,6 +61,9 @@ function mount(doc = document, options = {}) {
     if (!LIMITS[panel]) continue;
     const axis = splitter.dataset.axis === "y" ? "y" : "x";
     const position = event => axis === "x" ? event.clientX : event.clientY;
+    /* The right pane and the console dock sit after their splitter, so they
+     * grow as the pointer moves left or up. */
+    const sign = TRAILING.has(panel) ? -1 : 1;
     let origin = null;
     splitter.addEventListener("pointerdown", event => {
       origin = { pointer: position(event), size: layout[panel] };
@@ -74,7 +78,7 @@ function mount(doc = document, options = {}) {
     function move(event) {
       if (!origin) return;
       const delta = position(event) - origin.pointer;
-      layout[panel] = clamp(panel, origin.size + delta);
+      layout[panel] = clamp(panel, origin.size + sign * delta);
       applyLayout();
     }
     function stop() {
@@ -89,7 +93,7 @@ function mount(doc = document, options = {}) {
       const increase = axis === "x" ? "ArrowRight" : "ArrowDown";
       if (event.key !== decrease && event.key !== increase) return;
       event.preventDefault();
-      layout[panel] = clamp(panel, layout[panel] + (event.key === increase ? 16 : -16));
+      layout[panel] = clamp(panel, layout[panel] + sign * (event.key === increase ? 16 : -16));
       applyLayout();
       saveLayout();
     });

@@ -215,10 +215,37 @@ try {
   // ---- search view searches the explorer's folder ------------------------
   await page.locator('#tab-search').click();
   assert.equal(await page.locator('#sidebarTitle').textContent(), 'Search');
-  await page.locator('#projectSearch').fill('changed');
-  await page.locator('#searchProject').click();
-  await page.waitForFunction(() => /1 matches/.test(document.getElementById('searchResults').textContent));
-  assert.match(await page.locator('#searchResults').textContent(), /src\/tools\.py:1:8/);
+  await page.locator('#projectSearch').fill('changed');           // live: no button press
+  await page.waitForFunction(() => document.getElementById('searchSummary').textContent === '1 result in 1 file');
+  assert.match(await page.locator('#searchResults .sr-file').getAttribute('data-file'), /src\/tools\.py$/);
+  assert.match(await page.locator('#searchResults .sr-match').getAttribute('aria-label'), /src\/tools\.py:1:8/);
+  assert.equal(await page.locator('#searchResults .sr-match mark').textContent(), 'changed');
+  await page.locator('#projectInclude').fill('*.flow');               // include filter narrows live
+  await page.waitForFunction(() => /^0 results/.test(document.getElementById('searchSummary').textContent));
+  await page.locator('#projectInclude').fill('src');
+  await page.waitForFunction(() => document.getElementById('searchSummary').textContent === '1 result in 1 file');
+  await page.locator('#projectSearch').press('ArrowDown');            // keyboard into results
+  await page.keyboard.press('ArrowLeft');                            // fold the file
+  assert.equal(await page.locator('#searchResults .sr-match').isHidden(), true);
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');                                // open the match
+  await page.waitForFunction(() => FlowStudioApp.documents.active().name === 'tools.py');
+  await page.locator('#projectInclude').fill('');
+
+  // ---- Search Everywhere: Ctrl+P finds files in the folder ---------------
+  await page.keyboard.press('Control+p');
+  await page.waitForFunction(() => document.getElementById('searchEverywhere').open);
+  assert.equal(await page.locator('#seTabs .se-tab.active').innerText(), 'Files');
+  await page.locator('#seQuery').fill('tool');
+  await page.waitForFunction(() => document.querySelector('#seGroups .se-row[data-kind="file"]'));
+  assert.equal(await page.locator('#seGroups .se-row[data-kind="file"] mark').first().textContent(), 'tool');
+  await page.keyboard.press('Escape');
+
+  // ---- typing quotes never opens Search Everywhere -----------------------
+  await page.locator('#terminalRoot textarea, #terminalRoot input, #terminalRoot [contenteditable]').first().click().catch(() => {});
+  await page.keyboard.type('"a" "b" ""', { delay: 40 });
+  assert.equal(await page.evaluate(() => document.getElementById('searchEverywhere').open), false);
   await page.locator('#tab-files').click();
   assert.equal(await page.locator('#sidebarTitle').textContent(), 'Explorer');
 

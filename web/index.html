@@ -508,23 +508,19 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
     </div>
   </nav>
   <div class="topbar-actions" aria-label="Editor actions">
-    <button id="commandLauncher" class="command-launcher" type="button" aria-haspopup="dialog" aria-controls="commandPalette" title="Search commands (Ctrl+K)"><i data-lucide="search"></i><span>Search commands...</span><kbd>Ctrl K</kbd></button>
+    <button id="commandLauncher" class="command-launcher" type="button" aria-haspopup="dialog" aria-controls="searchEverywhere" title="Search files, commands and examples (Shift Shift, Ctrl+P, Ctrl+K)"><i data-lucide="search"></i><span id="commandLauncherLabel">Search FlowStudio</span><kbd>Ctrl K</kbd></button>
     <div class="run-cluster" role="group" aria-label="Run configuration">
       <div class="run-widget">
-        <button id="runConfigChip" type="button" class="run-chip" aria-haspopup="dialog" aria-controls="runConfigDialog" title="Run configuration — language and compiler backend for runs">
+        <button id="runConfigChip" type="button" class="run-chip" aria-haspopup="dialog" aria-controls="runConfigDialog" title="Run configuration: language and compiler backend">
+          <span class="run-chip-dot" aria-hidden="true"></span>
           <span class="run-chip-main" id="runChipLang">Flow</span>
           <span class="run-chip-sub" id="runChipBackend">C backend</span>
-          <span class="run-chip-caret" aria-hidden="true">▾</span>
+          <svg class="run-chip-caret" viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 6.5L8 10l3.5-3.5"/></svg>
         </button>
-        <button id="run" class="primary run-main" title="Run selection or entire buffer (Ctrl/⌘+Enter)"><i data-lucide="play"></i>Run</button>
-      </div>
-      <label for="language" class="hidden-widget">Runtime</label>
-      <select id="language" class="hidden-widget" aria-label="Execution language"><option value="flow">Flow</option><option value="r">R</option><option value="python">Python</option></select>
-      <label for="flowBackend" class="hidden-widget">Backend</label>
-      <select id="flowBackend" class="hidden-widget" aria-label="Flow compiler backend" title="Compiler backend for Flow runs"><option value="" selected>C (default)</option><option value="mlir">MLIR (experimental)</option></select>
-      <button id="checkFlow" type="button" title="Compile-check the current Flow buffer without running it">Check Flow</button>
-      <div class="run-more">
-        <button id="runMore" type="button" class="run-more-trigger" aria-haspopup="menu" aria-expanded="false" aria-controls="runMorePopup" title="More run actions" aria-label="More run actions">&middot;&middot;&middot;</button>
+        <button id="run" class="primary run-main" title="Run selection or entire buffer (Ctrl/⌘+Enter)"><i data-lucide="play"></i><span>Run</span></button>
+        <button id="checkFlow" type="button" class="run-icon" title="Check Flow: compile the current buffer without running it" aria-label="Check Flow"><i data-lucide="circle-check"></i></button>
+        <div class="run-more">
+          <button id="runMore" type="button" class="run-more-trigger run-icon" aria-haspopup="menu" aria-expanded="false" aria-controls="runMorePopup" title="More run actions" aria-label="More run actions"><i data-lucide="ellipsis"></i></button>
         <div class="menu-popup run-more-popup" id="runMorePopup" role="menu" aria-label="More run actions" hidden>
           <button id="runCell" type="button" role="menuitem" title="Run current # %% cell (Ctrl/⌘+Shift+Enter)">Run cell<kbd>Ctrl+Shift+Enter</kbd></button>
           <button id="runProject" type="button" role="menuitem" title="Run every file of the active example project in its declared order, stopping at the first failure">Run project</button>
@@ -535,7 +531,12 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
           <button id="resetR" type="button" role="menuitem" title="Discard native R variables and restart its interpreter">Reset R session</button>
           <button id="resetPython" type="button" role="menuitem" title="Discard native Python variables and restart its interpreter">Reset Python session</button>
         </div>
+        </div>
       </div>
+      <label for="language" class="hidden-widget">Runtime</label>
+      <select id="language" class="hidden-widget" aria-label="Execution language"><option value="flow">Flow</option><option value="r">R</option><option value="python">Python</option></select>
+      <label for="flowBackend" class="hidden-widget">Backend</label>
+      <select id="flowBackend" class="hidden-widget" aria-label="Flow compiler backend" title="Compiler backend for Flow runs"><option value="" selected>C (default)</option><option value="mlir">MLIR (experimental)</option></select>
     </div>
     <input id="fallbackOpen" type="file" accept=".flow,.R,.r,.py,.txt" hidden>
   </div>
@@ -559,22 +560,31 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
     </div>
     <div class="body search-body" id="view-search" role="tabpanel" aria-labelledby="tab-search" hidden>
       <div class="project-search" role="search" aria-label="Search project files">
-        <div class="search-field">
-          <input id="projectSearch" type="search" maxlength="256" placeholder="Search" aria-label="Find in project">
-          <label class="search-toggle" title="Match case"><input id="caseSensitive" type="checkbox"><span>Aa</span></label>
-          <label class="search-toggle" title="Match whole word"><input id="projectWholeWord" type="checkbox"><span>ab</span></label>
-          <label class="search-toggle" title="Use regular expression"><input id="projectRegex" type="checkbox"><span>.*</span></label>
-        </div>
-        <div class="search-field">
-          <input id="projectReplace" type="text" maxlength="10000" placeholder="Replace" aria-label="Project-wide replacement text">
-        </div>
-        <div class="search-actions">
-          <button id="searchProject" type="button" class="primary">Find all</button>
-          <button id="replaceProject" type="button" title="Preview and confirm local file changes">Replace all...</button>
-          <button id="undoProjectReplace" type="button" disabled title="Undo the last verified project-wide replacement">Undo replace</button>
+        <button id="toggleProjectReplace" type="button" class="sv-replace-toggle" aria-expanded="false" aria-controls="projectReplaceRow" title="Toggle replace"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg></button>
+        <div class="sv-fields">
+          <div class="search-field">
+            <input id="projectSearch" type="search" maxlength="256" placeholder="Search" aria-label="Find in project" autocomplete="off" spellcheck="false">
+            <label class="search-toggle" title="Match case"><input id="caseSensitive" type="checkbox"><span>Aa</span></label>
+            <label class="search-toggle" title="Match whole word"><input id="projectWholeWord" type="checkbox"><span class="sv-word">ab</span></label>
+            <label class="search-toggle" title="Use regular expression"><input id="projectRegex" type="checkbox"><span>.*</span></label>
+          </div>
+          <div class="search-field" id="projectReplaceRow" hidden>
+            <input id="projectReplace" type="text" maxlength="10000" placeholder="Replace" aria-label="Project-wide replacement text" autocomplete="off" spellcheck="false">
+            <button id="replaceProject" type="button" class="sv-icon" title="Replace all: preview and confirm local file changes" aria-label="Replace all"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4.5h6M2.5 8h6"/><path d="M11 3v6.5"/><path d="M9 7.5l2 2 2-2"/><path d="M2.5 11.5h11"/></svg></button>
+          </div>
+          <div class="search-field sv-include">
+            <input id="projectInclude" type="text" maxlength="256" placeholder="Files to include, e.g. *.flow, src/" aria-label="Files to include" autocomplete="off" spellcheck="false">
+          </div>
         </div>
       </div>
-      <div id="searchResults" aria-live="polite" aria-label="Project search results"></div>
+      <div class="sv-summary">
+        <span id="searchSummary" aria-live="polite"></span>
+        <button id="undoProjectReplace" type="button" class="sv-icon" disabled title="Undo the last verified project-wide replacement" aria-label="Undo replace"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3.5L2.5 6 5 8.5"/><path d="M2.5 6h7a4 4 0 0 1 0 8H7"/></svg></button>
+        <button id="searchProject" type="button" class="sv-icon" title="Search again" aria-label="Search again"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9"/><path d="M13.5 2.2v3h-3"/></svg></button>
+        <button id="clearProjectSearch" type="button" class="sv-icon" title="Clear search results" aria-label="Clear search results"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg></button>
+        <button id="collapseProjectSearch" type="button" class="sv-icon" title="Collapse all" aria-label="Collapse all"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 6.5L8 3.5l3 3M5 9.5l3 3 3-3"/></svg></button>
+      </div>
+      <div id="searchResults" role="tree" aria-label="Project search results"></div>
       <p class="muted hint" id="searchHint">Searches the open folder on this device. Nothing is sent to the server.</p>
     </div>
     <div class="body outline-body" id="view-outline" role="tabpanel" aria-labelledby="tab-outline" hidden>
@@ -701,7 +711,7 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
   <span id="dirty" hidden>● unsaved</span>
   <span id="cursor">Ln 1, Col 1</span>
   <span class="spacer"></span>
-  <span class="shortcut-hint">Ctrl+K Commands &nbsp; Ctrl+Enter Run</span>
+  <span class="shortcut-hint">Shift Shift Search &nbsp; Ctrl+Enter Run</span>
 </footer>
 </div>
 <dialog id="runConfigDialog" class="config-dialog" aria-label="Run configuration">
@@ -709,12 +719,13 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
   <div id="runConfigList" class="se-list" role="listbox" aria-label="Run configurations"></div>
   <footer class="config-footer">Choose language and backend · Enter applies · Esc closes</footer>
 </dialog>
-<dialog id="searchEverywhere" class="config-dialog" aria-label="Search everywhere">
-  <div class="se-search"><i data-lucide="search"></i><input id="seQuery" type="search" placeholder="Commands, buffers, examples… (Shift Shift)" aria-label="Search everywhere" autocomplete="off"></div>
+<dialog id="searchEverywhere" class="config-dialog se-dialog" aria-label="Search everywhere">
+  <div class="se-search"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg><input id="seQuery" type="search" placeholder="Search files, commands, open buffers and examples" aria-label="Search everywhere" aria-controls="seGroups" autocomplete="off" spellcheck="false"></div>
+  <div id="seTabs" class="se-tabs" role="tablist" aria-label="Search scope"></div>
   <div id="seGroups" class="se-list" role="listbox" aria-label="Search everywhere results"></div>
-  <footer class="config-footer">Enter opens · ↑↓ navigate · Shift Shift reopens · Esc closes</footer>
+  <footer id="seFooter" class="config-footer">Enter opens. Tab switches scope. Type &gt; for commands.</footer>
 </dialog>
-<dialog id="commandPalette" aria-label="Search commands"><div class="command-search"><i data-lucide="search"></i><input id="commandQuery" type="search" placeholder="Type a command..." aria-label="Search commands" autocomplete="off"><button id="closePalette" type="button" aria-label="Close commands"><i data-lucide="x"></i></button></div><div id="commandResults" aria-live="polite"></div><div class="command-footer">Arrow keys to navigate &nbsp; Enter to select &nbsp; Esc to close</div></dialog>
+
 <!-- BEGIN EMBEDDED PROJECT MODULE: mirrors web/project.js -->
 <script>
 /* FlowStudio project explorer. Browser File System Access API only. */
@@ -783,6 +794,24 @@ async function readProjectText(file, limit) {
 }
 
 /* Bounded, read-only literal/regex search over browser-granted project files. */
+const SEARCH_SKIP_DIRS = new Set([".git", "node_modules", "__pycache__", ".venv"]);
+/* "Files to include": comma-separated globs. A pattern without a slash
+ * matches the file name or any folder name; one with a slash matches the
+ * path from the folder root, and a folder pattern matches everything in it. */
+function includeFilter(spec) {
+  const patterns = String(spec || "").split(",").map(item => item.trim()).filter(Boolean);
+  if (!patterns.length) return null;
+  const toRegex = glob => new RegExp("^" + glob.replace(/[.+^${}()|[\]\\]/g, "\\$&")
+    .replace(/\*\*\/?/g, "\u0000").replace(/\*/g, "[^/]*").replace(/\?/g, "[^/]")
+    .replace(/\u0000/g, ".*") + "(?:/.*)?$", "i");
+  const tests = patterns.map(pattern => {
+    const clean = pattern.replace(/^\.\//, "").replace(/\/+$/, "");
+    const expression = toRegex(clean);
+    if (clean.includes("/")) return rel => expression.test(rel);
+    return rel => rel.split("/").some(part => expression.test(part));
+  });
+  return rel => tests.some(test => test(rel));
+}
 async function searchProject(root, query, options = {}) {
   if (!root || root.kind !== "directory") throw new Error("Open a project folder first.");
   if (typeof query !== "string" || !query.trim() || query.length > 256)
@@ -801,6 +830,7 @@ async function searchProject(root, query, options = {}) {
   } catch (error) {
     throw new Error("Invalid regular expression: " + error.message);
   }
+  const included = includeFilter(options.include);
   const matches = [];
   let scannedFiles = 0, skippedLarge = 0, skippedUnsafe = 0, truncated = false;
   function checkAbort() {
@@ -828,10 +858,12 @@ async function searchProject(root, query, options = {}) {
       }
       const path = prefix + "/" + name;
       if (handle.kind === "directory") {
+        if (SEARCH_SKIP_DIRS.has(name)) continue;
         await walk(handle, path, depth + 1);
         continue;
       }
       if (handle.kind !== "file" || !editable.test(name)) continue;
+      if (included && !included(path.slice(root.name.length + 1))) continue;
       const file = await handle.getFile();
       checkAbort();
       const maxBytes = options.regex ? 128 * 1024 : MAX_BYTES;
@@ -2099,9 +2131,10 @@ const project = FlowStudioProject.createProjectExplorer({
 });
 function adoptProjectRoot(handle) {
   project.adopt(handle);
-  ++searchRevision;
-  el("searchResults").replaceChildren();
+  clearProjectSearch();
+  collapsedSearchFiles.clear();
   el("undoProjectReplace").disabled = true;
+  if (el("projectSearch").value.trim()) scheduleProjectSearch();
 }
 function workspaceExplorer() { return globalThis.FlowStudioWorkspaceExplorer || null; }
 function explorerCommand(name) {
@@ -2121,76 +2154,184 @@ function explorerCommand(name) {
 }
 
 let searchRevision = 0;
+let searchAbort = null;
+let searchTimer = 0;
+const collapsedSearchFiles = new Set();
+const SEARCH_ICON = d => '<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" ' +
+  'stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>';
+function searchOptions() {
+  return { caseSensitive: el("caseSensitive").checked, regex: el("projectRegex").checked,
+    wholeWord: el("projectWholeWord").checked,
+    include: el("projectInclude") ? el("projectInclude").value : "" };
+}
+function setSearchSummary(text) {
+  const node = el("searchSummary");
+  if (node) node.textContent = text;
+}
+function clearProjectSearch() {
+  ++searchRevision;
+  if (searchAbort) searchAbort.abort();
+  el("searchResults").replaceChildren();
+  setSearchSummary("");
+}
+function scheduleProjectSearch() {
+  clearTimeout(searchTimer);
+  if (!el("projectSearch").value.trim()) { clearProjectSearch(); return; }
+  searchTimer = setTimeout(() => { if (project.hasProject()) runProjectSearch(); }, 220);
+}
+/* One flat list of file rows and match rows keeps arrow navigation simple;
+ * collapsing a file hides its match rows. */
+function searchFileRow(path, count) {
+  const row = document.createElement("button");
+  row.type = "button";
+  row.className = "sr-file";
+  row.dataset.file = path;
+  row.setAttribute("role", "treeitem");
+  row.setAttribute("aria-expanded", collapsedSearchFiles.has(path) ? "false" : "true");
+  row.setAttribute("aria-label", path + ", " + count + (count === 1 ? " match" : " matches"));
+  const slash = path.indexOf("/");
+  const rel = slash >= 0 ? path.slice(slash + 1) : path;
+  const cut = rel.lastIndexOf("/");
+  const name = cut >= 0 ? rel.slice(cut + 1) : rel;
+  const dir = cut >= 0 ? rel.slice(0, cut) : "";
+  const chevron = document.createElement("span");
+  chevron.className = "sr-chevron";
+  chevron.innerHTML = SEARCH_ICON('<path d="M6 4l4 4-4 4"/>');
+  const explorer = globalThis.FlowStudioExplorer;
+  const badgeInfo = explorer && explorer.fileBadge ? explorer.fileBadge(name) : { label: "", tone: "other" };
+  const badge = document.createElement("span");
+  badge.className = "ex-badge tone-" + badgeInfo.tone;
+  badge.textContent = badgeInfo.label;
+  const label = document.createElement("span");
+  label.className = "sr-name";
+  label.textContent = name;
+  const where = document.createElement("span");
+  where.className = "sr-dir";
+  where.textContent = dir;
+  const total = document.createElement("span");
+  total.className = "sr-count";
+  total.textContent = String(count);
+  row.append(chevron, badge, label, where, total);
+  row.addEventListener("click", () => {
+    if (collapsedSearchFiles.has(path)) collapsedSearchFiles.delete(path);
+    else collapsedSearchFiles.add(path);
+    applySearchCollapse();
+  });
+  return row;
+}
+function applySearchCollapse() {
+  for (const node of el("searchResults").children || []) {
+    const file = node.dataset && node.dataset.file;
+    if (!file) continue;
+    const collapsed = collapsedSearchFiles.has(file);
+    if (node.classList && node.classList.contains("sr-file")) node.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    else node.hidden = collapsed;
+  }
+}
+function searchMatchRow(hit, regex) {
+  const row = document.createElement("button");
+  row.type = "button";
+  row.className = "sr-match";
+  row.dataset.file = hit.path;
+  row.setAttribute("role", "treeitem");
+  row.setAttribute("aria-label", hit.path + ":" + hit.line + ":" + hit.column + "  " + hit.preview.trim());
+  row.title = "Open " + hit.path + " at line " + hit.line;
+  /* Keep the match visible in a narrow sidebar: trim long leading context. */
+  const start = hit.column - 1;
+  const end = Math.min(hit.preview.length, start + hit.length);
+  let before = hit.preview.slice(0, start).replace(/^\s+/, "");
+  if (before.length > 28) before = "..." + before.slice(-26);
+  const lineNo = document.createElement("span");
+  lineNo.className = "sr-line";
+  lineNo.textContent = String(hit.line);
+  const text = document.createElement("span");
+  text.className = "sr-text";
+  const pre = document.createElement("span");
+  pre.textContent = before;
+  const mark = document.createElement("mark");
+  mark.textContent = hit.preview.slice(start, end) || hit.text;
+  const post = document.createElement("span");
+  post.textContent = hit.preview.slice(end, end + 120);
+  text.append(pre, mark, post);
+  row.append(lineNo, text);
+  if (collapsedSearchFiles.has(hit.path)) row.hidden = true;
+  row.addEventListener("click", async () => {
+    try {
+      // Re-read the granted disk file before switching tabs: an already
+      // open editor tab may still hold an older, cached buffer.
+      const current = await hit.handle.getFile();
+      const limit = regex ? 128 * 1024 : 1024 * 1024;
+      if (current.size > limit ||
+          (await current.text()).slice(hit.index, hit.index + hit.length) !== hit.text) {
+        status("File changed since search; search again.", "error");
+        return;
+      }
+      const opened = await openEditorHandle(hit.handle, hit.path);
+      if (!opened) return;
+      const selected = src.value.slice(hit.index, hit.index + hit.length);
+      if (selected !== hit.text) {
+        status("File changed since search; search again.", "error");
+        return;
+      }
+      src.focus();
+      src.setSelectionRange(hit.index, hit.index + hit.length);
+      updateCursor();
+    } catch (error) {
+      status(error.message || String(error), "error");
+    }
+  });
+  return row;
+}
 async function runProjectSearch() {
+  clearTimeout(searchTimer);
   const token = ++searchRevision;
+  if (searchAbort) searchAbort.abort();
+  const controller = typeof AbortController === "function" ? new AbortController() : null;
+  searchAbort = controller;
   const resultsNode = el("searchResults");
-  resultsNode.replaceChildren();
   const query = el("projectSearch").value;
   if (!project.hasProject()) {
+    resultsNode.replaceChildren();
+    setSearchSummary("Open a folder to search it.");
     status("Open a project folder before searching.", "error");
     return;
   }
   if (!query.trim()) {
+    resultsNode.replaceChildren();
+    setSearchSummary("");
     status("Enter text to find in the project.", "error");
     return;
   }
-  el("searchProject").disabled = true;
-  el("replaceProject").disabled = true;
-  status("Searching project …");
+  setSearchSummary("Searching...");
   try {
-    const caseSensitive = el("caseSensitive").checked;
-    const regex = el("projectRegex").checked;
-    const wholeWord = el("projectWholeWord").checked;
-    const result = await project.search(query, { caseSensitive, regex, wholeWord });
+    const options = searchOptions();
+    const result = await project.search(query, { caseSensitive: options.caseSensitive,
+      regex: options.regex, wholeWord: options.wholeWord, include: options.include,
+      signal: controller ? controller.signal : undefined });
     if (token !== searchRevision) return;
-    const summary = document.createElement("p");
-    summary.className = "muted hint";
-    summary.textContent = result.matches.length + " matches in " + result.scannedFiles +
-      " files" + (result.skippedLarge ? "; " + result.skippedLarge + " large files skipped" : "") +
-      (result.skippedUnsafe ? "; " + result.skippedUnsafe + " unsafe-encoding files skipped" : "") +
-      (result.truncated ? "; result limit reached" : "");
-    resultsNode.append(summary);
+    const files = new Map();
     for (const hit of result.matches) {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.textContent = hit.path + ":" + hit.line + ":" + hit.column + "  " + hit.preview.trim();
-      button.title = "Open " + hit.path + " at line " + hit.line;
-      button.addEventListener("click", async () => {
-        try {
-          // Re-read the granted disk file before switching tabs: an already
-          // open editor tab may still hold an older, cached buffer.
-          const current = await hit.handle.getFile();
-          const limit = regex ? 128 * 1024 : 1024 * 1024;
-          if (current.size > limit ||
-              (await current.text()).slice(hit.index, hit.index + hit.length) !== hit.text) {
-            status("File changed since search; search again.", "error");
-            return;
-          }
-          const opened = await openEditorHandle(hit.handle, hit.path);
-          if (!opened) return;
-          const selected = src.value.slice(hit.index, hit.index + hit.length);
-          if (selected !== hit.text) {
-            status("File changed since search; search again.", "error");
-            return;
-          }
-          src.focus();
-          src.setSelectionRange(hit.index, hit.index + hit.length);
-          updateCursor();
-        } catch (error) {
-          status(error.message || String(error), "error");
-        }
-      });
-      resultsNode.append(button);
+      if (!files.has(hit.path)) files.set(hit.path, []);
+      files.get(hit.path).push(hit);
     }
-    status("Found " + result.matches.length + " project matches.", "ok");
+    const count = result.matches.length;
+    setSearchSummary(count + (count === 1 ? " result in " : " results in ") + files.size +
+      (files.size === 1 ? " file" : " files") +
+      (result.skippedLarge ? ", " + result.skippedLarge + " large skipped" : "") +
+      (result.skippedUnsafe ? ", " + result.skippedUnsafe + " unreadable skipped" : "") +
+      (result.truncated ? ". Limit reached" : ""));
+    const rows = [];
+    for (const [path, hits] of files) {
+      rows.push(searchFileRow(path, hits.length));
+      for (const hit of hits) rows.push(searchMatchRow(hit, options.regex));
+    }
+    resultsNode.replaceChildren(...rows);
+    status(count ? "Found " + count + " matches in " + files.size + " files." : "No matches in the folder.", "ok");
   } catch (error) {
-    if (token === searchRevision && error.name !== "AbortError")
-      status(error.message || String(error), "error");
-  } finally {
-    if (token === searchRevision) {
-      el("searchProject").disabled = false;
-      el("replaceProject").disabled = false;
-    }
+    if (token !== searchRevision || error.name === "AbortError") return;
+    resultsNode.replaceChildren();
+    setSearchSummary(error.message || String(error));
+    status(error.message || String(error), "error");
   }
 }
 
@@ -2287,6 +2428,54 @@ el("projectSearch").addEventListener("keydown", event => {
   if (event.key === "Enter") {
     event.preventDefault();
     runProjectSearch();
+  } else if (event.key === "ArrowDown") {
+    const first = [...(el("searchResults").children || [])].find(node => !node.hidden);
+    if (first) { event.preventDefault(); first.focus(); }
+  }
+});
+el("projectSearch").addEventListener("input", scheduleProjectSearch);
+for (const id of ["caseSensitive", "projectWholeWord", "projectRegex"])
+  el(id).addEventListener("change", scheduleProjectSearch);
+if (el("projectInclude")) {
+  el("projectInclude").addEventListener("input", scheduleProjectSearch);
+  el("projectInclude").addEventListener("keydown", event => {
+    if (event.key === "Enter") { event.preventDefault(); runProjectSearch(); }
+  });
+}
+if (el("clearProjectSearch")) el("clearProjectSearch").addEventListener("click", () => {
+  el("projectSearch").value = "";
+  clearProjectSearch();
+  el("projectSearch").focus();
+});
+if (el("collapseProjectSearch")) el("collapseProjectSearch").addEventListener("click", () => {
+  for (const node of el("searchResults").children || [])
+    if (node.dataset && node.dataset.file) collapsedSearchFiles.add(node.dataset.file);
+  applySearchCollapse();
+});
+if (el("toggleProjectReplace")) el("toggleProjectReplace").addEventListener("click", () => {
+  const row = el("projectReplaceRow");
+  row.hidden = !row.hidden;
+  el("toggleProjectReplace").setAttribute("aria-expanded", row.hidden ? "false" : "true");
+  if (!row.hidden) el("projectReplace").focus();
+});
+/* Arrow keys walk the visible result rows; Left and Right fold a file. */
+el("searchResults").addEventListener("keydown", event => {
+  const rows = [...(el("searchResults").children || [])].filter(node => !node.hidden);
+  const index = rows.indexOf(document.activeElement);
+  if (index < 0) return;
+  const row = rows[index];
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    event.preventDefault();
+    const next = rows[index + (event.key === "ArrowDown" ? 1 : -1)];
+    if (next) next.focus(); else if (event.key === "ArrowUp") el("projectSearch").focus();
+  } else if ((event.key === "ArrowLeft" || event.key === "ArrowRight") && row.dataset.file) {
+    const file = row.dataset.file;
+    const collapse = event.key === "ArrowLeft";
+    if (collapse === collapsedSearchFiles.has(file)) return;
+    event.preventDefault();
+    if (collapse) collapsedSearchFiles.add(file); else collapsedSearchFiles.delete(file);
+    applySearchCollapse();
+    if (collapse) rows.find(node => node.classList.contains("sr-file") && node.dataset.file === file)?.focus();
   }
 });
 

@@ -112,6 +112,26 @@ test("arrow keys on a splitter resize the pane and persist the layout", () => {
   assert.equal(JSON.parse(app.storage.getItem(shell.LAYOUT_KEY)).sidebar, 180);
 });
 
+test("dragging a splitter grows the pane on the side the pointer moves away from", () => {
+  for (const [panel, axis, variable, start] of [
+    ["sidebar", "x", "--sidebar-width", 260], ["right", "x", "--right-width", 280],
+    ["dock", "y", "--dock-height", 240]]) {
+    const app = build();
+    const splitter = new FakeNode("div", "splitter");
+    splitter.dataset.panel = panel;
+    splitter.dataset.axis = axis;
+    splitter.setAttribute("data-splitter", "");
+    app.shellNode.children = [splitter];
+    shell.mount(app.doc, { storage: app.storage });
+    const at = value => axis === "x" ? { clientX: value } : { clientY: value };
+    splitter.fire("pointerdown", { ...at(500), preventDefault() {} });
+    app.doc.fire("pointermove", at(440));          // pointer moves left or up by 60
+    app.doc.fire("pointerup", {});
+    const grows = panel !== "sidebar";             // trailing panes grow toward the pointer
+    assert.equal(app.shellNode.style.vars[variable], (start + (grows ? 60 : -60)) + "px", panel);
+  }
+});
+
 test("stored layout preferences are restored within documented limits", () => {
   const app = build();
   app.storage.setItem(shell.LAYOUT_KEY, JSON.stringify({ sidebar: 420, right: 9999, dock: "wide" }));

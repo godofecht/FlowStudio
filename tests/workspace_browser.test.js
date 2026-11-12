@@ -79,7 +79,7 @@ function workspace(folder) {
   const ids = [
     "source", "language", "console", "resultStatus", "fileLabel", "dirty",
     "cursor", "run", "runProject", "runMathFlow", "mathFlowPlot", "tab-plots", "runCell", "resetR", "resetPython", "refreshPythonEnvironment", "pythonEnvironment", "open", "save", "clear", "fallbackOpen", "runtimeInfo",
-    "projectSearch", "caseSensitive", "projectRegex", "projectWholeWord", "searchProject", "searchResults", "projectReplace", "replaceProject", "undoProjectReplace",
+    "projectSearch", "caseSensitive", "projectRegex", "projectWholeWord", "searchProject", "searchResults", "projectInclude", "searchSummary", "clearProjectSearch", "collapseProjectSearch", "toggleProjectReplace", "projectReplaceRow", "projectReplace", "replaceProject", "undoProjectReplace",
     "editorFind", "editorReplace", "findNext", "findPrevious",
     "replaceOne", "replaceAll", "editorCaseSensitive", "editorRegex", "editorWholeWord", "editorFindCount",
     "docTabs", "newDocument", "newDocumentTab", "findBar"
@@ -118,7 +118,7 @@ function workspace(folder) {
       fetches.push({ url, options });
       return { ok: true, status: 200, text: async () => "ran" };
     },
-    Blob, URL, setTimeout, console
+    Blob, URL, setTimeout, clearTimeout, console
   });
   assert.equal(scripts.length, 4, "Expected embedded project, editor-find, documents and workspace scripts");
   vm.runInContext(scripts[0], context, { filename: "project-embedded.js" });
@@ -233,9 +233,10 @@ test("project-wide search navigates to exact match with editor selection", async
   app.el("projectSearch").value = "x <- 2";
   await app.el("searchProject").fire("click");
   const results = app.el("searchResults");
-  assert.equal(results.children.length, 2);
-  assert.match(results.children[0].textContent, /1 matches in 1 files/);
-  assert.match(results.children[1].textContent, /analysis\.R:2:1/);
+  assert.equal(results.children.length, 2);             // file row, match row
+  assert.equal(app.el("searchSummary").textContent, "1 result in 1 file");
+  assert.equal(results.children[0].dataset.file, "research/analysis.R");
+  assert.match(results.children[1].getAttribute("aria-label"), /analysis\.R:2:1/);
   await results.children[1].fire("click");
   assert.equal(app.el("source").value, "x <- 1\nx <- 2\n");
   assert.equal(app.el("source").selectionStart, 7);
@@ -256,7 +257,7 @@ test("search navigation opens its own tab and preserves the edited buffer", asyn
   app.el("source").fire("input");
   app.el("projectSearch").value = "needle";
   await app.el("searchProject").fire("click");
-  await app.el("searchResults").children[2].fire("click");
+  await app.el("searchResults").children[3].fire("click");   // b.flow's match row
   assert.equal(app.el("source").value, "needle");
   const tabs = app.el("docTabs").children;
   assert.equal(tabs.length, 3);
@@ -275,6 +276,7 @@ test("search does not send local project contents to execution API", async () =>
   await app.el("searchProject").fire("click");
   assert.equal(app.fetches.length, 0);
   assert.equal(app.el("searchResults").children.length, 2);
+  assert.match(app.el("searchSummary").textContent, /^1 result in 1 file/);
 });
 
 
@@ -497,7 +499,7 @@ test("project regex search selects real matches and rejects stale changed file t
   await app.el("searchProject").fire("click");
   const results = app.el("searchResults");
   assert.equal(results.children.length, 3);
-  assert.match(results.children[0].textContent, /2 matches in 1 files/);
+  assert.equal(app.el("searchSummary").textContent, "2 results in 1 file");
   await results.children[2].fire("click");
   assert.equal(app.el("source").selectionStart, 15);
   assert.equal(app.el("source").selectionEnd, 20);

@@ -12,9 +12,11 @@ lucide/dist/esm/icons/blocks.js:
 lucide/dist/esm/icons/bug.js:
 lucide/dist/esm/icons/chart-no-axes-combined.js:
 lucide/dist/esm/icons/chevron-right.js:
+lucide/dist/esm/icons/circle-check.js:
 lucide/dist/esm/icons/circle.js:
 lucide/dist/esm/icons/command.js:
 lucide/dist/esm/icons/download.js:
+lucide/dist/esm/icons/ellipsis.js:
 lucide/dist/esm/icons/file-code-2.js:
 lucide/dist/esm/icons/file-plus-2.js:
 lucide/dist/esm/icons/files.js:

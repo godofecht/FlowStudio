@@ -64,6 +64,24 @@ async function readProjectText(file, limit) {
 }
 
 /* Bounded, read-only literal/regex search over browser-granted project files. */
+const SEARCH_SKIP_DIRS = new Set([".git", "node_modules", "__pycache__", ".venv"]);
+/* "Files to include": comma-separated globs. A pattern without a slash
+ * matches the file name or any folder name; one with a slash matches the
+ * path from the folder root, and a folder pattern matches everything in it. */
+function includeFilter(spec) {
+  const patterns = String(spec || "").split(",").map(item => item.trim()).filter(Boolean);
+  if (!patterns.length) return null;
+  const toRegex = glob => new RegExp("^" + glob.replace(/[.+^${}()|[\]\\]/g, "\\$&")
+    .replace(/\*\*\/?/g, "\u0000").replace(/\*/g, "[^/]*").replace(/\?/g, "[^/]")
+    .replace(/\u0000/g, ".*") + "(?:/.*)?$", "i");
+  const tests = patterns.map(pattern => {
+    const clean = pattern.replace(/^\.\//, "").replace(/\/+$/, "");
+    const expression = toRegex(clean);
+    if (clean.includes("/")) return rel => expression.test(rel);
+    return rel => rel.split("/").some(part => expression.test(part));
+  });
+  return rel => tests.some(test => test(rel));
+}
 async function searchProject(root, query, options = {}) {
   if (!root || root.kind !== "directory") throw new Error("Open a project folder first.");
   if (typeof query !== "string" || !query.trim() || query.length > 256)
@@ -82,6 +100,7 @@ async function searchProject(root, query, options = {}) {
   } catch (error) {
     throw new Error("Invalid regular expression: " + error.message);
   }
+  const included = includeFilter(options.include);
   const matches = [];
   let scannedFiles = 0, skippedLarge = 0, skippedUnsafe = 0, truncated = false;
   function checkAbort() {
@@ -109,10 +128,12 @@ async function searchProject(root, query, options = {}) {
       }
       const path = prefix + "/" + name;
       if (handle.kind === "directory") {
+        if (SEARCH_SKIP_DIRS.has(name)) continue;
         await walk(handle, path, depth + 1);
         continue;
       }
       if (handle.kind !== "file" || !editable.test(name)) continue;
+      if (included && !included(path.slice(root.name.length + 1))) continue;
       const file = await handle.getFile();
       checkAbort();
       const maxBytes = options.regex ? 128 * 1024 : MAX_BYTES;

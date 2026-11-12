@@ -12,7 +12,7 @@ import 'monaco-editor/languages/definitions/r/register.js';
 import { createIcons, FolderOpen, FilePlus2, RotateCw, Play, Blocks, Files, ListTree,
   ChartNoAxesCombined, Table2, Terminal, SlidersHorizontal, Search, Command,
   ChevronRight, Circle, ArrowUpRight, X, FileCode2, Package, Library, Bug,
-  Octagon, Download, List } from 'lucide';
+  Octagon, Download, List, CircleCheck, Ellipsis } from 'lucide';
 import { mountEditor } from './editor.js';
 import { registerCompletion } from './completion.js';
 import './workbench.css';
@@ -20,7 +20,7 @@ import './workbench.css';
 const icons = { FolderOpen, FilePlus2, RotateCw, Play, Blocks, Files, ListTree,
   ChartNoAxesCombined, Table2, Terminal, SlidersHorizontal, Search, Command,
   ChevronRight, Circle, ArrowUpRight, X, FileCode2, Package, Library, Bug,
-  Octagon, Download, List };
+  Octagon, Download, List, CircleCheck, Ellipsis };
 createIcons({ icons, attrs: { 'aria-hidden': 'true', 'stroke-width': 1.6 } });
 globalThis.MonacoEnvironment = {
   getWorker: () => new Worker('/ui/editor.worker.js', { name: 'flowstudio-editor' })
@@ -65,50 +65,5 @@ globalThis.FlowStudioEditor = mountEditor(monaco, document.getElementById('sourc
 document.getElementById('editorEngine').textContent = 'Monaco';
 registerCompletion(monaco, app);
 
-// Native dialog supplies focus containment, Escape and focus restoration.
-const palette = document.getElementById('commandPalette');
-const query = document.getElementById('commandQuery');
-const results = document.getElementById('commandResults');
-const commands = [
-  ['New buffer', 'newDocument', 'Ctrl+Alt+N'], ['Open file', 'openFile', 'Ctrl+O'],
-  ['Open folder', 'openFolder', ''], ['Save file', 'saveFile', 'Ctrl+S'],
-  ['Find in buffer', 'focusFind', 'Ctrl+F'], ['Go to symbol', 'goToSymbol', 'Ctrl+Shift+O'],
-  ['Run selection or file', 'run', 'Ctrl+Enter'], ['Run current cell', 'runCell', 'Ctrl+Shift+Enter'],
-  ['Show files', 'showFiles', ''], ['Show plots', 'showPlots', ''], ['Show data', 'showData', ''],
-  ['Refresh environment', 'refreshEnvironment', ''], ['Toggle console', 'toggleDock', '']
-];
-function renderCommands() {
-  results.replaceChildren();
-  const matches = commands.filter(([label]) => label.toLowerCase().includes(query.value.toLowerCase()));
-  for (const [label, command, shortcut] of matches) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    const name = document.createElement('span'); name.textContent = label;
-    const hint = document.createElement('kbd'); hint.textContent = shortcut;
-    button.append(name, hint);
-    button.addEventListener('click', () => { palette.close(); app.commands[command](); });
-    results.append(button);
-  }
-  if (!matches.length) results.textContent = 'No matching commands.';
-}
-document.getElementById('commandLauncher').addEventListener('click', () => {
-  query.value = ''; renderCommands(); palette.showModal(); query.focus();
-});
-document.getElementById('closePalette').addEventListener('click', () => palette.close());
-query.addEventListener('input', renderCommands);
-palette.addEventListener('click', event => { if (event.target === palette) palette.close(); });
-palette.addEventListener('keydown', event => {
-  const buttons = [...results.querySelectorAll('button')];
-  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-    event.preventDefault();
-    const index = buttons.indexOf(document.activeElement);
-    buttons[(index + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length]?.focus();
-  } else if (event.key === 'Enter' && event.target === query) {
-    event.preventDefault(); buttons[0]?.click();
-  }
-});
-document.addEventListener('keydown', event => {
-  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
-    event.preventDefault(); document.getElementById('commandLauncher').click();
-  }
-}, true);
+// The top bar command center, Ctrl+K and Ctrl+P open Search Everywhere
+// (web/ide_search_everywhere.js).

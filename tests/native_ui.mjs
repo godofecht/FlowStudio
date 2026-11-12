@@ -53,7 +53,7 @@ try {
   await page.locator('#seQuery').fill('');
   await page.waitForFunction(() =>
     document.querySelectorAll('#seGroups .se-row').length >= 4);
-  assert.match(await page.locator('#seGroups').innerText(), /OPEN BUFFERS/i);
+  assert.match(await page.locator('#seGroups').innerText(), /^OPEN$/m);
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.getElementById('searchEverywhere').open);
   // Double-Shift heartbeat: two Shift presses open it from anywhere.
@@ -65,7 +65,7 @@ try {
 
   // Run-configuration chip mirrors the selects; the dialog filters configs.
   assert.equal(await page.locator('#runChipLang').innerText(), 'Flow');
-  assert.equal(await page.locator('#runChipBackend').innerText(), 'C backend (default)');
+  assert.equal(await page.locator('#runChipBackend').innerText(), 'C');
   await page.locator('#runConfigChip').click();
   await page.waitForFunction(() => document.getElementById('runConfigDialog').open);
   await page.waitForFunction(() =>
@@ -80,7 +80,7 @@ try {
     language.dispatchEvent(new Event('change', { bubbles: true }));
   });
   assert.equal(await page.locator('#runChipLang').innerText(), 'R');
-  assert.equal(await page.locator('#runChipBackend').innerText(), '—');
+  assert.equal(await page.locator('#runChipBackend').innerText(), '');
   await page.evaluate(() => {
     const language = document.getElementById('language');
     language.value = 'flow';
@@ -240,13 +240,14 @@ try {
   assert.equal(await page.locator('#liveDebugFrames button').count(), 0);
 
   await page.locator('#commandLauncher').click();
-  await page.locator('#commandQuery').fill('go to symbol');
+  await page.locator('#seQuery').fill('go to symbol');
   await page.keyboard.press('Enter');
   assert.equal(await page.locator('#tab-outline').getAttribute('aria-selected'), 'true');
   await page.locator('#tab-files').click();
-  await page.locator('#commandLauncher').click();
-  await page.locator('#commandQuery').fill('zzzz-missing');
-  assert.equal(await page.locator('#commandResults').innerText(), 'No matching commands.');
+  await page.keyboard.press('Control+k');
+  assert.equal(await page.locator('#seTabs .se-tab.active').innerText(), 'Commands');
+  await page.locator('#seQuery').fill('zzzz-missing');
+  assert.equal(await page.locator('#seGroups').innerText(), 'Nothing matches "zzzz-missing".');
   await page.keyboard.press('Escape');
   await page.evaluate(() => {
     const language = document.getElementById('language');
@@ -264,7 +265,7 @@ try {
   });
   // The preceding command-palette interaction leaves a modal open in some
   // Chromium builds; close it before testing the real topbar control.
-  await page.evaluate(() => document.getElementById('commandPalette').close());
+  await page.evaluate(() => FlowStudioSearchEverywhere.instance.close());
   await page.locator('#checkFlow').click();
   await page.waitForFunction(() =>
     document.getElementById('resultStatus').textContent === 'Flow compile check passed.');
@@ -340,7 +341,7 @@ try {
   // Examples open as real editor tabs and every buffer keeps its own content;
   // re-opening never collapses tabs onto the untitled Flow stub.
   await page.evaluate(() => localStorage.removeItem('flowstudio.savedProjects.v1'));
-  await page.evaluate(() => document.getElementById('commandPalette').close());
+  await page.evaluate(() => FlowStudioSearchEverywhere.instance.close());
   await page.click('#tab-examples');
   await page.locator('.example-card button.primary').first().click();
   await page.waitForFunction(() => document.querySelectorAll('#docTabs .doc-tab').length >= 3);

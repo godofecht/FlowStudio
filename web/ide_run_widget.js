@@ -76,8 +76,9 @@ function mount(doc, options = {}) {
     const conf = backend && typeof backend.value === "string" ? backend.value : "";
     if (chipLang && typeof chipLang.textContent === "string") chipLang.textContent = languageLabel(lang);
     if (chipBackend && typeof chipBackend.textContent === "string") {
-      chipBackend.textContent = lang === "flow" ? backendLabel(conf) : "—";
+      chipBackend.textContent = lang === "flow" ? (conf === "mlir" ? "MLIR" : "C") : "";
     }
+    if (typeof chip.setAttribute === "function") chip.setAttribute("data-language", lang);
   }
   function configurations() {
     const rows = [];

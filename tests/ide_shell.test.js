@@ -95,18 +95,18 @@ function build() {
 test("the shell applies the default pane layout as CSS variables", () => {
   const app = build();
   const controller = shell.mount(app.doc, { storage: app.storage });
-  assert.equal(app.shellNode.style.vars["--sidebar-width"], "260px");
-  assert.equal(app.shellNode.style.vars["--right-width"], "280px");
-  assert.equal(app.shellNode.style.vars["--dock-height"], "240px");
-  assert.deepEqual(controller.layout(), { sidebar: 260, right: 280, dock: 240 });
+  assert.equal(app.shellNode.style.vars["--sidebar-width"], "300px");
+  assert.equal(app.shellNode.style.vars["--right-width"], "260px");
+  assert.equal(app.shellNode.style.vars["--dock-height"], "220px");
+  assert.deepEqual(controller.layout(), { sidebar: 300, right: 260, dock: 220 });
 });
 
 test("arrow keys on a splitter resize the pane and persist the layout", () => {
   const app = build();
   shell.mount(app.doc, { storage: app.storage });
   app.splitter.fire("keydown", { key: "ArrowRight", preventDefault() {} });
-  assert.equal(app.shellNode.style.vars["--sidebar-width"], "276px");
-  assert.equal(JSON.parse(app.storage.getItem(shell.LAYOUT_KEY)).sidebar, 276);
+  assert.equal(app.shellNode.style.vars["--sidebar-width"], "316px");
+  assert.equal(JSON.parse(app.storage.getItem(shell.LAYOUT_KEY)).sidebar, 316);
   for (let step = 0; step < 40; step++)
     app.splitter.fire("keydown", { key: "ArrowLeft", preventDefault() {} });
   assert.equal(JSON.parse(app.storage.getItem(shell.LAYOUT_KEY)).sidebar, 180);
@@ -114,8 +114,8 @@ test("arrow keys on a splitter resize the pane and persist the layout", () => {
 
 test("dragging a splitter grows the pane on the side the pointer moves away from", () => {
   for (const [panel, axis, variable, start] of [
-    ["sidebar", "x", "--sidebar-width", 260], ["right", "x", "--right-width", 280],
-    ["dock", "y", "--dock-height", 240]]) {
+    ["sidebar", "x", "--sidebar-width", 300], ["right", "x", "--right-width", 260],
+    ["dock", "y", "--dock-height", 220]]) {
     const app = build();
     const splitter = new FakeNode("div", "splitter");
     splitter.dataset.panel = panel;
@@ -136,7 +136,7 @@ test("stored layout preferences are restored within documented limits", () => {
   const app = build();
   app.storage.setItem(shell.LAYOUT_KEY, JSON.stringify({ sidebar: 420, right: 9999, dock: "wide" }));
   const controller = shell.mount(app.doc, { storage: app.storage });
-  assert.deepEqual(controller.layout(), { sidebar: 420, right: 560, dock: 240 });
+  assert.deepEqual(controller.layout(), { sidebar: 420, right: 560, dock: 220 });
 });
 
 test("document tab strips move focus with arrow keys without activating", () => {

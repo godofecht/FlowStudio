@@ -175,8 +175,9 @@ function mount(doc = document, request = fetch) {
         session.state === "running" ? "live" : "");
     stateText.textContent = SESSION_MODULE.STATE_LABELS[session.state] || session.state;
     stateNode.title = stateText.textContent;
-    runtimeLabel.textContent = session.runtime + " · session " + session.ordinal +
-      (session.runtime === "flow" ? "" : " · shared interpreter");
+    runtimeLabel.textContent = "";
+    statusRow.title = session.runtime + " session " + session.ordinal +
+      (session.runtime === "flow" ? "" : ", shared interpreter");
     durationNode.textContent =
       session.running && session.lastCommandTs ?
         "running " + SESSION_MODULE.formatDuration(Date.now() - session.lastCommandTs) :
@@ -535,7 +536,10 @@ function mount(doc = document, request = fetch) {
     if (!menu.hidden && !menu.contains(event.target) && event.target !== menuButton)
       hideMenu();
   });
-  panel.append(menu, tabbar, statusRow, searchbar, transcript);
+  /* Session tabs and status share one header row. */
+  const head = h(doc, "div", "terminal-head");
+  head.append(tabbar, statusRow);
+  panel.append(menu, head, searchbar, transcript);
 
   /* ---------- search ---------- */
   let searchOpen = false;

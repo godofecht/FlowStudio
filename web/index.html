@@ -1789,6 +1789,7 @@ async function refreshPythonEnvironment() {
   table.append(header);
   for (const variable of snapshot.variables) {
     if (!variable || typeof variable.name !== "string" || typeof variable.type !== "string") continue;
+    if (selectedLanguage === "python" && variable.type === "module") continue;   // imports are noise here
     const row = document.createElement("tr");
     // R arrays/matrices expose raw dimensions without invoking user methods.
     // Ignore malformed shapes and retain the ordinary scalar/container size.
@@ -1815,7 +1816,8 @@ async function refreshPythonEnvironment() {
       if (list.childNodes.length) {
         const details = document.createElement("details");
         const summary = document.createElement("summary");
-        summary.textContent = variable.name + " — expand children" +
+        summary.textContent = variable.name;
+        summary.title = "Show the children of " + variable.name +
           (variable.truncated === true ? " (partial)" : "");
         details.append(summary, list);
         row.firstChild.replaceChildren(details);
@@ -2706,6 +2708,7 @@ renderTabs();
   <script src="/workspace_console.js"></script>
 <script src="/packages_panel.js"></script>
 <script src="/examples_mathflow.js"></script>
+<script src="/examples_polyglot.js"></script>
 <script src="/examples_gallery.js"></script>
 <script src="/saved_projects.js"></script>
 <script src="/app/native_flow.js"></script>

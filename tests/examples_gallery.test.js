@@ -2,6 +2,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const path = require("node:path");
+const fs = require("node:fs");
 const root = path.join(__dirname, "..");
 const gallery = require(path.join(root, "web/examples_gallery.js"));
 
@@ -85,7 +86,7 @@ test("gallery mounts example cards with open and demo actions", () => {
   // Click the first file button and the demo button found across cards.
   for (const button of buttons) button.listeners.click?.();
   assert.ok(opened.length >= 1, "open callback fired for file buttons");
-  assert.ok(demos.includes("python-r-handshake"), "one-shot demo wired");
+  assert.deepEqual(demos, [], "no example needs a server demo route");
 });
 
 test("primary open-project action loads every example file at once", () => {
@@ -106,7 +107,6 @@ test("primary open-project action loads every example file at once", () => {
   const flowExample = examples.find(example => example.id === "flow-backend-mlir");
   assert.ok(opened.some(fired => fired[0] === "flow-backend-mlir" && fired[1] === "project"),
     "flow example exposes one-shot project open");
-  assert.ok(demos.includes("python-r-handshake"));
   const chips = doc.created.filter(node => node.className === "example-langs");
   assert.ok(chips.length >= 3, "every card shows language chips");
 });
@@ -149,8 +149,7 @@ test("opened projects appear as saved project files and reopen on demand", () =>
   forget.listeners.click?.();
   assert.deepEqual(forgotten, ["polyglot-pipeline"], "forget removes the saved project");
   assert.equal(cards(savedSection).length, 0, "saved section refreshes after forgetting");
-  assert.match(savedSection.children.find(node => node.className === "muted").textContent,
-    /saved on this device/);
+  assert.equal(savedSection.dataset.empty, "true", "an empty saved section hides itself");
 });
 
 test("upgradeFiles replaces only buffers holding the legacy Reader source", () => {
@@ -228,4 +227,25 @@ test("chips and search filter cards, and Debug opens the debugger callback", () 
   assert.equal(debugButtons.length, 3, "only examples with breakpoints offer Debug");
   debugButtons[0].listeners.click();
   assert.equal(debugged.length, 1);
+});
+
+test("polyglot examples come from examples/polyglot in run order and pass validation", () => {
+  const catalog = require(path.join(root, "web/examples_polyglot.js"));
+  assert.ok(catalog.length >= 5, "five polyglot examples are generated");
+  const merged = gallery.examples([], catalog).filter(example => example.category === "polyglot");
+  assert.deepEqual(merged.slice(0, catalog.length).map(example => example.id), catalog.map(example => example.id));
+  for (const example of catalog) {
+    const dir = path.join(root, "examples/polyglot");
+    const folder = fs.readdirSync(dir).find(name =>
+      JSON.parse(fs.readFileSync(path.join(dir, name, "example.json"), "utf8")).id === example.id);
+    assert.ok(folder, example.id + " has a source folder");
+    for (const file of example.files)
+      assert.equal(file.text, fs.readFileSync(path.join(dir, folder, file.name), "utf8"), "generated text is current");
+  }
+  const languages = new Set(catalog.flatMap(example => example.files.map(file => file.language)));
+  assert.deepEqual([...languages].sort(), ["flow", "python", "r"]);
+  assert.ok(catalog.some(example => example.runProject && example.files.length === 3), "the pipeline runs as a project");
+  globalThis.FlowStudioPolyglotExamples = catalog;
+  try { assert.equal(gallery.validate(), null); }
+  finally { delete globalThis.FlowStudioPolyglotExamples; }
 });

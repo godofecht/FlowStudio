@@ -90,6 +90,11 @@ class Session(object):
         path = os.path.join(self.workdir, self.source_name)
         with open(path, "w") as handle:
             handle.write(source)
+        # `import flowstudio` must resolve; bridge calls report that the
+        # bridge is unavailable while a program runs under the debugger.
+        library = os.path.join(os.path.dirname(os.path.abspath(__file__)), "flowstudio.flow")
+        if os.path.exists(library):
+            shutil.copy(library, os.path.join(self.workdir, "flowstudio.flow"))
         build = subprocess.run(["flow", "debug", path, "--no-launch"], cwd=self.workdir,
                                capture_output=True, text=True, timeout=120)
         text = ANSI.sub("", build.stdout + build.stderr)

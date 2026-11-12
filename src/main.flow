@@ -57,6 +57,8 @@ extern {
     function fs_pty_status() -> i32
     function fs_flow_debug(op: string, body: string) -> string
     function fs_flow_debug_status() -> i32
+    function fs_flow_run_bridged(code: string) -> string
+    function fs_flow_bridged_status() -> i32
     function unlink(path: string) -> i32
     function strcmp(a: string, b: string) -> i32
     function strlen(s: string) -> i64
@@ -74,6 +76,12 @@ struct ExecutionResult {
 # backend selects the compiler backend for Flow runs: "" uses the default
 # C backend, "mlir" passes --backend=mlir to the real flow process.
 function execute(language: string, code: string, check_only: bool, backend: string) -> ExecutionResult {
+    # C backend runs carry the polyglot bridge: the program can import
+    # flowstudio and call the live Python and R sessions while it runs.
+    if eq(language, "flow") and not check_only and eq(backend, "") {
+        let bridged: string = fs_flow_run_bridged(code)
+        return ExecutionResult { status: fs_flow_bridged_status(), output: bridged }
+    }
     let mut command: ptr<ProcCmd> = proc_cmd("flow")
     if eq(language, "mathflow") {
         command = proc_cmd("python3")

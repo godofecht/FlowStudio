@@ -50,7 +50,8 @@ svg.lucide{width:15px;height:15px;flex-shrink:0;vertical-align:middle}
 .doc-tab-new{font-size:19px;padding:0 12px}
 .editor-breadcrumb{height:33px;flex-shrink:0;display:flex;align-items:center;gap:9px;padding:0 18px;border-bottom:1px solid #24272e;font-size:11px;color:#838d99}
 .editor-breadcrumb svg{width:12px;height:12px}
-.editor-breadcrumb .editor-engine{margin-left:auto;color:#69737f;font-size:10px}
+.editor-breadcrumb .editor-engine{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.editor-breadcrumb{min-height:30px}
 #monacoHost{flex:1;min-height:0;width:100%;overflow:hidden}
 #source{background:#191b20;color:#cdd1d8}
 .rightpanel>h2{height:43px;text-transform:none;letter-spacing:0;font-size:12px;font-weight:500;color:#bdc4ce;padding:0 15px;justify-content:flex-start}
@@ -375,10 +376,10 @@ dialog.dg-dialog[open]{display:flex}
 .monaco-editor .dbg-line-current{background:#f0c67424}
 .monaco-editor .dbg-line-error{background:#e5534b26}
 .monaco-editor .dbg-line-frame{background:#9cc6ae1f}
-.dbg-toolbar{position:absolute;top:45px;right:92px;z-index:30;display:flex;align-items:center;gap:1px;padding:3px 4px;background:#24272d;border:1px solid #3a4049;border-radius:7px;box-shadow:0 8px 24px #0008}
+.dbg-toolbar{display:flex;align-items:center;gap:1px;margin-left:auto;padding:0 3px;height:24px;background:#24272d;border:1px solid #3a4049;border-radius:6px}
 .dbg-toolbar[hidden]{display:none}
-.dbg-grip{width:6px;height:16px;margin:0 3px 0 1px;background:radial-gradient(#5f6874 1px,transparent 1.3px) 0 0/3px 4px}
-.dbg-tb{display:grid;place-items:center;width:26px;height:24px;padding:0;border:0;border-radius:5px;background:transparent;color:#8fc8a6}
+.dbg-grip{display:none}
+.dbg-tb{display:grid;place-items:center;width:24px;height:20px;padding:0;border:0;border-radius:5px;background:transparent;color:#8fc8a6}
 .dbg-tb:hover:not(:disabled){background:#33373e!important}
 .dbg-tb:disabled{opacity:.4}
 .dbg-tb[hidden]{display:none}
@@ -412,7 +413,10 @@ dialog.dg-dialog[open]{display:flex}
 .exg-actions .primary:hover:not(:disabled){background:#bddcc8!important}
 .exg-actions .ex-debug{background:#3a2526;border:1px solid #6b3a37;color:#f0b9b3;font-weight:600}
 .exg-actions .ex-debug:hover:not(:disabled){background:#4a2d2e!important}
-.exg-actions .example-file-btn{background:transparent;border:1px solid #32363f;color:#a3abb6;font-family:var(--mono);font-size:11px}
+.exg-actions .example-file-btn{background:transparent;border:0;padding:0 4px;color:#8f98a4;font-family:var(--mono);font-size:11px;text-decoration:underline;text-decoration-color:#3a4049;text-underline-offset:3px}
+.exg-actions .example-file-btn:hover:not(:disabled){color:#e3e7ec;background:transparent!important}
+.examples-body .saved-projects[data-empty="true"]{display:none}
+.examples-body .ex-desc{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .exg-actions .example-forget{background:transparent;border:0;color:#7f8996}
 .examples-body .example-runbook{margin-top:5px;font-size:11.5px;color:#99a2ae}
 .examples-body .example-runbook summary{cursor:pointer;color:#7f8996;list-style:none}
@@ -422,3 +426,21 @@ dialog.dg-dialog[open]{display:flex}
 .examples-body .example-runbook ol{margin:4px 0 0;padding-left:18px;line-height:1.55}
 .ex-empty{margin:16px 14px;font-size:12px}
 .ex-empty[hidden]{display:none}
+
+/* Console header: session tabs and status in one row. */
+.terminal-head{display:flex;align-items:center;flex:none;min-height:30px;background:#16181c;border-bottom:1px solid #262a30}
+.terminal-head .terminal-tabs{flex:none;padding:0 6px;background:transparent;border:0;gap:0}
+.terminal-head .terminal-tab{padding:4px 10px;border:0;border-radius:4px;font:11.5px/1.3 var(--mono)}
+.terminal-head .terminal-tab[aria-selected="true"]{background:#262a31;color:#e8ebef}
+.terminal-head .terminal-status{flex:1;min-width:0;justify-content:flex-end;gap:10px;min-height:0;padding:0 8px;background:transparent;border:0}
+.terminal-head .terminal-runtime-label:empty{display:none}
+.terminal-head .terminal-state-label{overflow:hidden;text-overflow:ellipsis}
+
+/* Environment variables table: fixed columns, one line per row. */
+#pythonEnvironment table{width:100%;table-layout:fixed;border-collapse:collapse;font:11.5px/1.4 var(--mono)}
+#pythonEnvironment caption{caption-side:top;text-align:left;padding:0 0 6px;font:600 10.5px var(--sans,inherit);letter-spacing:.06em;text-transform:uppercase;color:#7f8996}
+#pythonEnvironment th{text-align:left;font-weight:600;color:#8d96a2;padding:4px 6px;border-bottom:1px solid #2a2e35}
+#pythonEnvironment th:nth-child(1){width:38%}#pythonEnvironment th:nth-child(3){width:22%}
+#pythonEnvironment td{padding:3px 6px;border-bottom:1px solid #1f2227;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:top;color:#cdd3da}
+#pythonEnvironment td details summary{cursor:pointer;overflow:hidden;text-overflow:ellipsis}
+#pythonEnvironment td details ul{margin:2px 0 0;padding-left:12px;white-space:normal}

@@ -88,6 +88,13 @@ mountPanel("FlowStudioExamples", global.FlowStudioExamples, Examples => {
       runMath.click();
       return true;
     }
+    if (project.runProject) {
+      // Multi-language pipelines run every file in order (Run project).
+      const runAll = el("runProject");
+      if (!runAll || runAll.disabled) return false;
+      runAll.click();
+      return true;
+    }
     const commands = global.FlowStudioApp && global.FlowStudioApp.commands;
     if (!commands || typeof commands.runDocument !== "function") return false;
     const docIds = openedProjects.get(project.id) || [];

@@ -289,6 +289,45 @@ the first error. Flow still requires the native localhost server. This is
 not an RStudio-compatible kernel debugger or a guarantee of physical-browser
 acceptance.
 
+## Flow, Python and R in one session
+
+Flow programs, the Python session and the R session can call each other
+while they run. Values cross directly between the live sessions, so no data
+files are needed.
+
+| From | Call | Gets back |
+| --- | --- | --- |
+| Python | `import flowstudio as fs`, then `fs.r("lm(...)")`, `fs.R.name`, `fs.R.name = value` | Python values; an R data.frame is a `fs.Frame` (`.rows()`, `.to_pandas()`) |
+| Python | `fs.flow("kernel.flow")` or `fs.flow(source)` | what the Flow program printed |
+| R | `py("...")`, `py$name`, `py$name <- value` | R values; a list of dicts or a Frame is a data.frame |
+| R | `flow("kernel.flow")` | what the Flow program printed |
+| Flow | `import flowstudio { py, r, py_num, r_num, py_int, r_int, fmt, fmt_int }` | the last value as text: one item per line, a data frame as CSV |
+
+Each call evaluates in the same namespace as the editor and console, so
+whatever one language creates, the others can read afterwards. A language
+that is waiting on a call cannot be called back into; that request fails
+with a clear error. A Flow program started by Python can still call back
+into that Python session, because Python serves those calls itself. A Flow
+program started from R runs without the bridge.
+
+How it works: a call is a length-framed request on the caller's protocol
+pipe. The C session transports relay it to the target kernel and pass the
+reply back (`src/polyglot_bridge.c`). Flow programs get the channel on fds 3
+and 4, and `src/flowstudio.flow` sits next to every run so the import
+resolves. Python sends values to R as R source, R sends them back as JSON.
+
+The Examples view's Polyglot category has five worked examples, generated
+from `examples/polyglot/`:
+
+- Python drives R: mtcars from R, grouped in Python, `lm()` in R.
+- R drives Python: Python's `re` parses log lines, and R aggregates and plots them.
+- Flow drives Python and R: a compiled SIR model queried from both sessions.
+- Python runs a Flow kernel: `fs.flow()` with input read back through `py_int()`.
+- Flow, Python and R pipeline: three files run in order with Run project.
+
+Tests: `tests/test_polyglot_bridge.py` covers the conversions offline and
+runs every polyglot example against the live server.
+
 ## Run and Debug
 
 One debugger front end (`web/ide_debugger.js`) drives three real back ends:
@@ -304,7 +343,7 @@ Breakpoints take conditions (a C expression for Flow, a numeric comparison
 such as `i>=3` for Python and R) and follow edits to the file. F5 starts or
 continues, F10 steps over, F11 steps into, Shift+F11 steps out, Ctrl+F10
 runs to the cursor and Shift+F5 stops. While paused, the editor marks the
-line, a toolbar floats over the editor, and the Debug view shows variables,
+line, a debug toolbar appears in the editor's path bar, and the Debug view shows variables,
 watch expressions, the call stack, breakpoints and a debug console.
 Breakpoint changes reach a running session at once.
 
@@ -431,7 +470,7 @@ See [scope, semantics and native acceptance](docs/FLOWJIT.md).
              |
        Flow / R / Python
 
-Current API: GET /, GET /health, POST /api/run/flow, POST /api/run/flow-mlir, POST /api/check/flow, POST /api/run/r, POST /api/reset/r, POST /api/inspect/r, POST /api/run/python, POST /api/trace/python, POST /api/inspect/python, POST /api/demo/python-r and POST /api/reset/python. POST sends UTF-8 source text and requires an X-FlowStudio-Intent: run request header. Persistent Python and R sessions each have a 15-second evaluation timeout and explicit reset; Flow has a 60-second compile-and-run budget to accommodate cold compiler start. All processes have bounded, captured output. No shell command-string evaluation is used.
+Current API: GET /, GET /health, POST /api/run/flow, POST /api/run/flow-mlir, POST /api/check/flow, POST /api/run/r, POST /api/reset/r, POST /api/inspect/r, POST /api/run/python, POST /api/trace/python, POST /api/inspect/python, POST /api/demo/python-r and POST /api/reset/python. Flow runs on the C backend carry the language bridge described above. POST sends UTF-8 source text and requires an X-FlowStudio-Intent: run request header. Persistent Python and R sessions each have a 15-second evaluation timeout and explicit reset; Flow has a 60-second compile-and-run budget to accommodate cold compiler start. All processes have bounded, captured output. No shell command-string evaluation is used.
 
 ## Security and scope
 

@@ -139,7 +139,7 @@ const EXAMPLES = [
     id: "polyglot-pipeline",
     category: "polyglot",
     title: "Python → data file → R analysis",
-    description: "Generate data with the persistent Python session, then analyse the same file with the R session. Two languages, one project folder.",
+    description: "The file-based handoff: Python writes data/samples.csv, R reads it. Useful when a step must leave a file behind.",
     language: "python-entry",
     files: [
       { name: "generate.py", language: "python", text: PY_GENERATE },
@@ -163,62 +163,14 @@ const EXAMPLES = [
       "Set Backend to MLIR and run.",
       "Compiler stderr from the real flow process is shown in the console."
     ]
-  },
-  {
-    id: "python-r-handshake",
-    category: "polyglot",
-    title: "Python → R one-shot handshake",
-    description: "Uses the built-in /api/demo/python-r route: Python sums a vector, R takes the result as sqrt input. Shows the cross-kernel contract without files.",
-    language: "demo",
-    files: [],
-    demoRoute: "/api/demo/python-r",
-    steps: [
-      "Press Run demo; the server runs Python then R in sequence."
-    ]
-  },
-  {
-    id: "py-plot-r",
-    category: "polyglot",
-    title: "Stats in Python, visuals in R",
-    description: "Fits a regression with Python's stdlib (no deps) and plots residuals with base R graphics you can send to the Plots tab.",
-    language: "python-entry",
-    files: [
-      { name: "fit.py", language: "python", text:
-'# Linear regression with the standard library only.\n' +
-'import random\n' +
-'random.seed(3)\n' +
-'xs = [float(i) for i in range(30)]\n' +
-'ys = [2.0 * x + 1.0 + random.gauss(0, 3) for x in xs]\n' +
-'n = len(xs)\n' +
-'mean_x = sum(xs) / n\n' +
-'mean_y = sum(ys) / n\n' +
-'slope = sum((x - mean_x) * (y - mean_y) for x, y in zip(xs, ys)) / sum((x - mean_x) ** 2 for x in xs)\n' +
-'intercept = mean_y - slope * mean_x\n' +
-'residuals = [y - (intercept + slope * x) for x, y in zip(xs, ys)]\n' +
-'print("slope", round(slope, 4), "intercept", round(intercept, 4))\n' +
-'with open("data/fit_residuals.csv", "w", newline="") as handle:\n' +
-'    import csv\n' +
-'    writer = csv.writer(handle)\n' +
-'    writer.writerow(["index", "residual"])\n' +
-'    writer.writerows(enumerate(residuals))\n' },
-      { name: "plot.R", language: "r", text:
-'res <- read.csv("data/fit_residuals.csv")\n' +
-'plot(res$index, res$residual, type = "b", main = "Residuals of a Python fit")\n' +
-'abline(h = 0, col = "red")\n' }
-    ],
-    visual: "Plots residuals with base R. The Plots tab opens with the figure after Run.",
-    steps: [
-      "Run fit.py with Python selected (writes data/fit_residuals.csv).",
-      "Run plot.R with R selected. The Plots tab opens automatically with the figure."
-    ]
   }
 ];
 
 const CATEGORIES = Object.freeze([
-  ["start", "Get started"],
-  ["debug", "Debugging"],
-  ["polyglot", "Multi-language"],
-  ["flow", "Compiler backends"],
+  ["start", "Start"],
+  ["polyglot", "Polyglot"],
+  ["debug", "Debug"],
+  ["flow", "Backends"],
   ["simulation", "Simulations"]
 ]);
 
@@ -234,14 +186,25 @@ function simulations(source) {
       steps: ["Press Run. MathFlow integrates the PDE with NumPy and plots the field in the Plots view."]
     }));
 }
-function examples(source) {
-  return EXAMPLES.slice().concat(simulations(source));
+/* Polyglot examples from examples/polyglot (generated into examples_polyglot.js). */
+function polyglot(source) {
+  const list = Array.isArray(source) ? source :
+    Array.isArray(global.FlowStudioPolyglotExamples) ? global.FlowStudioPolyglotExamples : [];
+  return list.filter(item => item && typeof item.id === "string" && Array.isArray(item.files))
+    .map(item => Object.assign({}, item, { category: "polyglot" }));
+}
+function examples(source, polyglotSource) {
+  const curated = polyglot(polyglotSource);
+  const firstPolyglot = EXAMPLES.findIndex(example => example.category === "polyglot");
+  const head = EXAMPLES.slice(0, firstPolyglot < 0 ? EXAMPLES.length : firstPolyglot);
+  const tail = EXAMPLES.slice(head.length);
+  return head.concat(curated, tail, simulations(source));
 }
 
 function validate() {
   const seen = new Set();
   const categories = new Set(CATEGORIES.map(([key]) => key));
-  for (const example of EXAMPLES) {
+  for (const example of EXAMPLES.concat(polyglot())) {
     if (typeof example.id !== "string" || !example.id || seen.has(example.id)) return "bad id";
     seen.add(example.id);
     if (typeof example.title !== "string" || !example.title) return "bad title";
@@ -349,12 +312,11 @@ function mount(document, options) {
   function renderSaved() {
     const list = savedData ? savedData.list() : [];
     savedSection.replaceChildren();
+    savedSection.dataset.empty = String(!list.length);
+    if (!list.length) return;
     const heading = h("h2", "gallery-heading", "Your projects");
+    heading.title = "Examples you open are saved on this device with your edits.";
     savedSection.append(heading);
-    if (!list.length) {
-      savedSection.append(h("p", "muted", "Examples you open are saved on this device with your edits, so you can reopen them here after a reload."));
-      return;
-    }
     for (const project of list) {
       const card = h("section", "example-card saved-project");
       card.dataset.projectId = project.id;
@@ -470,7 +432,7 @@ function upgradeFiles(files) {
   return upgraded ? next : null;
 }
 
-const api = { examples, validate, mount, upgradeFiles, simulations, CATEGORIES };
+const api = { examples, validate, mount, upgradeFiles, simulations, polyglot, CATEGORIES };
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 global.FlowStudioExamples = api;
 })(globalThis);

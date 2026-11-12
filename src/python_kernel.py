@@ -1,7 +1,7 @@
 """Length-framed, persistent native Python kernel for FlowStudio's loopback server.
 
 Not a sandbox: code executes with the FlowStudio user's local permissions.
-Protocol: stdin E/I/P opcode + 8 ASCII hex bytes + UTF-8 source; fd 3: status (0/1) +
+Protocol: stdin E/I/P/Y opcode + 8 ASCII hex bytes + UTF-8 source; fd 3: status (0/1) +
 8 ASCII hex bytes + UTF-8 captured output. One process per local server.
 """
 from __future__ import annotations
@@ -229,6 +229,10 @@ def serve() -> None:
     debugger = DebugSession()
     protocol = os.fdopen(3, "wb", buffering=0)
     stdin = sys.stdin.buffer
+    # `import flowstudio` in user code reaches R and Flow through this pipe.
+    import flowstudio_bridge
+    flowstudio_bridge.connect(protocol, stdin, namespace)
+    sys.modules["flowstudio"] = flowstudio_bridge
     while True:
         header = read_exact(stdin, 9)
         if header is None:
@@ -237,7 +241,7 @@ def serve() -> None:
             length = int(header[1:], 16)
         except ValueError:
             return
-        if header[:1] not in (b"E", b"I", b"P", b"T", b"B", b"S", b"N", b"F", b"C", b"X", b"Q", b"G", b"L") or length > MAX_SOURCE or (header[:1] in (b"I", b"P", b"S", b"N", b"F", b"C", b"X", b"Q") and length != 0):
+        if header[:1] not in (b"E", b"I", b"P", b"T", b"B", b"S", b"N", b"F", b"C", b"X", b"Q", b"G", b"L", b"Y") or length > MAX_SOURCE or (header[:1] in (b"I", b"P", b"S", b"N", b"F", b"C", b"X", b"Q") and length != 0):
             return
         data = read_exact(stdin, length)
         if data is None:
@@ -266,6 +270,13 @@ def serve() -> None:
             ok, payload = False, b"Python debugger is active; stop or finish it before normal execution."
         elif debugger.busy() and debugger.snapshot()["state"] == "running":
             ok, payload = False, b"Python debugger is executing; inspection is temporarily unavailable."
+        elif header[:1] == b"Y":
+            # Another language calls in: format char, then source.
+            try:
+                request = data.decode("utf-8", "strict")
+                ok, payload = flowstudio_bridge.evaluate(namespace, request[:1], request[1:])
+            except UnicodeDecodeError:
+                ok, payload = False, b"Invalid UTF-8 bridge request."
         elif header[:1] == b"I":
             ok = True
             payload = inspect_namespace(namespace)

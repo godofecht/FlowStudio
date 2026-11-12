@@ -1,0 +1,12 @@
+{
+  "id": "polyglot-flow-drives-both",
+  "order": 3,
+  "title": "Flow drives Python and R",
+  "description": "A compiled Flow program integrates an epidemic, then asks R and Python about the result while it runs.",
+  "files": ["epidemic.flow"],
+  "steps": [
+    "Press Run. Flow computes 160 days of an SIR model.",
+    "r(...) and py(...) evaluate in the live sessions and return text; r_num() parses a number.",
+    "Afterwards `infected` exists in the Python and R consoles."
+  ]
+}

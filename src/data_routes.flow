@@ -141,6 +141,9 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/examples_mathflow.js" {
         return StaticAsset { path: "web/examples_mathflow.js", mime: "text/javascript; charset=utf-8", found: true }
     }
+    if url == "/examples_polyglot.js" {
+        return StaticAsset { path: "web/examples_polyglot.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
     if url == "/ide_debugger.js" {
         return StaticAsset { path: "web/ide_debugger.js", mime: "text/javascript; charset=utf-8", found: true }
     }

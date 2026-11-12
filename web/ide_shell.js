@@ -4,14 +4,14 @@
 (function (root) {
 "use strict";
 
-const LAYOUT_KEY = "flowstudio.layout.v1";
+const LAYOUT_KEY = "flowstudio.layout.v2";
 const LIMITS = Object.freeze({
   sidebar: [180, 560],
   right: [200, 560],
   dock: [90, 620]
 });
 const TRAILING = new Set(["right", "dock"]);
-const DEFAULTS = Object.freeze({ sidebar: 260, right: 280, dock: 240 });
+const DEFAULTS = Object.freeze({ sidebar: 300, right: 260, dock: 220 });
 
 function clamp(panel, value) {
   const range = LIMITS[panel];

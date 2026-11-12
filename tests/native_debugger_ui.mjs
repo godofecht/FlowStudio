@@ -105,7 +105,16 @@ await page.locator('.curated-examples .example-card:not([hidden]) .primary').cli
 await page.waitForFunction(() => document.getElementById('mathFlowPlot').children.length > 0, null, { timeout: 90000 });
 assert.equal(await page.locator('#tab-plots').getAttribute('aria-selected'), 'true', 'the simulation plot is shown');
 
+// ---- Polyglot: a Flow program calls the live Python and R sessions ---------
+await page.locator('#tab-examples').click();
+await page.locator('#examplesSearch').fill('');
+await page.locator('.ex-chip[data-category="polyglot"]').click();
+await page.locator('.example-card[data-example-id="polyglot-flow-drives-both"] .primary').click();
+await page.waitForFunction(() => /R: peak on day 36/.test(document.getElementById('console').textContent),
+  null, { timeout: 120000 });
+assert.match(await page.locator('#console').textContent(), /Python: mean infected share/);
+
 assert.deepEqual(errors, []);
 await browser.close();
 console.log('PASS: ' + (flowChecked ? 'Flow LLDB breakpoints, step into, evaluate, continue, gutter toggle; ' : '') +
-  'Python breakpoint and step out; R run-to-breakpoint, evaluate and step; examples search, categories and MathFlow run');
+  'Python breakpoint and step out; R run-to-breakpoint, evaluate and step; examples search, categories and MathFlow run; Flow calling Python and R from the gallery');

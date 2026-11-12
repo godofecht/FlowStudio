@@ -275,10 +275,10 @@ function mount(doc, options = {}) {
   };
   const grip = h("span", "dbg-grip");
   toolbar.append(grip, ...Object.values(tb));
-  if (host && host.parentElement) {
-    host.parentElement.style.position = host.parentElement.style.position || "relative";
-    host.parentElement.append(toolbar);
-  }
+  /* The toolbar sits in the breadcrumb row so it never covers code or tabs. */
+  const crumbRow = doc.querySelector ? doc.querySelector(".editor-breadcrumb") : null;
+  if (crumbRow) crumbRow.append(toolbar);
+  else if (host && host.parentElement) host.parentElement.append(toolbar);
 
   /* ----- state ----- */
   let session = null;      // {language, adapter, docId, model, snap, selected}

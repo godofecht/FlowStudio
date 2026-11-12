@@ -1,0 +1,138 @@
+# flowstudio: call the live Python and R sessions from a Flow program.
+#
+#   import flowstudio { py, r, py_num, r_num, fmt }
+#
+# FlowStudio runs Flow programs with a bridge on fds 3 (requests) and 4
+# (replies). Each call sends source to the persistent Python or R session,
+# which evaluates it in the same namespace the editor and console use, and
+# returns the value of the last expression as text:
+#   a number or string as itself, a vector or list one item per line,
+#   a data frame as CSV with a header row.
+# A failed call prints the error and stops the program with exit code 3.
+
+extern {
+    function fdopen(fd: i32, mode: string) -> ptr<u8>
+    function fwrite(data: string, size: i64, count: i64, stream: ptr<u8>) -> i64
+    function fread(data: string, size: i64, count: i64, stream: ptr<u8>) -> i64
+    function fflush(stream: ptr<u8>) -> i32
+    function malloc(n: i64) -> string
+    function strlen(s: string) -> i64
+    function snprintf(buf: string, n: i64, fmt: string, ...) -> i32
+    function atof(s: string) -> f64
+    function atoll(s: string) -> i64
+    function getenv(name: string) -> ptr<u8>
+    function exit(code: i32) -> void
+    function fprintf(stream: ptr<u8>, fmt: string, ...) -> i32
+}
+
+# The bridge streams open once; a second fdopen would lose read-ahead bytes.
+let mut bridge_out: ptr<u8> = null
+let mut bridge_in: ptr<u8> = null
+
+export struct BridgeResult {
+    ok: bool,
+    text: string
+}
+
+function hex_value(c: u8) -> i64 {
+    if c >= 48 and c <= 57 {
+        return (c as i64) - 48
+    }
+    if c >= 97 and c <= 102 {
+        return (c as i64) - 87
+    }
+    return -1
+}
+
+# One request and its reply: "Q" + 8 hex digits + target + format + code,
+# answered by "0" or "1" + 8 hex digits + text.
+export function bridge_call(target: string, code: string) -> BridgeResult {
+    if getenv("FLOWSTUDIO_BRIDGE") as i64 == 0 {
+        return BridgeResult { ok: false, text: "The FlowStudio bridge is only available when FlowStudio runs this program." }
+    }
+    if bridge_out as i64 == 0 {
+        bridge_out = fdopen(3, "wb")
+        bridge_in = fdopen(4, "rb")
+    }
+    if bridge_out as i64 == 0 or bridge_in as i64 == 0 {
+        return BridgeResult { ok: false, text: "The FlowStudio bridge is not connected." }
+    }
+    let out: ptr<u8> = bridge_out
+    let input: ptr<u8> = bridge_in
+    let body: string = target + "t" + code
+    let size: i64 = strlen(body)
+    let header: string = malloc(16)
+    snprintf(header, 16, "Q%08llx", size)
+    fwrite(header, 1, 9, out)
+    fwrite(body, 1, size, out)
+    fflush(out)
+    let reply: string = malloc(16)
+    if fread(reply, 1, 9, input) != 9 {
+        return BridgeResult { ok: false, text: "The FlowStudio bridge closed." }
+    }
+    let h: ptr<u8> = reply as ptr<u8>
+    let mut length: i64 = 0
+    let mut i: i32 = 1
+    while i < 9 {
+        let digit: i64 = hex_value(h[i])
+        if digit < 0 {
+            return BridgeResult { ok: false, text: "The FlowStudio bridge sent a malformed reply." }
+        }
+        length = length * 16 + digit
+        i = i + 1
+    }
+    let text: string = malloc(length + 1)
+    if length > 0 and fread(text, 1, length, input) != length {
+        return BridgeResult { ok: false, text: "The FlowStudio bridge closed mid-reply." }
+    }
+    let t: ptr<u8> = text as ptr<u8>
+    t[length] = 0
+    return BridgeResult { ok: h[0] == 48, text: text }
+}
+
+function must(language: string, result: BridgeResult) -> string {
+    if result.ok == false {
+        println(language + " error: " + result.text)
+        exit(3)
+    }
+    return result.text
+}
+
+# Evaluate Python source; returns the last expression's value as text.
+export function py(code: string) -> string {
+    return must("Python", bridge_call("p", code))
+}
+
+# Evaluate R source; returns the last expression's value as text.
+export function r(code: string) -> string {
+    return must("R", bridge_call("r", code))
+}
+
+export function py_num(code: string) -> f64 {
+    return atof(py(code))
+}
+
+export function r_num(code: string) -> f64 {
+    return atof(r(code))
+}
+
+export function py_int(code: string) -> i64 {
+    return atoll(py(code))
+}
+
+export function r_int(code: string) -> i64 {
+    return atoll(r(code))
+}
+
+# A number as text, with 15 significant digits.
+export function fmt(x: f64) -> string {
+    let buf: string = malloc(32)
+    snprintf(buf, 32, "%.15g", x)
+    return buf
+}
+
+export function fmt_int(x: i64) -> string {
+    let buf: string = malloc(24)
+    snprintf(buf, 24, "%lld", x)
+    return buf
+}

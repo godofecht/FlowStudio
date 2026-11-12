@@ -1,5 +1,6 @@
-/* FlowStudio IDE shell: menu bar, resizable panes and document-tab keyboard
- * navigation. Execution and document state stay in the Flow-owned workspace. */
+/* FlowStudio IDE shell: resizable panes and document-tab keyboard navigation.
+ * The menubar itself is engine-driven (web/ide_menubar.js); execution and
+ * document state stay in the Flow-owned workspace. */
 (function (root) {
 "use strict";
 
@@ -40,8 +41,6 @@ function mount(doc = document, options = {}) {
     try { storage = root.localStorage; } catch (_) { storage = null; }
   }
   const layout = readLayout(storage);
-  const menus = Array.from(shell.querySelectorAll(".menu"));
-  let openMenu = null;
 
   function applyLayout() {
     if (!shell.style || typeof shell.style.setProperty !== "function") return;
@@ -54,109 +53,7 @@ function mount(doc = document, options = {}) {
     try { storage.setItem(LAYOUT_KEY, JSON.stringify(layout)); }
     catch (_) { /* Preferences are optional. */ }
   }
-  function popupOf(menu) { return menu.querySelector(".menu-popup"); }
-  function triggerOf(menu) { return menu.querySelector(".menu-trigger"); }
-  function itemsOf(menu) {
-    return Array.from(popupOf(menu).querySelectorAll("[role='menuitem']"));
-  }
-  function closeMenus(focusTrigger = false) {
-    if (!openMenu) return;
-    const menu = openMenu;
-    openMenu = null;
-    const popup = popupOf(menu);
-    const trigger = triggerOf(menu);
-    if (popup) popup.hidden = true;
-    if (trigger) {
-      trigger.setAttribute("aria-expanded", "false");
-      if (focusTrigger) trigger.focus();
-    }
-  }
-  function openMenus(menu, focusFirst) {
-    closeMenus();
-    const popup = popupOf(menu);
-    if (!popup) return;
-    openMenu = menu;
-    popup.hidden = false;
-    const trigger = triggerOf(menu);
-    if (trigger) trigger.setAttribute("aria-expanded", "true");
-    if (focusFirst) {
-      const items = itemsOf(menu);
-      if (items.length) items[0].focus();
-    }
-  }
-  function runCommand(name) {
-    const commands = options.commands ||
-      (root.FlowStudioApp && root.FlowStudioApp.commands) || {};
-    const command = commands[name];
-    if (typeof command !== "function") return false;
-    closeMenus();
-    command();
-    return true;
-  }
-
-  for (const menu of menus) {
-    const trigger = triggerOf(menu);
-    const popup = popupOf(menu);
-    if (!trigger || !popup) continue;
-    trigger.addEventListener("click", event => {
-      event.stopPropagation();
-      if (openMenu === menu) closeMenus(true);
-      else openMenus(menu, false);
-    });
-    trigger.addEventListener("keydown", event => {
-      if (event.key === "ArrowDown" || event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        openMenus(menu, true);
-      } else if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
-        const index = menus.indexOf(menu);
-        const step = event.key === "ArrowRight" ? 1 : -1;
-        const next = menus[(index + step + menus.length) % menus.length];
-        closeMenus();
-        if (next) triggerOf(next).focus();
-      } else if (event.key === "Escape") {
-        closeMenus(true);
-      }
-    });
-    popup.addEventListener("click", event => {
-      const item = event.target && event.target.closest
-        ? event.target.closest("[data-command]") : null;
-      const name = item ? item.dataset.command
-        : (event.target && event.target.dataset && event.target.dataset.command);
-      if (name) runCommand(name);
-      else closeMenus();
-    });
-    popup.addEventListener("keydown", event => {
-      const items = itemsOf(menu);
-      if (!items.length) return;
-      const index = items.indexOf(doc.activeElement);
-      if (event.key === "ArrowDown") {
-        event.preventDefault();
-        items[(index + 1 + items.length) % items.length].focus();
-      } else if (event.key === "ArrowUp") {
-        event.preventDefault();
-        items[(index - 1 + items.length) % items.length].focus();
-      } else if (event.key === "Home") {
-        event.preventDefault();
-        items[0].focus();
-      } else if (event.key === "End") {
-        event.preventDefault();
-        items[items.length - 1].focus();
-      } else if (event.key === "Escape") {
-        event.preventDefault();
-        closeMenus(true);
-      } else if (event.key === "Tab") {
-        closeMenus();
-      }
-    });
-  }
-
-  if (options.closeOnPointerDown !== false) {
-    doc.addEventListener("pointerdown", event => {
-      const target = event.target;
-      if (openMenu && target && typeof target.closest === "function" &&
-          !target.closest(".menu")) closeMenus();
-    });
-  }
+  applyLayout();
 
   for (const splitter of shell.querySelectorAll("[data-splitter]")) {
     const panel = splitter.dataset.panel;
@@ -214,12 +111,8 @@ function mount(doc = document, options = {}) {
     });
   }
 
-  applyLayout();
-
   return Object.freeze({
     layout: () => ({ ...layout }),
-    closeMenus,
-    runCommand,
     setPanel(panel, value) {
       if (!LIMITS[panel]) return false;
       layout[panel] = clamp(panel, value);
@@ -227,10 +120,7 @@ function mount(doc = document, options = {}) {
       saveLayout();
       return true;
     },
-    dispose() {
-      closeMenus();
-      doc.removeEventListener("pointermove", () => {});
-    }
+    dispose() { /* Splitters keep page-lifetime listeners. */ }
   });
 }
 

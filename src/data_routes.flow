@@ -126,6 +126,15 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/ide_shell.js" {
         return StaticAsset { path: "web/ide_shell.js", mime: "text/javascript; charset=utf-8", found: true }
     }
+    if url == "/ide_menubar.js" {
+        return StaticAsset { path: "web/ide_menubar.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/ide_run_widget.js" {
+        return StaticAsset { path: "web/ide_run_widget.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/ide_search_everywhere.js" {
+        return StaticAsset { path: "web/ide_search_everywhere.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
     # Serve the same browser workspace under the native Flow-owned loopback server.
     # Every asset is allowlisted; URL paths are never used as filesystem paths.
     if url == "/app" or url == "/app/" or url == "/app/index.html" {

@@ -32,9 +32,52 @@ test("sidebar panels load in dependency order behind the console stack", () => {
 test("every workspace script tag has an explicit allowlisted route", () => {
   for (const tag of ["/packages_panel.js", "/examples_gallery.js",
     "/debug_panel.js", "/workspace_panels.js", "/ide_completion_core.js",
-    "/terminal_render.js"]) {
+    "/terminal_render.js", "/ide_menubar.js", "/ide_run_widget.js",
+    "/ide_search_everywhere.js"]) {
     assert.ok(routes.includes('if url == "' + tag + '"'), tag + " route allowlisted");
   }
+});
+
+test("JetBrains-style top bar ships complete native markup and wiring", () => {
+  // Menubar: every root menu is a .menu with trigger + popup and ARIA wiring.
+  const menus = ["File", "Edit", "View", "Navigate", "Code", "Refactor",
+    "Run", "Tools", "Help"];
+  for (const name of menus) {
+    assert.ok(html.includes("aria-controls="), "menus use aria-controls");
+    assert.ok(html.includes(">" + name + "</button>"), name + " trigger present");
+  }
+  assert.match(html, /<nav class="menubar" role="menubar"/,
+    "menubar is a role=menubar region");
+  // Keyboard hints are visible in the menus (JetBrains-native affordance).
+  assert.match(html, /<kbd>[^<]+<\/kbd>/, "menus show shortcut hints");
+  // Dynamic checkbox state binds to the real page control.
+  assert.match(html, /data-check-of="autoCheckFlow"/);
+  assert.match(html, /<input id="autoCheckFlow" type="checkbox"/);
+  // Tools menu reaches both polysemantic overlays by element id.
+  assert.match(html, /data-act="searchEverywhere"/);
+  assert.match(html, /data-act="runConfigChip"/);
+  // Recent projects submenu slot for the saved-projects fill.
+  assert.match(html, /data-fill="recent"/);
+  // Run configuration chip + dialog ids the run widget requires.
+  for (const id of ["runConfigChip", "runChipLang", "runChipBackend",
+    "runConfigDialog", "runConfigList", "runConfigQuery"]) {
+    assert.match(html, new RegExp('id="' + id + '"'), id + " present");
+  }
+  // Search-everywhere dialog ids the search engine requires.
+  for (const id of ["searchEverywhere", "seQuery", "seGroups"]) {
+    assert.match(html, new RegExp('id="' + id + '"'), id + " present");
+  }
+  // The engines load after the panels that own their data.
+  const menubarAt = html.indexOf('<script src="/ide_menubar.js"></script>');
+  const runWidgetAt = html.indexOf('<script src="/ide_run_widget.js"></script>');
+  const searchAt = html.indexOf('<script src="/ide_search_everywhere.js"></script>');
+  assert.ok(menubarAt > 0, "ide_menubar.js loads once");
+  assert.ok(runWidgetAt > 0, "ide_run_widget.js loads once");
+  assert.ok(searchAt > 0, "ide_search_everywhere.js loads once");
+  /* The engines only enhance static markup, so they may load before the
+   * panels; the menubar reads the saved-projects store lazily at open. */
+  assert.ok(menubarAt < runWidgetAt && runWidgetAt < searchAt,
+    "top-bar engines load in a stable order");
 });
 
 test("MLIR backend is a real compiler invocation behind an explicit route", () => {

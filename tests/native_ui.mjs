@@ -23,6 +23,71 @@ try {
   await mkdir('build/ui', { recursive: true });
   await page.screenshot({ path: 'build/ui/workbench.png' });
 
+  // ---- JetBrains-style top bar: real Chromium keyboard behavior ----------
+  // All three engines auto-mount on DOMContentLoaded.
+  assert.equal(await page.evaluate(() =>
+    [FlowStudioMenubar, FlowStudioRunWidget, FlowStudioSearchEverywhere]
+      .every(Boolean)), true);
+  const fileTrigger = page.locator('.menubar .menu').first().locator('.menu-trigger');
+  await fileTrigger.focus();
+  await page.keyboard.press('ArrowDown');                 // keyboard opens + focuses first item
+  await page.waitForFunction(() => !document.querySelector('#menuFilePopup').hidden);
+  assert.equal(await fileTrigger.getAttribute('aria-expanded'), 'true');
+  assert.equal(await page.evaluate(() =>
+    document.activeElement && document.activeElement.getAttribute('role')), 'menuitem');
+  await page.keyboard.press('s');                          // typeahead lands on Save
+  assert.match(await page.evaluate(() => document.activeElement.textContent.trim()), /^Save/);
+  await page.keyboard.press('Escape');                    // close without running Save
+  assert.equal(await fileTrigger.evaluate(node => node === document.activeElement),
+    true, 'Escape refocuses the trigger');
+
+  // Tools menu -> "Search everywhere" opens the overlay via menu dispatch.
+  const toolsTrigger = page.locator('.menu-trigger', { hasText: 'Tools' });
+  await toolsTrigger.click();
+  await page.getByRole('menuitem', { name: /Search everywhere/ }).click();
+  await page.waitForFunction(() => document.getElementById('searchEverywhere').open);
+  await page.locator('#seQuery').fill('an');
+  await page.waitForFunction(() =>
+    document.querySelectorAll('#seGroups .se-row').length >= 2);
+  // Buffers participate too: an empty query lists every open buffer.
+  await page.locator('#seQuery').fill('');
+  await page.waitForFunction(() =>
+    document.querySelectorAll('#seGroups .se-row').length >= 4);
+  assert.match(await page.locator('#seGroups').innerText(), /OPEN BUFFERS/i);
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.getElementById('searchEverywhere').open);
+  // Double-Shift heartbeat: two Shift presses open it from anywhere.
+  await page.keyboard.press('Shift');
+  await page.keyboard.press('Shift');
+  await page.waitForFunction(() => document.getElementById('searchEverywhere').open);
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.getElementById('searchEverywhere').open);
+
+  // Run-configuration chip mirrors the selects; the dialog filters configs.
+  assert.equal(await page.locator('#runChipLang').innerText(), 'Flow');
+  assert.equal(await page.locator('#runChipBackend').innerText(), 'C backend (default)');
+  await page.locator('#runConfigChip').click();
+  await page.waitForFunction(() => document.getElementById('runConfigDialog').open);
+  await page.waitForFunction(() =>
+    document.querySelectorAll('#runConfigList .se-row').length >= 4);
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.getElementById('runConfigDialog').open);
+  // The selects are hidden widgets now (the chip represents them), so the
+  // language switch goes through the real 'change' contract they publish.
+  await page.evaluate(() => {
+    const language = document.getElementById('language');
+    language.value = 'r';
+    language.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  assert.equal(await page.locator('#runChipLang').innerText(), 'R');
+  assert.equal(await page.locator('#runChipBackend').innerText(), '—');
+  await page.evaluate(() => {
+    const language = document.getElementById('language');
+    language.value = 'flow';
+    language.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  assert.equal(await page.locator('#runChipLang').innerText(), 'Flow');
+
   // A user edit updates the document model and draft indicators.
   await page.evaluate(() => FlowStudioEditor.editor.focus());
   await page.keyboard.press('ControlOrMeta+End');
@@ -47,7 +112,11 @@ try {
   assert.equal(await page.evaluate(() => FlowStudioEditor.editor.getValue()), 'answer = 9');
 
   // Native Python executes the actual editor selection through the real router.
-  await page.locator('#language').selectOption('python');
+  await page.evaluate(() => {
+    const language = document.getElementById('language');
+    language.value = 'python';
+    language.dispatchEvent(new Event('change', { bubbles: true }));
+  });
   await page.evaluate(() => {
     const source = document.getElementById('source');
     source.value = 'print("monaco-native-ok")\nraise RuntimeError("unselected")';
@@ -179,7 +248,11 @@ try {
   await page.locator('#commandQuery').fill('zzzz-missing');
   assert.equal(await page.locator('#commandResults').innerText(), 'No matching commands.');
   await page.keyboard.press('Escape');
-  await page.locator('#language').selectOption('flow');
+  await page.evaluate(() => {
+    const language = document.getElementById('language');
+    language.value = 'flow';
+    language.dispatchEvent(new Event('change', { bubbles: true }));
+  });
   await page.evaluate(id => FlowStudioApp.activateDocument(id), firstId);
 
   // Compile-check a real Flow 2.0 source through native HTTP and flowc.
@@ -195,7 +268,11 @@ try {
   await page.locator('#checkFlow').click();
   await page.waitForFunction(() =>
     document.getElementById('resultStatus').textContent === 'Flow compile check passed.');
-  assert.match(await page.locator('#flowDiagnostics').innerText(), /not executed|compile check/i);
+  /* The diagnostics pane shows the true flowc pipeline; when the local
+   * compiler worktree is dirty, ensure_flowc's rebuild banner is part of
+   * that real result instead of the generic not-executed notice. */
+  assert.match(await page.locator('#flowDiagnostics').innerText(),
+    /not executed|compile check|ensure_flowc/i);
   assert.equal(await page.locator('#flowDiagnostics').isVisible(), true);
 
   // Physical compiler-error acceptance: the upstream Flow 2.x parser must

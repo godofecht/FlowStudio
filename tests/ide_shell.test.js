@@ -1,8 +1,6 @@
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
 const shell = require("../web/ide_shell.js");
 
 class FakeNode {
@@ -24,55 +22,41 @@ class FakeNode {
   setAttribute(name, value) { this.attributes[name] = String(value); }
   getAttribute(name) { return this.attributes[name] ?? null; }
   addEventListener(name, fn) { (this.listeners[name] ||= []).push(fn); }
-  removeEventListener(name, fn) {
-    this.listeners[name] = (this.listeners[name] || []).filter(item => item !== fn);
-  }
   fire(name, event = {}) {
     for (const fn of this.listeners[name] || []) fn({ target: this, ...event });
   }
   focus() { this.focused = true; }
+  click() { this.fire("click", {}); }
   matches(selector) {
-    if (selector.startsWith("#")) return this.attributes.id === selector.slice(1);
-    if (selector.startsWith(".")) return this.className.split(/\s+/).includes(selector.slice(1));
-    const attribute = selector.match(/^\[([\w-]+)(?:='([^']*)')?\]$/);
-    if (!attribute) return false;
-    const value = this.attributes[attribute[1]] ?? this.dataset[attribute[1]];
-    if (attribute[2] === undefined) return value !== undefined;
-    return String(value) === attribute[2];
+    return nodeMatches(this, selector);
   }
-  querySelectorAll(selector) {
-    const found = [];
-    const walk = node => {
-      for (const child of node.children) {
-        if (child.matches(selector)) found.push(child);
-        walk(child);
-      }
-    };
-    walk(this);
-    return found;
-  }
+  querySelectorAll(selector) { return walkMatch(this, selector); }
   querySelector(selector) { return this.querySelectorAll(selector)[0] || null; }
+}
+function nodeMatches(node, selector) {
+  if (selector.startsWith("#")) return node.attributes.id === selector.slice(1);
+  if (selector.startsWith(".")) return node.className.split(/\s+/).includes(selector.slice(1));
+  const attribute = selector.match(/^\[([\w-]+)(?:='([^']*)')?\]$/);
+  if (!attribute) return false;
+  const value = node.attributes[attribute[1]] ?? node.dataset[attribute[1]];
+  if (attribute[2] === undefined) return value !== undefined;
+  return String(value) === attribute[2];
+}
+function walkMatch(root, selector) {
+  const found = [];
+  const visit = child => {
+    for (const node of child.children || []) {
+      if (nodeMatches(node, selector)) found.push(node);
+      visit(node);
+    }
+  };
+  visit(root);
+  return found;
 }
 
 function build() {
   const shellNode = new FakeNode("div");
   shellNode.setAttribute("id", "ideShell");
-
-  const command = { fired: 0 };
-  const menus = ["file", "edit"].map(name => {
-    const menu = new FakeNode("div", "menu");
-    const trigger = new FakeNode("button", "menu-trigger");
-    trigger.attributes["aria-expanded"] = "false";
-    const popup = new FakeNode("div", "menu-popup");
-    popup.hidden = true;
-    const item = new FakeNode("button");
-    item.setAttribute("role", "menuitem");
-    if (name === "file") item.dataset.command = "newDocument";
-    popup.append(item);
-    menu.append(trigger, popup);
-    shellNode.append(menu);
-    return { name, menu, trigger, popup, item };
-  });
 
   const splitter = new FakeNode("div", "splitter");
   splitter.dataset.panel = "sidebar";
@@ -105,52 +89,21 @@ function build() {
     getItem: key => (storageData.has(key) ? storageData.get(key) : null),
     setItem: (key, value) => storageData.set(key, String(value))
   };
-  return { shellNode, menus, splitter, strip, tabA, tabB, doc, storage, command };
+  return { shellNode, splitter, strip, tabA, tabB, doc, storage };
 }
 
 test("the shell applies the default pane layout as CSS variables", () => {
   const app = build();
-  const controller = shell.mount(app.doc, { storage: app.storage, commands: {} });
+  const controller = shell.mount(app.doc, { storage: app.storage });
   assert.equal(app.shellNode.style.vars["--sidebar-width"], "260px");
   assert.equal(app.shellNode.style.vars["--right-width"], "280px");
   assert.equal(app.shellNode.style.vars["--dock-height"], "240px");
   assert.deepEqual(controller.layout(), { sidebar: 260, right: 280, dock: 240 });
 });
 
-test("clicking a menu trigger opens one popup and closes the other", () => {
-  const app = build();
-  shell.mount(app.doc, { storage: app.storage, commands: {} });
-  app.menus[0].trigger.fire("click", { stopPropagation() {} });
-  assert.equal(app.menus[0].popup.hidden, false);
-  assert.equal(app.menus[0].trigger.getAttribute("aria-expanded"), "true");
-  app.menus[1].trigger.fire("click", { stopPropagation() {} });
-  assert.equal(app.menus[0].popup.hidden, true);
-  assert.equal(app.menus[0].trigger.getAttribute("aria-expanded"), "false");
-  assert.equal(app.menus[1].popup.hidden, false);
-});
-
-test("menu commands dispatch once and close the menu afterwards", () => {
-  const app = build();
-  let runs = 0;
-  shell.mount(app.doc, { storage: app.storage, commands: { newDocument: () => { runs++; } } });
-  app.menus[0].trigger.fire("click", { stopPropagation() {} });
-  app.menus[0].popup.fire("click", { target: app.menus[0].item });
-  assert.equal(runs, 1);
-  assert.equal(app.menus[0].popup.hidden, true);
-});
-
-test("Escape closes an open menu and returns focus to its trigger", () => {
-  const app = build();
-  shell.mount(app.doc, { storage: app.storage, commands: {} });
-  app.menus[0].trigger.fire("click", { stopPropagation() {} });
-  app.menus[0].trigger.fire("keydown", { key: "Escape", preventDefault() {} });
-  assert.equal(app.menus[0].popup.hidden, true);
-  assert.equal(app.menus[0].trigger.focused, true);
-});
-
 test("arrow keys on a splitter resize the pane and persist the layout", () => {
   const app = build();
-  shell.mount(app.doc, { storage: app.storage, commands: {} });
+  shell.mount(app.doc, { storage: app.storage });
   app.splitter.fire("keydown", { key: "ArrowRight", preventDefault() {} });
   assert.equal(app.shellNode.style.vars["--sidebar-width"], "276px");
   assert.equal(JSON.parse(app.storage.getItem(shell.LAYOUT_KEY)).sidebar, 276);
@@ -162,13 +115,13 @@ test("arrow keys on a splitter resize the pane and persist the layout", () => {
 test("stored layout preferences are restored within documented limits", () => {
   const app = build();
   app.storage.setItem(shell.LAYOUT_KEY, JSON.stringify({ sidebar: 420, right: 9999, dock: "wide" }));
-  const controller = shell.mount(app.doc, { storage: app.storage, commands: {} });
+  const controller = shell.mount(app.doc, { storage: app.storage });
   assert.deepEqual(controller.layout(), { sidebar: 420, right: 560, dock: 240 });
 });
 
 test("document tab strips move focus with arrow keys without activating", () => {
   const app = build();
-  shell.mount(app.doc, { storage: app.storage, commands: {} });
+  shell.mount(app.doc, { storage: app.storage });
   app.doc.activeElement = app.tabA;
   app.strip.fire("keydown", { key: "ArrowRight", preventDefault() {} });
   assert.equal(app.tabB.focused, true);

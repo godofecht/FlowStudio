@@ -39,6 +39,42 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
 .command-launcher span{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .command-launcher kbd{margin-left:auto;color:#8fa2c0;font:11px/1 var(--mono);background:#ffffff0d;border:1px solid #33415a;border-radius:4px;padding:2px 5px}
 .command-launcher:hover{border-color:#4a5f85}
+.hidden-widget{display:none!important}
+.menu{position:relative}
+.menu-item{position:relative}
+.menu-trigger.open{background:#ffffff1c;border-color:transparent}
+.menu-item-sub[data-sub]{display:flex;align-items:center;justify-content:space-between}
+.menu-sub{position:absolute;top:-5px;left:calc(100% - 4px);z-index:60;min-width:230px;padding:5px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;box-shadow:0 18px 34px #0009}
+.menu-popup button[aria-disabled="true"]{opacity:.42;cursor:default}
+.menu-popup button[aria-disabled="true"]:hover,.menu-popup button[aria-disabled="true"]:focus-visible{background:transparent}
+.menu-popup .menu-check{width:16px;flex:none;text-align:center;color:var(--accent);font-size:11px}
+.menu-popup .menu-check[data-checked]{visibility:visible}
+.menu-popup .menu-check:not([data-checked]){visibility:hidden}
+.menu-empty{padding:8px 10px;color:var(--muted);font-size:11.5px}
+.menu-footer{display:flex;gap:16px;justify-content:flex-end;padding:6px 9px 2px;margin-top:4px;border-top:1px solid var(--line);color:var(--muted);font-size:10.5px}
+.menu-footer kbd{color:#8fa2c0;background:#ffffff0d;border:1px solid #33415a;border-radius:3px;padding:0 4px;font:10px var(--mono)}
+.run-cluster{display:flex;gap:6px;align-items:center;flex-wrap:wrap;row-gap:3px}
+.run-widget{display:flex;align-items:stretch;overflow:hidden;border:1px solid #33415a;border-radius:6px;background:#0f141d}
+.run-chip{display:flex;align-items:center;gap:8px;background:transparent;border:0;border-radius:6px 0 0 6px;padding:4px 6px 4px 9px;font-size:12.5px;color:#dfe4ee}
+.run-chip:hover{background:#ffffff08}
+.run-chip-main{font-weight:600;white-space:nowrap}
+.run-chip-sub{color:var(--muted);font-size:10.5px;padding:2px 6px;border:1px solid #33415a;border-radius:4px;background:#ffffff08;white-space:nowrap}
+.run-chip-caret{color:var(--muted);font-size:10px;flex:none}
+.run-main{border:0;border-left:1px solid #33415a;border-radius:0 6px 6px 0}
+.config-dialog{border:1px solid #2c3648;border-radius:12px;background:#0e131c;color:var(--fg,#e6ebf5);padding:10px 12px;min-width:min(620px,92vw);box-shadow:0 30px 60px #000a}
+.config-dialog::backdrop{background:#0007}
+.se-search{display:flex;gap:9px;align-items:center;border-bottom:1px solid var(--line);padding:2px 4px 10px}
+.se-search i{color:var(--muted)}
+.se-search input{flex:1;background:transparent;border:0;color:inherit;font-size:13px;outline:none}
+.se-list{max-height:52vh;overflow:auto;padding:4px 0;min-height:80px}
+.se-row{display:flex;width:100%;gap:10px;align-items:baseline;padding:6px 8px;border:0;border-radius:6px;background:transparent;text-align:left;font-size:12.5px;color:inherit}
+.se-row .se-kind{flex:none;min-width:64px;color:var(--muted);font-size:10px;letter-spacing:.06em;text-transform:uppercase}
+.se-row .se-label{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.se-row .se-meta{flex:none;color:var(--muted);font-size:10.5px}
+.se-row:focus-visible,.se-row.selected{background:var(--accent-dim);outline:0}
+.se-group-title{padding:8px 8px 3px;font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.se-empty{padding:14px 8px;color:var(--muted);font-size:12px}
+.config-footer{display:flex;justify-content:flex-end;gap:16px;color:var(--muted);font-size:10.5px;border-top:1px solid var(--line);padding-top:8px;margin-top:4px}
 .workspace{display:grid;grid-template-columns:var(--sidebar-width) var(--sash) minmax(0,1fr) var(--sash) var(--right-width);min-height:0}
 .splitter{position:relative;background:var(--bg);cursor:col-resize}
 .splitter::after{content:"";position:absolute;inset:0 2px;background:var(--line)}
@@ -282,13 +318,17 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
 <div class="shell" id="ideShell">
 <header class="topbar">
   <div class="brand" aria-label="FlowStudio"><span class="brand-mark"><i data-lucide="blocks"></i></span><b>FlowStudio</b></div>
-  <nav class="menubar" aria-label="Main menu">
-    <div class="menu">
-      <button class="menu-trigger" id="menuFile" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="menuFilePopup">File</button>
-      <div class="menu-popup" id="menuFilePopup" role="menu" aria-labelledby="menuFile" hidden>
+  <nav class="menubar" role="menubar" aria-label="Main menu">
+    <div class="menu" id="menuFile">
+      <button class="menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="menuFilePopup">File</button>
+      <div class="menu-popup" id="menuFilePopup" role="menu" aria-label="File" hidden>
         <button type="button" role="menuitem" id="newDocument">New buffer<kbd>Ctrl+Alt+N</kbd></button>
         <button type="button" role="menuitem" id="open">Open file…<kbd>Ctrl+O</kbd></button>
         <button type="button" role="menuitem" data-command="openFolder">Open folder…</button>
+        <div class="menu-item">
+          <button type="button" role="menuitem" class="menu-item-sub" data-sub aria-haspopup="menu" aria-expanded="false">Open recent<kbd>▸</kbd></button>
+          <div class="menu-popup menu-sub" role="menu" data-fill="recent" hidden></div>
+        </div>
         <hr>
         <button type="button" role="menuitem" id="save">Save<kbd>Ctrl+S</kbd></button>
         <button type="button" role="menuitem" data-command="saveFileAs">Save as…</button>
@@ -296,63 +336,113 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
         <button type="button" role="menuitem" data-command="closeDocument">Close tab<kbd>Ctrl+W</kbd></button>
       </div>
     </div>
-    <div class="menu">
-      <button class="menu-trigger" id="menuEdit" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="menuEditPopup">Edit</button>
-      <div class="menu-popup" id="menuEditPopup" role="menu" aria-labelledby="menuEdit" hidden>
+    <div class="menu" id="menuEdit">
+      <button class="menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="menuEditPopup">Edit</button>
+      <div class="menu-popup" id="menuEditPopup" role="menu" aria-label="Edit" hidden>
         <button type="button" role="menuitem" data-command="focusFind">Find in buffer<kbd>Ctrl+F</kbd></button>
         <button type="button" role="menuitem" data-command="focusReplace">Replace<kbd>Ctrl+H</kbd></button>
         <button type="button" role="menuitem" data-command="findInProject">Find in project</button>
+      </div>
+    </div>
+    <div class="menu" id="menuView">
+      <button class="menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="menuViewPopup">View</button>
+      <div class="menu-popup" id="menuViewPopup" role="menu" aria-label="View" hidden>
+        <div class="menu-item">
+          <button type="button" role="menuitem" class="menu-item-sub" data-sub aria-haspopup="menu" aria-expanded="false">Tool Windows<kbd>▸</kbd></button>
+          <div class="menu-popup menu-sub" role="menu" aria-label="Tool Windows" hidden>
+            <button type="button" role="menuitem" data-command="showFiles">Project files</button>
+            <button type="button" role="menuitem" data-command="showOutline">Outline</button>
+            <button type="button" role="menuitem" data-command="showPlots">Plots</button>
+            <button type="button" role="menuitem" data-command="showData">Data viewer</button>
+            <button type="button" role="menuitem" data-tab="tab-packages">Packages</button>
+            <button type="button" role="menuitem" data-tab="tab-examples">Examples</button>
+            <button type="button" role="menuitem" data-tab="tab-debug">Debug</button>
+          </div>
+        </div>
         <hr>
+        <button type="button" role="menuitem" data-command="toggleDock">Toggle console dock</button>
+        <button type="button" role="menuitem" data-command="refreshEnvironment">Refresh environment</button>
+      </div>
+    </div>
+    <div class="menu" id="menuNavigate">
+      <button class="menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="menuNavigatePopup">Navigate</button>
+      <div class="menu-popup" id="menuNavigatePopup" role="menu" aria-label="Navigate" hidden>
         <button type="button" role="menuitem" data-command="goToSymbol">Go to symbol…<kbd>Ctrl+Shift+O</kbd></button>
         <button type="button" role="menuitem" data-command="goToDefinition">Go to definition<kbd>F12</kbd></button>
         <button type="button" role="menuitem" data-command="findReferences">Find references<kbd>Shift+F12</kbd></button>
-        <button type="button" role="menuitem" data-command="renameSymbol">Rename identifier…<kbd>F2</kbd></button>
+        <hr>
+        <button type="button" role="menuitem" data-command="findInProject">Find in project</button>
       </div>
     </div>
-    <div class="menu">
-      <button class="menu-trigger" id="menuRun" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="menuRunPopup">Run</button>
-      <div class="menu-popup" id="menuRunPopup" role="menu" aria-labelledby="menuRun" hidden>
+    <div class="menu" id="menuCode">
+      <button class="menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="menuCodePopup">Code</button>
+      <div class="menu-popup" id="menuCodePopup" role="menu" aria-label="Code" hidden>
+        <button type="button" role="menuitem" data-command="checkFlow">Check Flow syntax<kbd>N/A</kbd></button>
+        <button type="button" role="menuitemcheckbox" data-check-of="autoCheckFlow" aria-checked="false"><span class="menu-check" aria-hidden="true">✓</span>Check on idle</button>
+      </div>
+    </div>
+    <div class="menu" id="menuRefactor">
+      <button class="menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="menuRefactorPopup">Refactor</button>
+      <div class="menu-popup" id="menuRefactorPopup" role="menu" aria-label="Refactor" hidden>
+        <button type="button" role="menuitem" data-command="renameSymbol">Rename symbol…<kbd>F2</kbd></button>
+      </div>
+    </div>
+    <div class="menu" id="menuRun">
+      <button class="menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="menuRunPopup">Run</button>
+      <div class="menu-popup" id="menuRunPopup" role="menu" aria-label="Run" hidden>
         <button type="button" role="menuitem" data-command="run">Run selection or file<kbd>Ctrl+Enter</kbd></button>
-        <button type="button" role="menuitem" data-command="runCell">Run cell<kbd>Ctrl+Shift+Enter</kbd></button>
-        <button type="button" role="menuitem" data-command="checkFlow">Check Flow syntax (no execution)</button>
+        <button type="button" role="menuitem" data-command="runCell">Run current cell<kbd>Ctrl+Shift+Enter</kbd></button>
+        <button type="button" role="menuitem" data-command="runProject">Run project</button>
         <hr>
-        <button type="button" role="menuitem" data-command="resetR">Reset R session</button>
-        <button type="button" role="menuitem" data-command="resetPython">Reset Python session</button>
+        <button type="button" role="menuitem" data-command="runMathFlow">Run MathFlow</button>
+        <button type="button" role="menuitem" data-command="checkFlow">Check Flow syntax</button>
+        <hr>
+        <button type="button" role="menuitem" data-class="menu-dynamic">Reset R session</button>
+        <button type="button" role="menuitem" data-class="menu-dynamic">Reset Python session</button>
       </div>
     </div>
-    <div class="menu">
-      <button class="menu-trigger" id="menuView" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="menuViewPopup">View</button>
-      <div class="menu-popup" id="menuViewPopup" role="menu" aria-labelledby="menuView" hidden>
-        <button type="button" role="menuitem" data-command="showFiles">Project files</button>
-        <button type="button" role="menuitem" data-command="showPlots">Plots</button>
-        <button type="button" role="menuitem" data-command="showData">Data viewer</button>
-        <button type="button" role="menuitem" data-command="showOutline">Outline</button>
+    <div class="menu" id="menuTools">
+      <button class="menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="menuToolsPopup">Tools</button>
+      <div class="menu-popup" id="menuToolsPopup" role="menu" aria-label="Tools" hidden>
+        <button type="button" role="menuitem" data-act="commandLauncher">Search commands…<kbd>Ctrl+K</kbd></button>
+        <button type="button" role="menuitem" data-act="searchEverywhere">Search everywhere<kbd>Shift Shift</kbd></button>
+        <button type="button" role="menuitem" data-act="runConfigChip">Run configuration…</button>
         <hr>
-        <button type="button" role="menuitem" data-command="toggleDock">Toggle console dock</button>
+        <button type="button" role="menuitem" data-command="shortcuts">Show keyboard shortcuts</button>
+        <button type="button" role="menuitem" data-command="about">About FlowStudio</button>
       </div>
     </div>
-    <div class="menu">
-      <button class="menu-trigger" id="menuHelp" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="menuHelpPopup">Help</button>
-      <div class="menu-popup" id="menuHelpPopup" role="menu" aria-labelledby="menuHelp" hidden>
-        <button type="button" role="menuitem" data-command="shortcuts">Keyboard shortcuts</button>
+    <div class="menu" id="menuHelp">
+      <button class="menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="menuHelpPopup">Help</button>
+      <div class="menu-popup" id="menuHelpPopup" role="menu" aria-label="Help" hidden>
+        <button type="button" role="menuitem" data-command="shortcuts">Show keyboard shortcuts</button>
         <button type="button" role="menuitem" data-command="about">About FlowStudio</button>
       </div>
     </div>
   </nav>
   <div class="topbar-actions" aria-label="Editor actions">
     <button id="commandLauncher" class="command-launcher" type="button" aria-haspopup="dialog" aria-controls="commandPalette" title="Search commands (Ctrl+K)"><i data-lucide="search"></i><span>Search commands...</span><kbd>Ctrl K</kbd></button>
-    <label for="language">Runtime</label>
-    <select id="language" aria-label="Execution language"><option value="flow">Flow</option><option value="r">R</option><option value="python">Python</option></select>
-    <label for="flowBackend">Backend</label>
-    <select id="flowBackend" aria-label="Flow compiler backend" title="Compiler backend for Flow runs"><option value="" selected>C (default)</option><option value="mlir">MLIR (experimental)</option></select>
-    <button id="run" class="primary" title="Run selection or entire buffer (Ctrl/⌘+Enter)"><i data-lucide="play"></i>Run</button>
-    <button id="runProject" title="Run every file of the active example project in its declared order, stopping at the first failure">Run Project</button>
-    <button id="checkFlow" type="button" title="Compile-check the current Flow buffer without running it">Check Flow</button>
-    <label class="flow-auto-check" title="Opt in to strict, nonexecuting Flow compiler checks after 1.1 seconds of inactivity; checks can take up to 60 seconds"><input id="autoCheckFlow" type="checkbox">Check on idle</label>
-    <button id="runMathFlow" title="Run the supported Unicode mathematical Flow PDE dialect (NumPy required)">Run MathFlow</button>
-    <button id="runCell" title="Run current # %% cell (Ctrl/⌘+Shift+Enter)">Run cell</button>
-    <button id="resetR" type="button" title="Discard native R variables and restart its interpreter">Reset R</button>
-    <button id="resetPython" type="button" title="Discard native Python variables and restart its interpreter">Reset Python</button>
+    <div class="run-cluster" role="group" aria-label="Run configuration">
+      <div class="run-widget">
+        <button id="runConfigChip" type="button" class="run-chip" aria-haspopup="dialog" aria-controls="runConfigDialog" title="Run configuration — language and compiler backend for runs">
+          <span class="run-chip-main" id="runChipLang">Flow</span>
+          <span class="run-chip-sub" id="runChipBackend">C backend</span>
+          <span class="run-chip-caret" aria-hidden="true">▾</span>
+        </button>
+        <button id="run" class="primary run-main" title="Run selection or entire buffer (Ctrl/⌘+Enter)"><i data-lucide="play"></i>Run</button>
+      </div>
+      <label for="language" class="hidden-widget">Runtime</label>
+      <select id="language" class="hidden-widget" aria-label="Execution language"><option value="flow">Flow</option><option value="r">R</option><option value="python">Python</option></select>
+      <label for="flowBackend" class="hidden-widget">Backend</label>
+      <select id="flowBackend" class="hidden-widget" aria-label="Flow compiler backend" title="Compiler backend for Flow runs"><option value="" selected>C (default)</option><option value="mlir">MLIR (experimental)</option></select>
+      <button id="runProject" title="Run every file of the active example project in its declared order, stopping at the first failure">Run Project</button>
+      <button id="checkFlow" type="button" title="Compile-check the current Flow buffer without running it">Check Flow</button>
+      <label class="flow-auto-check" title="Opt in to strict, nonexecuting Flow compiler checks after 1.1 seconds of inactivity; checks can take up to 60 seconds"><input id="autoCheckFlow" type="checkbox">Check on idle</label>
+      <button id="runMathFlow" title="Run the supported Unicode mathematical Flow PDE dialect (NumPy required)">Run MathFlow</button>
+      <button id="runCell" title="Run current # %% cell (Ctrl/⌘+Shift+Enter)">Run cell</button>
+      <button id="resetR" type="button" title="Discard native R variables and restart its interpreter">Reset R</button>
+      <button id="resetPython" type="button" title="Discard native Python variables and restart its interpreter">Reset Python</button>
+    </div>
     <input id="fallbackOpen" type="file" accept=".flow,.R,.r,.py,.txt" hidden>
   </div>
 </header>
@@ -515,6 +605,16 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
   <span class="shortcut-hint">Ctrl+K Commands &nbsp; Ctrl+Enter Run</span>
 </footer>
 </div>
+<dialog id="runConfigDialog" class="config-dialog" aria-label="Run configuration">
+  <div class="se-search"><i data-lucide="search"></i><input id="runConfigQuery" type="search" placeholder="Language, backend or configuration…" aria-label="Search run configurations" autocomplete="off"></div>
+  <div id="runConfigList" class="se-list" role="listbox" aria-label="Run configurations"></div>
+  <footer class="config-footer">Choose language and backend · Enter applies · Esc closes</footer>
+</dialog>
+<dialog id="searchEverywhere" class="config-dialog" aria-label="Search everywhere">
+  <div class="se-search"><i data-lucide="search"></i><input id="seQuery" type="search" placeholder="Commands, buffers, examples… (Shift Shift)" aria-label="Search everywhere" autocomplete="off"></div>
+  <div id="seGroups" class="se-list" role="listbox" aria-label="Search everywhere results"></div>
+  <footer class="config-footer">Enter opens · ↑↓ navigate · Shift Shift reopens · Esc closes</footer>
+</dialog>
 <dialog id="commandPalette" aria-label="Search commands"><div class="command-search"><i data-lucide="search"></i><input id="commandQuery" type="search" placeholder="Type a command..." aria-label="Search commands" autocomplete="off"><button id="closePalette" type="button" aria-label="Close commands"><i data-lucide="x"></i></button></div><div id="commandResults" aria-live="polite"></div><div class="command-footer">Arrow keys to navigate &nbsp; Enter to select &nbsp; Esc to close</div></dialog>
 <!-- BEGIN EMBEDDED PROJECT MODULE: mirrors web/project.js -->
 <script>
@@ -2361,6 +2461,9 @@ renderTabs();
 <script src="/app/native_flow.js"></script>
 <script src="/app/python_debug_panel.js"></script>
 <script src="/ide_shell.js"></script>
+<script src="/ide_menubar.js"></script>
+<script src="/ide_run_widget.js"></script>
+<script src="/ide_search_everywhere.js"></script>
 <script src="/ide_symbols.js"></script>
 <script src="/ide_outline.js"></script>
 <script>

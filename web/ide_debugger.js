@@ -256,6 +256,22 @@ function mount(doc, options = {}) {
   consoleIn.placeholder = "Evaluate an expression while paused";
   consoleSection.body.append(consoleOut, consoleIn);
   view.append(launch, statusLine, variables.wrap, watch.wrap, stack.wrap, bps.wrap, consoleSection.wrap);
+  /* The Debug Console lives in the bottom dock when the dock has room for it,
+   * as in VS Code; the sidebar keeps variables, watch, stack and breakpoints. */
+  function attachConsole() {
+    const dockHost = options.consoleHost || (root.FlowStudioTerminal && root.FlowStudioTerminal.debugRoot);
+    if (!dockHost || consoleOut.parentElement === dockHost) return Boolean(dockHost);
+    dockHost.append(consoleOut, consoleIn);
+    consoleSection.wrap.remove();
+    return true;
+  }
+  attachConsole();
+  function showConsole() {
+    if (attachConsole() && root.FlowStudioTerminal && typeof root.FlowStudioTerminal.show === "function")
+      root.FlowStudioTerminal.show("debug");
+  }
+  const debugButton = doc.getElementById("runDebug");
+  if (debugButton) debugButton.addEventListener("click", () => void start());
 
   /* ----- floating toolbar over the editor ----- */
   const host = doc.getElementById("monacoHost");
@@ -316,6 +332,9 @@ function mount(doc, options = {}) {
     busy = true;
     session = { language, adapter, docId: docNow.id, model, snap: snapshot("running"), selected: 0, output: "" };
     consoleOut.textContent = "";
+    const debugTab = doc.getElementById("tab-debug");
+    if (debugTab && debugTab.getAttribute("aria-selected") !== "true") debugTab.click();
+    showConsole();
     render();
     log("Starting " + adapter.label + " debugger" + (points.length ? " with " + points.length +
       (points.length === 1 ? " breakpoint" : " breakpoints") : ", pausing on the first line") + ".\n", "meta");
@@ -387,6 +406,7 @@ function mount(doc, options = {}) {
     const { adapter } = session;
     try { await post(adapter.route + "stop", ""); } catch (_) { /* best effort */ }
     log("Debugging stopped.\n", "meta");
+    status("Debugging stopped.", "ok");
     session.snap = snapshot("idle");
     render();
   }
@@ -499,10 +519,79 @@ function mount(doc, options = {}) {
         glyphMarginClassName: "dbg-arrow" } });
     if (session.selected > 0 && line !== snap.line) decorations.push({ range: { startLineNumber: line, startColumn: 1, endLineNumber: line, endColumn: 1 },
       options: { isWholeLine: true, className: "dbg-line-frame" } });
+    if (snap.state === "paused" && frame) decorations.push(...inlineValues(model, line, frame));
     currentDecorations = model.deltaDecorations(currentDecorations, decorations);
     editor.revealLineInCenterIfOutsideViewport(line);
   }
+  /* VS Code inline values: after each line of the current function up to the
+   * paused line, the values of the frame's variables that line mentions. */
+  function inlineValues(model, line, frame) {
+    const values = new Map();
+    for (const variable of frame.variables || []) {
+      if (variable.value === "" || variable.value == null) continue;
+      values.set(variable.name, String(variable.value).replace(/\s+/g, " ").slice(0, 40));
+    }
+    if (!values.size) return [];
+    const result = [];
+    const rules = [];
+    for (let at = line; at >= Math.max(1, line - 60); at--) {
+      const text = model.getLineContent(at);
+      const code = text.replace(/#.*$/, "").replace(/"(?:[^"\\]|\\.)*"/g, "");
+      const seen = [];
+      for (const match of code.matchAll(/[A-Za-z_][A-Za-z0-9_.]*/g)) {
+        const name = match[0];
+        if (values.has(name) && !seen.includes(name)) seen.push(name);
+        if (seen.length >= 4) break;
+      }
+      if (seen.length) {
+        const column = model.getLineMaxColumn(at);
+        const key = "dbg-iv-" + rules.length;
+        rules.push("." + key + "::after{content:" + cssString(seen.map(name => name + " = " + values.get(name)).join(", ")) + "}");
+        result.push({ range: { startLineNumber: at, startColumn: column, endLineNumber: at, endColumn: column },
+          options: { afterContentClassName: "dbg-inline-value " + key } });
+      }
+      if (at < line && /^\s*(function|def)\b|<-\s*function\s*\(/.test(text)) break;
+    }
+    /* This Monaco build draws afterContentClassName but not injected text,
+     * so each line's text lives in one generated stylesheet. */
+    inlineStyle().textContent = rules.map(rule => ".monaco-editor " + rule).join("\n");
+    return result;
+  }
+  function cssString(text) {
+    return '"' + String(text).replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/[\r\n]+/g, " ") + '"';
+  }
+  let styleNode = null;
+  function inlineStyle() {
+    if (!styleNode) {
+      styleNode = doc.createElement("style");
+      styleNode.id = "debugInlineValues";
+      (doc.head || doc.body).append(styleNode);
+    }
+    return styleNode;
+  }
+  /* Hovering a name while paused shows its value in the selected frame. */
+  const monaco = options.monaco || root.FlowStudioMonaco;
+  if (monaco && monaco.languages && typeof monaco.languages.registerHoverProvider === "function") {
+    const provider = {
+      provideHover(model, position) {
+        if (!session || session.snap.state !== "paused" || model !== session.model) return null;
+        const word = model.getWordAtPosition(position);
+        if (!word) return null;
+        const frame = session.snap.frames[session.selected];
+        const variable = frame && (frame.variables || []).find(item => item.name === word.word);
+        if (!variable) return null;
+        return { range: { startLineNumber: position.lineNumber, startColumn: word.startColumn,
+          endLineNumber: position.lineNumber, endColumn: word.endColumn },
+          contents: [{ value: "`" + variable.name + (variable.type ? ": " + variable.type : "") + "` = `" +
+            String(variable.value).slice(0, 200).replace(/`/g, "'") + "`" }] };
+      }
+    };
+    for (const language of ["flow", "python", "r"]) {
+      try { monaco.languages.registerHoverProvider(language, provider); } catch (_) { /* unknown language */ }
+    }
+  }
   function clearCurrent() {
+    if (styleNode) styleNode.textContent = "";
     if (session && session.model && currentDecorations.length) {
       try { currentDecorations = session.model.deltaDecorations(currentDecorations, []); } catch (_) { currentDecorations = []; }
     }
@@ -608,7 +697,7 @@ function mount(doc, options = {}) {
     consoleIn.disabled = !(snap.state === "paused" && adapter.caps.evaluate);
     consoleIn.placeholder = adapter.caps.evaluate ? "Evaluate an expression while paused" :
       "Expressions are not evaluated in this debugger";
-    if (!active) clearCurrent();
+    if (snap.state !== "paused" && snap.state !== "error") clearCurrent();
     renderVariables(snap);
     renderWatch(snap);
     renderStack(snap);

@@ -327,13 +327,19 @@ try {
   });
   assert.equal(workerResult, 'flow');
   await page.screenshot({ path: 'build/ui/workbench-tested.png' });
-  // Examples open as real editor tabs and every buffer keeps its own content;
-  // re-opening never collapses tabs onto the untitled Flow stub.
-  await page.evaluate(() => localStorage.removeItem('flowstudio.savedProjects.v1'));
+  // Examples open as their own project: the earlier buffers close (the
+  // unsaved ones are confirmed first) and every file gets its own tab.
   await page.evaluate(() => FlowStudioSearchEverywhere.instance.close());
   await page.click('#tab-examples');
   await page.locator('.example-card[data-example-id="polyglot-pipeline"] button.primary').click();
-  await page.waitForFunction(() => document.querySelectorAll('#docTabs .doc-tab').length >= 3);
+  if (await page.waitForSelector('#projectDialog[open]', { timeout: 4000 }).catch(() => null))
+    await page.locator('#projectDialogActions button', { hasText: 'Discard' }).click();
+  await page.waitForFunction(() => FlowStudioProjects.current() && FlowStudioProjects.current().name === 'polyglot-pipeline');
+  await page.waitForFunction(() => document.querySelectorAll('#docTabs .doc-tab').length === 2);
+  assert.deepEqual(await page.evaluate(() => FlowStudioApp.documents.list().map(d => d.path)),
+    ['polyglot-pipeline/generate.py', 'polyglot-pipeline/analyse.R'], 'the example files, in order');
+  assert.equal(await page.evaluate(() => FlowStudioApp.documents.list().every(d => (d.path || '').startsWith('polyglot-pipeline/'))), true,
+    'only the example project is open');
   await page.evaluate(() => {
     const tab = [...document.querySelectorAll('#docTabs .doc-tab')]
       .find(t => t.textContent.includes('analyse.R'));
@@ -343,14 +349,12 @@ try {
     FlowStudioApp.documents.active().text.startsWith('# Step 3'));
   assert.match(await page.evaluate(() => document.getElementById('source').value),
     /samples <- read\.csv\("data\/samples\.csv"\)/);
-  // The open example becomes a saved project file on this device.
-  await page.evaluate(() => FlowStudioWorkspacePanels.saveOpenProjects());
-  assert.match(await page.locator('.saved-projects button.primary').getAttribute('aria-label'), /^Reopen project Python/);
+  // The project and its tabs come back after a page reload.
   await page.reload({ waitUntil: 'networkidle' });
-  await page.click('#tab-examples');
-  assert.match(await page.locator('.saved-projects').innerText(),
-    /Python → data file → R analysis/,
-    'saved projects reopen after a page reload');
+  await page.waitForFunction(() => globalThis.FlowStudioProjects && FlowStudioProjects.current() &&
+    FlowStudioProjects.current().name === 'polyglot-pipeline', null, { timeout: 15000 });
+  await page.waitForFunction(() => FlowStudioApp.documents.list().some(d => d.name === 'analyse.R'));
+  assert.equal(await page.textContent('#projectName'), 'polyglot-pipeline');
   await page.setViewportSize({ width: 600, height: 850 });
   await page.waitForTimeout(500);
   const dimensions = await page.evaluate(() => ({

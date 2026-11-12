@@ -39,6 +39,13 @@ assert.equal(await page.evaluate(() => document.getElementById('searchEverywhere
 await page.keyboard.press('Control+p');
 assert.equal(await page.evaluate(() => document.getElementById('searchEverywhere').open), false);
 await page.keyboard.press('Control+c');
+// Linux bash drops typed keys until it has redrawn the prompt after SIGINT;
+// wait for a fresh, empty prompt line before typing again.
+await page.waitForFunction(() => {
+  const b = FlowStudioTerminal.active.term.buffer.active;
+  const line = b.getLine(b.baseY + b.cursorY).translateToString(true);
+  return /[$%#>] ?$/.test(line) && !/echo|printf/.test(line);
+}, null, { timeout: 10000 });
 // The pty follows the panel size.
 await page.keyboard.type('stty size\n', { delay: 15 });
 await page.waitForFunction(() => {

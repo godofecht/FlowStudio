@@ -340,6 +340,9 @@ function mount(options) {
   const listDocuments = options.listDocuments || (() => []);
   const activePath = options.activePath || (() => null);
   const onRootChanged = options.onRootChanged || (() => {});
+  /* Asked before the root is replaced or closed; false keeps the current one. */
+  const beforeRootChange = options.beforeRootChange || (() => true);
+  const emptyActions = options.emptyActions || null;
   const onEntryMoved = options.onEntryMoved || (() => {});
   const onEntryDeleted = options.onEntryDeleted || (() => {});
   const picker = options.picker || null;
@@ -598,10 +601,19 @@ function mount(options) {
 
   function renderEmpty() {
     const parts = [];
-    parts.push(el("p", "ex-empty-title", "No folder opened"));
-    parts.push(el("p", "ex-empty-text", "Open a folder to browse, create and rename files. " +
-      "Files stay on this device; FlowStudio reads them through your browser."));
-    const open = el("button", "ex-primary", "Open folder...");
+    parts.push(el("p", "ex-empty-title", "No project open"));
+    parts.push(el("p", "ex-empty-text", "Start a project in FlowStudio, or open a folder on disk. " +
+      "Each project keeps its own files and tabs."));
+    if (emptyActions) {
+      for (const action of emptyActions()) {
+        const button = el("button", action.primary ? "ex-primary" : "ex-secondary", action.label);
+        button.type = "button";
+        button.dataset.action = action.id;
+        button.addEventListener("click", () => action.run());
+        parts.push(button);
+      }
+    }
+    const open = el("button", emptyActions ? "ex-secondary" : "ex-primary", "Open folder...");
     open.type = "button";
     open.dataset.action = "openFolder";
     open.addEventListener("click", () => void choose());
@@ -610,7 +622,7 @@ function mount(options) {
       parts.push(open, el("p", "ex-empty-text", "This browser cannot open local folders. Use Chrome, Edge or another Chromium browser."));
     } else parts.push(open);
     if (recents.length) {
-      parts.push(el("p", "ex-section-label", "Recent"));
+      parts.push(el("p", "ex-section-label", "Recent projects"));
       const ul = el("ul", "ex-recent");
       for (const item of recents) {
         const li = el("li");
@@ -639,6 +651,7 @@ function mount(options) {
   /* ---------- root management ---------- */
 
   async function setRoot(handle, remember = true) {
+    if (!(await beforeRootChange(handle))) return false;
     tree = createTree(handle);
     focusedRel = null;
     editing = null;
@@ -662,7 +675,7 @@ function mount(options) {
     try {
       const handle = await picker({ mode: "readwrite", id: "flowstudio-workspace" });
       if (!handle || handle.kind !== "directory") throw new Error("Choose a folder.");
-      await setRoot(handle);
+      if (!(await setRoot(handle))) return false;
       status("Opened folder " + handle.name, "ok");
       return true;
     } catch (error) { report(error); return false; }
@@ -676,8 +689,8 @@ function mount(options) {
           state = await handle.requestPermission({ mode: "readwrite" });
         if (state !== "granted") throw new Error("Permission to open " + item.name + " was not granted.");
       }
-      await setRoot(handle);
-      status("Reopened folder " + item.name, "ok");
+      if (!(await setRoot(handle))) return false;
+      status("Reopened " + item.name, "ok");
       return true;
     } catch (error) {
       if (error && error.name === "NotFoundError") {
@@ -690,12 +703,14 @@ function mount(options) {
       return false;
     }
   }
-  function close() {
+  async function close() {
+    if (!(await beforeRootChange(null))) return false;
     tree = null;
     focusedRel = null;
     editing = null;
     render();
     onRootChanged(null);
+    return true;
   }
 
   /* ---------- expansion ---------- */

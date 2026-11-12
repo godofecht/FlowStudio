@@ -105,7 +105,33 @@ function mount(doc, options = {}) {
     try {
       for (const node of Array.from(popup.querySelectorAll("[data-fill='recent']"))) { slot = node; break; }
     } catch (_) { slot = null; }
-    if (!slot || (slot.dataset && slot.dataset.filled === "done")) return;
+    if (!slot) return;
+    /* Projects (web/ide_projects.js) are the recent list when present. */
+    const service = root.FlowStudioProjects;
+    if (service && typeof service.recents === "function") {
+      if (slot.replaceChildren) slot.replaceChildren();
+      const items = service.recents().filter(item => {
+        const current = service.current();
+        return !current || item.name !== current.name;
+      }).slice(0, 8);
+      if (!items.length && doc.createElement) {
+        const empty = doc.createElement("div");
+        empty.setAttribute("class", "menu-empty");
+        empty.textContent = "No other recent projects.";
+        if (slot.append) slot.append(empty);
+      }
+      for (const item of items) {
+        const button = doc.createElement("button");
+        button.type = "button";
+        button.setAttribute("role", "menuitem");
+        button.textContent = item.name;
+        button.addEventListener?.("click", () => { closeRoots(); void service.openRecent(item); });
+        slot.append(button);
+      }
+      void service.refreshRecents();
+      return;
+    }
+    if (slot.dataset && slot.dataset.filled === "done") return;
     const saved = root.FlowStudioSavedProjects;
     if (!saved || typeof saved.createStore !== "function") return;
     let storage = null;

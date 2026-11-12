@@ -113,24 +113,27 @@ test("Run Project executes the whole open project sequentially with failure stop
   assert.match(html, /  return ok;\n\}\nasync function run\(\)/, "executeCode returns ok to callers");
   assert.match(html, /el\("run"\)\.disabled && !options\.forceRunGate/, 
     "project runs bypass the single-run button gate");
-  // The ordered plan comes from the examples panel because that panel
-  // already tracks which open buffers belong to each project.
+  // The ordered plan comes from the open project (web/ide_projects.js),
+  // which knows the example's declared file order.
   assert.match(panels, /exports\.projectRunPlan/, "panel exposes the ordered run plan");
-  assert.match(panels, /steps\.push\(\{ id: doc\.id, name: file\.name, language: doc\.language \}\)/,
+  assert.match(panels, /service \? service\.runPlan\(\) : null/, "the plan comes from the project service");
+  const projects = read("web/ide_projects.js");
+  assert.match(projects, /steps\.push\(\{ id: doc_\.id, name, language: doc_\.language \}\)/,
     "plan steps carry document id, filename and language");
 });
 
-test("legacy Reader pipeline text is auto-upgraded on reopen and draft restore", () => {
-  assert.match(panels, /Examples\.upgradeFiles/, 
-    "reopening a saved project upgrades legacy Flow text");
-  assert.match(panels, /const LEGACY_READER_MARKER = "for row in Reader"/,
-    "dirty open buffers holding the legacy source are upgraded too");
-  assert.match(panels, /function upgradeOpenBuffers/, "buffer-level upgrade helper exists");
-  // The upgrade itself lives with the curated text it replaces.
+test("examples open as their own project instead of adding tabs to the current one", () => {
+  assert.match(panels, /projects\(\)\.openExample\(example\)/);
+  assert.doesNotMatch(panels, /documents\.open\(/, "the gallery no longer opens loose buffers");
+  const projects = read("web/ide_projects.js");
+  assert.match(projects, /a\.closeAllDocuments\(\)/, "a project switch closes the previous tabs");
+});
+
+test("legacy Reader pipeline text is still upgraded for recovered drafts", () => {
   const gallery = read("web/examples_gallery.js");
   assert.match(gallery, /function upgradeFiles/, "gallery exposes upgradeFiles");
   assert.match(gallery, /const api = \{ examples, validate, mount, upgradeFiles,/,
-    "upgradeFiles stays exported for panels and recovery");
+    "upgradeFiles stays exported for recovery");
   const recovery = read("web/editor_recovery.js");
   assert.match(recovery, /gallery\.upgradeFiles/, "recovered drafts are upgraded");
   assert.match(recovery, /let draft = pending/, "draft reassignment stays allowed");

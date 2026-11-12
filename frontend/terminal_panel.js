@@ -57,6 +57,10 @@ class ShellInstance {
   async start() {
     this.fitNow();
     const { cols, rows } = this.term;
+    // Start the prompt on the bottom row, as a console does, so the space
+    // below the input line is never empty. The extra blank scrollback lets
+    // the prompt stay on the bottom row when the dock grows.
+    this.term.write('\r\n'.repeat(Math.max(0, rows - 1) + 40));
     const response = await api('open', `${cols} ${rows}`);
     const text = await response.text();
     if (!response.ok) {
@@ -164,6 +168,13 @@ export function mountTerminalPanel() {
   };
   const terminalTab = makeView('terminal', 'Terminal');
   const consoleTab = makeView('console', 'Console');
+  const debugTab = makeView('debug', 'Debug Console');
+  // The debugger (web/ide_debugger.js) fills this with its output and input.
+  const debugRoot = document.createElement('div');
+  debugRoot.className = 'dock-debug';
+  debugRoot.id = 'dockDebugConsole';
+  debugRoot.hidden = true;
+  consoleRoot.after(debugRoot);
   const actions = document.createElement('div');
   actions.className = 'xt-actions';
   const list = document.createElement('div');
@@ -194,14 +205,18 @@ export function mountTerminalPanel() {
   const panel = {
     root, surface, instances: [], active: null, view: 'terminal', counter: 0,
     show(view) {
+      if (!['terminal', 'console', 'debug'].includes(view)) view = 'terminal';
       this.view = view;
       const terminal = view === 'terminal';
       root.hidden = !terminal;
-      consoleRoot.hidden = terminal;
+      consoleRoot.hidden = view !== 'console';
+      debugRoot.hidden = view !== 'debug';
       actions.hidden = !terminal;
-      clear.hidden = terminal;
+      clear.hidden = view !== 'console';
       terminalTab.setAttribute('aria-selected', String(terminal));
-      consoleTab.setAttribute('aria-selected', String(!terminal));
+      consoleTab.setAttribute('aria-selected', String(view === 'console'));
+      debugTab.setAttribute('aria-selected', String(view === 'debug'));
+      if (this.ready && globalThis.FlowStudioLayout && !globalThis.FlowStudioLayout.isVisible('dock')) globalThis.FlowStudioLayout.show('dock');
       try { localStorage.setItem('flowstudio.dock.view', view); } catch (_) {}
       if (terminal) {
         if (!this.instances.length) this.create();
@@ -274,6 +289,8 @@ export function mountTerminalPanel() {
   let initial = 'terminal';
   try { initial = localStorage.getItem('flowstudio.dock.view') || 'terminal'; } catch (_) {}
   panel.show(initial === 'console' ? 'console' : 'terminal');
+  panel.debugRoot = debugRoot;
+  panel.ready = true;
   globalThis.FlowStudioTerminal = panel;
   return panel;
 }

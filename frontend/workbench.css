@@ -80,7 +80,7 @@ svg.lucide{width:15px;height:15px;flex-shrink:0;vertical-align:middle}
 .menu-popup kbd{font-size:10px;color:#808b99}
 dialog{color:var(--ink);background:#202329;border:1px solid #464e58;border-radius:12px;box-shadow:0 30px 100px #0009;width:min(540px,90vw);padding:0;margin:15vh auto}
 dialog::backdrop{background:#0b0e13a8;backdrop-filter:blur(4px)}
-@media(max-width:900px){.shell{padding:0 6px}.workspace{grid-template-columns:minmax(0,1fr)}.topbar-actions label{display:none}.topbar{gap:14px}.menubar{margin-left:auto}.topbar-actions{margin-left:0}}
+@media(max-width:900px){.shell{padding:0 6px}.topbar-actions label{display:none}.topbar{gap:14px}.menubar{margin-left:auto}.topbar-actions{margin-left:0}}
 @media(max-width:600px){.menubar{display:none}.topbar-actions{margin-left:auto}.topbar{padding:0 3px;gap:8px}.brand{font-size:13px;gap:6px}.topbar-actions{gap:5px}.statusbar .shortcut-hint{display:none}.statusbar{gap:8px}.editor-breadcrumb{padding:0 10px}.shell{grid-template-rows:52px minmax(0,1fr) 6px var(--dock-height) 30px}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
 @media(max-width:680px){html{overflow-x:hidden}.shell{min-width:0;width:100%;grid-template-columns:minmax(0,1fr)}.workspace,.editor-area,#monacoHost{min-width:0;max-width:100%}.ide-shell-width{min-width:0;width:100%}}
@@ -444,3 +444,104 @@ dialog.dg-dialog[open]{display:flex}
 #pythonEnvironment td{padding:3px 6px;border-bottom:1px solid #1f2227;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:top;color:#cdd3da}
 #pythonEnvironment td details summary{cursor:pointer;overflow:hidden;text-overflow:ellipsis}
 #pythonEnvironment td details ul{margin:2px 0 0;padding-left:12px;white-space:normal}
+
+/* ---- Layout manager (web/ide_shell.js) ---------------------------------- */
+.shell.dock-max{grid-template-rows:58px 0 6px minmax(0,1fr) 30px}
+.shell.dock-max .workspace{visibility:hidden}
+.shell.resizing,.shell.resizing *{user-select:none}
+.shell.resizing iframe{pointer-events:none}
+.workspace>.splitter,.workspace>.panel{overflow:hidden;min-width:0}
+.shell.sidebar-hidden .sidebar-views{display:none}
+.shell.sidebar-hidden .sidebar{border-right:0}
+.shell.right-hidden .rightpanel{visibility:hidden}
+.shell.dock-hidden .dock{display:none}
+.layout-toggles{display:flex;gap:1px;padding-left:6px;margin-left:2px;border-left:1px solid #2c3037}
+.layout-toggle{display:grid;place-items:center;width:26px;height:26px;padding:0!important;border:0!important;background:transparent;color:#7f8996;border-radius:5px!important}
+.layout-toggle:hover:not(:disabled){background:#262a31!important;color:#d6dbe1}
+.layout-toggle .lt-fill{opacity:0}
+.layout-toggle[aria-pressed="true"]{color:#c6ccd4}
+.layout-toggle[aria-pressed="true"] .lt-fill{opacity:.55}
+@media(max-width:600px){.layout-toggles{display:none}}
+
+/* ---- Side panel: Preview and Environment -------------------------------- */
+.rp-head{display:flex;align-items:center;height:36px;flex:none;padding:0 4px 0 6px;border-bottom:1px solid var(--line);background:#1a1c20}
+.rp-tabs{display:flex;align-items:stretch;height:100%;gap:2px;flex:1;min-width:0}
+.rp-tabs [role="tab"]{height:100%;padding:0 10px;border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;color:#8f98a4;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.rp-tabs [role="tab"]:hover:not(:disabled){background:transparent;color:#d0d6de}
+.rp-tabs [role="tab"][aria-selected="true"]{color:#e3e7ec;border-bottom-color:var(--accent)}
+.rp-close{display:grid;place-items:center;width:24px;height:24px;padding:0;border:0;background:transparent;color:#8f98a4}
+.rp-view{display:flex;flex-direction:column;flex:1;min-height:0}
+.rp-view>.body{flex:1;min-height:0;overflow:auto;padding:10px 12px}
+.preview-view{background:#111215}
+.pv-bar{display:flex;align-items:center;gap:8px;min-height:32px;padding:0 6px 0 10px;border-bottom:1px solid #24272d;font-size:11.5px;color:#9aa2ad;flex:none}
+.pv-dot{width:7px;height:7px;border-radius:50%;background:#59606b;flex:none}
+.pv-dot[data-state="live"]{background:#8fd0a8;box-shadow:0 0 0 3px #8fd0a826}
+.pv-dot[data-state="building"]{background:#e3c27c;animation:terminal-pulse 1s ease-in-out infinite}
+.pv-dot[data-state="error"]{background:#ec8d84}
+.pv-title{color:#dfe3e8;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:40%}
+.pv-status{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pv-hot{display:flex;align-items:center;gap:5px;white-space:nowrap;color:#aab2bd;cursor:pointer}
+.pv-hot input{margin:0;accent-color:#9cc6ae}
+.pv-btn{display:grid;place-items:center;width:26px;height:24px;padding:0;border:0;background:transparent;color:#aab2bd}
+.pv-btn:disabled{opacity:.35}
+.pv-error{margin:0;padding:8px 10px;max-height:40%;overflow:auto;flex:none;background:#2a1b1c;border-bottom:1px solid #5a2f2d;color:#f2bcb5;font:11.5px/1.5 var(--mono);white-space:pre-wrap}
+.pv-error-row{display:block;width:100%;text-align:left;padding:2px 4px;border:0;border-radius:4px;background:transparent;color:#f2bcb5;font:11.5px/1.5 var(--mono);white-space:pre-wrap}
+.pv-error-row:hover:not(:disabled){background:#3a2425!important;color:#ffd9d3}
+.pv-stage{position:relative;flex:1;min-height:0}
+.pv-frame{position:absolute;inset:0;width:100%;height:100%;border:0;background:#111215}
+.pv-frame.pv-loading{visibility:hidden}
+.pv-empty{max-width:340px;margin:28px auto;padding:0 18px;color:#9aa2ad;font-size:12.5px;line-height:1.55}
+.pv-empty-title{margin:0 0 6px;color:#e3e7ec;font-weight:600;font-size:13px}
+.pv-empty code{font:11.5px var(--mono);color:#cfd8cf;background:#1f2328;padding:1px 4px;border-radius:3px}
+.pv-primary{margin-top:8px;height:28px;padding:0 12px;background:#2f4a3b;border:1px solid #4b6b58;color:#d7e9dd;border-radius:6px}
+
+/* ---- Run widget: Debug ------------------------------------------------- */
+.run-debug{color:#e8a49c}
+.run-debug:hover:not(:disabled){color:#ffc2ba}
+
+/* ---- Projects ------------------------------------------------------------ */
+.brand{position:relative}
+.project-switcher{display:flex;align-items:center;gap:5px;max-width:220px;height:26px;margin-left:2px;padding:0 8px;border:1px solid transparent;background:transparent;border-radius:6px;color:#c7cdd5;font-size:12.5px;font-weight:500;letter-spacing:0}
+.project-switcher:hover:not(:disabled){background:#23262c!important;border-color:#30343c!important}
+.project-switcher::before{content:"";width:1px;height:16px;margin-right:6px;background:#30343c}
+.ps-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.project-menu{position:absolute;top:36px;left:38px;min-width:240px;z-index:60}
+.project-menu .pm-tag{margin-left:auto;padding-left:16px;color:#7f8996;font-size:10.5px}
+.project-menu [role="menuitem"]{display:flex;align-items:center;width:100%}
+.project-menu .menu-label{padding:4px 9px 2px;font-size:10.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#7f8996}
+@media(max-width:1150px){.project-switcher{max-width:150px}}
+.ex-secondary{display:block;width:100%;margin-top:6px;padding:6px 10px;background:transparent;border:1px solid #3a4049;color:#cdd3da;border-radius:6px;font-size:13px}
+.np-dialog{width:min(560px,calc(100vw - 32px));padding:18px 20px 16px;border:1px solid #373c45;border-radius:10px;background:#1c1e23;color:var(--ink);box-shadow:0 24px 60px #0009}
+.np-dialog::backdrop{background:#0008}
+.np-dialog h2{margin:0 0 12px;font-size:15px;font-weight:600}
+.np-templates{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin-bottom:14px}
+.np-template{display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-height:74px;padding:9px 10px;text-align:left;background:#17191d;border:1px solid #2c3037;border-radius:8px}
+.np-template[aria-checked="true"]{border-color:#6f9c82;background:#1f2a24}
+.np-template-title{font-size:12.5px;font-weight:600;color:#e3e7ec}
+.np-template-detail{font-size:11.5px;line-height:1.4;color:#99a2ae}
+.np-field{display:flex;flex-direction:column;gap:5px;font-size:11.5px;color:#99a2ae;margin-bottom:12px}
+.np-field input{height:30px;padding:0 9px;background:#141619;border:1px solid #32363f;border-radius:6px;font-size:13px}
+.np-location{margin:0 0 12px;padding:0;border:0;display:flex;flex-direction:column;gap:6px}
+.np-location legend{font-size:11.5px;color:#99a2ae;margin-bottom:5px}
+.np-location label{display:grid;grid-template-columns:auto 1fr;column-gap:8px;font-size:12.5px;color:#d6dbe1}
+.np-location label span{grid-column:2;font-size:11.5px;color:#8f98a4}
+.np-error{margin:0 0 10px;color:var(--error);font-size:12px}
+.np-actions{display:flex;justify-content:flex-end;gap:8px}
+.np-actions button{height:30px;padding:0 14px;border-radius:6px}
+.np-actions .primary{background:#a8cdb5;border:0;color:#16241c;font-weight:600}
+.np-confirm p{margin:0 0 14px;font-size:13px;line-height:1.5}
+
+/* ---- Dock: Debug Console, and consoles that fill from the bottom --------- */
+.dock-debug{flex:1;min-height:0;display:flex;flex-direction:column;background:#141619}
+.dock-debug .dbg-console-out{flex:1;min-height:0;max-height:none;margin:0;padding:6px 12px;border:0;border-radius:0;background:transparent}
+.dock-debug .dbg-console-in{width:auto;margin:0;height:28px;border:0;border-top:1px solid #262a30;border-radius:0;padding:0 12px;background:#17191d}
+.terminal-transcript{display:flex;flex-direction:column}
+.terminal-transcript>.terminal-entries{margin-top:auto}
+.monaco-editor .dbg-inline-value::after{color:#d8b58b;opacity:.85;font-style:italic;padding-left:14px;white-space:pre}
+
+/* ---- Top bar priorities: drop the least used controls first ------------- */
+@media(max-width:1280px){.layout-toggles{display:none}}
+@media(max-width:1150px){.project-switcher{max-width:140px}}
+@media(max-width:1100px){#checkFlow{display:none}}
+@media(max-width:600px){.command-launcher{width:30px;justify-self:end;padding:0;justify-content:center}.command-launcher span,.command-launcher kbd{display:none}
+  .run-more,.run-chip-caret,.run-chip-sub{display:none}.project-switcher{max-width:120px}.brand{gap:6px}}

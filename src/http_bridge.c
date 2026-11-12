@@ -40,10 +40,19 @@ static int fs_write_all(int fd, const char *data, size_t n)
     return 0;
 }
 
+void fs_reply_bytes(int code, const char *content_type, const char *body, size_t length);
+
 void fs_reply(int code, const char *content_type, const char *body)
 {
-    if (fs_client < 0) return;
     if (!body) body = "";
+    fs_reply_bytes(code, content_type, body, strlen(body));
+}
+
+/* Binary-safe reply: the body may hold NUL bytes (WebAssembly). */
+void fs_reply_bytes(int code, const char *content_type, const char *body, size_t length)
+{
+    if (fs_client < 0) return;
+    if (!body) { body = ""; length = 0; }
     if (!content_type) content_type = "text/plain; charset=utf-8";
 
     const char *reason = code == 200 ? "OK" :
@@ -66,12 +75,12 @@ void fs_reply(int code, const char *content_type, const char *body)
         "Content-Security-Policy: frame-ancestors 'self'\r\n"
         "Referrer-Policy: no-referrer\r\n"
         "Connection: close\r\n\r\n",
-        code, reason, content_type, strlen(body));
+        code, reason, content_type, length);
 
     if (n > 0 && (size_t)n < sizeof(header))
     {
         (void)fs_write_all(fs_client, header, (size_t)n);
-        (void)fs_write_all(fs_client, body, strlen(body));
+        (void)fs_write_all(fs_client, body, length);
     }
     /* Early rejection can leave unread request bytes in the socket. Drain
        already-buffered bytes after shutting down writes, avoiding an RST

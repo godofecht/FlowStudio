@@ -168,6 +168,7 @@ const EXAMPLES = [
 
 const CATEGORIES = Object.freeze([
   ["start", "Start"],
+  ["graphics", "Graphics"],
   ["polyglot", "Polyglot"],
   ["debug", "Debug"],
   ["flow", "Backends"],
@@ -193,8 +194,16 @@ function polyglot(source) {
   return list.filter(item => item && typeof item.id === "string" && Array.isArray(item.files))
     .map(item => Object.assign({}, item, { category: "polyglot" }));
 }
-function examples(source, polyglotSource) {
-  const curated = polyglot(polyglotSource);
+/* Graphics apps from examples/graphics (generated into examples_graphics.js).
+ * They run in the Preview panel with hot reload. */
+function graphics(source) {
+  const list = Array.isArray(source) ? source :
+    Array.isArray(global.FlowStudioGraphicsExamples) ? global.FlowStudioGraphicsExamples : [];
+  return list.filter(item => item && typeof item.id === "string" && Array.isArray(item.files))
+    .map(item => Object.assign({}, item, { category: "graphics", runner: "preview" }));
+}
+function examples(source, polyglotSource, graphicsSource) {
+  const curated = graphics(graphicsSource).concat(polyglot(polyglotSource));
   const firstPolyglot = EXAMPLES.findIndex(example => example.category === "polyglot");
   const head = EXAMPLES.slice(0, firstPolyglot < 0 ? EXAMPLES.length : firstPolyglot);
   const tail = EXAMPLES.slice(head.length);
@@ -204,7 +213,7 @@ function examples(source, polyglotSource) {
 function validate() {
   const seen = new Set();
   const categories = new Set(CATEGORIES.map(([key]) => key));
-  for (const example of EXAMPLES.concat(polyglot())) {
+  for (const example of EXAMPLES.concat(polyglot(), graphics())) {
     if (typeof example.id !== "string" || !example.id || seen.has(example.id)) return "bad id";
     seen.add(example.id);
     if (typeof example.title !== "string" || !example.title) return "bad title";
@@ -217,7 +226,7 @@ function validate() {
       if (!file || typeof file.name !== "string" || typeof file.language !== "string" ||
           typeof file.text !== "string") return "bad file";
       if (!["flow", "r", "python"].includes(file.language)) return "bad language";
-      if (file.text.length > 32768) return "file too large";
+      if (file.text.length > 65536) return "file too large";
     }
     if (example.breakpoints !== undefined) {
       for (const [name, lines] of Object.entries(example.breakpoints)) {
@@ -432,7 +441,7 @@ function upgradeFiles(files) {
   return upgraded ? next : null;
 }
 
-const api = { examples, validate, mount, upgradeFiles, simulations, polyglot, CATEGORIES };
+const api = { examples, validate, mount, upgradeFiles, simulations, polyglot, graphics, CATEGORIES };
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 global.FlowStudioExamples = api;
 })(globalThis);

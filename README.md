@@ -76,6 +76,62 @@ Run its tests with:
 
     node --test tests/ide_symbols.test.js tests/ide_outline.test.js tests/ide_definition.test.js
 
+### Projects
+
+One project is open at a time, and each keeps its own files and tabs. The
+project switcher next to the FlowStudio name lists recent projects and holds
+New project, Open folder and Close project.
+
+- New project offers five templates: a Flow graphics app, a Flow program, a
+  Flow, Python and R pipeline, a Python script and an R analysis. A project
+  lives either in FlowStudio, in the browser's private file system (OPFS), or
+  in a new folder inside a folder you pick on disk.
+- Opening a project closes every tab of the previous one. Files with
+  unsaved changes are listed first, with Save and switch, Discard or Cancel.
+  The new project reopens the tabs it had last time, or its entry file.
+- Examples open as their own local project, so the Explorer shows only that
+  example's files and your edits to it are kept.
+- The last project reopens on the next visit when the browser still allows
+  access to it.
+
+### Layout
+
+The window has four regions: the sidebar (activity bar and views), the
+editor, the side panel (Preview and Environment) and the console dock. The
+layout manager (`web/ide_shell.js`) solves their sizes against the window:
+the editor keeps at least 360 by 150 pixels, and when the window is too
+narrow the side panel shrinks and then hides, then the sidebar does. Those
+collapses are not saved, so widening the window brings the panes back.
+
+Ctrl+B toggles the sidebar, Ctrl+Alt+B the side panel and Ctrl+J the dock;
+the three buttons at the right of the top bar do the same. Clicking the
+active activity-bar icon hides the sidebar. Splitters drag, take arrow keys,
+and reset on double-click; dragging the dock below 60 pixels closes it. The
+side panel stays closed until something needs it.
+
+### Flow apps with graphics and hot reload
+
+A Flow program that imports `stdlib/gfx.flow` runs in the Preview, in
+the side panel. The server type checks it with the strict Flow emitter, builds
+it with `flow wasm` into WebAssembly with the canvas backend
+(`runtime/gfx_wasm.c` in the Flow repository), and the Preview runs the
+build in a frame. Keyboard and mouse go to the program after you click the
+canvas.
+
+With Hot reload on, an edit rebuilds the app after a short pause, about one
+second for the examples, and swaps the new build in once it has loaded. A
+build that fails leaves the last good build running and lists the compiler
+errors, each a link to its line. A reload restarts the program, so its state
+starts fresh. The Graphics examples are a starter app and three games from
+the Flow repository: Pong, Snake and Falling sand.
+
+The first build on a machine also compiles the Flow runtime for WebAssembly,
+which takes about ten seconds. The Preview needs Emscripten (`emcc`) on the
+server's PATH. Builds live in a private folder under the system temp folder,
+and the last four are kept. Code: `src/flow_app.c`, `web/app_host.html`,
+`web/ide_app_preview.js`. Tests: `tests/ide_app_preview.test.js`,
+`tests/test_flow_app.py`, `tests/native_projects_ui.mjs`.
+
 ### Workspace explorer
 
 The native IDE at `http://127.0.0.1:8751/` has an activity bar on the left
@@ -344,7 +400,10 @@ such as `i>=3` for Python and R) and follow edits to the file. F5 starts or
 continues, F10 steps over, F11 steps into, Shift+F11 steps out, Ctrl+F10
 runs to the cursor and Shift+F5 stops. While paused, the editor marks the
 line, a debug toolbar appears in the editor's path bar, and the Debug view shows variables,
-watch expressions, the call stack, breakpoints and a debug console.
+watch expressions, the call stack and breakpoints. The Debug button beside
+Run starts a session, which opens the Debug view and the Debug Console in the
+dock. While paused, each line of the current function shows the values of the
+variables it mentions, and hovering a name shows its value.
 Breakpoint changes reach a running session at once.
 
 Flow debugging needs LLDB with Python support: Xcode command line tools on

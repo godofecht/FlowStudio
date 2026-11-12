@@ -1,0 +1,12 @@
+{
+  "id": "graphics-snake",
+  "order": 3,
+  "title": "Snake",
+  "description": "The classic, drawn with fill_rect at 60 frames a second.",
+  "files": ["app.flow"],
+  "steps": [
+    "Press Run. It compiles to WebAssembly and plays in the Preview.",
+    "Click the canvas to give it the keyboard. Arrows or WASD steer. Space starts, R restarts.",
+    "Edit a colour or constant and the Preview rebuilds as you type."
+  ]
+}

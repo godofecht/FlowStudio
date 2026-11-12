@@ -59,6 +59,9 @@ extern {
     function fs_flow_debug_status() -> i32
     function fs_flow_run_bridged(code: string) -> string
     function fs_flow_bridged_status() -> i32
+    function fs_app_build(code: string) -> string
+    function fs_app_build_status() -> i32
+    function fs_app_serve(path: string) -> i32
     function unlink(path: string) -> i32
     function strcmp(a: string, b: string) -> i32
     function strlen(s: string) -> i64
@@ -734,6 +737,10 @@ function dispatch() -> void {
         fs_reply(200, "text/plain; charset=utf-8", "FlowStudio ready")
         return
     }
+    # Built Flow apps: a fixed set of file names inside numbered builds.
+    if eq(method, "GET") and fs_app_serve(path) == 1 {
+        return
+    }
     # Only explicit read-only assets can be served; never use the URL as a file path.
     if eq(method, "GET") {
         let asset: StaticAsset = data_route(path)
@@ -1003,6 +1010,11 @@ function dispatch() -> void {
         }
         if eq(path, "/api/inspect/python") {
             send_python_environment()
+            return
+        }
+        if eq(path, "/api/app/build") {
+            let built: string = fs_app_build(fs_body())
+            fs_reply(fs_app_build_status(), "application/json; charset=utf-8", built)
             return
         }
         if eq(path, "/api/reset/r") {

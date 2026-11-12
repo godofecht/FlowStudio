@@ -81,7 +81,7 @@ try {
 
   // ---- empty state, then Open folder -----------------------------------
   assert.equal(await page.locator('#explorer .ex-empty').isVisible(), true, 'empty state before a folder opens');
-  await page.locator('#explorer .ex-primary').click();
+  await page.locator('#explorer [data-action="openFolder"]').click();
   await page.waitForFunction(() => document.querySelectorAll('#explorer .ex-row[data-rel]').length >= 4);
   assert.deepEqual(await rows(page), ['data', 'src', 'photo.png', 'README.md'],
     'folders first, natural order, .git hidden');
@@ -249,14 +249,13 @@ try {
   await page.locator('#tab-files').click();
   assert.equal(await page.locator('#sidebarTitle').textContent(), 'Explorer');
 
-  // ---- reload: recent folder and expansion state come back --------------
+  // ---- reload: the project, its expansion state and its tabs come back ---
   await page.reload();
-  await page.waitForFunction(() => document.querySelector('#explorer .ex-recent-item'));
-  assert.match(await page.locator('#explorer .ex-recent-item').first().textContent(), /proj/);
-  await page.locator('#explorer .ex-recent-item').first().click();
-  await page.waitForFunction(() => document.querySelector('#explorer .ex-row[data-rel="src/tools.py"]'));
+  // The browser still grants access to the folder, so it reopens by itself.
+  await page.waitForFunction(() => document.querySelector('#explorer .ex-row[data-rel="src/tools.py"]'), null, { timeout: 15000 });
+  assert.equal(await page.textContent('#projectName'), 'proj');
   assert.equal(await row(page, 'src').getAttribute('aria-expanded'), 'true', 'expanded folders persist');
-  await page.waitForFunction(() => /Reopened \d+ editor/.test(document.getElementById('resultStatus').textContent));
+  await page.waitForFunction(() => document.querySelectorAll('#docTabs [role="tab"]').length >= 3);
   const reopened = await page.$$eval('#docTabs [role="tab"]', tabs => tabs.map(tab => tab.title));
   for (const path of ['proj/src/main.flow', 'proj/src/tools.py', 'proj/src/core/helper.flow'])
     assert.ok(reopened.includes(path), path + ' reopened after reload');

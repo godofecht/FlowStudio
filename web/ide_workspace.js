@@ -82,8 +82,9 @@ function mount(doc, app, Explorer, options = {}) {
   /* Remember which project files were open, and reopen them the first time
    * that folder is opened again on this page (VS Code restores editors per
    * workspace). Only paths are stored; contents are re-read from disk. */
+  let switching = false;    // a project switch is closing and reopening tabs
   function saveEditors() {
-    if (!storage || !explorer || !explorer.hasRoot()) return;
+    if (switching || !storage || !explorer || !explorer.hasRoot()) return;
     const prefix = explorer.rootName() + "/";
     const open = documents.list().filter(item => item.path && item.path.startsWith(prefix)).map(item => item.path);
     const active = documents.active && documents.active();
@@ -94,11 +95,12 @@ function mount(doc, app, Explorer, options = {}) {
     } catch (_) { /* optional */ }
   }
   async function restoreEditors(handle) {
-    if (!storage || !handle || restored.has(handle.name)) return;
+    const projects = root.FlowStudioProjects;
+    if (!storage || !handle || (!projects && restored.has(handle.name))) return 0;
     restored.add(handle.name);
     let saved = null;
     try { saved = JSON.parse(storage.getItem(EDITORS_KEY + handle.name) || "null"); } catch (_) { saved = null; }
-    if (!saved || !Array.isArray(saved.open)) return;
+    if (!saved || !Array.isArray(saved.open)) return 0;
     const already = new Set(documents.list().map(item => item.path).filter(Boolean));
     let reopened = 0;
     for (const path of saved.open.slice(0, 30)) {
@@ -113,6 +115,7 @@ function mount(doc, app, Explorer, options = {}) {
       if (target) app.activateDocument(target.id);
     }
     if (reopened) app.status("Reopened " + reopened + " editor" + (reopened === 1 ? "" : "s") + " from " + handle.name, "ok");
+    return reopened;
   }
 
   async function onEntryMoved({ kind, oldPath, newPath, handle }) {
@@ -148,8 +151,21 @@ function mount(doc, app, Explorer, options = {}) {
     activePath: () => { const active = documents.active && documents.active(); return active ? active.path : null; },
     onRootChanged: handle => {
       app.adoptProjectRoot(handle);
-      if (handle) void restoreEditors(handle);
+      /* A project switch closes the previous project's tabs first. */
+      if (root.FlowStudioProjects) {
+        switching = true;
+        Promise.resolve(root.FlowStudioProjects.rootChanged(handle, restoreEditors))
+          .catch(error => app.status("Could not open the project: " + (error && error.message || error), "error"))
+          .finally(() => { switching = false; saveEditors(); });
+      } else if (handle) void restoreEditors(handle);
     },
+    beforeRootChange: () => (root.FlowStudioProjects ? root.FlowStudioProjects.beforeSwitch() : true),
+    emptyActions: () => [
+      { id: "newProject", label: "New project...", primary: true,
+        run: () => { if (root.FlowStudioProjects) root.FlowStudioProjects.newProject(); } },
+      { id: "examples", label: "Browse examples",
+        run: () => { const tab = doc.getElementById("tab-examples"); if (tab) tab.click(); } }
+    ],
     onEntryMoved,
     onEntryDeleted,
     picker: typeof root.showDirectoryPicker === "function" ? opts => root.showDirectoryPicker(opts) : null,

@@ -165,7 +165,7 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
 .run-more-popup{left:auto;right:0}
 .run-more-popup .flow-auto-check{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:5px;color:var(--ink)!important;font-size:13px!important;cursor:pointer}
 .run-more-popup .flow-auto-check:hover{background:var(--accent-dim)}
-.workspace{display:grid;grid-template-columns:var(--sidebar-width) var(--sash) minmax(0,1fr) var(--sash) var(--right-width);min-height:0}
+.workspace{display:grid;grid-template-columns:var(--sidebar-width) var(--sidebar-sash,5px) minmax(0,1fr) var(--right-sash,5px) var(--right-width);min-height:0}
 .splitter{position:relative;background:var(--bg);cursor:col-resize}
 .splitter::after{content:"";position:absolute;inset:0 2px;background:var(--line)}
 .splitter:hover::after,.splitter:focus-visible::after{background:var(--accent)}
@@ -379,8 +379,7 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
 #editorRecovery{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--warn)}
 [hidden]{display:none !important}
 svg{width:14px;height:14px;vertical-align:-2px;flex:none}
-@media(max-width:900px){.workspace{grid-template-columns:minmax(0,1fr)}.sidebar,.rightpanel,.workspace>.splitter{display:none}}
-@media(max-width:760px){.shell{grid-template-rows:auto minmax(0,1fr) var(--sash) 40vh auto}.topbar-actions{margin-left:0}}
+@media(max-width:760px){.topbar-actions{margin-left:0}}
 @media(max-width:680px){html{overflow-x:auto}.shell{min-width:680px}.ide-shell-width{width:max(100%,680px)}}
 </style>
 <link rel="stylesheet" href="/ui/workbench.css">
@@ -388,11 +387,12 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
 <body>
 <div class="shell" id="ideShell">
 <header class="topbar">
-  <div class="brand" aria-label="FlowStudio"><span class="brand-mark"><i data-lucide="blocks"></i></span><b>FlowStudio</b></div>
+  <div class="brand" aria-label="FlowStudio"><span class="brand-mark"><i data-lucide="blocks"></i></span><b>FlowStudio</b><button id="projectSwitcher" type="button" class="project-switcher" aria-haspopup="menu" aria-expanded="false" aria-controls="projectMenu" title="Switch, create or close projects"><span class="ps-name" id="projectName">No project</span><svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 6.5L8 10l3.5-3.5"/></svg></button><div class="menu-popup project-menu" id="projectMenu" role="menu" aria-label="Projects" hidden></div></div>
   <nav class="menubar" role="menubar" aria-label="Main menu">
     <div class="menu" id="menuFile">
       <button class="menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="menuFilePopup">File</button>
       <div class="menu-popup" id="menuFilePopup" role="menu" aria-label="File" hidden>
+        <button type="button" role="menuitem" data-command="newProject">New project…</button>
         <button type="button" role="menuitem" id="newDocument">New buffer<kbd>Ctrl+Alt+N</kbd></button>
         <button type="button" role="menuitem" id="open">Open file…<kbd>Ctrl+O</kbd></button>
         <button type="button" role="menuitem" data-command="openFolder">Open folder…</button>
@@ -431,7 +431,11 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
           </div>
         </div>
         <hr>
-        <button type="button" role="menuitem" data-command="toggleDock">Toggle console dock</button>
+        <button type="button" role="menuitem" data-command="toggleSidebar">Toggle sidebar<kbd>Ctrl+B</kbd></button>
+        <button type="button" role="menuitem" data-command="toggleRightPanel">Toggle side panel<kbd>Ctrl+Alt+B</kbd></button>
+        <button type="button" role="menuitem" data-command="toggleDock">Toggle console dock<kbd>Ctrl+J</kbd></button>
+        <button type="button" role="menuitem" data-command="maximizeDock">Maximize console dock</button>
+        <button type="button" role="menuitem" data-command="showPreview">App preview</button>
         <button type="button" role="menuitem" data-command="refreshEnvironment">Refresh environment</button>
       </div>
     </div>
@@ -502,6 +506,7 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
           <svg class="run-chip-caret" viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 6.5L8 10l3.5-3.5"/></svg>
         </button>
         <button id="run" class="primary run-main" title="Run selection or entire buffer (Ctrl/⌘+Enter)"><i data-lucide="play"></i><span>Run</span></button>
+        <button id="runDebug" type="button" class="run-icon run-debug" title="Debug (F5): run under the debugger and stop at breakpoints" aria-label="Debug"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 5.5h5a1 1 0 0 1 1 1V9a3.5 3.5 0 0 1-7 0V6.5a1 1 0 0 1 1-1z"/><path d="M6 5.5V4.8a2 2 0 0 1 4 0v.7M8 8.5v4M2.5 8.5h2M11.5 8.5h2M3 4.5l1.6 1.2M13 4.5l-1.6 1.2M3 12.5l1.6-1.2M13 12.5l-1.6-1.2"/></svg></button>
         <button id="checkFlow" type="button" class="run-icon" title="Check Flow: compile the current buffer without running it" aria-label="Check Flow"><i data-lucide="circle-check"></i></button>
         <div class="run-more">
           <button id="runMore" type="button" class="run-more-trigger run-icon" aria-haspopup="menu" aria-expanded="false" aria-controls="runMorePopup" title="More run actions" aria-label="More run actions"><i data-lucide="ellipsis"></i></button>
@@ -516,6 +521,11 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
           <button id="resetPython" type="button" role="menuitem" title="Discard native Python variables and restart its interpreter">Reset Python session</button>
         </div>
         </div>
+      </div>
+      <div class="layout-toggles" role="group" aria-label="Layout">
+        <button type="button" class="layout-toggle" data-layout-toggle="sidebar" title="Toggle sidebar (Ctrl+B)" aria-label="Toggle sidebar" aria-pressed="true"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path class="lt-fill" d="M3 3.5h3v9H3z" fill="currentColor" stroke="none"/><path d="M6.5 2.5v11"/></svg></button>
+        <button type="button" class="layout-toggle" data-layout-toggle="dock" title="Toggle console dock (Ctrl+J)" aria-label="Toggle console dock" aria-pressed="true"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path class="lt-fill" d="M3 10h10v2.5H3z" fill="currentColor" stroke="none"/><path d="M2 9.5h12"/></svg></button>
+        <button type="button" class="layout-toggle" data-layout-toggle="right" title="Toggle side panel (Ctrl+Alt+B)" aria-label="Toggle side panel" aria-pressed="false"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path class="lt-fill" d="M10 3.5h3v9h-3z" fill="currentColor" stroke="none"/><path d="M9.5 2.5v11"/></svg></button>
       </div>
       <label for="language" class="hidden-widget">Runtime</label>
       <select id="language" class="hidden-widget" aria-label="Execution language"><option value="flow">Flow</option><option value="r">R</option><option value="python">Python</option></select>
@@ -622,15 +632,40 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
     <div id="flowProblems" role="group" aria-label="Flow compiler source locations" hidden></div>
   </main>
   <div class="splitter" data-splitter data-axis="x" data-panel="right" role="separator" aria-orientation="vertical" aria-label="Resize environment panel" tabindex="0"></div>
-  <aside class="panel rightpanel" aria-label="Environment">
-    <h2><i data-lucide="sliders-horizontal"></i>Environment<span class="panel-tag">Native session</span></h2>
-    <div class="body">
-      <p id="runtimeInfo">Flow executions are independent.</p>
-      <button id="refreshPythonEnvironment" type="button"><i data-lucide="rotate-cw"></i>Refresh environment</button>
-      <div id="pythonEnvironment" aria-live="polite"><p class="muted">Select Python or R to inspect its native session.</p></div>
-      <p class="muted hint">Python and R keep their variables between runs. Reset a session from the Run menu.</p>
-      <p class="muted hint">Code runs on your computer with your OS permissions.</p>
+  <aside class="panel rightpanel" id="rightPanel" aria-label="Side panel">
+    <div class="rp-head">
+      <div class="rp-tabs" role="tablist" aria-label="Side panel views">
+        <button type="button" role="tab" id="rpTab-preview" aria-controls="rpView-preview" aria-selected="false" tabindex="-1">Preview</button>
+        <button type="button" role="tab" id="rpTab-environment" aria-controls="rpView-environment" aria-selected="true" tabindex="0">Environment</button>
+      </div>
+      <button type="button" id="rightPanelClose" class="rp-close" title="Hide side panel (Ctrl+Alt+B)" aria-label="Hide side panel"><svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
     </div>
+    <section class="rp-view preview-view" id="rpView-preview" role="tabpanel" aria-labelledby="rpTab-preview" hidden>
+      <div class="pv-bar">
+        <span class="pv-dot" id="previewDot" data-state="idle" aria-hidden="true"></span>
+        <span class="pv-title" id="previewTitle">No app running</span>
+        <span class="pv-status" id="previewStatus" role="status" aria-live="polite"></span>
+        <label class="pv-hot" title="Rebuild and restart the app as you type"><input type="checkbox" id="previewHot" checked>Hot reload</label>
+        <button type="button" id="previewRestart" class="pv-btn" title="Rebuild and restart" aria-label="Rebuild and restart" disabled><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.5-3.6"/><path d="M13 2.5v3h-3"/></svg></button>
+        <button type="button" id="previewStop" class="pv-btn" title="Stop the app" aria-label="Stop the app" disabled><svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"><rect x="3" y="3" width="10" height="10" rx="1.5" fill="currentColor"/></svg></button>
+      </div>
+      <pre class="pv-error" id="previewError" role="alert" hidden></pre>
+      <div class="pv-stage" id="previewStage">
+        <div class="pv-empty" id="previewEmpty">
+          <p class="pv-empty-title">Run a Flow graphics program</p>
+          <p>A program that imports <code>stdlib/gfx.flow</code> runs here, compiled to WebAssembly. With hot reload on, every edit rebuilds and restarts it. A build that fails keeps the last good one running.</p>
+          <button type="button" id="previewNewApp" class="pv-primary">New graphics app</button>
+        </div>
+      </div>
+    </section>
+    <section class="rp-view" id="rpView-environment" role="tabpanel" aria-labelledby="rpTab-environment">
+      <div class="body">
+        <p id="runtimeInfo">Flow executions are independent.</p>
+        <button id="refreshPythonEnvironment" type="button"><i data-lucide="rotate-cw"></i>Refresh environment</button>
+        <div id="pythonEnvironment" aria-live="polite"><p class="muted">Select Python or R to inspect its native session.</p></div>
+        <p class="muted hint">Python and R keep their variables between runs. Reset a session from the Run menu.</p>
+      </div>
+    </section>
   </aside>
 </div>
 <div class="splitter splitter-horizontal" id="dockSplitter" data-splitter data-axis="y" data-panel="dock" role="separator" aria-orientation="horizontal" aria-label="Resize console dock" tabindex="0"></div>
@@ -648,6 +683,22 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
   <span class="shortcut-hint">Shift Shift Search &nbsp; Ctrl+Enter Run</span>
 </footer>
 </div>
+<dialog id="newProjectDialog" class="np-dialog" aria-labelledby="npHeading">
+  <h2 id="npHeading">New project</h2>
+  <div id="npTemplates" class="np-templates" role="radiogroup" aria-label="Template"></div>
+  <label class="np-field" for="npName">Name<input id="npName" type="text" autocomplete="off" spellcheck="false" maxlength="60"></label>
+  <fieldset class="np-location">
+    <legend>Location</legend>
+    <label><input type="radio" name="npLocation" id="npLocationLocal" value="local" checked>In FlowStudio<span>Kept in this browser's private storage.</span></label>
+    <label><input type="radio" name="npLocation" id="npLocationDisk" value="disk">In a folder on disk<span>You pick a parent folder; the project gets its own folder inside it.</span></label>
+  </fieldset>
+  <p id="npError" class="np-error" role="alert" hidden></p>
+  <div class="np-actions"><button type="button" id="npCancel">Cancel</button><button type="button" id="npCreate" class="primary">Create project</button></div>
+</dialog>
+<dialog id="projectDialog" class="np-dialog np-confirm" aria-labelledby="projectDialogText">
+  <p id="projectDialogText"></p>
+  <div id="projectDialogActions" class="np-actions"></div>
+</dialog>
 <dialog id="runConfigDialog" class="config-dialog" aria-label="Run configuration">
   <div class="se-search"><i data-lucide="search"></i><input id="runConfigQuery" type="search" placeholder="Language, backend or configuration…" aria-label="Search run configurations" autocomplete="off"></div>
   <div id="runConfigList" class="se-list" role="listbox" aria-label="Run configurations"></div>
@@ -1687,6 +1738,31 @@ function closeDocument(id = null) {
   src.focus();
   return true;
 }
+/* Project switching: write every dirty file that has a place on disk,
+ * without pickers. Untitled buffers are returned unsaved. */
+async function saveAllDocuments() {
+  saveEditorBuffer();
+  const unsaved = [];
+  for (const doc of documents.list()) {
+    if (!doc.dirty) continue;
+    if (doc.handle && typeof doc.handle.createWritable === "function") {
+      const saved = await FlowStudioFileSave.writeIfUnchanged(doc.handle, doc.saved, doc.text);
+      documents.markSaved(doc.id, saved);
+    } else unsaved.push(doc);
+  }
+  const active = activeDocument();
+  markDirty(Boolean(active && active.dirty));
+  renderTabs();
+  return unsaved;
+}
+/* Closes every tab without prompting; the caller has already asked. */
+function closeAllDocuments() {
+  saveEditorBuffer();
+  for (const doc of documents.list()) documents.close(doc.id);
+  editorDocId = null;
+  renderTabs();
+  return true;
+}
 function cycleDocument(step) {
   const list = documents.list();
   if (list.length < 2) return false;
@@ -1914,6 +1990,10 @@ async function executeCode(code, label, languageOverride = null, options = {}) {
 }
 async function run() {
   const selection = src.value.substring(src.selectionStart, src.selectionEnd);
+  /* A Flow program that draws with stdlib/gfx.flow runs in the Preview. */
+  const preview = globalThis.FlowStudioAppPreview;
+  if (!selection.length && language.value === "flow" && preview && preview.isGraphicsProgram(src.value))
+    return preview.start(activeDocument());
   return executeCode(selection.length ? selection : src.value,
     selection.length ? "[selection]" : "[buffer]");
 }
@@ -2676,20 +2756,23 @@ const commands = Object.freeze({
     globalThis.FlowStudioPlotFigures && globalThis.FlowStudioPlotFigures.show ?
       globalThis.FlowStudioPlotFigures.show(globalThis, document, language, status) : false,
   showData: () => el("tab-data").click(),
-  toggleDock: () => {
-    const dock = el("consoleDock");
-    const splitter = el("dockSplitter");
-    const hide = !dock.hidden;
-    dock.hidden = hide;
-    if (splitter) splitter.hidden = hide;
-    el("ideShell").classList.toggle("dock-hidden", hide);
-  },
+  toggleDock: () => { if (globalThis.FlowStudioLayout) globalThis.FlowStudioLayout.toggle("dock"); },
+  toggleSidebar: () => { if (globalThis.FlowStudioLayout) globalThis.FlowStudioLayout.toggle("sidebar"); },
+  toggleRightPanel: () => { if (globalThis.FlowStudioLayout) globalThis.FlowStudioLayout.toggle("right"); },
+  maximizeDock: () => { if (globalThis.FlowStudioLayout) globalThis.FlowStudioLayout.toggleDockMax(); },
+  showPreview: () => { if (globalThis.FlowStudioSidePanel) globalThis.FlowStudioSidePanel.show("preview"); },
+  showEnvironment: () => { if (globalThis.FlowStudioSidePanel) globalThis.FlowStudioSidePanel.show("environment"); },
+  newProject: template => globalThis.FlowStudioProjects ? globalThis.FlowStudioProjects.newProject(template) : false,
+  closeProject: () => globalThis.FlowStudioProjects ? globalThis.FlowStudioProjects.closeProject() : false,
+  startDebugging: () => globalThis.FlowStudioDebugger && globalThis.FlowStudioDebugger.instance ?
+    globalThis.FlowStudioDebugger.instance.start() : false,
   refreshEnvironment: () => el("refreshPythonEnvironment").click(),
   shortcuts: () => status("Ctrl+Enter run · Ctrl+Shift+Enter cell · Ctrl+S save · Ctrl+W close tab · Ctrl+Tab next tab · Ctrl+F find · Ctrl+H replace · Ctrl+Shift+O outline · F12 definition · Shift+F12 references · F2 rename", "ok"),    about: () => status("FlowStudio 0.2.0-alpha.1 · Flow-first local IDE · execution on 127.0.0.1:8751 only", "ok")
 });
 if (typeof window !== "undefined") {
   window.FlowStudioApp = Object.freeze({
     commands, documents, createUntitled, activateDocument, closeDocument, openEditorHandle, revealPosition,
+    saveAllDocuments, closeAllDocuments, saveEditorBuffer,
     project, adoptProjectRoot, status, renderTabs
   });
 }
@@ -2709,6 +2792,7 @@ renderTabs();
 <script src="/packages_panel.js"></script>
 <script src="/examples_mathflow.js"></script>
 <script src="/examples_polyglot.js"></script>
+<script src="/examples_graphics.js"></script>
 <script src="/examples_gallery.js"></script>
 <script src="/saved_projects.js"></script>
 <script src="/app/native_flow.js"></script>
@@ -2723,6 +2807,9 @@ renderTabs();
 <script src="/data_viewer.js"></script>
 <script src="/ide_data_view.js"></script>
 <script src="/ide_packages_view.js"></script>
+<script src="/ide_side_panel.js"></script>
+<script src="/ide_app_preview.js"></script>
+<script src="/ide_projects.js"></script>
 <script src="/ide_debugger.js"></script>
 <script src="/ide_symbols.js"></script>
 <script src="/ide_outline.js"></script>

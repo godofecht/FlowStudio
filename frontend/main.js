@@ -60,6 +60,8 @@ monaco.languages.setLanguageConfiguration('flow', {
   autoClosingPairs: [{ open: '{', close: '}' }, { open: '(', close: ')' },
     { open: '[', close: ']' }, { open: '"', close: '"' }]
 });
+// The debugger registers its hover provider through this.
+globalThis.FlowStudioMonaco = monaco;
 const app = globalThis.FlowStudioApp;
 globalThis.FlowStudioEditor = mountEditor(monaco, document.getElementById('source'),
   document.getElementById('monacoHost'), app, document.getElementById('language'));

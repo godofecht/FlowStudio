@@ -30,6 +30,9 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/data_page.js" {
         return StaticAsset { path: "web/data_page.js", mime: "text/javascript; charset=utf-8", found: true }
     }
+    if url == "/app-host.html" {
+        return StaticAsset { path: "web/app_host.html", mime: "text/html; charset=utf-8", found: true }
+    }
     if url == "/index.html" {
         return StaticAsset { path: "web/index.html", mime: "text/html; charset=utf-8", found: true }
     }
@@ -141,8 +144,20 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/examples_mathflow.js" {
         return StaticAsset { path: "web/examples_mathflow.js", mime: "text/javascript; charset=utf-8", found: true }
     }
+    if url == "/examples_graphics.js" {
+        return StaticAsset { path: "web/examples_graphics.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
     if url == "/examples_polyglot.js" {
         return StaticAsset { path: "web/examples_polyglot.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/ide_app_preview.js" {
+        return StaticAsset { path: "web/ide_app_preview.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/ide_side_panel.js" {
+        return StaticAsset { path: "web/ide_side_panel.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/ide_projects.js" {
+        return StaticAsset { path: "web/ide_projects.js", mime: "text/javascript; charset=utf-8", found: true }
     }
     if url == "/ide_debugger.js" {
         return StaticAsset { path: "web/ide_debugger.js", mime: "text/javascript; charset=utf-8", found: true }

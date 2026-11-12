@@ -216,21 +216,6 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
 #searchResults button{width:100%;text-align:left;white-space:normal;overflow-wrap:anywhere;font:12px/1.45 ui-monospace,monospace;padding:4px 6px}
 .hint{font-size:12px;max-width:46ch}
 .muted{color:var(--muted)}
-.example-card{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:10px;background:var(--surface-2)}
-.example-card.saved-project{border-color:#2f5245;background:#15202b}
-.gallery-heading{margin:2px 0 8px;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:#7d8ba3;font-weight:600}
-.saved-projects{margin-bottom:14px}
-.example-forget{font-size:11px;padding:2px 8px;background:transparent;border-color:#2c3a52;color:#7d8ba3;margin-top:4px}
-.example-forget:hover{color:var(--error);border-color:#5e3434}
-.example-head{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
-.example-head h3{margin:0;font-size:13.5px;overflow-wrap:anywhere}
-.example-langs{margin-left:auto;flex:none;font-size:10.5px;color:var(--muted);border:1px solid var(--line);border-radius:9px;padding:2px 7px;white-space:nowrap}
-.example-card p{margin:2px 0 8px;font-size:12.5px;line-height:1.55;overflow-wrap:anywhere}
-.example-card button{display:block;width:100%;text-align:left;font-size:12.5px;margin-top:6px;white-space:normal;overflow-wrap:anywhere}
-.example-card .primary{background:#2f5db8;border-color:#4275d6;color:#fff}
-.example-card .example-file-btn{font-size:11.5px;padding:3px 8px;text-align:left;background:#151d2b;border-color:#2c3a52;color:#a9bcd8}
-.example-card .example-runbook{margin-top:8px;font-size:12px;color:var(--muted)}
-.example-card .example-runbook summary{cursor:pointer;user-select:none;font-size:11.5px}  .example-card .example-runbook ol{margin:6px 0 2px;padding-left:20px}
   .example-card .example-visual{margin:2px 0 8px;font-size:12.5px;color:#7fd1a8}
   .plots-body{flex:1;min-height:0;overflow:auto;padding:12px 16px}
   .plots-body .hint{margin:0 0 6px;font-size:12.5px}
@@ -241,7 +226,6 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
   .plots-body figure.captured-figure embed{max-width:100%;height:auto;display:block}
   .plots-body figure.captured-figure figcaption{margin-top:6px;font-size:12px;color:#333}
   .plots-body figure.captured-figure figcaption a{color:#1c5fb8;margin-left:6px}
-.example-card ol{margin:8px 0 2px;padding-left:20px;font-size:12px;color:var(--muted)}
 #debugSteps{max-height:200px;overflow:auto;display:flex;flex-direction:column;gap:2px;margin-bottom:8px}
 .debug-step button{width:100%;text-align:left;font:11.5px/1.4 var(--mono);padding:3px 7px;background:transparent;border:1px solid transparent;border-radius:5px}
 .debug-step button:hover{background:var(--accent-dim)}
@@ -551,7 +535,7 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
       <button type="button" id="tab-data" role="tab" aria-controls="view-data" aria-selected="false" tabindex="-1" title="Data frames and tables" data-title="Data"><i data-lucide="table-2"></i><span class="tab-label">Data</span></button>
       <button type="button" id="tab-packages" role="tab" aria-controls="view-packages" aria-selected="false" tabindex="-1" title="Packages" data-title="Packages"><i data-lucide="package"></i><span class="tab-label">Packages</span></button>
       <button type="button" id="tab-examples" role="tab" aria-controls="view-examples" aria-selected="false" tabindex="-1" title="Examples" data-title="Examples"><i data-lucide="library"></i><span class="tab-label">Examples</span></button>
-      <button type="button" id="tab-debug" role="tab" aria-controls="view-debug" aria-selected="false" tabindex="-1" title="Debug" data-title="Debug"><i data-lucide="bug"></i><span class="tab-label">Debug</span></button>
+      <button type="button" id="tab-debug" role="tab" aria-controls="view-debug" aria-selected="false" tabindex="-1" title="Run and Debug (F5)" data-title="Run and Debug"><i data-lucide="bug"></i><span class="tab-label">Debug</span></button>
     </div>
     <div class="sidebar-views">
     <div class="workspace-heading"><span id="sidebarTitle">Explorer</span><span class="local-badge" title="Files are read and written by your browser on this device">Local</span></div>
@@ -614,47 +598,9 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
     <div class="body data-view" id="view-data" role="tabpanel" aria-labelledby="tab-data" hidden></div>
     <div class="body packages-view" id="view-packages" role="tabpanel" aria-labelledby="tab-packages" hidden></div>
     <div class="body examples-body" id="view-examples" role="tabpanel" aria-labelledby="tab-examples" hidden>
-      <p class="muted hint">Curated local examples showing Flow, Python and R working in one project. Everything executes on this device.</p>
-      <p class="muted hint">Projects you open are kept as saved project files (with your edits) in the "Your projects" list at the top of this tab, and reopen from there after a reload.</p>
       <div id="examplesHost"></div>
     </div>
-    <div class="body debug-body" id="view-debug" role="tabpanel" aria-labelledby="tab-debug" hidden>
-      <p class="muted hint">Replay debugger for Python: breakpoints, the real line trace, click through recorded states.</p>
-      <div class="project-tools">
-        <button id="debugToggleBp" type="button"><i data-lucide="octagon"></i>Breakpoint at cursor</button>
-        <button id="debugClearBp" type="button">Clear</button>
-        <button id="debugRun" type="button"><i data-lucide="play"></i>Run trace</button>
-      </div>
-      <div class="project-tools" role="group" aria-label="Recorded Python trace navigation">
-        <button id="debugPrevious" type="button" disabled>Previous step</button>
-        <button id="debugNext" type="button" disabled>Next step</button>
-        <button id="debugPreviousBp" type="button" disabled>Previous breakpoint</button>
-        <button id="debugNextBp" type="button" disabled>Next breakpoint</button>
-      </div>
-      <p id="debugBreakpoints" class="muted" aria-live="polite">No breakpoints yet.</p>
-      <p id="debugSummary" class="muted"></p>
-      <div id="debugSteps" class="debug-steps"></div>
-      <div id="debugLocals" class="debug-locals"></div>
-      <section class="live-debugger" aria-label="Interactive native Python debugger">
-        <h3>Live Python debugger</h3>
-        <p class="muted hint">Real CPython pause, step, step over, finish, continue and stop through the local Flow server. Unlike replay, this executes the buffer and may change interpreter state. Leave the breakpoint field empty to use cursor breakpoints above.</p>
-        <label for="liveDebugBreakpoints">Breakpoint lines (optional numeric conditions)</label>
-        <input id="liveDebugBreakpoints" type="text" maxlength="512" placeholder="2, 5?counter>=3" aria-label="Live debugger breakpoints">
-        <label><input id="liveDebugPauseException" type="checkbox"> Pause on raised exceptions</label>
-        <div class="project-tools" role="group" aria-label="Live Python debugger controls">
-          <button id="liveDebugStart" type="button">Start</button>
-          <button id="liveDebugStep" type="button" disabled>Step</button>
-          <button id="liveDebugNext" type="button" disabled>Step over</button>
-          <button id="liveDebugFinish" type="button" disabled>Finish</button>
-          <button id="liveDebugContinue" type="button" disabled>Continue</button>
-          <button id="liveDebugRunToCursor" type="button" disabled title="Continue real CPython execution to the editor caret line; other breakpoints still apply">Run to caret</button>
-          <button id="liveDebugStop" type="button" disabled>Stop</button>
-          <button id="liveDebugStatus" type="button">Status</button>
-        </div>
-        <div id="liveDebugFrames" class="live-debug-frames" role="group" aria-label="Paused Python stack frames"></div>
-        <pre id="liveDebugOutput" class="live-debug-output" role="status" aria-live="polite">Start a Python session to inspect live stack frames.</pre>
-      </section>
-    </div>
+    <div class="body debug-view" id="view-debug" role="tabpanel" aria-labelledby="tab-debug" hidden></div>
     </div>
   </aside>
   <div class="splitter" data-splitter data-axis="x" data-panel="sidebar" role="separator" aria-orientation="vertical" aria-label="Resize project sidebar" tabindex="0"></div>
@@ -2759,11 +2705,10 @@ renderTabs();
   <script src="/terminal_sessions.js"></script>
   <script src="/workspace_console.js"></script>
 <script src="/packages_panel.js"></script>
+<script src="/examples_mathflow.js"></script>
 <script src="/examples_gallery.js"></script>
 <script src="/saved_projects.js"></script>
-<script src="/debug_panel.js"></script>
 <script src="/app/native_flow.js"></script>
-<script src="/app/python_debug_panel.js"></script>
 <script src="/ide_shell.js"></script>
 <script src="/ide_menubar.js"></script>
 <script src="/ide_run_widget.js"></script>
@@ -2775,6 +2720,7 @@ renderTabs();
 <script src="/data_viewer.js"></script>
 <script src="/ide_data_view.js"></script>
 <script src="/ide_packages_view.js"></script>
+<script src="/ide_debugger.js"></script>
 <script src="/ide_symbols.js"></script>
 <script src="/ide_outline.js"></script>
 <script>

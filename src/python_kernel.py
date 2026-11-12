@@ -237,18 +237,24 @@ def serve() -> None:
             length = int(header[1:], 16)
         except ValueError:
             return
-        if header[:1] not in (b"E", b"I", b"P", b"T", b"B", b"S", b"N", b"F", b"C", b"X", b"Q", b"G") or length > MAX_SOURCE or (header[:1] in (b"I", b"P", b"S", b"N", b"F", b"C", b"X", b"Q") and length != 0):
+        if header[:1] not in (b"E", b"I", b"P", b"T", b"B", b"S", b"N", b"F", b"C", b"X", b"Q", b"G", b"L") or length > MAX_SOURCE or (header[:1] in (b"I", b"P", b"S", b"N", b"F", b"C", b"X", b"Q") and length != 0):
             return
         data = read_exact(stdin, length)
         if data is None:
             return
-        if header[:1] in (b"B", b"S", b"N", b"F", b"C", b"X", b"Q", b"G"):
+        if header[:1] in (b"B", b"S", b"N", b"F", b"C", b"X", b"Q", b"G", b"L"):
             if header[:1] == b"B":
                 try:
                     ok, payload = encode(debugger.start(data.decode("utf-8", "strict"), namespace, LimitedWriter()))
                 except UnicodeDecodeError:
                     ok, payload = encode({"state": "idle", "ok": False, "stack": [],
                                           "output": "", "message": "Invalid UTF-8 debugger request."})
+            elif header[:1] == b"L":
+                try:
+                    ok, payload = encode(debugger.set_breakpoints(data.decode("utf-8", "strict")))
+                except UnicodeDecodeError:
+                    ok, payload = encode({"state": "idle", "ok": False, "stack": [],
+                                          "output": "", "message": "Invalid UTF-8 breakpoint list."})
             elif header[:1] == b"G":
                 # The payload is a decimal source line. Expressions and commands are rejected.
                 line = int(data) if 1 <= len(data) <= 6 and data[:1] != b"0" and data.isdigit() else None

@@ -138,6 +138,12 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/ide_workspace.js" {
         return StaticAsset { path: "web/ide_workspace.js", mime: "text/javascript; charset=utf-8", found: true }
     }
+    if url == "/examples_mathflow.js" {
+        return StaticAsset { path: "web/examples_mathflow.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/ide_debugger.js" {
+        return StaticAsset { path: "web/ide_debugger.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
     if url == "/ide_data_view.js" {
         return StaticAsset { path: "web/ide_data_view.js", mime: "text/javascript; charset=utf-8", found: true }
     }

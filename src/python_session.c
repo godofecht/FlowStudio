@@ -184,4 +184,5 @@ const char *fs_py_debug_continue(void) { return request_python('C', ""); }
 const char *fs_py_debug_run_to_line(const char *line) { return request_python('G', line); }
 const char *fs_py_debug_stop(void) { return request_python('X', ""); }
 const char *fs_py_debug_state(void) { return request_python('Q', ""); }
+const char *fs_py_debug_breakpoints(const char *points) { return request_python('L', points); }
 int fs_py_status(void) { return last_status; }

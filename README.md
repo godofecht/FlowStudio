@@ -118,7 +118,13 @@ Run the additional pure-module tests with:
 
 ## Terminal console, packages, examples, debugger (native workspace)
 
-The native workspace console is a full terminal, not a form: runtime tabs
+**Terminal.** The bottom panel opens on a real terminal: xterm.js on a
+pseudo-terminal running your login shell (`src/pty_session.c`). Several
+terminals can run at once. Ctrl+P, Ctrl+K and quotes go to the shell.
+The shell runs with your user's permissions behind the same localhost
+intent gate as code execution. Shells left by a closed page are reclaimed.
+
+The **Console** tab beside it holds the language consoles. The native workspace console is a full terminal, not a form: runtime tabs
 (Flow, Python, R, plus explicit `+` sessions), a compact status row that only
 reports states the server actually produced (unknown at start, running,
 ready, failed, disconnected; Python/R say "shared interpreter" because they
@@ -147,25 +153,23 @@ the documented C path. The server exposes this as
 stderr. A Flow build without LLVM shows exactly that error. Verified live
 against the real compiler on macOS arm64 (see below for both pipelines).
 
-**Packages tab.** A sidebar tab installs and lists real packages through
-the persistent local sessions: pip (`pip install --user`, pinned
-`name==version` specs allowed) and R `install.packages(...)` from the CRAN
-cloud mirror. Specs are validated in the browser before any request; the
-local 15 s per-session execution budget applies to installs.
+**Packages.** One list per runtime, Python and R, filtered as you type.
+When the typed name is not installed, the first row offers to install it
+(pip `--user`, pinned `name==version` allowed, or R from CRAN). R rows show
+whether the package is attached and offer load, update and remove; Python
+rows offer uninstall. Names are validated in the browser before any request.
 
-**Examples tab.** Curated local examples show Flow, Python and R working in
-one project: a Python → data-file → R pipeline, a stats-in-Python/visuals-in-R
-pair, a one-shot Python → R handshake through `POST /api/demo/python-r`, and
-a Flow example meant to run with the MLIR backend. "Open" adds each file to
-the editor with the right language.
+**Data.** Lists the data frames in the R and Python sessions with their
+shape, and the CSV and TSV files of the open folder. Either opens in a data
+grid with sorting, filtering, paging and CSV export. Folder files are read
+by the browser and never uploaded.
 
-**Debug tab (Python replay tracer).** Toggle breakpoints at the cursor
-(per buffer), run the real CPython line trace (`POST /api/trace/python`,
-@traced by the persistent kernel) and scrub recorded states: click a step to
-jump the caret to that line and read the bounded locals captured there.
-Only builtin scalar values are previewed; complex values show type only.
-This is an execution replay, not a live pause/resume kernel debugger, and
-it is Python-only: Flow and R tracing remain missing.
+**Examples.** Search and category chips over 44 examples: getting started
+in Flow, debugging walkthroughs for Flow, Python and R, multi-language
+projects, the MLIR backend, and every MathFlow simulation in `examples/`
+(generated into `web/examples_mathflow.js` at UI build time). Run opens the
+files and runs the entry file; Debug opens them, places the example's
+breakpoints and starts the debugger.
 
 **Completion.** The Monaco workbench merges lexical Flow symbols (same
 bounded scanner as the Pages editor), live Python/R session variable names
@@ -285,18 +289,34 @@ the first error. Flow still requires the native localhost server. This is
 not an RStudio-compatible kernel debugger or a guarantee of physical-browser
 acceptance.
 
-## Native Python source debugging
+## Run and Debug
 
-The Flow-owned localhost server now has an experimental interactive CPython
-debugger. Enter comma-separated breakpoint line numbers in the browser's
-Python debugger panel, then Start, Step into, Step over, Step out, Continue or Stop. An empty breakpoint
-list stops on the first executable line. The stack viewer shows bounded local
-variable types and safe scalar previews. Debugging executes real Python in
-the existing persistent native session; it does not emulate breakpoints in
-JavaScript. Step over skips source callees unless a breakpoint is hit; Step out resumes at the caller or completes a top-level frame. Ordinary native Python execution is blocked while the debugger
-is active. The kernel runs with the current user's permissions and is not
-safe for untrusted code. GitHub Pages, R and Flow source debugging are not
-supported. See [docs/PARITY.md](docs/PARITY.md) for verification status.
+One debugger front end (`web/ide_debugger.js`) drives three real back ends:
+
+| Language | Back end | Stepping |
+| --- | --- | --- |
+| Flow | LLDB on a `flow debug` build whose `#line` directives name the .flow file (`src/flow_debugger.py`) | into, over, out, pause, evaluate C expressions |
+| Python | the persistent kernel's tracer (`src/python_debugger.py`) | into, over, out, run to cursor, pause on exceptions |
+| R | top-level expression stepping in the persistent R session | over, run to cursor, evaluate R |
+
+Click the gutter left of a line number, or press F9, to set a breakpoint.
+Breakpoints take conditions (a C expression for Flow, a numeric comparison
+such as `i>=3` for Python and R) and follow edits to the file. F5 starts or
+continues, F10 steps over, F11 steps into, Shift+F11 steps out, Ctrl+F10
+runs to the cursor and Shift+F5 stops. While paused, the editor marks the
+line, a toolbar floats over the editor, and the Debug view shows variables,
+watch expressions, the call stack, breakpoints and a debug console.
+Breakpoint changes reach a running session at once.
+
+Flow debugging needs LLDB with Python support: Xcode command line tools on
+macOS, or `lldb` and its Python module on Linux (set
+`FLOWSTUDIO_LLDB_PYTHON` to the Python that can import it). Debugging runs
+real code with your permissions and is not safe for untrusted source.
+GitHub Pages does not debug.
+
+Tests: `tests/ide_debugger.test.js`, `tests/test_flow_debugger.py`,
+`tests/test_python_debugger.py` and the browser acceptance
+`tests/native_debugger_ui.mjs`.
 
 ## Native Git branches
 

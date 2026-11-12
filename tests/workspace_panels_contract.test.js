@@ -12,7 +12,7 @@ const main = read("src/main.flow");
 
 test("sidebar panels load in dependency order behind the console stack", () => {
   const order = ["/terminal_render.js", "/console.js", "/workspace_console.js",
-    "/packages_panel.js", "/examples_gallery.js", "/debug_panel.js",
+    "/packages_panel.js", "/examples_mathflow.js", "/examples_gallery.js", "/ide_debugger.js",
     "/workspace_panels.js", "/ui/workbench.js"];
   let last = -1;
   for (const tag of order) {
@@ -21,7 +21,7 @@ test("sidebar panels load in dependency order behind the console stack", () => {
     last = at;
   }
   for (const tag of ["/packages_panel.js", "/examples_gallery.js",
-    "/debug_panel.js", "/workspace_panels.js", "/terminal_render.js"]) {
+    "/ide_debugger.js", "/workspace_panels.js", "/terminal_render.js"]) {
     assert.ok(html.split('<script src="' + tag + '"></script>').length - 1 === 1,
       tag + " loads exactly once");
   }
@@ -129,7 +129,7 @@ test("legacy Reader pipeline text is auto-upgraded on reopen and draft restore",
   // The upgrade itself lives with the curated text it replaces.
   const gallery = read("web/examples_gallery.js");
   assert.match(gallery, /function upgradeFiles/, "gallery exposes upgradeFiles");
-  assert.match(gallery, /const api = \{ examples, validate, mount, upgradeFiles \};/,
+  assert.match(gallery, /const api = \{ examples, validate, mount, upgradeFiles,/,
     "upgradeFiles stays exported for panels and recovery");
   const recovery = read("web/editor_recovery.js");
   assert.match(recovery, /gallery\.upgradeFiles/, "recovered drafts are upgraded");

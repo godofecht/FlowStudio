@@ -206,6 +206,7 @@ jobs:
           node tests/native_math_plot_ui.mjs
           node tests/native_explorer_ui.mjs
           node tests/native_panels_ui.mjs
+          node tests/native_debugger_ui.mjs
       - name: Package verified executable
         run: sh scripts/package.sh
       - name: Archive qualified platform build

@@ -129,115 +129,104 @@ try {
   await page.waitForFunction(() => !document.getElementById('run').disabled);
   assert.doesNotMatch(await page.locator('#console').innerText(), /RuntimeError/);
 
-  // Exercise real Flow HTTP -> persistent CPython pause/step/continue from
-  // the primary workspace. No mocked trace or browser-only interpreter.
+  // Real Flow HTTP -> persistent CPython pause/step/continue through the
+  // Run and Debug view: gutter breakpoints, F5, F10, and the debug console.
+  const debugState = () => page.evaluate(() => document.getElementById('debugStatus').dataset.state);
+  const debugText = () => page.locator('#debugStatus').textContent();
+  const setBreakpoints = lines => page.evaluate(lines => {
+    const model = FlowStudioEditor.editor.getModel();
+    FlowStudioDebugger.instance.breakpoints.clear(model);
+    for (const line of lines) FlowStudioDebugger.instance.breakpoints.toggle(model, line);
+  }, lines);
   await page.evaluate(() => {
     const source = document.getElementById('source');
     source.value = 'live_value = 40\nlive_value += 2\nprint(live_value)\n';
     source.dispatchEvent(new Event('input', { bubbles: true }));
   });
   await page.locator('#tab-debug').click();
-  await page.locator('#liveDebugBreakpoints').fill('2');
-  await page.locator('#liveDebugStart').click();
-  await page.waitForFunction(() =>
-    document.getElementById('liveDebugOutput').textContent.includes('Python debugger: paused'));
-  assert.match(await page.locator('#liveDebugOutput').innerText(), /Line 2 in/);
-  await page.locator('#liveDebugStep').click();
-  await page.waitForFunction(() =>
-    document.getElementById('liveDebugOutput').textContent.includes('Line 3 in'));
-  await page.locator('#liveDebugContinue').click();
-  await page.waitForFunction(() =>
-    document.getElementById('liveDebugOutput').textContent.includes('Python debugger: done'));
-  assert.match(await page.locator('#liveDebugOutput').innerText(), /Output:\n42/);
+  await setBreakpoints([2]);
+  assert.equal(await page.locator('#debugBreakpoints .dbg-bp-row').count(), 1);
+  await page.locator('#debugStart').click();
+  await page.waitForFunction(() => document.getElementById('debugStatus').dataset.state === 'paused');
+  assert.equal(await debugText(), 'Paused at line 2');
+  assert.equal(await page.locator('#debugToolbar').isVisible(), true);
+  assert.match((await page.locator('#debugVariables .dbg-var').allTextContents()).join('|'), /live_value40/);
+  await page.keyboard.press('F10');
+  await page.waitForFunction(() => /line 3/.test(document.getElementById('debugStatus').textContent));
+  await page.keyboard.press('F5');
+  await page.waitForFunction(() => document.getElementById('debugStatus').dataset.state === 'done');
+  assert.match(await page.locator('#debugConsoleOutput').innerText(), /^42$/m);
+  assert.equal(await page.locator('#debugToolbar').isHidden(), true);
 
   // Real Chromium -> native Flow HTTP -> persistent CPython scientific
-  // conditional breakpoint. The first hit is iteration 2 (0.5 * 0.1^3),
-  // not an editor-only parse or a replayed debugger frame.
+  // conditional breakpoint. The first hit is iteration 2 (0.5 * 0.1^3).
   await page.evaluate(() => {
     const source = document.getElementById('source');
     source.value = 'residual = 0.5\nfor iteration in range(8):\n    residual *= 0.1\n    observed = residual\nprint(observed)\n';
     source.dispatchEvent(new Event('input', { bubbles: true }));
   });
-  await page.locator('#liveDebugBreakpoints').fill('4?residual<=1e-3');
-  await page.locator('#liveDebugStart').click();
-  await page.waitForFunction(() =>
-    document.getElementById('liveDebugOutput').textContent.includes('Python debugger: paused'));
-  assert.match(await page.locator('#liveDebugOutput').innerText(), /Line 4 in/);
-  assert.match(await page.locator('#liveDebugOutput').innerText(), /iteration: int = 2/);
-  await page.locator('#liveDebugStop').click();
-  await page.waitForFunction(() =>
-    document.getElementById('liveDebugOutput').textContent.includes('Python debugger: stopped'));
+  await page.evaluate(() => {
+    const dbg = FlowStudioDebugger.instance, model = FlowStudioEditor.editor.getModel();
+    dbg.breakpoints.clear(model);
+    dbg.breakpoints.set(model, 4, { condition: 'residual<=1e-3', enabled: true });
+  });
+  await page.locator('#debugStart').click();
+  await page.waitForFunction(() => document.getElementById('debugStatus').dataset.state === 'paused');
+  assert.equal(await debugText(), 'Paused at line 4');
+  assert.match((await page.locator('#debugVariables .dbg-var').allTextContents()).join('|'), /iteration2/);
+  await page.keyboard.press('Shift+F5');
+  await page.waitForFunction(() => document.getElementById('debugStatus').dataset.state !== 'paused');
 
-  // A final newline is not a second executable Python line. Reject the
-  // phantom breakpoint in the real Chromium workspace before HTTP submission.
+  // A final newline is not a second executable Python line: a breakpoint
+  // there is rejected by the native debugger.
   await page.evaluate(() => {
     const source = document.getElementById('source');
     source.value = 'terminal_line = 1\n';
     source.dispatchEvent(new Event('input', { bubbles: true }));
   });
-  await page.locator('#liveDebugBreakpoints').fill('2');
-  await page.locator('#liveDebugStart').click();
-  await page.waitForFunction(() =>
-    document.getElementById('liveDebugOutput').textContent.includes('Breakpoint is outside source.'));
-  assert.match(await page.locator('#liveDebugOutput').innerText(),
-    /Native Python debugger error: Breakpoint is outside source/);
+  await setBreakpoints([2]);
+  await page.locator('#debugStart').click();
+  await page.waitForFunction(() => /Invalid or duplicate breakpoint line/.test(document.getElementById('debugConsoleOutput').textContent));
+  assert.notEqual(await page.evaluate(() => document.getElementById('debugStatus').dataset.state), 'paused');
+  // That 422 is the expected rejection; account for only this response.
+  assert.ok(errors.includes('422 http://127.0.0.1:8751/api/debug/python/start'));
+  assert.ok(errors.every(message => message === '422 http://127.0.0.1:8751/api/debug/python/start' ||
+    /Failed to load resource:.*422/.test(message)), JSON.stringify(errors));
+  errors.length = 0;
 
-  // Actual native Chromium caret -> Flow HTTP -> persistent CPython one-shot
-  // run-to-line. The target is executed, not emulated by editor navigation.
+  // Run to Cursor executes up to the caret line in the real kernel.
   await page.evaluate(() => {
     const source = document.getElementById('source');
     source.value = 'caret_a = 1\ncaret_b = caret_a + 1\ncaret_result = caret_b + 1\nprint(caret_result)\n';
     source.dispatchEvent(new Event('input', { bubbles: true }));
   });
-  await page.locator('#liveDebugBreakpoints').fill('2');
-  await page.locator('#liveDebugStart').click();
-  await page.waitForFunction(() =>
-    document.getElementById('liveDebugOutput').textContent.includes('Line 2 in'));
-  await page.evaluate(() => {
-    const source = document.getElementById('source');
-    const at = source.value.indexOf('print(caret_result)');
-    source.setSelectionRange(at, at);
-    source.dispatchEvent(new Event('select', { bubbles: true }));
-  });
-  assert.equal(await page.locator('#liveDebugRunToCursor').isDisabled(), false);
-  await page.locator('#liveDebugRunToCursor').click();
-  await page.waitForFunction(() =>
-    document.getElementById('liveDebugOutput').textContent.includes('Line 4 in'));
-  assert.match(await page.locator('#liveDebugOutput').innerText(), /caret_result: int = 3/);
-  await page.locator('#liveDebugContinue').click();
-  await page.waitForFunction(() =>
-    document.getElementById('liveDebugOutput').textContent.includes('Python debugger: done'));
+  await setBreakpoints([2]);
+  await page.locator('#debugStart').click();
+  await page.waitForFunction(() => /line 2/.test(document.getElementById('debugStatus').textContent));
+  await page.evaluate(() => FlowStudioEditor.editor.setPosition({ lineNumber: 4, column: 1 }));
+  await page.evaluate(() => FlowStudioDebugger.instance.command('cursor'));
+  await page.waitForFunction(() => /line 4/.test(document.getElementById('debugStatus').textContent));
+  assert.match((await page.locator('#debugVariables .dbg-var').allTextContents()).join('|'), /caret_result3/);
+  await page.locator('#debugContinue').click();
+  await page.waitForFunction(() => document.getElementById('debugStatus').dataset.state === 'done');
 
-  // Actual native Chromium/Flow/CPython stack-frame navigation: select a
-  // caller frame, then ensure switching editor documents cannot jump into
-  // unrelated source while the native kernel remains paused.
+  // Call stack navigation: select the caller frame, then stop.
   await page.evaluate(() => {
     const source = document.getElementById('source');
     source.value = 'def inner():\n    value = 40\n    return value\nanswer = inner()\nprint(answer)\n';
     source.dispatchEvent(new Event('input', { bubbles: true }));
   });
-  await page.locator('#liveDebugBreakpoints').fill('3');
-  await page.locator('#liveDebugStart').click();
-  await page.waitForFunction(() =>
-    document.getElementById('liveDebugOutput').textContent.includes('Python debugger: paused') &&
-    document.querySelectorAll('#liveDebugFrames button').length === 2);
-  assert.equal(await page.evaluate(() => FlowStudioEditor.editor.getPosition().lineNumber), 3);
-  await page.locator('#liveDebugFrames button').nth(1).click();
-  assert.equal(await page.evaluate(() => FlowStudioEditor.editor.getPosition().lineNumber), 4);
-  assert.equal(await page.locator('#liveDebugFrames button').nth(1).getAttribute('aria-current'), 'true');
-  await page.locator('#newDocumentTab').click();
-  await page.keyboard.insertText('unrelated = 1');
-  const unrelatedLine = await page.evaluate(() => FlowStudioEditor.editor.getPosition().lineNumber);
-  // The editor input event disables stale-frame controls immediately.
-  // Playwright cannot click a disabled control; verify the actual controller
-  // refuses the navigation as well as preserving the unrelated caret.
-  assert.equal(await page.locator('#liveDebugFrames button').first().isDisabled(), true);
-  assert.equal(await page.evaluate(() => FlowStudioWorkspacePanels.liveDebugPanel.selectFrame(0)), false);
-  assert.equal(await page.evaluate(() => FlowStudioEditor.editor.getPosition().lineNumber), unrelatedLine);
-  await page.locator('#liveDebugStop').click();
-  await page.waitForFunction(() =>
-    document.getElementById('liveDebugOutput').textContent.includes('Python debugger: stopped'));
-  assert.equal(await page.locator('#liveDebugFrames button').count(), 0);
+  await setBreakpoints([3]);
+  await page.locator('#debugStart').click();
+  await page.waitForFunction(() => document.querySelectorAll('#debugCallStack .dbg-frame').length === 2);
+  assert.ok(await page.locator('.monaco-editor .dbg-line-current').count() > 0, 'paused line is marked');
+  await page.locator('#debugCallStack .dbg-frame').nth(1).click();
+  assert.equal(await page.locator('#debugCallStack .dbg-frame').nth(1).getAttribute('aria-current'), 'true');
+  assert.equal(await page.evaluate(() => FlowStudioEditor.editor.getVisibleRanges()[0].startLineNumber <= 4), true);
+  await page.keyboard.press('Shift+F5');
+  await page.waitForFunction(() => document.getElementById('debugStatus').dataset.state === 'idle');
+  assert.equal(await page.locator('#debugCallStack .dbg-frame').count(), 0);
+  await setBreakpoints([]);
 
   await page.locator('#commandLauncher').click();
   await page.locator('#seQuery').fill('go to symbol');
@@ -343,7 +332,7 @@ try {
   await page.evaluate(() => localStorage.removeItem('flowstudio.savedProjects.v1'));
   await page.evaluate(() => FlowStudioSearchEverywhere.instance.close());
   await page.click('#tab-examples');
-  await page.locator('.example-card button.primary').first().click();
+  await page.locator('.example-card[data-example-id="polyglot-pipeline"] button.primary').click();
   await page.waitForFunction(() => document.querySelectorAll('#docTabs .doc-tab').length >= 3);
   await page.evaluate(() => {
     const tab = [...document.querySelectorAll('#docTabs .doc-tab')]
@@ -356,7 +345,7 @@ try {
     /samples <- read\.csv\("data\/samples\.csv"\)/);
   // The open example becomes a saved project file on this device.
   await page.evaluate(() => FlowStudioWorkspacePanels.saveOpenProjects());
-  assert.match(await page.locator('.saved-projects').innerText(), /Reopen project/);
+  assert.match(await page.locator('.saved-projects button.primary').getAttribute('aria-label'), /^Reopen project Python/);
   await page.reload({ waitUntil: 'networkidle' });
   await page.click('#tab-examples');
   assert.match(await page.locator('.saved-projects').innerText(),

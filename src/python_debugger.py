@@ -175,7 +175,7 @@ class DebugSession:
                     return self._trace
                 exception_type, exception_value, _ = arg
                 # A raised exception propagates through several source frames.
-                # Pause at its first source frame, not once per unwinding frame.
+                # Pause once, at its first source frame. Later unwinding frames are skipped.
                 if exception_value is self.last_exception:
                     return self._trace
                 self.last_exception = exception_value
@@ -294,6 +294,21 @@ class DebugSession:
                 self.state = "running"
                 self.cv.notify_all()
             return self._wait()
+
+    def set_breakpoints(self, data: str) -> dict[str, object]:
+        """Replace the breakpoints of the running session (editor edits while paused)."""
+        try:
+            points = json.loads(data)
+        except ValueError:
+            return {**self.snapshot(), "ok": False, "message": "Expected a JSON breakpoint list."}
+        with self.cv:
+            if self.state not in ("paused", "running"):
+                return {**self._snapshot(), "ok": False, "message": "No active debugging session."}
+            try:
+                self.breakpoints = _parse_breakpoints(points, self.source_lines)
+            except (ValueError, TypeError) as exc:
+                return {**self._snapshot(), "ok": False, "message": str(exc)[:1024]}
+            return {**self._snapshot(), "ok": True}
 
     def busy(self) -> bool:
         with self.cv:

@@ -15,7 +15,7 @@ const store = (function () {
 const modules = [
   ["FlowStudioPackageManager", global.FlowStudioPackageManager],
   ["FlowStudioExamples", global.FlowStudioExamples],
-  ["FlowStudioDebugPanel", global.FlowStudioDebugPanel]
+
 ];
 const el = typeof global.document !== "undefined" && global.document.getElementById
   ? id => global.document.getElementById(id) : null;
@@ -82,6 +82,12 @@ mountPanel("FlowStudioExamples", global.FlowStudioExamples, Examples => {
    * put a figure on the Plots tab without an extra click. Execution failures
    * surface through the normal editor/console status, never as thrown errors. */
   function runExampleEntry(project) {
+    if (project.runner === "mathflow") {
+      const runMath = el("runMathFlow");
+      if (!runMath || runMath.disabled) return false;
+      runMath.click();
+      return true;
+    }
     const commands = global.FlowStudioApp && global.FlowStudioApp.commands;
     if (!commands || typeof commands.runDocument !== "function") return false;
     const docIds = openedProjects.get(project.id) || [];
@@ -195,6 +201,26 @@ mountPanel("FlowStudioExamples", global.FlowStudioExamples, Examples => {
         el("resultStatus").dataset.state = "error";
       }
     },
+    /* Debug: open the example, place its breakpoints, start the debugger. */
+    onDebug: async (example) => {
+      try {
+        openProjectBuffers(example, example.files);
+        persistOpenProject(example, example.files);
+        const debuggerApi = global.FlowStudioDebugger && global.FlowStudioDebugger.instance;
+        const editor = global.FlowStudioEditor && global.FlowStudioEditor.editor;
+        const doc = global.FlowStudioApp.documents.active();
+        if (!debuggerApi || !editor || !doc) throw new Error("The debugger is still loading.");
+        const model = editor.getModel();
+        const lines = (example.breakpoints || {})[doc.name] || [];
+        debuggerApi.breakpoints.clear(model);
+        for (const line of lines) debuggerApi.breakpoints.toggle(model, line);
+        el("tab-debug").click();
+        await debuggerApi.start();
+      } catch (error) {
+        el("resultStatus").textContent = error.message || String(error);
+        el("resultStatus").dataset.state = "error";
+      }
+    },
     onOpen: (example, file) => {
       try {
         const openedId = syncDoc(null, file);
@@ -273,116 +299,7 @@ mountPanel("FlowStudioExamples", global.FlowStudioExamples, Examples => {
 /* The Packages view (web/ide_packages_view.js) mounts itself and uses
  * FlowStudioPackageManager for its validated install and list code. */
 
-mountPanel("FlowStudioDebugPanel", global.FlowStudioDebugPanel, DebugPanel => {
-  const breakpoints = DebugPanel.createBreakpointStore();
-  const activeDocumentId = () => {
-    const app = global.FlowStudioApp;
-    const doc = app && app.documents.active();
-    return doc ? doc.id : null;
-  };
-  const debugPanel = DebugPanel.mount(global.document, {
-    node: el("view-debug"),
-    fetchFn: (route, init) => global.fetch(route, init),
-    getSource: () => document.getElementById("source").value,
-    getDocId: activeDocumentId,
-    getBreakpoints: () => breakpoints.lines(activeDocumentId()),
-    previousButton: el("debugPrevious"), nextButton: el("debugNext"),
-    previousBreakpointButton: el("debugPreviousBp"),
-    nextBreakpointButton: el("debugNextBp"),
-    onStep: step => global.FlowStudioApp.revealPosition(step.line, 1),
-    onOutput: output => {
-      const text = "\n> Python debug trace\n" + output +
-        (output.endsWith("\n") ? "" : "\n");
-      if (global.FlowStudioConsoleIO) global.FlowStudioConsoleIO.write(text, "python");
-      else {
-        const consolePane = el("console");
-        consolePane.textContent += text;
-        consolePane.scrollTop = consolePane.scrollHeight;
-      }
-    },
-    notice: (message, state) => {
-      el("resultStatus").textContent = message;
-      el("resultStatus").dataset.state = state || "";
-    }
-  });
-  const renderBreakpoints = () => {
-    const lines = breakpoints.lines(activeDocumentId());
-    el("debugBreakpoints").textContent = lines.length ?
-      "Breakpoints on lines: " + lines.join(", ") : "No breakpoints yet.";
-  };
-  const cursorLine = () => {
-    const source = document.getElementById("source");
-    return source.value.slice(0, source.selectionStart).split("\n").length;
-  };
-  el("debugToggleBp").addEventListener("click", () => {
-    const docId = activeDocumentId();
-    if (!docId) { el("resultStatus").textContent = "No active buffer."; return; }
-    if (!breakpoints.toggle(docId, cursorLine())) {
-      el("resultStatus").textContent = "Breakpoint limit reached.";
-      el("resultStatus").dataset.state = "error";
-    }
-    renderBreakpoints();
-  });
-  el("debugClearBp").addEventListener("click", () => {
-    const docId = activeDocumentId();
-    if (docId) breakpoints.clear(docId);
-    renderBreakpoints();
-  });
-  el("debugRun").addEventListener("click", async () => {
-    if (language.value !== "python") {
-      el("resultStatus").textContent = "The replay tracer runs Python only today.";
-      el("resultStatus").dataset.state = "error";
-      return;
-    }
-    const result = await debugPanel.run();
-    if (result) {
-      renderBreakpoints();
-      const first = debugPanel.current();
-      if (first) global.FlowStudioApp.revealPosition(first.line, 1);
-      el("resultStatus").textContent = result.ok ?
-        "Trace finished; scrub the steps." : "Execution failed; see the console.";
-      el("resultStatus").dataset.state = result.ok ? "ok" : "error";
-    }
-  });
-  // The existing native CPython debugger already implements genuine pausing
-  // in the persistent Python kernel. Mount its tested browser controller in
-  // the native workspace rather than substituting another replay tracer.
-  // An empty live breakpoint input inherits the editor's cursor breakpoints;
-  // explicit entries support the backend's bounded numeric conditions.
-  const NativePython = global.FlowStudioNativeFlow;
-  const LivePython = global.FlowStudioPythonDebugPanel;
-  if (NativePython && LivePython) {
-    const liveBreakpointInput = el("liveDebugBreakpoints");
-    const liveBreakpoints = {
-      get value() {
-        return liveBreakpointInput.value.trim() ||
-          breakpoints.lines(activeDocumentId()).join(",");
-      }
-    };
-    exports.liveDebugPanel = LivePython.create({
-      native: NativePython, source: el("source"), language,
-      breakpoints: liveBreakpoints,
-      pauseOnException: el("liveDebugPauseException"),
-      startButton: el("liveDebugStart"), stepButton: el("liveDebugStep"),
-      nextButton: el("liveDebugNext"), finishButton: el("liveDebugFinish"),
-      continueButton: el("liveDebugContinue"), runToCursorButton: el("liveDebugRunToCursor"),
-      stopButton: el("liveDebugStop"),
-      statusButton: el("liveDebugStatus"), target: el("liveDebugOutput"),
-      frameHost: el("liveDebugFrames"),
-      getDocId: activeDocumentId,
-      onFrame: frame => global.FlowStudioApp.revealPosition(frame.line, 1),
-      notice: message => {
-        el("resultStatus").textContent = message;
-        el("resultStatus").dataset.state = message.includes("error") ? "error" : "ok";
-      }
-    });
-  } else {
-    el("liveDebugOutput").textContent = "Native Python debugger scripts unavailable.";
-  }
-  exports.breakpoints = breakpoints;
-  exports.debugPanel = debugPanel;
-  exports.renderBreakpoints = renderBreakpoints;
-});
+/* Debugging lives in web/ide_debugger.js (Flow via LLDB, Python, R). */
 
 if ((typeof module === "undefined" || !module.exports) &&
     firstErrorPanel && global.console && global.console.warn) {

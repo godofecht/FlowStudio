@@ -48,12 +48,15 @@ extern {
     function fs_py_debug_run_to_line(line: string) -> string
     function fs_py_debug_stop() -> string
     function fs_py_debug_state() -> string
+    function fs_py_debug_breakpoints(points: string) -> string
     function fs_py_inspect() -> string
     function fs_py_plot() -> string
     function fs_py_status() -> i32
     function fs_py_reset() -> void
     function fs_pty(op: string, body: string) -> string
     function fs_pty_status() -> i32
+    function fs_flow_debug(op: string, body: string) -> string
+    function fs_flow_debug_status() -> i32
     function unlink(path: string) -> i32
     function strcmp(a: string, b: string) -> i32
     function strlen(s: string) -> i64
@@ -416,6 +419,9 @@ function send_python_debug(action: string, body: string) -> void {
     if eq(action, "status") {
         output = fs_py_debug_state()
     }
+    if eq(action, "breakpoints") {
+        output = fs_py_debug_breakpoints(body)
+    }
     let status: i32 = fs_py_status()
     if status == 200 or status == 422 {
         fs_reply(status, "application/json; charset=utf-8", output)
@@ -439,6 +445,18 @@ function send_python_environment() -> void {
 function send_pty(op: string) -> void {
     let output: string = fs_pty(op, fs_body())
     fs_reply(fs_pty_status(), "text/plain; charset=utf-8", output)
+}
+
+# Flow source debugging through LLDB (src/flow_debug_session.c and
+# src/flow_debugger.py). Replies are JSON snapshots of the paused program.
+function send_flow_debug(op: string) -> void {
+    let output: string = fs_flow_debug(op, fs_body())
+    let status: i32 = fs_flow_debug_status()
+    if status == 200 or status == 422 {
+        fs_reply(status, "application/json; charset=utf-8", output)
+    } else {
+        fs_reply(status, "text/plain; charset=utf-8", output)
+    }
 }
 
 function send_flow_check(code: string) -> void {
@@ -754,6 +772,46 @@ function dispatch() -> void {
             send_pty("close")
             return
         }
+        if eq(path, "/api/debug/flow/start") {
+            send_flow_debug("start")
+            return
+        }
+        if eq(path, "/api/debug/flow/step") {
+            send_flow_debug("step")
+            return
+        }
+        if eq(path, "/api/debug/flow/next") {
+            send_flow_debug("next")
+            return
+        }
+        if eq(path, "/api/debug/flow/finish") {
+            send_flow_debug("finish")
+            return
+        }
+        if eq(path, "/api/debug/flow/continue") {
+            send_flow_debug("continue")
+            return
+        }
+        if eq(path, "/api/debug/flow/pause") {
+            send_flow_debug("pause")
+            return
+        }
+        if eq(path, "/api/debug/flow/stop") {
+            send_flow_debug("stop")
+            return
+        }
+        if eq(path, "/api/debug/flow/status") {
+            send_flow_debug("status")
+            return
+        }
+        if eq(path, "/api/debug/flow/breakpoints") {
+            send_flow_debug("breakpoints")
+            return
+        }
+        if eq(path, "/api/debug/flow/evaluate") {
+            send_flow_debug("evaluate")
+            return
+        }
         if eq(path, "/api/check/flow") {
             send_flow_check(fs_body())
             return
@@ -893,6 +951,10 @@ function dispatch() -> void {
         }
         if eq(path, "/api/packages/r/update") {
             send_r_package_update(fs_body())
+            return
+        }
+        if eq(path, "/api/debug/python/breakpoints") {
+            send_python_debug("breakpoints", fs_body())
             return
         }
         if eq(path, "/api/debug/python/start") {

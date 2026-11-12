@@ -87,7 +87,57 @@ const R_ANALYSE =
 
 const EXAMPLES = [
   {
+    id: "flow-basics",
+    category: "start",
+    title: "Flow basics",
+    description: "Functions, while and for loops, conditions and printing, in one short program.",
+    language: "flow",
+    files: [{ name: "basics.flow", language: "flow", text: "# Flow basics: functions, loops, conditions and printing.\n# Press Run (Ctrl+Enter). Then try the debugging example next.\n\nfunction fib(n: i32) -> i64 {\n    let mut a: i64 = 0\n    let mut b: i64 = 1\n    let mut i: i32 = 0\n    while i < n {\n        let next: i64 = a + b\n        a = b\n        b = next\n        i = i + 1\n    }\n    return a\n}\n\nfunction parity(n: i64) -> string {\n    if n % 2 == 0 {\n        return \"even\"\n    }\n    return \"odd\"\n}\n\nfunction main() -> i32 {\n    let mut evens: i32 = 0\n    for i in 1 to 13 {\n        let value: i64 = fib(i)\n        if parity(value) == \"even\" {\n            evens = evens + 1\n        }\n        println(\"fib\", i, \"=\", value, parity(value))\n    }\n    println(\"even values:\", evens)\n    return 0\n}\n" }],
+    steps: ["Press Run. The console prints the first twelve Fibonacci numbers."]
+  },
+  {
+    id: "flow-structs",
+    category: "start",
+    title: "Structs and arrays",
+    description: "A struct, a fixed array and a function that returns a new struct each step of a falling-particle simulation.",
+    language: "flow",
+    files: [{ name: "particles.flow", language: "flow", text: "# Structs and fixed arrays: a small particle simulation step.\n\nstruct Particle {\n    x: f64,\n    v: f64\n}\n\nfunction step(p: Particle, dt: f64) -> Particle {\n    let accel: f64 = 0.0 - 9.81\n    return Particle { x: p.x + p.v * dt, v: p.v + accel * dt }\n}\n\nfunction main() -> i32 {\n    let heights: array<f64, 3> = [10.0, 20.0, 40.0]\n    for k in 0 to 3 {\n        let mut p: Particle = Particle { x: heights[k], v: 0.0 }\n        let mut t: i32 = 0\n        while p.x > 0.0 {\n            p = step(p, 0.01)\n            t = t + 1\n        }\n        println(\"dropped from\", heights[k], \"m, landed after\", t, \"steps\")\n    }\n    return 0\n}\n" }],
+    steps: ["Press Run. Each particle reports how many steps it took to land."]
+  },
+  {
+    id: "debug-flow",
+    category: "debug",
+    title: "Debug a Flow program",
+    description: "Pause at a breakpoint, step into a function, read locals and evaluate expressions. Runs under LLDB on a source-mapped build.",
+    language: "flow",
+    files: [{ name: "debug_me.flow", language: "flow", text: "# Debug a Flow program. Breakpoint on line 12 is set for you.\n# F5 starts, F11 steps into square(), Shift+F11 steps out, F5 continues.\nfunction square(n: i32) -> i32 {\n    let r: i32 = n * n\n    return r\n}\n\nfunction main() -> i32 {\n    let mut total: i32 = 0\n    let mut i: i32 = 1\n    while i <= 3 {\n        total = total + square(i)\n        i = i + 1\n    }\n    println(\"total\", total)\n    return 0\n}\n" }],
+    breakpoints: { "debug_me.flow": [12] },
+    steps: ["Press Debug. The program pauses on line 12.", "F11 steps into square(), Shift+F11 steps back out.",
+      "Type total * 2 in the Debug Console.", "F5 continues to the next loop iteration."]
+  },
+  {
+    id: "debug-python",
+    category: "debug",
+    title: "Debug a Python function",
+    description: "Watch a running total change inside a loop, then step out to the caller.",
+    language: "python",
+    files: [{ name: "debug_me.py", language: "python", text: "# Debug a Python function. Breakpoint on line 6 is set for you.\n# F5 starts and pauses there. Watch total grow in Variables, F10 steps.\ndef mean(values):\n    total = 0\n    for value in values:\n        total += value\n    return total / len(values)\n\nscores = [72, 88, 95, 61, 79]\naverage = mean(scores)\nabove = [s for s in scores if s > average]\nprint(\"average\", average)\nprint(\"above average\", above)\n" }],
+    breakpoints: { "debug_me.py": [6] },
+    steps: ["Press Debug. The program pauses inside mean().", "F10 steps, Shift+F11 returns to the caller."]
+  },
+  {
+    id: "debug-r",
+    category: "debug",
+    title: "Step through an R analysis",
+    description: "Run to a breakpoint, step one expression at a time and evaluate R while paused.",
+    language: "r",
+    files: [{ name: "step_me.R", language: "r", text: "# Step through an R analysis. Breakpoint on line 5 is set for you.\n# F5 runs to it, F10 runs one expression at a time, and the Debug Console\n# evaluates R while paused. Open the Data view to see summary_table.\nscores <- c(72, 88, 95, 61, 79)\naverage <- mean(scores)\nabove <- scores[scores > average]\nsummary_table <- data.frame(score = scores, above = scores > average)\nprint(summary_table)\ncat(\"average:\", average, \"\\n\")\n" }],
+    breakpoints: { "step_me.R": [5] },
+    steps: ["Press Debug. R pauses before line 5.", "F10 runs one expression. Evaluate mean(scores) in the Debug Console."]
+  },
+  {
     id: "polyglot-pipeline",
+    category: "polyglot",
     title: "Python → data file → R analysis",
     description: "Generate data with the persistent Python session, then analyse the same file with the R session. Two languages, one project folder.",
     language: "python-entry",
@@ -102,6 +152,7 @@ const EXAMPLES = [
   },
   {
     id: "flow-backend-mlir",
+    category: "flow",
     title: "Flow with the MLIR backend",
     description: "A Flow program compiled through the real MLIR/LLVM pipeline (choose Backend: MLIR next to Runtime). Falls back to the C backend message if this Flow build lacks LLVM.",
     language: "flow",
@@ -115,6 +166,7 @@ const EXAMPLES = [
   },
   {
     id: "python-r-handshake",
+    category: "polyglot",
     title: "Python → R one-shot handshake",
     description: "Uses the built-in /api/demo/python-r route: Python sums a vector, R takes the result as sqrt input. Shows the cross-kernel contract without files.",
     language: "demo",
@@ -126,6 +178,7 @@ const EXAMPLES = [
   },
   {
     id: "py-plot-r",
+    category: "polyglot",
     title: "Stats in Python, visuals in R",
     description: "Fits a regression with Python's stdlib (no deps) and plots residuals with base R graphics you can send to the Plots tab.",
     language: "python-entry",
@@ -161,17 +214,39 @@ const EXAMPLES = [
   }
 ];
 
-function examples() {
-  return EXAMPLES.slice();
+const CATEGORIES = Object.freeze([
+  ["start", "Get started"],
+  ["debug", "Debugging"],
+  ["polyglot", "Multi-language"],
+  ["flow", "Compiler backends"],
+  ["simulation", "Simulations"]
+]);
+
+/* MathFlow programs from examples/ (generated into examples_mathflow.js). */
+function simulations(source) {
+  const list = Array.isArray(source) ? source :
+    Array.isArray(global.FlowStudioMathFlowExamples) ? global.FlowStudioMathFlowExamples : [];
+  return list.filter(item => item && typeof item.text === "string" && item.text.length <= 32768)
+    .map(item => ({
+      id: item.id, category: "simulation", title: item.title, description: item.description || "",
+      language: "flow", runner: "mathflow",
+      files: [{ name: item.file, language: "flow", text: item.text }],
+      steps: ["Press Run. MathFlow integrates the PDE with NumPy and plots the field in the Plots view."]
+    }));
+}
+function examples(source) {
+  return EXAMPLES.slice().concat(simulations(source));
 }
 
 function validate() {
   const seen = new Set();
+  const categories = new Set(CATEGORIES.map(([key]) => key));
   for (const example of EXAMPLES) {
     if (typeof example.id !== "string" || !example.id || seen.has(example.id)) return "bad id";
     seen.add(example.id);
     if (typeof example.title !== "string" || !example.title) return "bad title";
     if (typeof example.description !== "string") return "bad description";
+    if (!categories.has(example.category)) return "bad category";
     if (!Array.isArray(example.steps)) return "bad steps";
     if (example.visual !== undefined && typeof example.visual !== "string") return "bad visual";
     if (!Array.isArray(example.files)) return "bad files";
@@ -181,12 +256,33 @@ function validate() {
       if (!["flow", "r", "python"].includes(file.language)) return "bad language";
       if (file.text.length > 32768) return "file too large";
     }
+    if (example.breakpoints !== undefined) {
+      for (const [name, lines] of Object.entries(example.breakpoints)) {
+        const file = example.files.find(item => item.name === name);
+        if (!file || !Array.isArray(lines)) return "bad breakpoints";
+        const count = file.text.split("\n").length;
+        if (lines.some(line => !Number.isInteger(line) || line < 1 || line > count)) return "bad breakpoint line";
+      }
+    }
   }
   return null;
 }
 
+const LANGUAGE_LABEL = { flow: "Flow", python: "Python", r: "R" };
+function languagesOf(example) {
+  const kinds = [...new Set(example.files.map(file => file.language))];
+  if (example.runner === "mathflow") return ["MathFlow"];
+  return kinds.length ? kinds.map(kind => LANGUAGE_LABEL[kind] || kind) : ["Python", "R"];
+}
+function matches(example, needle) {
+  if (!needle) return true;
+  const hay = (example.title + " " + example.description + " " + languagesOf(example).join(" ") + " " +
+    example.files.map(file => file.name).join(" ")).toLowerCase();
+  return needle.toLowerCase().split(/\s+/).filter(Boolean).every(word => hay.includes(word));
+}
+
 function mount(document, options) {
-  const { host, onOpen, onOpenProject, onDemo, notice = () => {},
+  const { host, onOpen, onOpenProject, onDemo, onDebug, notice = () => {},
     onReopenProject = null, onForgetProject = null } = options || {};
   if (!host) throw new TypeError("Examples gallery needs a host element.");
   const problem = validate();
@@ -194,19 +290,58 @@ function mount(document, options) {
   if (typeof onOpen !== "function" ||
       (onOpenProject && typeof onOpenProject !== "function") ||
       (onDemo && typeof onDemo !== "function") ||
+      (onDebug && typeof onDebug !== "function") ||
       (onReopenProject && typeof onReopenProject !== "function") ||
       (onForgetProject && typeof onForgetProject !== "function"))
-    throw new TypeError("Examples gallery needs onOpen and optional onOpenProject, onDemo, onReopenProject and onForgetProject callbacks.");
+    throw new TypeError("Examples gallery needs onOpen and optional onOpenProject, onDemo, onDebug, onReopenProject and onForgetProject callbacks.");
   const savedData = options && options.saved && typeof options.saved.list === "function"
     ? options.saved : null;
+  const all = examples(options && options.simulations);
+  const h = (tag, className, text) => {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text != null) node.textContent = text;
+    return node;
+  };
+  const button = (className, text, onClick, label) => {
+    const node = h("button", className, text);
+    node.type = "button";
+    if (label) node.setAttribute("aria-label", label);
+    node.addEventListener("click", onClick);
+    return node;
+  };
 
-  /* Saved projects come first: they act like project management for
-   * examples opened earlier, persisting as project files on this device. */
-  const savedSection = document.createElement("div");
-  savedSection.className = "saved-projects";
-  const curatedSection = document.createElement("div");
-  curatedSection.className = "curated-examples";
-  host.replaceChildren(savedSection, curatedSection);
+  /* Toolbar: search and category chips. */
+  const toolbar = h("div", "ex-toolbar");
+  const search = h("input", "ex-search");
+  search.type = "search";
+  search.id = "examplesSearch";
+  search.placeholder = "Search " + all.length + " examples";
+  search.setAttribute("aria-label", "Search examples");
+  search.autocomplete = "off";
+  const chips = h("div", "ex-chips");
+  chips.setAttribute("role", "tablist");
+  chips.setAttribute("aria-label", "Example categories");
+  toolbar.append(search, chips);
+  const savedSection = h("div", "saved-projects");
+  const curatedSection = h("div", "curated-examples");
+  const empty = h("p", "ex-empty muted", "No examples match.");
+  empty.hidden = true;
+  host.replaceChildren(toolbar, savedSection, curatedSection, empty);
+
+  let category = "all";
+  const chipNodes = new Map();
+  for (const [key, label] of [["all", "All"], ...CATEGORIES]) {
+    const count = key === "all" ? all.length : all.filter(example => example.category === key).length;
+    if (!count) continue;
+    const chip = button("ex-chip", label, () => { category = key; filter(); });
+    chip.dataset.category = key;
+    chip.setAttribute("role", "tab");
+    chip.append(h("span", "ex-chip-count", String(count)));
+    chipNodes.set(key, chip);
+    chips.append(chip);
+  }
+  if (typeof search.addEventListener === "function") search.addEventListener("input", () => filter());
 
   function fileCountText(files) {
     return files.length + (files.length === 1 ? " file" : " files");
@@ -214,65 +349,34 @@ function mount(document, options) {
   function renderSaved() {
     const list = savedData ? savedData.list() : [];
     savedSection.replaceChildren();
-    const heading = document.createElement("h2");
-    heading.className = "gallery-heading";
-    heading.textContent = "Your projects";
+    const heading = h("h2", "gallery-heading", "Your projects");
     savedSection.append(heading);
     if (!list.length) {
-      const empty = document.createElement("p");
-      empty.className = "muted";
-      empty.textContent = "Projects you open below are saved on this device with your edits, so you can reopen them here after a reload.";
-      savedSection.append(empty);
+      savedSection.append(h("p", "muted", "Examples you open are saved on this device with your edits, so you can reopen them here after a reload."));
       return;
     }
     for (const project of list) {
-      const card = document.createElement("section");
-      card.className = "example-card saved-project";
+      const card = h("section", "example-card saved-project");
       card.dataset.projectId = project.id;
-      const head = document.createElement("div");
-      head.className = "example-head";
-      const title = document.createElement("h3");
-      title.textContent = project.title;
-      head.append(title);
-      const meta = document.createElement("span");
-      meta.className = "example-langs";
-      const when = Number.isFinite(project.savedAt) ?
-        new Date(project.savedAt).toLocaleString() : "";
-      meta.textContent = fileCountText(project.files) + (when ? " · " + when : "");
-      head.append(meta);
+      const head = h("div", "example-head");
+      head.append(h("h3", "", project.title));
+      const when = Number.isFinite(project.savedAt) ? new Date(project.savedAt).toLocaleString() : "";
+      head.append(h("span", "example-langs", fileCountText(project.files) + (when ? ", " + when : "")));
       card.append(head);
-      const names = document.createElement("p");
-      names.className = "saved-project-files muted";
-      names.textContent = project.files.map(file => file.name).join(", ");
-      card.append(names);
+      const actions = h("div", "exg-actions");
       if (onReopenProject) {
-        const reopen = document.createElement("button");
-        reopen.type = "button";
-        reopen.className = "primary";
-        reopen.textContent = "Reopen project (" + fileCountText(project.files) + ")";
-        reopen.addEventListener("click", () => onReopenProject(project));
-        card.append(reopen);
-        for (const file of project.files) {
-          const button = document.createElement("button");
-          button.type = "button";
-          button.className = "example-file-btn";
-          button.textContent = file.name + " · " + file.language;
-          button.addEventListener("click", () => onReopenProject(project, file));
-          card.append(button);
-        }
+        actions.append(button("primary", "Reopen", () => onReopenProject(project),
+          "Reopen project " + project.title + " (" + fileCountText(project.files) + ")"));
+        for (const file of project.files)
+          actions.append(button("example-file-btn", file.name, () => onReopenProject(project, file)));
       }
       if (onForgetProject) {
-        const forget = document.createElement("button");
-        forget.type = "button";
-        forget.className = "example-forget";
-        forget.setAttribute("aria-label", "Forget saved project " + project.title);
-        forget.textContent = "Forget project";
-        forget.addEventListener("click", () => {
+        actions.append(button("example-forget", "Forget", () => {
           onForgetProject(project.id);
           renderSaved();
-        });
-        card.append(forget);
+        }, "Forget saved project " + project.title));
       }
+      card.append(actions);
       savedSection.append(card);
     }
   }
@@ -281,75 +385,70 @@ function mount(document, options) {
     renderSaved();
   });
 
-  const curated = document.createElement("h2");
-  curated.className = "gallery-heading";
-  curated.textContent = "Curated examples";
-  curatedSection.append(curated);
-  for (const example of EXAMPLES) {
-    const card = document.createElement("section");
-    card.className = "example-card";
-    card.dataset.exampleId = example.id;
-    const head = document.createElement("div");
-    head.className = "example-head";
-    const title = document.createElement("h3");
-    title.textContent = example.title;
-    head.append(title);
-    const langs = document.createElement("span");
-    langs.className = "example-langs";
-    const kinds = [...new Set(example.files.map(file => file.language))];
-    langs.textContent = kinds.length ? kinds.join(" · ") : "Python + R (one-shot)";
-    head.append(langs);
-    card.append(head);
-    const description = document.createElement("p");
-    description.className = "muted";
-    description.textContent = example.description;
-    card.append(description);
-    if (example.visual) {
-      const hint = document.createElement("p");
-      hint.className = "example-visual";
-      hint.textContent = "Visual: " + example.visual;
-      card.append(hint);
+  const groups = new Map();
+  const cards = [];
+  for (const [key, label] of CATEGORIES) {
+    const members = all.filter(example => example.category === key);
+    if (!members.length) continue;
+    const group = h("div", "ex-group");
+    group.dataset.category = key;
+    group.append(h("h2", "gallery-heading", label));
+    groups.set(key, group);
+    curatedSection.append(group);
+    for (const example of members) {
+      const card = h("section", "example-card");
+      card.dataset.exampleId = example.id;
+      card.dataset.category = key;
+      const head = h("div", "example-head");
+      const title = h("h3", "", example.title);
+      head.append(title);
+      head.append(h("span", "example-langs", languagesOf(example).join(" + ")));
+      card.append(head);
+      card.append(h("p", "muted ex-desc", example.description));
+      if (example.visual) card.append(h("p", "example-visual", example.visual));
+      const actions = h("div", "exg-actions");
+      if (handleOpenProject && !example.demoRoute) {
+        actions.append(button("primary", "Run", () => handleOpenProject(example),
+          "Open and run " + example.title + " (" + fileCountText(example.files) + ")"));
+      }
+      if (example.breakpoints && onDebug) {
+        actions.append(button("ex-debug", "Debug", () => { onDebug(example); renderSaved(); },
+          "Open " + example.title + " and start debugging"));
+      }
+      if (example.demoRoute && onDemo) {
+        actions.append(button("primary", "Run demo", () => onDemo(example),
+          "Run the Python and R demo in the console"));
+      }
+      for (const file of example.files)
+        actions.append(button("example-file-btn", file.name, () => onOpen(example, file), "Open " + file.name));
+      card.append(actions);
+      const steps = h("details", "example-runbook");
+      steps.append(h("summary", "", "How it works"));
+      const ordered = h("ol");
+      for (const step of example.steps) ordered.append(h("li", "", step));
+      steps.append(ordered);
+      card.append(steps);
+      group.append(card);
+      cards.push({ card, example });
     }
-    if (handleOpenProject && !example.demoRoute) {
-      const primary = document.createElement("button");
-      primary.type = "button";
-      primary.className = "primary";
-      primary.textContent = "Open and run (" + example.files.length + " " +
-        (example.files.length === 1 ? "file" : "files") + ")";
-      primary.addEventListener("click", () => handleOpenProject(example));
-      card.append(primary);
+  }
+  function filter() {
+    const needle = String(search.value || "").trim();
+    let shown = 0;
+    for (const { card, example } of cards) {
+      const visible = (category === "all" || example.category === category) && matches(example, needle);
+      card.hidden = !visible;
+      if (visible) shown++;
     }
-    if (example.demoRoute && onDemo) {
-      const demo = document.createElement("button");
-      demo.type = "button";
-      demo.textContent = "Run demo in the console (Python + R)";
-      demo.addEventListener("click", () => onDemo(example));
-      card.append(demo);
-    }
-    for (const file of example.files) {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "example-file-btn";
-      button.textContent = file.name + " · " + file.language;
-      button.addEventListener("click", () => onOpen(example, file));
-      card.append(button);
-    }
-    const steps = document.createElement("details");
-    steps.className = "example-runbook";
-    const summary = document.createElement("summary");
-    summary.textContent = "How to run";
-    steps.append(summary);
-    const ordered = document.createElement("ol");
-    for (const step of example.steps) {
-      const item = document.createElement("li");
-      item.textContent = step;
-      ordered.append(item);
-    }
-    steps.append(ordered);
-    card.append(steps);
-    curatedSection.append(card);
+    for (const [key, group] of groups)
+      group.hidden = !cards.some(item => item.example.category === key && !item.card.hidden);
+    for (const [key, chip] of chipNodes) chip.setAttribute("aria-selected", String(key === category));
+    savedSection.hidden = !!needle || category !== "all";
+    empty.hidden = shown > 0;
   }
   renderSaved();
+  filter();
+  return { filter: (text, next) => { if (text != null) search.value = text; if (next) category = next; filter(); } };
 }
 
 /* Legacy-source upgrade: buffers and saved projects written before the
@@ -371,7 +470,7 @@ function upgradeFiles(files) {
   return upgraded ? next : null;
 }
 
-const api = { examples, validate, mount, upgradeFiles };
+const api = { examples, validate, mount, upgradeFiles, simulations, CATEGORIES };
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 global.FlowStudioExamples = api;
 })(globalThis);

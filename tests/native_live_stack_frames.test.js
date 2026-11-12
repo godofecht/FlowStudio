@@ -110,20 +110,12 @@ test("status without an owned source snapshot cannot jump to unrelated code", as
   assert.equal(ui.selectFrame(0), false);
 });
 
-test("native workspace wires paused frames to the actual editor and keeps labels inert", () => {
+test("native workspace renders paused frames as inert text and reveals their lines", () => {
   const read = name => fs.readFileSync(path.join(__dirname, "..", name), "utf8");
-  const html = read("web/index.html");
-  const wiring = read("web/workspace_panels.js");
-  assert.match(html, /id="liveDebugFrames"/);
-  assert.match(html, /class="live-debug-frames"/);
-  assert.match(wiring, /frameHost: el\("liveDebugFrames"\)/);
-  assert.match(wiring, /getDocId: activeDocumentId/);
-  assert.match(wiring, /onFrame: frame => global\.FlowStudioApp\.revealPosition\(frame\.line, 1\)/);
-  const f = fixture([{...nested, stack: [
-    {line: 3, function: "<img onerror=alert(1)>", locals: {}}
-  ]}]);
-  return panel.create(f.controls).execute("start").then(() => {
-    assert.equal(f.host.children[0].textContent.includes("<img"), true);
-    assert.equal(f.host.children[0].innerHTML, undefined);
-  });
+  const source = read("web/ide_debugger.js");
+  // Frame and variable names come from the debuggee: always textContent.
+  assert.match(source, /h\("span", "dbg-frame-name", frame\.name \|\| "\?"\)/);
+  assert.match(source, /h\("span", "dbg-var-name", variable\.name\)/);
+  assert.doesNotMatch(source, /innerHTML = (frame|variable|snap)/);
+  assert.match(source, /editor\.revealLineInCenterIfOutsideViewport\(line\)/);
 });

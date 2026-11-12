@@ -76,6 +76,36 @@ Run its tests with:
 
     node --test tests/ide_symbols.test.js tests/ide_outline.test.js tests/ide_definition.test.js
 
+### Workspace explorer
+
+The native IDE at `http://127.0.0.1:8751/` has an activity bar on the left
+with Explorer, Search, Outline, Plots, Data, Packages, Examples and Debug
+views. The Explorer shows the open folder as a tree:
+
+- Open folder asks the browser for read and write access to one folder.
+  Recently opened folders are listed for one-click reopening, and the files
+  that were open come back as tabs.
+- New file and New folder take a name inline. A path such as
+  `lib/helper.flow` creates the missing folders. Names are checked as you
+  type.
+- F2 or the context menu renames a file or folder. Delete asks before it
+  removes anything. Dragging a file or folder onto another folder moves it.
+  Open tabs follow a rename or move, and a tab with unsaved changes blocks
+  the operation until it is saved or closed.
+- Arrow keys, Home, End and Enter move through the tree. Typing the start of
+  a name selects it. Shift+F10 opens the context menu, Ctrl+Shift+E focuses
+  the Explorer, Ctrl+Shift+F opens Search, and Alt+F1 reveals the active file.
+- Open files are marked in the tree, unsaved ones with an M. The breadcrumb
+  above the editor shows the file's path, and each folder in it reveals that
+  folder in the tree.
+
+All file access goes through the browser's File System Access API on this
+device, so the Explorer needs Chrome, Edge or another Chromium browser.
+Nothing is uploaded to the server. Browsers do not yet offer an atomic folder
+move for user folders, so a folder rename or move copies the folder, checks
+every file, and then removes the original. Folders over 1,000 entries or
+64 MB are refused.
+
 The browser can open several source files at once as tabs, save them, choose a local project folder, lazily browse its source tree, create a source file in the project root, refresh the tree, search project files for literal text with exact match navigation, run the selected text or whole buffer as Flow, R or Python, and display captured stdout/stderr. Project operations use the browser File System Access API and are unavailable in browsers without folder-picker support. The native server retains separate Python and R interpreter processes between evaluations, with explicit reset controls. These are single-user localhost sessions, not restart-persistent or remotely isolated kernels.
 
 ### Editor find and replace

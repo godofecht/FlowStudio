@@ -309,6 +309,7 @@ try {
     source.dispatchEvent(new Event('input', { bubbles: true }));
     FlowStudioEditor.editor.setPosition({lineNumber: 3, column: 1});
   });
+  await page.locator('#runMore').click();               // secondary run actions live in the overflow
   await page.locator('#autoCheckFlow').check();
   await page.waitForFunction(() =>
     document.getElementById('resultStatus').textContent === 'Flow compile check passed.',
@@ -317,6 +318,7 @@ try {
     'idle compiler diagnostics must preserve the user caret');
   assert.equal(await page.locator('#autoCheckFlow').isChecked(), true);
   await page.locator('#autoCheckFlow').uncheck();
+  await page.keyboard.press('Escape');
 
   // Exercise the worker path and wait beyond rendering and deferred callbacks.
   const workerResult = await page.evaluate(async () => {

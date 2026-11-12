@@ -17,7 +17,7 @@ button:hover:not(:disabled),select:hover{border-color:#6d90cf}
 button:disabled{opacity:.45;cursor:not-allowed}
 button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .shell{height:100dvh;display:grid;grid-template-rows:auto minmax(0,1fr) var(--sash) var(--dock-height) auto}
-.topbar{display:flex;align-items:center;gap:8px;min-height:var(--titlebar-height);padding:3px 10px;background:var(--surface);border-bottom:1px solid var(--line);flex-wrap:wrap;row-gap:3px}
+.topbar{display:flex;align-items:center;gap:8px;min-height:var(--titlebar-height);padding:3px 10px;background:var(--surface);border-bottom:1px solid var(--line);flex-wrap:nowrap;min-width:0}
 .brand{display:flex;align-items:center;gap:8px;font-weight:600;font-size:13.5px;white-space:nowrap;letter-spacing:-.01em;padding-right:10px;margin-right:2px;border-right:1px solid var(--line)}
 .brand b{color:#8fb8ff}
 .brand-mark{display:grid;place-items:center;width:22px;height:22px;border-radius:5px;background:var(--accent-dim);color:#8fb8ff}
@@ -31,11 +31,11 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
 .menu-popup button:hover,.menu-popup button:focus-visible{background:var(--accent-dim)}
 .menu-popup kbd{color:var(--muted);font:11px ui-monospace,monospace}
 .menu-popup hr{border:0;border-top:1px solid var(--line);margin:4px 2px}
-.topbar-actions{margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap;row-gap:3px;padding:1px 0}
+.topbar-actions{margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:nowrap;min-width:0;padding:1px 0}
 .topbar-actions label{color:var(--muted);font-size:11.5px}
 .topbar-actions button,.topbar-actions select{padding:4px 9px;font-size:12.5px;border-radius:6px;line-height:1.25}
 .primary{background:#2f5db8;border-color:#4275d6}
-.command-launcher{display:flex;align-items:center;gap:8px;min-width:200px;max-width:320px;background:#0f141d;border:1px solid #33415a;border-radius:6px;padding:4px 9px;color:var(--muted);font-size:12.5px}
+.command-launcher{display:flex;align-items:center;gap:8px;min-width:120px;flex:0 1 320px;max-width:320px;background:#0f141d;border:1px solid #33415a;border-radius:6px;padding:4px 9px;color:var(--muted);font-size:12.5px}
 .command-launcher span{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .command-launcher kbd{margin-left:auto;color:#8fa2c0;font:11px/1 var(--mono);background:#ffffff0d;border:1px solid #33415a;border-radius:4px;padding:2px 5px}
 .command-launcher:hover{border-color:#4a5f85}
@@ -53,7 +53,7 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
 .menu-empty{padding:8px 10px;color:var(--muted);font-size:11.5px}
 .menu-footer{display:flex;gap:16px;justify-content:flex-end;padding:6px 9px 2px;margin-top:4px;border-top:1px solid var(--line);color:var(--muted);font-size:10.5px}
 .menu-footer kbd{color:#8fa2c0;background:#ffffff0d;border:1px solid #33415a;border-radius:3px;padding:0 4px;font:10px var(--mono)}
-.run-cluster{display:flex;gap:6px;align-items:center;flex-wrap:wrap;row-gap:3px}
+.run-cluster{display:flex;gap:6px;align-items:center;flex:none}
 .run-widget{display:flex;align-items:stretch;overflow:hidden;border:1px solid #33415a;border-radius:6px;background:#0f141d}
 .run-chip{display:flex;align-items:center;gap:8px;background:transparent;border:0;border-radius:6px 0 0 6px;padding:4px 6px 4px 9px;font-size:12.5px;color:#dfe4ee}
 .run-chip:hover{background:#ffffff08}
@@ -75,6 +75,96 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
 .se-group-title{padding:8px 8px 3px;font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
 .se-empty{padding:14px 8px;color:var(--muted);font-size:12px}
 .config-footer{display:flex;justify-content:flex-end;gap:16px;color:var(--muted);font-size:10.5px;border-top:1px solid var(--line);padding-top:8px;margin-top:4px}
+/* Sidebar: VS Code activity bar beside the active view. */
+.sidebar{flex-direction:row}
+.activity-bar{display:flex;flex-direction:column;align-items:center;gap:2px;flex:none;width:42px;padding:6px 0;background:var(--bg);border-right:1px solid var(--line)}
+.activity-bar button{position:relative;display:grid;place-items:center;width:42px;height:40px;padding:0;background:transparent;border:0;border-radius:0;color:#7f8ea6}
+.activity-bar button svg{width:20px;height:20px}
+.activity-bar button:hover{color:var(--ink)}
+.activity-bar button[aria-selected="true"]{color:var(--ink)}
+.activity-bar button[aria-selected="true"]::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:2px;border-radius:0 2px 2px 0;background:var(--accent)}
+.activity-bar button:focus-visible{outline-offset:-3px}
+.tab-label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.sidebar-views{display:flex;flex-direction:column;flex:1;min-width:0;min-height:0}
+.explorer-body{padding:0!important;display:flex;flex-direction:column}
+/* Explorer tree */
+.explorer{display:flex;flex-direction:column;min-height:0;flex:1;font-size:13px;position:relative}
+.ex-header{display:flex;align-items:center;gap:2px;height:28px;padding:0 4px 0 2px;flex:none}
+.ex-title{display:flex;align-items:center;gap:2px;flex:1;min-width:0;height:24px;padding:0 4px;background:transparent;border:1px solid transparent;border-radius:4px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink);text-align:left}
+.ex-title-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ex-title.drop-target{background:var(--accent-dim);border-color:var(--accent)}
+.explorer:not(.has-root) .ex-header{display:none}
+.ex-actions{display:flex;gap:1px;opacity:.0;transition:opacity .12s}
+.explorer:hover .ex-actions,.explorer:focus-within .ex-actions,.explorer:not(.has-root) .ex-actions{opacity:1}
+.ex-action{display:grid;place-items:center;width:24px;height:24px;padding:0;background:transparent;border:0;border-radius:4px;color:#aebbd0}
+.ex-action:hover:not(:disabled){background:#ffffff14;color:#fff}
+.ex-action:disabled{opacity:.3}
+.ex-icon{display:inline-grid;place-items:center;flex:none;width:16px;height:16px}
+.ex-icon svg{width:16px;height:16px}
+.ex-chevron{color:#8a98ae;transition:transform .1s}
+.ex-chevron.open{transform:rotate(90deg)}
+.ex-chevron-space{display:inline-block;flex:none;width:16px}
+.ex-folder{color:#d8b56a}
+.ex-tree{list-style:none;margin:0;padding:0 0 12px;overflow:auto;flex:1;min-height:0;outline:none}
+.ex-row{position:relative;display:flex;align-items:center;gap:4px;height:22px;padding:0 8px 0 calc(6px + var(--depth,0) * 14px);cursor:pointer;white-space:nowrap;color:#cfd8e6;border:1px solid transparent;user-select:none}
+.ex-row::before{content:"";position:absolute;top:0;bottom:0;left:calc(13px + (var(--depth,0) - 1) * 14px);border-left:1px solid #ffffff10;display:var(--guide,block)}
+.ex-row[aria-level="1"]::before{display:none}
+.ex-row:hover{background:#ffffff0b}
+.ex-row[aria-selected="true"]{background:#ffffff12}
+.ex-tree:focus .ex-row[aria-selected="true"]{background:var(--accent-dim);border-color:var(--accent)}
+.ex-row.is-active .ex-name{color:#fff;font-weight:600}
+.ex-row.is-dirty .ex-name{color:var(--warn)}
+.ex-row.unsupported .ex-name{color:#76849a}
+.ex-row.is-dragging{opacity:.5}
+.ex-row.drop-target{background:var(--accent-dim);border-color:var(--accent)}
+.ex-name{overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1}
+.ex-badge{display:inline-grid;place-items:center;flex:none;min-width:16px;height:14px;padding:0 2px;border-radius:3px;font:700 8.5px/1 var(--mono);letter-spacing:-.02em;color:#0d1119}
+.ex-badge .ex-icon{color:#8a98ae}
+.ex-badge.tone-other{background:transparent}
+.tone-flow{background:#7fb0ff}.tone-r{background:#6ab8f0}.tone-python{background:#f2cf6b}.tone-markdown{background:#a7b6cc}.tone-data{background:#7fd6a3}.tone-config{background:#d39bf0}.tone-text{background:#94a3b8}
+.ex-dirty{flex:none;font:600 10px/1 var(--mono);color:var(--warn);margin-left:auto}
+.ex-dirty-dot{flex:none;width:6px;height:6px;border-radius:50%;background:var(--warn);margin-left:auto}
+.ex-note{height:22px;line-height:22px;padding-left:calc(28px + var(--depth,0) * 14px);color:var(--muted);font-size:12px;font-style:italic}
+.ex-editing{cursor:default;background:transparent!important}
+.ex-input-wrap{position:relative;flex:1;min-width:0}
+.ex-input{width:100%;height:20px;padding:0 4px;background:#0b0f16;color:var(--ink);border:1px solid var(--accent);border-radius:2px;font:inherit;font-size:13px;outline:none}
+.ex-input[aria-invalid="true"]{border-color:#e06c75}
+.ex-input-error{position:absolute;z-index:5;left:0;right:0;top:21px;padding:4px 6px;background:#4a1d22;border:1px solid #e06c75;color:#ffd7d7;font-size:11.5px;line-height:1.35;white-space:normal}
+.ex-empty{padding:10px 14px;display:flex;flex-direction:column;gap:8px}
+.ex-empty-title{margin:4px 0 0;font-weight:600;color:var(--ink)}
+.ex-empty-text{margin:0;color:var(--muted);font-size:12.5px;line-height:1.5}
+.ex-primary{padding:6px 10px;font-size:13px}
+.ex-section-label{margin:10px 0 0;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.ex-recent{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px}
+.ex-recent li{display:flex;align-items:center}
+.ex-recent-item{display:flex;align-items:center;gap:6px;flex:1;min-width:0;padding:4px 6px;background:transparent;border:0;border-radius:4px;text-align:left;font-size:13px}
+.ex-recent-item:hover{background:#ffffff0d}
+.ex-recent-forget{display:grid;place-items:center;width:22px;height:22px;padding:0;background:transparent;border:0;color:var(--muted);opacity:0}
+.ex-recent li:hover .ex-recent-forget,.ex-recent-forget:focus-visible{opacity:1}
+.ex-typeahead{position:absolute;right:10px;bottom:10px;padding:3px 8px;background:var(--surface-2);border:1px solid var(--accent);border-radius:4px;font:12px var(--mono);color:var(--ink);box-shadow:0 6px 16px #0007}
+.ex-typeahead.miss{border-color:#e06c75;color:#ffb4a8}
+.ex-menu{position:fixed;z-index:100;min-width:220px;padding:4px;background:var(--surface-2);border:1px solid #33415a;border-radius:7px;box-shadow:0 14px 32px #000a;font-size:13px}
+.ex-menu-item{display:flex;justify-content:space-between;align-items:center;gap:18px;width:100%;padding:5px 10px;background:transparent;border:0;border-radius:4px;text-align:left}
+.ex-menu-item:hover,.ex-menu-item:focus{background:var(--accent-dim);outline:none}
+.ex-menu-item kbd{color:var(--muted);font:11px var(--mono)}
+.ex-menu hr{border:0;border-top:1px solid var(--line);margin:4px 2px}
+/* Search view */
+.search-body .project-search{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+.search-field{display:flex;align-items:center;gap:2px;background:#0f141d;border:1px solid #3a4a63;border-radius:5px;padding:0 3px 0 0}
+.search-field:focus-within{border-color:var(--accent)}
+.search-field input[type="search"],.search-field input[type="text"]{flex:1;min-width:0;background:transparent;border:0;color:var(--ink);padding:5px 7px;font:inherit;font-size:13px;outline:none}
+.search-toggle{display:grid;place-items:center;position:relative;flex:none;width:22px;height:20px;border-radius:3px;cursor:pointer;font:11px var(--mono);color:var(--muted)}
+.search-toggle input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
+.search-toggle:has(input:checked){background:var(--accent-dim);color:#fff;outline:1px solid var(--accent)}
+.search-toggle:has(input:focus-visible){outline:2px solid var(--accent)}
+.search-actions{display:flex;gap:5px;flex-wrap:wrap}
+.search-actions button{padding:4px 9px;font-size:12px}
+/* Run overflow */
+.run-more{position:relative}
+.run-more-trigger{padding:4px 8px!important;letter-spacing:.05em}
+.run-more-popup{left:auto;right:0}
+.run-more-popup .flow-auto-check{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:5px;color:var(--ink)!important;font-size:13px!important;cursor:pointer}
+.run-more-popup .flow-auto-check:hover{background:var(--accent-dim)}
 .workspace{display:grid;grid-template-columns:var(--sidebar-width) var(--sash) minmax(0,1fr) var(--sash) var(--right-width);min-height:0}
 .splitter{position:relative;background:var(--bg);cursor:col-resize}
 .splitter::after{content:"";position:absolute;inset:0 2px;background:var(--line)}
@@ -92,9 +182,6 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
 .sidebar{border-right:1px solid var(--line)}
 .rightpanel{border-left:1px solid var(--line)}
 .panel .body{flex:1;min-height:0;overflow:auto;padding:10px 12px}
-.workspace-tabs{display:flex;flex:none;flex-wrap:wrap;overflow-x:auto;gap:4px 3px;padding:6px 8px;border-bottom:1px solid var(--line)}
-.workspace-tabs button{flex:1 1 auto;font-size:12px;background:transparent;border-color:transparent;white-space:nowrap}
-.workspace-tabs [aria-selected="true"]{background:var(--accent-dim);border-color:#3d5c95}
 .workspace-frame{flex:1;min-height:0}
 .workspace-frame iframe{display:block;width:100%;height:100%;border:0;background:#10141e}
 #view-plots:not([hidden]){display:flex;flex-direction:column}
@@ -127,12 +214,6 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
 .project-search label{font-size:12px;color:var(--muted)}
 #searchResults{display:flex;flex-direction:column;gap:3px;margin-bottom:9px}
 #searchResults button{width:100%;text-align:left;white-space:normal;overflow-wrap:anywhere;font:12px/1.45 ui-monospace,monospace;padding:4px 6px}
-#projectTree{display:flex;flex-direction:column;gap:3px;font-size:13px}
-#projectTree details{padding-left:8px;border-left:1px solid var(--line)}
-#projectTree summary{cursor:pointer;padding:3px 0}
-#projectTree .project-children{display:flex;flex-direction:column;gap:2px;margin:3px 0 4px 6px}
-#projectTree .project-file{display:block;width:100%;text-align:left;overflow-wrap:anywhere;padding:3px 6px;background:transparent;border-color:transparent}
-#projectTree .project-file:hover{background:var(--accent-dim)}
 .hint{font-size:12px;max-width:46ch}
 .muted{color:var(--muted)}
 .example-card{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:10px;background:var(--surface-2)}
@@ -189,6 +270,12 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
 .doc-tab{display:flex;align-items:center;gap:7px;max-width:230px;padding:0 5px 0 11px;background:#151c27;border:0;border-right:1px solid var(--line);border-radius:0;color:var(--muted);font-size:13px}
 .doc-tab.active{background:#111721;color:var(--ink);box-shadow:inset 0 2px 0 var(--accent)}
 .doc-tab-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.breadcrumb-path{display:flex;align-items:center;gap:4px;min-width:0;overflow:hidden;white-space:nowrap}
+.breadcrumb-path button{padding:1px 4px;background:transparent;border:0;border-radius:3px;color:inherit;font:inherit}
+.breadcrumb-path button:hover{background:#ffffff12;color:var(--ink)}
+.breadcrumb-path .crumb-current{color:var(--ink)}
+.crumb-sep{opacity:.6}
+.doc-tab-dir{flex:none;color:var(--muted);font-size:11px;opacity:.8}
 .doc-tab-dot{color:var(--warn);font-size:9px}
 .doc-tab-close{width:19px;height:19px;padding:0;line-height:1;background:transparent;border:0;border-radius:4px;color:var(--muted)}
 .doc-tab-close:hover{background:#33415a;color:#fff}
@@ -435,49 +522,60 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
       <select id="language" class="hidden-widget" aria-label="Execution language"><option value="flow">Flow</option><option value="r">R</option><option value="python">Python</option></select>
       <label for="flowBackend" class="hidden-widget">Backend</label>
       <select id="flowBackend" class="hidden-widget" aria-label="Flow compiler backend" title="Compiler backend for Flow runs"><option value="" selected>C (default)</option><option value="mlir">MLIR (experimental)</option></select>
-      <button id="runProject" title="Run every file of the active example project in its declared order, stopping at the first failure">Run Project</button>
       <button id="checkFlow" type="button" title="Compile-check the current Flow buffer without running it">Check Flow</button>
-      <label class="flow-auto-check" title="Opt in to strict, nonexecuting Flow compiler checks after 1.1 seconds of inactivity; checks can take up to 60 seconds"><input id="autoCheckFlow" type="checkbox">Check on idle</label>
-      <button id="runMathFlow" title="Run the supported Unicode mathematical Flow PDE dialect (NumPy required)">Run MathFlow</button>
-      <button id="runCell" title="Run current # %% cell (Ctrl/⌘+Shift+Enter)">Run cell</button>
-      <button id="resetR" type="button" title="Discard native R variables and restart its interpreter">Reset R</button>
-      <button id="resetPython" type="button" title="Discard native Python variables and restart its interpreter">Reset Python</button>
+      <div class="run-more">
+        <button id="runMore" type="button" class="run-more-trigger" aria-haspopup="menu" aria-expanded="false" aria-controls="runMorePopup" title="More run actions" aria-label="More run actions">&middot;&middot;&middot;</button>
+        <div class="menu-popup run-more-popup" id="runMorePopup" role="menu" aria-label="More run actions" hidden>
+          <button id="runCell" type="button" role="menuitem" title="Run current # %% cell (Ctrl/⌘+Shift+Enter)">Run cell<kbd>Ctrl+Shift+Enter</kbd></button>
+          <button id="runProject" type="button" role="menuitem" title="Run every file of the active example project in its declared order, stopping at the first failure">Run project</button>
+          <button id="runMathFlow" type="button" role="menuitem" title="Run the supported Unicode mathematical Flow PDE dialect (NumPy required)">Run MathFlow</button>
+          <hr>
+          <label class="flow-auto-check" role="menuitemcheckbox" title="Opt in to strict, nonexecuting Flow compiler checks after 1.1 seconds of inactivity; checks can take up to 60 seconds"><input id="autoCheckFlow" type="checkbox">Check Flow on idle</label>
+          <hr>
+          <button id="resetR" type="button" role="menuitem" title="Discard native R variables and restart its interpreter">Reset R session</button>
+          <button id="resetPython" type="button" role="menuitem" title="Discard native Python variables and restart its interpreter">Reset Python session</button>
+        </div>
+      </div>
     </div>
     <input id="fallbackOpen" type="file" accept=".flow,.R,.r,.py,.txt" hidden>
   </div>
 </header>
 <div class="workspace">
-  <aside class="panel sidebar" aria-label="Project files, outline, plots and data">
-    <div class="workspace-heading"><i data-lucide="folder-open"></i>Workspace<span class="local-badge">Local</span></div>
-    <div class="workspace-tabs" role="tablist" aria-label="Workspace views">
-      <button type="button" id="tab-files" role="tab" aria-controls="view-files" aria-selected="true" tabindex="0"><i data-lucide="files"></i>Files</button>
-      <button type="button" id="tab-outline" role="tab" aria-controls="view-outline" aria-selected="false" tabindex="-1"><i data-lucide="list-tree"></i>Outline</button>
-      <button type="button" id="tab-plots" role="tab" aria-controls="view-plots" aria-selected="false" tabindex="-1"><i data-lucide="chart-no-axes-combined"></i>Plots</button>
-      <button type="button" id="tab-data" role="tab" aria-controls="view-data" aria-selected="false" tabindex="-1"><i data-lucide="table-2"></i>Data</button>
-      <button type="button" id="tab-packages" role="tab" aria-controls="view-packages" aria-selected="false" tabindex="-1"><i data-lucide="package"></i>Packages</button>
-      <button type="button" id="tab-examples" role="tab" aria-controls="view-examples" aria-selected="false" tabindex="-1"><i data-lucide="library"></i>Examples</button>
-      <button type="button" id="tab-debug" role="tab" aria-controls="view-debug" aria-selected="false" tabindex="-1"><i data-lucide="bug"></i>Debug</button>
+  <aside class="panel sidebar" aria-label="Workspace">
+    <div class="activity-bar workspace-tabs" role="tablist" aria-orientation="vertical" aria-label="Workspace views">
+      <button type="button" id="tab-files" role="tab" aria-controls="view-files" aria-selected="true" tabindex="0" title="Explorer (Ctrl+Shift+E)" data-title="Explorer"><i data-lucide="files"></i><span class="tab-label">Files</span></button>
+      <button type="button" id="tab-search" role="tab" aria-controls="view-search" aria-selected="false" tabindex="-1" title="Search in folder (Ctrl+Shift+F)" data-title="Search"><i data-lucide="search"></i><span class="tab-label">Search</span></button>
+      <button type="button" id="tab-outline" role="tab" aria-controls="view-outline" aria-selected="false" tabindex="-1" title="Outline (Ctrl+Shift+O)" data-title="Outline"><i data-lucide="list-tree"></i><span class="tab-label">Outline</span></button>
+      <button type="button" id="tab-plots" role="tab" aria-controls="view-plots" aria-selected="false" tabindex="-1" title="Plots" data-title="Plots"><i data-lucide="chart-no-axes-combined"></i><span class="tab-label">Plots</span></button>
+      <button type="button" id="tab-data" role="tab" aria-controls="view-data" aria-selected="false" tabindex="-1" title="Data viewer" data-title="Data"><i data-lucide="table-2"></i><span class="tab-label">Data</span></button>
+      <button type="button" id="tab-packages" role="tab" aria-controls="view-packages" aria-selected="false" tabindex="-1" title="Packages" data-title="Packages"><i data-lucide="package"></i><span class="tab-label">Packages</span></button>
+      <button type="button" id="tab-examples" role="tab" aria-controls="view-examples" aria-selected="false" tabindex="-1" title="Examples" data-title="Examples"><i data-lucide="library"></i><span class="tab-label">Examples</span></button>
+      <button type="button" id="tab-debug" role="tab" aria-controls="view-debug" aria-selected="false" tabindex="-1" title="Debug" data-title="Debug"><i data-lucide="bug"></i><span class="tab-label">Debug</span></button>
     </div>
-    <div class="body project-body" id="view-files" role="tabpanel" aria-labelledby="tab-files">
-      <div class="project-tools">
-        <button id="folder" type="button"><i data-lucide="folder-open"></i>Open folder</button>
-        <button id="newFile" type="button" title="Create a new source file in the opened project"><i data-lucide="file-plus-2"></i>New file</button>
-        <button id="refreshProject" type="button" title="Refresh project tree" aria-label="Refresh project tree"><i data-lucide="rotate-cw"></i></button>
-      </div>
+    <div class="sidebar-views">
+    <div class="workspace-heading"><span id="sidebarTitle">Explorer</span><span class="local-badge" title="Files are read and written by your browser on this device">Local</span></div>
+    <div class="body explorer-body" id="view-files" role="tabpanel" aria-labelledby="tab-files">
+      <div id="explorer"></div>
+    </div>
+    <div class="body search-body" id="view-search" role="tabpanel" aria-labelledby="tab-search" hidden>
       <div class="project-search" role="search" aria-label="Search project files">
-        <label for="projectSearch">Find in project</label>
-        <input id="projectSearch" type="search" maxlength="256" placeholder="Text or regex" aria-label="Find in project">
-        <label><input id="caseSensitive" type="checkbox"> Case</label>
-        <label><input id="projectRegex" type="checkbox"> Regex</label>
-        <label><input id="projectWholeWord" type="checkbox"> Word</label>
-        <button id="searchProject" type="button">Find all</button>
-        <label for="projectReplace">Replace</label><input id="projectReplace" type="text" maxlength="10000" placeholder="Replacement text" aria-label="Project-wide replacement text">
-        <button id="replaceProject" type="button" title="Preview and confirm local file changes">Replace all…</button>
-        <button id="undoProjectReplace" type="button" disabled title="Undo the last verified project-wide replacement">Undo project replace</button>
+        <div class="search-field">
+          <input id="projectSearch" type="search" maxlength="256" placeholder="Search" aria-label="Find in project">
+          <label class="search-toggle" title="Match case"><input id="caseSensitive" type="checkbox"><span>Aa</span></label>
+          <label class="search-toggle" title="Match whole word"><input id="projectWholeWord" type="checkbox"><span>ab</span></label>
+          <label class="search-toggle" title="Use regular expression"><input id="projectRegex" type="checkbox"><span>.*</span></label>
+        </div>
+        <div class="search-field">
+          <input id="projectReplace" type="text" maxlength="10000" placeholder="Replace" aria-label="Project-wide replacement text">
+        </div>
+        <div class="search-actions">
+          <button id="searchProject" type="button" class="primary">Find all</button>
+          <button id="replaceProject" type="button" title="Preview and confirm local file changes">Replace all...</button>
+          <button id="undoProjectReplace" type="button" disabled title="Undo the last verified project-wide replacement">Undo replace</button>
+        </div>
       </div>
       <div id="searchResults" aria-live="polite" aria-label="Project search results"></div>
-      <div id="projectTree" role="navigation" aria-label="Project files"><div class="project-empty"><i data-lucide="folder-open"></i><p><strong>Your workspace starts here</strong></p><p>Open a folder to browse and edit your source files.</p></div></div>
-      <p class="muted hint">Files stay on this device.</p>
+      <p class="muted hint" id="searchHint">Searches the open folder on this device. Nothing is sent to the server.</p>
     </div>
     <div class="body outline-body" id="view-outline" role="tabpanel" aria-labelledby="tab-outline" hidden>
       <div class="outline-head"><span id="outlineLabel">Document symbols</span><button id="outlineRefresh" type="button" title="Re-read the buffer">Refresh</button></div>
@@ -559,6 +657,7 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
         <pre id="liveDebugOutput" class="live-debug-output" role="status" aria-live="polite">Start a Python session to inspect live stack frames.</pre>
       </section>
     </div>
+    </div>
   </aside>
   <div class="splitter" data-splitter data-axis="x" data-panel="sidebar" role="separator" aria-orientation="vertical" aria-label="Resize project sidebar" tabindex="0"></div>
   <main class="editor-area" aria-label="Source editor">
@@ -566,7 +665,7 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
       <div class="doc-tabs" id="docTabs" role="tablist" aria-label="Open documents"></div>
       <button id="newDocumentTab" class="doc-tab-new" type="button" title="New buffer (Ctrl+Alt+N)" aria-label="New buffer">+</button>
     </div>
-    <div class="editor-breadcrumb"><i data-lucide="file-code-2"></i><span>Workspace</span><i data-lucide="chevron-right"></i><span>Source</span><span id="editorEngine" class="editor-engine">Text editor</span></div>
+    <div class="editor-breadcrumb"><i data-lucide="file-code-2"></i><nav id="breadcrumbPath" class="breadcrumb-path" aria-label="File path"><span>Workspace</span><span class="crumb-sep" aria-hidden="true">&rsaquo;</span><span>Source</span></nav><span id="editorEngine" class="editor-engine">Text editor</span></div>
     <div class="editor-find" id="findBar" hidden><input id="editorFind" type="text" aria-label="Find text"><button id="findNext">Next</button>
     <label for="editorReplace">Replace with</label><input id="editorReplace" type="text" aria-label="Replacement text"><button id="replaceOne">Replace</button><button id="replaceAll">Replace all</button><button id="findPrevious">Previous</button><label><input id="editorCaseSensitive" type="checkbox"> Match case</label><label><input id="editorRegex" type="checkbox"> Regex</label><label><input id="editorWholeWord" type="checkbox"> Whole word</label><span id="editorFindCount" role="status" aria-live="polite"></span></div>
     <textarea id="source" spellcheck="false" aria-label="Source code editor">function main() -> i32 {
@@ -582,7 +681,7 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
   <aside class="panel rightpanel" aria-label="Environment">
     <h2><i data-lucide="sliders-horizontal"></i>Environment<span class="panel-tag">Native session</span></h2>
     <div class="body">
-      <p id="runtimeInfo">Flow execution available when Flow is installed.</p>
+      <p id="runtimeInfo">Flow executions are independent.</p>
       <button id="refreshPythonEnvironment" type="button"><i data-lucide="rotate-cw"></i>Refresh environment</button>
       <div id="pythonEnvironment" aria-live="polite"><p class="muted">Select Python or R to inspect its native session.</p></div>
       <p class="muted hint">Python and R keep their variables between runs. Reset a session from the Run menu.</p>
@@ -882,7 +981,7 @@ async function applyProjectReplacement(plan, options = {}) {
     if (!attempted.length) throw error;
     let restored = 0, unchanged = 0;
     const unresolved = [];
-    // Best-effort compensation, not a transaction. A crash, external edit,
+    // Best-effort compensation. This is no transaction. A crash, external edit,
     // denied permission or newly opened editor can prevent restoration.
     // Never overwrite contents differing from both the before/after images.
     for (const entry of attempted.reverse()) {
@@ -1037,7 +1136,15 @@ function createProjectExplorer({ tree, status, openHandle, picker }) {
       return applyProjectReplacement(undo, options);
     },
     hasUndoReplace: () => lastReplacement !== null && lastReplacement.root === root,
-    hasProject: () => root !== null };
+    hasProject: () => root !== null,
+    /* The workspace explorer owns folder choice; search and replace follow it. */
+    adopt: handle => {
+      if (handle !== null && (!handle || handle.kind !== "directory"))
+        throw new Error("Project root must be a directory.");
+      if (handle !== root) lastReplacement = null;
+      root = handle;
+    },
+    root: () => root };
 }
 const api = { createProjectExplorer, validFilename, searchProject, planProjectReplace, applyProjectReplacement, reverseProjectReplacement };
 if (typeof module !== "undefined" && module.exports) module.exports = api;
@@ -1501,6 +1608,9 @@ function markDirty(isDirty) {
 }
 /* Open-document tab strip: one tab per buffer, dirty marker, close control. */
 function renderTabs() {
+  // The explorer listens for this to refresh open, active and modified marks.
+  if (typeof document.dispatchEvent === "function" && typeof CustomEvent === "function")
+    document.dispatchEvent(new CustomEvent("flowstudio:documents"));
   const strip = el("docTabs");
   if (!strip) return;
   const list = documents.list();
@@ -1521,10 +1631,19 @@ function renderTabs() {
     tab.setAttribute("role", "tab");
     tab.setAttribute("aria-selected", String(selected));
     tab.title = FlowStudioDocuments.label(doc);
+    // VS Code style: the file name, plus its folder only when two open
+    // tabs share a name. The full path stays in the tooltip.
     const name = document.createElement("span");
     name.className = "doc-tab-name";
-    name.textContent = FlowStudioDocuments.label(doc);
+    name.textContent = doc.name;
     tab.append(name);
+    if (doc.path && list.some(other => other !== doc && other.name === doc.name)) {
+      const folder = document.createElement("span");
+      folder.className = "doc-tab-dir";
+      const parts = doc.path.split("/");
+      folder.textContent = parts.length > 1 ? parts[parts.length - 2] : "";
+      tab.append(folder);
+    }
     if (doc.dirty) {
       const dot = document.createElement("span");
       dot.className = "doc-tab-dot";
@@ -1970,36 +2089,36 @@ async function saveFileAs() {
     if (error.name !== "AbortError") status(String(error), "error");
   }
 }
+/* Search and replace model for the open folder. The workspace explorer
+ * (web/ide_explorer.js) owns the tree and hands its root over with adopt(). */
 const project = FlowStudioProject.createProjectExplorer({
-  tree: el("projectTree"),
+  tree: document.createElement("div"),
   status,
   openHandle: openEditorHandle,
-  picker: typeof window.showDirectoryPicker === "function"
-    ? options => window.showDirectoryPicker(options)
-    : null
+  picker: null
 });
-el("folder").addEventListener("click", async () => {
-  const chosen = await project.choose();
-  if (chosen) { ++searchRevision; el("searchResults").replaceChildren(); el("undoProjectReplace").disabled = true; }
-});
-el("refreshProject").addEventListener("click", () => project.refresh());
-el("newFile").addEventListener("click", async () => {
-  if (!project.hasProject()) {
-    status("Open a project folder first.", "error");
-    return;
+function adoptProjectRoot(handle) {
+  project.adopt(handle);
+  ++searchRevision;
+  el("searchResults").replaceChildren();
+  el("undoProjectReplace").disabled = true;
+}
+function workspaceExplorer() { return globalThis.FlowStudioWorkspaceExplorer || null; }
+function explorerCommand(name) {
+  const explorer = workspaceExplorer();
+  if (!explorer) { status("The file explorer is still loading.", "error"); return false; }
+  if (name !== "choose" && !explorer.hasRoot() && name !== "reveal") {
+    status("Open a folder first.", "error");
+    return false;
   }
-  const name = window.prompt("New source filename", "untitled." + extension(language.value));
-  if (name === null) return;
-  if (!FlowStudioProject.validFilename(name)) {
-    status("Invalid or unsupported source filename.", "error");
-    return;
+  el("tab-files").click();
+  if (name === "reveal") {
+    const doc = activeDocument();
+    if (!doc || !doc.path || !explorer.hasRoot()) { status("The active file is not in the open folder.", "error"); return false; }
+    return explorer.reveal(doc.path, true);
   }
-  try {
-    await project.create(name);
-  } catch (error) {
-    status(error.message || String(error), "error");
-  }
-});
+  return explorer[name]();
+}
 
 let searchRevision = 0;
 async function runProjectSearch() {
@@ -2391,7 +2510,11 @@ const commands = Object.freeze({
   openFile: () => openFile(),
   saveFile: () => saveFile(),
   saveFileAs: () => saveFileAs(),
-  openFolder: () => el("folder").click(),
+  openFolder: () => explorerCommand("choose"),
+  newFile: () => explorerCommand("newFile"),
+  newFolder: () => explorerCommand("newFolder"),
+  revealActiveFile: () => explorerCommand("reveal"),
+  showExplorer: () => { el("tab-files").click(); const explorer = workspaceExplorer(); if (explorer) explorer.focus(); },
   focusFind: () => {
     showFindBar();
     const selection = src.value.slice(src.selectionStart, src.selectionEnd);
@@ -2400,7 +2523,7 @@ const commands = Object.freeze({
     el("editorFind").focus();
   },
   focusReplace: () => { showFindBar(); el("editorReplace").focus(); },
-  findInProject: () => el("projectSearch").focus(),
+  findInProject: () => { el("tab-search").click(); el("projectSearch").focus(); },
   showOutline: () => el("tab-outline").click(),
   goToSymbol: () => goToSymbol(),
   goToDefinition: () => goToDefinition(),
@@ -2438,7 +2561,8 @@ const commands = Object.freeze({
 });
 if (typeof window !== "undefined") {
   window.FlowStudioApp = Object.freeze({
-    commands, documents, createUntitled, activateDocument, closeDocument, openEditorHandle, revealPosition
+    commands, documents, createUntitled, activateDocument, closeDocument, openEditorHandle, revealPosition,
+    project, adoptProjectRoot, status, renderTabs
   });
 }
 renderTabs();
@@ -2464,6 +2588,10 @@ renderTabs();
 <script src="/ide_menubar.js"></script>
 <script src="/ide_run_widget.js"></script>
 <script src="/ide_search_everywhere.js"></script>
+<script src="/app/project_create.js"></script>
+<script src="/app/project_rename.js"></script>
+<script src="/ide_explorer.js"></script>
+<script src="/ide_workspace.js"></script>
 <script src="/ide_symbols.js"></script>
 <script src="/ide_outline.js"></script>
 <script>

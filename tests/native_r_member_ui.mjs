@@ -29,7 +29,10 @@ try {
   });
   assert.ok(inspection.variables.some(variable => variable.name === 'analysis'),
     'real R inspector did not expose the created list');
-  await page.locator('#language').selectOption('r');
+  // The language select is driven by the run configuration widget.
+  await page.locator('#runConfigChip').click();
+  await page.locator('#runConfigList .se-row[data-language="r"]').first().click();
+  await page.waitForFunction(() => document.getElementById('language').value === 'r');
   await page.evaluate(() => {
     const editor = globalThis.FlowStudioEditor.editor;
     editor.setValue('analysis$model$sc');

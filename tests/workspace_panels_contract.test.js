@@ -33,7 +33,8 @@ test("every workspace script tag has an explicit allowlisted route", () => {
   for (const tag of ["/packages_panel.js", "/examples_gallery.js",
     "/debug_panel.js", "/workspace_panels.js", "/ide_completion_core.js",
     "/terminal_render.js", "/ide_menubar.js", "/ide_run_widget.js",
-    "/ide_search_everywhere.js"]) {
+    "/ide_search_everywhere.js", "/ide_explorer.js", "/ide_workspace.js",
+    "/app/project_create.js", "/app/project_rename.js"]) {
     assert.ok(routes.includes('if url == "' + tag + '"'), tag + " route allowlisted");
   }
 });
@@ -133,4 +134,30 @@ test("legacy Reader pipeline text is auto-upgraded on reopen and draft restore",
   const recovery = read("web/editor_recovery.js");
   assert.match(recovery, /gallery\.upgradeFiles/, "recovered drafts are upgraded");
   assert.match(recovery, /let draft = pending/, "draft reassignment stays allowed");
+});
+
+test("workspace explorer loads after its file-operation modules and the app", () => {
+  const order = ["/app/project_create.js", "/app/project_rename.js", "/ide_explorer.js", "/ide_workspace.js"];
+  let last = html.indexOf("window.FlowStudioApp = Object.freeze(");
+  assert.ok(last > 0, "FlowStudioApp is published before the explorer mounts");
+  for (const tag of order) {
+    const at = html.indexOf('<script src="' + tag + '"></script>');
+    assert.ok(at > last, tag + " loads after its dependencies");
+    assert.equal(html.split('<script src="' + tag + '"></script>').length - 1, 1, tag + " loads once");
+    last = at;
+  }
+  assert.match(html, /<div id="explorer"><\/div>/, "explorer host present");
+  assert.match(html, /role="tablist" aria-orientation="vertical"/, "activity bar is a vertical tablist");
+  assert.match(html, /id="tab-search"[^>]*aria-controls="view-search"/, "search has its own view");
+  assert.doesNotMatch(html, /id="projectTree"|id="folder"|id="newFile"/, "legacy tree controls removed");
+});
+
+test("secondary run actions live in one overflow menu beside Run", () => {
+  const start = html.indexOf('id="runMorePopup"');
+  const end = html.indexOf("</div>", start);
+  assert.ok(start > 0, "overflow popup present");
+  const popup = html.slice(start, end);
+  for (const id of ["runCell", "runProject", "runMathFlow", "autoCheckFlow", "resetR", "resetPython"])
+    assert.ok(popup.includes('id="' + id + '"'), id + " is inside the overflow");
+  assert.match(html, /id="runMore"[^>]*aria-haspopup="menu"[^>]*aria-expanded="false"/);
 });

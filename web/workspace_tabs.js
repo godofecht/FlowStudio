@@ -1,7 +1,9 @@
-/* Accessible Files, Plots and Data workspace tabs for FlowStudio. */
+/* Accessible workspace views for FlowStudio: a vertical activity bar
+ * (VS Code style) that switches the sidebar between Files, Search, Outline,
+ * Plots, Data, Packages, Examples and Debug. */
 (function (root) {
   "use strict";
-  const NAMES = ["files", "outline", "plots", "data", "packages", "examples", "debug"];
+  const NAMES = ["files", "search", "outline", "plots", "data", "packages", "examples", "debug"];
   const SOURCES = Object.freeze({data: "/data"});
 
   function mount(doc = document, storage = null) {
@@ -34,6 +36,10 @@
         if (!frame) throw new Error("Missing " + name + " frame");
         if (!frame.getAttribute("src")) frame.setAttribute("src", SOURCES[name]);
       }
+      const heading = doc.getElementById("sidebarTitle");
+      const label = typeof tabs[index].getAttribute === "function"
+        ? tabs[index].getAttribute("data-title") : null;
+      if (heading && label) heading.textContent = label;
       if (focus) tabs[index].focus();
       try { storage && storage.setItem("flowstudio.workspace.tab", name); }
       catch (_) { /* Tabs remain usable without storage. */ }
@@ -44,8 +50,8 @@
       tabs[index].addEventListener("click", () => select(name));
       tabs[index].addEventListener("keydown", event => {
         let next = index;
-        if (event.key === "ArrowRight") next = (index + 1) % NAMES.length;
-        else if (event.key === "ArrowLeft") next = (index + NAMES.length - 1) % NAMES.length;
+        if (event.key === "ArrowRight" || event.key === "ArrowDown") next = (index + 1) % NAMES.length;
+        else if (event.key === "ArrowLeft" || event.key === "ArrowUp") next = (index + NAMES.length - 1) % NAMES.length;
         else if (event.key === "Home") next = 0;
         else if (event.key === "End") next = NAMES.length - 1;
         else return;

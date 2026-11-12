@@ -262,7 +262,7 @@ async function applyProjectReplacement(plan, options = {}) {
     if (!attempted.length) throw error;
     let restored = 0, unchanged = 0;
     const unresolved = [];
-    // Best-effort compensation, not a transaction. A crash, external edit,
+    // Best-effort compensation. This is no transaction. A crash, external edit,
     // denied permission or newly opened editor can prevent restoration.
     // Never overwrite contents differing from both the before/after images.
     for (const entry of attempted.reverse()) {
@@ -417,7 +417,15 @@ function createProjectExplorer({ tree, status, openHandle, picker }) {
       return applyProjectReplacement(undo, options);
     },
     hasUndoReplace: () => lastReplacement !== null && lastReplacement.root === root,
-    hasProject: () => root !== null };
+    hasProject: () => root !== null,
+    /* The workspace explorer owns folder choice; search and replace follow it. */
+    adopt: handle => {
+      if (handle !== null && (!handle || handle.kind !== "directory"))
+        throw new Error("Project root must be a directory.");
+      if (handle !== root) lastReplacement = null;
+      root = handle;
+    },
+    root: () => root };
 }
 const api = { createProjectExplorer, validFilename, searchProject, planProjectReplace, applyProjectReplacement, reverseProjectReplacement };
 if (typeof module !== "undefined" && module.exports) module.exports = api;

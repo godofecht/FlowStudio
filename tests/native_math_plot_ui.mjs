@@ -146,6 +146,7 @@ try {
   ]) {
     await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
       readFileSync(source, 'utf8'));
+    await page.locator('#runMore').click();
     await page.locator('#runMathFlow').click();
     await page.waitForFunction(expected => {
       const plot = document.querySelector('#mathFlowPlot');

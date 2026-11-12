@@ -132,6 +132,12 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/ide_run_widget.js" {
         return StaticAsset { path: "web/ide_run_widget.js", mime: "text/javascript; charset=utf-8", found: true }
     }
+    if url == "/ide_explorer.js" {
+        return StaticAsset { path: "web/ide_explorer.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/ide_workspace.js" {
+        return StaticAsset { path: "web/ide_workspace.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
     if url == "/ide_search_everywhere.js" {
         return StaticAsset { path: "web/ide_search_everywhere.js", mime: "text/javascript; charset=utf-8", found: true }
     }

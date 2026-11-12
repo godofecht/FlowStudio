@@ -217,12 +217,56 @@ function mount(doc, options = {}) {
   });
 }
 
-const api = Object.freeze({ mount, KEY, LANGUAGES, BACKENDS, languageLabel, backendLabel, readStorage, writeStorage });
+/* The "..." overflow next to Run holds secondary run actions so the title
+ * bar keeps a single row (JetBrains keeps only the run configuration, Run
+ * and Debug in its toolbar). Items stay real buttons with their own ids. */
+function mountOverflow(doc) {
+  const trigger = doc.getElementById("runMore");
+  const popup = doc.getElementById("runMorePopup");
+  if (!trigger || !popup) return null;
+  const items = () => [...popup.querySelectorAll("button, input")].filter(node => !node.disabled);
+  function isOpen() { return !popup.hidden; }
+  function setOpen(open, focusFirst = false) {
+    popup.hidden = !open;
+    trigger.setAttribute("aria-expanded", String(open));
+    if (open && focusFirst) { const first = items()[0]; if (first) first.focus(); }
+  }
+  trigger.addEventListener("click", event => {
+    if (event && typeof event.stopPropagation === "function") event.stopPropagation();
+    setOpen(!isOpen(), !isOpen() && event && event.detail === 0);
+  });
+  trigger.addEventListener("keydown", event => {
+    if (event.key === "ArrowDown") { event.preventDefault(); setOpen(true, true); }
+  });
+  popup.addEventListener("click", event => {
+    const target = event.target;
+    // Toggling "Check Flow on idle" keeps the menu open, as a checkbox item should.
+    if (target && target.closest && target.closest("label")) return;
+    if (target && target.closest && target.closest("button")) setOpen(false);
+  });
+  popup.addEventListener("keydown", event => {
+    const list = items();
+    const index = list.indexOf(doc.activeElement);
+    if (event.key === "Escape") { event.preventDefault(); setOpen(false); trigger.focus(); }
+    else if (event.key === "ArrowDown") { event.preventDefault(); list[(index + 1) % list.length].focus(); }
+    else if (event.key === "ArrowUp") { event.preventDefault(); list[(index - 1 + list.length) % list.length].focus(); }
+  });
+  doc.addEventListener("mousedown", event => {
+    if (!isOpen()) return;
+    const target = event.target;
+    if (target && (popup.contains(target) || trigger.contains(target))) return;
+    setOpen(false);
+  }, true);
+  return Object.freeze({ open: () => setOpen(true), close: () => setOpen(false), isOpen });
+}
+
+const api = Object.freeze({ mount, mountOverflow, KEY, LANGUAGES, BACKENDS, languageLabel, backendLabel, readStorage, writeStorage });
 root.FlowStudioRunWidget = api;
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 if (typeof document !== "undefined") {
   const start = () => {
     try { mount(document, {}); } catch (_) { /* Widget enhancement is optional. */ }
+    try { mountOverflow(document); } catch (_) { /* Overflow enhancement is optional. */ }
   };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);
   else start();

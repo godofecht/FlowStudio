@@ -38,7 +38,7 @@ test("starts on files without loading plot or data frames", () => {
   assert.equal(f.nodes.get("tab-files").attributes["aria-selected"], "true");
 });
 
-test("switches tabs and lazy-loads the data frame exactly once", () => {
+test("switches tabs without loading any iframe; the Data view is native", () => {
   const f = fixture();
   const tabs = mount(f.doc, f.storage);
   f.nodes.get("tab-plots").listeners.click();
@@ -49,10 +49,10 @@ test("switches tabs and lazy-loads the data frame exactly once", () => {
   assert.equal(f.nodes.get("view-files").hidden, true);
   assert.equal(f.storage.saved, "plots");
   f.nodes.get("tab-data").listeners.click();
-  assert.equal(f.nodes.get("view-data").frame.getAttribute("src"), "/data");
+  assert.equal(f.nodes.get("view-data").hidden, false);
+  assert.equal(f.nodes.get("view-data").frame.getAttribute("src"), null);
   tabs.select("plots");
   assert.equal(f.nodes.get("view-plots").frame.getAttribute("src"), null);
-  assert.equal(f.nodes.get("view-data").frame.getAttribute("src"), "/data");
   assert.equal(tabs.select("unknown"), false);
 });
 
@@ -86,7 +86,7 @@ test("recovers from invalid and inaccessible session storage", () => {
   const tabs = mount(f.doc, f.storage);
   assert.equal(tabs.current(), "files");
   assert.equal(tabs.select("data"), true);
-  assert.equal(f.nodes.get("view-data").frame.getAttribute("src"), "/data");
+  assert.equal(f.nodes.get("view-data").hidden, false);
 });
 
 test("fails visibly when required tab controls are absent", () => {

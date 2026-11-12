@@ -25,6 +25,32 @@ function h(doc, tag, className, text) {
   return node;
 }
 
+/* The Flow console accepts bare statements. Top-level declarations
+ * (function, struct, enum, import, extern, type, const) stay at file scope;
+ * every other line becomes the body of a generated main(). A snippet that
+ * already defines main() is sent unchanged. */
+const FLOW_DECLARATION = /^(?:pub\s+)?(?:function|struct|enum|import|extern|type|const|trait|impl)\b/;
+function flowSnippetProgram(code) {
+  const source = String(code || "");
+  if (/(^|\n)\s*(?:pub\s+)?function\s+main\s*\(/.test(source)) return source;
+  const declarations = [];
+  const body = [];
+  let depth = 0;
+  let inDeclaration = false;
+  for (const line of source.split("\n")) {
+    if (depth === 0) inDeclaration = FLOW_DECLARATION.test(line.trimStart()) && line === line.trimStart();
+    (inDeclaration ? declarations : body).push(line);
+    for (const char of line.replace(/"(?:[^"\\]|\\.)*"/g, '""').replace(/#.*$/, "")) {
+      if (char === "{") depth++;
+      else if (char === "}") depth = Math.max(0, depth - 1);
+    }
+  }
+  if (!body.some(line => line.trim())) return source;
+  const indented = body.map(line => line.trim() ? "    " + line : line);
+  return (declarations.length ? declarations.join("\n") + "\n\n" : "") +
+    "function main() -> i32 {\n" + indented.join("\n") + "\n    return 0\n}\n";
+}
+
 function mount(doc = document, request = fetch) {
   const el = id => doc.getElementById(id);
   const output = el("console");
@@ -275,7 +301,7 @@ function mount(doc = document, request = fetch) {
     result.dataset.state = kind;
   }
 
-  /* ---------- execution path (unchanged semantics, session-aware) ---------- */
+  /* ---------- execution path (session-aware) ---------- */
   async function submit(name, code) {
     if ((editorRun && editorRun.disabled) || (editorCell && editorCell.disabled)) {
       status("Wait for editor execution to finish.", "error");
@@ -298,7 +324,7 @@ function mount(doc = document, request = fetch) {
         method: "POST",
         headers: { "Content-Type": "text/plain; charset=utf-8",
           "X-FlowStudio-Intent": "run" },
-        body: code
+        body: name === "flow" ? flowSnippetProgram(code) : code
       });
       const text = await response.text();
       sessions.appendTo(session, text + (text.endsWith("\n") ? "" : "\n"), "out");
@@ -376,7 +402,7 @@ function mount(doc = document, request = fetch) {
   exportItem.setAttribute("role", "menuitem");
   exportItem.id = "terminalMenuExport";
   exportItem.textContent = "Download this session transcript (.txt)";
-  exportItem.title = "Includes commands and output, which may contain secrets. Figures are referenced, not embedded.";
+  exportItem.title = "Includes commands and output, which may contain secrets. Figures are included as references.";
 
   const resetItem = h(doc, "button", "terminal-menuitem");
   resetItem.type = "button";
@@ -569,7 +595,7 @@ function mount(doc = document, request = fetch) {
   return controller;
 }
 
-const api = Object.freeze({ mount, DOM_NODES_MAX });
+const api = Object.freeze({ mount, DOM_NODES_MAX, flowSnippetProgram });
 root.FlowStudioWorkspaceConsole = Object.freeze({ mount });
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 if (typeof document !== "undefined" && document.getElementById("console") &&

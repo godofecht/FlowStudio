@@ -548,7 +548,7 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
       <button type="button" id="tab-search" role="tab" aria-controls="view-search" aria-selected="false" tabindex="-1" title="Search in folder (Ctrl+Shift+F)" data-title="Search"><i data-lucide="search"></i><span class="tab-label">Search</span></button>
       <button type="button" id="tab-outline" role="tab" aria-controls="view-outline" aria-selected="false" tabindex="-1" title="Outline (Ctrl+Shift+O)" data-title="Outline"><i data-lucide="list-tree"></i><span class="tab-label">Outline</span></button>
       <button type="button" id="tab-plots" role="tab" aria-controls="view-plots" aria-selected="false" tabindex="-1" title="Plots" data-title="Plots"><i data-lucide="chart-no-axes-combined"></i><span class="tab-label">Plots</span></button>
-      <button type="button" id="tab-data" role="tab" aria-controls="view-data" aria-selected="false" tabindex="-1" title="Data viewer" data-title="Data"><i data-lucide="table-2"></i><span class="tab-label">Data</span></button>
+      <button type="button" id="tab-data" role="tab" aria-controls="view-data" aria-selected="false" tabindex="-1" title="Data frames and tables" data-title="Data"><i data-lucide="table-2"></i><span class="tab-label">Data</span></button>
       <button type="button" id="tab-packages" role="tab" aria-controls="view-packages" aria-selected="false" tabindex="-1" title="Packages" data-title="Packages"><i data-lucide="package"></i><span class="tab-label">Packages</span></button>
       <button type="button" id="tab-examples" role="tab" aria-controls="view-examples" aria-selected="false" tabindex="-1" title="Examples" data-title="Examples"><i data-lucide="library"></i><span class="tab-label">Examples</span></button>
       <button type="button" id="tab-debug" role="tab" aria-controls="view-debug" aria-selected="false" tabindex="-1" title="Debug" data-title="Debug"><i data-lucide="bug"></i><span class="tab-label">Debug</span></button>
@@ -611,20 +611,8 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
       <p class="muted hint">Need saved PNG files too? <a href="/plots" target="_blank" rel="noopener">Open the standalone plot page</a>.</p>
       <div id="plotFigures" aria-label="Captured figures" aria-live="polite"></div>
     </div>
-    <div id="view-data" class="workspace-frame" role="tabpanel" aria-labelledby="tab-data" hidden><iframe title="Local CSV and TSV data viewer" loading="lazy"></iframe></div>
-    <div class="body packages-body" id="view-packages" role="tabpanel" aria-labelledby="tab-packages" hidden>
-      <p class="muted hint">Installs run on this device through the persistent local Python / R sessions (each under the 15 s execution budget). R installs use the CRAN cloud mirror.</p>
-      <div class="project-search">
-        <label for="packageSpec">Package</label>
-        <input id="packageSpec" type="text" maxlength="96" placeholder="package==version" aria-label="Package spec">
-      </div>
-      <div class="project-tools">
-        <button id="packageInstall" type="button"><i data-lucide="download"></i>Install package</button>
-        <button id="packageList" type="button"><i data-lucide="list"></i>List packages</button>
-      </div>
-      <p id="packageNotice" class="muted" role="status" aria-live="polite"></p>
-      <div id="packageTable" aria-label="Installed packages"></div>
-    </div>
+    <div class="body data-view" id="view-data" role="tabpanel" aria-labelledby="tab-data" hidden></div>
+    <div class="body packages-view" id="view-packages" role="tabpanel" aria-labelledby="tab-packages" hidden></div>
     <div class="body examples-body" id="view-examples" role="tabpanel" aria-labelledby="tab-examples" hidden>
       <p class="muted hint">Curated local examples showing Flow, Python and R working in one project. Everything executes on this device.</p>
       <p class="muted hint">Projects you open are kept as saved project files (with your edits) in the "Your projects" list at the top of this tab, and reopen from there after a reload.</p>
@@ -1915,6 +1903,9 @@ async function executeCode(code, label, languageOverride = null, options = {}) {
   }
   el("run").disabled = true;
   el("runCell").disabled = true;
+  /* Editor runs print to the Console view; bring it forward. */
+  if (globalThis.FlowStudioTerminal && globalThis.FlowStudioTerminal.view !== "console")
+    globalThis.FlowStudioTerminal.show("console");
   status("Running " + executionLanguage + " …");
   writeConsole("\n> " + label + " (" + executionLanguage + ")\n", executionLanguage, "cmd");
   const startedAt = Date.now();
@@ -2781,6 +2772,9 @@ renderTabs();
 <script src="/app/project_rename.js"></script>
 <script src="/ide_explorer.js"></script>
 <script src="/ide_workspace.js"></script>
+<script src="/data_viewer.js"></script>
+<script src="/ide_data_view.js"></script>
+<script src="/ide_packages_view.js"></script>
 <script src="/ide_symbols.js"></script>
 <script src="/ide_outline.js"></script>
 <script>

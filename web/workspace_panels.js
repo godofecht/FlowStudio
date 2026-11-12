@@ -270,18 +270,8 @@ mountPanel("FlowStudioExamples", global.FlowStudioExamples, Examples => {
   };
 });
 
-mountPanel("FlowStudioPackageManager", global.FlowStudioPackageManager, PackageManager => {
-  const packagesPanel = PackageManager.mount(global.document, {
-    target: el("packageTable"), input: el("packageSpec"),
-    installButton: el("packageInstall"), listButton: el("packageList"),
-    notice: message => { el("packageNotice").textContent = message; },
-    language: () => language.value
-  });
-  packagesPanel.updateLanguage();
-  el("packageInstall").addEventListener("click", () => void packagesPanel.install());
-  el("packageList").addEventListener("click", () => void packagesPanel.list());
-  exports.packagesPanel = packagesPanel;
-});
+/* The Packages view (web/ide_packages_view.js) mounts itself and uses
+ * FlowStudioPackageManager for its validated install and list code. */
 
 mountPanel("FlowStudioDebugPanel", global.FlowStudioDebugPanel, DebugPanel => {
   const breakpoints = DebugPanel.createBreakpointStore();

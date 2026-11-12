@@ -593,6 +593,9 @@ function mount(doc, options = {}) {
     if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
     const key = String(event.key || "").toLowerCase();
     if (key !== "k" && key !== "p") return;
+    /* In the integrated terminal Ctrl+K and Ctrl+P are readline keys. */
+    if (event.ctrlKey && event.target && typeof event.target.closest === "function" &&
+        event.target.closest(".xterm")) return;
     event.preventDefault?.();
     event.stopPropagation?.();
     open("", key === "p" ? "files" : "commands");

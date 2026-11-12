@@ -150,6 +150,16 @@ def inspect_namespace(namespace: dict[str, object]) -> bytes:
         node: dict[str, object] = {
             "name": name[:160], "type": kind, "size": size
         }
+        # pandas DataFrames report their shape (a pandas-owned property); the
+        # frame is still never iterated or repr()'d here.
+        module = type.__getattribute__(exact_type, "__module__")
+        if kind == "DataFrame" and isinstance(module, str) and module.startswith("pandas."):
+            try:
+                rows, cols = value.shape
+                node["dimensions"] = [int(rows), int(cols)]
+            except Exception:
+                pass
+            return node
         if depth >= MAX_INSPECT_DEPTH or exact_type not in (list, tuple, dict):
             return node
         if id(value) in ancestors:
@@ -240,7 +250,7 @@ def serve() -> None:
                     ok, payload = encode({"state": "idle", "ok": False, "stack": [],
                                           "output": "", "message": "Invalid UTF-8 debugger request."})
             elif header[:1] == b"G":
-                # A decimal source line, not an expression or a Python command.
+                # The payload is a decimal source line. Expressions and commands are rejected.
                 line = int(data) if 1 <= len(data) <= 6 and data[:1] != b"0" and data.isdigit() else None
                 ok, payload = encode(debugger.command("run-to-line", line))
             else:

@@ -16,6 +16,7 @@ import { createIcons, FolderOpen, FilePlus2, RotateCw, Play, Blocks, Files, List
 import { mountEditor } from './editor.js';
 import { registerCompletion } from './completion.js';
 import './workbench.css';
+import { mountTerminalPanel } from './terminal_panel.js';
 
 const icons = { FolderOpen, FilePlus2, RotateCw, Play, Blocks, Files, ListTree,
   ChartNoAxesCombined, Table2, Terminal, SlidersHorizontal, Search, Command,
@@ -64,6 +65,8 @@ globalThis.FlowStudioEditor = mountEditor(monaco, document.getElementById('sourc
   document.getElementById('monacoHost'), app, document.getElementById('language'));
 document.getElementById('editorEngine').textContent = 'Monaco';
 registerCompletion(monaco, app);
+
+mountTerminalPanel();
 
 // The top bar command center, Ctrl+K and Ctrl+P open Search Everywhere
 // (web/ide_search_everywhere.js).

@@ -18,7 +18,8 @@ await build({ ...shared,
   entryPoints: ['node_modules/monaco-editor/esm/vs/editor/editor.worker.js'],
   outfile: 'web/ui/editor.worker.js', format: 'iife' });
 const notices = await Promise.all([
-  ['monaco-editor', 'LICENSE'], ['lucide', 'LICENSE'], ['dompurify', 'LICENSE']
+  ['monaco-editor', 'LICENSE'], ['lucide', 'LICENSE'], ['dompurify', 'LICENSE'],
+  ['@xterm/xterm', 'LICENSE'], ['@xterm/addon-fit', 'LICENSE'], ['@xterm/addon-web-links', 'LICENSE']
 ].map(async ([name, file]) => `${name}\n${await readFile(`node_modules/${name}/${file}`, 'utf8')}`));
 await writeFile('web/ui/THIRD_PARTY_LICENSES.txt', notices.join('\n\n'));
 console.log('Built local Monaco editor, worker and workbench assets.');

@@ -4,7 +4,7 @@
 (function (root) {
   "use strict";
   const NAMES = ["files", "search", "outline", "plots", "data", "packages", "examples", "debug"];
-  const SOURCES = Object.freeze({data: "/data"});
+  const SOURCES = Object.freeze({});
 
   function mount(doc = document, storage = null) {
     if (storage === null) {

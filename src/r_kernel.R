@@ -552,7 +552,9 @@ plot_snapshot <- function() {
 # Read the real installed R package database without evaluating workspace code.
 # Return at most 1000 packages and 65 KiB of dependency-free JSON.
 package_snapshot <- function() {
-    matrix <- utils::installed.packages()[, c("Package", "Version"), drop = FALSE]
+    matrix <- utils::installed.packages()[, c("Package", "Version", "LibPath", "Priority"), drop = FALSE]
+    attached <- sub("^package:", "", grep("^package:", search(), value = TRUE))
+    user_lib <- tryCatch(normalizePath(user_library, mustWork = FALSE), error = function(e) "")
     if (nrow(matrix) > 1L) matrix <- matrix[order(matrix[, 1L]), , drop = FALSE]
     entries <- character(0)
     used <- 64L
@@ -568,8 +570,13 @@ package_snapshot <- function() {
             truncated <- TRUE
             next
         }
+        lib <- tryCatch(normalizePath(matrix[index, 3L], mustWork = FALSE), error = function(e) "")
+        priority <- matrix[index, 4L]
         entry <- paste0('{"name":', json_quote(name),
-                        ',"version":', json_quote(version), "}")
+                        ',"version":', json_quote(version),
+                        ',"attached":', if (name %in% attached) "true" else "false",
+                        ',"user":', if (nzchar(user_lib) && identical(lib, user_lib)) "true" else "false",
+                        ',"base":', if (!is.na(priority) && priority == "base") "true" else "false", "}")
         length_bytes <- nchar(entry, type = "bytes") + 1L
         if (used + length_bytes > 65000L) { truncated <- TRUE; break }
         entries <- c(entries, entry)
@@ -759,6 +766,17 @@ inspect_value <- function(name, value, depth, budget) {
         length(shape) <= 8L && all(!is.na(shape)) && all(shape >= 0L)) {
         dimensions <- paste0("[", paste(shape, collapse = ","), "]")
     }
+    # Data frames (tibbles included) read their shape from attributes, which
+    # never dispatches to user S3 methods.
+    if (inherits(value, "data.frame")) {
+        rows <- .row_names_info(value, 2L)
+        cols <- length(attr(value, "names", exact = TRUE))
+        kind <- "data.frame"
+        dimensions <- paste0("[", rows, ",", cols, "]")
+        fields <- paste0('"name":', json_quote(substr(name, 1L, 160L)),
+                         ',"type":"data.frame","size":null,"dimensions":', dimensions)
+        return(paste0("{", fields, "}"))
+    }
     fields <- paste0('"name":', json_quote(substr(name, 1L, 160L)),
                      ',"type":', json_quote(substr(kind, 1L, 100L)),
                      ',"size":', size, ',"dimensions":', dimensions)
@@ -866,8 +884,9 @@ table_snapshot <- function(query) {
         return(list(success = FALSE, payload = charToRaw("R table unavailable.")))
     }
     shape <- attr(value, "dim", exact = TRUE)
-    frame <- identical(typeof(value), "list") &&
-             identical(attr(value, "class", exact = TRUE), "data.frame")
+    # Plain data frames and subclasses such as tibbles; columns are read
+    # through unclass(), so no S3 method of the subclass runs.
+    frame <- identical(typeof(value), "list") && inherits(value, "data.frame")
     matrix <- !is.object(value) &&
               typeof(value) %in% c("logical", "integer", "double", "character") &&
               is.integer(shape) && length(shape) == 2L &&

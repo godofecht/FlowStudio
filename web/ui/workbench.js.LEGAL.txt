@@ -40,3 +40,19 @@ lucide/dist/esm/lucide.js:
    * This source code is licensed under the ISC license.
    * See the LICENSE file in the root directory of this source tree.
    */
+
+@xterm/xterm/lib/xterm.mjs:
+@xterm/addon-fit/lib/addon-fit.mjs:
+@xterm/addon-web-links/lib/addon-web-links.mjs:
+  /**
+   * Copyright (c) 2014-2024 The xterm.js authors. All rights reserved.
+   * @license MIT
+   *
+   * Copyright (c) 2012-2013, Christopher Jeffrey (MIT License)
+   * @license MIT
+   *
+   * Originally forked from (with the author's permission):
+   *   Fabrice Bellard's javascript vt100 for jslinux:
+   *   http://bellard.org/jslinux/
+   *   Copyright (c) 2011 Fabrice Bellard
+   */

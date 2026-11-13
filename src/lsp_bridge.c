@@ -566,11 +566,20 @@ static const char *status(void)
     return set_reply(200, out);
 }
 
+/* Starts the server if it is not running. Always 200, so a browser that
+ * only wants to know whether Flow has a language server logs no error. */
+static const char *start(void)
+{
+    int running = child_alive() || start_child();
+    return set_reply(200, strdup(running ? "{\"available\":true}" : "{\"available\":false}"));
+}
+
 const char *fs_lsp(const char *op, const char *body)
 {
     if (!op) return fail(400, "Bad language server request.");
     if (strcmp(op, "request") == 0) return request(body);
     if (strcmp(op, "events") == 0) return events();
     if (strcmp(op, "status") == 0) return status();
+    if (strcmp(op, "start") == 0) return start();
     return fail(400, "Unknown language server operation.");
 }

@@ -12,6 +12,7 @@
 (function (global) {
 "use strict";
 const REQUEST_ROUTE = "/api/lsp/request";
+const START_ROUTE = "/api/lsp/start";
 const EVENTS_ROUTE = "/api/lsp/events";
 const OWNER = "flow-lsp";
 const URI_ROOT = "file:///flowstudio/";
@@ -611,6 +612,12 @@ function create(options) {
     state = "starting";
     let result = null;
     try {
+      // Ask first: a missing `flow lsp` answers 200 here, so the console
+      // stays clean and the older helpers carry on.
+      const probe = await post(START_ROUTE, "");
+      let available = probe.status !== 404;
+      if (probe.status === 200) { try { available = JSON.parse(probe.text).available === true; } catch (_) { available = false; } }
+      if (!available) { state = "unavailable"; return false; }
       result = await request("initialize", { processId: null, rootUri: null, capabilities: {} });
     } catch (_) { result = null; }
     if (!result || !result.capabilities) { state = "unavailable"; return false; }

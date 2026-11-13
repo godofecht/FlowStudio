@@ -883,6 +883,10 @@ function dispatch() -> void {
             send_lsp("status")
             return
         }
+        if eq(path, "/api/lsp/start") {
+            send_lsp("start")
+            return
+        }
         if eq(path, "/api/pty/read") {
             send_pty("read")
             return

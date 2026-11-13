@@ -122,6 +122,7 @@ function fakeBridge(answers = {}) {
     const reply = (status, body) => ({ status, text: async () => typeof body === "string" ? body : JSON.stringify(body) });
     if (unavailable) return reply(503, "The Flow language server is unavailable.");
     if (route === "/api/lsp/events") return reply(200, events.splice(0));
+    if (route === "/api/lsp/start") return reply(200, { available: true });
     assert.equal(route, "/api/lsp/request");
     const message = JSON.parse(init.body);
     sent.push(message);
@@ -171,6 +172,18 @@ test("an unavailable server registers nothing and leaves the lexical helpers on"
   assert.deepEqual(Object.keys(f.monaco.providers), []);
   assert.equal(f.lsp.handles(f.models[0]), false);
   assert.equal(f.lsp.run("definition"), false);
+});
+
+test("a missing flow lsp is found by the start probe, with no failed request", async () => {
+  const routes = [];
+  const f = setup({ fetch: async route => {
+    routes.push(route);
+    return { status: 200, text: async () => JSON.stringify({ available: false }) };
+  } });
+  assert.equal(await f.lsp.start(), false);
+  assert.equal(f.lsp.state(), "unavailable");
+  assert.deepEqual(routes, ["/api/lsp/start"]);
+  assert.deepEqual(Object.keys(f.monaco.providers), []);
 });
 
 test("start registers every provider and opens Flow models under their project path", async () => {

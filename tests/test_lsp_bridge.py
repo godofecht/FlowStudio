@@ -125,6 +125,11 @@ class LanguageServerBridgeTest(unittest.TestCase):
     def tearDown(self) -> None:
         self.client.close()
 
+    def test_start_answers_200_with_availability(self) -> None:
+        code, text = post("/api/lsp/start", "")
+        self.assertEqual(code, 200, text)
+        self.assertEqual(json.loads(text), {"available": True})
+
     def test_hover_returns_the_typechecked_signature(self) -> None:
         hover = self.client.request("textDocument/hover", self.client.at(5, 18))["result"]
         value = hover["contents"]["value"]

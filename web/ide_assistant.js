@@ -378,6 +378,7 @@ function mount(doc, options = {}) {
   const recall = key => { try { return storage ? storage.getItem(key) : null; } catch (_) { return null; } };
 
   let providers = [];
+  let serverInfo = null;   // { mcpServer, url } for project agent files
   let job = null;            // { id, provider, parser, message, tools, timer }
   let history = [];
   let decisions = [];        // proposal ids, files and the user's decision
@@ -469,7 +470,9 @@ function mount(doc, options = {}) {
     try {
       const reply = await api("/api/assistant/providers");
       if (reply.status !== 200) throw new Error(reply.text);
-      providers = JSON.parse(reply.text).providers || [];
+      const listing = JSON.parse(reply.text);
+      providers = listing.providers || [];
+      serverInfo = listing.mcpServer ? { mcpServer: listing.mcpServer, url: listing.url } : null;
     } catch (error) {
       providers = [];
       setNote("Could not list assistants: " + (error.message || error));
@@ -887,6 +890,7 @@ function mount(doc, options = {}) {
 
   return Object.freeze({
     ready, open, send, stop, loadProviders, pushContext, snapshot,
+    info: () => (serverInfo ? { ...serverInfo } : null),
     explain: () => { open(false); return send("explain", ""); },
     fixErrors: () => { open(false); return send("fix", ""); },
     translate: () => { open(false); return send("translate", ""); },

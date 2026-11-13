@@ -72,6 +72,65 @@ const TEMPLATES = Object.freeze([
     files: () => [{ name: "analysis.R", language: "r", text: R_MAIN }], entry: "analysis.R" }
 ]);
 
+/* ---------- files for AI tools opened in the project folder ----------
+ * AGENTS.md is read by Codex, Cursor and others, CLAUDE.md by Claude Code,
+ * and .mcp.json registers the FlowStudio MCP server so those tools can check
+ * and run Flow through FlowStudio. info is { mcpServer, url } from the
+ * server; without it the MCP file is left out. */
+const AGENT_FILE_NAMES = Object.freeze(["AGENTS.md", "CLAUDE.md", ".mcp.json"]);
+function agentFiles(info) {
+  const server = info && info.mcpServer ? info.mcpServer : null;
+  const url = info && info.url ? info.url : "http://127.0.0.1:8751";
+  const guide = server ? server.replace(/mcp\/flowstudio_mcp\.py$/, "docs/FLOW_FOR_AI.md") : "docs/FLOW_FOR_AI.md in the FlowStudio folder";
+  const agents = `# Working on this project with an AI tool
+
+This project is written in Flow, a statically typed language that compiles
+to C. AI models know little Flow, so check everything you write.
+
+## Use FlowStudio's tools
+
+FlowStudio runs on ${url}. Its MCP server (registered in .mcp.json) gives
+you these tools:
+
+- flowstudio_flow_guide: the verified Flow guide. Read it before writing Flow.
+- flowstudio_check_code: parse and type check Flow without running it.
+- flowstudio_run_code: build and run a Flow program and return its output.
+- flowstudio_editor_state: the file, selection and errors open in FlowStudio.
+- flowstudio_propose_edit: show the user a diff in FlowStudio to accept.
+
+Check every Flow program with flowstudio_check_code. When it has a main
+function and opens no window, also run it with flowstudio_run_code, because
+some errors only appear when the C compiler builds it. Fix errors until both
+pass. Without FlowStudio, \`flow run file.flow\` does the same from a shell.
+
+The guide is also a file: ${guide}
+
+## Flow in brief
+
+- \`function name(a: i32) -> f64 { ... }\`. No semicolons. Comments start with #.
+- \`function main() -> i32\` returns 0.
+- \`let\` is immutable, \`let mut\` is mutable. \`else if\` is \`elif\`.
+- \`for i in 0 to n\` counts 0 to n - 1. There is no for-each over arrays.
+- Arrays have a fixed size: \`let mut xs: array<f64, 8> = [0.0]\`. Pass
+  \`span<f64>\` to functions and read \`.len\`. There is no length() or push().
+- \`println("x =", x)\` takes several values. println of an array prints a
+  pointer, so loop over it.
+- Graphics apps import "stdlib/gfx.flow" and "stdlib/text.flow". Check them
+  and do not run them, because they open a window.
+- In FlowStudio, \`import flowstudio { py, r, py_num, r_num, fmt }\` calls the
+  live Python and R sessions.
+`;
+  const files = [
+    { name: "AGENTS.md", language: "markdown", text: agents },
+    { name: "CLAUDE.md", language: "markdown", text: "Read AGENTS.md in this folder. It explains how to write and check Flow with FlowStudio's MCP tools.\n" }
+  ];
+  if (server) {
+    files.push({ name: ".mcp.json", language: "json", text: JSON.stringify({ mcpServers: { flowstudio: {
+      type: "stdio", command: "python3", args: [server], env: { FLOWSTUDIO_URL: url.replace(/\/$/, "") } } } }, null, 2) + "\n" });
+  }
+  return files;
+}
+
 function slug(name) {
   const base = String(name || "").trim().toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
   return base || "project";
@@ -133,6 +192,12 @@ function mount(doc, options = {}) {
   const app = () => options.app || root.FlowStudioApp || null;
   const explorer = () => options.explorer || root.FlowStudioWorkspaceExplorer || null;
   const local = options.localStore || createLocalStore(root.navigator && root.navigator.storage);
+  const agentInfo = options.agentInfo || (async () => {
+    const assistant = root.FlowStudioAssistant;
+    if (!assistant) return null;
+    await assistant.ready;
+    return assistant.info();
+  });
   let storage = options.storage;
   if (storage === undefined) { try { storage = root.localStorage; } catch (_) { storage = null; } }
   const switcher = el("projectSwitcher"), nameNode = el("projectName"), menu = el("projectMenu");
@@ -270,6 +335,9 @@ function mount(doc, options = {}) {
     const spec = TEMPLATES.find(item => item.id === template) || TEMPLATES[0];
     const files = spec.files();
     if (!files.length) throw new Error("That template has no files.");
+    let info = null;
+    try { info = await agentInfo(); } catch (_) { info = null; }
+    const written = files.concat(agentFiles(info).filter(extra => !files.some(file => file.name === extra.name)));
     let handle;
     if (location === "disk") {
       if (typeof root.showDirectoryPicker !== "function") throw new Error("This browser cannot create folders on disk.");
@@ -280,13 +348,13 @@ function mount(doc, options = {}) {
         catch (_) { break; }
       }
       handle = await parent.getDirectoryHandle(folder, { create: true });
-      for (const file of files) {
+      for (const file of written) {
         const fileHandle = await handle.getFileHandle(file.name, { create: true });
         const writable = await fileHandle.createWritable();
         await writable.write(file.text);
         await writable.close();
       }
-    } else handle = await local.create(name, files);
+    } else handle = await local.create(name, written);
     const meta = { template: spec.id, files: files.map(file => file.name), runProject: Boolean(spec.runProject) };
     return openHandle(handle, { entry: spec.entry || files[0].name, meta,
       openAll: files.length <= 4 ? files.map(file => file.name) : null });
@@ -486,7 +554,7 @@ function mount(doc, options = {}) {
   });
 }
 
-const api = Object.freeze({ mount, createLocalStore, TEMPLATES, slug, guessEntry });
+const api = Object.freeze({ mount, createLocalStore, TEMPLATES, slug, guessEntry, agentFiles, AGENT_FILE_NAMES });
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 root.FlowStudioProjectsModule = api;
 if (typeof document !== "undefined" && document.getElementById("projectSwitcher")) {

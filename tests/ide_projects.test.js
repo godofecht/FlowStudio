@@ -125,3 +125,41 @@ test("closing the project leaves one untitled buffer", async () => {
   assert.deepEqual(docs.map(d => d.name), ["untitled.flow"]);
   assert.equal(service.current(), null);
 });
+
+/* ---------- files for outside AI tools ---------- */
+const INFO = { mcpServer: "/Users/me/FlowStudio/mcp/flowstudio_mcp.py", url: "http://127.0.0.1:8763" };
+
+test("agent files point AI tools at FlowStudio's MCP server and the Flow guide", () => {
+  const files = Object.fromEntries(projects.agentFiles(INFO).map(file => [file.name, file.text]));
+  assert.deepEqual(Object.keys(files), ["AGENTS.md", "CLAUDE.md", ".mcp.json"]);
+  assert.deepEqual(JSON.parse(files[".mcp.json"]), { mcpServers: { flowstudio: { type: "stdio", command: "python3",
+    args: ["/Users/me/FlowStudio/mcp/flowstudio_mcp.py"], env: { FLOWSTUDIO_URL: "http://127.0.0.1:8763" } } } });
+  assert.match(files["AGENTS.md"], /flowstudio_check_code/);
+  assert.match(files["AGENTS.md"], /flowstudio_run_code/);
+  assert.match(files["AGENTS.md"], /\/Users\/me\/FlowStudio\/docs\/FLOW_FOR_AI\.md/);
+  assert.match(files["AGENTS.md"], /http:\/\/127\.0\.0\.1:8763/);
+  assert.match(files["CLAUDE.md"], /AGENTS\.md/);
+  assert.doesNotMatch(files["AGENTS.md"] + files["CLAUDE.md"], /[–—‘’“”]/, "plain punctuation only");
+  const without = projects.agentFiles(null).map(file => file.name);
+  assert.deepEqual(without, ["AGENTS.md", "CLAUDE.md"], "no MCP file without a known server path");
+});
+
+for (const template of projects.TEMPLATES.filter(spec => spec.files().length)) {
+  test("the " + template.id + " template writes AGENTS.md, CLAUDE.md and .mcp.json but opens only its sources", async () => {
+    const manager = fakeStorageManager();
+    const local = projects.createLocalStore(manager);
+    const { app, docs } = workspace();
+    let explorerRoot = null;
+    const service = projects.mount({ getElementById: () => null }, { app, localStore: local, storage: null, agentInfo: async () => INFO,
+      explorer: { setRoot: async handle => { explorerRoot = handle; await service.rootChanged(handle, async () => 0); return true; },
+        hasRoot: () => Boolean(explorerRoot), recents: () => [] } });
+    assert.equal(await service.createProject({ name: "demo " + template.id, template: template.id, location: "local" }), true);
+    const folder = explorerRoot;
+    const names = Array.from(folder.entries.keys());
+    for (const name of projects.AGENT_FILE_NAMES) assert.ok(names.includes(name), name + " is written");
+    assert.equal(JSON.parse((await folder.getFileHandle(".mcp.json")).text).mcpServers.flowstudio.args[0], INFO.mcpServer);
+    const sources = template.files().map(file => file.name);
+    assert.deepEqual(service.current().meta.files, sources, "Run project ignores the agent files");
+    assert.ok(docs.every(doc => !projects.AGENT_FILE_NAMES.includes(doc.name)), "agent files do not open as tabs");
+  });
+}

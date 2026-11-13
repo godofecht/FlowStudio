@@ -660,10 +660,10 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
     </section>
     <section class="rp-view" id="rpView-environment" role="tabpanel" aria-labelledby="rpTab-environment">
       <div class="body">
-        <p id="runtimeInfo">Flow executions are independent.</p>
+        <p id="runtimeInfo">Flow session: variables and definitions persist until you reset the console.</p>
         <button id="refreshPythonEnvironment" type="button"><i data-lucide="rotate-cw"></i>Refresh environment</button>
-        <div id="pythonEnvironment" aria-live="polite"><p class="muted">Select Python or R to inspect its native session.</p></div>
-        <p class="muted hint">Python and R keep their variables between runs. Reset a session from the Run menu.</p>
+        <div id="pythonEnvironment" aria-live="polite"><p class="muted">Select Flow, Python or R to inspect its session.</p></div>
+        <p class="muted hint">Flow, Python and R keep their variables between runs. Reset a session from the console menu.</p>
       </div>
     </section>
   </aside>
@@ -1832,6 +1832,13 @@ function renderPythonEnvironmentChild(item, depth) {
 async function refreshPythonEnvironment() {
   const revision = ++environmentRevision;
   const selectedLanguage = language.value;
+  const flowSession = globalThis.FlowStudioFlowSession;
+  if (selectedLanguage === "flow" && flowSession && flowSession.client) {
+    const snapshot = await flowSession.client.state();
+    if (revision !== environmentRevision || language.value !== "flow") return;
+    flowSession.renderEnvironment(el("pythonEnvironment"), snapshot && snapshot.variables);
+    return;
+  }
   if (selectedLanguage !== "python" && selectedLanguage !== "r") {
     showPythonEnvironmentMessage("Select Python or R to inspect its native session.");
     return;
@@ -1988,8 +1995,32 @@ async function executeCode(code, label, languageOverride = null, options = {}) {
   }
   return ok;
 }
+/* Flow, the way R scripts work: Ctrl+Enter sends the selection, or the
+ * statement under the cursor, to the Flow console session and moves to the
+ * next statement. A file with main() still runs as a whole program. */
+async function sendFlowToConsole(selection) {
+  const session = globalThis.FlowStudioFlowSession;
+  const submit = globalThis.FlowStudioConsoleSubmit;
+  if (!session || typeof submit !== "function") return null;
+  let code = selection;
+  if (!code) {
+    const statement = session.statementAt(src.value, src.selectionStart);
+    if (!statement) { status("Nothing to run at the cursor.", "error"); return false; }
+    code = statement.code;
+    src.setSelectionRange(statement.next, statement.next);
+  }
+  if (globalThis.FlowStudioTerminal && FlowStudioTerminal.show) FlowStudioTerminal.show("console");
+  const ok = await submit("flow", code);
+  void refreshPythonEnvironment().catch(() => {});
+  return ok;
+}
 async function run() {
   const selection = src.value.substring(src.selectionStart, src.selectionEnd);
+  if (language.value === "flow" && globalThis.FlowStudioFlowSession &&
+      (selection.trim() || !FlowStudioFlowSession.hasMain(src.value))) {
+    const sent = await sendFlowToConsole(selection.trim() ? selection : "");
+    if (sent !== null) return sent;
+  }
   /* A Flow program that draws with stdlib/gfx.flow runs in the Preview. */
   const preview = globalThis.FlowStudioAppPreview;
   if (!selection.length && language.value === "flow" && preview && preview.isGraphicsProgram(src.value))
@@ -2528,8 +2559,9 @@ src.addEventListener("click", updateCursor);
 src.addEventListener("keyup", updateCursor);
 language.addEventListener("change", () => {
   environmentRevision++;
-  showPythonEnvironmentMessage(language.value === "python" || language.value === "r" ?
-    "Refresh to inspect native " + language.value + " variables." : "Select Python or R to inspect its native session.");
+  if (language.value === "flow") void refreshPythonEnvironment().catch(() => {});
+  else showPythonEnvironmentMessage(language.value === "python" || language.value === "r" ?
+    "Refresh to inspect native " + language.value + " variables." : "Select Flow, Python or R to inspect its session.");
   const doc = activeDocument();
   if (doc) {
     documents.setLanguage(doc.id, language.value);
@@ -2537,7 +2569,7 @@ language.addEventListener("change", () => {
   }
   el("runtimeInfo").textContent = language.value === "python" ? "Native Python: persistent until Reset Python." :
     language.value === "r" ? "Native R: persistent until Reset R." :
-    "Flow executions are independent.";
+    "Flow session: variables and definitions persist until you reset the console.";
 });
 el("run").addEventListener("click", run);
 el("runProject").addEventListener("click", () => void runProject());
@@ -2788,6 +2820,7 @@ renderTabs();
   <script src="/plot_figures.js"></script>
   <script src="/terminal_input.js"></script>
   <script src="/terminal_sessions.js"></script>
+  <script src="/ide_flow_session.js"></script>
   <script src="/workspace_console.js"></script>
 <script src="/packages_panel.js"></script>
 <script src="/examples_mathflow.js"></script>

@@ -321,14 +321,24 @@ function mount(doc = document, request = fetch) {
     prompt.set(true);
     status("Running " + name + " …");
     try {
-      const response = await request("/api/run/" + name, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain; charset=utf-8",
-          "X-FlowStudio-Intent": "run" },
-        body: name === "flow" ? flowSnippetProgram(code) : code
-      });
-      const text = await response.text();
-      sessions.appendTo(session, text + (text.endsWith("\n") ? "" : "\n"), "out");
+      // Flow entries join the persistent Flow session when it is loaded.
+      const flowSession = name === "flow" && root.FlowStudioFlowSession &&
+        root.FlowStudioFlowSession.client;
+      let response, text;
+      if (flowSession) {
+        const result = await flowSession.evaluate(code);
+        response = { ok: result.ok, status: result.status };
+        text = result.data && typeof result.data.output === "string" ? result.data.output : result.text;
+      } else {
+        response = await request("/api/run/" + name, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain; charset=utf-8",
+            "X-FlowStudio-Intent": "run" },
+          body: name === "flow" ? flowSnippetProgram(code) : code
+        });
+        text = await response.text();
+      }
+      if (text) sessions.appendTo(session, text + (text.endsWith("\n") ? "" : "\n"), "out");
       status(response.ok ? "Finished" :
         response.status === 422 ? "Execution failed" :
         response.status === 503 ? "Interpreter unavailable" :
@@ -411,7 +421,7 @@ function mount(doc = document, request = fetch) {
   resetItem.id = "terminalMenuReset";
   resetItem.textContent = "Reset interpreter state…";
   resetItem.disabled = true;
-  resetItem.title = "Python and R only; Flow compiles each program from scratch.";
+  resetItem.title = "Clears the variables and definitions of this runtime's session.";
 
   const rememberLabel = h(doc, "label", "terminal-menuitem terminal-menu-flag");
   rememberLabel.id = "consoleRememberHistory";
@@ -449,12 +459,12 @@ function mount(doc = document, request = fetch) {
   async function doReset() {
     const session = sessions.active();
     const name = session.runtime;
-    if (name !== "python" && name !== "r") return;
+    if (name !== "python" && name !== "r" && name !== "flow") return;
     if (!resetArmed) { armToggle(); return; }
     disarmReset();
     hideMenu();
     try {
-      const response = await request("/api/reset/" + name, {
+      const response = await request(name === "flow" ? "/api/flow/session/reset" : "/api/reset/" + name, {
         method: "POST",
         headers: { "Content-Type": "text/plain; charset=utf-8",
           "X-FlowStudio-Intent": "run" },
@@ -524,7 +534,7 @@ function mount(doc = document, request = fetch) {
   });
   menuButton.addEventListener("click", () => {
     const runtime = sessions.active().runtime;
-    resetItem.disabled = !(runtime === "python" || runtime === "r");
+    resetItem.disabled = !(runtime === "python" || runtime === "r" || runtime === "flow");
     menu.hidden = !menu.hidden;
     menuButton.setAttribute("aria-expanded", String(!menu.hidden));
     if (!menu.hidden) { disarmReset(); newSessionItem.focus(); }
@@ -584,8 +594,8 @@ function mount(doc = document, request = fetch) {
 
   /* ---------- editor runtime selector → sessions ---------- */
   const intro = "FlowStudio terminal ready. Enter runs the command; " +
-    "Shift+Enter adds a newline. Python and R keep session state; Flow " +
-    "compiles each command as a program.\n";
+    "Shift+Enter adds a newline. Flow, Python and R each keep their " +
+    "variables between commands.\n";
   sessions.append(sessions.active().runtime, intro, "notice");
   if (language) {
     language.addEventListener("change", () => {
@@ -596,6 +606,8 @@ function mount(doc = document, request = fetch) {
   }
   prompt.setRuntime(sessions.active().runtime);
   paint();
+  // The editor sends lines here with Ctrl+Enter.
+  root.FlowStudioConsoleSubmit = (name, code) => submit(name, code);
   return controller;
 }
 

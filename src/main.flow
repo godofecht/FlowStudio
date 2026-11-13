@@ -4,7 +4,7 @@
 # This is a single-process, localhost-only development preview. It does not
 # sandbox executed code. Python and R retain separate local interpreter sessions.
 
-import std.process { ProcCmd, ProcResult, proc_cmd, proc_arg, proc_timeout_ms, proc_run }
+import std.process { ProcCmd, ProcResult, proc_cmd, proc_arg, proc_timeout_ms, proc_run, proc_input }
 import std.io { FileRead, io_read_text, io_read_file }
 import .data_routes { StaticAsset, data_route }
 
@@ -475,6 +475,64 @@ function send_flow_debug(op: string) -> void {
     }
 }
 
+# The persistent Flow console session (src/flow_session.py). The helper
+# rebuilds the session around each entry; the program runs through the
+# bridged runner so the console can call Python and R.
+function flow_session_helper(op: string, input: string, status_word: string) -> ptr<ProcResult> {
+    let command: ptr<ProcCmd> = proc_cmd("python3")
+    proc_arg(command, "src/flow_session.py")
+    proc_arg(command, op)
+    if not eq(status_word, "") {
+        proc_arg(command, status_word)
+    }
+    proc_input(command, input)
+    proc_timeout_ms(command, 60000)
+    return proc_run(command)
+}
+
+function send_flow_session(op: string, code: string) -> void {
+    if eq(op, "state") or eq(op, "reset") {
+        let result: ptr<ProcResult> = flow_session_helper(op, "", "")
+        if result.exit_code != 0 or not eq(result.error, "") {
+            fs_reply(503, "text/plain; charset=utf-8", "FlowStudio: the Flow session helper failed. " + result.stderr + result.error)
+            return
+        }
+        fs_reply(200, "application/json; charset=utf-8", result.stdout)
+        return
+    }
+    let prepared: ptr<ProcResult> = flow_session_helper("prepare", code, "")
+    if prepared.exit_code == 2 {
+        fs_reply(422, "application/json; charset=utf-8", prepared.stdout)
+        return
+    }
+    if prepared.exit_code != 0 or not eq(prepared.error, "") or prepared.timed_out {
+        fs_reply(503, "text/plain; charset=utf-8", "FlowStudio: the Flow session helper failed. " + prepared.stderr + prepared.error)
+        return
+    }
+    let output: string = fs_flow_run_bridged(prepared.stdout)
+    let status: i32 = fs_flow_bridged_status()
+    let mut word: string = "200"
+    if status == 422 {
+        word = "422"
+    } elif status == 504 {
+        word = "504"
+    } elif status != 200 {
+        word = "503"
+    }
+    let committed: ptr<ProcResult> = flow_session_helper("commit", output, word)
+    if (committed.exit_code != 0 and committed.exit_code != 3) or not eq(committed.error, "") {
+        fs_reply(503, "text/plain; charset=utf-8", "FlowStudio: the Flow session helper failed. " + committed.stderr + committed.error)
+        return
+    }
+    if status == 200 and committed.exit_code == 0 {
+        fs_reply(200, "application/json; charset=utf-8", committed.stdout)
+    } elif status == 504 {
+        fs_reply(504, "application/json; charset=utf-8", committed.stdout)
+    } else {
+        fs_reply(422, "application/json; charset=utf-8", committed.stdout)
+    }
+}
+
 function send_flow_check(code: string) -> void {
     let result: ExecutionResult = execute("flow", code, true, "")
     fs_reply(result.status, "text/plain; charset=utf-8", result.output)
@@ -830,6 +888,18 @@ function dispatch() -> void {
         }
         if eq(path, "/api/debug/flow/evaluate") {
             send_flow_debug("evaluate")
+            return
+        }
+        if eq(path, "/api/flow/session/eval") {
+            send_flow_session("eval", fs_body())
+            return
+        }
+        if eq(path, "/api/flow/session/state") {
+            send_flow_session("state", "")
+            return
+        }
+        if eq(path, "/api/flow/session/reset") {
+            send_flow_session("reset", "")
             return
         }
         if eq(path, "/api/check/flow") {

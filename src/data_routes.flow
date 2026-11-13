@@ -153,6 +153,9 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/ide_app_preview.js" {
         return StaticAsset { path: "web/ide_app_preview.js", mime: "text/javascript; charset=utf-8", found: true }
     }
+    if url == "/ide_flow_session.js" {
+        return StaticAsset { path: "web/ide_flow_session.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
     if url == "/ide_side_panel.js" {
         return StaticAsset { path: "web/ide_side_panel.js", mime: "text/javascript; charset=utf-8", found: true }
     }

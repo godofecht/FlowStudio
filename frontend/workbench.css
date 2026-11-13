@@ -441,6 +441,10 @@ dialog.dg-dialog[open]{display:flex}
 #pythonEnvironment caption{caption-side:top;text-align:left;padding:0 0 6px;font:600 10.5px var(--sans,inherit);letter-spacing:.06em;text-transform:uppercase;color:#7f8996}
 #pythonEnvironment th{text-align:left;font-weight:600;color:#8d96a2;padding:4px 6px;border-bottom:1px solid #2a2e35}
 #pythonEnvironment th:nth-child(1){width:38%}#pythonEnvironment th:nth-child(3){width:22%}
+#pythonEnvironment .flow-env th:nth-child(1){width:28%}#pythonEnvironment .flow-env th:nth-child(2){width:28%}#pythonEnvironment .flow-env th:nth-child(3){width:44%}
+#pythonEnvironment .flow-env td{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#pythonEnvironment .flow-env-value{color:#cfd6df}
+#pythonEnvironment .flow-env-lost td{color:#7f8996;font-style:italic}
 #pythonEnvironment td{padding:3px 6px;border-bottom:1px solid #1f2227;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:top;color:#cdd3da}
 #pythonEnvironment td details summary{cursor:pointer;overflow:hidden;text-overflow:ellipsis}
 #pythonEnvironment td details ul{margin:2px 0 0;padding-left:12px;white-space:normal}
@@ -537,6 +541,7 @@ dialog.dg-dialog[open]{display:flex}
 .dock-debug .dbg-console-in{width:auto;margin:0;height:28px;border:0;border-top:1px solid #262a30;border-radius:0;padding:0 12px;background:#17191d}
 .terminal-transcript{display:flex;flex-direction:column}
 .terminal-transcript>.terminal-entries{margin-top:auto}
+.terminal-transcript>*{flex-shrink:0}
 .monaco-editor .dbg-inline-value::after{color:#d8b58b;opacity:.85;font-style:italic;padding-left:14px;white-space:pre}
 
 /* ---- Top bar priorities: drop the least used controls first ------------- */

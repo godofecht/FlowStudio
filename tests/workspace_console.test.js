@@ -364,12 +364,12 @@ test("overflow menu gates destructive reset and wires history persistence", asyn
   const reset = app.panel.querySelector("#terminalMenuReset");
   assert.equal(reset.disabled, false,
     "python keeps an interpreter, so the menu offers its reset");
-  // Switching to flow disables honest reset support: Flow compiles per run.
+  // Flow keeps a console session too, so its reset is offered as well.
   app.el("language").value = "flow";
   app.el("language").fire("change");
   menuButton.fire("click");
-  assert.equal(reset.disabled, true,
-    "Flow cannot reset an interpreter; it has none");
+  assert.equal(reset.disabled, false,
+    "the Flow console session can be reset");
 });
 
 

@@ -92,6 +92,36 @@ void fs_reply_bytes(int code, const char *content_type, const char *body, size_t
     fs_client = -1;
 }
 
+/* The loopback port: FLOWSTUDIO_PORT when set to 1024..65535, else 8751.
+ * The Host and Origin checks below follow it. */
+static int fs_port_value = 0;
+static char fs_host_ip[32], fs_host_name[32], fs_origin_ip[48], fs_origin_name[48];
+
+int fs_port(void)
+{
+    if (fs_port_value) return fs_port_value;
+    int port = 8751;
+    const char *raw = getenv("FLOWSTUDIO_PORT");
+    if (raw && *raw)
+    {
+        char *end = NULL;
+        long value = strtol(raw, &end, 10);
+        if (end && *end == 0 && value >= 1024 && value <= 65535) port = (int)value;
+    }
+    fs_port_value = port;
+    snprintf(fs_host_ip, sizeof(fs_host_ip), "127.0.0.1:%d", port);
+    snprintf(fs_host_name, sizeof(fs_host_name), "localhost:%d", port);
+    snprintf(fs_origin_ip, sizeof(fs_origin_ip), "http://127.0.0.1:%d", port);
+    snprintf(fs_origin_name, sizeof(fs_origin_name), "http://localhost:%d", port);
+    return port;
+}
+
+const char *fs_origin(void)
+{
+    (void)fs_port();
+    return fs_origin_ip;
+}
+
 int fs_listen(int port)
 {
     if (port <= 0 || port > 65535) return -1;
@@ -174,8 +204,8 @@ int fs_intent_allowed(void)
        this server never grants cross-origin requests. */
     if (!fs_header_equals("X-FlowStudio-Intent", "run", 0)) return 0;
     if (fs_header_value("Origin") &&
-        !fs_header_equals("Origin", "http://127.0.0.1:8751", 0) &&
-        !fs_header_equals("Origin", "http://localhost:8751", 0))
+        !fs_header_equals("Origin", fs_origin_ip, 0) &&
+        !fs_header_equals("Origin", fs_origin_name, 0))
         return 0;
     return 1;
 }
@@ -215,8 +245,9 @@ int fs_read_request(int listener)
 
     /* DNS rebinding defence: never serve executable endpoints under an
        arbitrary Host header, even if DNS resolves that host to loopback. */
-    if ((!fs_header_equals("Host", "127.0.0.1:8751", 1) &&
-         !fs_header_equals("Host", "localhost:8751", 1)) ||
+    (void)fs_port();
+    if ((!fs_header_equals("Host", fs_host_ip, 1) &&
+         !fs_header_equals("Host", fs_host_name, 1)) ||
         fs_header_count("Host") != 1)
     {
         fs_reply(403, "text/plain", "Invalid Host header");

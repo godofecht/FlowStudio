@@ -10,6 +10,8 @@ import .data_routes { StaticAsset, data_route }
 
 extern {
     function fs_listen(port: i32) -> i32
+    function fs_port() -> i32
+    function fs_origin() -> string
     function fs_read_request(listener: i32) -> i32
     function fs_method() -> string
     function fs_path() -> string
@@ -1035,12 +1037,13 @@ function dispatch() -> void {
 }
 
 function main() -> i32 {
-    let listener: i32 = fs_listen(8751)
+    let port: i32 = fs_port()
+    let listener: i32 = fs_listen(port)
     if listener < 0 {
-        println("FlowStudio: unable to bind localhost port 8751.")
+        println("FlowStudio: unable to bind " + fs_origin())
         return 1
     }
-    println("FlowStudio listening on http://127.0.0.1:8751")
+    println("FlowStudio listening on " + fs_origin())
     println("Warning: executions have your user's local permissions. Do not run untrusted code.")
     while true {
         if fs_read_request(listener) == 1 {

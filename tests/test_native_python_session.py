@@ -14,6 +14,8 @@ class NativePythonSessionTest(unittest.TestCase):
             subprocess.run([
                 "cc", "-std=c11", "-Wall", "-Wextra", "-Werror", "-O2",
                 str(ROOT / "src/python_session.c"),
+                # The session relays bridge calls; link the bridge and the other session.
+                str(ROOT / "src/polyglot_bridge.c"), str(ROOT / "src/r_session.c"),
                 str(ROOT / "tests/python_session_harness.c"),
                 "-o", str(binary),
             ], cwd=ROOT, check=True, capture_output=True, text=True, timeout=30)

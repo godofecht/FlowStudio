@@ -18,6 +18,7 @@ extern {
     function fs_reply(status: i32, content_type: string, body: string) -> void
     function fs_write_temp_flow(code: string) -> string
     function fs_write_temp_flow_run(code: string) -> string
+    function fs_write_temp_flow_check(code: string) -> string
     function fs_clean_run_dir() -> void
     function fs_make_temp_c() -> string
     function fs_r_run(code: string) -> string
@@ -48,10 +49,20 @@ extern {
     function fs_py_debug_run_to_line(line: string) -> string
     function fs_py_debug_stop() -> string
     function fs_py_debug_state() -> string
+    function fs_py_debug_breakpoints(points: string) -> string
     function fs_py_inspect() -> string
     function fs_py_plot() -> string
     function fs_py_status() -> i32
     function fs_py_reset() -> void
+    function fs_pty(op: string, body: string) -> string
+    function fs_pty_status() -> i32
+    function fs_flow_debug(op: string, body: string) -> string
+    function fs_flow_debug_status() -> i32
+    function fs_flow_run_bridged(code: string) -> string
+    function fs_flow_bridged_status() -> i32
+    function fs_app_build(code: string) -> string
+    function fs_app_build_status() -> i32
+    function fs_app_serve(path: string) -> i32
     function unlink(path: string) -> i32
     function strcmp(a: string, b: string) -> i32
     function strlen(s: string) -> i64
@@ -69,6 +80,12 @@ struct ExecutionResult {
 # backend selects the compiler backend for Flow runs: "" uses the default
 # C backend, "mlir" passes --backend=mlir to the real flow process.
 function execute(language: string, code: string, check_only: bool, backend: string) -> ExecutionResult {
+    # C backend runs carry the polyglot bridge: the program can import
+    # flowstudio and call the live Python and R sessions while it runs.
+    if eq(language, "flow") and not check_only and eq(backend, "") {
+        let bridged: string = fs_flow_run_bridged(code)
+        return ExecutionResult { status: fs_flow_bridged_status(), output: bridged }
+    }
     let mut command: ptr<ProcCmd> = proc_cmd("flow")
     if eq(language, "mathflow") {
         command = proc_cmd("python3")
@@ -88,21 +105,23 @@ function execute(language: string, code: string, check_only: bool, backend: stri
         proc_arg(command, temp_path)
     } elif eq(language, "flow") {
         if check_only {
-            temp_path = fs_write_temp_flow(code)
-            if eq(temp_path, "") {
+            # Staged beside the bridge module so `import flowstudio` checks
+            # the way it runs. The directory goes in fs_clean_run_dir.
+            let staged: string = fs_write_temp_flow_check(code)
+            if eq(staged, "") {
                 return ExecutionResult { status: 500, output: "FlowStudio: unable to create temporary Flow source file." }
             }
+            proc_arg(command, "tool")
+            proc_arg(command, "compiler/scripts/flowc_emit.flow")
+            proc_arg(command, "--strict")
+            proc_arg(command, staged)
             output_path = fs_make_temp_c()
             if eq(output_path, "") {
-                let _removed: i32 = unlink(temp_path)
+                fs_clean_run_dir()
                 return ExecutionResult { status: 500, output: "FlowStudio: unable to create temporary compiler output." }
             }
             # The documented strict Flow-to-C emitter performs parsing and
             # type checking without linking or running the submitted program.
-            proc_arg(command, "tool")
-            proc_arg(command, "compiler/scripts/flowc_emit.flow")
-            proc_arg(command, "--strict")
-            proc_arg(command, temp_path)
             proc_arg(command, output_path)
         } else {
             # The MLIR backend refuses imports unless a flow.toml sits above
@@ -414,6 +433,9 @@ function send_python_debug(action: string, body: string) -> void {
     if eq(action, "status") {
         output = fs_py_debug_state()
     }
+    if eq(action, "breakpoints") {
+        output = fs_py_debug_breakpoints(body)
+    }
     let status: i32 = fs_py_status()
     if status == 200 or status == 422 {
         fs_reply(status, "application/json; charset=utf-8", output)
@@ -427,6 +449,25 @@ function send_python_environment() -> void {
     let status: i32 = fs_py_status()
     if status == 200 {
         fs_reply(200, "application/json; charset=utf-8", output)
+    } else {
+        fs_reply(status, "text/plain; charset=utf-8", output)
+    }
+}
+
+# Integrated terminal: a real pty running the user's login shell
+# (src/pty_session.c). Same trust as code execution, same intent gate.
+function send_pty(op: string) -> void {
+    let output: string = fs_pty(op, fs_body())
+    fs_reply(fs_pty_status(), "text/plain; charset=utf-8", output)
+}
+
+# Flow source debugging through LLDB (src/flow_debug_session.c and
+# src/flow_debugger.py). Replies are JSON snapshots of the paused program.
+function send_flow_debug(op: string) -> void {
+    let output: string = fs_flow_debug(op, fs_body())
+    let status: i32 = fs_flow_debug_status()
+    if status == 200 or status == 422 {
+        fs_reply(status, "application/json; charset=utf-8", output)
     } else {
         fs_reply(status, "text/plain; charset=utf-8", output)
     }
@@ -699,6 +740,10 @@ function dispatch() -> void {
         fs_reply(200, "text/plain; charset=utf-8", "FlowStudio ready")
         return
     }
+    # Built Flow apps: a fixed set of file names inside numbered builds.
+    if eq(method, "GET") and fs_app_serve(path) == 1 {
+        return
+    }
     # Only explicit read-only assets can be served; never use the URL as a file path.
     if eq(method, "GET") {
         let asset: StaticAsset = data_route(path)
@@ -723,6 +768,66 @@ function dispatch() -> void {
         if eq(path, "/api/run/mathflow") {
             let result: ExecutionResult = execute("mathflow", fs_body(), false, "")
             fs_reply(result.status, "application/json; charset=utf-8", result.output)
+            return
+        }
+        if eq(path, "/api/pty/read") {
+            send_pty("read")
+            return
+        }
+        if eq(path, "/api/pty/write") {
+            send_pty("write")
+            return
+        }
+        if eq(path, "/api/pty/open") {
+            send_pty("open")
+            return
+        }
+        if eq(path, "/api/pty/resize") {
+            send_pty("resize")
+            return
+        }
+        if eq(path, "/api/pty/close") {
+            send_pty("close")
+            return
+        }
+        if eq(path, "/api/debug/flow/start") {
+            send_flow_debug("start")
+            return
+        }
+        if eq(path, "/api/debug/flow/step") {
+            send_flow_debug("step")
+            return
+        }
+        if eq(path, "/api/debug/flow/next") {
+            send_flow_debug("next")
+            return
+        }
+        if eq(path, "/api/debug/flow/finish") {
+            send_flow_debug("finish")
+            return
+        }
+        if eq(path, "/api/debug/flow/continue") {
+            send_flow_debug("continue")
+            return
+        }
+        if eq(path, "/api/debug/flow/pause") {
+            send_flow_debug("pause")
+            return
+        }
+        if eq(path, "/api/debug/flow/stop") {
+            send_flow_debug("stop")
+            return
+        }
+        if eq(path, "/api/debug/flow/status") {
+            send_flow_debug("status")
+            return
+        }
+        if eq(path, "/api/debug/flow/breakpoints") {
+            send_flow_debug("breakpoints")
+            return
+        }
+        if eq(path, "/api/debug/flow/evaluate") {
+            send_flow_debug("evaluate")
             return
         }
         if eq(path, "/api/check/flow") {
@@ -866,6 +971,10 @@ function dispatch() -> void {
             send_r_package_update(fs_body())
             return
         }
+        if eq(path, "/api/debug/python/breakpoints") {
+            send_python_debug("breakpoints", fs_body())
+            return
+        }
         if eq(path, "/api/debug/python/start") {
             send_python_debug("start", fs_body())
             return
@@ -904,6 +1013,11 @@ function dispatch() -> void {
         }
         if eq(path, "/api/inspect/python") {
             send_python_environment()
+            return
+        }
+        if eq(path, "/api/app/build") {
+            let built: string = fs_app_build(fs_body())
+            fs_reply(fs_app_build_status(), "application/json; charset=utf-8", built)
             return
         }
         if eq(path, "/api/reset/r") {

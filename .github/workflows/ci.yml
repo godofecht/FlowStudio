@@ -204,6 +204,10 @@ jobs:
           npm run test:ui
           node tests/native_r_member_ui.mjs
           node tests/native_math_plot_ui.mjs
+          node tests/native_explorer_ui.mjs
+          node tests/native_panels_ui.mjs
+          node tests/native_debugger_ui.mjs
+          node tests/native_projects_ui.mjs
       - name: Package verified executable
         run: sh scripts/package.sh
       - name: Archive qualified platform build

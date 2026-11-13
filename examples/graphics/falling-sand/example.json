@@ -1,0 +1,12 @@
+{
+  "id": "graphics-falling-sand",
+  "order": 4,
+  "title": "Falling sand",
+  "description": "Sand, water and oil settle by one density ladder; thousands of particles in a blitted buffer.",
+  "files": ["app.flow"],
+  "steps": [
+    "Press Run. It compiles to WebAssembly and plays in the Preview.",
+    "Click the canvas to give it the keyboard. Click and drag to pour. Number keys pick a material, C clears.",
+    "Edit a colour or constant and the Preview rebuilds as you type."
+  ]
+}

@@ -79,6 +79,12 @@ function entryText(app, bucket) {
   return host.children.map(node => node.serialize()).join("");
 }
 
+/* Session tabs and status live inside one .terminal-head row. */
+function panelKids(app) {
+  return app.panel.children.flatMap(node =>
+    node.className === "terminal-head" ? node.children : [node]);
+}
+
 test("workspace exposes console controls and loads allowlisted modules", () => {
   assert.match(html, /id="console"/);
   const routes = fs.readFileSync(path.join(root, "src/data_routes.flow"), "utf8");
@@ -92,22 +98,22 @@ test("workspace exposes console controls and loads allowlisted modules", () => {
 
 test("mount builds tabs, honest status row and an inline transcript prompt", () => {
   const app = mount();
-  const tabs = app.panel.children.filter(node =>
+  const tabs = panelKids(app).filter(node =>
     node.className.split(/\s+/).includes("terminal-tab"));
   // Tabs live in the tab strip; find by class anywhere.
-  const tabbar = app.panel.children.find(node => node.className === "terminal-tabs");
+  const tabbar = panelKids(app).find(node => node.className === "terminal-tabs");
   assert.ok(tabbar, "a runtime tab strip is injected into the panel");
   const tabsFound = tabbar.querySelectorAll(".terminal-tab");
   assert.deepEqual(tabsFound.map(tab => tab.textContent.replace(/\s+\d+$/, "")), ["Flow", "Python", "R", "+"]);
   assert.equal(app.output.className, "terminal-entries");
-  const transcript = app.panel.children.find(node =>
+  const transcript = panelKids(app).find(node =>
     node.className === "terminal-transcript");
   assert.ok(transcript, "the transcript wraps output and prompt");
   assert.ok(transcript.contains(app.el("consoleInput")),
     "the prompt is the next line of the transcript, not an anchored form");
-  const status = app.panel.children.find(node => node.className === "terminal-status");
-  assert.match(status.textContent, /No commands yet/, "runtime honestly starts unknown");
-  const menu = app.panel.children.find(node => node.attributes.id === "terminalMenu");
+  const status = panelKids(app).find(node => node.className === "terminal-status");
+  assert.match(status.textContent, /Ready/, "runtime honestly starts unknown");
+  const menu = panelKids(app).find(node => node.attributes.id === "terminalMenu");
   assert.equal(menu.hidden, true, "secondary actions live in a collapsed menu");
 });
 
@@ -127,8 +133,8 @@ test("prompt keydown submits exact code; output and ready state follow", async (
   assert.match(transcriptHTML, /term-cmd/);
   assert.match(transcriptHTML, /&gt; [\s\S]*print[\s\S]*hello/);
   assert.match(transcriptHTML, /ok/);
-  const status = app.panel.children.find(node => node.className === "terminal-status");
-  assert.match(status.textContent, /Last submission succeeded/);
+  const status = panelKids(app).find(node => node.className === "terminal-status");
+  assert.match(status.textContent, /Last run succeeded/);
 });
 
 test("runtime errors surface failure classes but keep the command in history", async () => {
@@ -140,8 +146,8 @@ test("runtime errors surface failure classes but keep the command in history", a
   assert.match(app.el("console").innerHTML, /fs-error-line/);
   assert.match(app.el("console").innerHTML, /TypeError/);
   assert.equal(app.el("resultStatus").dataset.state, "error");
-  const status = app.panel.children.find(node => node.className === "terminal-status");
-  assert.match(status.textContent, /Last submission failed/);
+  const status = panelKids(app).find(node => node.className === "terminal-status");
+  assert.match(status.textContent, /Last run failed/);
 });
 
 test("console output is never interpreted as HTML", async () => {
@@ -164,7 +170,7 @@ test("Shift+Enter keeps editing; Ctrl+F is reserved for the editor", () => {
   assert.equal(stopped, false);
   assert.equal(field.value, "one");
   // The prompt swallows Ctrl+F so the editor's global find stays untouched.
-  const transcript = app.panel.children.find(node =>
+  const transcript = panelKids(app).find(node =>
     node.className === "terminal-transcript");
   field.fire("keydown", {
     key: "f", ctrlKey: true, stopPropagation() { executed = true; } });
@@ -199,7 +205,7 @@ test("network failures flip the runtime to disconnected, not 'error'", async () 
   assert.equal(await app.controller.run(field), false);
   assert.deepEqual(Array.from(app.controller.history("python")), []);
   assert.equal(app.el("resultStatus").dataset.state, "error");
-  const status = app.panel.children.find(node => node.className === "terminal-status");
+  const status = panelKids(app).find(node => node.className === "terminal-status");
   assert.match(status.textContent, /Server unreachable/,
     "a transport failure is reported as disconnected, not as a runtime error");
   assert.equal(field.value, "retry");
@@ -247,7 +253,7 @@ test("language change and tab switches isolate drafts per session", () => {
   language.fire("change");
   assert.equal(field.value, "python draft",
     "switching back restores that session's draft");
-  const tabStrip = app.panel.children.find(node => node.className === "terminal-tabs");
+  const tabStrip = panelKids(app).find(node => node.className === "terminal-tabs");
   const rTab = tabStrip.querySelectorAll(".terminal-tab")
     .find(tab => tab.dataset.runtime === "r");
   rTab.fire("click");
@@ -268,23 +274,23 @@ test("new sessions add scrollbacks and flag unread output in background tabs", a
     return app.controller;
   })();
   assert.ok(vibe);
-  const response = app.panel.children.find(node =>
+  const response = panelKids(app).find(node =>
     node.className === "terminal-actions");
   const plus = app.panel.querySelector("#terminalNewSession");
   assert.ok(plus, "an explicit + control creates sessions");
   plus.fire("click");
-  const tabStrip = app.panel.children.find(node => node.className === "terminal-tabs");
+  const tabStrip = panelKids(app).find(node => node.className === "terminal-tabs");
   const suffixes = tabStrip.querySelectorAll(".terminal-tab")
     .map(tab => tab.textContent);
   assert.ok(suffixes.some(text => /\bPython 2\b/.test(text)), suffixes.join("|"));
-  const status = app.panel.children.find(node => node.className === "terminal-status");
-  assert.match(status.textContent, /No commands yet/,
+  const status = panelKids(app).find(node => node.className === "terminal-status");
+  assert.match(status.textContent, /Ready/,
     "a fresh session reports unknown state, not the other session's status");
 });
 
 test("Ctrl+L clears visible output for the active session only", () => {
   const app = mount();
-  const transcript = app.panel.children.find(node =>
+  const transcript = panelKids(app).find(node =>
     node.className === "terminal-transcript");
   transcript.fire("keydown", { key: "l", ctrlKey: true, preventDefault() {} });
   assert.equal(app.el("console").children.length, 0,

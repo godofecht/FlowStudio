@@ -12,7 +12,7 @@ const main = read("src/main.flow");
 
 test("sidebar panels load in dependency order behind the console stack", () => {
   const order = ["/terminal_render.js", "/console.js", "/workspace_console.js",
-    "/packages_panel.js", "/examples_gallery.js", "/debug_panel.js",
+    "/packages_panel.js", "/examples_mathflow.js", "/examples_gallery.js", "/ide_debugger.js",
     "/workspace_panels.js", "/ui/workbench.js"];
   let last = -1;
   for (const tag of order) {
@@ -21,7 +21,7 @@ test("sidebar panels load in dependency order behind the console stack", () => {
     last = at;
   }
   for (const tag of ["/packages_panel.js", "/examples_gallery.js",
-    "/debug_panel.js", "/workspace_panels.js", "/terminal_render.js"]) {
+    "/ide_debugger.js", "/workspace_panels.js", "/terminal_render.js"]) {
     assert.ok(html.split('<script src="' + tag + '"></script>').length - 1 === 1,
       tag + " loads exactly once");
   }
@@ -32,9 +32,53 @@ test("sidebar panels load in dependency order behind the console stack", () => {
 test("every workspace script tag has an explicit allowlisted route", () => {
   for (const tag of ["/packages_panel.js", "/examples_gallery.js",
     "/debug_panel.js", "/workspace_panels.js", "/ide_completion_core.js",
-    "/terminal_render.js"]) {
+    "/terminal_render.js", "/ide_menubar.js", "/ide_run_widget.js",
+    "/ide_search_everywhere.js", "/ide_explorer.js", "/ide_workspace.js",
+    "/app/project_create.js", "/app/project_rename.js"]) {
     assert.ok(routes.includes('if url == "' + tag + '"'), tag + " route allowlisted");
   }
+});
+
+test("JetBrains-style top bar ships complete native markup and wiring", () => {
+  // Menubar: every root menu is a .menu with trigger + popup and ARIA wiring.
+  const menus = ["File", "Edit", "View", "Navigate", "Code", "Refactor",
+    "Run", "Tools", "Help"];
+  for (const name of menus) {
+    assert.ok(html.includes("aria-controls="), "menus use aria-controls");
+    assert.ok(html.includes(">" + name + "</button>"), name + " trigger present");
+  }
+  assert.match(html, /<nav class="menubar" role="menubar"/,
+    "menubar is a role=menubar region");
+  // Keyboard hints are visible in the menus (JetBrains-native affordance).
+  assert.match(html, /<kbd>[^<]+<\/kbd>/, "menus show shortcut hints");
+  // Dynamic checkbox state binds to the real page control.
+  assert.match(html, /data-check-of="autoCheckFlow"/);
+  assert.match(html, /<input id="autoCheckFlow" type="checkbox"/);
+  // Tools menu reaches both polysemantic overlays by element id.
+  assert.match(html, /data-act="searchEverywhere"/);
+  assert.match(html, /data-act="runConfigChip"/);
+  // Recent projects submenu slot for the saved-projects fill.
+  assert.match(html, /data-fill="recent"/);
+  // Run configuration chip + dialog ids the run widget requires.
+  for (const id of ["runConfigChip", "runChipLang", "runChipBackend",
+    "runConfigDialog", "runConfigList", "runConfigQuery"]) {
+    assert.match(html, new RegExp('id="' + id + '"'), id + " present");
+  }
+  // Search-everywhere dialog ids the search engine requires.
+  for (const id of ["searchEverywhere", "seQuery", "seGroups"]) {
+    assert.match(html, new RegExp('id="' + id + '"'), id + " present");
+  }
+  // The engines load after the panels that own their data.
+  const menubarAt = html.indexOf('<script src="/ide_menubar.js"></script>');
+  const runWidgetAt = html.indexOf('<script src="/ide_run_widget.js"></script>');
+  const searchAt = html.indexOf('<script src="/ide_search_everywhere.js"></script>');
+  assert.ok(menubarAt > 0, "ide_menubar.js loads once");
+  assert.ok(runWidgetAt > 0, "ide_run_widget.js loads once");
+  assert.ok(searchAt > 0, "ide_search_everywhere.js loads once");
+  /* The engines only enhance static markup, so they may load before the
+   * panels; the menubar reads the saved-projects store lazily at open. */
+  assert.ok(menubarAt < runWidgetAt && runWidgetAt < searchAt,
+    "top-bar engines load in a stable order");
 });
 
 test("MLIR backend is a real compiler invocation behind an explicit route", () => {
@@ -69,25 +113,54 @@ test("Run Project executes the whole open project sequentially with failure stop
   assert.match(html, /  return ok;\n\}\nasync function run\(\)/, "executeCode returns ok to callers");
   assert.match(html, /el\("run"\)\.disabled && !options\.forceRunGate/, 
     "project runs bypass the single-run button gate");
-  // The ordered plan comes from the examples panel because that panel
-  // already tracks which open buffers belong to each project.
+  // The ordered plan comes from the open project (web/ide_projects.js),
+  // which knows the example's declared file order.
   assert.match(panels, /exports\.projectRunPlan/, "panel exposes the ordered run plan");
-  assert.match(panels, /steps\.push\(\{ id: doc\.id, name: file\.name, language: doc\.language \}\)/,
+  assert.match(panels, /service \? service\.runPlan\(\) : null/, "the plan comes from the project service");
+  const projects = read("web/ide_projects.js");
+  assert.match(projects, /steps\.push\(\{ id: doc_\.id, name, language: doc_\.language \}\)/,
     "plan steps carry document id, filename and language");
 });
 
-test("legacy Reader pipeline text is auto-upgraded on reopen and draft restore", () => {
-  assert.match(panels, /Examples\.upgradeFiles/, 
-    "reopening a saved project upgrades legacy Flow text");
-  assert.match(panels, /const LEGACY_READER_MARKER = "for row in Reader"/,
-    "dirty open buffers holding the legacy source are upgraded too");
-  assert.match(panels, /function upgradeOpenBuffers/, "buffer-level upgrade helper exists");
-  // The upgrade itself lives with the curated text it replaces.
+test("examples open as their own project instead of adding tabs to the current one", () => {
+  assert.match(panels, /projects\(\)\.openExample\(example\)/);
+  assert.doesNotMatch(panels, /documents\.open\(/, "the gallery no longer opens loose buffers");
+  const projects = read("web/ide_projects.js");
+  assert.match(projects, /a\.closeAllDocuments\(\)/, "a project switch closes the previous tabs");
+});
+
+test("legacy Reader pipeline text is still upgraded for recovered drafts", () => {
   const gallery = read("web/examples_gallery.js");
   assert.match(gallery, /function upgradeFiles/, "gallery exposes upgradeFiles");
-  assert.match(gallery, /const api = \{ examples, validate, mount, upgradeFiles \};/,
-    "upgradeFiles stays exported for panels and recovery");
+  assert.match(gallery, /const api = \{ examples, validate, mount, upgradeFiles,/,
+    "upgradeFiles stays exported for recovery");
   const recovery = read("web/editor_recovery.js");
   assert.match(recovery, /gallery\.upgradeFiles/, "recovered drafts are upgraded");
   assert.match(recovery, /let draft = pending/, "draft reassignment stays allowed");
+});
+
+test("workspace explorer loads after its file-operation modules and the app", () => {
+  const order = ["/app/project_create.js", "/app/project_rename.js", "/ide_explorer.js", "/ide_workspace.js"];
+  let last = html.indexOf("window.FlowStudioApp = Object.freeze(");
+  assert.ok(last > 0, "FlowStudioApp is published before the explorer mounts");
+  for (const tag of order) {
+    const at = html.indexOf('<script src="' + tag + '"></script>');
+    assert.ok(at > last, tag + " loads after its dependencies");
+    assert.equal(html.split('<script src="' + tag + '"></script>').length - 1, 1, tag + " loads once");
+    last = at;
+  }
+  assert.match(html, /<div id="explorer"><\/div>/, "explorer host present");
+  assert.match(html, /role="tablist" aria-orientation="vertical"/, "activity bar is a vertical tablist");
+  assert.match(html, /id="tab-search"[^>]*aria-controls="view-search"/, "search has its own view");
+  assert.doesNotMatch(html, /id="projectTree"|id="folder"|id="newFile"/, "legacy tree controls removed");
+});
+
+test("secondary run actions live in one overflow menu beside Run", () => {
+  const start = html.indexOf('id="runMorePopup"');
+  const end = html.indexOf("</div>", start);
+  assert.ok(start > 0, "overflow popup present");
+  const popup = html.slice(start, end);
+  for (const id of ["runCell", "runProject", "runMathFlow", "autoCheckFlow", "resetR", "resetPython"])
+    assert.ok(popup.includes('id="' + id + '"'), id + " is inside the overflow");
+  assert.match(html, /id="runMore"[^>]*aria-haspopup="menu"[^>]*aria-expanded="false"/);
 });

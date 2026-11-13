@@ -19,10 +19,10 @@ const RUNTIMES = Object.freeze(["flow", "python", "r"]);
 const MAX_ENTRIES = 2000;        // dom+memory bound per session
 const MAX_EXPORT_BYTES = 2 * 1024 * 1024; // explicit user-initiated text export
 const STATE_LABELS = Object.freeze({
-  idle: "No commands yet in this session",
+  idle: "Ready",
   running: "Executing…",
-  ready: "Last submission succeeded",
-  error: "Last submission failed",
+  ready: "Last run succeeded",
+  error: "Last run failed",
   disconnected: "Server unreachable; output shown below may be stale"
 });
 

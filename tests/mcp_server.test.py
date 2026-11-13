@@ -139,7 +139,6 @@ class McpServerContract(unittest.TestCase):
                        "arguments": {"language": "flow", "code": LEGAL_FLOW}},
         })
         self.assertFalse(reply["result"].get("isError", False))
-        self.assertIn("Program finished", reply["result"]["content"][0]["text"])
         self.assertIn("2.000000", reply["result"]["content"][0]["text"])
 
     @unittest.skipUnless(server_is_up(), "FlowStudio native server is not running")

@@ -190,14 +190,16 @@ async function checkRSyntax(code) {
   return {ok:false, output:response.output, diagnostics};
 }
 // The native C transport writes the checked buffer to a unique
-// /tmp/flowstudio-XXXXXX.flow path (mkstemps). The compiler can also report
+// /tmp/flowstudio-XXXXXX.flow path (mkstemps), or, for the strict check, to
+// prog.flow in a private /tmp/flowstudio-check-XXXXXX directory beside the
+// flowstudio bridge module, whose own locations are left out. The compiler can also report
 // locations in imported Flow files or its generated C output; those do not
 // belong to the current Monaco document and must never become editor markers.
 function parseFlowDiagnostics(output) {
   const diagnostics = [];
   const seen = new Set();
   for (const text of output.split(/\r?\n/)) {
-    const match = /^\s*\/tmp\/flowstudio-[A-Za-z0-9]{6}\.flow:([1-9][0-9]{0,6}):([1-9][0-9]{0,6}):\s*(.+)$/.exec(text);
+    const match = /^\s*\/tmp\/flowstudio-(?:[A-Za-z0-9]{6}\.flow|check-[A-Za-z0-9]{6}\/prog\.flow):([1-9][0-9]{0,6}):([1-9][0-9]{0,6}):\s*(.+)$/.exec(text);
     if (!match) continue;
     const line = Number(match[1]);
     const column = Number(match[2]);

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flow app</title>
+<style>
+:root { color-scheme: dark; --bg: #111215; --line: #262830; --muted: #8a8e9b; --text: #d6d8df; --err: #f28b82; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+  font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; overflow: hidden; }
+body { display: flex; flex-direction: column; }
+.stage { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 8px; }
+canvas { display: block; max-width: 100%; max-height: 100%; image-rendering: pixelated;
+  background: #000; outline: none; border-radius: 3px; }
+canvas:focus-visible { box-shadow: 0 0 0 2px #6ea8fe; }
+body:not([data-gfx="true"]) .stage { display: none; }
+pre { margin: 0; padding: 6px 10px; white-space: pre-wrap; word-break: break-word; overflow: auto;
+  flex: 0 0 auto; max-height: 30%; border-top: 1px solid var(--line); }
+body:not([data-gfx="true"]) pre { flex: 1 1 auto; max-height: none; border-top: 0; }
+pre:empty { display: none; }
+.err { color: var(--err); }
+</style>
+</head>
+<body>
+<div class="stage"><canvas id="canvas" width="640" height="480" tabindex="0" aria-label="Flow app canvas"></canvas></div>
+<pre id="out" aria-live="polite"></pre>
+<script>
+/* Runs one Flow WebAssembly build (#build=N) and reports to the IDE. The
+ * IDE replaces this frame with a new build on every hot reload. */
+(function () {
+  "use strict";
+  /* The build number travels in the fragment: the server serves this page
+   * by its exact path, so a query string would not match. */
+  var params = new URLSearchParams(location.hash.slice(1));
+  var build = /^\d{1,9}$/.test(params.get("build") || "") ? params.get("build") : null;
+  var out = document.getElementById("out");
+  var canvas = document.getElementById("canvas");
+  var lines = 0;
+  function tell(event, detail) {
+    try { parent.postMessage({ source: "flowstudio-app", build: build, event: event, detail: detail }, location.origin); }
+    catch (_) { /* the IDE is gone */ }
+  }
+  function log(text, isError) {
+    if (lines > 2000) out.removeChild(out.firstChild);
+    var line = document.createElement("span");
+    if (isError) line.className = "err";
+    line.textContent = text + "\n";
+    out.appendChild(line);
+    lines++;
+    out.scrollTop = out.scrollHeight;
+    tell(isError ? "stderr" : "stdout", String(text));
+  }
+  if (!build) { log("No app build was given.", true); return; }
+  window.flowGfxOnStart = function (title, w, h) {
+    document.body.dataset.gfx = "true";
+    tell("start", { title: title, width: w, height: h });
+  };
+  window.flowGfxOnExit = function (frames) { tell("exit", { frames: frames }); };
+  window.addEventListener("message", function (event) {
+    if (event.origin !== location.origin || !event.data || event.data.source !== "flowstudio-ide") return;
+    if (event.data.command === "stop" && window.flowGfxStop) window.flowGfxStop();
+    if (event.data.command === "focus") canvas.focus();
+  });
+  canvas.addEventListener("pointerdown", function () { canvas.focus(); });
+  var script = document.createElement("script");
+  script.src = "/flowapp/" + build + "/app.js";
+  script.onerror = function () { log("The app build could not be loaded.", true); tell("error", "load"); };
+  script.onload = function () {
+    if (typeof createFlowModule !== "function") { log("The app build has no module.", true); tell("error", "module"); return; }
+    createFlowModule({
+      print: function (text) { log(text, false); },
+      printErr: function (text) { log(text, true); },
+      canvas: canvas
+    }).then(function (module) {
+      tell("loaded");
+      try { module.callMain([]); }
+      catch (error) {
+        if (error && error.name === "ExitStatus") tell("exit", { status: error.status });
+        else { log(String(error), true); tell("error", String(error)); }
+      }
+    }).catch(function (error) { log(String(error), true); tell("error", String(error)); });
+  };
+  document.body.appendChild(script);
+})();
+</script>
+</body>
+</html>

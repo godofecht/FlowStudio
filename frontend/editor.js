@@ -10,7 +10,7 @@ export function mountEditor(monaco, source, host, app, language) {
     fontFamily: '"SFMono-Regular", Consolas, "Liberation Mono", monospace',
     minimap: { enabled: false }, padding: { top: 22, bottom: 24 },
     scrollBeyondLastLine: false, smoothScrolling: true, cursorBlinking: 'smooth',
-    renderLineHighlight: 'line', lineNumbersMinChars: 4, glyphMargin: false,
+    renderLineHighlight: 'line', lineNumbersMinChars: 3, glyphMargin: true,
     folding: true, roundedSelection: true, tabSize: 4, insertSpaces: true,
     overviewRulerBorder: false, hideCursorInOverviewRuler: true,
     scrollbar: { verticalScrollbarSize: 9, horizontalScrollbarSize: 9 },

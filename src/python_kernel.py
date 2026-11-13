@@ -1,7 +1,7 @@
 """Length-framed, persistent native Python kernel for FlowStudio's loopback server.
 
 Not a sandbox: code executes with the FlowStudio user's local permissions.
-Protocol: stdin E/I/P opcode + 8 ASCII hex bytes + UTF-8 source; fd 3: status (0/1) +
+Protocol: stdin E/I/P/Y opcode + 8 ASCII hex bytes + UTF-8 source; fd 3: status (0/1) +
 8 ASCII hex bytes + UTF-8 captured output. One process per local server.
 """
 from __future__ import annotations
@@ -150,6 +150,16 @@ def inspect_namespace(namespace: dict[str, object]) -> bytes:
         node: dict[str, object] = {
             "name": name[:160], "type": kind, "size": size
         }
+        # pandas DataFrames report their shape (a pandas-owned property); the
+        # frame is still never iterated or repr()'d here.
+        module = type.__getattribute__(exact_type, "__module__")
+        if kind == "DataFrame" and isinstance(module, str) and module.startswith("pandas."):
+            try:
+                rows, cols = value.shape
+                node["dimensions"] = [int(rows), int(cols)]
+            except Exception:
+                pass
+            return node
         if depth >= MAX_INSPECT_DEPTH or exact_type not in (list, tuple, dict):
             return node
         if id(value) in ancestors:
@@ -219,6 +229,10 @@ def serve() -> None:
     debugger = DebugSession()
     protocol = os.fdopen(3, "wb", buffering=0)
     stdin = sys.stdin.buffer
+    # `import flowstudio` in user code reaches R and Flow through this pipe.
+    import flowstudio_bridge
+    flowstudio_bridge.connect(protocol, stdin, namespace)
+    sys.modules["flowstudio"] = flowstudio_bridge
     while True:
         header = read_exact(stdin, 9)
         if header is None:
@@ -227,20 +241,26 @@ def serve() -> None:
             length = int(header[1:], 16)
         except ValueError:
             return
-        if header[:1] not in (b"E", b"I", b"P", b"T", b"B", b"S", b"N", b"F", b"C", b"X", b"Q", b"G") or length > MAX_SOURCE or (header[:1] in (b"I", b"P", b"S", b"N", b"F", b"C", b"X", b"Q") and length != 0):
+        if header[:1] not in (b"E", b"I", b"P", b"T", b"B", b"S", b"N", b"F", b"C", b"X", b"Q", b"G", b"L", b"Y") or length > MAX_SOURCE or (header[:1] in (b"I", b"P", b"S", b"N", b"F", b"C", b"X", b"Q") and length != 0):
             return
         data = read_exact(stdin, length)
         if data is None:
             return
-        if header[:1] in (b"B", b"S", b"N", b"F", b"C", b"X", b"Q", b"G"):
+        if header[:1] in (b"B", b"S", b"N", b"F", b"C", b"X", b"Q", b"G", b"L"):
             if header[:1] == b"B":
                 try:
                     ok, payload = encode(debugger.start(data.decode("utf-8", "strict"), namespace, LimitedWriter()))
                 except UnicodeDecodeError:
                     ok, payload = encode({"state": "idle", "ok": False, "stack": [],
                                           "output": "", "message": "Invalid UTF-8 debugger request."})
+            elif header[:1] == b"L":
+                try:
+                    ok, payload = encode(debugger.set_breakpoints(data.decode("utf-8", "strict")))
+                except UnicodeDecodeError:
+                    ok, payload = encode({"state": "idle", "ok": False, "stack": [],
+                                          "output": "", "message": "Invalid UTF-8 breakpoint list."})
             elif header[:1] == b"G":
-                # A decimal source line, not an expression or a Python command.
+                # The payload is a decimal source line. Expressions and commands are rejected.
                 line = int(data) if 1 <= len(data) <= 6 and data[:1] != b"0" and data.isdigit() else None
                 ok, payload = encode(debugger.command("run-to-line", line))
             else:
@@ -250,6 +270,13 @@ def serve() -> None:
             ok, payload = False, b"Python debugger is active; stop or finish it before normal execution."
         elif debugger.busy() and debugger.snapshot()["state"] == "running":
             ok, payload = False, b"Python debugger is executing; inspection is temporarily unavailable."
+        elif header[:1] == b"Y":
+            # Another language calls in: format char, then source.
+            try:
+                request = data.decode("utf-8", "strict")
+                ok, payload = flowstudio_bridge.evaluate(namespace, request[:1], request[1:])
+            except UnicodeDecodeError:
+                ok, payload = False, b"Invalid UTF-8 bridge request."
         elif header[:1] == b"I":
             ok = True
             payload = inspect_namespace(namespace)

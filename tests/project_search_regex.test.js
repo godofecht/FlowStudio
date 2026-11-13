@@ -68,6 +68,6 @@ test("native embedded project search stays identical to tested source and wires 
   assert.ok(html.includes(source));
   for(const id of ["projectRegex","projectWholeWord","projectSearch","searchResults"])
     assert.ok(html.includes('id="'+id+'"'));
-  assert.match(html,/project\.search\(query, \{ caseSensitive, regex, wholeWord \}\)/);
+  assert.match(html,/project\.search\(query, \{ caseSensitive: options\.caseSensitive,\s+regex: options\.regex, wholeWord: options\.wholeWord, include: options\.include/);
   assert.match(html,/selected !== hit\.text/);
 });

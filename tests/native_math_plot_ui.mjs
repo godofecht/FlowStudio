@@ -146,6 +146,7 @@ try {
   ]) {
     await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
       readFileSync(source, 'utf8'));
+    await page.locator('#runMore').click();
     await page.locator('#runMathFlow').click();
     await page.waitForFunction(expected => {
       const plot = document.querySelector('#mathFlowPlot');
@@ -281,7 +282,12 @@ try {
   // compiler-generated RK4 for eight coupled reaction/diffusion states.
   // This deliberately exercises the actual browser interaction, not only
   // fetch() from the Playwright page or the separate mathematical frontend.
-  await page.locator('#language').selectOption('flow');
+  // The language select is driven by the run chip; set it the same way.
+  await page.evaluate(() => {
+    const select = document.getElementById('language');
+    select.value = 'flow';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  });
   await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
     readFileSync('examples/native_coupled_evolution2d.flow', 'utf8'));
   await page.locator('#run').click();

@@ -23,6 +23,71 @@ try {
   await mkdir('build/ui', { recursive: true });
   await page.screenshot({ path: 'build/ui/workbench.png' });
 
+  // ---- JetBrains-style top bar: real Chromium keyboard behavior ----------
+  // All three engines auto-mount on DOMContentLoaded.
+  assert.equal(await page.evaluate(() =>
+    [FlowStudioMenubar, FlowStudioRunWidget, FlowStudioSearchEverywhere]
+      .every(Boolean)), true);
+  const fileTrigger = page.locator('.menubar .menu').first().locator('.menu-trigger');
+  await fileTrigger.focus();
+  await page.keyboard.press('ArrowDown');                 // keyboard opens + focuses first item
+  await page.waitForFunction(() => !document.querySelector('#menuFilePopup').hidden);
+  assert.equal(await fileTrigger.getAttribute('aria-expanded'), 'true');
+  assert.equal(await page.evaluate(() =>
+    document.activeElement && document.activeElement.getAttribute('role')), 'menuitem');
+  await page.keyboard.press('s');                          // typeahead lands on Save
+  assert.match(await page.evaluate(() => document.activeElement.textContent.trim()), /^Save/);
+  await page.keyboard.press('Escape');                    // close without running Save
+  assert.equal(await fileTrigger.evaluate(node => node === document.activeElement),
+    true, 'Escape refocuses the trigger');
+
+  // Tools menu -> "Search everywhere" opens the overlay via menu dispatch.
+  const toolsTrigger = page.locator('.menu-trigger', { hasText: 'Tools' });
+  await toolsTrigger.click();
+  await page.getByRole('menuitem', { name: /Search everywhere/ }).click();
+  await page.waitForFunction(() => document.getElementById('searchEverywhere').open);
+  await page.locator('#seQuery').fill('an');
+  await page.waitForFunction(() =>
+    document.querySelectorAll('#seGroups .se-row').length >= 2);
+  // Buffers participate too: an empty query lists every open buffer.
+  await page.locator('#seQuery').fill('');
+  await page.waitForFunction(() =>
+    document.querySelectorAll('#seGroups .se-row').length >= 4);
+  assert.match(await page.locator('#seGroups').innerText(), /^OPEN$/m);
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.getElementById('searchEverywhere').open);
+  // Double-Shift heartbeat: two Shift presses open it from anywhere.
+  await page.keyboard.press('Shift');
+  await page.keyboard.press('Shift');
+  await page.waitForFunction(() => document.getElementById('searchEverywhere').open);
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.getElementById('searchEverywhere').open);
+
+  // Run-configuration chip mirrors the selects; the dialog filters configs.
+  assert.equal(await page.locator('#runChipLang').innerText(), 'Flow');
+  assert.equal(await page.locator('#runChipBackend').innerText(), 'C');
+  await page.locator('#runConfigChip').click();
+  await page.waitForFunction(() => document.getElementById('runConfigDialog').open);
+  await page.waitForFunction(() =>
+    document.querySelectorAll('#runConfigList .se-row').length >= 4);
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.getElementById('runConfigDialog').open);
+  // The selects are hidden widgets now (the chip represents them), so the
+  // language switch goes through the real 'change' contract they publish.
+  await page.evaluate(() => {
+    const language = document.getElementById('language');
+    language.value = 'r';
+    language.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  assert.equal(await page.locator('#runChipLang').innerText(), 'R');
+  assert.equal(await page.locator('#runChipBackend').innerText(), '');
+  await page.evaluate(() => {
+    const language = document.getElementById('language');
+    language.value = 'flow';
+    language.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  assert.equal(await page.locator('#runChipLang').innerText(), 'Flow');
+
   // A user edit updates the document model and draft indicators.
   await page.evaluate(() => FlowStudioEditor.editor.focus());
   await page.keyboard.press('ControlOrMeta+End');
@@ -47,7 +112,11 @@ try {
   assert.equal(await page.evaluate(() => FlowStudioEditor.editor.getValue()), 'answer = 9');
 
   // Native Python executes the actual editor selection through the real router.
-  await page.locator('#language').selectOption('python');
+  await page.evaluate(() => {
+    const language = document.getElementById('language');
+    language.value = 'python';
+    language.dispatchEvent(new Event('change', { bubbles: true }));
+  });
   await page.evaluate(() => {
     const source = document.getElementById('source');
     source.value = 'print("monaco-native-ok")\nraise RuntimeError("unselected")';
@@ -60,126 +129,120 @@ try {
   await page.waitForFunction(() => !document.getElementById('run').disabled);
   assert.doesNotMatch(await page.locator('#console').innerText(), /RuntimeError/);
 
-  // Exercise real Flow HTTP -> persistent CPython pause/step/continue from
-  // the primary workspace. No mocked trace or browser-only interpreter.
+  // Real Flow HTTP -> persistent CPython pause/step/continue through the
+  // Run and Debug view: gutter breakpoints, F5, F10, and the debug console.
+  const debugState = () => page.evaluate(() => document.getElementById('debugStatus').dataset.state);
+  const debugText = () => page.locator('#debugStatus').textContent();
+  const setBreakpoints = lines => page.evaluate(lines => {
+    const model = FlowStudioEditor.editor.getModel();
+    FlowStudioDebugger.instance.breakpoints.clear(model);
+    for (const line of lines) FlowStudioDebugger.instance.breakpoints.toggle(model, line);
+  }, lines);
   await page.evaluate(() => {
     const source = document.getElementById('source');
     source.value = 'live_value = 40\nlive_value += 2\nprint(live_value)\n';
     source.dispatchEvent(new Event('input', { bubbles: true }));
   });
   await page.locator('#tab-debug').click();
-  await page.locator('#liveDebugBreakpoints').fill('2');
-  await page.locator('#liveDebugStart').click();
-  await page.waitForFunction(() =>
-    document.getElementById('liveDebugOutput').textContent.includes('Python debugger: paused'));
-  assert.match(await page.locator('#liveDebugOutput').innerText(), /Line 2 in/);
-  await page.locator('#liveDebugStep').click();
-  await page.waitForFunction(() =>
-    document.getElementById('liveDebugOutput').textContent.includes('Line 3 in'));
-  await page.locator('#liveDebugContinue').click();
-  await page.waitForFunction(() =>
-    document.getElementById('liveDebugOutput').textContent.includes('Python debugger: done'));
-  assert.match(await page.locator('#liveDebugOutput').innerText(), /Output:\n42/);
+  await setBreakpoints([2]);
+  assert.equal(await page.locator('#debugBreakpoints .dbg-bp-row').count(), 1);
+  await page.locator('#debugStart').click();
+  await page.waitForFunction(() => document.getElementById('debugStatus').dataset.state === 'paused');
+  assert.equal(await debugText(), 'Paused at line 2');
+  assert.equal(await page.locator('#debugToolbar').isVisible(), true);
+  assert.match((await page.locator('#debugVariables .dbg-var').allTextContents()).join('|'), /live_value40/);
+  await page.keyboard.press('F10');
+  await page.waitForFunction(() => /line 3/.test(document.getElementById('debugStatus').textContent));
+  await page.keyboard.press('F5');
+  await page.waitForFunction(() => document.getElementById('debugStatus').dataset.state === 'done');
+  assert.match(await page.locator('#debugConsoleOutput').innerText(), /^42$/m);
+  assert.equal(await page.locator('#debugToolbar').isHidden(), true);
 
   // Real Chromium -> native Flow HTTP -> persistent CPython scientific
-  // conditional breakpoint. The first hit is iteration 2 (0.5 * 0.1^3),
-  // not an editor-only parse or a replayed debugger frame.
+  // conditional breakpoint. The first hit is iteration 2 (0.5 * 0.1^3).
   await page.evaluate(() => {
     const source = document.getElementById('source');
     source.value = 'residual = 0.5\nfor iteration in range(8):\n    residual *= 0.1\n    observed = residual\nprint(observed)\n';
     source.dispatchEvent(new Event('input', { bubbles: true }));
   });
-  await page.locator('#liveDebugBreakpoints').fill('4?residual<=1e-3');
-  await page.locator('#liveDebugStart').click();
-  await page.waitForFunction(() =>
-    document.getElementById('liveDebugOutput').textContent.includes('Python debugger: paused'));
-  assert.match(await page.locator('#liveDebugOutput').innerText(), /Line 4 in/);
-  assert.match(await page.locator('#liveDebugOutput').innerText(), /iteration: int = 2/);
-  await page.locator('#liveDebugStop').click();
-  await page.waitForFunction(() =>
-    document.getElementById('liveDebugOutput').textContent.includes('Python debugger: stopped'));
+  await page.evaluate(() => {
+    const dbg = FlowStudioDebugger.instance, model = FlowStudioEditor.editor.getModel();
+    dbg.breakpoints.clear(model);
+    dbg.breakpoints.set(model, 4, { condition: 'residual<=1e-3', enabled: true });
+  });
+  await page.locator('#debugStart').click();
+  await page.waitForFunction(() => document.getElementById('debugStatus').dataset.state === 'paused');
+  assert.equal(await debugText(), 'Paused at line 4');
+  assert.match((await page.locator('#debugVariables .dbg-var').allTextContents()).join('|'), /iteration2/);
+  await page.keyboard.press('Shift+F5');
+  await page.waitForFunction(() => document.getElementById('debugStatus').dataset.state !== 'paused');
 
-  // A final newline is not a second executable Python line. Reject the
-  // phantom breakpoint in the real Chromium workspace before HTTP submission.
+  // A final newline is not a second executable Python line: a breakpoint
+  // there is rejected by the native debugger.
   await page.evaluate(() => {
     const source = document.getElementById('source');
     source.value = 'terminal_line = 1\n';
     source.dispatchEvent(new Event('input', { bubbles: true }));
   });
-  await page.locator('#liveDebugBreakpoints').fill('2');
-  await page.locator('#liveDebugStart').click();
-  await page.waitForFunction(() =>
-    document.getElementById('liveDebugOutput').textContent.includes('Breakpoint is outside source.'));
-  assert.match(await page.locator('#liveDebugOutput').innerText(),
-    /Native Python debugger error: Breakpoint is outside source/);
+  await setBreakpoints([2]);
+  await page.locator('#debugStart').click();
+  await page.waitForFunction(() => /Invalid or duplicate breakpoint line/.test(document.getElementById('debugConsoleOutput').textContent));
+  assert.notEqual(await page.evaluate(() => document.getElementById('debugStatus').dataset.state), 'paused');
+  // That 422 is the expected rejection; account for only this response.
+  assert.ok(errors.includes('422 http://127.0.0.1:8751/api/debug/python/start'));
+  assert.ok(errors.every(message => message === '422 http://127.0.0.1:8751/api/debug/python/start' ||
+    /Failed to load resource:.*422/.test(message)), JSON.stringify(errors));
+  errors.length = 0;
 
-  // Actual native Chromium caret -> Flow HTTP -> persistent CPython one-shot
-  // run-to-line. The target is executed, not emulated by editor navigation.
+  // Run to Cursor executes up to the caret line in the real kernel.
   await page.evaluate(() => {
     const source = document.getElementById('source');
     source.value = 'caret_a = 1\ncaret_b = caret_a + 1\ncaret_result = caret_b + 1\nprint(caret_result)\n';
     source.dispatchEvent(new Event('input', { bubbles: true }));
   });
-  await page.locator('#liveDebugBreakpoints').fill('2');
-  await page.locator('#liveDebugStart').click();
-  await page.waitForFunction(() =>
-    document.getElementById('liveDebugOutput').textContent.includes('Line 2 in'));
-  await page.evaluate(() => {
-    const source = document.getElementById('source');
-    const at = source.value.indexOf('print(caret_result)');
-    source.setSelectionRange(at, at);
-    source.dispatchEvent(new Event('select', { bubbles: true }));
-  });
-  assert.equal(await page.locator('#liveDebugRunToCursor').isDisabled(), false);
-  await page.locator('#liveDebugRunToCursor').click();
-  await page.waitForFunction(() =>
-    document.getElementById('liveDebugOutput').textContent.includes('Line 4 in'));
-  assert.match(await page.locator('#liveDebugOutput').innerText(), /caret_result: int = 3/);
-  await page.locator('#liveDebugContinue').click();
-  await page.waitForFunction(() =>
-    document.getElementById('liveDebugOutput').textContent.includes('Python debugger: done'));
+  await setBreakpoints([2]);
+  await page.locator('#debugStart').click();
+  await page.waitForFunction(() => /line 2/.test(document.getElementById('debugStatus').textContent));
+  await page.evaluate(() => FlowStudioEditor.editor.setPosition({ lineNumber: 4, column: 1 }));
+  await page.evaluate(() => FlowStudioDebugger.instance.command('cursor'));
+  await page.waitForFunction(() => /line 4/.test(document.getElementById('debugStatus').textContent));
+  assert.match((await page.locator('#debugVariables .dbg-var').allTextContents()).join('|'), /caret_result3/);
+  await page.locator('#debugContinue').click();
+  await page.waitForFunction(() => document.getElementById('debugStatus').dataset.state === 'done');
 
-  // Actual native Chromium/Flow/CPython stack-frame navigation: select a
-  // caller frame, then ensure switching editor documents cannot jump into
-  // unrelated source while the native kernel remains paused.
+  // Call stack navigation: select the caller frame, then stop.
   await page.evaluate(() => {
     const source = document.getElementById('source');
     source.value = 'def inner():\n    value = 40\n    return value\nanswer = inner()\nprint(answer)\n';
     source.dispatchEvent(new Event('input', { bubbles: true }));
   });
-  await page.locator('#liveDebugBreakpoints').fill('3');
-  await page.locator('#liveDebugStart').click();
-  await page.waitForFunction(() =>
-    document.getElementById('liveDebugOutput').textContent.includes('Python debugger: paused') &&
-    document.querySelectorAll('#liveDebugFrames button').length === 2);
-  assert.equal(await page.evaluate(() => FlowStudioEditor.editor.getPosition().lineNumber), 3);
-  await page.locator('#liveDebugFrames button').nth(1).click();
-  assert.equal(await page.evaluate(() => FlowStudioEditor.editor.getPosition().lineNumber), 4);
-  assert.equal(await page.locator('#liveDebugFrames button').nth(1).getAttribute('aria-current'), 'true');
-  await page.locator('#newDocumentTab').click();
-  await page.keyboard.insertText('unrelated = 1');
-  const unrelatedLine = await page.evaluate(() => FlowStudioEditor.editor.getPosition().lineNumber);
-  // The editor input event disables stale-frame controls immediately.
-  // Playwright cannot click a disabled control; verify the actual controller
-  // refuses the navigation as well as preserving the unrelated caret.
-  assert.equal(await page.locator('#liveDebugFrames button').first().isDisabled(), true);
-  assert.equal(await page.evaluate(() => FlowStudioWorkspacePanels.liveDebugPanel.selectFrame(0)), false);
-  assert.equal(await page.evaluate(() => FlowStudioEditor.editor.getPosition().lineNumber), unrelatedLine);
-  await page.locator('#liveDebugStop').click();
-  await page.waitForFunction(() =>
-    document.getElementById('liveDebugOutput').textContent.includes('Python debugger: stopped'));
-  assert.equal(await page.locator('#liveDebugFrames button').count(), 0);
+  await setBreakpoints([3]);
+  await page.locator('#debugStart').click();
+  await page.waitForFunction(() => document.querySelectorAll('#debugCallStack .dbg-frame').length === 2);
+  assert.ok(await page.locator('.monaco-editor .dbg-line-current').count() > 0, 'paused line is marked');
+  await page.locator('#debugCallStack .dbg-frame').nth(1).click();
+  assert.equal(await page.locator('#debugCallStack .dbg-frame').nth(1).getAttribute('aria-current'), 'true');
+  assert.equal(await page.evaluate(() => FlowStudioEditor.editor.getVisibleRanges()[0].startLineNumber <= 4), true);
+  await page.keyboard.press('Shift+F5');
+  await page.waitForFunction(() => document.getElementById('debugStatus').dataset.state === 'idle');
+  assert.equal(await page.locator('#debugCallStack .dbg-frame').count(), 0);
+  await setBreakpoints([]);
 
   await page.locator('#commandLauncher').click();
-  await page.locator('#commandQuery').fill('go to symbol');
+  await page.locator('#seQuery').fill('go to symbol');
   await page.keyboard.press('Enter');
   assert.equal(await page.locator('#tab-outline').getAttribute('aria-selected'), 'true');
   await page.locator('#tab-files').click();
-  await page.locator('#commandLauncher').click();
-  await page.locator('#commandQuery').fill('zzzz-missing');
-  assert.equal(await page.locator('#commandResults').innerText(), 'No matching commands.');
+  await page.keyboard.press('Control+k');
+  assert.equal(await page.locator('#seTabs .se-tab.active').innerText(), 'Commands');
+  await page.locator('#seQuery').fill('zzzz-missing');
+  assert.equal(await page.locator('#seGroups').innerText(), 'Nothing matches "zzzz-missing".');
   await page.keyboard.press('Escape');
-  await page.locator('#language').selectOption('flow');
+  await page.evaluate(() => {
+    const language = document.getElementById('language');
+    language.value = 'flow';
+    language.dispatchEvent(new Event('change', { bubbles: true }));
+  });
   await page.evaluate(id => FlowStudioApp.activateDocument(id), firstId);
 
   // Compile-check a real Flow 2.0 source through native HTTP and flowc.
@@ -191,11 +254,15 @@ try {
   });
   // The preceding command-palette interaction leaves a modal open in some
   // Chromium builds; close it before testing the real topbar control.
-  await page.evaluate(() => document.getElementById('commandPalette').close());
+  await page.evaluate(() => FlowStudioSearchEverywhere.instance.close());
   await page.locator('#checkFlow').click();
   await page.waitForFunction(() =>
     document.getElementById('resultStatus').textContent === 'Flow compile check passed.');
-  assert.match(await page.locator('#flowDiagnostics').innerText(), /not executed|compile check/i);
+  /* The diagnostics pane shows the true flowc pipeline; when the local
+   * compiler worktree is dirty, ensure_flowc's rebuild banner is part of
+   * that real result instead of the generic not-executed notice. */
+  assert.match(await page.locator('#flowDiagnostics').innerText(),
+    /not executed|compile check|ensure_flowc/i);
   assert.equal(await page.locator('#flowDiagnostics').isVisible(), true);
 
   // Physical compiler-error acceptance: the upstream Flow 2.x parser must
@@ -232,6 +299,7 @@ try {
     source.dispatchEvent(new Event('input', { bubbles: true }));
     FlowStudioEditor.editor.setPosition({lineNumber: 3, column: 1});
   });
+  await page.locator('#runMore').click();               // secondary run actions live in the overflow
   await page.locator('#autoCheckFlow').check();
   await page.waitForFunction(() =>
     document.getElementById('resultStatus').textContent === 'Flow compile check passed.',
@@ -240,6 +308,7 @@ try {
     'idle compiler diagnostics must preserve the user caret');
   assert.equal(await page.locator('#autoCheckFlow').isChecked(), true);
   await page.locator('#autoCheckFlow').uncheck();
+  await page.keyboard.press('Escape');
 
   // Exercise the worker path and wait beyond rendering and deferred callbacks.
   const workerResult = await page.evaluate(async () => {
@@ -258,13 +327,19 @@ try {
   });
   assert.equal(workerResult, 'flow');
   await page.screenshot({ path: 'build/ui/workbench-tested.png' });
-  // Examples open as real editor tabs and every buffer keeps its own content;
-  // re-opening never collapses tabs onto the untitled Flow stub.
-  await page.evaluate(() => localStorage.removeItem('flowstudio.savedProjects.v1'));
-  await page.evaluate(() => document.getElementById('commandPalette').close());
+  // Examples open as their own project: the earlier buffers close (the
+  // unsaved ones are confirmed first) and every file gets its own tab.
+  await page.evaluate(() => FlowStudioSearchEverywhere.instance.close());
   await page.click('#tab-examples');
-  await page.locator('.example-card button.primary').first().click();
-  await page.waitForFunction(() => document.querySelectorAll('#docTabs .doc-tab').length >= 3);
+  await page.locator('.example-card[data-example-id="polyglot-pipeline"] button.primary').click();
+  if (await page.waitForSelector('#projectDialog[open]', { timeout: 4000 }).catch(() => null))
+    await page.locator('#projectDialogActions button', { hasText: 'Discard' }).click();
+  await page.waitForFunction(() => FlowStudioProjects.current() && FlowStudioProjects.current().name === 'polyglot-pipeline');
+  await page.waitForFunction(() => document.querySelectorAll('#docTabs .doc-tab').length === 2);
+  assert.deepEqual(await page.evaluate(() => FlowStudioApp.documents.list().map(d => d.path)),
+    ['polyglot-pipeline/generate.py', 'polyglot-pipeline/analyse.R'], 'the example files, in order');
+  assert.equal(await page.evaluate(() => FlowStudioApp.documents.list().every(d => (d.path || '').startsWith('polyglot-pipeline/'))), true,
+    'only the example project is open');
   await page.evaluate(() => {
     const tab = [...document.querySelectorAll('#docTabs .doc-tab')]
       .find(t => t.textContent.includes('analyse.R'));
@@ -274,14 +349,12 @@ try {
     FlowStudioApp.documents.active().text.startsWith('# Step 3'));
   assert.match(await page.evaluate(() => document.getElementById('source').value),
     /samples <- read\.csv\("data\/samples\.csv"\)/);
-  // The open example becomes a saved project file on this device.
-  await page.evaluate(() => FlowStudioWorkspacePanels.saveOpenProjects());
-  assert.match(await page.locator('.saved-projects').innerText(), /Reopen project/);
+  // The project and its tabs come back after a page reload.
   await page.reload({ waitUntil: 'networkidle' });
-  await page.click('#tab-examples');
-  assert.match(await page.locator('.saved-projects').innerText(),
-    /Python → data file → R analysis/,
-    'saved projects reopen after a page reload');
+  await page.waitForFunction(() => globalThis.FlowStudioProjects && FlowStudioProjects.current() &&
+    FlowStudioProjects.current().name === 'polyglot-pipeline', null, { timeout: 15000 });
+  await page.waitForFunction(() => FlowStudioApp.documents.list().some(d => d.name === 'analyse.R'));
+  assert.equal(await page.textContent('#projectName'), 'polyglot-pipeline');
   await page.setViewportSize({ width: 600, height: 850 });
   await page.waitForTimeout(500);
   const dimensions = await page.evaluate(() => ({

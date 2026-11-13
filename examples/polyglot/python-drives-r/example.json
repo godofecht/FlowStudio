@@ -1,0 +1,12 @@
+{
+  "id": "polyglot-python-drives-r",
+  "order": 1,
+  "title": "Python drives R",
+  "description": "Pull mtcars out of R, group it in Python, send the table back and fit lm() in R. One script, both sessions.",
+  "files": ["cars.py"],
+  "steps": [
+    "Press Run. fs.R.mtcars arrives in Python as a Frame.",
+    "fs.R.by_cyl = rows makes an R data.frame; fs.r(...) returns lm() coefficients as a dict.",
+    "Type by_cyl in the R console: the table exists there too."
+  ]
+}

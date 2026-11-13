@@ -44,6 +44,25 @@ class DebugTests(unittest.TestCase):
         self.assertEqual(namespace["y"], 3)
         self.assertFalse(debugger.busy())
 
+    def test_breakpoints_change_while_paused(self):
+        source = "total = 0\nfor i in range(4):\n    total += i\nprint(total)\n"
+        debugger, namespace, result = self.start(source, [3])
+        self.assertEqual(result["stack"][0]["line"], 3)
+        # Removing the loop breakpoint while paused lets Continue run to the end.
+        updated = debugger.set_breakpoints(json.dumps([]))
+        self.assertTrue(updated["ok"])
+        self.assertEqual(debugger.command("continue")["state"], "done")
+        self.assertEqual(namespace["total"], 6)
+        # Adding one mid-run pauses there, with its condition.
+        debugger, namespace, result = self.start(source, [1])
+        debugger.set_breakpoints(json.dumps([{"line": 3, "condition": "i>=2"}]))
+        result = debugger.command("continue")
+        self.assertEqual(result["stack"][0]["line"], 3)
+        self.assertEqual(result["stack"][0]["locals"]["i"]["value"], "2")
+        self.assertFalse(debugger.set_breakpoints("[99]")["ok"])
+        debugger.command("stop")
+        self.assertFalse(debugger.set_breakpoints("[]")["ok"], "no session after stop")
+
     def test_step_over_skips_called_source_frames(self):
         source = ("def inner():\n    value = 40\n    return value\n"
                   "answer = inner()\nprint(answer)\n")

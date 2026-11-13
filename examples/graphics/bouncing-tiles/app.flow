@@ -1,0 +1,73 @@
+# A Flow graphics app. Run it, then edit a colour or a speed below and
+# watch the Preview rebuild. Click the canvas to give it the keyboard.
+#
+# Controls: move the mouse over the tiles, hold Space to pause the ball.
+
+import "stdlib/gfx.flow"
+import "stdlib/text.flow"
+
+const W: i32 = 640
+const H: i32 = 400
+const TILE: i32 = 40
+const BALL: i32 = 14
+const KEY_SPACE: i32 = 49
+
+# Try changing these while the app runs.
+const SPEED_X: i32 = 4
+const SPEED_Y: i32 = 3
+const BALL_R: i32 = 250
+const BALL_G: i32 = 196
+const BALL_B: i32 = 92
+
+function main() -> i32 {
+    let g = gfx_open(W, H, "Bouncing tiles")
+    let mut x: i32 = 60
+    let mut y: i32 = 80
+    let mut dx: i32 = SPEED_X
+    let mut dy: i32 = SPEED_Y
+    let mut frame: i32 = 0
+    let mut bounces: i32 = 0
+    while gfx_frame_pump(g) {
+        gfx_clear(g, 18, 20, 26)
+        let mx: i32 = gfx_mouse_x(g)
+        let my: i32 = gfx_mouse_y(g)
+        let mut ty: i32 = 0
+        while ty < H / TILE {
+            let mut tx: i32 = 0
+            while tx < W / TILE {
+                let shade: i32 = (tx * 9 + ty * 13 + frame / 2) % 60
+                let mut r: i32 = 30 + shade / 2
+                let mut gr: i32 = 44 + shade
+                let mut b: i32 = 64 + shade
+                if mx / TILE == tx and my / TILE == ty {
+                    r = 120
+                    gr = 210
+                    b = 170
+                }
+                gfx_fill_rect(g, tx * TILE + 1, ty * TILE + 1, TILE - 2, TILE - 2, r, gr, b)
+                tx = tx + 1
+            }
+            ty = ty + 1
+        }
+        if !gfx_key_down(g, KEY_SPACE) {
+            x = x + dx
+            y = y + dy
+        }
+        if x < 0 or x > W - BALL {
+            dx = 0 - dx
+            bounces = bounces + 1
+        }
+        if y < 0 or y > H - BALL {
+            dy = 0 - dy
+            bounces = bounces + 1
+        }
+        gfx_fill_rect(g, x, y, BALL, BALL, BALL_R, BALL_G, BALL_B)
+        let pen: i32 = gfx_draw_text(g, 12, 12, "BOUNCES ", 2, 230, 232, 238)
+        gfx_draw_int(g, 12 + pen, 12, bounces, 2, BALL_R, BALL_G, BALL_B)
+        gfx_present(g)
+        gfx_wait_frame(g, 60)
+        frame = frame + 1
+    }
+    gfx_close(g)
+    return 0
+}

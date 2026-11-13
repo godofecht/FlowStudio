@@ -79,8 +79,7 @@ function workspace(folder) {
   const ids = [
     "source", "language", "console", "resultStatus", "fileLabel", "dirty",
     "cursor", "run", "runProject", "runMathFlow", "mathFlowPlot", "tab-plots", "runCell", "resetR", "resetPython", "refreshPythonEnvironment", "pythonEnvironment", "open", "save", "clear", "fallbackOpen", "runtimeInfo",
-    "projectTree", "folder", "newFile", "refreshProject",
-    "projectSearch", "caseSensitive", "projectRegex", "projectWholeWord", "searchProject", "searchResults", "projectReplace", "replaceProject", "undoProjectReplace",
+    "projectSearch", "caseSensitive", "projectRegex", "projectWholeWord", "searchProject", "searchResults", "projectInclude", "searchSummary", "clearProjectSearch", "collapseProjectSearch", "toggleProjectReplace", "projectReplaceRow", "projectReplace", "replaceProject", "undoProjectReplace",
     "editorFind", "editorReplace", "findNext", "findPrevious",
     "replaceOne", "replaceAll", "editorCaseSensitive", "editorRegex", "editorWholeWord", "editorFindCount",
     "docTabs", "newDocument", "newDocumentTab", "findBar"
@@ -119,7 +118,7 @@ function workspace(folder) {
       fetches.push({ url, options });
       return { ok: true, status: 200, text: async () => "ran" };
     },
-    Blob, URL, setTimeout, console
+    Blob, URL, setTimeout, clearTimeout, console
   });
   assert.equal(scripts.length, 4, "Expected embedded project, editor-find, documents and workspace scripts");
   vm.runInContext(scripts[0], context, { filename: "project-embedded.js" });
@@ -127,8 +126,23 @@ function workspace(folder) {
   vm.runInContext(sourceCells, context, { filename: "source_cells.js" });
   vm.runInContext(scripts[2], context, { filename: "documents-embedded.js" });
   vm.runInContext(scripts[3], context, { filename: "workspace.js" });
+  /* The explorer (tests/ide_explorer.test.js) owns folder choice and the
+   * tree. These helpers stand in for it: adopt the folder, then open the
+   * nth file in the explorer's order (folders first, then by name). */
+  async function nthFile(index) {
+    const entries = [];
+    for await (const [name, handle] of folder.entries()) if (handle.kind === "file") entries.push([name, handle]);
+    entries.sort((a, b) => a[0].localeCompare(b[0]));
+    return entries[index];
+  }
   return {
     el: id => elements.get(id), document, fetches, inspectionFetches,
+    choose: () => window.FlowStudioApp.adoptProjectRoot(folder),
+    open: (handle, path) => window.FlowStudioApp.openEditorHandle(handle, path),
+    openNth: async index => {
+      const [name, handle] = await nthFile(index);
+      return window.FlowStudioApp.openEditorHandle(handle, folder.name + "/" + name);
+    },
     setDiscard: value => { allowDiscard = value; },
     setNewFilename: value => { nextFilename = value; }
   };
@@ -140,19 +154,15 @@ test("embedded project module exactly mirrors tested standalone source", () => {
   assert.equal(scripts[1].trim(), findSource);
   assert.match(html, /<script src="\/source_cells\.js"><\/script>/);
   assert.equal(scripts[2].trim(), fs.readFileSync(path.join(root, "web/ide_documents.js"), "utf8").trimEnd());
-  assert.match(html, /id="projectTree"/);
-  assert.match(html, /id="folder"/);
-  assert.match(html, /id="newFile"/);
+  assert.match(html, /<div id="explorer"><\/div>/);
 });
 
-test("folder selection opens nested source in editor, saves to exact handle", async () => {
+test("opening a folder file loads it in the editor and saves to the exact handle", async () => {
   const target = file("analysis.R", "x <- 7");
   const folder = directory("research", [["analysis.R", target]]);
   const app = workspace(folder);
-  await app.el("folder").fire("click");
-  const tree = app.el("projectTree");
-  assert.equal(tree.children[1].textContent, "File: analysis.R");
-  await tree.children[1].fire("click");
+  app.choose();
+  await app.openNth(0);
   assert.equal(app.el("source").value, "x <- 7");
   assert.equal(app.el("language").value, "r");
   assert.equal(app.el("fileLabel").textContent, "research/analysis.R");
@@ -168,11 +178,11 @@ test("opening a second project file keeps the edited buffer in its own tab", asy
   const first = file("one.py", "first");
   const second = file("two.py", "second");
   const app = workspace(directory("p", [["one.py", first], ["two.py", second]]));
-  await app.el("folder").fire("click");
-  await app.el("projectTree").children[1].fire("click");
+  app.choose();
+  await app.openNth(0);
   app.el("source").value = "unsaved";
   app.el("source").fire("input");
-  await app.el("projectTree").children[2].fire("click");
+  await app.openNth(1);
   assert.equal(app.el("source").value, "second");
   const tabs = app.el("docTabs").children;
   // The starting buffer plus one tab per opened project file.
@@ -182,20 +192,6 @@ test("opening a second project file keeps the edited buffer in its own tab", asy
   await tabs[1].fire("click");
   assert.equal(app.el("source").value, "unsaved");
   assert.equal(app.el("dirty").hidden, false);
-});
-
-test("new source file is created in project and opened in editor", async () => {
-  const folder = directory("work");
-  const app = workspace(folder);
-  await app.el("folder").fire("click");
-  app.setNewFilename("result.flow");
-  await app.el("newFile").fire("click");
-  assert.equal(app.el("fileLabel").textContent, "work/result.flow");
-  app.el("source").value = 'function main() -> i32 { return 0 }';
-  app.el("source").fire("input");
-  await app.el("save").fire("click");
-  const handle = await folder.getFileHandle("result.flow");
-  assert.equal(handle.content, app.el("source").value);
 });
 
 test("selection execution sends selected code with required request intent", async () => {
@@ -226,15 +222,6 @@ test("native Python execution refreshes environment through intent-protected ins
   assert.equal(table.children[2].children[1].textContent, "int");
 });
 
-test("new-file action rejects unsupported filenames without creating files", async () => {
-  const folder = directory("work");
-  const app = workspace(folder);
-  await app.el("folder").fire("click");
-  app.setNewFilename("../bad.flow");
-  await app.el("newFile").fire("click");
-  assert.match(app.el("resultStatus").textContent, /Invalid/);
-  assert.equal(app.el("projectTree").children.length, 1);
-});
 
 
 test("project-wide search navigates to exact match with editor selection", async () => {
@@ -242,13 +229,14 @@ test("project-wide search navigates to exact match with editor selection", async
     ["analysis.R", file("analysis.R", "x <- 1\nx <- 2\n")]
   ]);
   const app = workspace(folder);
-  await app.el("folder").fire("click");
+  app.choose();
   app.el("projectSearch").value = "x <- 2";
   await app.el("searchProject").fire("click");
   const results = app.el("searchResults");
-  assert.equal(results.children.length, 2);
-  assert.match(results.children[0].textContent, /1 matches in 1 files/);
-  assert.match(results.children[1].textContent, /analysis\.R:2:1/);
+  assert.equal(results.children.length, 2);             // file row, match row
+  assert.equal(app.el("searchSummary").textContent, "1 result in 1 file");
+  assert.equal(results.children[0].dataset.file, "research/analysis.R");
+  assert.match(results.children[1].getAttribute("aria-label"), /analysis\.R:2:1/);
   await results.children[1].fire("click");
   assert.equal(app.el("source").value, "x <- 1\nx <- 2\n");
   assert.equal(app.el("source").selectionStart, 7);
@@ -263,13 +251,13 @@ test("search navigation opens its own tab and preserves the edited buffer", asyn
     ["b.flow", file("b.flow", "needle")]
   ]);
   const app = workspace(folder);
-  await app.el("folder").fire("click");
-  await app.el("projectTree").children[1].fire("click");
+  app.choose();
+  await app.openNth(0);
   app.el("source").value = "unsaved changes";
   app.el("source").fire("input");
   app.el("projectSearch").value = "needle";
   await app.el("searchProject").fire("click");
-  await app.el("searchResults").children[2].fire("click");
+  await app.el("searchResults").children[3].fire("click");   // b.flow's match row
   assert.equal(app.el("source").value, "needle");
   const tabs = app.el("docTabs").children;
   assert.equal(tabs.length, 3);
@@ -283,11 +271,12 @@ test("search does not send local project contents to execution API", async () =>
     ["secret.flow", file("secret.flow", "private searchable content")]
   ]);
   const app = workspace(folder);
-  await app.el("folder").fire("click");
+  app.choose();
   app.el("projectSearch").value = "private";
   await app.el("searchProject").fire("click");
   assert.equal(app.fetches.length, 0);
   assert.equal(app.el("searchResults").children.length, 2);
+  assert.match(app.el("searchSummary").textContent, /^1 result in 1 file/);
 });
 
 
@@ -503,14 +492,14 @@ test("native R execution and reset refresh bounded environment through Flow inte
 test("project regex search selects real matches and rejects stale changed file text", async () => {
   const target = file("analysis.R", "α αβ\nfoo_2 = 1\nfoo_3 = 2");
   const app = workspace(directory("research", [["analysis.R", target]]));
-  await app.el("folder").fire("click");
+  app.choose();
   app.el("projectSearch").value = "foo_(\\d)";
   app.el("projectRegex").checked = true;
   app.el("projectWholeWord").checked = true;
   await app.el("searchProject").fire("click");
   const results = app.el("searchResults");
   assert.equal(results.children.length, 3);
-  assert.match(results.children[0].textContent, /2 matches in 1 files/);
+  assert.equal(app.el("searchSummary").textContent, "2 results in 1 file");
   await results.children[2].fire("click");
   assert.equal(app.el("source").selectionStart, 15);
   assert.equal(app.el("source").selectionEnd, 20);
@@ -526,7 +515,7 @@ test("project regex search selects real matches and rejects stale changed file t
 test("project-wide replacement writes only after confirmation and never uploads project contents", async () => {
   const target = file("analysis.R", "x <- 1\nx <- 2\n");
   const app = workspace(directory("work", [["analysis.R", target]]));
-  await app.el("folder").fire("click");
+  app.choose();
   app.el("projectSearch").value = "x";
   app.el("projectReplace").value = "count";
   app.setDiscard(false);
@@ -543,8 +532,8 @@ test("project-wide replacement writes only after confirmation and never uploads 
 test("project-wide replacement refuses open tabs and preserves unsaved source", async () => {
   const target = file("analysis.R", "x <- 1\n");
   const app = workspace(directory("work", [["analysis.R", target]]));
-  await app.el("folder").fire("click");
-  await app.el("projectTree").children[1].fire("click");
+  app.choose();
+  await app.openNth(0);
   app.el("source").value = "x <- 99\n";
   app.el("source").fire("input");
   app.el("projectSearch").value = "x";
@@ -558,7 +547,7 @@ test("project-wide replacement refuses open tabs and preserves unsaved source", 
 test("project-wide replacement uses regex capture groups in the native workspace", async () => {
   const target = file("analysis.R", "foo_1 <- 3\nfoo_2 <- 4");
   const app = workspace(directory("work", [["analysis.R", target]]));
-  await app.el("folder").fire("click");
+  app.choose();
   app.el("projectSearch").value = "foo_(\\d)";
   app.el("projectRegex").checked = true;
   app.el("projectReplace").value = "bar_$1";
@@ -569,7 +558,7 @@ test("project-wide replacement uses regex capture groups in the native workspace
 test("native project undo restores verified disk contents and is one-shot", async () => {
   const target = file("analysis.R", "x <- 1\nx <- 2\n");
   const app = workspace(directory("work", [["analysis.R", target]]));
-  await app.el("folder").fire("click");
+  app.choose();
   app.el("projectSearch").value = "x";
   app.el("projectReplace").value = "z";
   await app.el("replaceProject").fire("click");
@@ -583,7 +572,7 @@ test("native project undo restores verified disk contents and is one-shot", asyn
 test("native project undo refuses external edits without overwriting", async () => {
   const target = file("analysis.R", "x <- 1\n");
   const app = workspace(directory("work", [["analysis.R", target]]));
-  await app.el("folder").fire("click");
+  app.choose();
   app.el("projectSearch").value = "x";
   app.el("projectReplace").value = "z";
   await app.el("replaceProject").fire("click");

@@ -17,7 +17,7 @@ button:hover:not(:disabled),select:hover{border-color:#6d90cf}
 button:disabled{opacity:.45;cursor:not-allowed}
 button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .shell{height:100dvh;display:grid;grid-template-rows:auto minmax(0,1fr) var(--sash) var(--dock-height) auto}
-.topbar{display:flex;align-items:center;gap:8px;min-height:var(--titlebar-height);padding:3px 10px;background:var(--surface);border-bottom:1px solid var(--line);flex-wrap:wrap;row-gap:3px}
+.topbar{display:flex;align-items:center;gap:8px;min-height:var(--titlebar-height);padding:3px 10px;background:var(--surface);border-bottom:1px solid var(--line);flex-wrap:nowrap;min-width:0}
 .brand{display:flex;align-items:center;gap:8px;font-weight:600;font-size:13.5px;white-space:nowrap;letter-spacing:-.01em;padding-right:10px;margin-right:2px;border-right:1px solid var(--line)}
 .brand b{color:#8fb8ff}
 .brand-mark{display:grid;place-items:center;width:22px;height:22px;border-radius:5px;background:var(--accent-dim);color:#8fb8ff}
@@ -31,15 +31,141 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
 .menu-popup button:hover,.menu-popup button:focus-visible{background:var(--accent-dim)}
 .menu-popup kbd{color:var(--muted);font:11px ui-monospace,monospace}
 .menu-popup hr{border:0;border-top:1px solid var(--line);margin:4px 2px}
-.topbar-actions{margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap;row-gap:3px;padding:1px 0}
+.topbar-actions{margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:nowrap;min-width:0;padding:1px 0}
 .topbar-actions label{color:var(--muted);font-size:11.5px}
 .topbar-actions button,.topbar-actions select{padding:4px 9px;font-size:12.5px;border-radius:6px;line-height:1.25}
 .primary{background:#2f5db8;border-color:#4275d6}
-.command-launcher{display:flex;align-items:center;gap:8px;min-width:200px;max-width:320px;background:#0f141d;border:1px solid #33415a;border-radius:6px;padding:4px 9px;color:var(--muted);font-size:12.5px}
+.command-launcher{display:flex;align-items:center;gap:8px;min-width:120px;flex:0 1 320px;max-width:320px;background:#0f141d;border:1px solid #33415a;border-radius:6px;padding:4px 9px;color:var(--muted);font-size:12.5px}
 .command-launcher span{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .command-launcher kbd{margin-left:auto;color:#8fa2c0;font:11px/1 var(--mono);background:#ffffff0d;border:1px solid #33415a;border-radius:4px;padding:2px 5px}
 .command-launcher:hover{border-color:#4a5f85}
-.workspace{display:grid;grid-template-columns:var(--sidebar-width) var(--sash) minmax(0,1fr) var(--sash) var(--right-width);min-height:0}
+.hidden-widget{display:none!important}
+.menu{position:relative}
+.menu-item{position:relative}
+.menu-trigger.open{background:#ffffff1c;border-color:transparent}
+.menu-item-sub[data-sub]{display:flex;align-items:center;justify-content:space-between}
+.menu-sub{position:absolute;top:-5px;left:calc(100% - 4px);z-index:60;min-width:230px;padding:5px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;box-shadow:0 18px 34px #0009}
+.menu-popup button[aria-disabled="true"]{opacity:.42;cursor:default}
+.menu-popup button[aria-disabled="true"]:hover,.menu-popup button[aria-disabled="true"]:focus-visible{background:transparent}
+.menu-popup .menu-check{width:16px;flex:none;text-align:center;color:var(--accent);font-size:11px}
+.menu-popup .menu-check[data-checked]{visibility:visible}
+.menu-popup .menu-check:not([data-checked]){visibility:hidden}
+.menu-empty{padding:8px 10px;color:var(--muted);font-size:11.5px}
+.menu-footer{display:flex;gap:16px;justify-content:flex-end;padding:6px 9px 2px;margin-top:4px;border-top:1px solid var(--line);color:var(--muted);font-size:10.5px}
+.menu-footer kbd{color:#8fa2c0;background:#ffffff0d;border:1px solid #33415a;border-radius:3px;padding:0 4px;font:10px var(--mono)}
+.run-cluster{display:flex;gap:6px;align-items:center;flex:none}
+.run-widget{display:flex;align-items:stretch;overflow:hidden;border:1px solid #33415a;border-radius:6px;background:#0f141d}
+.run-chip{display:flex;align-items:center;gap:8px;background:transparent;border:0;border-radius:6px 0 0 6px;padding:4px 6px 4px 9px;font-size:12.5px;color:#dfe4ee}
+.run-chip:hover{background:#ffffff08}
+.run-chip-main{font-weight:600;white-space:nowrap}
+.run-chip-sub{color:var(--muted);font-size:10.5px;padding:2px 6px;border:1px solid #33415a;border-radius:4px;background:#ffffff08;white-space:nowrap}
+.run-chip-caret{color:var(--muted);font-size:10px;flex:none}
+.run-main{border:0;border-left:1px solid #33415a;border-radius:0 6px 6px 0}
+.config-dialog{border:1px solid #2c3648;border-radius:12px;background:#0e131c;color:var(--fg,#e6ebf5);padding:10px 12px;min-width:min(620px,92vw);box-shadow:0 30px 60px #000a}
+.config-dialog::backdrop{background:#0007}
+.se-search{display:flex;gap:9px;align-items:center;border-bottom:1px solid var(--line);padding:2px 4px 10px}
+.se-search i{color:var(--muted)}
+.se-search input{flex:1;background:transparent;border:0;color:inherit;font-size:13px;outline:none}
+.se-list{max-height:52vh;overflow:auto;padding:4px 0;min-height:80px}
+.se-row{display:flex;width:100%;gap:10px;align-items:baseline;padding:6px 8px;border:0;border-radius:6px;background:transparent;text-align:left;font-size:12.5px;color:inherit}
+.se-row .se-kind{flex:none;min-width:64px;color:var(--muted);font-size:10px;letter-spacing:.06em;text-transform:uppercase}
+.se-row .se-label{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.se-row .se-meta{flex:none;color:var(--muted);font-size:10.5px}
+.se-row:focus-visible,.se-row.selected{background:var(--accent-dim);outline:0}
+.se-group-title{padding:8px 8px 3px;font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.se-empty{padding:14px 8px;color:var(--muted);font-size:12px}
+.config-footer{display:flex;justify-content:flex-end;gap:16px;color:var(--muted);font-size:10.5px;border-top:1px solid var(--line);padding-top:8px;margin-top:4px}
+/* Sidebar: VS Code activity bar beside the active view. */
+.sidebar{flex-direction:row}
+.activity-bar{display:flex;flex-direction:column;align-items:center;gap:2px;flex:none;width:42px;padding:6px 0;background:var(--bg);border-right:1px solid var(--line)}
+.activity-bar button{position:relative;display:grid;place-items:center;width:42px;height:40px;padding:0;background:transparent;border:0;border-radius:0;color:#7f8ea6}
+.activity-bar button svg{width:20px;height:20px}
+.activity-bar button:hover{color:var(--ink)}
+.activity-bar button[aria-selected="true"]{color:var(--ink)}
+.activity-bar button[aria-selected="true"]::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:2px;border-radius:0 2px 2px 0;background:var(--accent)}
+.activity-bar button:focus-visible{outline-offset:-3px}
+.tab-label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.sidebar-views{display:flex;flex-direction:column;flex:1;min-width:0;min-height:0}
+.explorer-body{padding:0!important;display:flex;flex-direction:column}
+/* Explorer tree */
+.explorer{display:flex;flex-direction:column;min-height:0;flex:1;font-size:13px;position:relative}
+.ex-header{display:flex;align-items:center;gap:2px;height:28px;padding:0 4px 0 2px;flex:none}
+.ex-title{display:flex;align-items:center;gap:2px;flex:1;min-width:0;height:24px;padding:0 4px;background:transparent;border:1px solid transparent;border-radius:4px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink);text-align:left}
+.ex-title-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ex-title.drop-target{background:var(--accent-dim);border-color:var(--accent)}
+.explorer:not(.has-root) .ex-header{display:none}
+.ex-actions{display:flex;gap:1px;opacity:.0;transition:opacity .12s}
+.explorer:hover .ex-actions,.explorer:focus-within .ex-actions,.explorer:not(.has-root) .ex-actions{opacity:1}
+.ex-action{display:grid;place-items:center;width:24px;height:24px;padding:0;background:transparent;border:0;border-radius:4px;color:#aebbd0}
+.ex-action:hover:not(:disabled){background:#ffffff14;color:#fff}
+.ex-action:disabled{opacity:.3}
+.ex-icon{display:inline-grid;place-items:center;flex:none;width:16px;height:16px}
+.ex-icon svg{width:16px;height:16px}
+.ex-chevron{color:#8a98ae;transition:transform .1s}
+.ex-chevron.open{transform:rotate(90deg)}
+.ex-chevron-space{display:inline-block;flex:none;width:16px}
+.ex-folder{color:#d8b56a}
+.ex-tree{list-style:none;margin:0;padding:0 0 12px;overflow:auto;flex:1;min-height:0;outline:none}
+.ex-row{position:relative;display:flex;align-items:center;gap:4px;height:22px;padding:0 8px 0 calc(6px + var(--depth,0) * 14px);cursor:pointer;white-space:nowrap;color:#cfd8e6;border:1px solid transparent;user-select:none}
+.ex-row::before{content:"";position:absolute;top:0;bottom:0;left:calc(13px + (var(--depth,0) - 1) * 14px);border-left:1px solid #ffffff10;display:var(--guide,block)}
+.ex-row[aria-level="1"]::before{display:none}
+.ex-row:hover{background:#ffffff0b}
+.ex-row[aria-selected="true"]{background:#ffffff12}
+.ex-tree:focus .ex-row[aria-selected="true"]{background:var(--accent-dim);border-color:var(--accent)}
+.ex-row.is-active .ex-name{color:#fff;font-weight:600}
+.ex-row.is-dirty .ex-name{color:var(--warn)}
+.ex-row.unsupported .ex-name{color:#76849a}
+.ex-row.is-dragging{opacity:.5}
+.ex-row.drop-target{background:var(--accent-dim);border-color:var(--accent)}
+.ex-name{overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1}
+.ex-badge{display:inline-grid;place-items:center;flex:none;min-width:16px;height:14px;padding:0 2px;border-radius:3px;font:700 8.5px/1 var(--mono);letter-spacing:-.02em;color:#0d1119}
+.ex-badge .ex-icon{color:#8a98ae}
+.ex-badge.tone-other{background:transparent}
+.tone-flow{background:#7fb0ff}.tone-r{background:#6ab8f0}.tone-python{background:#f2cf6b}.tone-markdown{background:#a7b6cc}.tone-data{background:#7fd6a3}.tone-config{background:#d39bf0}.tone-text{background:#94a3b8}
+.ex-dirty{flex:none;font:600 10px/1 var(--mono);color:var(--warn);margin-left:auto}
+.ex-dirty-dot{flex:none;width:6px;height:6px;border-radius:50%;background:var(--warn);margin-left:auto}
+.ex-note{height:22px;line-height:22px;padding-left:calc(28px + var(--depth,0) * 14px);color:var(--muted);font-size:12px;font-style:italic}
+.ex-editing{cursor:default;background:transparent!important}
+.ex-input-wrap{position:relative;flex:1;min-width:0}
+.ex-input{width:100%;height:20px;padding:0 4px;background:#0b0f16;color:var(--ink);border:1px solid var(--accent);border-radius:2px;font:inherit;font-size:13px;outline:none}
+.ex-input[aria-invalid="true"]{border-color:#e06c75}
+.ex-input-error{position:absolute;z-index:5;left:0;right:0;top:21px;padding:4px 6px;background:#4a1d22;border:1px solid #e06c75;color:#ffd7d7;font-size:11.5px;line-height:1.35;white-space:normal}
+.ex-empty{padding:10px 14px;display:flex;flex-direction:column;gap:8px}
+.ex-empty-title{margin:4px 0 0;font-weight:600;color:var(--ink)}
+.ex-empty-text{margin:0;color:var(--muted);font-size:12.5px;line-height:1.5}
+.ex-primary{padding:6px 10px;font-size:13px}
+.ex-section-label{margin:10px 0 0;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.ex-recent{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px}
+.ex-recent li{display:flex;align-items:center}
+.ex-recent-item{display:flex;align-items:center;gap:6px;flex:1;min-width:0;padding:4px 6px;background:transparent;border:0;border-radius:4px;text-align:left;font-size:13px}
+.ex-recent-item:hover{background:#ffffff0d}
+.ex-recent-forget{display:grid;place-items:center;width:22px;height:22px;padding:0;background:transparent;border:0;color:var(--muted);opacity:0}
+.ex-recent li:hover .ex-recent-forget,.ex-recent-forget:focus-visible{opacity:1}
+.ex-typeahead{position:absolute;right:10px;bottom:10px;padding:3px 8px;background:var(--surface-2);border:1px solid var(--accent);border-radius:4px;font:12px var(--mono);color:var(--ink);box-shadow:0 6px 16px #0007}
+.ex-typeahead.miss{border-color:#e06c75;color:#ffb4a8}
+.ex-menu{position:fixed;z-index:100;min-width:220px;padding:4px;background:var(--surface-2);border:1px solid #33415a;border-radius:7px;box-shadow:0 14px 32px #000a;font-size:13px}
+.ex-menu-item{display:flex;justify-content:space-between;align-items:center;gap:18px;width:100%;padding:5px 10px;background:transparent;border:0;border-radius:4px;text-align:left}
+.ex-menu-item:hover,.ex-menu-item:focus{background:var(--accent-dim);outline:none}
+.ex-menu-item kbd{color:var(--muted);font:11px var(--mono)}
+.ex-menu hr{border:0;border-top:1px solid var(--line);margin:4px 2px}
+/* Search view */
+.search-body .project-search{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+.search-field{display:flex;align-items:center;gap:2px;background:#0f141d;border:1px solid #3a4a63;border-radius:5px;padding:0 3px 0 0}
+.search-field:focus-within{border-color:var(--accent)}
+.search-field input[type="search"],.search-field input[type="text"]{flex:1;min-width:0;background:transparent;border:0;color:var(--ink);padding:5px 7px;font:inherit;font-size:13px;outline:none}
+.search-toggle{display:grid;place-items:center;position:relative;flex:none;width:22px;height:20px;border-radius:3px;cursor:pointer;font:11px var(--mono);color:var(--muted)}
+.search-toggle input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
+.search-toggle:has(input:checked){background:var(--accent-dim);color:#fff;outline:1px solid var(--accent)}
+.search-toggle:has(input:focus-visible){outline:2px solid var(--accent)}
+.search-actions{display:flex;gap:5px;flex-wrap:wrap}
+.search-actions button{padding:4px 9px;font-size:12px}
+/* Run overflow */
+.run-more{position:relative}
+.run-more-trigger{padding:4px 8px!important;letter-spacing:.05em}
+.run-more-popup{left:auto;right:0}
+.run-more-popup .flow-auto-check{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:5px;color:var(--ink)!important;font-size:13px!important;cursor:pointer}
+.run-more-popup .flow-auto-check:hover{background:var(--accent-dim)}
+.workspace{display:grid;grid-template-columns:var(--sidebar-width) var(--sidebar-sash,5px) minmax(0,1fr) var(--right-sash,5px) var(--right-width);min-height:0}
 .splitter{position:relative;background:var(--bg);cursor:col-resize}
 .splitter::after{content:"";position:absolute;inset:0 2px;background:var(--line)}
 .splitter:hover::after,.splitter:focus-visible::after{background:var(--accent)}
@@ -56,9 +182,6 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
 .sidebar{border-right:1px solid var(--line)}
 .rightpanel{border-left:1px solid var(--line)}
 .panel .body{flex:1;min-height:0;overflow:auto;padding:10px 12px}
-.workspace-tabs{display:flex;flex:none;flex-wrap:wrap;overflow-x:auto;gap:4px 3px;padding:6px 8px;border-bottom:1px solid var(--line)}
-.workspace-tabs button{flex:1 1 auto;font-size:12px;background:transparent;border-color:transparent;white-space:nowrap}
-.workspace-tabs [aria-selected="true"]{background:var(--accent-dim);border-color:#3d5c95}
 .workspace-frame{flex:1;min-height:0}
 .workspace-frame iframe{display:block;width:100%;height:100%;border:0;background:#10141e}
 #view-plots:not([hidden]){display:flex;flex-direction:column}
@@ -91,29 +214,8 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
 .project-search label{font-size:12px;color:var(--muted)}
 #searchResults{display:flex;flex-direction:column;gap:3px;margin-bottom:9px}
 #searchResults button{width:100%;text-align:left;white-space:normal;overflow-wrap:anywhere;font:12px/1.45 ui-monospace,monospace;padding:4px 6px}
-#projectTree{display:flex;flex-direction:column;gap:3px;font-size:13px}
-#projectTree details{padding-left:8px;border-left:1px solid var(--line)}
-#projectTree summary{cursor:pointer;padding:3px 0}
-#projectTree .project-children{display:flex;flex-direction:column;gap:2px;margin:3px 0 4px 6px}
-#projectTree .project-file{display:block;width:100%;text-align:left;overflow-wrap:anywhere;padding:3px 6px;background:transparent;border-color:transparent}
-#projectTree .project-file:hover{background:var(--accent-dim)}
 .hint{font-size:12px;max-width:46ch}
 .muted{color:var(--muted)}
-.example-card{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:10px;background:var(--surface-2)}
-.example-card.saved-project{border-color:#2f5245;background:#15202b}
-.gallery-heading{margin:2px 0 8px;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:#7d8ba3;font-weight:600}
-.saved-projects{margin-bottom:14px}
-.example-forget{font-size:11px;padding:2px 8px;background:transparent;border-color:#2c3a52;color:#7d8ba3;margin-top:4px}
-.example-forget:hover{color:var(--error);border-color:#5e3434}
-.example-head{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
-.example-head h3{margin:0;font-size:13.5px;overflow-wrap:anywhere}
-.example-langs{margin-left:auto;flex:none;font-size:10.5px;color:var(--muted);border:1px solid var(--line);border-radius:9px;padding:2px 7px;white-space:nowrap}
-.example-card p{margin:2px 0 8px;font-size:12.5px;line-height:1.55;overflow-wrap:anywhere}
-.example-card button{display:block;width:100%;text-align:left;font-size:12.5px;margin-top:6px;white-space:normal;overflow-wrap:anywhere}
-.example-card .primary{background:#2f5db8;border-color:#4275d6;color:#fff}
-.example-card .example-file-btn{font-size:11.5px;padding:3px 8px;text-align:left;background:#151d2b;border-color:#2c3a52;color:#a9bcd8}
-.example-card .example-runbook{margin-top:8px;font-size:12px;color:var(--muted)}
-.example-card .example-runbook summary{cursor:pointer;user-select:none;font-size:11.5px}  .example-card .example-runbook ol{margin:6px 0 2px;padding-left:20px}
   .example-card .example-visual{margin:2px 0 8px;font-size:12.5px;color:#7fd1a8}
   .plots-body{flex:1;min-height:0;overflow:auto;padding:12px 16px}
   .plots-body .hint{margin:0 0 6px;font-size:12.5px}
@@ -124,7 +226,6 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
   .plots-body figure.captured-figure embed{max-width:100%;height:auto;display:block}
   .plots-body figure.captured-figure figcaption{margin-top:6px;font-size:12px;color:#333}
   .plots-body figure.captured-figure figcaption a{color:#1c5fb8;margin-left:6px}
-.example-card ol{margin:8px 0 2px;padding-left:20px;font-size:12px;color:var(--muted)}
 #debugSteps{max-height:200px;overflow:auto;display:flex;flex-direction:column;gap:2px;margin-bottom:8px}
 .debug-step button{width:100%;text-align:left;font:11.5px/1.4 var(--mono);padding:3px 7px;background:transparent;border:1px solid transparent;border-radius:5px}
 .debug-step button:hover{background:var(--accent-dim)}
@@ -153,6 +254,12 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
 .doc-tab{display:flex;align-items:center;gap:7px;max-width:230px;padding:0 5px 0 11px;background:#151c27;border:0;border-right:1px solid var(--line);border-radius:0;color:var(--muted);font-size:13px}
 .doc-tab.active{background:#111721;color:var(--ink);box-shadow:inset 0 2px 0 var(--accent)}
 .doc-tab-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.breadcrumb-path{display:flex;align-items:center;gap:4px;min-width:0;overflow:hidden;white-space:nowrap}
+.breadcrumb-path button{padding:1px 4px;background:transparent;border:0;border-radius:3px;color:inherit;font:inherit}
+.breadcrumb-path button:hover{background:#ffffff12;color:var(--ink)}
+.breadcrumb-path .crumb-current{color:var(--ink)}
+.crumb-sep{opacity:.6}
+.doc-tab-dir{flex:none;color:var(--muted);font-size:11px;opacity:.8}
 .doc-tab-dot{color:var(--warn);font-size:9px}
 .doc-tab-close{width:19px;height:19px;padding:0;line-height:1;background:transparent;border:0;border-radius:4px;color:var(--muted)}
 .doc-tab-close:hover{background:#33415a;color:#fff}
@@ -272,8 +379,7 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focu
 #editorRecovery{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--warn)}
 [hidden]{display:none !important}
 svg{width:14px;height:14px;vertical-align:-2px;flex:none}
-@media(max-width:900px){.workspace{grid-template-columns:minmax(0,1fr)}.sidebar,.rightpanel,.workspace>.splitter{display:none}}
-@media(max-width:760px){.shell{grid-template-rows:auto minmax(0,1fr) var(--sash) 40vh auto}.topbar-actions{margin-left:0}}
+@media(max-width:760px){.topbar-actions{margin-left:0}}
 @media(max-width:680px){html{overflow-x:auto}.shell{min-width:680px}.ide-shell-width{width:max(100%,680px)}}
 </style>
 <link rel="stylesheet" href="/ui/workbench.css">
@@ -281,14 +387,19 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
 <body>
 <div class="shell" id="ideShell">
 <header class="topbar">
-  <div class="brand" aria-label="FlowStudio"><span class="brand-mark"><i data-lucide="blocks"></i></span><b>FlowStudio</b></div>
-  <nav class="menubar" aria-label="Main menu">
-    <div class="menu">
-      <button class="menu-trigger" id="menuFile" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="menuFilePopup">File</button>
-      <div class="menu-popup" id="menuFilePopup" role="menu" aria-labelledby="menuFile" hidden>
+  <div class="brand" aria-label="FlowStudio"><span class="brand-mark"><i data-lucide="blocks"></i></span><b>FlowStudio</b><button id="projectSwitcher" type="button" class="project-switcher" aria-haspopup="menu" aria-expanded="false" aria-controls="projectMenu" title="Switch, create or close projects"><span class="ps-name" id="projectName">No project</span><svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 6.5L8 10l3.5-3.5"/></svg></button><div class="menu-popup project-menu" id="projectMenu" role="menu" aria-label="Projects" hidden></div></div>
+  <nav class="menubar" role="menubar" aria-label="Main menu">
+    <div class="menu" id="menuFile">
+      <button class="menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="menuFilePopup">File</button>
+      <div class="menu-popup" id="menuFilePopup" role="menu" aria-label="File" hidden>
+        <button type="button" role="menuitem" data-command="newProject">New project…</button>
         <button type="button" role="menuitem" id="newDocument">New buffer<kbd>Ctrl+Alt+N</kbd></button>
         <button type="button" role="menuitem" id="open">Open file…<kbd>Ctrl+O</kbd></button>
         <button type="button" role="menuitem" data-command="openFolder">Open folder…</button>
+        <div class="menu-item">
+          <button type="button" role="menuitem" class="menu-item-sub" data-sub aria-haspopup="menu" aria-expanded="false">Open recent<kbd>▸</kbd></button>
+          <div class="menu-popup menu-sub" role="menu" data-fill="recent" hidden></div>
+        </div>
         <hr>
         <button type="button" role="menuitem" id="save">Save<kbd>Ctrl+S</kbd></button>
         <button type="button" role="menuitem" data-command="saveFileAs">Save as…</button>
@@ -296,98 +407,179 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
         <button type="button" role="menuitem" data-command="closeDocument">Close tab<kbd>Ctrl+W</kbd></button>
       </div>
     </div>
-    <div class="menu">
-      <button class="menu-trigger" id="menuEdit" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="menuEditPopup">Edit</button>
-      <div class="menu-popup" id="menuEditPopup" role="menu" aria-labelledby="menuEdit" hidden>
+    <div class="menu" id="menuEdit">
+      <button class="menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="menuEditPopup">Edit</button>
+      <div class="menu-popup" id="menuEditPopup" role="menu" aria-label="Edit" hidden>
         <button type="button" role="menuitem" data-command="focusFind">Find in buffer<kbd>Ctrl+F</kbd></button>
         <button type="button" role="menuitem" data-command="focusReplace">Replace<kbd>Ctrl+H</kbd></button>
         <button type="button" role="menuitem" data-command="findInProject">Find in project</button>
+      </div>
+    </div>
+    <div class="menu" id="menuView">
+      <button class="menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="menuViewPopup">View</button>
+      <div class="menu-popup" id="menuViewPopup" role="menu" aria-label="View" hidden>
+        <div class="menu-item">
+          <button type="button" role="menuitem" class="menu-item-sub" data-sub aria-haspopup="menu" aria-expanded="false">Tool Windows<kbd>▸</kbd></button>
+          <div class="menu-popup menu-sub" role="menu" aria-label="Tool Windows" hidden>
+            <button type="button" role="menuitem" data-command="showFiles">Project files</button>
+            <button type="button" role="menuitem" data-command="showOutline">Outline</button>
+            <button type="button" role="menuitem" data-command="showPlots">Plots</button>
+            <button type="button" role="menuitem" data-command="showData">Data viewer</button>
+            <button type="button" role="menuitem" data-tab="tab-packages">Packages</button>
+            <button type="button" role="menuitem" data-tab="tab-examples">Examples</button>
+            <button type="button" role="menuitem" data-tab="tab-debug">Debug</button>
+          </div>
+        </div>
         <hr>
+        <button type="button" role="menuitem" data-command="toggleSidebar">Toggle sidebar<kbd>Ctrl+B</kbd></button>
+        <button type="button" role="menuitem" data-command="toggleRightPanel">Toggle side panel<kbd>Ctrl+Alt+B</kbd></button>
+        <button type="button" role="menuitem" data-command="toggleDock">Toggle console dock<kbd>Ctrl+J</kbd></button>
+        <button type="button" role="menuitem" data-command="maximizeDock">Maximize console dock</button>
+        <button type="button" role="menuitem" data-command="showPreview">App preview</button>
+        <button type="button" role="menuitem" data-command="refreshEnvironment">Refresh environment</button>
+      </div>
+    </div>
+    <div class="menu" id="menuNavigate">
+      <button class="menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="menuNavigatePopup">Navigate</button>
+      <div class="menu-popup" id="menuNavigatePopup" role="menu" aria-label="Navigate" hidden>
         <button type="button" role="menuitem" data-command="goToSymbol">Go to symbol…<kbd>Ctrl+Shift+O</kbd></button>
         <button type="button" role="menuitem" data-command="goToDefinition">Go to definition<kbd>F12</kbd></button>
         <button type="button" role="menuitem" data-command="findReferences">Find references<kbd>Shift+F12</kbd></button>
-        <button type="button" role="menuitem" data-command="renameSymbol">Rename identifier…<kbd>F2</kbd></button>
+        <hr>
+        <button type="button" role="menuitem" data-command="findInProject">Find in project</button>
       </div>
     </div>
-    <div class="menu">
-      <button class="menu-trigger" id="menuRun" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="menuRunPopup">Run</button>
-      <div class="menu-popup" id="menuRunPopup" role="menu" aria-labelledby="menuRun" hidden>
+    <div class="menu" id="menuCode">
+      <button class="menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="menuCodePopup">Code</button>
+      <div class="menu-popup" id="menuCodePopup" role="menu" aria-label="Code" hidden>
+        <button type="button" role="menuitem" data-command="checkFlow">Check Flow syntax<kbd>N/A</kbd></button>
+        <button type="button" role="menuitemcheckbox" data-check-of="autoCheckFlow" aria-checked="false"><span class="menu-check" aria-hidden="true">✓</span>Check on idle</button>
+      </div>
+    </div>
+    <div class="menu" id="menuRefactor">
+      <button class="menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="menuRefactorPopup">Refactor</button>
+      <div class="menu-popup" id="menuRefactorPopup" role="menu" aria-label="Refactor" hidden>
+        <button type="button" role="menuitem" data-command="renameSymbol">Rename symbol…<kbd>F2</kbd></button>
+      </div>
+    </div>
+    <div class="menu" id="menuRun">
+      <button class="menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="menuRunPopup">Run</button>
+      <div class="menu-popup" id="menuRunPopup" role="menu" aria-label="Run" hidden>
         <button type="button" role="menuitem" data-command="run">Run selection or file<kbd>Ctrl+Enter</kbd></button>
-        <button type="button" role="menuitem" data-command="runCell">Run cell<kbd>Ctrl+Shift+Enter</kbd></button>
-        <button type="button" role="menuitem" data-command="checkFlow">Check Flow syntax (no execution)</button>
+        <button type="button" role="menuitem" data-command="runCell">Run current cell<kbd>Ctrl+Shift+Enter</kbd></button>
+        <button type="button" role="menuitem" data-command="runProject">Run project</button>
         <hr>
-        <button type="button" role="menuitem" data-command="resetR">Reset R session</button>
-        <button type="button" role="menuitem" data-command="resetPython">Reset Python session</button>
+        <button type="button" role="menuitem" data-command="runMathFlow">Run MathFlow</button>
+        <button type="button" role="menuitem" data-command="checkFlow">Check Flow syntax</button>
+        <hr>
+        <button type="button" role="menuitem" data-class="menu-dynamic">Reset R session</button>
+        <button type="button" role="menuitem" data-class="menu-dynamic">Reset Python session</button>
       </div>
     </div>
-    <div class="menu">
-      <button class="menu-trigger" id="menuView" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="menuViewPopup">View</button>
-      <div class="menu-popup" id="menuViewPopup" role="menu" aria-labelledby="menuView" hidden>
-        <button type="button" role="menuitem" data-command="showFiles">Project files</button>
-        <button type="button" role="menuitem" data-command="showPlots">Plots</button>
-        <button type="button" role="menuitem" data-command="showData">Data viewer</button>
-        <button type="button" role="menuitem" data-command="showOutline">Outline</button>
+    <div class="menu" id="menuTools">
+      <button class="menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="menuToolsPopup">Tools</button>
+      <div class="menu-popup" id="menuToolsPopup" role="menu" aria-label="Tools" hidden>
+        <button type="button" role="menuitem" data-act="commandLauncher">Search commands…<kbd>Ctrl+K</kbd></button>
+        <button type="button" role="menuitem" data-act="searchEverywhere">Search everywhere<kbd>Shift Shift</kbd></button>
+        <button type="button" role="menuitem" data-act="runConfigChip">Run configuration…</button>
         <hr>
-        <button type="button" role="menuitem" data-command="toggleDock">Toggle console dock</button>
+        <button type="button" role="menuitem" data-command="shortcuts">Show keyboard shortcuts</button>
+        <button type="button" role="menuitem" data-command="about">About FlowStudio</button>
       </div>
     </div>
-    <div class="menu">
-      <button class="menu-trigger" id="menuHelp" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="menuHelpPopup">Help</button>
-      <div class="menu-popup" id="menuHelpPopup" role="menu" aria-labelledby="menuHelp" hidden>
-        <button type="button" role="menuitem" data-command="shortcuts">Keyboard shortcuts</button>
+    <div class="menu" id="menuHelp">
+      <button class="menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="menuHelpPopup">Help</button>
+      <div class="menu-popup" id="menuHelpPopup" role="menu" aria-label="Help" hidden>
+        <button type="button" role="menuitem" data-command="shortcuts">Show keyboard shortcuts</button>
         <button type="button" role="menuitem" data-command="about">About FlowStudio</button>
       </div>
     </div>
   </nav>
   <div class="topbar-actions" aria-label="Editor actions">
-    <button id="commandLauncher" class="command-launcher" type="button" aria-haspopup="dialog" aria-controls="commandPalette" title="Search commands (Ctrl+K)"><i data-lucide="search"></i><span>Search commands...</span><kbd>Ctrl K</kbd></button>
-    <label for="language">Runtime</label>
-    <select id="language" aria-label="Execution language"><option value="flow">Flow</option><option value="r">R</option><option value="python">Python</option></select>
-    <label for="flowBackend">Backend</label>
-    <select id="flowBackend" aria-label="Flow compiler backend" title="Compiler backend for Flow runs"><option value="" selected>C (default)</option><option value="mlir">MLIR (experimental)</option></select>
-    <button id="run" class="primary" title="Run selection or entire buffer (Ctrl/⌘+Enter)"><i data-lucide="play"></i>Run</button>
-    <button id="runProject" title="Run every file of the active example project in its declared order, stopping at the first failure">Run Project</button>
-    <button id="checkFlow" type="button" title="Compile-check the current Flow buffer without running it">Check Flow</button>
-    <label class="flow-auto-check" title="Opt in to strict, nonexecuting Flow compiler checks after 1.1 seconds of inactivity; checks can take up to 60 seconds"><input id="autoCheckFlow" type="checkbox">Check on idle</label>
-    <button id="runMathFlow" title="Run the supported Unicode mathematical Flow PDE dialect (NumPy required)">Run MathFlow</button>
-    <button id="runCell" title="Run current # %% cell (Ctrl/⌘+Shift+Enter)">Run cell</button>
-    <button id="resetR" type="button" title="Discard native R variables and restart its interpreter">Reset R</button>
-    <button id="resetPython" type="button" title="Discard native Python variables and restart its interpreter">Reset Python</button>
+    <button id="commandLauncher" class="command-launcher" type="button" aria-haspopup="dialog" aria-controls="searchEverywhere" title="Search files, commands and examples (Shift Shift, Ctrl+P, Ctrl+K)"><i data-lucide="search"></i><span id="commandLauncherLabel">Search FlowStudio</span><kbd>Ctrl K</kbd></button>
+    <div class="run-cluster" role="group" aria-label="Run configuration">
+      <div class="run-widget">
+        <button id="runConfigChip" type="button" class="run-chip" aria-haspopup="dialog" aria-controls="runConfigDialog" title="Run configuration: language and compiler backend">
+          <span class="run-chip-dot" aria-hidden="true"></span>
+          <span class="run-chip-main" id="runChipLang">Flow</span>
+          <span class="run-chip-sub" id="runChipBackend">C backend</span>
+          <svg class="run-chip-caret" viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 6.5L8 10l3.5-3.5"/></svg>
+        </button>
+        <button id="run" class="primary run-main" title="Run selection or entire buffer (Ctrl/⌘+Enter)"><i data-lucide="play"></i><span>Run</span></button>
+        <button id="runDebug" type="button" class="run-icon run-debug" title="Debug (F5): run under the debugger and stop at breakpoints" aria-label="Debug"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 5.5h5a1 1 0 0 1 1 1V9a3.5 3.5 0 0 1-7 0V6.5a1 1 0 0 1 1-1z"/><path d="M6 5.5V4.8a2 2 0 0 1 4 0v.7M8 8.5v4M2.5 8.5h2M11.5 8.5h2M3 4.5l1.6 1.2M13 4.5l-1.6 1.2M3 12.5l1.6-1.2M13 12.5l-1.6-1.2"/></svg></button>
+        <button id="checkFlow" type="button" class="run-icon" title="Check Flow: compile the current buffer without running it" aria-label="Check Flow"><i data-lucide="circle-check"></i></button>
+        <div class="run-more">
+          <button id="runMore" type="button" class="run-more-trigger run-icon" aria-haspopup="menu" aria-expanded="false" aria-controls="runMorePopup" title="More run actions" aria-label="More run actions"><i data-lucide="ellipsis"></i></button>
+        <div class="menu-popup run-more-popup" id="runMorePopup" role="menu" aria-label="More run actions" hidden>
+          <button id="runCell" type="button" role="menuitem" title="Run current # %% cell (Ctrl/⌘+Shift+Enter)">Run cell<kbd>Ctrl+Shift+Enter</kbd></button>
+          <button id="runProject" type="button" role="menuitem" title="Run every file of the active example project in its declared order, stopping at the first failure">Run project</button>
+          <button id="runMathFlow" type="button" role="menuitem" title="Run the supported Unicode mathematical Flow PDE dialect (NumPy required)">Run MathFlow</button>
+          <hr>
+          <label class="flow-auto-check" role="menuitemcheckbox" title="Opt in to strict, nonexecuting Flow compiler checks after 1.1 seconds of inactivity; checks can take up to 60 seconds"><input id="autoCheckFlow" type="checkbox">Check Flow on idle</label>
+          <hr>
+          <button id="resetR" type="button" role="menuitem" title="Discard native R variables and restart its interpreter">Reset R session</button>
+          <button id="resetPython" type="button" role="menuitem" title="Discard native Python variables and restart its interpreter">Reset Python session</button>
+        </div>
+        </div>
+      </div>
+      <div class="layout-toggles" role="group" aria-label="Layout">
+        <button type="button" class="layout-toggle" data-layout-toggle="sidebar" title="Toggle sidebar (Ctrl+B)" aria-label="Toggle sidebar" aria-pressed="true"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path class="lt-fill" d="M3 3.5h3v9H3z" fill="currentColor" stroke="none"/><path d="M6.5 2.5v11"/></svg></button>
+        <button type="button" class="layout-toggle" data-layout-toggle="dock" title="Toggle console dock (Ctrl+J)" aria-label="Toggle console dock" aria-pressed="true"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path class="lt-fill" d="M3 10h10v2.5H3z" fill="currentColor" stroke="none"/><path d="M2 9.5h12"/></svg></button>
+        <button type="button" class="layout-toggle" data-layout-toggle="right" title="Toggle side panel (Ctrl+Alt+B)" aria-label="Toggle side panel" aria-pressed="false"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path class="lt-fill" d="M10 3.5h3v9h-3z" fill="currentColor" stroke="none"/><path d="M9.5 2.5v11"/></svg></button>
+      </div>
+      <label for="language" class="hidden-widget">Runtime</label>
+      <select id="language" class="hidden-widget" aria-label="Execution language"><option value="flow">Flow</option><option value="r">R</option><option value="python">Python</option></select>
+      <label for="flowBackend" class="hidden-widget">Backend</label>
+      <select id="flowBackend" class="hidden-widget" aria-label="Flow compiler backend" title="Compiler backend for Flow runs"><option value="" selected>C (default)</option><option value="mlir">MLIR (experimental)</option></select>
+    </div>
     <input id="fallbackOpen" type="file" accept=".flow,.R,.r,.py,.txt" hidden>
   </div>
 </header>
 <div class="workspace">
-  <aside class="panel sidebar" aria-label="Project files, outline, plots and data">
-    <div class="workspace-heading"><i data-lucide="folder-open"></i>Workspace<span class="local-badge">Local</span></div>
-    <div class="workspace-tabs" role="tablist" aria-label="Workspace views">
-      <button type="button" id="tab-files" role="tab" aria-controls="view-files" aria-selected="true" tabindex="0"><i data-lucide="files"></i>Files</button>
-      <button type="button" id="tab-outline" role="tab" aria-controls="view-outline" aria-selected="false" tabindex="-1"><i data-lucide="list-tree"></i>Outline</button>
-      <button type="button" id="tab-plots" role="tab" aria-controls="view-plots" aria-selected="false" tabindex="-1"><i data-lucide="chart-no-axes-combined"></i>Plots</button>
-      <button type="button" id="tab-data" role="tab" aria-controls="view-data" aria-selected="false" tabindex="-1"><i data-lucide="table-2"></i>Data</button>
-      <button type="button" id="tab-packages" role="tab" aria-controls="view-packages" aria-selected="false" tabindex="-1"><i data-lucide="package"></i>Packages</button>
-      <button type="button" id="tab-examples" role="tab" aria-controls="view-examples" aria-selected="false" tabindex="-1"><i data-lucide="library"></i>Examples</button>
-      <button type="button" id="tab-debug" role="tab" aria-controls="view-debug" aria-selected="false" tabindex="-1"><i data-lucide="bug"></i>Debug</button>
+  <aside class="panel sidebar" aria-label="Workspace">
+    <div class="activity-bar workspace-tabs" role="tablist" aria-orientation="vertical" aria-label="Workspace views">
+      <button type="button" id="tab-files" role="tab" aria-controls="view-files" aria-selected="true" tabindex="0" title="Explorer (Ctrl+Shift+E)" data-title="Explorer"><i data-lucide="files"></i><span class="tab-label">Files</span></button>
+      <button type="button" id="tab-search" role="tab" aria-controls="view-search" aria-selected="false" tabindex="-1" title="Search in folder (Ctrl+Shift+F)" data-title="Search"><i data-lucide="search"></i><span class="tab-label">Search</span></button>
+      <button type="button" id="tab-outline" role="tab" aria-controls="view-outline" aria-selected="false" tabindex="-1" title="Outline (Ctrl+Shift+O)" data-title="Outline"><i data-lucide="list-tree"></i><span class="tab-label">Outline</span></button>
+      <button type="button" id="tab-plots" role="tab" aria-controls="view-plots" aria-selected="false" tabindex="-1" title="Plots" data-title="Plots"><i data-lucide="chart-no-axes-combined"></i><span class="tab-label">Plots</span></button>
+      <button type="button" id="tab-data" role="tab" aria-controls="view-data" aria-selected="false" tabindex="-1" title="Data frames and tables" data-title="Data"><i data-lucide="table-2"></i><span class="tab-label">Data</span></button>
+      <button type="button" id="tab-packages" role="tab" aria-controls="view-packages" aria-selected="false" tabindex="-1" title="Packages" data-title="Packages"><i data-lucide="package"></i><span class="tab-label">Packages</span></button>
+      <button type="button" id="tab-examples" role="tab" aria-controls="view-examples" aria-selected="false" tabindex="-1" title="Examples" data-title="Examples"><i data-lucide="library"></i><span class="tab-label">Examples</span></button>
+      <button type="button" id="tab-debug" role="tab" aria-controls="view-debug" aria-selected="false" tabindex="-1" title="Run and Debug (F5)" data-title="Run and Debug"><i data-lucide="bug"></i><span class="tab-label">Debug</span></button>
     </div>
-    <div class="body project-body" id="view-files" role="tabpanel" aria-labelledby="tab-files">
-      <div class="project-tools">
-        <button id="folder" type="button"><i data-lucide="folder-open"></i>Open folder</button>
-        <button id="newFile" type="button" title="Create a new source file in the opened project"><i data-lucide="file-plus-2"></i>New file</button>
-        <button id="refreshProject" type="button" title="Refresh project tree" aria-label="Refresh project tree"><i data-lucide="rotate-cw"></i></button>
-      </div>
+    <div class="sidebar-views">
+    <div class="workspace-heading"><span id="sidebarTitle">Explorer</span><span class="local-badge" title="Files are read and written by your browser on this device">Local</span></div>
+    <div class="body explorer-body" id="view-files" role="tabpanel" aria-labelledby="tab-files">
+      <div id="explorer"></div>
+    </div>
+    <div class="body search-body" id="view-search" role="tabpanel" aria-labelledby="tab-search" hidden>
       <div class="project-search" role="search" aria-label="Search project files">
-        <label for="projectSearch">Find in project</label>
-        <input id="projectSearch" type="search" maxlength="256" placeholder="Text or regex" aria-label="Find in project">
-        <label><input id="caseSensitive" type="checkbox"> Case</label>
-        <label><input id="projectRegex" type="checkbox"> Regex</label>
-        <label><input id="projectWholeWord" type="checkbox"> Word</label>
-        <button id="searchProject" type="button">Find all</button>
-        <label for="projectReplace">Replace</label><input id="projectReplace" type="text" maxlength="10000" placeholder="Replacement text" aria-label="Project-wide replacement text">
-        <button id="replaceProject" type="button" title="Preview and confirm local file changes">Replace all…</button>
-        <button id="undoProjectReplace" type="button" disabled title="Undo the last verified project-wide replacement">Undo project replace</button>
+        <button id="toggleProjectReplace" type="button" class="sv-replace-toggle" aria-expanded="false" aria-controls="projectReplaceRow" title="Toggle replace"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg></button>
+        <div class="sv-fields">
+          <div class="search-field">
+            <input id="projectSearch" type="search" maxlength="256" placeholder="Search" aria-label="Find in project" autocomplete="off" spellcheck="false">
+            <label class="search-toggle" title="Match case"><input id="caseSensitive" type="checkbox"><span>Aa</span></label>
+            <label class="search-toggle" title="Match whole word"><input id="projectWholeWord" type="checkbox"><span class="sv-word">ab</span></label>
+            <label class="search-toggle" title="Use regular expression"><input id="projectRegex" type="checkbox"><span>.*</span></label>
+          </div>
+          <div class="search-field" id="projectReplaceRow" hidden>
+            <input id="projectReplace" type="text" maxlength="10000" placeholder="Replace" aria-label="Project-wide replacement text" autocomplete="off" spellcheck="false">
+            <button id="replaceProject" type="button" class="sv-icon" title="Replace all: preview and confirm local file changes" aria-label="Replace all"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4.5h6M2.5 8h6"/><path d="M11 3v6.5"/><path d="M9 7.5l2 2 2-2"/><path d="M2.5 11.5h11"/></svg></button>
+          </div>
+          <div class="search-field sv-include">
+            <input id="projectInclude" type="text" maxlength="256" placeholder="Files to include, e.g. *.flow, src/" aria-label="Files to include" autocomplete="off" spellcheck="false">
+          </div>
+        </div>
       </div>
-      <div id="searchResults" aria-live="polite" aria-label="Project search results"></div>
-      <div id="projectTree" role="navigation" aria-label="Project files"><div class="project-empty"><i data-lucide="folder-open"></i><p><strong>Your workspace starts here</strong></p><p>Open a folder to browse and edit your source files.</p></div></div>
-      <p class="muted hint">Files stay on this device.</p>
+      <div class="sv-summary">
+        <span id="searchSummary" aria-live="polite"></span>
+        <button id="undoProjectReplace" type="button" class="sv-icon" disabled title="Undo the last verified project-wide replacement" aria-label="Undo replace"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3.5L2.5 6 5 8.5"/><path d="M2.5 6h7a4 4 0 0 1 0 8H7"/></svg></button>
+        <button id="searchProject" type="button" class="sv-icon" title="Search again" aria-label="Search again"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9"/><path d="M13.5 2.2v3h-3"/></svg></button>
+        <button id="clearProjectSearch" type="button" class="sv-icon" title="Clear search results" aria-label="Clear search results"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg></button>
+        <button id="collapseProjectSearch" type="button" class="sv-icon" title="Collapse all" aria-label="Collapse all"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 6.5L8 3.5l3 3M5 9.5l3 3 3-3"/></svg></button>
+      </div>
+      <div id="searchResults" role="tree" aria-label="Project search results"></div>
+      <p class="muted hint" id="searchHint">Searches the open folder on this device. Nothing is sent to the server.</p>
     </div>
     <div class="body outline-body" id="view-outline" role="tabpanel" aria-labelledby="tab-outline" hidden>
       <div class="outline-head"><span id="outlineLabel">Document symbols</span><button id="outlineRefresh" type="button" title="Re-read the buffer">Refresh</button></div>
@@ -413,61 +605,12 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
       <p class="muted hint">Need saved PNG files too? <a href="/plots" target="_blank" rel="noopener">Open the standalone plot page</a>.</p>
       <div id="plotFigures" aria-label="Captured figures" aria-live="polite"></div>
     </div>
-    <div id="view-data" class="workspace-frame" role="tabpanel" aria-labelledby="tab-data" hidden><iframe title="Local CSV and TSV data viewer" loading="lazy"></iframe></div>
-    <div class="body packages-body" id="view-packages" role="tabpanel" aria-labelledby="tab-packages" hidden>
-      <p class="muted hint">Installs run on this device through the persistent local Python / R sessions (each under the 15 s execution budget). R installs use the CRAN cloud mirror.</p>
-      <div class="project-search">
-        <label for="packageSpec">Package</label>
-        <input id="packageSpec" type="text" maxlength="96" placeholder="package==version" aria-label="Package spec">
-      </div>
-      <div class="project-tools">
-        <button id="packageInstall" type="button"><i data-lucide="download"></i>Install package</button>
-        <button id="packageList" type="button"><i data-lucide="list"></i>List packages</button>
-      </div>
-      <p id="packageNotice" class="muted" role="status" aria-live="polite"></p>
-      <div id="packageTable" aria-label="Installed packages"></div>
-    </div>
+    <div class="body data-view" id="view-data" role="tabpanel" aria-labelledby="tab-data" hidden></div>
+    <div class="body packages-view" id="view-packages" role="tabpanel" aria-labelledby="tab-packages" hidden></div>
     <div class="body examples-body" id="view-examples" role="tabpanel" aria-labelledby="tab-examples" hidden>
-      <p class="muted hint">Curated local examples showing Flow, Python and R working in one project. Everything executes on this device.</p>
-      <p class="muted hint">Projects you open are kept as saved project files (with your edits) in the "Your projects" list at the top of this tab, and reopen from there after a reload.</p>
       <div id="examplesHost"></div>
     </div>
-    <div class="body debug-body" id="view-debug" role="tabpanel" aria-labelledby="tab-debug" hidden>
-      <p class="muted hint">Replay debugger for Python: breakpoints, the real line trace, click through recorded states.</p>
-      <div class="project-tools">
-        <button id="debugToggleBp" type="button"><i data-lucide="octagon"></i>Breakpoint at cursor</button>
-        <button id="debugClearBp" type="button">Clear</button>
-        <button id="debugRun" type="button"><i data-lucide="play"></i>Run trace</button>
-      </div>
-      <div class="project-tools" role="group" aria-label="Recorded Python trace navigation">
-        <button id="debugPrevious" type="button" disabled>Previous step</button>
-        <button id="debugNext" type="button" disabled>Next step</button>
-        <button id="debugPreviousBp" type="button" disabled>Previous breakpoint</button>
-        <button id="debugNextBp" type="button" disabled>Next breakpoint</button>
-      </div>
-      <p id="debugBreakpoints" class="muted" aria-live="polite">No breakpoints yet.</p>
-      <p id="debugSummary" class="muted"></p>
-      <div id="debugSteps" class="debug-steps"></div>
-      <div id="debugLocals" class="debug-locals"></div>
-      <section class="live-debugger" aria-label="Interactive native Python debugger">
-        <h3>Live Python debugger</h3>
-        <p class="muted hint">Real CPython pause, step, step over, finish, continue and stop through the local Flow server. Unlike replay, this executes the buffer and may change interpreter state. Leave the breakpoint field empty to use cursor breakpoints above.</p>
-        <label for="liveDebugBreakpoints">Breakpoint lines (optional numeric conditions)</label>
-        <input id="liveDebugBreakpoints" type="text" maxlength="512" placeholder="2, 5?counter>=3" aria-label="Live debugger breakpoints">
-        <label><input id="liveDebugPauseException" type="checkbox"> Pause on raised exceptions</label>
-        <div class="project-tools" role="group" aria-label="Live Python debugger controls">
-          <button id="liveDebugStart" type="button">Start</button>
-          <button id="liveDebugStep" type="button" disabled>Step</button>
-          <button id="liveDebugNext" type="button" disabled>Step over</button>
-          <button id="liveDebugFinish" type="button" disabled>Finish</button>
-          <button id="liveDebugContinue" type="button" disabled>Continue</button>
-          <button id="liveDebugRunToCursor" type="button" disabled title="Continue real CPython execution to the editor caret line; other breakpoints still apply">Run to caret</button>
-          <button id="liveDebugStop" type="button" disabled>Stop</button>
-          <button id="liveDebugStatus" type="button">Status</button>
-        </div>
-        <div id="liveDebugFrames" class="live-debug-frames" role="group" aria-label="Paused Python stack frames"></div>
-        <pre id="liveDebugOutput" class="live-debug-output" role="status" aria-live="polite">Start a Python session to inspect live stack frames.</pre>
-      </section>
+    <div class="body debug-view" id="view-debug" role="tabpanel" aria-labelledby="tab-debug" hidden></div>
     </div>
   </aside>
   <div class="splitter" data-splitter data-axis="x" data-panel="sidebar" role="separator" aria-orientation="vertical" aria-label="Resize project sidebar" tabindex="0"></div>
@@ -476,7 +619,7 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
       <div class="doc-tabs" id="docTabs" role="tablist" aria-label="Open documents"></div>
       <button id="newDocumentTab" class="doc-tab-new" type="button" title="New buffer (Ctrl+Alt+N)" aria-label="New buffer">+</button>
     </div>
-    <div class="editor-breadcrumb"><i data-lucide="file-code-2"></i><span>Workspace</span><i data-lucide="chevron-right"></i><span>Source</span><span id="editorEngine" class="editor-engine">Text editor</span></div>
+    <div class="editor-breadcrumb"><i data-lucide="file-code-2"></i><nav id="breadcrumbPath" class="breadcrumb-path" aria-label="File path"><span>Workspace</span><span class="crumb-sep" aria-hidden="true">&rsaquo;</span><span>Source</span></nav><span id="editorEngine" class="editor-engine">Text editor</span></div>
     <div class="editor-find" id="findBar" hidden><input id="editorFind" type="text" aria-label="Find text"><button id="findNext">Next</button>
     <label for="editorReplace">Replace with</label><input id="editorReplace" type="text" aria-label="Replacement text"><button id="replaceOne">Replace</button><button id="replaceAll">Replace all</button><button id="findPrevious">Previous</button><label><input id="editorCaseSensitive" type="checkbox"> Match case</label><label><input id="editorRegex" type="checkbox"> Regex</label><label><input id="editorWholeWord" type="checkbox"> Whole word</label><span id="editorFindCount" role="status" aria-live="polite"></span></div>
     <textarea id="source" spellcheck="false" aria-label="Source code editor">function main() -> i32 {
@@ -489,15 +632,40 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
     <div id="flowProblems" role="group" aria-label="Flow compiler source locations" hidden></div>
   </main>
   <div class="splitter" data-splitter data-axis="x" data-panel="right" role="separator" aria-orientation="vertical" aria-label="Resize environment panel" tabindex="0"></div>
-  <aside class="panel rightpanel" aria-label="Environment">
-    <h2><i data-lucide="sliders-horizontal"></i>Environment<span class="panel-tag">Native session</span></h2>
-    <div class="body">
-      <p id="runtimeInfo">Flow execution available when Flow is installed.</p>
-      <button id="refreshPythonEnvironment" type="button"><i data-lucide="rotate-cw"></i>Refresh environment</button>
-      <div id="pythonEnvironment" aria-live="polite"><p class="muted">Select Python or R to inspect its native session.</p></div>
-      <p class="muted hint">Python and R keep their variables between runs. Reset a session from the Run menu.</p>
-      <p class="muted hint">Code runs on your computer with your OS permissions.</p>
+  <aside class="panel rightpanel" id="rightPanel" aria-label="Side panel">
+    <div class="rp-head">
+      <div class="rp-tabs" role="tablist" aria-label="Side panel views">
+        <button type="button" role="tab" id="rpTab-preview" aria-controls="rpView-preview" aria-selected="false" tabindex="-1">Preview</button>
+        <button type="button" role="tab" id="rpTab-environment" aria-controls="rpView-environment" aria-selected="true" tabindex="0">Environment</button>
+      </div>
+      <button type="button" id="rightPanelClose" class="rp-close" title="Hide side panel (Ctrl+Alt+B)" aria-label="Hide side panel"><svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
     </div>
+    <section class="rp-view preview-view" id="rpView-preview" role="tabpanel" aria-labelledby="rpTab-preview" hidden>
+      <div class="pv-bar">
+        <span class="pv-dot" id="previewDot" data-state="idle" aria-hidden="true"></span>
+        <span class="pv-title" id="previewTitle">No app running</span>
+        <span class="pv-status" id="previewStatus" role="status" aria-live="polite"></span>
+        <label class="pv-hot" title="Rebuild and restart the app as you type"><input type="checkbox" id="previewHot" checked>Hot reload</label>
+        <button type="button" id="previewRestart" class="pv-btn" title="Rebuild and restart" aria-label="Rebuild and restart" disabled><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.5-3.6"/><path d="M13 2.5v3h-3"/></svg></button>
+        <button type="button" id="previewStop" class="pv-btn" title="Stop the app" aria-label="Stop the app" disabled><svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"><rect x="3" y="3" width="10" height="10" rx="1.5" fill="currentColor"/></svg></button>
+      </div>
+      <pre class="pv-error" id="previewError" role="alert" hidden></pre>
+      <div class="pv-stage" id="previewStage">
+        <div class="pv-empty" id="previewEmpty">
+          <p class="pv-empty-title">Run a Flow graphics program</p>
+          <p>A program that imports <code>stdlib/gfx.flow</code> runs here, compiled to WebAssembly. With hot reload on, every edit rebuilds and restarts it. A build that fails keeps the last good one running.</p>
+          <button type="button" id="previewNewApp" class="pv-primary">New graphics app</button>
+        </div>
+      </div>
+    </section>
+    <section class="rp-view" id="rpView-environment" role="tabpanel" aria-labelledby="rpTab-environment">
+      <div class="body">
+        <p id="runtimeInfo">Flow executions are independent.</p>
+        <button id="refreshPythonEnvironment" type="button"><i data-lucide="rotate-cw"></i>Refresh environment</button>
+        <div id="pythonEnvironment" aria-live="polite"><p class="muted">Select Python or R to inspect its native session.</p></div>
+        <p class="muted hint">Python and R keep their variables between runs. Reset a session from the Run menu.</p>
+      </div>
+    </section>
   </aside>
 </div>
 <div class="splitter splitter-horizontal" id="dockSplitter" data-splitter data-axis="y" data-panel="dock" role="separator" aria-orientation="horizontal" aria-label="Resize console dock" tabindex="0"></div>
@@ -512,10 +680,37 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
   <span id="dirty" hidden>● unsaved</span>
   <span id="cursor">Ln 1, Col 1</span>
   <span class="spacer"></span>
-  <span class="shortcut-hint">Ctrl+K Commands &nbsp; Ctrl+Enter Run</span>
+  <span class="shortcut-hint">Shift Shift Search &nbsp; Ctrl+Enter Run</span>
 </footer>
 </div>
-<dialog id="commandPalette" aria-label="Search commands"><div class="command-search"><i data-lucide="search"></i><input id="commandQuery" type="search" placeholder="Type a command..." aria-label="Search commands" autocomplete="off"><button id="closePalette" type="button" aria-label="Close commands"><i data-lucide="x"></i></button></div><div id="commandResults" aria-live="polite"></div><div class="command-footer">Arrow keys to navigate &nbsp; Enter to select &nbsp; Esc to close</div></dialog>
+<dialog id="newProjectDialog" class="np-dialog" aria-labelledby="npHeading">
+  <h2 id="npHeading">New project</h2>
+  <div id="npTemplates" class="np-templates" role="radiogroup" aria-label="Template"></div>
+  <label class="np-field" for="npName">Name<input id="npName" type="text" autocomplete="off" spellcheck="false" maxlength="60"></label>
+  <fieldset class="np-location">
+    <legend>Location</legend>
+    <label><input type="radio" name="npLocation" id="npLocationLocal" value="local" checked>In FlowStudio<span>Kept in this browser's private storage.</span></label>
+    <label><input type="radio" name="npLocation" id="npLocationDisk" value="disk">In a folder on disk<span>You pick a parent folder; the project gets its own folder inside it.</span></label>
+  </fieldset>
+  <p id="npError" class="np-error" role="alert" hidden></p>
+  <div class="np-actions"><button type="button" id="npCancel">Cancel</button><button type="button" id="npCreate" class="primary">Create project</button></div>
+</dialog>
+<dialog id="projectDialog" class="np-dialog np-confirm" aria-labelledby="projectDialogText">
+  <p id="projectDialogText"></p>
+  <div id="projectDialogActions" class="np-actions"></div>
+</dialog>
+<dialog id="runConfigDialog" class="config-dialog" aria-label="Run configuration">
+  <div class="se-search"><i data-lucide="search"></i><input id="runConfigQuery" type="search" placeholder="Language, backend or configuration…" aria-label="Search run configurations" autocomplete="off"></div>
+  <div id="runConfigList" class="se-list" role="listbox" aria-label="Run configurations"></div>
+  <footer class="config-footer">Choose language and backend · Enter applies · Esc closes</footer>
+</dialog>
+<dialog id="searchEverywhere" class="config-dialog se-dialog" aria-label="Search everywhere">
+  <div class="se-search"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg><input id="seQuery" type="search" placeholder="Search files, commands, open buffers and examples" aria-label="Search everywhere" aria-controls="seGroups" autocomplete="off" spellcheck="false"></div>
+  <div id="seTabs" class="se-tabs" role="tablist" aria-label="Search scope"></div>
+  <div id="seGroups" class="se-list" role="listbox" aria-label="Search everywhere results"></div>
+  <footer id="seFooter" class="config-footer">Enter opens. Tab switches scope. Type &gt; for commands.</footer>
+</dialog>
+
 <!-- BEGIN EMBEDDED PROJECT MODULE: mirrors web/project.js -->
 <script>
 /* FlowStudio project explorer. Browser File System Access API only. */
@@ -584,6 +779,24 @@ async function readProjectText(file, limit) {
 }
 
 /* Bounded, read-only literal/regex search over browser-granted project files. */
+const SEARCH_SKIP_DIRS = new Set([".git", "node_modules", "__pycache__", ".venv"]);
+/* "Files to include": comma-separated globs. A pattern without a slash
+ * matches the file name or any folder name; one with a slash matches the
+ * path from the folder root, and a folder pattern matches everything in it. */
+function includeFilter(spec) {
+  const patterns = String(spec || "").split(",").map(item => item.trim()).filter(Boolean);
+  if (!patterns.length) return null;
+  const toRegex = glob => new RegExp("^" + glob.replace(/[.+^${}()|[\]\\]/g, "\\$&")
+    .replace(/\*\*\/?/g, "\u0000").replace(/\*/g, "[^/]*").replace(/\?/g, "[^/]")
+    .replace(/\u0000/g, ".*") + "(?:/.*)?$", "i");
+  const tests = patterns.map(pattern => {
+    const clean = pattern.replace(/^\.\//, "").replace(/\/+$/, "");
+    const expression = toRegex(clean);
+    if (clean.includes("/")) return rel => expression.test(rel);
+    return rel => rel.split("/").some(part => expression.test(part));
+  });
+  return rel => tests.some(test => test(rel));
+}
 async function searchProject(root, query, options = {}) {
   if (!root || root.kind !== "directory") throw new Error("Open a project folder first.");
   if (typeof query !== "string" || !query.trim() || query.length > 256)
@@ -602,6 +815,7 @@ async function searchProject(root, query, options = {}) {
   } catch (error) {
     throw new Error("Invalid regular expression: " + error.message);
   }
+  const included = includeFilter(options.include);
   const matches = [];
   let scannedFiles = 0, skippedLarge = 0, skippedUnsafe = 0, truncated = false;
   function checkAbort() {
@@ -629,10 +843,12 @@ async function searchProject(root, query, options = {}) {
       }
       const path = prefix + "/" + name;
       if (handle.kind === "directory") {
+        if (SEARCH_SKIP_DIRS.has(name)) continue;
         await walk(handle, path, depth + 1);
         continue;
       }
       if (handle.kind !== "file" || !editable.test(name)) continue;
+      if (included && !included(path.slice(root.name.length + 1))) continue;
       const file = await handle.getFile();
       checkAbort();
       const maxBytes = options.regex ? 128 * 1024 : MAX_BYTES;
@@ -782,7 +998,7 @@ async function applyProjectReplacement(plan, options = {}) {
     if (!attempted.length) throw error;
     let restored = 0, unchanged = 0;
     const unresolved = [];
-    // Best-effort compensation, not a transaction. A crash, external edit,
+    // Best-effort compensation. This is no transaction. A crash, external edit,
     // denied permission or newly opened editor can prevent restoration.
     // Never overwrite contents differing from both the before/after images.
     for (const entry of attempted.reverse()) {
@@ -937,7 +1153,15 @@ function createProjectExplorer({ tree, status, openHandle, picker }) {
       return applyProjectReplacement(undo, options);
     },
     hasUndoReplace: () => lastReplacement !== null && lastReplacement.root === root,
-    hasProject: () => root !== null };
+    hasProject: () => root !== null,
+    /* The workspace explorer owns folder choice; search and replace follow it. */
+    adopt: handle => {
+      if (handle !== null && (!handle || handle.kind !== "directory"))
+        throw new Error("Project root must be a directory.");
+      if (handle !== root) lastReplacement = null;
+      root = handle;
+    },
+    root: () => root };
 }
 const api = { createProjectExplorer, validFilename, searchProject, planProjectReplace, applyProjectReplacement, reverseProjectReplacement };
 if (typeof module !== "undefined" && module.exports) module.exports = api;
@@ -1401,6 +1625,9 @@ function markDirty(isDirty) {
 }
 /* Open-document tab strip: one tab per buffer, dirty marker, close control. */
 function renderTabs() {
+  // The explorer listens for this to refresh open, active and modified marks.
+  if (typeof document.dispatchEvent === "function" && typeof CustomEvent === "function")
+    document.dispatchEvent(new CustomEvent("flowstudio:documents"));
   const strip = el("docTabs");
   if (!strip) return;
   const list = documents.list();
@@ -1421,10 +1648,19 @@ function renderTabs() {
     tab.setAttribute("role", "tab");
     tab.setAttribute("aria-selected", String(selected));
     tab.title = FlowStudioDocuments.label(doc);
+    // VS Code style: the file name, plus its folder only when two open
+    // tabs share a name. The full path stays in the tooltip.
     const name = document.createElement("span");
     name.className = "doc-tab-name";
-    name.textContent = FlowStudioDocuments.label(doc);
+    name.textContent = doc.name;
     tab.append(name);
+    if (doc.path && list.some(other => other !== doc && other.name === doc.name)) {
+      const folder = document.createElement("span");
+      folder.className = "doc-tab-dir";
+      const parts = doc.path.split("/");
+      folder.textContent = parts.length > 1 ? parts[parts.length - 2] : "";
+      tab.append(folder);
+    }
     if (doc.dirty) {
       const dot = document.createElement("span");
       dot.className = "doc-tab-dot";
@@ -1500,6 +1736,31 @@ function closeDocument(id = null) {
   if (documents.count() === 0) { createUntitled(); return true; }
   loadDocumentIntoEditor(activeDocument());
   src.focus();
+  return true;
+}
+/* Project switching: write every dirty file that has a place on disk,
+ * without pickers. Untitled buffers are returned unsaved. */
+async function saveAllDocuments() {
+  saveEditorBuffer();
+  const unsaved = [];
+  for (const doc of documents.list()) {
+    if (!doc.dirty) continue;
+    if (doc.handle && typeof doc.handle.createWritable === "function") {
+      const saved = await FlowStudioFileSave.writeIfUnchanged(doc.handle, doc.saved, doc.text);
+      documents.markSaved(doc.id, saved);
+    } else unsaved.push(doc);
+  }
+  const active = activeDocument();
+  markDirty(Boolean(active && active.dirty));
+  renderTabs();
+  return unsaved;
+}
+/* Closes every tab without prompting; the caller has already asked. */
+function closeAllDocuments() {
+  saveEditorBuffer();
+  for (const doc of documents.list()) documents.close(doc.id);
+  editorDocId = null;
+  renderTabs();
   return true;
 }
 function cycleDocument(step) {
@@ -1604,6 +1865,7 @@ async function refreshPythonEnvironment() {
   table.append(header);
   for (const variable of snapshot.variables) {
     if (!variable || typeof variable.name !== "string" || typeof variable.type !== "string") continue;
+    if (selectedLanguage === "python" && variable.type === "module") continue;   // imports are noise here
     const row = document.createElement("tr");
     // R arrays/matrices expose raw dimensions without invoking user methods.
     // Ignore malformed shapes and retain the ordinary scalar/container size.
@@ -1630,7 +1892,8 @@ async function refreshPythonEnvironment() {
       if (list.childNodes.length) {
         const details = document.createElement("details");
         const summary = document.createElement("summary");
-        summary.textContent = variable.name + " — expand children" +
+        summary.textContent = variable.name;
+        summary.title = "Show the children of " + variable.name +
           (variable.truncated === true ? " (partial)" : "");
         details.append(summary, list);
         row.firstChild.replaceChildren(details);
@@ -1664,6 +1927,9 @@ async function executeCode(code, label, languageOverride = null, options = {}) {
   }
   el("run").disabled = true;
   el("runCell").disabled = true;
+  /* Editor runs print to the Console view; bring it forward. */
+  if (globalThis.FlowStudioTerminal && globalThis.FlowStudioTerminal.view !== "console")
+    globalThis.FlowStudioTerminal.show("console");
   status("Running " + executionLanguage + " …");
   writeConsole("\n> " + label + " (" + executionLanguage + ")\n", executionLanguage, "cmd");
   const startedAt = Date.now();
@@ -1724,6 +1990,10 @@ async function executeCode(code, label, languageOverride = null, options = {}) {
 }
 async function run() {
   const selection = src.value.substring(src.selectionStart, src.selectionEnd);
+  /* A Flow program that draws with stdlib/gfx.flow runs in the Preview. */
+  const preview = globalThis.FlowStudioAppPreview;
+  if (!selection.length && language.value === "flow" && preview && preview.isGraphicsProgram(src.value))
+    return preview.start(activeDocument());
   return executeCode(selection.length ? selection : src.value,
     selection.length ? "[selection]" : "[buffer]");
 }
@@ -1870,108 +2140,217 @@ async function saveFileAs() {
     if (error.name !== "AbortError") status(String(error), "error");
   }
 }
+/* Search and replace model for the open folder. The workspace explorer
+ * (web/ide_explorer.js) owns the tree and hands its root over with adopt(). */
 const project = FlowStudioProject.createProjectExplorer({
-  tree: el("projectTree"),
+  tree: document.createElement("div"),
   status,
   openHandle: openEditorHandle,
-  picker: typeof window.showDirectoryPicker === "function"
-    ? options => window.showDirectoryPicker(options)
-    : null
+  picker: null
 });
-el("folder").addEventListener("click", async () => {
-  const chosen = await project.choose();
-  if (chosen) { ++searchRevision; el("searchResults").replaceChildren(); el("undoProjectReplace").disabled = true; }
-});
-el("refreshProject").addEventListener("click", () => project.refresh());
-el("newFile").addEventListener("click", async () => {
-  if (!project.hasProject()) {
-    status("Open a project folder first.", "error");
-    return;
+function adoptProjectRoot(handle) {
+  project.adopt(handle);
+  clearProjectSearch();
+  collapsedSearchFiles.clear();
+  el("undoProjectReplace").disabled = true;
+  if (el("projectSearch").value.trim()) scheduleProjectSearch();
+}
+function workspaceExplorer() { return globalThis.FlowStudioWorkspaceExplorer || null; }
+function explorerCommand(name) {
+  const explorer = workspaceExplorer();
+  if (!explorer) { status("The file explorer is still loading.", "error"); return false; }
+  if (name !== "choose" && !explorer.hasRoot() && name !== "reveal") {
+    status("Open a folder first.", "error");
+    return false;
   }
-  const name = window.prompt("New source filename", "untitled." + extension(language.value));
-  if (name === null) return;
-  if (!FlowStudioProject.validFilename(name)) {
-    status("Invalid or unsupported source filename.", "error");
-    return;
+  el("tab-files").click();
+  if (name === "reveal") {
+    const doc = activeDocument();
+    if (!doc || !doc.path || !explorer.hasRoot()) { status("The active file is not in the open folder.", "error"); return false; }
+    return explorer.reveal(doc.path, true);
   }
-  try {
-    await project.create(name);
-  } catch (error) {
-    status(error.message || String(error), "error");
-  }
-});
+  return explorer[name]();
+}
 
 let searchRevision = 0;
+let searchAbort = null;
+let searchTimer = 0;
+const collapsedSearchFiles = new Set();
+const SEARCH_ICON = d => '<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" ' +
+  'stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>';
+function searchOptions() {
+  return { caseSensitive: el("caseSensitive").checked, regex: el("projectRegex").checked,
+    wholeWord: el("projectWholeWord").checked,
+    include: el("projectInclude") ? el("projectInclude").value : "" };
+}
+function setSearchSummary(text) {
+  const node = el("searchSummary");
+  if (node) node.textContent = text;
+}
+function clearProjectSearch() {
+  ++searchRevision;
+  if (searchAbort) searchAbort.abort();
+  el("searchResults").replaceChildren();
+  setSearchSummary("");
+}
+function scheduleProjectSearch() {
+  clearTimeout(searchTimer);
+  if (!el("projectSearch").value.trim()) { clearProjectSearch(); return; }
+  searchTimer = setTimeout(() => { if (project.hasProject()) runProjectSearch(); }, 220);
+}
+/* One flat list of file rows and match rows keeps arrow navigation simple;
+ * collapsing a file hides its match rows. */
+function searchFileRow(path, count) {
+  const row = document.createElement("button");
+  row.type = "button";
+  row.className = "sr-file";
+  row.dataset.file = path;
+  row.setAttribute("role", "treeitem");
+  row.setAttribute("aria-expanded", collapsedSearchFiles.has(path) ? "false" : "true");
+  row.setAttribute("aria-label", path + ", " + count + (count === 1 ? " match" : " matches"));
+  const slash = path.indexOf("/");
+  const rel = slash >= 0 ? path.slice(slash + 1) : path;
+  const cut = rel.lastIndexOf("/");
+  const name = cut >= 0 ? rel.slice(cut + 1) : rel;
+  const dir = cut >= 0 ? rel.slice(0, cut) : "";
+  const chevron = document.createElement("span");
+  chevron.className = "sr-chevron";
+  chevron.innerHTML = SEARCH_ICON('<path d="M6 4l4 4-4 4"/>');
+  const explorer = globalThis.FlowStudioExplorer;
+  const badgeInfo = explorer && explorer.fileBadge ? explorer.fileBadge(name) : { label: "", tone: "other" };
+  const badge = document.createElement("span");
+  badge.className = "ex-badge tone-" + badgeInfo.tone;
+  badge.textContent = badgeInfo.label;
+  const label = document.createElement("span");
+  label.className = "sr-name";
+  label.textContent = name;
+  const where = document.createElement("span");
+  where.className = "sr-dir";
+  where.textContent = dir;
+  const total = document.createElement("span");
+  total.className = "sr-count";
+  total.textContent = String(count);
+  row.append(chevron, badge, label, where, total);
+  row.addEventListener("click", () => {
+    if (collapsedSearchFiles.has(path)) collapsedSearchFiles.delete(path);
+    else collapsedSearchFiles.add(path);
+    applySearchCollapse();
+  });
+  return row;
+}
+function applySearchCollapse() {
+  for (const node of el("searchResults").children || []) {
+    const file = node.dataset && node.dataset.file;
+    if (!file) continue;
+    const collapsed = collapsedSearchFiles.has(file);
+    if (node.classList && node.classList.contains("sr-file")) node.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    else node.hidden = collapsed;
+  }
+}
+function searchMatchRow(hit, regex) {
+  const row = document.createElement("button");
+  row.type = "button";
+  row.className = "sr-match";
+  row.dataset.file = hit.path;
+  row.setAttribute("role", "treeitem");
+  row.setAttribute("aria-label", hit.path + ":" + hit.line + ":" + hit.column + "  " + hit.preview.trim());
+  row.title = "Open " + hit.path + " at line " + hit.line;
+  /* Keep the match visible in a narrow sidebar: trim long leading context. */
+  const start = hit.column - 1;
+  const end = Math.min(hit.preview.length, start + hit.length);
+  let before = hit.preview.slice(0, start).replace(/^\s+/, "");
+  if (before.length > 28) before = "..." + before.slice(-26);
+  const lineNo = document.createElement("span");
+  lineNo.className = "sr-line";
+  lineNo.textContent = String(hit.line);
+  const text = document.createElement("span");
+  text.className = "sr-text";
+  const pre = document.createElement("span");
+  pre.textContent = before;
+  const mark = document.createElement("mark");
+  mark.textContent = hit.preview.slice(start, end) || hit.text;
+  const post = document.createElement("span");
+  post.textContent = hit.preview.slice(end, end + 120);
+  text.append(pre, mark, post);
+  row.append(lineNo, text);
+  if (collapsedSearchFiles.has(hit.path)) row.hidden = true;
+  row.addEventListener("click", async () => {
+    try {
+      // Re-read the granted disk file before switching tabs: an already
+      // open editor tab may still hold an older, cached buffer.
+      const current = await hit.handle.getFile();
+      const limit = regex ? 128 * 1024 : 1024 * 1024;
+      if (current.size > limit ||
+          (await current.text()).slice(hit.index, hit.index + hit.length) !== hit.text) {
+        status("File changed since search; search again.", "error");
+        return;
+      }
+      const opened = await openEditorHandle(hit.handle, hit.path);
+      if (!opened) return;
+      const selected = src.value.slice(hit.index, hit.index + hit.length);
+      if (selected !== hit.text) {
+        status("File changed since search; search again.", "error");
+        return;
+      }
+      src.focus();
+      src.setSelectionRange(hit.index, hit.index + hit.length);
+      updateCursor();
+    } catch (error) {
+      status(error.message || String(error), "error");
+    }
+  });
+  return row;
+}
 async function runProjectSearch() {
+  clearTimeout(searchTimer);
   const token = ++searchRevision;
+  if (searchAbort) searchAbort.abort();
+  const controller = typeof AbortController === "function" ? new AbortController() : null;
+  searchAbort = controller;
   const resultsNode = el("searchResults");
-  resultsNode.replaceChildren();
   const query = el("projectSearch").value;
   if (!project.hasProject()) {
+    resultsNode.replaceChildren();
+    setSearchSummary("Open a folder to search it.");
     status("Open a project folder before searching.", "error");
     return;
   }
   if (!query.trim()) {
+    resultsNode.replaceChildren();
+    setSearchSummary("");
     status("Enter text to find in the project.", "error");
     return;
   }
-  el("searchProject").disabled = true;
-  el("replaceProject").disabled = true;
-  status("Searching project …");
+  setSearchSummary("Searching...");
   try {
-    const caseSensitive = el("caseSensitive").checked;
-    const regex = el("projectRegex").checked;
-    const wholeWord = el("projectWholeWord").checked;
-    const result = await project.search(query, { caseSensitive, regex, wholeWord });
+    const options = searchOptions();
+    const result = await project.search(query, { caseSensitive: options.caseSensitive,
+      regex: options.regex, wholeWord: options.wholeWord, include: options.include,
+      signal: controller ? controller.signal : undefined });
     if (token !== searchRevision) return;
-    const summary = document.createElement("p");
-    summary.className = "muted hint";
-    summary.textContent = result.matches.length + " matches in " + result.scannedFiles +
-      " files" + (result.skippedLarge ? "; " + result.skippedLarge + " large files skipped" : "") +
-      (result.skippedUnsafe ? "; " + result.skippedUnsafe + " unsafe-encoding files skipped" : "") +
-      (result.truncated ? "; result limit reached" : "");
-    resultsNode.append(summary);
+    const files = new Map();
     for (const hit of result.matches) {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.textContent = hit.path + ":" + hit.line + ":" + hit.column + "  " + hit.preview.trim();
-      button.title = "Open " + hit.path + " at line " + hit.line;
-      button.addEventListener("click", async () => {
-        try {
-          // Re-read the granted disk file before switching tabs: an already
-          // open editor tab may still hold an older, cached buffer.
-          const current = await hit.handle.getFile();
-          const limit = regex ? 128 * 1024 : 1024 * 1024;
-          if (current.size > limit ||
-              (await current.text()).slice(hit.index, hit.index + hit.length) !== hit.text) {
-            status("File changed since search; search again.", "error");
-            return;
-          }
-          const opened = await openEditorHandle(hit.handle, hit.path);
-          if (!opened) return;
-          const selected = src.value.slice(hit.index, hit.index + hit.length);
-          if (selected !== hit.text) {
-            status("File changed since search; search again.", "error");
-            return;
-          }
-          src.focus();
-          src.setSelectionRange(hit.index, hit.index + hit.length);
-          updateCursor();
-        } catch (error) {
-          status(error.message || String(error), "error");
-        }
-      });
-      resultsNode.append(button);
+      if (!files.has(hit.path)) files.set(hit.path, []);
+      files.get(hit.path).push(hit);
     }
-    status("Found " + result.matches.length + " project matches.", "ok");
+    const count = result.matches.length;
+    setSearchSummary(count + (count === 1 ? " result in " : " results in ") + files.size +
+      (files.size === 1 ? " file" : " files") +
+      (result.skippedLarge ? ", " + result.skippedLarge + " large skipped" : "") +
+      (result.skippedUnsafe ? ", " + result.skippedUnsafe + " unreadable skipped" : "") +
+      (result.truncated ? ". Limit reached" : ""));
+    const rows = [];
+    for (const [path, hits] of files) {
+      rows.push(searchFileRow(path, hits.length));
+      for (const hit of hits) rows.push(searchMatchRow(hit, options.regex));
+    }
+    resultsNode.replaceChildren(...rows);
+    status(count ? "Found " + count + " matches in " + files.size + " files." : "No matches in the folder.", "ok");
   } catch (error) {
-    if (token === searchRevision && error.name !== "AbortError")
-      status(error.message || String(error), "error");
-  } finally {
-    if (token === searchRevision) {
-      el("searchProject").disabled = false;
-      el("replaceProject").disabled = false;
-    }
+    if (token !== searchRevision || error.name === "AbortError") return;
+    resultsNode.replaceChildren();
+    setSearchSummary(error.message || String(error));
+    status(error.message || String(error), "error");
   }
 }
 
@@ -2068,6 +2447,54 @@ el("projectSearch").addEventListener("keydown", event => {
   if (event.key === "Enter") {
     event.preventDefault();
     runProjectSearch();
+  } else if (event.key === "ArrowDown") {
+    const first = [...(el("searchResults").children || [])].find(node => !node.hidden);
+    if (first) { event.preventDefault(); first.focus(); }
+  }
+});
+el("projectSearch").addEventListener("input", scheduleProjectSearch);
+for (const id of ["caseSensitive", "projectWholeWord", "projectRegex"])
+  el(id).addEventListener("change", scheduleProjectSearch);
+if (el("projectInclude")) {
+  el("projectInclude").addEventListener("input", scheduleProjectSearch);
+  el("projectInclude").addEventListener("keydown", event => {
+    if (event.key === "Enter") { event.preventDefault(); runProjectSearch(); }
+  });
+}
+if (el("clearProjectSearch")) el("clearProjectSearch").addEventListener("click", () => {
+  el("projectSearch").value = "";
+  clearProjectSearch();
+  el("projectSearch").focus();
+});
+if (el("collapseProjectSearch")) el("collapseProjectSearch").addEventListener("click", () => {
+  for (const node of el("searchResults").children || [])
+    if (node.dataset && node.dataset.file) collapsedSearchFiles.add(node.dataset.file);
+  applySearchCollapse();
+});
+if (el("toggleProjectReplace")) el("toggleProjectReplace").addEventListener("click", () => {
+  const row = el("projectReplaceRow");
+  row.hidden = !row.hidden;
+  el("toggleProjectReplace").setAttribute("aria-expanded", row.hidden ? "false" : "true");
+  if (!row.hidden) el("projectReplace").focus();
+});
+/* Arrow keys walk the visible result rows; Left and Right fold a file. */
+el("searchResults").addEventListener("keydown", event => {
+  const rows = [...(el("searchResults").children || [])].filter(node => !node.hidden);
+  const index = rows.indexOf(document.activeElement);
+  if (index < 0) return;
+  const row = rows[index];
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    event.preventDefault();
+    const next = rows[index + (event.key === "ArrowDown" ? 1 : -1)];
+    if (next) next.focus(); else if (event.key === "ArrowUp") el("projectSearch").focus();
+  } else if ((event.key === "ArrowLeft" || event.key === "ArrowRight") && row.dataset.file) {
+    const file = row.dataset.file;
+    const collapse = event.key === "ArrowLeft";
+    if (collapse === collapsedSearchFiles.has(file)) return;
+    event.preventDefault();
+    if (collapse) collapsedSearchFiles.add(file); else collapsedSearchFiles.delete(file);
+    applySearchCollapse();
+    if (collapse) rows.find(node => node.classList.contains("sr-file") && node.dataset.file === file)?.focus();
   }
 });
 
@@ -2291,7 +2718,11 @@ const commands = Object.freeze({
   openFile: () => openFile(),
   saveFile: () => saveFile(),
   saveFileAs: () => saveFileAs(),
-  openFolder: () => el("folder").click(),
+  openFolder: () => explorerCommand("choose"),
+  newFile: () => explorerCommand("newFile"),
+  newFolder: () => explorerCommand("newFolder"),
+  revealActiveFile: () => explorerCommand("reveal"),
+  showExplorer: () => { el("tab-files").click(); const explorer = workspaceExplorer(); if (explorer) explorer.focus(); },
   focusFind: () => {
     showFindBar();
     const selection = src.value.slice(src.selectionStart, src.selectionEnd);
@@ -2300,7 +2731,7 @@ const commands = Object.freeze({
     el("editorFind").focus();
   },
   focusReplace: () => { showFindBar(); el("editorReplace").focus(); },
-  findInProject: () => el("projectSearch").focus(),
+  findInProject: () => { el("tab-search").click(); el("projectSearch").focus(); },
   showOutline: () => el("tab-outline").click(),
   goToSymbol: () => goToSymbol(),
   goToDefinition: () => goToDefinition(),
@@ -2325,20 +2756,24 @@ const commands = Object.freeze({
     globalThis.FlowStudioPlotFigures && globalThis.FlowStudioPlotFigures.show ?
       globalThis.FlowStudioPlotFigures.show(globalThis, document, language, status) : false,
   showData: () => el("tab-data").click(),
-  toggleDock: () => {
-    const dock = el("consoleDock");
-    const splitter = el("dockSplitter");
-    const hide = !dock.hidden;
-    dock.hidden = hide;
-    if (splitter) splitter.hidden = hide;
-    el("ideShell").classList.toggle("dock-hidden", hide);
-  },
+  toggleDock: () => { if (globalThis.FlowStudioLayout) globalThis.FlowStudioLayout.toggle("dock"); },
+  toggleSidebar: () => { if (globalThis.FlowStudioLayout) globalThis.FlowStudioLayout.toggle("sidebar"); },
+  toggleRightPanel: () => { if (globalThis.FlowStudioLayout) globalThis.FlowStudioLayout.toggle("right"); },
+  maximizeDock: () => { if (globalThis.FlowStudioLayout) globalThis.FlowStudioLayout.toggleDockMax(); },
+  showPreview: () => { if (globalThis.FlowStudioSidePanel) globalThis.FlowStudioSidePanel.show("preview"); },
+  showEnvironment: () => { if (globalThis.FlowStudioSidePanel) globalThis.FlowStudioSidePanel.show("environment"); },
+  newProject: template => globalThis.FlowStudioProjects ? globalThis.FlowStudioProjects.newProject(template) : false,
+  closeProject: () => globalThis.FlowStudioProjects ? globalThis.FlowStudioProjects.closeProject() : false,
+  startDebugging: () => globalThis.FlowStudioDebugger && globalThis.FlowStudioDebugger.instance ?
+    globalThis.FlowStudioDebugger.instance.start() : false,
   refreshEnvironment: () => el("refreshPythonEnvironment").click(),
   shortcuts: () => status("Ctrl+Enter run · Ctrl+Shift+Enter cell · Ctrl+S save · Ctrl+W close tab · Ctrl+Tab next tab · Ctrl+F find · Ctrl+H replace · Ctrl+Shift+O outline · F12 definition · Shift+F12 references · F2 rename", "ok"),    about: () => status("FlowStudio 0.2.0-alpha.1 · Flow-first local IDE · execution on 127.0.0.1:8751 only", "ok")
 });
 if (typeof window !== "undefined") {
   window.FlowStudioApp = Object.freeze({
-    commands, documents, createUntitled, activateDocument, closeDocument, openEditorHandle, revealPosition
+    commands, documents, createUntitled, activateDocument, closeDocument, openEditorHandle, revealPosition,
+    saveAllDocuments, closeAllDocuments, saveEditorBuffer,
+    project, adoptProjectRoot, status, renderTabs
   });
 }
 renderTabs();
@@ -2355,12 +2790,27 @@ renderTabs();
   <script src="/terminal_sessions.js"></script>
   <script src="/workspace_console.js"></script>
 <script src="/packages_panel.js"></script>
+<script src="/examples_mathflow.js"></script>
+<script src="/examples_polyglot.js"></script>
+<script src="/examples_graphics.js"></script>
 <script src="/examples_gallery.js"></script>
 <script src="/saved_projects.js"></script>
-<script src="/debug_panel.js"></script>
 <script src="/app/native_flow.js"></script>
-<script src="/app/python_debug_panel.js"></script>
 <script src="/ide_shell.js"></script>
+<script src="/ide_menubar.js"></script>
+<script src="/ide_run_widget.js"></script>
+<script src="/ide_search_everywhere.js"></script>
+<script src="/app/project_create.js"></script>
+<script src="/app/project_rename.js"></script>
+<script src="/ide_explorer.js"></script>
+<script src="/ide_workspace.js"></script>
+<script src="/data_viewer.js"></script>
+<script src="/ide_data_view.js"></script>
+<script src="/ide_packages_view.js"></script>
+<script src="/ide_side_panel.js"></script>
+<script src="/ide_app_preview.js"></script>
+<script src="/ide_projects.js"></script>
+<script src="/ide_debugger.js"></script>
 <script src="/ide_symbols.js"></script>
 <script src="/ide_outline.js"></script>
 <script>

@@ -76,6 +76,92 @@ Run its tests with:
 
     node --test tests/ide_symbols.test.js tests/ide_outline.test.js tests/ide_definition.test.js
 
+### Projects
+
+One project is open at a time, and each keeps its own files and tabs. The
+project switcher next to the FlowStudio name lists recent projects and holds
+New project, Open folder and Close project.
+
+- New project offers five templates: a Flow graphics app, a Flow program, a
+  Flow, Python and R pipeline, a Python script and an R analysis. A project
+  lives either in FlowStudio, in the browser's private file system (OPFS), or
+  in a new folder inside a folder you pick on disk.
+- Opening a project closes every tab of the previous one. Files with
+  unsaved changes are listed first, with Save and switch, Discard or Cancel.
+  The new project reopens the tabs it had last time, or its entry file.
+- Examples open as their own local project, so the Explorer shows only that
+  example's files and your edits to it are kept.
+- The last project reopens on the next visit when the browser still allows
+  access to it.
+
+### Layout
+
+The window has four regions: the sidebar (activity bar and views), the
+editor, the side panel (Preview and Environment) and the console dock. The
+layout manager (`web/ide_shell.js`) solves their sizes against the window:
+the editor keeps at least 360 by 150 pixels, and when the window is too
+narrow the side panel shrinks and then hides, then the sidebar does. Those
+collapses are not saved, so widening the window brings the panes back.
+
+Ctrl+B toggles the sidebar, Ctrl+Alt+B the side panel and Ctrl+J the dock;
+the three buttons at the right of the top bar do the same. Clicking the
+active activity-bar icon hides the sidebar. Splitters drag, take arrow keys,
+and reset on double-click; dragging the dock below 60 pixels closes it. The
+side panel stays closed until something needs it.
+
+### Flow apps with graphics and hot reload
+
+A Flow program that imports `stdlib/gfx.flow` runs in the Preview, in
+the side panel. The server type checks it with the strict Flow emitter, builds
+it with `flow wasm` into WebAssembly with the canvas backend
+(`runtime/gfx_wasm.c` in the Flow repository), and the Preview runs the
+build in a frame. Keyboard and mouse go to the program after you click the
+canvas.
+
+With Hot reload on, an edit rebuilds the app after a short pause, about one
+second for the examples, and swaps the new build in once it has loaded. A
+build that fails leaves the last good build running and lists the compiler
+errors, each a link to its line. A reload restarts the program, so its state
+starts fresh. The Graphics examples are a starter app and three games from
+the Flow repository: Pong, Snake and Falling sand.
+
+The first build on a machine also compiles the Flow runtime for WebAssembly,
+which takes about ten seconds. The Preview needs Emscripten (`emcc`) on the
+server's PATH. Builds live in a private folder under the system temp folder,
+and the last four are kept. Code: `src/flow_app.c`, `web/app_host.html`,
+`web/ide_app_preview.js`. Tests: `tests/ide_app_preview.test.js`,
+`tests/test_flow_app.py`, `tests/native_projects_ui.mjs`.
+
+### Workspace explorer
+
+The native IDE at `http://127.0.0.1:8751/` has an activity bar on the left
+with Explorer, Search, Outline, Plots, Data, Packages, Examples and Debug
+views. The Explorer shows the open folder as a tree:
+
+- Open folder asks the browser for read and write access to one folder.
+  Recently opened folders are listed for one-click reopening, and the files
+  that were open come back as tabs.
+- New file and New folder take a name inline. A path such as
+  `lib/helper.flow` creates the missing folders. Names are checked as you
+  type.
+- F2 or the context menu renames a file or folder. Delete asks before it
+  removes anything. Dragging a file or folder onto another folder moves it.
+  Open tabs follow a rename or move, and a tab with unsaved changes blocks
+  the operation until it is saved or closed.
+- Arrow keys, Home, End and Enter move through the tree. Typing the start of
+  a name selects it. Shift+F10 opens the context menu, Ctrl+Shift+E focuses
+  the Explorer, Ctrl+Shift+F opens Search, and Alt+F1 reveals the active file.
+- Open files are marked in the tree, unsaved ones with an M. The breadcrumb
+  above the editor shows the file's path, and each folder in it reveals that
+  folder in the tree.
+
+All file access goes through the browser's File System Access API on this
+device, so the Explorer needs Chrome, Edge or another Chromium browser.
+Nothing is uploaded to the server. Browsers do not yet offer an atomic folder
+move for user folders, so a folder rename or move copies the folder, checks
+every file, and then removes the original. Folders over 1,000 entries or
+64 MB are refused.
+
 The browser can open several source files at once as tabs, save them, choose a local project folder, lazily browse its source tree, create a source file in the project root, refresh the tree, search project files for literal text with exact match navigation, run the selected text or whole buffer as Flow, R or Python, and display captured stdout/stderr. Project operations use the browser File System Access API and are unavailable in browsers without folder-picker support. The native server retains separate Python and R interpreter processes between evaluations, with explicit reset controls. These are single-user localhost sessions, not restart-persistent or remotely isolated kernels.
 
 ### Editor find and replace
@@ -88,7 +174,13 @@ Run the additional pure-module tests with:
 
 ## Terminal console, packages, examples, debugger (native workspace)
 
-The native workspace console is a full terminal, not a form: runtime tabs
+**Terminal.** The bottom panel opens on a real terminal: xterm.js on a
+pseudo-terminal running your login shell (`src/pty_session.c`). Several
+terminals can run at once. Ctrl+P, Ctrl+K and quotes go to the shell.
+The shell runs with your user's permissions behind the same localhost
+intent gate as code execution. Shells left by a closed page are reclaimed.
+
+The **Console** tab beside it holds the language consoles. The native workspace console is a full terminal, not a form: runtime tabs
 (Flow, Python, R, plus explicit `+` sessions), a compact status row that only
 reports states the server actually produced (unknown at start, running,
 ready, failed, disconnected; Python/R say "shared interpreter" because they
@@ -117,25 +209,23 @@ the documented C path. The server exposes this as
 stderr. A Flow build without LLVM shows exactly that error. Verified live
 against the real compiler on macOS arm64 (see below for both pipelines).
 
-**Packages tab.** A sidebar tab installs and lists real packages through
-the persistent local sessions: pip (`pip install --user`, pinned
-`name==version` specs allowed) and R `install.packages(...)` from the CRAN
-cloud mirror. Specs are validated in the browser before any request; the
-local 15 s per-session execution budget applies to installs.
+**Packages.** One list per runtime, Python and R, filtered as you type.
+When the typed name is not installed, the first row offers to install it
+(pip `--user`, pinned `name==version` allowed, or R from CRAN). R rows show
+whether the package is attached and offer load, update and remove; Python
+rows offer uninstall. Names are validated in the browser before any request.
 
-**Examples tab.** Curated local examples show Flow, Python and R working in
-one project: a Python → data-file → R pipeline, a stats-in-Python/visuals-in-R
-pair, a one-shot Python → R handshake through `POST /api/demo/python-r`, and
-a Flow example meant to run with the MLIR backend. "Open" adds each file to
-the editor with the right language.
+**Data.** Lists the data frames in the R and Python sessions with their
+shape, and the CSV and TSV files of the open folder. Either opens in a data
+grid with sorting, filtering, paging and CSV export. Folder files are read
+by the browser and never uploaded.
 
-**Debug tab (Python replay tracer).** Toggle breakpoints at the cursor
-(per buffer), run the real CPython line trace (`POST /api/trace/python`,
-@traced by the persistent kernel) and scrub recorded states: click a step to
-jump the caret to that line and read the bounded locals captured there.
-Only builtin scalar values are previewed; complex values show type only.
-This is an execution replay, not a live pause/resume kernel debugger, and
-it is Python-only: Flow and R tracing remain missing.
+**Examples.** Search and category chips over 44 examples: getting started
+in Flow, debugging walkthroughs for Flow, Python and R, multi-language
+projects, the MLIR backend, and every MathFlow simulation in `examples/`
+(generated into `web/examples_mathflow.js` at UI build time). Run opens the
+files and runs the entry file; Debug opens them, places the example's
+breakpoints and starts the debugger.
 
 **Completion.** The Monaco workbench merges lexical Flow symbols (same
 bounded scanner as the Pages editor), live Python/R session variable names
@@ -255,18 +345,76 @@ the first error. Flow still requires the native localhost server. This is
 not an RStudio-compatible kernel debugger or a guarantee of physical-browser
 acceptance.
 
-## Native Python source debugging
+## Flow, Python and R in one session
 
-The Flow-owned localhost server now has an experimental interactive CPython
-debugger. Enter comma-separated breakpoint line numbers in the browser's
-Python debugger panel, then Start, Step into, Step over, Step out, Continue or Stop. An empty breakpoint
-list stops on the first executable line. The stack viewer shows bounded local
-variable types and safe scalar previews. Debugging executes real Python in
-the existing persistent native session; it does not emulate breakpoints in
-JavaScript. Step over skips source callees unless a breakpoint is hit; Step out resumes at the caller or completes a top-level frame. Ordinary native Python execution is blocked while the debugger
-is active. The kernel runs with the current user's permissions and is not
-safe for untrusted code. GitHub Pages, R and Flow source debugging are not
-supported. See [docs/PARITY.md](docs/PARITY.md) for verification status.
+Flow programs, the Python session and the R session can call each other
+while they run. Values cross directly between the live sessions, so no data
+files are needed.
+
+| From | Call | Gets back |
+| --- | --- | --- |
+| Python | `import flowstudio as fs`, then `fs.r("lm(...)")`, `fs.R.name`, `fs.R.name = value` | Python values; an R data.frame is a `fs.Frame` (`.rows()`, `.to_pandas()`) |
+| Python | `fs.flow("kernel.flow")` or `fs.flow(source)` | what the Flow program printed |
+| R | `py("...")`, `py$name`, `py$name <- value` | R values; a list of dicts or a Frame is a data.frame |
+| R | `flow("kernel.flow")` | what the Flow program printed |
+| Flow | `import flowstudio { py, r, py_num, r_num, py_int, r_int, fmt, fmt_int }` | the last value as text: one item per line, a data frame as CSV |
+
+Each call evaluates in the same namespace as the editor and console, so
+whatever one language creates, the others can read afterwards. A language
+that is waiting on a call cannot be called back into; that request fails
+with a clear error. A Flow program started by Python can still call back
+into that Python session, because Python serves those calls itself. A Flow
+program started from R runs without the bridge.
+
+How it works: a call is a length-framed request on the caller's protocol
+pipe. The C session transports relay it to the target kernel and pass the
+reply back (`src/polyglot_bridge.c`). Flow programs get the channel on fds 3
+and 4, and `src/flowstudio.flow` sits next to every run so the import
+resolves. Python sends values to R as R source, R sends them back as JSON.
+
+The Examples view's Polyglot category has five worked examples, generated
+from `examples/polyglot/`:
+
+- Python drives R: mtcars from R, grouped in Python, `lm()` in R.
+- R drives Python: Python's `re` parses log lines, and R aggregates and plots them.
+- Flow drives Python and R: a compiled SIR model queried from both sessions.
+- Python runs a Flow kernel: `fs.flow()` with input read back through `py_int()`.
+- Flow, Python and R pipeline: three files run in order with Run project.
+
+Tests: `tests/test_polyglot_bridge.py` covers the conversions offline and
+runs every polyglot example against the live server.
+
+## Run and Debug
+
+One debugger front end (`web/ide_debugger.js`) drives three real back ends:
+
+| Language | Back end | Stepping |
+| --- | --- | --- |
+| Flow | LLDB on a `flow debug` build whose `#line` directives name the .flow file (`src/flow_debugger.py`) | into, over, out, pause, evaluate C expressions |
+| Python | the persistent kernel's tracer (`src/python_debugger.py`) | into, over, out, run to cursor, pause on exceptions |
+| R | top-level expression stepping in the persistent R session | over, run to cursor, evaluate R |
+
+Click the gutter left of a line number, or press F9, to set a breakpoint.
+Breakpoints take conditions (a C expression for Flow, a numeric comparison
+such as `i>=3` for Python and R) and follow edits to the file. F5 starts or
+continues, F10 steps over, F11 steps into, Shift+F11 steps out, Ctrl+F10
+runs to the cursor and Shift+F5 stops. While paused, the editor marks the
+line, a debug toolbar appears in the editor's path bar, and the Debug view shows variables,
+watch expressions, the call stack and breakpoints. The Debug button beside
+Run starts a session, which opens the Debug view and the Debug Console in the
+dock. While paused, each line of the current function shows the values of the
+variables it mentions, and hovering a name shows its value.
+Breakpoint changes reach a running session at once.
+
+Flow debugging needs LLDB with Python support: Xcode command line tools on
+macOS, or `lldb` and its Python module on Linux (set
+`FLOWSTUDIO_LLDB_PYTHON` to the Python that can import it). Debugging runs
+real code with your permissions and is not safe for untrusted source.
+GitHub Pages does not debug.
+
+Tests: `tests/ide_debugger.test.js`, `tests/test_flow_debugger.py`,
+`tests/test_python_debugger.py` and the browser acceptance
+`tests/native_debugger_ui.mjs`.
 
 ## Native Git branches
 
@@ -381,7 +529,7 @@ See [scope, semantics and native acceptance](docs/FLOWJIT.md).
              |
        Flow / R / Python
 
-Current API: GET /, GET /health, POST /api/run/flow, POST /api/run/flow-mlir, POST /api/check/flow, POST /api/run/r, POST /api/reset/r, POST /api/inspect/r, POST /api/run/python, POST /api/trace/python, POST /api/inspect/python, POST /api/demo/python-r and POST /api/reset/python. POST sends UTF-8 source text and requires an X-FlowStudio-Intent: run request header. Persistent Python and R sessions each have a 15-second evaluation timeout and explicit reset; Flow has a 60-second compile-and-run budget to accommodate cold compiler start. All processes have bounded, captured output. No shell command-string evaluation is used.
+Current API: GET /, GET /health, POST /api/run/flow, POST /api/run/flow-mlir, POST /api/check/flow, POST /api/run/r, POST /api/reset/r, POST /api/inspect/r, POST /api/run/python, POST /api/trace/python, POST /api/inspect/python, POST /api/demo/python-r and POST /api/reset/python. Flow runs on the C backend carry the language bridge described above. POST sends UTF-8 source text and requires an X-FlowStudio-Intent: run request header. Persistent Python and R sessions each have a 15-second evaluation timeout and explicit reset; Flow has a 60-second compile-and-run budget to accommodate cold compiler start. All processes have bounded, captured output. No shell command-string evaluation is used.
 
 ## Security and scope
 

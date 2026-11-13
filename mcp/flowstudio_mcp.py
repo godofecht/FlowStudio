@@ -313,6 +313,11 @@ def tool_check_code(args):
             "content": [{"type": "text", "text": "check supports 'flow' and 'mathflow'."}],
             "isError": True,
         }
+    if status == 200 and language == "flow":
+        # The compiler prints a build note when the Flow checkout has local edits. It is
+        # not a diagnostic, and models read it as one.
+        kept = [line for line in body.splitlines() if not line.startswith("ensure_flowc:")]
+        body = "\n".join(kept).strip() or "Flow compile check passed. The source was not executed."
     return short_text(status, body)
 
 

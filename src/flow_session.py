@@ -7,6 +7,8 @@ The native server drives three steps:
 
     prepare   reads an entry on stdin, prints the program to run (exit 0)
               or a JSON error reply (exit 2)
+    check     reads a script on stdin and prints its errors as JSON
+              diagnostics, without running it or changing the session
     commit    reads the program's output on stdin, records the new values
               and prints the JSON reply for the console
     state     prints the variables and declarations as JSON
@@ -429,7 +431,9 @@ def error_reply(message: str, entries: int) -> str:
     return json.dumps({"ok": False, "output": message, "variables": None, "entry": entries})
 
 
-def prepare(directory: str, entry: str) -> tuple[int, str]:
+def prepare(directory: str, entry: str, check_only: bool = False) -> tuple[int, str]:
+    """The program for an entry. With check_only, only the errors, as JSON
+    diagnostics with entry lines and columns; the session is left alone."""
     state = load(directory)
     if len(entry.encode("utf-8")) > ENTRY_LIMIT:
         return 2, error_reply("This entry is larger than 256 KiB.", state["entries"])
@@ -499,35 +503,55 @@ def prepare(directory: str, entry: str) -> tuple[int, str]:
 
     types: dict[str, str] = {}
     errors: list[str] = []
+    found: list[dict] = []
     probe_first = probe_start + len(restore) + len(body_lines) + len(last_lines)
     value_line = probe_start + len(restore) + len(body_lines)
     for line in report.splitlines():
-        match = re.match(r"entry:(\d+):(\d+):\s*(?:error|warning):\s*(.*)$", line)
+        match = re.match(r"entry:(\d+):(\d+):\s*(?:parse )?(?:error|warning):\s*(.*)$", line)
         if not match:
             continue
         number = int(match.group(1)) - 1
-        message = match.group(3)
+        message = re.sub(r" \(byte \d+\)", "", match.group(3))
         probe = re.match(r"Variable 'flowstudio_probe_(\d+)' initialized with (.+) but annotated as " + PROBE_TYPE, message)
         if probe and number >= probe_first:
             types[probe_names[int(probe.group(1))]] = probe.group(2).strip()
             continue
         if number >= probe_first:
+            # An unfinished last statement fails to parse on the probe line after it.
+            if "parse error" in line and statements:
+                errors.append(f"line {statements[-1]['line'] + 1}: " + message)
+                found.append({"line": statements[-1]["line"] + 1, "column": 1, "message": message})
+                continue
             # The probe of a shown value fails when the value itself is wrong.
             if show_last and number == probe_first + len(probe_names) - 1 and "Undefined" in message:
                 errors.append(f"line {statements[-1]['line'] + 1}: " + message)
+                found.append({"line": statements[-1]["line"] + 1, "column": 1, "message": message})
             continue
         entry_line = None
+        column = int(match.group(2))
         if probe_start + len(restore) <= number < value_line:
             entry_line = line_map[number - probe_start - len(restore)] + 1
+            column -= 4
         elif value_line <= number < probe_first and show_last:
             entry_line = statements[-1]["line"] + (number - value_line) + 1
+            original = statements[-1]["text"]
+            column -= len(f"    let {VALUE_NAME} = ") - (len(original) - len(original.lstrip()))
         elif number < probe_start:
             # A declaration from this entry maps back to its line.
             for program_line, item_line, count in declaration_lines(imports, declarations, new_items):
                 if program_line <= number < program_line + count:
                     entry_line = item_line + number - program_line + 1
         location = f"line {entry_line}: " if entry_line else ""
-        errors.append(location + message.replace(VALUE_NAME, "value"))
+        message = message.replace(VALUE_NAME, "value")
+        errors.append(location + message)
+        if entry_line:
+            found.append({"line": entry_line, "column": max(1, column), "message": message})
+    if check_only:
+        failed = bool(errors) or (bool(probe_names) and not types and "error" in report)
+        if failed and not errors:
+            errors = [line for line in report.splitlines() if "error" in line][:12]
+        return (2 if failed else 0), json.dumps({"ok": not failed, "output": "\n".join(errors) or
+                                                 "Flow script passed checking in the session.", "diagnostics": found})
     if errors or ("typecheck failed" in report and not types) or "parse" in report and "error" in report and not types:
         if not errors:
             errors = [line for line in report.splitlines() if "error" in line][:12] or [report.strip()[-2000:]]
@@ -649,10 +673,14 @@ def state_reply(directory: str) -> str:
 
 
 def main(argv: list[str]) -> int:
-    if len(argv) < 2 or argv[1] not in ("prepare", "commit", "state", "reset"):
+    if len(argv) < 2 or argv[1] not in ("prepare", "check", "commit", "state", "reset"):
         print("usage: flow_session.py prepare|commit STATUS|state|reset", file=sys.stderr)
         return 64
     directory = state_dir()
+    if argv[1] == "check":
+        code, text = prepare(directory, sys.stdin.read(), check_only=True)
+        sys.stdout.write(text)
+        return code
     if argv[1] == "prepare":
         code, text = prepare(directory, sys.stdin.read())
         sys.stdout.write(text)

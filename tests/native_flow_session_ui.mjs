@@ -107,6 +107,34 @@ await page.waitForFunction(() => /whole program/.test(document.querySelector('.t
   /whole program/.test(document.body.textContent), null, { timeout: 60000 });
 assert.deepEqual(await page.evaluate(() => FlowStudioFlowSession.client.variables().map(v => v.name)), ['x', 'p', 'y']);
 
+// In a script, Flow's language server knows the session's variables:
+// hovering p shows its struct type, though p was defined in an earlier entry.
+await page.evaluate(() => {
+  const editor = FlowStudioEditor.editor;
+  editor.setValue('let w = p.x + 1.0\nlet bad: i32 = "text"\nw\n');
+  editor.setPosition({ lineNumber: 1, column: 1 });
+});
+await page.waitForFunction(() => globalThis.FlowStudioFlowLsp && FlowStudioFlowLsp.state() === 'ready', null, { timeout: 30000 });
+await page.waitForTimeout(800);
+const point = await page.evaluate(() => {
+  const editor = FlowStudioEditor.editor;
+  const at = editor.getScrolledVisiblePosition({ lineNumber: 1, column: 10 });
+  const box = editor.getDomNode().getBoundingClientRect();
+  return { x: box.left + at.left + 3, y: box.top + at.top + at.height / 2 };
+});
+await page.mouse.move(point.x, point.y);
+await page.waitForFunction(() => /Point/.test(Array.from(document.querySelectorAll('.monaco-hover')).map(n => n.textContent).join(' ')),
+  null, { timeout: 15000 });
+await page.mouse.move(5, 5);
+
+// Check Flow checks a script the way the session runs it, and marks the line.
+await page.click('#checkFlow');
+await page.waitForFunction(() => FlowStudioEditor.editor.getModel().getAllDecorations()
+  .some(d => d.options.inlineClassName === 'flowstudio-flow-error' && d.range.startLineNumber === 2), null, { timeout: 60000 });
+const marked = await page.evaluate(() => FlowStudioEditor.editor.getModel().getAllDecorations()
+  .filter(d => d.options.inlineClassName === 'flowstudio-flow-error').map(d => d.range.startLineNumber));
+assert.deepEqual(marked, [2], 'only the wrong let is marked');
+
 // Reset from the console menu, which asks to confirm first.
 await page.evaluate(() => FlowStudioTerminal.show('console'));
 await page.click('#terminalMenuToggle');

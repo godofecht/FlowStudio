@@ -89,6 +89,49 @@ function create(options) {
   const watchers = [];
   let pollTimers = [];
 
+  /* A Flow script without main() is what the console session runs. The
+   * server only analyses code inside functions, so it gets a rearranged
+   * copy: declarations stay on their lines, the top-level statements move
+   * into a generated main() after the session's current variables, and
+   * every position is mapped between the two (FlowStudioFlowSession.scriptView). */
+  function sessionView(text) {
+    const session = options.session || global.FlowStudioFlowSession;
+    if (!session || typeof session.scriptView !== "function") return null;
+    const client = session.client;
+    return session.scriptView(text, client && typeof client.variables === "function" ? client.variables() : null);
+  }
+  function serverText(model, entry) {
+    const text = model.getValue();
+    entry.view = sessionView(text);
+    return entry.view ? entry.view.text : text;
+  }
+  function viewOf(model) {
+    const entry = model ? synced.get(model) : null;
+    return entry ? entry.view || null : null;
+  }
+  function toServer(model, position) {
+    const point = fromPosition(position);
+    const view = viewOf(model);
+    if (view) point.line = view.toVirtual(point.line);
+    return point;
+  }
+  function rangeToServer(model, range) {
+    const lsp = fromRange(range);
+    const view = viewOf(model);
+    if (view) { lsp.start.line = view.toVirtual(lsp.start.line); lsp.end.line = view.toVirtual(lsp.end.line); }
+    return lsp;
+  }
+  /* A server range in editor coordinates, or null inside generated lines. */
+  function fromServer(model, range) {
+    if (!range || !range.start || !range.end) return null;
+    const view = viewOf(model);
+    if (!view) return toRange(range);
+    const start = view.toReal(range.start.line), end = view.toReal(range.end.line);
+    if (start === null || end === null) return null;
+    return toRange({ start: { line: start, character: range.start.character },
+      end: { line: end, character: range.end.character } });
+  }
+
   function post(route, body) {
     const run = () => fetchFn(route, {
       method: "POST",
@@ -153,12 +196,12 @@ function create(options) {
     const text = model.getValue();
     if (text.length > MAX_TEXT) return;
     const entry = { uri: uriFor(model), version: 1, timer: null, changedAt: 0,
-      diagnostics: [], subscriptions: [] };
+      diagnostics: [], subscriptions: [], view: null };
     synced.set(model, entry);
     entry.subscriptions.push(model.onDidChangeContent(() => scheduleChange(model)));
     entry.subscriptions.push(model.onWillDispose(() => close(model)));
     void notify("textDocument/didOpen", { textDocument: { uri: entry.uri, languageId: "flow",
-      version: entry.version, text } });
+      version: entry.version, text: serverText(model, entry) } });
     schedulePolls();
   }
 
@@ -188,7 +231,7 @@ function create(options) {
     entry.version++;
     entry.changedAt = now();
     const uri = uriFor(model);
-    const text = model.getValue();
+    const text = serverText(model, entry);
     let sent;
     if (uri !== entry.uri) {
       // The document was renamed or saved under a new path.
@@ -221,7 +264,7 @@ function create(options) {
       entry.version++;
       entry.uri = uriFor(model);
       void notify("textDocument/didOpen", { textDocument: { uri: entry.uri, languageId: "flow",
-        version: entry.version, text: model.getValue() } });
+        version: entry.version, text: serverText(model, entry) } });
     }
     schedulePolls();
   }
@@ -238,7 +281,7 @@ function create(options) {
   }
 
   function markerOf(model, diagnostic) {
-    const range = toRange(diagnostic.range);
+    const range = fromServer(model, diagnostic.range);
     if (!range) return null;
     const lines = model.getLineCount();
     range.startLineNumber = Math.min(Math.max(1, range.startLineNumber), lines);
@@ -306,8 +349,8 @@ function create(options) {
     const out = [];
     for (const item of list) {
       const uri = item && (item.targetUri || item.uri);
-      const range = toRange(item && (item.targetSelectionRange || item.targetRange || item.range));
       const target = typeof uri === "string" ? modelForUri(uri) : null;
+      const range = fromServer(target, item && (item.targetSelectionRange || item.targetRange || item.range));
       // Targets outside the open documents (files on disk, the standard
       // library) have no buffer to show, so they are left out.
       if (target && range) out.push({ uri: target.uri, range });
@@ -321,7 +364,7 @@ function create(options) {
       const target = modelForUri(uri);
       if (!target || !Array.isArray(textEdits)) return;
       for (const textEdit of textEdits) {
-        const range = toRange(textEdit.range);
+        const range = fromServer(target, textEdit.range);
         if (range) edits.push({ resource: target.uri, textEdit: { range, text: String(textEdit.newText) },
           versionId: undefined });
       }
@@ -339,11 +382,11 @@ function create(options) {
       .filter(edit => edit.range);
   }
 
-  function completionItem(item, fallbackRange) {
+  function completionItem(model, item, fallbackRange) {
     const kinds = monaco.languages.CompletionItemKind;
     const name = COMPLETION_KINDS[item.kind] || "Text";
     const edit = item.textEdit;
-    const range = edit ? toRange(edit.range || edit.replace) : null;
+    const range = edit ? fromServer(model, edit.range || edit.replace) : null;
     const documentation = markdownOf(item.documentation)[0];
     return {
       label: String(item.label),
@@ -370,7 +413,7 @@ function create(options) {
         const entry = await prepare(model, false);
         if (!entry) return null;
         const result = await request("textDocument/completion", {
-          textDocument: { uri: entry.uri }, position: fromPosition(position),
+          textDocument: { uri: entry.uri }, position: toServer(model, position),
           context: { triggerKind: (context && context.triggerKind || 0) + 1,
             triggerCharacter: context ? context.triggerCharacter : undefined }
         }).catch(() => null);
@@ -378,7 +421,7 @@ function create(options) {
         const word = model.getWordUntilPosition(position);
         const fallback = { startLineNumber: position.lineNumber, endLineNumber: position.lineNumber,
           startColumn: word.startColumn, endColumn: position.column };
-        return { suggestions: items.slice(0, 500).map(item => completionItem(item, fallback)),
+        return { suggestions: items.slice(0, 500).map(item => completionItem(model, item, fallback)),
           incomplete: !!(result && result.isIncomplete) };
       }
     }));
@@ -388,10 +431,10 @@ function create(options) {
         const entry = await prepare(model, false);
         if (!entry) return null;
         const result = await request("textDocument/hover", {
-          textDocument: { uri: entry.uri }, position: fromPosition(position) }).catch(() => null);
+          textDocument: { uri: entry.uri }, position: toServer(model, position) }).catch(() => null);
         const contents = result ? markdownOf(result.contents) : [];
         if (!contents.length) return null;
-        return { contents, range: toRange(result.range) || undefined };
+        return { contents, range: fromServer(model, result.range) || undefined };
       }
     }));
     providers.push(languages.registerDefinitionProvider("flow", {
@@ -400,7 +443,7 @@ function create(options) {
         const entry = await prepare(model, true);
         if (!entry) return null;
         return locationsOf(await request("textDocument/definition", {
-          textDocument: { uri: entry.uri }, position: fromPosition(position) }).catch(() => null));
+          textDocument: { uri: entry.uri }, position: toServer(model, position) }).catch(() => null));
       }
     }));
     providers.push(languages.registerReferenceProvider("flow", {
@@ -409,7 +452,7 @@ function create(options) {
         const entry = await prepare(model, true);
         if (!entry) return null;
         return locationsOf(await request("textDocument/references", {
-          textDocument: { uri: entry.uri }, position: fromPosition(position),
+          textDocument: { uri: entry.uri }, position: toServer(model, position),
           context: { includeDeclaration: !context || context.includeDeclaration !== false }
         }).catch(() => null));
       }
@@ -420,9 +463,9 @@ function create(options) {
         const entry = await prepare(model, false);
         if (!entry) return null;
         const result = await request("textDocument/documentHighlight", {
-          textDocument: { uri: entry.uri }, position: fromPosition(position) }).catch(() => null);
+          textDocument: { uri: entry.uri }, position: toServer(model, position) }).catch(() => null);
         if (!Array.isArray(result)) return null;
-        return result.map(item => ({ range: toRange(item.range),
+        return result.map(item => ({ range: fromServer(model, item.range),
           kind: item.kind === 3 ? 2 : item.kind === 2 ? 1 : 0 })).filter(item => item.range);
       }
     }));
@@ -433,7 +476,7 @@ function create(options) {
         if (!entry) return null;
         try {
           const result = await request("textDocument/rename", { textDocument: { uri: entry.uri },
-            position: fromPosition(position), newName });
+            position: toServer(model, position), newName });
           return workspaceEditOf(result);
         } catch (error) {
           return { edits: [], rejectReason: error.message };
@@ -449,21 +492,24 @@ function create(options) {
         let result = null;
         try {
           result = await request("textDocument/prepareRename", { textDocument: { uri: entry.uri },
-            position: fromPosition(position) });
+            position: toServer(model, position) });
         } catch (error) {
           return { range: range || undefined, text: word ? word.word : "", rejectReason: error.message };
         }
         if (!result) return { range: range || undefined, text: word ? word.word : "",
           rejectReason: "This name cannot be renamed." };
-        if (result.start) return { range: toRange(result), text: model.getValueInRange(toRange(result)) };
-        if (result.range) return { range: toRange(result.range),
-          text: typeof result.placeholder === "string" ? result.placeholder : model.getValueInRange(toRange(result.range)) };
+        const mapped = fromServer(model, result.start ? result : result.range);
+        if (!mapped) return { range: range || undefined, text: word ? word.word : "",
+          rejectReason: "This name cannot be renamed." };
+        if (result.start) return { range: mapped, text: model.getValueInRange(mapped) };
+        if (result.range) return { range: mapped,
+          text: typeof result.placeholder === "string" ? result.placeholder : model.getValueInRange(mapped) };
         return range ? { range, text: word.word } : null;
       }
     }));
     providers.push(languages.registerDocumentFormattingEditProvider("flow", {
       async provideDocumentFormattingEdits(model, formatting) {
-        if (!handles(model)) return null;
+        if (!handles(model) || viewOf(model)) return null;
         const entry = await prepare(model, false);
         if (!entry) return null;
         return textEditsOf(await request("textDocument/formatting", { textDocument: { uri: entry.uri },
@@ -472,7 +518,7 @@ function create(options) {
     }));
     providers.push(languages.registerDocumentRangeFormattingEditProvider("flow", {
       async provideDocumentRangeFormattingEdits(model, range, formatting) {
-        if (!handles(model)) return null;
+        if (!handles(model) || viewOf(model)) return null;
         const entry = await prepare(model, false);
         if (!entry) return null;
         return textEditsOf(await request("textDocument/rangeFormatting", { textDocument: { uri: entry.uri },
@@ -487,15 +533,16 @@ function create(options) {
         if (!entry) return null;
         const result = await request("textDocument/documentSymbol", {
           textDocument: { uri: entry.uri } }).catch(() => null);
+        // Symbols inside the generated main() of a script are lifted to the top.
         const symbol = item => {
-          const range = toRange(item.range || (item.location && item.location.range));
-          if (!range) return null;
-          return { name: String(item.name), detail: item.detail ? String(item.detail) : "",
+          const children = Array.isArray(item.children) ? item.children.flatMap(symbol) : [];
+          const range = fromServer(model, item.range || (item.location && item.location.range));
+          if (!range) return children;
+          return [{ name: String(item.name), detail: item.detail ? String(item.detail) : "",
             kind: Math.max(0, (item.kind || 1) - 1), tags: [], range,
-            selectionRange: toRange(item.selectionRange) || range,
-            children: Array.isArray(item.children) ? item.children.map(symbol).filter(Boolean) : [] };
+            selectionRange: fromServer(model, item.selectionRange) || range, children }];
         };
-        return Array.isArray(result) ? result.map(symbol).filter(Boolean) : [];
+        return Array.isArray(result) ? result.flatMap(symbol) : [];
       }
     }));
     providers.push(languages.registerCodeActionProvider("flow", {
@@ -506,12 +553,12 @@ function create(options) {
         // Send back the server's own diagnostics, which carry fix data.
         const markers = (context && context.markers || []).filter(marker => marker.owner === OWNER);
         const diagnostics = entry.diagnostics.filter(diagnostic => {
-          const r = toRange(diagnostic.range);
+          const r = fromServer(model, diagnostic.range);
           return r && markers.some(marker => marker.startLineNumber === r.startLineNumber &&
             marker.startColumn === r.startColumn && marker.message === String(diagnostic.message));
         });
         const result = await request("textDocument/codeAction", { textDocument: { uri: entry.uri },
-          range: fromRange(range), context: { diagnostics } }).catch(() => null);
+          range: rangeToServer(model, range), context: { diagnostics } }).catch(() => null);
         const actions = (Array.isArray(result) ? result : [])
           .filter(action => action && action.edit)
           .map(action => ({ title: String(action.title), kind: action.kind || "quickfix",
@@ -550,6 +597,15 @@ function create(options) {
     for (const model of monaco.editor.getModels()) open(model);
   }
 
+  /* New session variables change the generated copy of every script. */
+  function followSession() {
+    const session = options.session || global.FlowStudioFlowSession;
+    if (!session || !session.client || typeof session.client.onChange !== "function") return;
+    watchers.push({ dispose: session.client.onChange(() => {
+      for (const [model, entry] of synced) if (entry.view) scheduleChange(model);
+    }) });
+  }
+
   async function start() {
     if (state !== "idle") return state === "ready";
     state = "starting";
@@ -562,6 +618,7 @@ function create(options) {
     state = "ready";
     register();
     watchModels();
+    followSession();
     return true;
   }
 

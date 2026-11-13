@@ -31,8 +31,6 @@ function mount({editor, native, app, language, button, output, status, problems 
     cancelAuto();
     if (!autoCheck?.checked || !available() ||
         !editor.getModel()?.getValue().trim()) return;
-    // The Flow language server already reports problems as you type.
-    if (languageServer()?.handles?.(editor.getModel())) return;
     timer = scheduler.setTimeout(() => {
       timer = null;
       if (!autoCheck.checked || !available()) return;
@@ -151,7 +149,10 @@ function mount({editor, native, app, language, button, output, status, problems 
     update();
     try {
       // This calls the existing strict, nonexecuting Flow 2.x compiler route.
-      const result = await native.checkSyntax(source);
+      // A script without main() is checked the way the console session runs it.
+      const session = global.FlowStudioFlowSession;
+      const result = session && session.client && !session.hasMain(source)
+        ? await session.client.check(source) : await native.checkSyntax(source);
       if (token !== generation || editor.getModel() !== model ||
           model.getVersionId() !== version ||
           app.documents.active()?.id !== documentId || !available()) return false;

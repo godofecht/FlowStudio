@@ -428,7 +428,7 @@ test("F12, Shift+F12, F2 and Shift+Alt+F reach the app commands", () => {
   assert.deepEqual(calls, ["def", "refs", "rename", "format"]);
 });
 
-test("idle compiler checks step aside while the language server owns the model", async () => {
+test("idle compiler checks keep running beside the language server without double markers", async () => {
   const { mount } = require("../web/flow_diagnostics.js");
   const timers = [];
   const model = { getValue: () => "function main() -> i32 {\n    return 0\n}", getVersionId: () => 1,
@@ -452,14 +452,16 @@ test("idle compiler checks step aside while the language server owns the model",
       scheduler: { setTimeout(fn) { timers.push(fn); return timers.length; }, clearTimeout() {} }
     });
     handlers.content();
-    assert.equal(timers.length, 0, "no idle compiler run while the server reports problems");
+    // The server misses errors the strict compiler finds (a let of the wrong
+    // type), so the idle check still runs while the server owns the model.
+    assert.equal(timers.length, 1, "the idle compiler check still runs");
     handlers.button();
     await flush();
     const shown = decorations.filter(set => set.length).at(-1);
     assert.deepEqual(shown.map(d => d.range.startLineNumber), [3], "a line the server marks is not marked twice");
     owned = false;
     handlers.content();
-    assert.equal(timers.length, 1, "idle checks return when the server is gone");
+    assert.equal(timers.length, 2, "idle checks run when the server is gone too");
   } finally {
     delete globalThis.FlowStudioFlowLsp;
   }

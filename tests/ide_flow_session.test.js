@@ -105,3 +105,29 @@ test("renderEnvironment lists values and marks values that are not kept", () => 
   session.renderEnvironment(container, [], doc);
   assert.match(container.children[0].textContent, /No Flow variables yet/);
 });
+
+test("scriptView moves top-level statements into main() and maps lines both ways", () => {
+  const text = "let x = 41\nfunction sq(n: i32) -> i32 {\n    return n * n\n}\nlet y = sq(x) + base\n";
+  const view = session.scriptView(text, [
+    { name: "base", type: "i32", kept: true, mutable: true },
+    { name: "x", type: "f64", kept: true },            // the script declares x itself
+    { name: "h", type: "ptr<T>", kept: false },        // not kept: no value to stand for
+    { name: "bad", type: "i32; evil()", kept: true }   // not a type: left out
+  ]);
+  const lines = view.text.split("\n");
+  assert.equal(lines[0], "");
+  assert.equal(lines[1], "function sq(n: i32) -> i32 {");
+  assert.ok(lines.includes("    function flowstudio_session_0() -> i32"));
+  assert.ok(lines.includes("let mut base: i32 = flowstudio_session_0()"));
+  assert.ok(!view.text.includes("ptr<T>") && !view.text.includes("evil"));
+  assert.equal(lines[view.toVirtual(0)], "let x = 41");
+  assert.equal(lines[view.toVirtual(4)], "let y = sq(x) + base");
+  assert.equal(view.toVirtual(2), 2, "declaration lines stay put");
+  assert.equal(view.toReal(view.toVirtual(4)), 4);
+  assert.equal(view.toReal(lines.indexOf("function main() -> i32 {")), null, "generated lines map nowhere");
+});
+
+test("scriptView leaves whole programs and declaration-only files alone", () => {
+  assert.equal(session.scriptView("function main() -> i32 {\n    return 0\n}\n", []), null);
+  assert.equal(session.scriptView("function f() -> i32 {\n    return 1\n}\n", []), null);
+});

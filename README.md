@@ -378,6 +378,43 @@ the first error. Flow still requires the native localhost server. This is
 not an RStudio-compatible kernel debugger or a guarantee of physical-browser
 acceptance.
 
+## Flow console session
+
+The Flow console keeps a session, the way the R and Python consoles do.
+Variables, functions, structs and imports from one entry are there in the
+next. A bare expression shows its value.
+
+    flow > let rate = 0.25
+    flow > function grow(x: f64, r: f64) -> f64 { return x * (1.0 + r) }
+    flow > grow(10.0, 0.5)
+    15.0
+
+In the editor, Ctrl+Enter sends the selection, or the statement under the
+cursor, to the console and moves to the next statement, so a `.flow` file
+without `main()` works as a script. A file with `main()` still runs as a
+whole program. The Environment pane lists the session's Flow variables with
+their types and values. Reset the session from the console menu.
+
+Check Flow and Check Flow on idle check a script the way the session runs
+it, so a `let` at the top level is not an error. In a script, the Flow
+language server knows the session's variables, so hover and completion work
+on names defined in earlier entries.
+
+How it works: Flow compiles whole programs, so `src/flow_session.py`
+rebuilds the session around each entry. Earlier declarations stay at file
+scope and earlier variables come back as typed `let` bindings with their
+values. The Flow checker names the type of each new variable, and a dump at
+the end of the program reads the values back. Each entry runs through the
+same bridged runner as Run, so the console can call `py()` and `r()`. An
+entry that fails leaves the session as it was. Values the session cannot
+rebuild (pointers, lists, maps, nested arrays, arrays over 4,096 items,
+infinities) are listed as not kept, and later entries cannot use them. An
+entry takes 1.5 to 2.5 seconds, mostly C compilation.
+
+Tests: `tests/test_flow_session.py` (offline and live),
+`tests/ide_flow_session.test.js` and the browser acceptance
+`tests/native_flow_session_ui.mjs`.
+
 ## Flow, Python and R in one session
 
 Flow programs, the Python session and the R session can call each other

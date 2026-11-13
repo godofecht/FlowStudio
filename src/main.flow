@@ -514,6 +514,18 @@ function send_flow_session(op: string, code: string) -> void {
         fs_reply(200, "application/json; charset=utf-8", result.stdout)
         return
     }
+    if eq(op, "check") {
+        # Errors for a script without main(), as the session would run it.
+        let checked: ptr<ProcResult> = flow_session_helper("check", code, "")
+        if checked.exit_code == 0 {
+            fs_reply(200, "application/json; charset=utf-8", checked.stdout)
+        } elif checked.exit_code == 2 {
+            fs_reply(422, "application/json; charset=utf-8", checked.stdout)
+        } else {
+            fs_reply(503, "text/plain; charset=utf-8", "FlowStudio: the Flow session helper failed. " + checked.stderr + checked.error)
+        }
+        return
+    }
     let prepared: ptr<ProcResult> = flow_session_helper("prepare", code, "")
     if prepared.exit_code == 2 {
         fs_reply(422, "application/json; charset=utf-8", prepared.stdout)
@@ -918,6 +930,10 @@ function dispatch() -> void {
         }
         if eq(path, "/api/flow/session/eval") {
             send_flow_session("eval", fs_body())
+            return
+        }
+        if eq(path, "/api/flow/session/check") {
+            send_flow_session("check", fs_body())
             return
         }
         if eq(path, "/api/flow/session/state") {

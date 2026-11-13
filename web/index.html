@@ -2017,7 +2017,7 @@ async function sendFlowToConsole(selection) {
 }
 async function run() {
   const selection = src.value.substring(src.selectionStart, src.selectionEnd);
-  if (language.value === "flow" && globalThis.FlowStudioFlowSession &&
+  if (language.value === "flow" && globalThis.FlowStudioFlowSession && src.value.trim() &&
       (selection.trim() || !FlowStudioFlowSession.hasMain(src.value))) {
     const sent = await sendFlowToConsole(selection.trim() ? selection : "");
     if (sent !== null) return sent;

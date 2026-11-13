@@ -40,6 +40,14 @@ function createClient(request) {
       if (result.data) publish(result.data.variables);
       return result;
     },
+    /* Errors for a script without main(), as the session would run it.
+     * Same shape as the native compiler check: {ok, output, diagnostics}. */
+    async check(code) {
+      const result = await call("check", code);
+      if (result.data && typeof result.data.ok === "boolean" && Array.isArray(result.data.diagnostics))
+        return { ok: result.data.ok, output: String(result.data.output || ""), diagnostics: result.data.diagnostics };
+      return { ok: false, output: result.text, diagnostics: [] };
+    },
     async state() {
       const result = await call("state");
       if (result.data) publish(result.data.variables);
@@ -139,6 +147,53 @@ function hasMain(text) {
   return /(^|\n)\s*(?:pub\s+)?function\s+main\s*\(/.test(String(text || ""));
 }
 
+/* The script as Flow's language server should see it. The server only
+ * analyses code inside functions, so a script without main() is rearranged:
+ * declarations keep their lines, top-level statements are blanked and
+ * copied verbatim into a generated main(), after the session's variables,
+ * which are declared through extern functions of their types. Columns never
+ * change; toVirtual and toReal map lines (toReal is null for generated
+ * lines). Returns null for a whole program or a file of declarations. */
+const TYPE_TEXT = /^[A-Za-z_][A-Za-z0-9_<>, ]*$/;
+function scriptView(text, variables) {
+  const source = String(text || "");
+  if (hasMain(source)) return null;
+  const list = items(source);
+  const statements = list.filter(item => !item.declaration);
+  if (!statements.length) return null;
+  const lines = source.split("\n");
+  const out = lines.slice();
+  const toVirtualLines = lines.map((_, index) => index);
+  for (const item of statements)
+    for (let line = item.start; line < item.end; line++) out[line] = "";
+  const declared = new Set();
+  for (const item of statements) {
+    const match = /^\s*let\s+(?:mut\s+)?([A-Za-z_][A-Za-z0-9_]*)/.exec(item.code);
+    if (match) declared.add(match[1]);
+  }
+  const kept = (Array.isArray(variables) ? variables : []).filter(variable => variable &&
+    variable.kept !== false && typeof variable.name === "string" && /^[A-Za-z_][A-Za-z0-9_]*$/.test(variable.name) &&
+    typeof variable.type === "string" && TYPE_TEXT.test(variable.type) && !declared.has(variable.name)).slice(0, 256);
+  if (kept.length) {
+    out.push("extern {");
+    kept.forEach((variable, index) => out.push("    function flowstudio_session_" + index + "() -> " + variable.type));
+    out.push("}");
+  }
+  out.push("function main() -> i32 {");
+  kept.forEach((variable, index) => out.push("let " + (variable.mutable ? "mut " : "") + variable.name + ": " +
+    variable.type + " = flowstudio_session_" + index + "()"));
+  for (const item of statements)
+    for (let line = item.start; line < item.end; line++) { toVirtualLines[line] = out.length; out.push(lines[line]); }
+  out.push("    return 0", "}", "");
+  const toRealLines = new Map();
+  toVirtualLines.forEach((virtual, real) => toRealLines.set(virtual, real));
+  return {
+    text: out.join("\n"),
+    toVirtual: line => line >= 0 && line < toVirtualLines.length ? toVirtualLines[line] : line,
+    toReal: line => toRealLines.has(line) ? toRealLines.get(line) : null
+  };
+}
+
 /* The Environment table for Flow variables. Values are text only. */
 function renderEnvironment(container, variables, doc) {
   doc = doc || root.document;
@@ -187,7 +242,7 @@ function renderEnvironment(container, variables, doc) {
   container.replaceChildren(table);
 }
 
-const api = Object.freeze({ createClient, items, statementAt, hasMain, renderEnvironment, codeOnly });
+const api = Object.freeze({ createClient, items, statementAt, hasMain, scriptView, renderEnvironment, codeOnly });
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 root.FlowStudioFlowSession = Object.freeze(Object.assign({}, api, {
   client: typeof root.fetch === "function" ? createClient((url, init) => root.fetch(url, init)) : null

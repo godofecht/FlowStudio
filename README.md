@@ -298,6 +298,39 @@ the actual `flowc --strict` diagnostics. No Flow execution occurs on GitHub Page
 `node --test tests/browser_flow_completion.test.js tests/browser_completion.test.js`
 checks real Flow syntax fixtures and editor insertion.
 
+## Flow language server
+
+The native editor runs Flow's own language server, `flow lsp`, for Flow
+buffers. The server starts it on the first request and keeps one copy
+running (`src/lsp_bridge.c`). The browser reaches it through
+`POST /api/lsp/request`, `/api/lsp/events` and `/api/lsp/status` on the
+loopback port, with the usual `X-FlowStudio-Intent` header.
+
+It gives Flow buffers completion, hover with the typechecked signature,
+go to definition (F12, or Ctrl+click), references (Shift+F12), highlights,
+rename (F2), Format document (Shift+Alt+F), quick fixes and problems as you
+type. Each buffer is named `file:///flowstudio/<path in the project>`;
+untitled buffers use their tab id.
+
+Each request waits at most 3 seconds and then fails with 504, so a busy
+server never holds up the rest of the IDE. If the server exits, the next
+request starts a new one and the editor sends it the open buffers again.
+While the server runs, the lexical Flow completion and the idle compiler
+check step aside for Flow buffers. Check Flow still runs the strict
+compiler on demand and skips lines the server already marks. Without a
+`flow` binary the routes answer 503 and the editor keeps the lexical
+helpers described below.
+
+The server sees buffer text only. It does not read the project folder, so
+definitions in other files are found only when they are open, and imports
+of project files are not resolved. Positions assume one column per code
+point, which can drift on lines with characters outside the Basic
+Multilingual Plane.
+
+Tests: `node --test tests/ide_flow_lsp.test.js`, the live
+`python3 tests/test_lsp_bridge.py` and the Chromium acceptance
+`node tests/native_lsp_ui.mjs`. The live tests honour `FLOWSTUDIO_URL`.
+
 ## Browser Python/R symbol completion
 
 The GitHub Pages workspace and native-served `/app/` editor support

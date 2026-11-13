@@ -45,7 +45,11 @@ await page.waitForFunction(() => {
   const b = FlowStudioTerminal.active.term.buffer.active;
   const line = b.getLine(b.baseY + b.cursorY).translateToString(true);
   return /[$%#>] ?$/.test(line) && !/echo|printf/.test(line);
-}, null, { timeout: 10000 });
+}, null, { timeout: 10000 }).catch(async error => {
+  // Show what the shell printed, so a CI failure says why.
+  console.error('terminal screen at timeout:\n' + JSON.stringify(await screen()));
+  throw error;
+});
 // The pty follows the panel size.
 await page.keyboard.type('stty size\n', { delay: 15 });
 await page.waitForFunction(() => {

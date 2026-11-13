@@ -122,6 +122,20 @@ test("Flow check retains multiple source-owned compiler locations and de-duplica
   }));
 });
 
+test("Flow check maps the staged check source but not the bridge module beside it", async () => {
+  // The strict check stages prog.flow in a private directory next to
+  // flowstudio.flow, so `import flowstudio` resolves.
+  const output = [
+    "/tmp/flowstudio-check-Xy12Ab/prog.flow:2:12: parse error: unexpected token '?'",
+    "/tmp/flowstudio-check-Xy12Ab/flowstudio.flow:9:1: error: the bridge module",
+    "/tmp/flowstudio-check-Xy12Ab/prog.flow.c:3:1: error: not the source"
+  ].join("\n");
+  await withBrowser(localhost, async () => ({ok:false, status:422, headers:{get:()=>null}, text:async()=>output}),
+    async () => assert.deepEqual((await native.checkSyntax("bad source")).diagnostics, [
+      {line:2,column:12,message:"parse error: unexpected token '?'"}
+    ]));
+});
+
 test("Flow check never maps imported-file or generated-C errors into the current source", async () => {
   const output = [
     "/app/examples/other.flow:1:1: parse error: imported source",

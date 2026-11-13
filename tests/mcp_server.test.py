@@ -164,6 +164,15 @@ class McpServerContract(unittest.TestCase):
         self.assertFalse(reply["result"].get("isError", False))
         self.assertIn("for i in 0 to 10", reply["result"]["content"][0]["text"])
 
+    @unittest.skipUnless(server_is_up(), "FlowStudio native server is not running")
+    def test_check_code_says_plainly_that_it_passed(self) -> None:
+        reply = self.rpc({"jsonrpc": "2.0", "id": 13, "method": "tools/call",
+                          "params": {"name": "flowstudio_check_code", "arguments": {"language": "flow", "code": LEGAL_FLOW}}})
+        self.assertFalse(reply["result"].get("isError", False))
+        text = reply["result"]["content"][0]["text"]
+        self.assertNotIn("ensure_flowc", text)
+        self.assertIn("passed", text)
+
     def test_flow_guide_returns_the_verified_guide(self) -> None:
         reply = self.rpc({"jsonrpc": "2.0", "id": 11, "method": "tools/call",
                           "params": {"name": "flowstudio_flow_guide", "arguments": {}}})

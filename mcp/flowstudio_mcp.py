@@ -24,6 +24,7 @@ import urllib.request
 SERVER_VERSION = "0.2.0"
 PROTOCOL_VERSION = "2024-11-05"
 BASE_URL = os.environ.get("FLOWSTUDIO_URL", "http://127.0.0.1:8751").rstrip("/")
+ORIGIN = "/".join(BASE_URL.split("/")[:3])
 READ_TIMEOUT = float(os.environ.get("FLOWSTUDIO_MCP_TIMEOUT", "75"))
 
 LANGUAGE_HINTS = {
@@ -49,7 +50,7 @@ RUN_ROUTES = {
 def post(path, body, language=None):
     headers = {
         "X-FlowStudio-Intent": "run",
-        "Origin": "http://127.0.0.1:8751",
+        "Origin": ORIGIN,
     }
     if language:
         headers["X-FlowStudio-Language"] = language

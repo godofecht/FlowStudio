@@ -216,6 +216,8 @@ test("Codex JSONL and Ollama text are parsed", () => {
   assert.equal(events[1].ok, true);
   const ollama = assistant.createParser("ollama");
   assert.deepEqual(ollama.feed("plain {not json}"), [{ kind: "text", text: "plain {not json}" }]);
+  assert.deepEqual(ollama.feed("\x1b[?25l\x1b[1G⠙ \x1b[K\x1b[?25h"), [], "a spinner frame is dropped");
+  assert.deepEqual(ollama.feed("\x1b[1G\x1b[KHello"), [{ kind: "text", text: "Hello" }]);
 });
 
 test("poll replies, markdown fences and diagnostics parse", () => {

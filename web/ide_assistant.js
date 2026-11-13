@@ -186,7 +186,11 @@ function createParser(provider) {
   }
   return {
     feed(chunk) {
-      if (provider === "ollama") return chunk ? [{ kind: "text", text: chunk }] : [];
+      if (provider === "ollama") {
+        // `ollama run` can draw a spinner with terminal escapes; keep only the text.
+        const text = String(chunk || "").replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "").replace(/[\u2800-\u28ff]/g, "");
+        return text.trim() || text.includes("\n") ? [{ kind: "text", text }] : [];
+      }
       buffer += chunk;
       const lines = buffer.split("\n");
       buffer = lines.pop();

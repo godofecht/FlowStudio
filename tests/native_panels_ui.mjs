@@ -57,7 +57,11 @@ await page.waitForFunction(() => {
   const b = t.buffer.active; let s = '';
   for (let i = 0; i < b.length; i++) s += b.getLine(i).translateToString(true) + '\n';
   return new RegExp('^' + t.rows + ' ' + t.cols + '$', 'm').test(s);
-}, null, { timeout: 10000 });
+}, null, { timeout: 10000 }).catch(async error => {
+  const size = await page.evaluate(() => [FlowStudioTerminal.active.term.rows, FlowStudioTerminal.active.term.cols]);
+  console.error('terminal ' + size.join('x') + ' at timeout:\n' + JSON.stringify(await screen()));
+  throw error;
+});
 // A second terminal, then kill it.
 await page.locator('#terminalAdd').click();
 await page.waitForFunction(() => FlowStudioTerminal.instances.length === 2 && FlowStudioTerminal.active.id);

@@ -14,8 +14,8 @@ command -v cc >/dev/null 2>&1 || {
 mkdir -p build
 pty_libs=""
 [ "$(uname -s)" = "Linux" ] && pty_libs="-lutil"
-cc -std=c11 -Wall -Wextra -Werror -fsyntax-only src/http_bridge.c src/python_session.c src/r_session.c src/pty_session.c src/flow_debug_session.c src/polyglot_bridge.c src/flow_app.c
+cc -std=c11 -Wall -Wextra -Werror -fsyntax-only src/http_bridge.c src/python_session.c src/r_session.c src/pty_session.c src/assistant_session.c src/flow_debug_session.c src/polyglot_bridge.c src/flow_app.c src/lsp_bridge.c
 flow tool compiler/scripts/flowc_emit.flow --strict src/main.flow build/flowstudio-generated.c
-cc -std=c11 -O2 -pthread build/flowstudio-generated.c src/http_bridge.c src/python_session.c src/r_session.c src/pty_session.c src/flow_debug_session.c src/polyglot_bridge.c src/flow_app.c -lm $pty_libs -o build/flowstudio
+cc -std=c11 -O2 -pthread build/flowstudio-generated.c src/http_bridge.c src/python_session.c src/r_session.c src/pty_session.c src/assistant_session.c src/flow_debug_session.c src/polyglot_bridge.c src/flow_app.c src/lsp_bridge.c -lm $pty_libs -o build/flowstudio
 echo "Built build/flowstudio"
 echo "Start it from the repository root: ./build/flowstudio"

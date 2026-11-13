@@ -452,6 +452,7 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
     <div class="menu" id="menuCode">
       <button class="menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="menuCodePopup">Code</button>
       <div class="menu-popup" id="menuCodePopup" role="menu" aria-label="Code" hidden>
+        <button type="button" role="menuitem" data-command="formatDocument">Format document<kbd>Shift+Alt+F</kbd></button>
         <button type="button" role="menuitem" data-command="checkFlow">Check Flow syntax<kbd>N/A</kbd></button>
         <button type="button" role="menuitemcheckbox" data-check-of="autoCheckFlow" aria-checked="false"><span class="menu-check" aria-hidden="true">✓</span>Check on idle</button>
       </div>
@@ -637,6 +638,7 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
       <div class="rp-tabs" role="tablist" aria-label="Side panel views">
         <button type="button" role="tab" id="rpTab-preview" aria-controls="rpView-preview" aria-selected="false" tabindex="-1">Preview</button>
         <button type="button" role="tab" id="rpTab-environment" aria-controls="rpView-environment" aria-selected="true" tabindex="0">Environment</button>
+        <button type="button" role="tab" id="rpTab-assistant" aria-controls="rpView-assistant" aria-selected="false" tabindex="-1" title="Assistant (Ctrl+I)">Assistant</button>
       </div>
       <button type="button" id="rightPanelClose" class="rp-close" title="Hide side panel (Ctrl+Alt+B)" aria-label="Hide side panel"><svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
     </div>
@@ -660,11 +662,14 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
     </section>
     <section class="rp-view" id="rpView-environment" role="tabpanel" aria-labelledby="rpTab-environment">
       <div class="body">
-        <p id="runtimeInfo">Flow executions are independent.</p>
+        <p id="runtimeInfo">Flow session: variables and definitions persist until you reset the console.</p>
         <button id="refreshPythonEnvironment" type="button"><i data-lucide="rotate-cw"></i>Refresh environment</button>
-        <div id="pythonEnvironment" aria-live="polite"><p class="muted">Select Python or R to inspect its native session.</p></div>
-        <p class="muted hint">Python and R keep their variables between runs. Reset a session from the Run menu.</p>
+        <div id="pythonEnvironment" aria-live="polite"><p class="muted">Select Flow, Python or R to inspect its session.</p></div>
+        <p class="muted hint">Flow, Python and R keep their variables between runs. Reset a session from the console menu.</p>
       </div>
+    </section>
+    <section class="rp-view" id="rpView-assistant" role="tabpanel" aria-labelledby="rpTab-assistant" hidden>
+      <div class="assistant-root" id="assistantRoot"></div>
     </section>
   </aside>
 </div>
@@ -1832,6 +1837,13 @@ function renderPythonEnvironmentChild(item, depth) {
 async function refreshPythonEnvironment() {
   const revision = ++environmentRevision;
   const selectedLanguage = language.value;
+  const flowSession = globalThis.FlowStudioFlowSession;
+  if (selectedLanguage === "flow" && flowSession && flowSession.client) {
+    const snapshot = await flowSession.client.state();
+    if (revision !== environmentRevision || language.value !== "flow") return;
+    flowSession.renderEnvironment(el("pythonEnvironment"), snapshot && snapshot.variables);
+    return;
+  }
   if (selectedLanguage !== "python" && selectedLanguage !== "r") {
     showPythonEnvironmentMessage("Select Python or R to inspect its native session.");
     return;
@@ -1988,8 +2000,32 @@ async function executeCode(code, label, languageOverride = null, options = {}) {
   }
   return ok;
 }
+/* Flow, the way R scripts work: Ctrl+Enter sends the selection, or the
+ * statement under the cursor, to the Flow console session and moves to the
+ * next statement. A file with main() still runs as a whole program. */
+async function sendFlowToConsole(selection) {
+  const session = globalThis.FlowStudioFlowSession;
+  const submit = globalThis.FlowStudioConsoleSubmit;
+  if (!session || typeof submit !== "function") return null;
+  let code = selection;
+  if (!code) {
+    const statement = session.statementAt(src.value, src.selectionStart);
+    if (!statement) { status("Nothing to run at the cursor.", "error"); return false; }
+    code = statement.code;
+    src.setSelectionRange(statement.next, statement.next);
+  }
+  if (globalThis.FlowStudioTerminal && FlowStudioTerminal.show) FlowStudioTerminal.show("console");
+  const ok = await submit("flow", code);
+  void refreshPythonEnvironment().catch(() => {});
+  return ok;
+}
 async function run() {
   const selection = src.value.substring(src.selectionStart, src.selectionEnd);
+  if (language.value === "flow" && globalThis.FlowStudioFlowSession && src.value.trim() &&
+      (selection.trim() || !FlowStudioFlowSession.hasMain(src.value))) {
+    const sent = await sendFlowToConsole(selection.trim() ? selection : "");
+    if (sent !== null) return sent;
+  }
   /* A Flow program that draws with stdlib/gfx.flow runs in the Preview. */
   const preview = globalThis.FlowStudioAppPreview;
   if (!selection.length && language.value === "flow" && preview && preview.isGraphicsProgram(src.value))
@@ -2528,8 +2564,9 @@ src.addEventListener("click", updateCursor);
 src.addEventListener("keyup", updateCursor);
 language.addEventListener("change", () => {
   environmentRevision++;
-  showPythonEnvironmentMessage(language.value === "python" || language.value === "r" ?
-    "Refresh to inspect native " + language.value + " variables." : "Select Python or R to inspect its native session.");
+  if (language.value === "flow") void refreshPythonEnvironment().catch(() => {});
+  else showPythonEnvironmentMessage(language.value === "python" || language.value === "r" ?
+    "Refresh to inspect native " + language.value + " variables." : "Select Flow, Python or R to inspect its session.");
   const doc = activeDocument();
   if (doc) {
     documents.setLanguage(doc.id, language.value);
@@ -2537,7 +2574,7 @@ language.addEventListener("change", () => {
   }
   el("runtimeInfo").textContent = language.value === "python" ? "Native Python: persistent until Reset Python." :
     language.value === "r" ? "Native R: persistent until Reset R." :
-    "Flow executions are independent.";
+    "Flow session: variables and definitions persist until you reset the console.";
 });
 el("run").addEventListener("click", run);
 el("runProject").addEventListener("click", () => void runProject());
@@ -2712,6 +2749,10 @@ document.addEventListener("keydown", event => {
 el("newDocument").addEventListener("click", () => createUntitled());
 el("newDocumentTab").addEventListener("click", () => createUntitled());
 
+function languageServerRun(action) {
+  const server = globalThis.FlowStudioFlowLsp;
+  return Boolean(server && typeof server.run === "function" && server.run(action));
+}
 const commands = Object.freeze({
   newDocument: () => createUntitled(),
   closeDocument: () => closeDocument(),
@@ -2734,9 +2775,13 @@ const commands = Object.freeze({
   findInProject: () => { el("tab-search").click(); el("projectSearch").focus(); },
   showOutline: () => el("tab-outline").click(),
   goToSymbol: () => goToSymbol(),
-  goToDefinition: () => goToDefinition(),
-  findReferences: () => findReferencesAtCaret(),
-  renameSymbol: () => openRenamePanel(),
+  // Flow buffers go to the Flow language server when it runs
+  // (web/ide_flow_lsp.js); other buffers use the lexical helpers below.
+  goToDefinition: () => languageServerRun("definition") || goToDefinition(),
+  findReferences: () => languageServerRun("references") || findReferencesAtCaret(),
+  renameSymbol: () => languageServerRun("rename") || openRenamePanel(),
+  formatDocument: () => languageServerRun("format") ||
+    status("Format document needs a Flow buffer and the Flow language server.", "error"),
   refreshOutline: () => refreshOutline(),
   run: () => el("run").click(),
   runProject: () => runProject(),
@@ -2762,12 +2807,17 @@ const commands = Object.freeze({
   maximizeDock: () => { if (globalThis.FlowStudioLayout) globalThis.FlowStudioLayout.toggleDockMax(); },
   showPreview: () => { if (globalThis.FlowStudioSidePanel) globalThis.FlowStudioSidePanel.show("preview"); },
   showEnvironment: () => { if (globalThis.FlowStudioSidePanel) globalThis.FlowStudioSidePanel.show("environment"); },
+  openAssistant: () => globalThis.FlowStudioAssistant ? globalThis.FlowStudioAssistant.open(true) : false,
+  assistantExplain: () => globalThis.FlowStudioAssistant ? globalThis.FlowStudioAssistant.explain() : false,
+  assistantFixErrors: () => globalThis.FlowStudioAssistant ? globalThis.FlowStudioAssistant.fixErrors() : false,
+  assistantTranslate: () => globalThis.FlowStudioAssistant ? globalThis.FlowStudioAssistant.translate() : false,
+  assistantWriteTest: () => globalThis.FlowStudioAssistant ? globalThis.FlowStudioAssistant.writeTest() : false,
   newProject: template => globalThis.FlowStudioProjects ? globalThis.FlowStudioProjects.newProject(template) : false,
   closeProject: () => globalThis.FlowStudioProjects ? globalThis.FlowStudioProjects.closeProject() : false,
   startDebugging: () => globalThis.FlowStudioDebugger && globalThis.FlowStudioDebugger.instance ?
     globalThis.FlowStudioDebugger.instance.start() : false,
   refreshEnvironment: () => el("refreshPythonEnvironment").click(),
-  shortcuts: () => status("Ctrl+Enter run · Ctrl+Shift+Enter cell · Ctrl+S save · Ctrl+W close tab · Ctrl+Tab next tab · Ctrl+F find · Ctrl+H replace · Ctrl+Shift+O outline · F12 definition · Shift+F12 references · F2 rename", "ok"),    about: () => status("FlowStudio 0.2.0-alpha.1 · Flow-first local IDE · execution on 127.0.0.1:8751 only", "ok")
+  shortcuts: () => status("Ctrl+Enter run · Ctrl+Shift+Enter cell · Ctrl+S save · Ctrl+W close tab · Ctrl+Tab next tab · Ctrl+F find · Ctrl+H replace · Ctrl+Shift+O outline · Ctrl+I assistant · F12 definition · Shift+F12 references · F2 rename · Shift+Alt+F format", "ok"),    about: () => status("FlowStudio 0.2.0-alpha.1 · Flow-first local IDE · execution on 127.0.0.1:8751 only", "ok")
 });
 if (typeof window !== "undefined") {
   window.FlowStudioApp = Object.freeze({
@@ -2788,6 +2838,7 @@ renderTabs();
   <script src="/plot_figures.js"></script>
   <script src="/terminal_input.js"></script>
   <script src="/terminal_sessions.js"></script>
+  <script src="/ide_flow_session.js"></script>
   <script src="/workspace_console.js"></script>
 <script src="/packages_panel.js"></script>
 <script src="/examples_mathflow.js"></script>
@@ -2808,6 +2859,7 @@ renderTabs();
 <script src="/ide_data_view.js"></script>
 <script src="/ide_packages_view.js"></script>
 <script src="/ide_side_panel.js"></script>
+<script src="/ide_assistant.js"></script>
 <script src="/ide_app_preview.js"></script>
 <script src="/ide_projects.js"></script>
 <script src="/ide_debugger.js"></script>
@@ -3036,6 +3088,7 @@ refreshOutline();
 </script>
 <script src="/workspace_panels.js"></script>
 <script src="/flow_diagnostics.js"></script>
+<script src="/ide_flow_lsp.js"></script>
 <script type="module" src="/ui/workbench.js"></script>
 </body>
 </html>

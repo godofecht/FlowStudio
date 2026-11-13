@@ -97,7 +97,7 @@ New project, Open folder and Close project.
 ### Layout
 
 The window has four regions: the sidebar (activity bar and views), the
-editor, the side panel (Preview and Environment) and the console dock. The
+editor, the side panel (Preview, Environment and Assistant) and the console dock. The
 layout manager (`web/ide_shell.js`) solves their sizes against the window:
 the editor keeps at least 360 by 150 pixels, and when the window is too
 narrow the side panel shrinks and then hides, then the sidebar does. Those
@@ -298,6 +298,39 @@ the actual `flowc --strict` diagnostics. No Flow execution occurs on GitHub Page
 `node --test tests/browser_flow_completion.test.js tests/browser_completion.test.js`
 checks real Flow syntax fixtures and editor insertion.
 
+## Flow language server
+
+The native editor runs Flow's own language server, `flow lsp`, for Flow
+buffers. The server starts it on the first request and keeps one copy
+running (`src/lsp_bridge.c`). The browser reaches it through
+`POST /api/lsp/request`, `/api/lsp/events` and `/api/lsp/status` on the
+loopback port, with the usual `X-FlowStudio-Intent` header.
+
+It gives Flow buffers completion, hover with the typechecked signature,
+go to definition (F12, or Ctrl+click), references (Shift+F12), highlights,
+rename (F2), Format document (Shift+Alt+F), quick fixes and problems as you
+type. Each buffer is named `file:///flowstudio/<path in the project>`;
+untitled buffers use their tab id.
+
+Each request waits at most 3 seconds and then fails with 504, so a busy
+server never holds up the rest of the IDE. If the server exits, the next
+request starts a new one and the editor sends it the open buffers again.
+While the server runs, the lexical Flow completion and the idle compiler
+check step aside for Flow buffers. Check Flow still runs the strict
+compiler on demand and skips lines the server already marks. Without a
+`flow` binary the routes answer 503 and the editor keeps the lexical
+helpers described below.
+
+The server sees buffer text only. It does not read the project folder, so
+definitions in other files are found only when they are open, and imports
+of project files are not resolved. Positions assume one column per code
+point, which can drift on lines with characters outside the Basic
+Multilingual Plane.
+
+Tests: `node --test tests/ide_flow_lsp.test.js`, the live
+`python3 tests/test_lsp_bridge.py` and the Chromium acceptance
+`node tests/native_lsp_ui.mjs`. The live tests honour `FLOWSTUDIO_URL`.
+
 ## Browser Python/R symbol completion
 
 The GitHub Pages workspace and native-served `/app/` editor support
@@ -344,6 +377,43 @@ runner validates the selected range before invoking any kernel, and stops on
 the first error. Flow still requires the native localhost server. This is
 not an RStudio-compatible kernel debugger or a guarantee of physical-browser
 acceptance.
+
+## Flow console session
+
+The Flow console keeps a session, the way the R and Python consoles do.
+Variables, functions, structs and imports from one entry are there in the
+next. A bare expression shows its value.
+
+    flow > let rate = 0.25
+    flow > function grow(x: f64, r: f64) -> f64 { return x * (1.0 + r) }
+    flow > grow(10.0, 0.5)
+    15.0
+
+In the editor, Ctrl+Enter sends the selection, or the statement under the
+cursor, to the console and moves to the next statement, so a `.flow` file
+without `main()` works as a script. A file with `main()` still runs as a
+whole program. The Environment pane lists the session's Flow variables with
+their types and values. Reset the session from the console menu.
+
+Check Flow and Check Flow on idle check a script the way the session runs
+it, so a `let` at the top level is not an error. In a script, the Flow
+language server knows the session's variables, so hover and completion work
+on names defined in earlier entries.
+
+How it works: Flow compiles whole programs, so `src/flow_session.py`
+rebuilds the session around each entry. Earlier declarations stay at file
+scope and earlier variables come back as typed `let` bindings with their
+values. The Flow checker names the type of each new variable, and a dump at
+the end of the program reads the values back. Each entry runs through the
+same bridged runner as Run, so the console can call `py()` and `r()`. An
+entry that fails leaves the session as it was. Values the session cannot
+rebuild (pointers, lists, maps, nested arrays, arrays over 4,096 items,
+infinities) are listed as not kept, and later entries cannot use them. An
+entry takes 1.5 to 2.5 seconds, mostly C compilation.
+
+Tests: `tests/test_flow_session.py` (offline and live),
+`tests/ide_flow_session.test.js` and the browser acceptance
+`tests/native_flow_session_ui.mjs`.
 
 ## Flow, Python and R in one session
 
@@ -439,6 +509,61 @@ tests the browser-facing contract; `python3 scripts/verify_native.py`
 builds the Flow server and exercises real Git operations over localhost
 against an isolated temporary repository.
 
+## AI assistant
+
+The Assistant tab in the side panel lets you work on Flow with your own AI
+tool. FlowStudio finds Claude Code (`claude`), Codex (`codex`) and Ollama
+(`ollama`, with the models you have pulled) on this machine, and you pick
+one. Ctrl+I (Cmd+I on macOS) opens the tab with the current selection as
+context.
+
+- Ask anything, or use the actions: Explain selection, Fix errors,
+  Translate to Flow (from R or Python) and Write a Flow test. They are in the
+  command palette too.
+- Chips show what is sent with a request: the active file, the selection
+  and the compiler errors. Click one to leave it out.
+- Answers stream in. Tool calls show as short lines such as
+  "Checked flow code: ok". Code blocks have Insert at cursor, Replace
+  selection and Run. Stop ends the request.
+- When the assistant changes a file, the change opens as a diff with Accept
+  and Reject. Nothing is written until you accept, and Ctrl+Z undoes it.
+
+AI models know little Flow, so every request carries the verified Flow guide
+([docs/FLOW_FOR_AI.md](docs/FLOW_FOR_AI.md)) and the rules in
+`mcp/assistant_prompt.md`: check all Flow code with the compiler, and fix it
+until it passes, before showing it. Every example in the guide is compiled
+and run by `tests/test_flow_for_ai.py`.
+
+How it runs. Each request starts the tool once as a child process of the
+server (`src/assistant_session.c`), in a private temporary folder and its own
+process group, and the browser polls for its output. Claude Code runs with
+`-p --output-format stream-json`, its built-in tools turned off, and only
+the FlowStudio MCP tools allowed. Codex runs `codex exec --json` in its
+read-only sandbox with the same MCP server. Ollama gets the guide and the
+editor context in the prompt and has no tools. The assistant cannot write
+files. With Runs ticked it may build and run Flow programs to test them,
+with your permissions, the way Run does. It never runs Python or R, and
+never runs a graphics program.
+
+Billing. The tools use your own login. FlowStudio removes
+`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, every other `*_API_KEY` and
+`*_AUTH_TOKEN` variable, and the Bedrock and Vertex switches from the
+child's environment, so a request never bills an API account. A request
+stops after ten minutes (`FLOWSTUDIO_ASSISTANT_TIMEOUT`, in seconds).
+
+Projects. New projects also get `AGENTS.md`, `CLAUDE.md` and `.mcp.json`,
+so Claude Code, Codex, Cursor or a similar tool opened in the project folder
+reads short Flow guidance and can check and run Flow through FlowStudio.
+
+Tests: `node --test tests/ide_assistant.test.js` (panel logic with a fake
+server and a fake Monaco), `python3 tests/test_assistant_bridge.py`
+(streaming, cancel, timeout and environment scrubbing against a real
+server with the fake provider in `tests/fixtures/fake_assistant.py`),
+`node tests/native_assistant_ui.mjs` (Chromium, including a proposal diff
+and Accept), and the opt-in `FLOWSTUDIO_LIVE_AI=1 python3
+tests/test_assistant_live.py`, which asks the real `claude` to write a Flow
+function and checks that the answer compiles and runs.
+
 ## Agent tools (MCP stdio server)
 
 Agents (Claude Code, MCP-compatible clients) can drive this FlowStudio
@@ -446,11 +571,20 @@ install through a small stdio MCP server that proxies the native loopback
 HTTP API with the same guarded `X-FlowStudio-Intent` requests. It supports
 newline-delimited and LSP-style `Content-Length` framing, and answers:
 
-- `flowstudio_run_code` compiles and runs Flow (default C path, or the
-  real FLOW to MLIR to LLVM pipeline via the `mlir` language value),
-  Python or R through the real server routes.
+- `flowstudio_flow_guide` returns the verified Flow guide. Read it before
+  writing Flow.
 - `flowstudio_check_code` runs the strict Flow-to-C emit check without
   execution.
+- `flowstudio_run_code` compiles and runs Flow (default C path, or the
+  real FLOW to MLIR to LLVM pipeline via the `mlir` language value),
+  Python or R through the real server routes. Some Flow errors only appear
+  when the C compiler builds the program, so a run finds more than a check.
+- `flowstudio_editor_state` returns what the user sees in FlowStudio: the
+  active file and its text, the selection, the other open files, compiler
+  errors, recent console output and earlier proposals. The browser sends
+  this snapshot to the server as the user works.
+- `flowstudio_propose_edit` sends a whole-file replacement or an insertion
+  for an open file. FlowStudio shows it as a diff to accept or reject.
 - `flowstudio_read_workspace_file` and `flowstudio_write_workspace_file`
   give bounded workspace file access.
 - `flowstudio_flow_help` serves offline Flow 2.0.0 language reference
@@ -459,16 +593,23 @@ newline-delimited and LSP-style `Content-Length` framing, and answers:
 
 Running tool calls execute unsandboxed local code, exactly as the native
 server does; do not aim the server at untrusted input. The server prints
-JSON-RPC to stdout only and binds nothing to a port.
+JSON-RPC to stdout only and binds nothing to a port. When FlowStudio's own
+assistant starts it (`FLOWSTUDIO_MCP_MODE=assistant`), the write tool is
+hidden and runs are limited to Flow.
 
     python3 mcp/flowstudio_mcp.py
 
 Register it in an MCP client as command `python3` with arg
 `mcp/flowstudio_mcp.py` (set `FLOWSTUDIO_URL` only if the native server
-listens somewhere other than 127.0.0.1:8751). Contract tests that also
-verify against a live server:
+listens somewhere other than 127.0.0.1:8751). For Codex:
+`codex mcp add flowstudio -- python3 /path/to/FlowStudio/mcp/flowstudio_mcp.py`.
+New projects carry a ready `.mcp.json`. Contract tests that also verify
+against a live server:
 
     python3 tests/mcp_server.test.py
+
+The editor state and proposal tests write to the server's shared snapshot,
+so they run only when `FLOWSTUDIO_URL` names a test server.
 
 ## Build and launch
 
@@ -529,7 +670,7 @@ See [scope, semantics and native acceptance](docs/FLOWJIT.md).
              |
        Flow / R / Python
 
-Current API: GET /, GET /health, POST /api/run/flow, POST /api/run/flow-mlir, POST /api/check/flow, POST /api/run/r, POST /api/reset/r, POST /api/inspect/r, POST /api/run/python, POST /api/trace/python, POST /api/inspect/python, POST /api/demo/python-r and POST /api/reset/python. Flow runs on the C backend carry the language bridge described above. POST sends UTF-8 source text and requires an X-FlowStudio-Intent: run request header. Persistent Python and R sessions each have a 15-second evaluation timeout and explicit reset; Flow has a 60-second compile-and-run budget to accommodate cold compiler start. All processes have bounded, captured output. No shell command-string evaluation is used.
+Current API: GET /, GET /health, POST /api/run/flow, POST /api/run/flow-mlir, POST /api/check/flow, POST /api/run/r, POST /api/reset/r, POST /api/inspect/r, POST /api/run/python, POST /api/trace/python, POST /api/inspect/python, POST /api/demo/python-r, POST /api/reset/python and the assistant routes under POST /api/assistant/ (providers, start, poll, cancel, context, context/get, propose, proposals). Flow runs on the C backend carry the language bridge described above. POST sends UTF-8 source text and requires an X-FlowStudio-Intent: run request header. Persistent Python and R sessions each have a 15-second evaluation timeout and explicit reset; Flow has a 60-second compile-and-run budget to accommodate cold compiler start. All processes have bounded, captured output. No shell command-string evaluation is used.
 
 ## Security and scope
 

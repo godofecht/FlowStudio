@@ -35,21 +35,31 @@ await page.waitForFunction(() => {
   return /^fs-42 two words$/m.test(t) && /café ✓/.test(t);
 }, null, { timeout: 15000 });
 assert.equal(await page.evaluate(() => document.getElementById('searchEverywhere').open), false);
-// Inside the shell Ctrl+P belongs to readline history.
-await page.keyboard.press('Control+p');
-assert.equal(await page.evaluate(() => document.getElementById('searchEverywhere').open), false);
-await page.keyboard.press('Control+c');
-// Linux bash drops typed keys until it has redrawn the prompt after SIGINT;
-// wait for a fresh, empty prompt line before typing again.
-await page.waitForFunction(() => {
+// Inside the shell Ctrl+P belongs to readline history: the last command
+// comes back on the prompt line.
+const cursorLine = () => page.evaluate(() => {
   const b = FlowStudioTerminal.active.term.buffer.active;
-  const line = b.getLine(b.baseY + b.cursorY).translateToString(true);
-  return /[$%#>] ?$/.test(line) && !/echo|printf/.test(line);
-}, null, { timeout: 10000 }).catch(async error => {
-  // Show what the shell printed, so a CI failure says why.
+  return { row: b.baseY + b.cursorY, text: b.getLine(b.baseY + b.cursorY).translateToString(true) };
+});
+const dumpOnTimeout = async error => {
   console.error('terminal screen at timeout:\n' + JSON.stringify(await screen()));
   throw error;
-});
+};
+await page.keyboard.press('Control+p');
+assert.equal(await page.evaluate(() => document.getElementById('searchEverywhere').open), false);
+await page.waitForFunction(() => {
+  const b = FlowStudioTerminal.active.term.buffer.active;
+  return /echo "fs-/.test(b.getLine(b.baseY + b.cursorY).translateToString(true));
+}, null, { timeout: 10000 }).catch(dumpOnTimeout);
+const recalled = (await cursorLine()).row;
+// Ctrl+C drops the recalled line. Bash ignores typed keys until it has
+// drawn the next prompt, so wait for an empty prompt below the recalled one.
+await page.keyboard.press('Control+c');
+await page.waitForFunction(row => {
+  const b = FlowStudioTerminal.active.term.buffer.active;
+  const line = b.getLine(b.baseY + b.cursorY).translateToString(true);
+  return b.baseY + b.cursorY > row && /[$%#>] ?$/.test(line) && !/echo|printf/.test(line);
+}, recalled, { timeout: 10000 }).catch(dumpOnTimeout);
 // The pty follows the panel size.
 await page.keyboard.type('stty size\n', { delay: 15 });
 await page.waitForFunction(() => {

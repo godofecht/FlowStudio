@@ -3,6 +3,8 @@ export function mountEditor(monaco, source, host, app, language) {
   const nativeValue = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value');
   const models = new Map();
   const views = new Map();
+  // The Flow language server client names each model by its document.
+  const documentIds = new WeakMap();
   let currentId = null;
   let updating = false;
   const editor = monaco.editor.create(host, {
@@ -25,6 +27,7 @@ export function mountEditor(monaco, source, host, app, language) {
       if (!model) {
         model = monaco.editor.createModel(doc.text, doc.language);
         models.set(doc.id, model);
+        documentIds.set(model, doc.id);
       }
       updating = true;
       editor.setModel(model);
@@ -93,5 +96,7 @@ export function mountEditor(monaco, source, host, app, language) {
   });
   source.hidden = true;
   host.hidden = false;
-  return Object.freeze({ editor, activate });
+  return Object.freeze({ editor, activate,
+    documentIdFor: model => documentIds.get(model) ?? null,
+    modelFor: id => models.get(id) ?? null });
 }

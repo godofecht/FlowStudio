@@ -4,12 +4,14 @@
 # This is a single-process, localhost-only development preview. It does not
 # sandbox executed code. Python and R retain separate local interpreter sessions.
 
-import std.process { ProcCmd, ProcResult, proc_cmd, proc_arg, proc_timeout_ms, proc_run }
+import std.process { ProcCmd, ProcResult, proc_cmd, proc_arg, proc_timeout_ms, proc_run, proc_input }
 import std.io { FileRead, io_read_text, io_read_file }
 import .data_routes { StaticAsset, data_route }
 
 extern {
     function fs_listen(port: i32) -> i32
+    function fs_port() -> i32
+    function fs_origin() -> string
     function fs_read_request(listener: i32) -> i32
     function fs_method() -> string
     function fs_path() -> string
@@ -56,6 +58,10 @@ extern {
     function fs_py_reset() -> void
     function fs_pty(op: string, body: string) -> string
     function fs_pty_status() -> i32
+    function fs_lsp(op: string, body: string) -> string
+    function fs_lsp_status() -> i32
+    function fs_assistant(op: string, body: string) -> string
+    function fs_assistant_status() -> i32
     function fs_flow_debug(op: string, body: string) -> string
     function fs_flow_debug_status() -> i32
     function fs_flow_run_bridged(code: string) -> string
@@ -461,6 +467,31 @@ function send_pty(op: string) -> void {
     fs_reply(fs_pty_status(), "text/plain; charset=utf-8", output)
 }
 
+# Flow language server: one persistent `flow lsp` child (src/lsp_bridge.c).
+# Replies are JSON-RPC text; errors are plain text with 400, 503 or 504.
+function send_lsp(op: string) -> void {
+    let output: string = fs_lsp(op, fs_body())
+    let status: i32 = fs_lsp_status()
+    if status == 200 {
+        fs_reply(status, "application/json; charset=utf-8", output)
+    } else {
+        fs_reply(status, "text/plain; charset=utf-8", output)
+    }
+}
+
+# The in-IDE assistant runs the user's own AI command line tool, one child
+# process per prompt, and keeps the editor snapshot and edit proposals the
+# MCP server reads and writes (src/assistant_session.c). Same intent gate.
+function send_assistant(op: string) -> void {
+    let output: string = fs_assistant(op, fs_body())
+    let status: i32 = fs_assistant_status()
+    if status == 200 and (eq(op, "providers") or eq(op, "context-get") or eq(op, "proposals")) {
+        fs_reply(status, "application/json; charset=utf-8", output)
+    } else {
+        fs_reply(status, "text/plain; charset=utf-8", output)
+    }
+}
+
 # Flow source debugging through LLDB (src/flow_debug_session.c and
 # src/flow_debugger.py). Replies are JSON snapshots of the paused program.
 function send_flow_debug(op: string) -> void {
@@ -470,6 +501,76 @@ function send_flow_debug(op: string) -> void {
         fs_reply(status, "application/json; charset=utf-8", output)
     } else {
         fs_reply(status, "text/plain; charset=utf-8", output)
+    }
+}
+
+# The persistent Flow console session (src/flow_session.py). The helper
+# rebuilds the session around each entry; the program runs through the
+# bridged runner so the console can call Python and R.
+function flow_session_helper(op: string, input: string, status_word: string) -> ptr<ProcResult> {
+    let command: ptr<ProcCmd> = proc_cmd("python3")
+    proc_arg(command, "src/flow_session.py")
+    proc_arg(command, op)
+    if not eq(status_word, "") {
+        proc_arg(command, status_word)
+    }
+    proc_input(command, input)
+    proc_timeout_ms(command, 60000)
+    return proc_run(command)
+}
+
+function send_flow_session(op: string, code: string) -> void {
+    if eq(op, "state") or eq(op, "reset") {
+        let result: ptr<ProcResult> = flow_session_helper(op, "", "")
+        if result.exit_code != 0 or not eq(result.error, "") {
+            fs_reply(503, "text/plain; charset=utf-8", "FlowStudio: the Flow session helper failed. " + result.stderr + result.error)
+            return
+        }
+        fs_reply(200, "application/json; charset=utf-8", result.stdout)
+        return
+    }
+    if eq(op, "check") {
+        # Errors for a script without main(), as the session would run it.
+        let checked: ptr<ProcResult> = flow_session_helper("check", code, "")
+        if checked.exit_code == 0 {
+            fs_reply(200, "application/json; charset=utf-8", checked.stdout)
+        } elif checked.exit_code == 2 {
+            fs_reply(422, "application/json; charset=utf-8", checked.stdout)
+        } else {
+            fs_reply(503, "text/plain; charset=utf-8", "FlowStudio: the Flow session helper failed. " + checked.stderr + checked.error)
+        }
+        return
+    }
+    let prepared: ptr<ProcResult> = flow_session_helper("prepare", code, "")
+    if prepared.exit_code == 2 {
+        fs_reply(422, "application/json; charset=utf-8", prepared.stdout)
+        return
+    }
+    if prepared.exit_code != 0 or not eq(prepared.error, "") or prepared.timed_out {
+        fs_reply(503, "text/plain; charset=utf-8", "FlowStudio: the Flow session helper failed. " + prepared.stderr + prepared.error)
+        return
+    }
+    let output: string = fs_flow_run_bridged(prepared.stdout)
+    let status: i32 = fs_flow_bridged_status()
+    let mut word: string = "200"
+    if status == 422 {
+        word = "422"
+    } elif status == 504 {
+        word = "504"
+    } elif status != 200 {
+        word = "503"
+    }
+    let committed: ptr<ProcResult> = flow_session_helper("commit", output, word)
+    if (committed.exit_code != 0 and committed.exit_code != 3) or not eq(committed.error, "") {
+        fs_reply(503, "text/plain; charset=utf-8", "FlowStudio: the Flow session helper failed. " + committed.stderr + committed.error)
+        return
+    }
+    if status == 200 and committed.exit_code == 0 {
+        fs_reply(200, "application/json; charset=utf-8", committed.stdout)
+    } elif status == 504 {
+        fs_reply(504, "application/json; charset=utf-8", committed.stdout)
+    } else {
+        fs_reply(422, "application/json; charset=utf-8", committed.stdout)
     }
 }
 
@@ -770,6 +871,22 @@ function dispatch() -> void {
             fs_reply(result.status, "application/json; charset=utf-8", result.output)
             return
         }
+        if eq(path, "/api/lsp/request") {
+            send_lsp("request")
+            return
+        }
+        if eq(path, "/api/lsp/events") {
+            send_lsp("events")
+            return
+        }
+        if eq(path, "/api/lsp/status") {
+            send_lsp("status")
+            return
+        }
+        if eq(path, "/api/lsp/start") {
+            send_lsp("start")
+            return
+        }
         if eq(path, "/api/pty/read") {
             send_pty("read")
             return
@@ -788,6 +905,38 @@ function dispatch() -> void {
         }
         if eq(path, "/api/pty/close") {
             send_pty("close")
+            return
+        }
+        if eq(path, "/api/assistant/providers") {
+            send_assistant("providers")
+            return
+        }
+        if eq(path, "/api/assistant/start") {
+            send_assistant("start")
+            return
+        }
+        if eq(path, "/api/assistant/poll") {
+            send_assistant("poll")
+            return
+        }
+        if eq(path, "/api/assistant/cancel") {
+            send_assistant("cancel")
+            return
+        }
+        if eq(path, "/api/assistant/context") {
+            send_assistant("context-set")
+            return
+        }
+        if eq(path, "/api/assistant/context/get") {
+            send_assistant("context-get")
+            return
+        }
+        if eq(path, "/api/assistant/propose") {
+            send_assistant("propose")
+            return
+        }
+        if eq(path, "/api/assistant/proposals") {
+            send_assistant("proposals")
             return
         }
         if eq(path, "/api/debug/flow/start") {
@@ -828,6 +977,22 @@ function dispatch() -> void {
         }
         if eq(path, "/api/debug/flow/evaluate") {
             send_flow_debug("evaluate")
+            return
+        }
+        if eq(path, "/api/flow/session/eval") {
+            send_flow_session("eval", fs_body())
+            return
+        }
+        if eq(path, "/api/flow/session/check") {
+            send_flow_session("check", fs_body())
+            return
+        }
+        if eq(path, "/api/flow/session/state") {
+            send_flow_session("state", "")
+            return
+        }
+        if eq(path, "/api/flow/session/reset") {
+            send_flow_session("reset", "")
             return
         }
         if eq(path, "/api/check/flow") {
@@ -1035,12 +1200,13 @@ function dispatch() -> void {
 }
 
 function main() -> i32 {
-    let listener: i32 = fs_listen(8751)
+    let port: i32 = fs_port()
+    let listener: i32 = fs_listen(port)
     if listener < 0 {
-        println("FlowStudio: unable to bind localhost port 8751.")
+        println("FlowStudio: unable to bind " + fs_origin())
         return 1
     }
-    println("FlowStudio listening on http://127.0.0.1:8751")
+    println("FlowStudio listening on " + fs_origin())
     println("Warning: executions have your user's local permissions. Do not run untrusted code.")
     while true {
         if fs_read_request(listener) == 1 {

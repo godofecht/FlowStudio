@@ -422,6 +422,10 @@ static char **job_argv(const char *provider, const char *tool, const char *model
         sb_str(&e, "}");
         argv[k++] = strdup("-c"); argv[k++] = e.data;
         argv[k++] = strdup("-c"); argv[k++] = strdup("approval_policy=\"never\"");
+        /* Under approval_policy never, MCP calls that need approval fail.
+           The FlowStudio tools are pre-approved; the write tool is off. */
+        argv[k++] = strdup("-c"); argv[k++] = strdup("mcp_servers.flowstudio.default_tools_approval_mode=\"approve\"");
+        argv[k++] = strdup("-c"); argv[k++] = strdup("mcp_servers.flowstudio.disabled_tools=[\"flowstudio_write_workspace_file\"]");
         if (model && *model) { argv[k++] = strdup("--model"); argv[k++] = strdup(model); }
         argv[k++] = strdup("-");
     } else {

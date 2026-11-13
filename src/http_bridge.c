@@ -324,6 +324,7 @@ const char *fs_write_temp_flow(const char *code)
  * then bundle from the compiler's own lib/stdlib fallback. Returns the
  * program path, or "" after cleaning up the half-built directory. */
 static char fs_last_run_dir[64];
+void fs_clean_run_dir(void);
 
 const char *fs_write_temp_flow_run(const char *code)
 {
@@ -394,16 +395,54 @@ const char *fs_write_temp_flow_run(const char *code)
     return prog;
 }
 
-/* Remove the staging directory of the last backend run; a no-op when the
- * flat /tmp file path was used (its file is unlinked from Flow). */
+/* Stage a source for the strict compile check in a private directory with
+ * the bridge module beside it, the same layout a bridged run uses, so
+ * `import flowstudio { ... }` resolves during the check. Returns the program
+ * path, or "" after cleaning up. fs_clean_run_dir removes the directory. */
+const char *fs_write_temp_flow_check(const char *code)
+{
+    static char prog[96];
+    char library[96];
+    strcpy(fs_last_run_dir, "/tmp/flowstudio-check-XXXXXX");
+    if (mkdtemp(fs_last_run_dir) == NULL)
+    {
+        fs_last_run_dir[0] = 0;
+        return "";
+    }
+    snprintf(prog, sizeof(prog), "%s/prog.flow", fs_last_run_dir);
+    snprintf(library, sizeof(library), "%s/flowstudio.flow", fs_last_run_dir);
+    FILE *in = fopen("src/flowstudio.flow", "rb");
+    FILE *out = in ? fopen(library, "wb") : NULL;
+    int ok = in && out;
+    char buffer[8192];
+    size_t n;
+    while (ok && (n = fread(buffer, 1, sizeof(buffer), in)) > 0)
+        ok = fwrite(buffer, 1, n, out) == n;
+    if (in) fclose(in);
+    if (out && fclose(out) != 0) ok = 0;
+    FILE *source = ok ? fopen(prog, "wb") : NULL;
+    if (!source || fputs(code, source) < 0) ok = 0;
+    if (source && fclose(source) != 0) ok = 0;
+    if (!ok)
+    {
+        fs_clean_run_dir();
+        return "";
+    }
+    return prog;
+}
+
+/* Remove the staging directory of the last backend run or check; a no-op
+ * when the flat /tmp file path was used (its file is unlinked from Flow). */
 void fs_clean_run_dir(void)
 {
     if (fs_last_run_dir[0] == 0) return;
-    char prog[96], toml[96];
+    char prog[96], toml[96], library[96];
     snprintf(prog, sizeof(prog), "%s/prog.flow", fs_last_run_dir);
     snprintf(toml, sizeof(toml), "%s/flow.toml", fs_last_run_dir);
+    snprintf(library, sizeof(library), "%s/flowstudio.flow", fs_last_run_dir);
     unlink(prog);
     unlink(toml);
+    unlink(library);
     rmdir(fs_last_run_dir);
     fs_last_run_dir[0] = 0;
 }

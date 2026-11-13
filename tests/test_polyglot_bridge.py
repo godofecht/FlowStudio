@@ -6,6 +6,7 @@ every example in examples/polyglot runs, and calls cross in each direction.
 """
 from __future__ import annotations
 
+import glob
 import json
 import os
 import shutil
@@ -31,8 +32,8 @@ def server_up() -> bool:
         return False
 
 
-def run(language: str, code: str) -> tuple[int, str]:
-    request = urllib.request.Request(URL + "/api/run/" + language, data=code.encode("utf-8"),
+def run(language: str, code: str, route: str = "run") -> tuple[int, str]:
+    request = urllib.request.Request(URL + "/api/" + route + "/" + language, data=code.encode("utf-8"),
                                      method="POST", headers={"X-FlowStudio-Intent": "run",
                                                              "Content-Type": "text/plain"})
     try:
@@ -165,6 +166,19 @@ class LiveBridgeTests(unittest.TestCase):
                 output += out
             for needle in needles:
                 self.assertIn(needle, output, name)
+
+    def test_compile_check_resolves_the_bridge_import(self) -> None:
+        # "Check Flow on idle" type-checks without running. The bridge module
+        # must resolve there the same way it does for a run.
+        for path in sorted(glob.glob(os.path.join(ROOT, "examples", "polyglot", "*", "*.flow"))):
+            with open(path, encoding="utf-8") as handle:
+                status, out = run("flow", handle.read(), route="check")
+            self.assertEqual(status, 200, f"{path}: {out}")
+            self.assertNotIn("cannot resolve import", out)
+        status, out = run("flow", 'import flowstudio { py }\nfunction main() -> i32 {\n'
+                                  '    let n: i32 = py("1")\n    return n\n}\n', route="check")
+        self.assertEqual(status, 422, out)
+        self.assertNotIn("cannot resolve import", out)
 
 
 if __name__ == "__main__":

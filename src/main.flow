@@ -58,6 +58,8 @@ extern {
     function fs_py_reset() -> void
     function fs_pty(op: string, body: string) -> string
     function fs_pty_status() -> i32
+    function fs_lsp(op: string, body: string) -> string
+    function fs_lsp_status() -> i32
     function fs_flow_debug(op: string, body: string) -> string
     function fs_flow_debug_status() -> i32
     function fs_flow_run_bridged(code: string) -> string
@@ -463,6 +465,18 @@ function send_pty(op: string) -> void {
     fs_reply(fs_pty_status(), "text/plain; charset=utf-8", output)
 }
 
+# Flow language server: one persistent `flow lsp` child (src/lsp_bridge.c).
+# Replies are JSON-RPC text; errors are plain text with 400, 503 or 504.
+function send_lsp(op: string) -> void {
+    let output: string = fs_lsp(op, fs_body())
+    let status: i32 = fs_lsp_status()
+    if status == 200 {
+        fs_reply(status, "application/json; charset=utf-8", output)
+    } else {
+        fs_reply(status, "text/plain; charset=utf-8", output)
+    }
+}
+
 # Flow source debugging through LLDB (src/flow_debug_session.c and
 # src/flow_debugger.py). Replies are JSON snapshots of the paused program.
 function send_flow_debug(op: string) -> void {
@@ -828,6 +842,18 @@ function dispatch() -> void {
         if eq(path, "/api/run/mathflow") {
             let result: ExecutionResult = execute("mathflow", fs_body(), false, "")
             fs_reply(result.status, "application/json; charset=utf-8", result.output)
+            return
+        }
+        if eq(path, "/api/lsp/request") {
+            send_lsp("request")
+            return
+        }
+        if eq(path, "/api/lsp/events") {
+            send_lsp("events")
+            return
+        }
+        if eq(path, "/api/lsp/status") {
+            send_lsp("status")
             return
         }
         if eq(path, "/api/pty/read") {

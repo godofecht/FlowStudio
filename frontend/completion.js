@@ -76,6 +76,10 @@ export function registerCompletion(monaco, app, fetchFn = (typeof fetch !== 'und
                 startColumn: position.column - math.length, endColumn: position.column }
             })) };
         }
+        // The Flow language server (web/ide_flow_lsp.js) answers for the
+        // models it syncs. Lexical Flow names would only repeat its items.
+        if (language === 'flow' && globalThis.FlowStudioFlowLsp?.handles?.(model))
+          return { suggestions: [] };
         const beforeCursor = (model.getLineContent(position.lineNumber) || '')
           .slice(0, position.column - 1);
         const member = language === 'r' ? core.rMemberContext(beforeCursor) : null;

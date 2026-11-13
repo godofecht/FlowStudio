@@ -31,6 +31,8 @@ function mount({editor, native, app, language, button, output, status, problems 
     cancelAuto();
     if (!autoCheck?.checked || !available() ||
         !editor.getModel()?.getValue().trim()) return;
+    // The Flow language server already reports problems as you type.
+    if (languageServer()?.handles?.(editor.getModel())) return;
     timer = scheduler.setTimeout(() => {
       timer = null;
       if (!autoCheck.checked || !available()) return;
@@ -86,6 +88,9 @@ function mount({editor, native, app, language, button, output, status, problems 
     });
     problems.replaceChildren(...entries);
     problems.hidden = false;
+  }
+  function languageServer() {
+    return global.FlowStudioFlowLsp || null;
   }
   function available() {
     return language.value === "flow" && native.available() && !!editor.getModel();
@@ -168,7 +173,11 @@ function mount({editor, native, app, language, button, output, status, problems 
             hoverMessage:{value:diagnostic.message.slice(0, 512)}}
         });
       }
-      decorations.set(errors);
+      // Lines the language server already marks keep one marker.
+      const server = languageServer();
+      decorations.set(server?.coversLine
+        ? errors.filter(error => !server.coversLine(model, error.range.startLineNumber))
+        : errors);
       renderProblems(errors, model, version, documentId, token);
       show(result.output || (result.ok ? "Flow source passed compiler checking." :
         "Flow compiler rejected this source without a location."), result.ok);

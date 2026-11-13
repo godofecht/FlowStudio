@@ -111,6 +111,9 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/workspace_panels.js" {
         return StaticAsset { path: "web/workspace_panels.js", mime: "text/javascript; charset=utf-8", found: true }
     }
+    if url == "/ide_flow_lsp.js" {
+        return StaticAsset { path: "web/ide_flow_lsp.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
     if url == "/flow_diagnostics.js" {
         return StaticAsset { path: "web/flow_diagnostics.js", mime: "text/javascript; charset=utf-8", found: true }
     }

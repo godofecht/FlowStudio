@@ -7,6 +7,14 @@ import 'monaco-editor/editor/contrib/wordHighlighter/browser/wordHighlighter.js'
 import 'monaco-editor/editor/contrib/suggest/browser/suggestController.js';
 import 'monaco-editor/editor/contrib/hover/browser/hoverContribution.js';
 import 'monaco-editor/editor/contrib/contextmenu/browser/contextmenu.js';
+// Language server features for Flow (web/ide_flow_lsp.js): go to definition,
+// references, rename, formatting, quick fixes and problem navigation.
+import 'monaco-editor/editor/contrib/gotoSymbol/browser/goToCommands.js';
+import 'monaco-editor/editor/contrib/gotoSymbol/browser/link/goToDefinitionAtPosition.js';
+import 'monaco-editor/editor/contrib/rename/browser/rename.js';
+import 'monaco-editor/editor/contrib/format/browser/formatActions.js';
+import 'monaco-editor/editor/contrib/codeAction/browser/codeActionContributions.js';
+import 'monaco-editor/editor/contrib/gotoError/browser/gotoError.js';
 import 'monaco-editor/languages/definitions/python/register.js';
 import 'monaco-editor/languages/definitions/r/register.js';
 import { createIcons, FolderOpen, FilePlus2, RotateCw, Play, Blocks, Files, ListTree,

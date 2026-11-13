@@ -34,6 +34,7 @@ const CATALOG = Object.freeze([
   ["Go to definition", "goToDefinition", "F12"],
   ["Find references", "findReferences", "Shift+F12"],
   ["Rename identifier", "renameSymbol", "F2"],
+  ["Format document", "formatDocument", "Shift+Alt+F"],
   ["Run selection or file", "run", "Ctrl+Enter"],
   ["Run current cell", "runCell", "Ctrl+Shift+Enter"],
   ["Run project", "runProject", ""],

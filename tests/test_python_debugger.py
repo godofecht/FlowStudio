@@ -61,7 +61,11 @@ class DebugTests(unittest.TestCase):
         self.assertEqual(result["stack"][0]["locals"]["i"]["value"], "2")
         self.assertFalse(debugger.set_breakpoints("[99]")["ok"])
         debugger.command("stop")
-        self.assertFalse(debugger.set_breakpoints("[]")["ok"], "no session after stop")
+        # An update that arrives after the session ended is accepted and dropped.
+        late = debugger.set_breakpoints("[]")
+        self.assertTrue(late["ok"])
+        self.assertEqual(late["applied"], False)
+        self.assertFalse(debugger.busy())
 
     def test_step_over_skips_called_source_frames(self):
         source = ("def inner():\n    value = 40\n    return value\n"
@@ -203,7 +207,7 @@ class DebugTests(unittest.TestCase):
         self.assertEqual(namespace["debug_value"], 42)
 
     def test_scientific_breakpoint_executes_two_mode_heat_equation(self):
-        # Real CPython tracing, not a simulated debugger or numerical solver.
+        # Real CPython tracing runs the solver line by line.
         # The independent eigenmode oracle does not run the Euler stencil.
         self.assertEqual(N * MAX_STEPS, 12288)
         self.assertLess(len(HEAT_SOURCE.encode("utf-8")), 4096)

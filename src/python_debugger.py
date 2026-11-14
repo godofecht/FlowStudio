@@ -303,7 +303,9 @@ class DebugSession:
             return {**self.snapshot(), "ok": False, "message": "Expected a JSON breakpoint list."}
         with self.cv:
             if self.state not in ("paused", "running"):
-                return {**self._snapshot(), "ok": False, "message": "No active debugging session."}
+                # The session ended while the editor's update was on its way.
+                # Nothing to replace; the next start sends the editor's list.
+                return {**self._snapshot(), "ok": True, "applied": False}
             try:
                 self.breakpoints = _parse_breakpoints(points, self.source_lines)
             except (ValueError, TypeError) as exc:

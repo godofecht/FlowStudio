@@ -151,8 +151,10 @@ class Session(object):
 
     def set_breakpoints(self, payload):
         if self.target is None or self.state not in ("paused", "running"):
-            self.message = "No program is being debugged."
-            return self.reply(False)
+            # The session ended while the editor's update was on its way.
+            # Nothing to replace; the next start sends the editor's list.
+            self.message = ""
+            return self.reply(True)
         try:
             points = json.loads(payload).get("breakpoints", [])
         except (ValueError, AttributeError):

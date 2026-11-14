@@ -210,6 +210,10 @@ jobs:
           node tests/native_projects_ui.mjs
       - name: Package verified executable
         run: sh scripts/package.sh
+      - name: Package holds every runtime file; quick console build
+        run: |
+          python3 tests/test_package_contents.py
+          python3 tests/test_flow_quick_run.py
       - name: Archive qualified platform build
         uses: actions/upload-artifact@v4
         with:

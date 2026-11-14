@@ -159,13 +159,18 @@ static int read_exact_deadline(int fd, char *data, size_t length, int64_t deadli
 
 static void remove_run_dir(const char *dir)
 {
+    /* flow_quick_run.sh leaves its build products beside the source. */
+    static const char *const names[] = {"main.flow", "flowstudio.flow", "main.c", "prog", "flowc.log", "cc.log"};
     char path[256];
-    snprintf(path, sizeof(path), "%s/main.flow", dir);
-    unlink(path);
-    snprintf(path, sizeof(path), "%s/flowstudio.flow", dir);
-    unlink(path);
+    for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); i++)
+    {
+        snprintf(path, sizeof(path), "%s/%s", dir, names[i]);
+        unlink(path);
+    }
     rmdir(dir);
 }
+
+static int quick_build = 0;
 
 /* Compiles and runs a Flow program with `flow run`, relaying bridge calls
  * to the Python and R sessions while it runs. stdout and stderr are merged
@@ -230,7 +235,8 @@ const char *fs_flow_run_bridged(const char *code)
             dup2(out, STDERR_FILENO) < 0 || dup2(req, 3) < 0 || dup2(rep, 4) < 0) _exit(127);
         for (int fd = 5; fd < 1024; fd++) close(fd);
         setenv("FLOWSTUDIO_BRIDGE", "1", 1);
-        execlp("flow", "flow", "run", source_path, (char *)NULL);
+        if (quick_build) execlp("sh", "sh", "src/flow_quick_run.sh", dir, (char *)NULL);
+        else execlp("flow", "flow", "run", source_path, (char *)NULL);
         const char *message = "Process error: flow was not found on PATH.\n";
         (void)!write(STDOUT_FILENO, message, strlen(message));
         _exit(127);
@@ -373,3 +379,13 @@ static void tidy_output(int succeeded)
 }
 
 int fs_flow_bridged_status(void) { return flow_status; }
+
+/* Console session entries: the same run, built at -O0 without `flow run`'s
+ * toolchain checks (src/flow_quick_run.sh). */
+const char *fs_flow_run_bridged_quick(const char *code)
+{
+    quick_build = 1;
+    const char *output = fs_flow_run_bridged(code);
+    quick_build = 0;
+    return output;
+}

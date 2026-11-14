@@ -65,6 +65,7 @@ extern {
     function fs_flow_debug(op: string, body: string) -> string
     function fs_flow_debug_status() -> i32
     function fs_flow_run_bridged(code: string) -> string
+    function fs_flow_run_bridged_quick(code: string) -> string
     function fs_flow_bridged_status() -> i32
     function fs_app_build(code: string) -> string
     function fs_app_build_status() -> i32
@@ -550,7 +551,7 @@ function send_flow_session(op: string, code: string) -> void {
         fs_reply(503, "text/plain; charset=utf-8", "FlowStudio: the Flow session helper failed. " + prepared.stderr + prepared.error)
         return
     }
-    let output: string = fs_flow_run_bridged(prepared.stdout)
+    let output: string = fs_flow_run_bridged_quick(prepared.stdout)
     let status: i32 = fs_flow_bridged_status()
     let mut word: string = "200"
     if status == 422 {

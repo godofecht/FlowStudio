@@ -18,9 +18,12 @@ const localhost = new URL("http://127.0.0.1:8751/app/");
 test("native execution is limited to the exact loopback FlowStudio origin", async () => {
   assert.equal(native.available(localhost), true);
   assert.equal(native.available(new URL("http://localhost:8751/app/")), true);
+  // FLOWSTUDIO_PORT moves the server; the page talks to its own origin.
+  assert.equal(native.available(new URL("http://127.0.0.1:8779/app/")), true);
   for (const url of [
     "https://godofecht.github.io/FlowStudio/app/",
-    "http://localhost:8752/app/",
+    "http://localhost/app/",
+    "http://localhost:80/app/",
     "http://127.0.0.1.evil.invalid:8751/app/",
     "https://localhost:8751/app/"
   ]) assert.equal(native.available(new URL(url)), false, url);

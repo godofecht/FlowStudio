@@ -52,7 +52,7 @@ function revealSourceLine(source, line) {
   if (typeof source.focus === "function") source.focus();
   return true;
 }
-// A cursor target is a 1-based source line, not an expression index. The R
+// A cursor target is a 1-based source line. The R
 // kernel checks whether a later top-level expression actually starts there.
 function caretLine(source) {
   if (!source || typeof source.value !== "string" ||
@@ -117,7 +117,7 @@ function create({native, source, language, runtime, startButton, stepButton,
       button.type = "button";
       button.textContent = "Frame " + frame.id + ": " + frame.call +
         (Number.isSafeInteger(frame.definition_line) ?
-          " — definition line " + frame.definition_line : "");
+          ", definition line " + frame.definition_line : "");
       button.title = "Select retained postmortem environment for R Evaluate";
       button.disabled = !selectable;
       button.setAttribute("aria-pressed", String(selected === frame.id));
@@ -231,7 +231,7 @@ function create({native, source, language, runtime, startButton, stepButton,
   if (frameInput) frameInput.addEventListener("change", update);
   language.addEventListener("change", update);
   runtime.addEventListener("change", update);
-  if (!supported) target.textContent = "Native R debugger requires FlowStudio on localhost:8751.";
+  if (!supported) target.textContent = "Native R debugger requires the FlowStudio server on localhost.";
   update();
   return Object.freeze({execute, update});
 }

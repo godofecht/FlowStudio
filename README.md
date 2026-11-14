@@ -215,6 +215,34 @@ When the typed name is not installed, the first row offers to install it
 whether the package is attached and offer load, update and remove; Python
 rows offer uninstall. Names are validated in the browser before any request.
 
+**Flow packages.** The Flow tab of Packages reads the `flow.toml` of a
+project folder you type (the browser cannot see the disk path of a folder it
+opened). It lists `[dependencies]` with what `flow.lock` pins and what is
+installed in `flow_packages/`. Buttons run `flow init`, `flow add` (a
+registry name, a git URL, or a local folder through `--path`) and
+`flow sync`, and show the command output. The Flow CLI has no remove
+command, so Remove deletes the entry from `flow.toml`, `flow.lock` and
+`flow_packages/`, then runs `flow sync`. All of it goes through
+`POST /api/packages/flow` (`src/flow_packages.py`) and nothing runs on page
+load.
+
+**Plots.** Flow, R and Python figures share one history in the Plots pane:
+back and forward, zoom, and saving as PNG or SVG. Flow draws its own figures
+with no Python or R involved:
+
+```flow
+import flowstudio { plot, scatter, hist, plot_title, plot_labels }
+
+let xs: array<f64, 5> = [1.0, 2.0, 3.0, 4.0, 5.0]
+let ys: array<f64, 5> = [1.0, 4.0, 9.0, 16.0, 25.0]
+plot_title("Squares")
+plot(xs, ys)
+```
+
+Each call prints one framed SVG line (at most 60000 bytes, series thinned
+to 1000 points, histograms up to 100 bins). Console entries and script runs
+move the figure to the pane and leave a note in the output.
+
 **Data.** Lists the data frames in the R and Python sessions with their
 shape, and the CSV and TSV files of the open folder. Either opens in a data
 grid with sorting, filtering, paging and CSV export. Folder files are read

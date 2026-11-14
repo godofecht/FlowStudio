@@ -604,7 +604,7 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
     </div>
     <div id="view-plots" class="body plots-body" role="tabpanel" aria-labelledby="tab-plots" hidden>
       <div id="mathFlowPlot" aria-live="polite" hidden></div>
-      <p class="muted hint">Figures captured by your Python and R runs land here automatically. This tab fills whenever a run opens a plot.</p>
+      <p class="muted hint">Figures from Flow, Python and R runs land here. Use the arrows to step through earlier plots.</p>
       <p class="muted hint">Need saved PNG files too? <a href="/plots" target="_blank" rel="noopener">Open the standalone plot page</a>.</p>
       <div id="plotFigures" aria-label="Captured figures" aria-live="polite"></div>
     </div>
@@ -1960,7 +1960,9 @@ async function executeCode(code, label, languageOverride = null, options = {}) {
       headers: { "Content-Type": "text/plain; charset=utf-8", "X-FlowStudio-Intent": "run" },
       body: code
     });
-    const output = await response.text();
+    let output = await response.text();
+    if (executionLanguage === "flow" && globalThis.FlowStudioFlowPlots)
+      output = FlowStudioFlowPlots.take(output);
     ok = response.ok;
     writeConsole(output + "\n", executionLanguage);
     if (executionLanguage === "mathflow" && response.ok) {
@@ -2842,6 +2844,8 @@ renderTabs();
 <script>FlowStudioWorkspaceTabs.mount();</script>
 <script src="/terminal_render.js"></script>
   <script src="/console.js"></script>
+  <script src="/plot_pane.js"></script>
+  <script src="/flow_plots.js"></script>
   <script src="/plot_figures.js"></script>
   <script src="/terminal_input.js"></script>
   <script src="/terminal_sessions.js"></script>
@@ -2864,6 +2868,7 @@ renderTabs();
 <script src="/ide_workspace.js"></script>
 <script src="/data_viewer.js"></script>
 <script src="/ide_data_view.js"></script>
+<script src="/ide_flow_packages.js"></script>
 <script src="/ide_packages_view.js"></script>
 <script src="/ide_side_panel.js"></script>
 <script src="/ide_flow_data.js"></script>

@@ -601,6 +601,24 @@ function send_flow_help(query: string) -> void {
     fs_reply(200, "application/json; charset=utf-8", result.stdout)
 }
 
+# Flow project dependencies (src/flow_packages.py). The body names the
+# operation, the project folder and one argument, one per line. Same trust
+# and intent gate as code execution; flow add may clone over the network.
+function send_flow_packages(body: string) -> void {
+    let command: ptr<ProcCmd> = proc_cmd("python3")
+    proc_arg(command, "src/flow_packages.py")
+    proc_input(command, body)
+    proc_timeout_ms(command, 300000)
+    let result: ptr<ProcResult> = proc_run(command)
+    if result.exit_code == 0 {
+        fs_reply(200, "application/json; charset=utf-8", result.stdout)
+    } elif result.exit_code == 2 {
+        fs_reply(422, "application/json; charset=utf-8", result.stdout)
+    } else {
+        fs_reply(503, "text/plain; charset=utf-8", "FlowStudio: the Flow package helper failed. " + result.stderr + result.error)
+    }
+}
+
 function send_flow_check(code: string) -> void {
     let result: ExecutionResult = execute("flow", code, true, "")
     fs_reply(result.status, "text/plain; charset=utf-8", result.output)
@@ -1153,6 +1171,10 @@ function dispatch() -> void {
         }
         if eq(path, "/api/packages/r") {
             send_r_packages()
+            return
+        }
+        if eq(path, "/api/packages/flow") {
+            send_flow_packages(fs_body())
             return
         }
         if eq(path, "/api/packages/r/load") {

@@ -8,7 +8,12 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import signal
+import socket
+import stat
+import subprocess
+import tempfile
 import time
 import unittest
 import urllib.error
@@ -16,6 +21,8 @@ import urllib.request
 import uuid
 
 URL = os.environ.get("FLOWSTUDIO_URL", "http://127.0.0.1:8751").rstrip("/")
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BINARY = os.path.join(ROOT, "build", "flowstudio")
 
 SOURCE = (
     "function add_one(x: i32) -> i32 {\n"
@@ -38,11 +45,11 @@ def server_up() -> bool:
         return False
 
 
-def post(path: str, body: str, intent: bool = True) -> tuple[int, str]:
+def post(path: str, body: str, intent: bool = True, base: str = "") -> tuple[int, str]:
     headers = {"Content-Type": "application/json"}
     if intent:
         headers["X-FlowStudio-Intent"] = "run"
-    request = urllib.request.Request(URL + path, data=body.encode("utf-8"), method="POST", headers=headers)
+    request = urllib.request.Request((base or URL) + path, data=body.encode("utf-8"), method="POST", headers=headers)
     try:
         with urllib.request.urlopen(request, timeout=15) as response:
             return response.status, response.read().decode("utf-8")
@@ -374,6 +381,86 @@ class ProjectImportTest(unittest.TestCase):
             status_code, text = post("/api/lsp/request", json.dumps({"jsonrpc": "2.0", "method": "flowstudio/forget",
                                                                      "params": {"uri": json.loads('"%s"' % uri)}}))
             self.assertEqual(status_code, 400, uri + ": " + text)
+
+
+# The first `flow lsp` on a machine builds the server from source. On a
+# 2-core Linux runner that took about 12 s, past the bridge's 10 s handshake.
+SLOW_START_SECONDS = 13
+
+
+@unittest.skipUnless(os.path.exists(BINARY) and shutil.which("flow"),
+                     "needs build/flowstudio and flow on PATH")
+class SlowFirstStartTest(unittest.TestCase):
+    """A server that needs longer than the handshake allows still comes up.
+
+    A wrapper named flow sits first on PATH and sleeps before it runs the
+    real `flow lsp`, the way a first start does while it builds. Before the
+    fix the bridge killed it after 10 s, so the build never finished.
+    """
+
+    def setUp(self) -> None:
+        self.dir = tempfile.mkdtemp(prefix="flowstudio-slow-lsp-")
+        wrapper = os.path.join(self.dir, "flow")
+        with open(wrapper, "w") as handle:
+            handle.write("#!/bin/sh\n"
+                         "if [ \"$1\" = lsp ]; then sleep %d; fi\n"
+                         "exec '%s' \"$@\"\n" % (SLOW_START_SECONDS, shutil.which("flow")))
+        os.chmod(wrapper, os.stat(wrapper).st_mode | stat.S_IXUSR)
+        with socket.socket() as sock:
+            sock.bind(("127.0.0.1", 0))
+            port = sock.getsockname()[1]
+        self.base = "http://127.0.0.1:%d" % port
+        env = dict(os.environ, FLOWSTUDIO_PORT=str(port), PATH=self.dir + os.pathsep + os.environ["PATH"])
+        self.server = subprocess.Popen([BINARY], cwd=ROOT, env=env,
+                                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        for _ in range(100):
+            try:
+                with urllib.request.urlopen(self.base + "/health", timeout=1):
+                    break
+            except OSError:
+                time.sleep(0.1)
+
+    def tearDown(self) -> None:
+        self.server.terminate()
+        try:
+            self.server.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            self.server.kill()
+        shutil.rmtree(self.dir, ignore_errors=True)
+
+    def call(self, op: str) -> dict:
+        code, text = post("/api/lsp/" + op, "", base=self.base)
+        self.assertEqual(code, 200, text)
+        return json.loads(text)
+
+    def test_a_start_slower_than_the_handshake_finishes(self) -> None:
+        began = time.time()
+        self.assertEqual(self.call("start"), {"available": False, "starting": True})
+        self.assertLess(time.time() - began, 12.0)
+        state = self.call("status")
+        self.assertTrue(state["starting"])
+        self.assertFalse(state["running"])
+        pid = state["pid"]
+        # While it starts, other routes answer at once and the child is kept.
+        began = time.time()
+        with urllib.request.urlopen(self.base + "/health", timeout=2) as response:
+            self.assertEqual(response.status, 200)
+        self.assertLess(time.time() - began, 1.0)
+        answer = self.call("start")
+        while answer.get("starting") and time.time() - began < 30:
+            self.assertEqual(self.call("status")["pid"], pid)
+            time.sleep(0.5)
+            answer = self.call("start")
+        self.assertEqual(answer, {"available": True})
+        state = self.call("status")
+        self.assertTrue(state["running"])
+        self.assertEqual(state["pid"], pid)
+        self.assertEqual(state["generation"], 1)
+        code, text = post("/api/lsp/request", json.dumps({"jsonrpc": "2.0", "id": 7, "method": "initialize",
+                                                          "params": {"processId": None, "rootUri": None,
+                                                                     "capabilities": {}}}), base=self.base)
+        self.assertEqual(code, 200, text)
+        self.assertIn("hoverProvider", json.loads(text)["result"]["capabilities"])
 
 
 if __name__ == "__main__":

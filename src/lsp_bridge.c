@@ -9,7 +9,10 @@
  *            initialize is answered from the handshake the bridge performed.
  *   events   body ignored. Returns and clears queued server notifications
  *            (publishDiagnostics and flowstudio/serverStarted) as a JSON array.
- *   status   body ignored. {"running", "pid", "generation", "queued"}.
+ *   status   body ignored. {"running", "starting", "pid", "generation",
+ *            "queued"}.
+ *   start    body ignored. Starts the server. {"available"}, plus
+ *            "starting": true while a slow first start is still going.
  *
  * Workspace mirror. The browser holds project files (a folder handle or the
  * origin private file system), so `flow lsp` cannot read them. The browser
@@ -24,9 +27,12 @@
  * with an empty, "." or ".." segment is refused with 400.
  *
  * The HTTP loop is single-threaded, so every wait is bounded: 3 seconds per
- * request, 10 seconds for the startup handshake. A child that exits is
- * started again on the next request, and the browser learns of it through a
- * flowstudio/serverStarted event so it can reopen its documents.
+ * request, 10 seconds for the startup handshake. The first `flow lsp` on a
+ * machine builds the server from source, which can take longer than that.
+ * The child is then kept, and later calls finish the handshake, for up to
+ * LSP_BUILD_MS. A child that exits is started again on the next request, and
+ * the browser learns of it through a flowstudio/serverStarted event so it
+ * can reopen its documents.
  * fs_lsp_status() reports 200, 400, 503 (no server) or 504 (timeout).
  */
 #ifndef _POSIX_C_SOURCE
@@ -66,6 +72,8 @@ enum {
     LSP_QUEUE_BYTES = 4 * 1024 * 1024,     /* and their total size */
     LSP_REQUEST_MS = 3000,
     LSP_START_MS = 10000,
+    LSP_PENDING_MS = 250,                  /* wait per later call while starting */
+    LSP_BUILD_MS = 300000,                 /* give up on a start after this long */
     LSP_RETRY_MS = 10000                   /* after a failed start, wait this long */
 };
 
@@ -75,6 +83,8 @@ static int from_child = -1;
 static int generation = 0;
 static int lsp_last_status = 503;
 static int64_t failed_at = -1;
+static int handshake_pending;              /* initialize sent, no answer yet */
+static int64_t handshake_deadline;
 
 static char *inbuf;                        /* bytes read from the child, not yet framed */
 static size_t inlen;
@@ -679,6 +689,8 @@ static void stop_child(void)
     discard_left = 0;
     free(waiting_response);
     waiting_response = NULL;
+    waiting_id = -1;
+    handshake_pending = 0;
 }
 
 static int child_alive(void)
@@ -845,8 +857,56 @@ static char *round_trip(const char *json, size_t length, const char *id_at, size
     return response;
 }
 
+/* Wait until wait_until for the answer to the bridge's initialize. 1 when the
+ * server is ready. 0 while it is still starting, or when the start failed. */
+static int finish_handshake(int64_t wait_until)
+{
+    int gone = 0;
+    while (!waiting_response) {
+        int64_t left = wait_until - now_ms();
+        if (left <= 0) break;
+        if (pump((int)left) < 0) { gone = 1; break; }
+    }
+    char *response = waiting_response;
+    waiting_response = NULL;
+    if (!response) {
+        if (!gone && child_alive() && now_ms() < handshake_deadline) return 0;
+        stop_child();
+        failed_at = now_ms();
+        return 0;
+    }
+    handshake_pending = 0;
+    waiting_id = -1;
+    const char *result = NULL;
+    size_t result_length = 0;
+    if (!json_member(response, strlen(response), "result", &result, &result_length)) {
+        free(response);
+        stop_child();
+        failed_at = now_ms();
+        return 0;
+    }
+    free(capabilities);
+    capabilities = malloc(result_length + 1);
+    if (capabilities) { memcpy(capabilities, result, result_length); capabilities[result_length] = 0; }
+    free(response);
+    const char *initialized = "{\"jsonrpc\":\"2.0\",\"method\":\"initialized\",\"params\":{}}";
+    send_message(initialized, strlen(initialized), now_ms() + LSP_REQUEST_MS);
+    failed_at = -1;
+    generation++;
+    char *started = malloc(96);
+    if (started) {
+        snprintf(started, 96, "{\"jsonrpc\":\"2.0\",\"method\":\"flowstudio/serverStarted\",\"params\":{\"generation\":%d}}", generation);
+        enqueue(started);
+    }
+    return 1;
+}
+
 static int start_child(void)
 {
+    if (handshake_pending) {
+        if (!child_alive()) { failed_at = now_ms(); return 0; }
+        return finish_handshake(now_ms() + LSP_PENDING_MS);
+    }
     if (child_alive()) return 1;
     if (failed_at >= 0 && now_ms() - failed_at < LSP_RETRY_MS) return 0;
     signal(SIGPIPE, SIG_IGN);
@@ -882,38 +942,31 @@ static int start_child(void)
     inlen = 0;
     discard_left = 0;
 
+    /* The answer may arrive after this call returns, so the id stays wanted
+     * until finish_handshake sees it. */
+    long mine = next_id++;
     char init[160];
     int init_length = snprintf(init, sizeof(init),
-        "{\"jsonrpc\":\"2.0\",\"id\":0,\"method\":\"initialize\",\"params\":"
-        "{\"processId\":%ld,\"rootUri\":null,\"capabilities\":{}}}", (long)getpid());
-    const char *id_at = strstr(init, "\"id\":0") + 5;
-    char *response = round_trip(init, (size_t)init_length, id_at, 1, now_ms() + LSP_START_MS);
-    const char *result = NULL;
-    size_t result_length = 0;
-    if (!response || !json_member(response, strlen(response), "result", &result, &result_length)) {
-        free(response);
+        "{\"jsonrpc\":\"2.0\",\"id\":%ld,\"method\":\"initialize\",\"params\":"
+        "{\"processId\":%ld,\"rootUri\":null,\"capabilities\":{}}}", mine, (long)getpid());
+    free(waiting_response);
+    waiting_response = NULL;
+    waiting_id = mine;
+    handshake_pending = 1;
+    handshake_deadline = now_ms() + LSP_BUILD_MS;
+    int64_t deadline = now_ms() + LSP_START_MS;
+    if (!send_message(init, (size_t)init_length, deadline)) {
         stop_child();
         failed_at = now_ms();
         return 0;
     }
-    free(capabilities);
-    capabilities = malloc(result_length + 1);
-    if (capabilities) { memcpy(capabilities, result, result_length); capabilities[result_length] = 0; }
-    free(response);
-    const char *initialized = "{\"jsonrpc\":\"2.0\",\"method\":\"initialized\",\"params\":{}}";
-    send_message(initialized, strlen(initialized), now_ms() + LSP_REQUEST_MS);
-    failed_at = -1;
-    generation++;
-    char *started = malloc(96);
-    if (started) {
-        snprintf(started, 96, "{\"jsonrpc\":\"2.0\",\"method\":\"flowstudio/serverStarted\",\"params\":{\"generation\":%d}}", generation);
-        enqueue(started);
-    }
-    return 1;
+    return finish_handshake(deadline);
 }
 
 static const char *unavailable(void)
 {
+    if (handshake_pending)
+        return fail(503, "The Flow language server is still starting. Its first start builds it from source.");
     return fail(503, "The Flow language server is unavailable. Install Flow 2.x so `flow lsp` is on PATH.");
 }
 
@@ -983,7 +1036,8 @@ static const char *request(const char *body)
 
 static const char *events(void)
 {
-    if (child > 0 && child_alive()) {
+    if (handshake_pending && child_alive()) (void)finish_handshake(now_ms());
+    if (!handshake_pending && child > 0 && child_alive()) {
         for (int rounds = 0; rounds < 64; rounds++)
             if (pump(0) <= 0) break;
     }
@@ -1007,20 +1061,25 @@ static const char *events(void)
 
 static const char *status(void)
 {
-    int running = child_alive();
-    char *out = malloc(128);
+    int alive = child_alive();
+    int running = alive && !handshake_pending;
+    char *out = malloc(160);
     if (!out) return fail(503, "Out of memory.");
-    snprintf(out, 128, "{\"running\":%s,\"pid\":%ld,\"generation\":%d,\"queued\":%d}",
-             running ? "true" : "false", running ? (long)child : 0L, generation, queue_len);
+    snprintf(out, 160, "{\"running\":%s,\"starting\":%s,\"pid\":%ld,\"generation\":%d,\"queued\":%d}",
+             running ? "true" : "false", alive && handshake_pending ? "true" : "false",
+             alive ? (long)child : 0L, generation, queue_len);
     return set_reply(200, out);
 }
 
 /* Starts the server if it is not running. Always 200, so a browser that
- * only wants to know whether Flow has a language server logs no error. */
+ * only wants to know whether Flow has a language server logs no error.
+ * "starting" asks the browser to call again: the first start is still
+ * building the server. */
 static const char *start(void)
 {
-    int running = child_alive() || start_child();
-    return set_reply(200, strdup(running ? "{\"available\":true}" : "{\"available\":false}"));
+    if (start_child()) return set_reply(200, strdup("{\"available\":true}"));
+    if (handshake_pending) return set_reply(200, strdup("{\"available\":false,\"starting\":true}"));
+    return set_reply(200, strdup("{\"available\":false}"));
 }
 
 const char *fs_lsp(const char *op, const char *body)

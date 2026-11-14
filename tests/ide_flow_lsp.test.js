@@ -190,6 +190,44 @@ test("a missing flow lsp is found by the start probe, with no failed request", a
   assert.deepEqual(Object.keys(f.monaco.providers), []);
 });
 
+test("a first start that is still building is asked again until the server is ready", async () => {
+  const bridge = fakeBridge();
+  const routes = [];
+  let probes = 0;
+  const f = setup({ fetch: async (route, init) => {
+    routes.push(route);
+    if (route === "/api/lsp/start" && ++probes < 3)
+      return { status: 200, text: async () => JSON.stringify({ available: false, starting: true }) };
+    return bridge.fetch(route, init);
+  } });
+  const started = f.lsp.start();
+  await f.time.advance(0);
+  assert.equal(f.lsp.state(), "starting");
+  assert.deepEqual(routes, ["/api/lsp/start"]);
+  await f.time.advance(2000);
+  assert.deepEqual(routes, ["/api/lsp/start", "/api/lsp/start"]);
+  await f.time.advance(2000);
+  assert.equal(await started, true);
+  assert.equal(f.lsp.state(), "ready");
+  assert.deepEqual(routes.slice(0, 4), ["/api/lsp/start", "/api/lsp/start", "/api/lsp/start", "/api/lsp/request"]);
+  assert.equal(bridge.sent[0].method, "initialize");
+});
+
+test("a start that gives up while building leaves the lexical helpers on", async () => {
+  let probes = 0;
+  const f = setup({ fetch: async () => {
+    probes++;
+    const answer = probes === 1 ? { available: false, starting: true } : { available: false };
+    return { status: 200, text: async () => JSON.stringify(answer) };
+  } });
+  const started = f.lsp.start();
+  await f.time.advance(2000);
+  assert.equal(await started, false);
+  assert.equal(probes, 2);
+  assert.equal(f.lsp.state(), "unavailable");
+  assert.deepEqual(Object.keys(f.monaco.providers), []);
+});
+
 test("start registers every provider and opens Flow models under their project path", async () => {
   const f = setup();
   assert.equal(await f.lsp.start(), true);

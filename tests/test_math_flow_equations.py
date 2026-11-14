@@ -86,7 +86,9 @@ class TypedHeatEquationTest(unittest.TestCase):
 
     def test_release_archive_includes_equation_compiler(self):
         packaging = (ROOT / "scripts/package.sh").read_text(encoding="utf-8")
-        self.assertIn('cp src/math_flow_equations.py "$stage/$name/src/math_flow_equations.py"', packaging)
+        # package.sh copies src/*.py; tests/test_package_contents.py checks the archive.
+        self.assertIn("for file in src/*.py ", packaging)
+        self.assertTrue((ROOT / "src/math_flow_equations.py").is_file())
 
     def test_checked_in_forced_equation_executes_through_cli(self):
         run = subprocess.run(

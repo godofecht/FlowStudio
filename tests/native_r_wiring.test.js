@@ -21,12 +21,13 @@ test("R kernel and transport use bounded IPC and are included in native builds",
   assert.match(transport, /FS_R_MAX 131072/);
   assert.match(kernel, /workspace <- new\.env/);
   assert.match(kernel, /sys\.source\("src\/flowjit\.R", envir = flowjit_api\)/);
-  assert.match(read("scripts/package.sh"), /src\/flowjit\.R/);
+  // package.sh copies src/*.R; tests/test_package_contents.py checks the archive.
+  assert.match(read("scripts/package.sh"), /for file in src\/\*\.py src\/\*\.R /);
   assert.match(kernel, /withVisible\(eval\(expression, envir = evaluation_env\)\)/);
   assert.match(kernel, /evaluation_env = workspace, capture_frames = FALSE/);
   assert.match(kernel, /MAX_OUTPUT <- 131072L/);
   assert.match(read("scripts/build.sh"), /src\/r_session\.c/);
-  assert.match(read("scripts/package.sh"), /src\/r_kernel\.R/);
+  assert.ok(fs.existsSync(path.join(__dirname, "../src/r_kernel.R")));
 });
 test("native editor exposes explicit R reset without conflating Python state", () => {
   const html = read("web/index.html");

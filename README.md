@@ -405,13 +405,18 @@ rebuilds the session around each entry. Earlier declarations stay at file
 scope and earlier variables come back as typed `let` bindings with their
 values. The Flow checker names the type of each new variable, and a dump at
 the end of the program reads the values back. Each entry runs through the
-same bridged runner as Run, so the console can call `py()` and `r()`. An
+same bridge as Run, so the console can call `py()` and `r()`. An
 entry that fails leaves the session as it was. Values the session cannot
 rebuild (pointers, lists, maps, nested arrays, arrays over 4,096 items,
-infinities) are listed as not kept, and later entries cannot use them. An
-entry takes 1.5 to 2.5 seconds, mostly C compilation.
+infinities) are listed as not kept, and later entries cannot use them.
+
+An entry takes about half a second once the compiler is warm: one type
+check, then `src/flow_quick_run.sh` compiles with flowc, builds the C at
+`-O0` and runs it. Run still uses `flow run`, which builds at `-O2`. If the
+quick build cannot link the program, the entry falls back to `flow run`.
 
 Tests: `tests/test_flow_session.py` (offline and live),
+`tests/test_flow_quick_run.py`,
 `tests/ide_flow_session.test.js` and the browser acceptance
 `tests/native_flow_session_ui.mjs`.
 

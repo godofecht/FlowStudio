@@ -156,7 +156,9 @@ function mount(doc, options = {}) {
       renderGrid();
     } else dialog.close();
   });
-  dialog.addEventListener("cancel", event => event.preventDefault());
+  /* Escape with focus outside the grid's controls (after a sort redraws the
+   * header, focus falls back to the page) reaches the dialog as cancel. */
+  dialog.addEventListener("cancel", event => { event.preventDefault(); dialog.close(); });
 
   let current = null;
   let state = { filter: "", sortColumn: null, descending: false, page: 0 };

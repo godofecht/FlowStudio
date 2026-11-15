@@ -67,11 +67,26 @@ try {
   const value = () => page.evaluate(() => FlowStudioEditor.editor.getModel().getValue());
   const setValue = text => page.evaluate(text => FlowStudioEditor.editor.getModel().setValue(text), text);
 
-  // Hover shows the typechecked signature.
+  // Hover shows the typechecked signature. Right after the document opens,
+  // Monaco can re-render the line under the pointer a few ms after a single
+  // synthetic move. Chromium then reports a mouseleave and Monaco drops the
+  // pending hover before it asks any provider. A real pointer keeps moving,
+  // so move away and back until the hover appears. The text still has to
+  // come from the server.
   const hoverAt = await point(6, 19);
-  await page.mouse.move(hoverAt.x, hoverAt.y);
-  await page.waitForFunction(() => [...document.querySelectorAll('.monaco-hover')]
-    .some(node => node.textContent.includes('function add_one(x: i32) -> i32')), null, { timeout: 10000 });
+  const deadline = Date.now() + 15000;
+  for (;;) {
+    await page.mouse.move(5, 5);
+    await page.mouse.move(hoverAt.x, hoverAt.y);
+    try {
+      await page.waitForFunction(() => [...document.querySelectorAll('.monaco-hover')]
+        .some(node => node.textContent.includes('function add_one(x: i32) -> i32')), null, { timeout: 3000 });
+      break;
+    } catch (error) {
+      if (Date.now() > deadline) throw error;
+      console.log('native_lsp_ui: the hover was dropped; moving the pointer again');
+    }
+  }
   assert.match(await page.locator('.monaco-hover').first().textContent(), /typechecked function/);
   await page.mouse.move(5, 5);
   await page.keyboard.press('Escape');

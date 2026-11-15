@@ -211,7 +211,54 @@ jobs:
           node tests/native_projects_ui.mjs
           node tests/native_flow_help_data_ui.mjs
           node tests/native_flow_plots_packages_ui.mjs
-          node tests/native_assistant_ui.mjs
+      # The first `flow lsp` builds the server from source, which takes about
+      # 12 s on a 2-core Linux machine, longer than the bridge's 10 s
+      # handshake. The bridge keeps such a start alive, and test_lsp_bridge
+      # covers that path with a slow wrapper. Building it here keeps the
+      # suites below timing the running server.
+      - name: Build the Flow language server
+        shell: bash
+        run: |
+          set -euo pipefail
+          time flow lsp --build
+      - name: Flow session, language server and assistant suites on native server
+        shell: bash
+        env:
+          FLOWSTUDIO_PORT: '8760'
+          FLOWSTUDIO_URL: http://127.0.0.1:8760
+        run: |
+          set -euo pipefail
+          if [ ! -d node_modules/playwright ]; then npm ci; fi
+          if [ "$RUNNER_OS" = Linux ]; then
+            npx playwright install --with-deps chromium
+          else
+            npx playwright install chromium
+          fi
+          ./build/flowstudio > /tmp/flowstudio-new-suites.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true; tail -n 50 /tmp/flowstudio-new-suites.log' EXIT
+          ready=0
+          for i in $(seq 1 100); do
+            if curl -fsS "$FLOWSTUDIO_URL/health" >/dev/null; then
+              ready=1
+              break
+            fi
+            sleep 0.2
+          done
+          if [ "$ready" -ne 1 ]; then exit 1; fi
+          # A live suite that skips has proved nothing, so a skip fails the step.
+          for suite in test_flow_session test_lsp_bridge test_flow_for_ai test_assistant_bridge; do
+            python3 "tests/$suite.py" -v 2>&1 | tee "/tmp/$suite.log"
+            if grep -q "skipped" "/tmp/$suite.log"; then
+              echo "::error::$suite skipped tests"
+              exit 1
+            fi
+          done
+          node tests/native_flow_session_ui.mjs
+          node tests/native_lsp_ui.mjs
+          node tests/native_lsp_project_ui.mjs
+          # The assistant suite starts its own server with the fake provider.
+          env -u FLOWSTUDIO_URL -u FLOWSTUDIO_PORT node tests/native_assistant_ui.mjs
       - name: Package verified executable
         run: sh scripts/package.sh
       - name: Package holds every runtime file; quick console build

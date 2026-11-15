@@ -93,6 +93,9 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/terminal_input.js" {
         return StaticAsset { path: "web/terminal_input.js", mime: "text/javascript; charset=utf-8", found: true }
     }
+    if url == "/console_format.js" {
+        return StaticAsset { path: "web/console_format.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
     if url == "/terminal_sessions.js" {
         return StaticAsset { path: "web/terminal_sessions.js", mime: "text/javascript; charset=utf-8", found: true }
     }

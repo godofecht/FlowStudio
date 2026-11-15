@@ -36,6 +36,8 @@ const DEPENDENTS_DELAY_MS = 700;
 const SYNC_DELAY_MS = 800;
 const PROJECT_LIMITS = Object.freeze({ files: 400, depth: 8 });
 const SKIP_DIRS = new Set(["node_modules", "build", "target", "dist", "flow_packages", "__pycache__"]);
+/* While the first `flow lsp` builds the server, ask again this often. */
+const START_RETRY_MS = 2000;
 const COMPLETION_KINDS = [null, "Text", "Method", "Function", "Constructor", "Field",
   "Variable", "Class", "Interface", "Module", "Property", "Unit", "Value", "Enum",
   "Keyword", "Snippet", "Color", "File", "Reference", "Folder", "EnumMember",
@@ -839,10 +841,22 @@ function create(options) {
     let result = null;
     try {
       // Ask first: a missing `flow lsp` answers 200 here, so the console
-      // stays clean and the older helpers carry on.
-      const probe = await post(START_ROUTE, "");
-      let available = probe.status !== 404;
-      if (probe.status === 200) { try { available = JSON.parse(probe.text).available === true; } catch (_) { available = false; } }
+      // stays clean and the older helpers carry on. A first start that is
+      // still building the server answers "starting"; ask again until the
+      // bridge says yes or gives up.
+      let available = false;
+      for (;;) {
+        const probe = await post(START_ROUTE, "");
+        available = probe.status !== 404;
+        let answer = null;
+        if (probe.status === 200) { try { answer = JSON.parse(probe.text); } catch (_) { answer = null; } }
+        if (answer && answer.starting === true) {
+          await new Promise(resolve => timers.setTimeout(resolve, START_RETRY_MS));
+          continue;
+        }
+        if (probe.status === 200) available = !!answer && answer.available === true;
+        break;
+      }
       if (!available) { state = "unavailable"; return false; }
       result = await request("initialize", { processId: null, rootUri: null, capabilities: {} });
     } catch (_) { result = null; }

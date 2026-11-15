@@ -1950,7 +1950,10 @@ async function executeCode(code, label, languageOverride = null, options = {}) {
   if (globalThis.FlowStudioTerminal && globalThis.FlowStudioTerminal.view !== "console")
     globalThis.FlowStudioTerminal.show("console");
   status("Running " + executionLanguage + " …");
-  writeConsole("\n> " + label + " (" + executionLanguage + ")\n", executionLanguage, "cmd");
+  const consoleIO = globalThis.FlowStudioConsoleIO;
+  const consoleRun = consoleIO && consoleIO.begin ? consoleIO.begin(executionLanguage, runLabel(label)) : null;
+  if (!consoleRun) writeConsole("\n> " + label + " (" + executionLanguage + ")\n", executionLanguage);
+  let consoleOutput = "";
   const startedAt = Date.now();
   let ok = false;
   try {
@@ -1965,7 +1968,8 @@ async function executeCode(code, label, languageOverride = null, options = {}) {
     if (executionLanguage === "flow" && globalThis.FlowStudioFlowPlots)
       output = FlowStudioFlowPlots.take(output);
     ok = response.ok;
-    writeConsole(output + "\n", executionLanguage);
+    if (consoleRun) consoleOutput = output;
+    else writeConsole(output + "\n", executionLanguage);
     if (executionLanguage === "mathflow" && response.ok) {
       try {
         FlowStudioMathPlots.render(document, el("mathFlowPlot"), JSON.parse(output));
@@ -1994,20 +1998,32 @@ async function executeCode(code, label, languageOverride = null, options = {}) {
       catch (_) { /* Figure capture is optional; the run still succeeded. */ }
     }
   } catch (error) {
-    writeConsole(String(error) + "\n", executionLanguage);
+    if (consoleRun) consoleOutput = String(error);
+    else writeConsole(String(error) + "\n", executionLanguage);
     status("Execution request failed", "error");
     return false;
   } finally {
+    if (consoleRun) consoleIO.finish(consoleRun, ok, consoleOutput);
     if (executionLanguage === "python" || executionLanguage === "r") {
       try { await refreshPythonEnvironment(); }
       catch (error) { showPythonEnvironmentMessage(error.message || String(error)); }
     }
     el("run").disabled = false;
     el("runCell").disabled = false;
-    writeConsole("↳ " + ((Date.now() - startedAt) / 1000).toFixed(1) + " s\n",
-      executionLanguage, "meta");
+    if (!consoleRun)
+      writeConsole("\u21B3 " + ((Date.now() - startedAt) / 1000).toFixed(1) + " s\n", executionLanguage);
   }
   return ok;
+}
+/* "untitled.flow", "selection in untitled.flow", "cell 2 of 5 in notes.R". */
+function runLabel(label) {
+  const doc = activeDocument();
+  const name = doc && doc.name ? doc.name : "buffer";
+  if (label === "[buffer]") return name;
+  if (label === "[selection]") return "selection in " + name;
+  const cell = /^\[cell (\d+)\/(\d+)\]$/.exec(label);
+  if (cell) return "cell " + cell[1] + " of " + cell[2] + " in " + name;
+  return String(label || name);
 }
 /* Flow, the way R scripts work: Ctrl+Enter sends the selection, or the
  * statement under the cursor, to the Flow console session and moves to the
@@ -2851,6 +2867,7 @@ renderTabs();
   <script src="/plot_figures.js"></script>
   <script src="/terminal_input.js"></script>
   <script src="/terminal_sessions.js"></script>
+  <script src="/console_format.js"></script>
   <script src="/ide_flow_session.js"></script>
   <script src="/workspace_console.js"></script>
 <script src="/packages_panel.js"></script>

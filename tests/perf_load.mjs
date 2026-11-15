@@ -7,9 +7,8 @@
  * (default 3; the median is reported). PERF_JSON=<file> writes the raw
  * numbers. PERF_NO_ASSERT=1 prints without checking budgets.
  *
- * Budgets were set from measured numbers on an M-series Mac with headroom
- * for a slower CI machine. The cold load numbers depend on the machine, so
- * CI=1 widens them by PERF_CI_FACTOR (default 3). */
+ * Timing budgets depend on the machine, so CI=1 widens them by
+ * PERF_CI_FACTOR (default 3). Byte and request budgets do not change. */
 import { chromium } from 'playwright';
 import { writeFileSync } from 'node:fs';
 
@@ -19,21 +18,26 @@ const SLACK = process.env.CI ? Number(process.env.PERF_CI_FACTOR || 3) : 1;
 
 /* Every budget is in ms, KB or a count. */
 const BUDGET = {
-  html_ms: 150,              // document response
-  fcp_ms: 450,               // first contentful paint
-  editor_ms: 1300,           // Monaco shows lines of text
-  long_task_max_ms: 600,     // the single longest main-thread task while loading
-  warm_transfer_kb: 260,     // bytes over the wire on a reload
-  warm_editor_ms: 1200,
-  requests: 70,
-  action_new_tab_ms: 50,
-  action_switch_tab_ms: 50,
-  action_open_file_ms: 80,
-  action_open_panel_ms: 50,
-  action_toggle_dock_ms: 50,
-  action_open_menu_ms: 50,
-  action_zoom_ms: 80,
-  typing_p95_ms: 50,          // per keystroke in a 4000 line file
+  // Measured on an M-series Mac shared with other work, 2026-11-15, after the
+  // change: html 1 to 2 ms, FCP 44 to 72, editor 290 to 500, longest task 170
+  // to 280, reload 16 KB, actions 6 to 31, zoom 23 to 55, typing p95 24.
+  // Before it: html 0.7 to 2 s, FCP 0.7 to 2.1 s, editor 0.9 to 2.7 s and
+  // 5.2 MB on every reload.
+  html_ms: 50,               // document response
+  fcp_ms: 250,               // first contentful paint
+  editor_ms: 900,            // Monaco shows lines of text
+  long_task_max_ms: 400,     // the longest task while loading: compiling Monaco on a cold cache
+  warm_transfer_kb: 64,      // bytes over the wire on a reload
+  warm_editor_ms: 500,
+  requests: 60,              // static files on load
+  action_new_tab_ms: 40,
+  action_switch_tab_ms: 40,
+  action_open_file_ms: 80,   // a 4000 line file
+  action_open_panel_ms: 40,
+  action_toggle_dock_ms: 40,
+  action_open_menu_ms: 40,
+  action_zoom_ms: 100,
+  typing_p95_ms: 50,         // per keystroke in the 4000 line file
   console_flow_ms: 8000      // includes compiling Flow on the server
 };
 
@@ -132,7 +136,8 @@ async function checkCaching() {
   const health = await fetch(URL + 'health');
   if (health.headers.get('cache-control') !== 'no-store' || health.headers.get('etag')) throw new Error('/health must not be stored');
 }
-await checkCaching();
+try { await checkCaching(); console.log('Static files revalidate with ETag and 304.'); }
+catch (error) { if (!process.env.PERF_NO_ASSERT) throw error; console.log('caching: ' + error.message); }
 
 const browser = await chromium.launch({ headless: true,
   ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}) });

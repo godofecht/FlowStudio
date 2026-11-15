@@ -41,9 +41,6 @@ export function mountZoom({ doc = document, storage = globalThis.localStorage, e
     const font = codeFont(doc);
     if (editor) editor.updateOptions(font);
     doc.dispatchEvent(new CustomEvent('flowstudio:zoom', { detail: { level, ...font } }));
-    // The layout manager sizes panes from the window, not from fonts, but a
-    // relayout keeps the dock and panes inside the window after a change.
-    if (globalThis.FlowStudioLayout) globalThis.FlowStudioLayout.relayout();
     return level;
   }
   function step(direction) {

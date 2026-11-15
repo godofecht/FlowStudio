@@ -124,6 +124,20 @@ async function surfaces(page, width, label) {
     checks.push(surface);
   };
   await check('workbench');
+  // A long project name, and a wide UI font like the DejaVu Sans a Linux
+  // machine falls back to, must not push the title bar off the screen.
+  const restore = await page.evaluate(() => {
+    const name = document.getElementById('projectName');
+    const before = name.textContent;
+    name.textContent = 'a-very-long-project-name-that-cannot-fit-in-the-explorer';
+    document.documentElement.style.setProperty('--font-ui', 'Verdana, "DejaVu Sans", sans-serif');
+    return before;
+  });
+  await check('long-name-wide-font');
+  await page.evaluate(before => {
+    document.getElementById('projectName').textContent = before;
+    document.documentElement.style.removeProperty('--font-ui');
+  }, restore);
   if (width > 900) {
     for (const menu of ['menuFile', 'menuView', 'menuRun']) {
       await page.locator(`#${menu} .menu-trigger`).click();

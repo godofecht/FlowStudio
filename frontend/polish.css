@@ -47,7 +47,7 @@
 @media (max-width:600px){
   .run-widget .backend-button{padding:0 6px}
   .run-widget .backend-button .bs-caret,.run-chip-dot{display:none}
-  .project-switcher{max-width:118px;padding:0 6px}
+  .project-switcher{max-width:84px;padding:0 6px}
   .project-switcher::before{display:none}
 }
 

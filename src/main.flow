@@ -68,6 +68,7 @@ extern {
     function fs_flow_run_bridged_quick(code: string) -> string
     function fs_flow_bridged_status() -> i32
     function fs_app_build(code: string) -> string
+    function fs_app_start(code: string) -> string
     function fs_app_build_status() -> i32
     function fs_app_serve(path: string) -> i32
     function unlink(path: string) -> i32
@@ -1235,6 +1236,11 @@ function dispatch() -> void {
         }
         if eq(path, "/api/inspect/python") {
             send_python_environment()
+            return
+        }
+        if eq(path, "/api/app/start") {
+            let begun: string = fs_app_start(fs_body())
+            fs_reply(fs_app_build_status(), "application/json; charset=utf-8", begun)
             return
         }
         if eq(path, "/api/app/build") {

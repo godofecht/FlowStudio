@@ -1,0 +1,12 @@
+{
+  "id": "polyglot-flow-blocks",
+  "order": 6,
+  "title": "Python and R blocks in Flow",
+  "description": "A Flow program with R and Python code written inline: R fits a dose-response curve, Python summarises the plates, and typed values pass both ways.",
+  "files": ["dose_response.flow"],
+  "steps": [
+    "Press Run. Flow lays out twelve wells and passes them to R by name.",
+    "r(wells) { ... } gets a data frame and returns the fitted EC50 as an f64.",
+    "python(...) -> array<f64, 4> { ... } returns a typed Flow array."
+  ]
+}

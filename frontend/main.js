@@ -22,6 +22,7 @@ import { createIcons, FolderOpen, FilePlus2, RotateCw, Play, Blocks, Files, List
   ChevronRight, Circle, ArrowUpRight, X, FileCode2, Package, Library, Bug,
   Octagon, Download, List, CircleCheck, Ellipsis } from 'lucide';
 import { mountEditor } from './editor.js';
+import { flowLanguage, loadEmbeddedLanguages } from './flow_language.js';
 import { registerCompletion } from './completion.js';
 import './workbench.css';
 import './polish.css';
@@ -56,15 +57,9 @@ monaco.editor.defineTheme('flowstudio', {
   }
 });
 monaco.languages.register({ id: 'flow', extensions: ['.flow'] });
-monaco.languages.setMonarchTokensProvider('flow', {
-  keywords: ['function', 'return', 'let', 'mut', 'const', 'if', 'else', 'while', 'for',
-    'in', 'import', 'export', 'struct', 'enum', 'trait', 'impl', 'match', 'true', 'false', 'and', 'or'],
-  tokenizer: { root: [
-    [/#.*$/, 'comment'], [/"([^"\\]|\\.)*"/, 'string'],
-    [/\b\d+(\.\d+)?\b/, 'number'],
-    [/[a-zA-Z_]\w*/, { cases: { '@keywords': 'keyword', '@default': 'identifier' } }]
-  ] }
-});
+// Python and R blocks inside Flow are tokenized as Python and R.
+monaco.languages.setMonarchTokensProvider('flow', flowLanguage);
+loadEmbeddedLanguages(monaco);
 monaco.languages.setLanguageConfiguration('flow', {
   comments: { lineComment: '#' }, brackets: [['{', '}'], ['(', ')'], ['[', ']']],
   autoClosingPairs: [{ open: '{', close: '}' }, { open: '(', close: ')' },

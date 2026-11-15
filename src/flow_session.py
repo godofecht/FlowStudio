@@ -41,6 +41,8 @@ import subprocess
 import sys
 import tempfile
 
+import flow_blocks
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BRIDGE_MODULE = os.path.join(ROOT, "src", "flowstudio.flow")
 PROBE_TYPE = "FlowStudioSessionProbe"
@@ -559,6 +561,53 @@ def error_reply(message: str, entries: int) -> str:
     return json.dumps({"ok": False, "output": message, "variables": None, "entry": entries})
 
 
+def block_error(error, state: dict, check_only: bool) -> tuple[int, str]:
+    if check_only:
+        return 2, json.dumps({"ok": False, "output": error.text(),
+                              "diagnostics": [{"line": error.line, "column": error.column, "message": error.message}]})
+    return 2, error_reply(error.text(), state["entries"])
+
+
+def block_support(entry: str, declarations: list[str], imports: list[str]) -> tuple[list[str], list[str]]:
+    """Helpers for the rewritten blocks of this entry and of earlier
+    declarations, and the imports with the bridge functions added. The state
+    keeps neither: they are generated again for every program."""
+    text = entry + "\n" + "\n".join(declarations)
+    if "flowstudio_call(" not in text:
+        return [], list(imports)
+    helpers = flow_blocks.support(text, flow_blocks.struct_fields("\n".join(declarations) + "\n" + entry))
+    return helpers + [""], list(imports) + [flow_blocks.IMPORT_LINE]
+
+
+def assemble(state: dict, entry: str, extra: list[str]) -> str:
+    """The session program around an entry, for the block type probe."""
+    imports = list(state["imports"])
+    declarations = list(state["declarations"])
+    statements = []
+    for item in split_items(entry):
+        text = item["text"].strip("\n")
+        if item["kind"] == "declaration" and text.lstrip().startswith("import"):
+            imports += [line.strip() for line in text.split("\n") if line.strip()]
+        elif item["kind"] == "declaration":
+            name = declaration_name(text)
+            declarations = [d for d in declarations if not name or declaration_name(d) != name] + [text]
+        else:
+            statements.append(item)
+    shadowed = set()
+    for item in statements:
+        match = LET.match(item["text"].strip())
+        if match:
+            shadowed.add(match.group(2))
+    body = restore_lines(state, shadowed)
+    for item in statements:
+        body += indent(item["text"])
+    helpers, imports = block_support(entry, declarations, imports)
+    if flow_blocks.IMPORT_LINE not in imports:
+        imports.append(flow_blocks.IMPORT_LINE)
+    source, _ = program(imports, declarations, body, helpers + extra)
+    return source
+
+
 def prepare(directory: str, entry: str, check_only: bool = False) -> tuple[int, str]:
     """The program for an entry. With check_only, only the errors, as JSON
     diagnostics with entry lines and columns; the session is left alone."""
@@ -567,9 +616,27 @@ def prepare(directory: str, entry: str, check_only: bool = False) -> tuple[int, 
         return 2, error_reply("This entry is larger than 256 KiB.", state["entries"])
     if re.search(r"(^|\n)\s*(?:pub\s+)?function\s+main\s*\(", entry):
         # A whole program runs as it is, outside the session.
+        try:
+            text, _, found_blocks = flow_blocks.expand(entry)
+        except flow_blocks.BlockError as error:
+            return block_error(error, state, check_only)
+        if check_only:
+            code, output = flow_blocks.check_source(entry)
+            diagnostics = [{"line": int(m.group(1)), "column": int(m.group(2)), "message": m.group(3)}
+                           for m in re.finditer(r"prog\.flow:([0-9]+):([0-9]+):\s*(?:error:\s*)?(.*)", output)]
+            return (0 if code == 0 else 2), json.dumps({"ok": code == 0, "output": output.strip() or
+                                                        "Flow program passed checking.", "diagnostics": diagnostics})
         state["pending"] = {"whole": True}
         save(directory, state)
-        return 0, entry
+        return 0, flow_blocks.finish(text, flow_blocks.struct_fields(entry)) if found_blocks else entry
+    # Python and R blocks become bridge calls on the same lines; their
+    # argument types come from a probe of the session program.
+    try:
+        entry, mapping, blocks = flow_blocks.expand(
+            entry, check=lambda probed, extra: run_checker(directory, assemble(state, probed, extra)),
+            declarations="\n".join(state["declarations"]))
+    except flow_blocks.BlockError as error:
+        return block_error(error, state, check_only)
     items = split_items(entry)
     imports = list(state["imports"])
     declarations = list(state["declarations"])
@@ -592,6 +659,8 @@ def prepare(directory: str, entry: str, check_only: bool = False) -> tuple[int, 
             new_items.append((text, item["line"]))
         else:
             statements.append(item)
+    # Helpers the rewritten blocks call, generated for this program only.
+    block_top, imports_run = block_support(entry, declarations, imports)
     show_last = bool(statements) and is_expression(statements[-1]["text"])
     names: list[tuple[str, bool, str | None]] = []
     for item in statements:
@@ -623,8 +692,8 @@ def prepare(directory: str, entry: str, check_only: bool = False) -> tuple[int, 
     probe_values = [name for name, _, _ in names] + ([reference or VALUE_NAME] if show_last else [])
     probe_body = restore + body_lines + last_lines + [
         f"    let flowstudio_probe_{index}: {PROBE_TYPE} = {value}" for index, value in enumerate(probe_values)]
-    probe_top = [f"struct {PROBE_TYPE} {{", "    flowstudio_unused: i32", "}", ""]
-    probe_source, probe_start = program(imports, declarations, probe_body, probe_top)
+    probe_top = block_top + [f"struct {PROBE_TYPE} {{", "    flowstudio_unused: i32", "}", ""]
+    probe_source, probe_start = program(imports_run, declarations, probe_body, probe_top)
     report = run_checker(directory, probe_source)
     if "flow was not found" in report:
         return 2, error_reply("The flow compiler was not found on PATH.", state["entries"])
@@ -666,15 +735,19 @@ def prepare(directory: str, entry: str, check_only: bool = False) -> tuple[int, 
             column -= len(f"    let {VALUE_NAME} = ") - (len(original) - len(original.lstrip()))
         elif number < probe_start:
             # A declaration from this entry maps back to its line.
-            for program_line, item_line, count in declaration_lines(imports, declarations, new_items):
+            for program_line, item_line, count in declaration_lines(imports_run, declarations, new_items):
                 if program_line <= number < program_line + count:
                     entry_line = item_line + number - program_line + 1
         location = f"line {entry_line}: " if entry_line else ""
         message = message.replace(VALUE_NAME, "value")
         errors.append(location + message)
         if entry_line:
+            column = mapping.original_column(entry_line - 1, max(1, column) - 1) + 1
             found.append({"line": entry_line, "column": max(1, column), "message": message})
     if check_only:
+        for error in flow_blocks.python_syntax(blocks):
+            errors.append(error.text())
+            found.append({"line": error.line, "column": error.column, "message": error.message})
         failed = bool(errors) or (bool(probe_names) and not types and "error" in report)
         if failed and not errors:
             errors = [line for line in report.splitlines() if "error" in line][:12]
@@ -723,7 +796,7 @@ def prepare(directory: str, entry: str, check_only: bool = False) -> tuple[int, 
             dump += dump_lines(state, new_declarations, VALUE_NAME, value_kind, reference)
         recorded.append({"name": VALUE_NAME, "type": value_kind, "mutable": False, "value": True,
                          "dumped": dumped})
-    source, _ = program(imports, declarations, run_body + dump)
+    source, _ = program(imports_run, declarations, run_body + dump, block_top)
     state["pending"] = {"imports": imports, "declarations": declarations,
                         "new_declarations": new_declarations, "recorded": recorded}
     save(directory, state)

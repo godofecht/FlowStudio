@@ -24,13 +24,15 @@ import io
 import json
 import math
 import os
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
 import traceback
+import urllib.parse
 
-__all__ = ["r", "R", "flow", "Frame", "RError", "FlowError", "to_r"]
+__all__ = ["r", "R", "flow", "Frame", "Rows", "RError", "FlowError", "to_r"]
 
 _channel: tuple | None = None
 _namespace: dict | None = None
@@ -346,8 +348,11 @@ def evaluate(namespace: dict, fmt: str, source: str) -> tuple[bool, bytes]:
 
     Statements run in order; when the last one is an expression its value is
     returned, formatted for the caller: R source with the captured output for
-    R, plain text for Flow.
+    R, plain text for Flow. Format "b" is a typed block from a Flow program
+    (see block()).
     """
+    if fmt == "b":
+        return block(namespace, source)
     output = io.StringIO()
     value = None
     try:
@@ -370,6 +375,258 @@ def evaluate(namespace: dict, fmt: str, source: str) -> tuple[bool, bytes]:
         reply = printed + _to_text(value) if fmt == "t" else json.dumps(
             {"value": repr(value), "output": printed})
     return True, reply.encode("utf-8", "replace")
+
+
+# ---- Typed blocks from Flow ------------------------------------------------
+#
+# A Flow program sends a python(...) { ... } block as format "b" (see the
+# request layout in src/flowstudio.flow). The values it passes are set in the
+# session namespace under their Flow names while the block runs, the code
+# runs with its Flow line numbers, and the last expression's value comes
+# back as the Flow type the block asked for, or as an error that names the
+# Flow line.
+
+_BLOCK_FILE = "<flow>"
+_BLOCK_REPLY_MAX = 120 * 1024
+_BLOCK_OUTPUT_MAX = 32 * 1024
+_BLOCK_ARRAY = re.compile(r"(f64|f32|i64|i32|bool|string)\[([0-9]+)\]$")
+
+
+class _BlockFailure(Exception):
+    pass
+
+
+class _Lines:
+    def __init__(self, text: str):
+        self.text = text
+        self.at = 0
+
+    def next(self) -> str:
+        end = self.text.find("\n", self.at)
+        if end < 0:
+            raise ValueError("the request ends early")
+        line = self.text[self.at:end]
+        self.at = end + 1
+        return line
+
+    def rest(self) -> str:
+        return self.text[self.at:]
+
+
+def _block_scalar(tag: str, text: str):
+    if tag == "f":
+        return float(text)
+    if tag == "i":
+        return int(text)
+    if tag == "b":
+        return text == "1"
+    if tag == "s":
+        return urllib.parse.unquote(text, errors="replace")
+    raise ValueError(f"unknown value kind {tag!r}")
+
+
+def _optional(module: str):
+    try:
+        return __import__(module)
+    except ImportError:
+        return None
+
+
+def _block_values(lines: _Lines) -> tuple[dict, str]:
+    """The values a block passes, by name, and the block's code."""
+    values: dict = {}
+    while True:
+        tag = lines.next()
+        if tag == "code":
+            return values, lines.rest()
+        name = lines.next()
+        if tag in ("f", "i", "b", "s"):
+            values[name] = _block_scalar(tag, lines.next())
+        elif tag in ("F", "I", "B", "S"):
+            count = int(lines.next())
+            items = [_block_scalar(tag.lower(), lines.next()) for _ in range(count)]
+            numpy = _optional("numpy") if tag != "S" else None
+            # Arrays of numbers arrive as numpy arrays when numpy is installed.
+            values[name] = numpy.array(items, dtype={"F": numpy.float64, "I": numpy.int64,
+                                                      "B": numpy.bool_}[tag]) if numpy else items
+        elif tag == "d":
+            specs = [(lines.next(), lines.next()) for _ in range(int(lines.next()))]
+            values[name] = {field: _block_scalar(kind, lines.next()) for kind, field in specs}
+        elif tag == "R":
+            rows = int(lines.next())
+            specs = [(lines.next(), lines.next()) for _ in range(int(lines.next()))]
+            records = Rows({field: _block_scalar(kind, lines.next()) for kind, field in specs}
+                           for _ in range(rows))
+            pandas = _optional("pandas")
+            # Rows of structs arrive as a pandas DataFrame, or as Rows
+            # (a list of dicts that also gives columns) without pandas.
+            values[name] = pandas.DataFrame({field: records[field] for _, field in specs}) if pandas else records
+        else:
+            raise ValueError(f"unknown value kind {tag!r}")
+
+
+class Rows(list):
+    """Rows of a Flow struct array when pandas is not installed: a list of
+    dicts, one per row, where rows["field"] is also the column."""
+
+    def __getitem__(self, key):
+        if isinstance(key, str):
+            return [row[key] for row in self]
+        return list.__getitem__(self, key)
+
+    @property
+    def columns(self) -> list[str]:
+        return list(self[0].keys()) if self else []
+
+    def to_pandas(self):
+        import pandas
+        return pandas.DataFrame(list(self))
+
+
+def _describe(value) -> str:
+    if value is None:
+        return "None"
+    text = repr(value)
+    if len(text) > 60:
+        text = text[:57] + "..."
+    return f"{type(value).__name__} {text}"
+
+
+def _block_scalar_out(kind: str, value) -> str:
+    import numbers
+    numpy = sys.modules.get("numpy")
+    if kind in ("f64", "f32"):
+        if isinstance(value, bool) or not isinstance(value, numbers.Real):
+            raise ValueError("a number")
+        return "%.17g" % float(value)
+    if kind in ("i64", "i32"):
+        if isinstance(value, bool) or (numpy is not None and isinstance(value, numpy.bool_)):
+            raise ValueError("a whole number")
+        if isinstance(value, numbers.Integral):
+            number = int(value)
+        elif isinstance(value, numbers.Real) and float(value).is_integer():
+            number = int(float(value))
+        else:
+            raise ValueError("a whole number")
+        bits = 31 if kind == "i32" else 63
+        if not -(1 << bits) <= number < (1 << bits):
+            raise ValueError(f"a whole number that fits in {kind}")
+        return str(number)
+    if kind == "bool":
+        if isinstance(value, bool) or (numpy is not None and isinstance(value, numpy.bool_)):
+            return "1" if value else "0"
+        raise ValueError("True or False")
+    if kind == "string":
+        if isinstance(value, str):
+            return value
+        raise ValueError("a string")
+    raise ValueError(f"a type FlowStudio does not know ({kind})")
+
+
+def _block_sequence(value):
+    if isinstance(value, (str, bytes, dict)):
+        return None
+    module = type(value).__module__ or ""
+    if module.startswith("numpy") and hasattr(value, "ndim"):
+        return value.tolist() if value.ndim == 1 else None
+    if module.startswith("pandas.") and type(value).__name__ == "Series":
+        return value.tolist()
+    if isinstance(value, (list, tuple, range)):
+        return list(value)
+    return None
+
+
+def _block_value(kind: str, value, line: int) -> str:
+    """The value as the Flow type kind, or _BlockFailure naming the line."""
+    if kind == "void":
+        return ""
+    if kind == "string":
+        return _to_text(value)
+    array = _BLOCK_ARRAY.match(kind)
+    if array:
+        element, size = array.group(1), int(array.group(2))
+        wanted = f"array<{element}, {size}>"
+        items = _block_sequence(value)
+        if items is None:
+            raise _BlockFailure(f"line {line}: the Python block returned {_describe(value)}; "
+                                f"{wanted} needs a list of {size} values.")
+        if len(items) != size:
+            raise _BlockFailure(f"line {line}: the Python block returned {len(items)} values; "
+                                f"{wanted} needs {size}.")
+        out = []
+        for index, item in enumerate(items):
+            try:
+                text = _block_scalar_out(element, item)
+            except ValueError as reason:
+                raise _BlockFailure(f"line {line}: item {index} of the Python block's value is "
+                                    f"{_describe(item)}; {element} needs {reason}.") from None
+            out.append(urllib.parse.quote(text, safe="-._~") if element == "string" else text)
+        return "\n".join(out)
+    try:
+        return _block_scalar_out(kind, value)
+    except ValueError as reason:
+        raise _BlockFailure(f"line {line}: the Python block returned {_describe(value)}; "
+                            f"{kind} needs {reason}.") from None
+
+
+def block(namespace: dict, payload: str) -> tuple[bool, bytes]:
+    """Run one python(...) { ... } block from a Flow program."""
+    try:
+        lines = _Lines(payload)
+        if lines.next() != "FSBLOCK 1":
+            raise ValueError("unknown block request version")
+        kind = lines.next()
+        line = int(lines.next())
+        first = int(lines.next())
+        values, code = _block_values(lines)
+    except (ValueError, IndexError) as error:
+        return False, f"FlowStudio could not read the block request: {error}.".encode("utf-8")
+    output = io.StringIO()
+    value = None
+    # The passed values exist while the block runs. A session variable of
+    # the same name (or a builtin such as sorted) comes back afterwards;
+    # other names the block assigns stay in the session.
+    missing = object()
+    saved = {name: namespace.get(name, missing) for name in values}
+    try:
+        with contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
+            # Blank lines in front give every statement its Flow line number.
+            tree = ast.parse("\n" * max(0, first - 1) + code, _BLOCK_FILE, "exec")
+            namespace.update(values)
+            last = tree.body.pop() if tree.body and isinstance(tree.body[-1], ast.Expr) else None
+            exec(compile(tree, _BLOCK_FILE, "exec"), namespace)
+            if last is not None:
+                expression = ast.Expression(last.value)
+                ast.copy_location(expression, last)
+                value = eval(compile(expression, _BLOCK_FILE, "eval"), namespace)
+    except SyntaxError as error:
+        text = output.getvalue() + f"line {error.lineno or first}: Python syntax error: {error.msg}"
+        return False, text.encode("utf-8", "replace")
+    except BaseException:
+        kind_, error, trace = sys.exc_info()
+        frames = [frame for frame in traceback.extract_tb(trace) if frame.filename == _BLOCK_FILE]
+        where = frames[-1].lineno if frames else line
+        message = "".join(traceback.format_exception_only(kind_, error)).strip()
+        text = output.getvalue() + f"line {where}: Python error: {message}"
+        for frame in reversed(frames[:-1]):
+            text += f"\n  called from line {frame.lineno}"
+        return False, text.encode("utf-8", "replace")
+    finally:
+        for name, before in saved.items():
+            if before is missing:
+                namespace.pop(name, None)
+            else:
+                namespace[name] = before
+    printed = output.getvalue().encode("utf-8", "replace")
+    if len(printed) > _BLOCK_OUTPUT_MAX:
+        printed = printed[:_BLOCK_OUTPUT_MAX] + b"\n[FlowStudio: the rest of the block's output was cut]\n"
+    try:
+        text = _block_value(kind, value, line).encode("utf-8", "replace")
+    except _BlockFailure as failure:
+        return False, printed + str(failure).encode("utf-8", "replace")
+    if len(printed) + len(text) > _BLOCK_REPLY_MAX:
+        return False, f"line {line}: the Python block's value is larger than 120 KiB.".encode("utf-8")
+    return True, str(len(printed)).encode("ascii") + b"\n" + printed + text
 
 
 # ---- Flow ----------------------------------------------------------------
@@ -395,6 +652,14 @@ def flow(program: str, input: str | None = None, timeout: float = 60.0) -> str:
     if "\n" not in program and program.endswith(".flow") and os.path.exists(program):
         with open(program, encoding="utf-8") as handle:
             source = handle.read()
+    import flow_blocks
+    try:
+        text, _, found = flow_blocks.expand(source)
+    except flow_blocks.BlockError as error:
+        raise FlowError(error.text()) from None
+    if found:
+        # python(...) { ... } and r(...) { ... } blocks become bridge calls.
+        source = flow_blocks.finish(text, flow_blocks.struct_fields(source))
     workdir = tempfile.mkdtemp(prefix="flowstudio-py-flow-")
     try:
         path = os.path.join(workdir, "main.flow")

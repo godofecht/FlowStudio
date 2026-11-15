@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.join(ROOT, "src"))
 
 import flowstudio_bridge as bridge  # noqa: E402
 
-URL = "http://127.0.0.1:8751"
+URL = os.environ.get("FLOWSTUDIO_URL", "http://127.0.0.1:8751").rstrip("/")
 
 
 def server_up() -> bool:
@@ -152,6 +152,8 @@ class LiveBridgeTests(unittest.TestCase):
             "python-runs-flow": ["primes below 2,000,000: 148,933"],
             "epidemic-pipeline": ["Flow sent 3 runs of 120 days", "Python sent 360 rows",
                                   "Python check: 0.1 0.2 0.35"],
+            "flow-blocks": ["EC50 from R: 0.800", "plate A mean 0.608, plate B mean 0.693",
+                            "predicted at 0.25, 0.5, 1, 2: 0.164 0.341 0.578 0.783"],
         }
         folder = os.path.join(ROOT, "examples", "polyglot")
         for name, needles in expected.items():

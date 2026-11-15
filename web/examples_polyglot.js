@@ -110,6 +110,26 @@ globalThis.FlowStudioPolyglotExamples = [
   ],
   "category": "polyglot",
   "language": "flow"
+ },
+ {
+  "id": "polyglot-flow-blocks",
+  "order": 6,
+  "title": "Python and R blocks in Flow",
+  "description": "A Flow program with R and Python code written inline: R fits a dose-response curve, Python summarises the plates, and typed values pass both ways.",
+  "files": [
+   {
+    "name": "dose_response.flow",
+    "language": "flow",
+    "text": "# Python and R blocks inside Flow. Flow lays out a dose-response plate,\n# R fits a Hill curve with nls(), and Python summarises each plate. The\n# blocks take Flow values by name and return Flow types: no strings to\n# build, nothing to parse.\nstruct Well {\n    dose: f64,\n    response: f64,\n    plate: string\n}\n\nfunction main() -> i32 {\n    # Flow: twelve wells, doses doubling from 1/16, responses on a Hill\n    # curve with a little deterministic noise.\n    let mut wells: array<Well, 12> = [Well { dose: 0.0, response: 0.0, plate: \"\" }]\n    for i in 0 to 12 {\n        let dose: f64 = pow(2.0, (i as f64) - 4.0)\n        let noise: f64 = sin((i as f64) * 1.7) * 0.02\n        let plate: string = if i % 2 == 0 { \"A\" } else { \"B\" }\n        wells[i] = Well { dose: dose, response: 1.0 / (1.0 + pow(0.8 / dose, 1.4)) + noise, plate: plate }\n    }\n\n    # R: the wells arrive as a data frame with columns dose, response, plate.\n    let ec50: f64 = r(wells) {\n        fit <- nls(response ~ 1 / (1 + (ec50 / dose)^hill), data = wells,\n                   start = list(ec50 = 1, hill = 1))\n        unname(coef(fit)[\"ec50\"])\n    }\n\n    # Python: the same wells as a DataFrame (or a dict of columns without\n    # pandas), and the EC50 R found, as a float.\n    let summary: string = python(wells, ec50) {\n        import statistics\n        plates = {}\n        for plate, response in zip(wells[\"plate\"], wells[\"response\"]):\n            plates.setdefault(plate, []).append(response)\n        means = \", \".join(f\"plate {p} mean {statistics.fmean(v):.3f}\" for p, v in sorted(plates.items()))\n        f\"{means}; EC50 {ec50:.3f}\"\n    }\n\n    # A typed array comes back: four predictions from the fitted curve.\n    let predicted: array<f64, 4> = python(ec50, hill = 1.4) -> array<f64, 4> {\n        [1 / (1 + (ec50 / d) ** hill) for d in (0.25, 0.5, 1.0, 2.0)]\n    }\n\n    printf(\"EC50 from R: %.3f\\n\", ec50)\n    println(summary)\n    printf(\"predicted at 0.25, 0.5, 1, 2: %.3f %.3f %.3f %.3f\\n\", predicted[0], predicted[1], predicted[2], predicted[3])\n    return 0\n}\n"
+   }
+  ],
+  "steps": [
+   "Press Run. Flow lays out twelve wells and passes them to R by name.",
+   "r(wells) { ... } gets a data frame and returns the fitted EC50 as an f64.",
+   "python(...) -> array<f64, 4> { ... } returns a typed Flow array."
+  ],
+  "category": "polyglot",
+  "language": "flow"
  }
 ];
 if (typeof module !== "undefined" && module.exports) module.exports = globalThis.FlowStudioPolyglotExamples;

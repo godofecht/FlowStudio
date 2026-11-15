@@ -1,5 +1,17 @@
 # flowstudio: call the live Python and R sessions from a Flow program.
 #
+# The usual way is a block, which needs no import:
+#
+#   let m: f64 = python(xs) {
+#       import numpy as np
+#       np.mean(xs)
+#   }
+#
+# FlowStudio rewrites each block into a call of flowstudio_call below
+# (src/flow_blocks.py), with typed values in and out.
+#
+# The older string calls still work:
+#
 #   import flowstudio { py, r, py_num, r_num, fmt }
 #
 # FlowStudio runs Flow programs with a bridge on fds 3 (requests) and 4
@@ -56,6 +68,11 @@ function hex_value(c: u8) -> i64 {
 # One request and its reply: "Q" + 8 hex digits + target + format + code,
 # answered by "0" or "1" + 8 hex digits + text.
 export function bridge_call(target: string, code: string) -> BridgeResult {
+    return bridge_request(target, "t", code)
+}
+
+# The same with the reply format named: "t" text, "b" a typed block.
+export function bridge_request(target: string, format: string, code: string) -> BridgeResult {
     if getenv("FLOWSTUDIO_BRIDGE") as i64 == 0 {
         return BridgeResult { ok: false, text: "The FlowStudio bridge is only available when FlowStudio runs this program." }
     }
@@ -68,7 +85,7 @@ export function bridge_call(target: string, code: string) -> BridgeResult {
     }
     let out: ptr<u8> = bridge_out
     let input: ptr<u8> = bridge_in
-    let body: string = target + "t" + code
+    let body: string = target + format + code
     let size: i64 = strlen(body)
     let header: string = malloc(16)
     snprintf(header, 16, "Q%08llx", size)
@@ -144,6 +161,397 @@ export function fmt_int(x: i64) -> string {
     let buf: string = malloc(24)
     snprintf(buf, 24, "%lld", x)
     return buf
+}
+
+# ---- Python and R blocks ---------------------------------------------------
+#
+#   let m: f64 = python(xs) {
+#       import numpy as np
+#       np.mean(xs)
+#   }
+#
+# FlowStudio rewrites each block into a call of flowstudio_call before the
+# program is checked or run (src/flow_blocks.py). The request is
+#
+#   "FSBLOCK 1\n" kind "\n" line "\n" first "\n" values "code\n" source
+#
+# kind is the result type (f64, i64, bool, string, void, f64[5], ...), line
+# the line of the block and first the line of its first source line. Each
+# value is one of, one item per line:
+#
+#   f|i|b|s, name, value                                    a scalar
+#   F|I|B|S, name, count, values                            an array
+#   d, name, k, k pairs of type and field, values           a struct
+#   R, name, rows, k, k pairs of type and field, values     rows of structs
+#
+# Numbers are written with %.17g or %lld, bools as 1 or 0 and strings
+# percent-encoded. The reply is the length of what the block printed, a
+# newline, the printed text and then the value: a scalar as text, an array
+# one item per line with strings percent-encoded. Values are bounded by the
+# bridge's 128 KiB limit.
+
+const FSBLOCK_LIMIT: i64 = 130000
+
+let mut fsblock_data: ptr<u8> = null
+let mut fsblock_used: i64 = 0
+let mut fsblock_over: bool = false
+let mut fsblock_args_over: bool = false
+
+export function flowstudio_buf_start() -> void {
+    if fsblock_data as i64 == 0 {
+        fsblock_data = malloc(FSBLOCK_LIMIT + 1) as ptr<u8>
+    }
+    fsblock_used = 0
+    fsblock_over = false
+}
+
+export function flowstudio_buf_put(text: string) -> void {
+    let n: i64 = strlen(text)
+    if fsblock_over or fsblock_used + n > FSBLOCK_LIMIT {
+        fsblock_over = true
+        return
+    }
+    let s: ptr<u8> = text as ptr<u8>
+    let out: ptr<u8> = fsblock_data
+    let mut k: i64 = 0
+    while k < n {
+        out[fsblock_used + k] = s[k]
+        k = k + 1
+    }
+    fsblock_used = fsblock_used + n
+}
+
+export function flowstudio_buf_int(x: i64) -> void {
+    let buf: string = malloc(32)
+    snprintf(buf, 32, "%lld\n", x)
+    flowstudio_buf_put(buf)
+}
+
+export function flowstudio_buf_f64(x: f64) -> void {
+    let buf: string = malloc(40)
+    snprintf(buf, 40, "%.17g\n", x)
+    flowstudio_buf_put(buf)
+}
+
+export function flowstudio_buf_bool(x: bool) -> void {
+    if x {
+        flowstudio_buf_put("1\n")
+    } else {
+        flowstudio_buf_put("0\n")
+    }
+}
+
+function fsblock_plain(c: u8) -> bool {
+    return (c >= 48 and c <= 57) or (c >= 65 and c <= 90) or (c >= 97 and c <= 122) or c == 45 or c == 46 or c == 95 or c == 126
+}
+
+# A string, percent-encoded, on one line.
+export function flowstudio_buf_str(x: string) -> void {
+    let s: ptr<u8> = x as ptr<u8>
+    let n: i64 = strlen(x)
+    let digits: string = "0123456789ABCDEF"
+    let d: ptr<u8> = digits as ptr<u8>
+    let piece: string = malloc(4)
+    let p: ptr<u8> = piece as ptr<u8>
+    let mut k: i64 = 0
+    while k < n {
+        let c: u8 = s[k]
+        if fsblock_plain(c) {
+            p[0] = c
+            p[1] = 0
+        } else {
+            p[0] = 37
+            p[1] = d[(c as i64) / 16]
+            p[2] = d[(c as i64) % 16]
+            p[3] = 0
+        }
+        flowstudio_buf_put(piece)
+        k = k + 1
+    }
+    flowstudio_buf_put("\n")
+}
+
+export function flowstudio_buf_take() -> string {
+    if fsblock_over {
+        fsblock_args_over = true
+    }
+    let text: string = malloc(fsblock_used + 1)
+    let t: ptr<u8> = text as ptr<u8>
+    let from: ptr<u8> = fsblock_data
+    let mut k: i64 = 0
+    while k < fsblock_used {
+        t[k] = from[k]
+        k = k + 1
+    }
+    t[fsblock_used] = 0
+    return text
+}
+
+export function flowstudio_arg_f64(name: string, x: f64) -> string {
+    flowstudio_buf_start()
+    flowstudio_buf_put("f\n" + name + "\n")
+    flowstudio_buf_f64(x)
+    return flowstudio_buf_take()
+}
+
+export function flowstudio_arg_i64(name: string, x: i64) -> string {
+    flowstudio_buf_start()
+    flowstudio_buf_put("i\n" + name + "\n")
+    flowstudio_buf_int(x)
+    return flowstudio_buf_take()
+}
+
+export function flowstudio_arg_bool(name: string, x: bool) -> string {
+    flowstudio_buf_start()
+    flowstudio_buf_put("b\n" + name + "\n")
+    flowstudio_buf_bool(x)
+    return flowstudio_buf_take()
+}
+
+export function flowstudio_arg_string(name: string, x: string) -> string {
+    flowstudio_buf_start()
+    flowstudio_buf_put("s\n" + name + "\n")
+    flowstudio_buf_str(x)
+    return flowstudio_buf_take()
+}
+
+export function flowstudio_arg_f64s(name: string, xs: span<f64>) -> string {
+    flowstudio_buf_start()
+    flowstudio_buf_put("F\n" + name + "\n")
+    flowstudio_buf_int(xs.len as i64)
+    for i in 0 to xs.len {
+        flowstudio_buf_f64(xs[i])
+    }
+    return flowstudio_buf_take()
+}
+
+export function flowstudio_arg_f32s(name: string, xs: span<f32>) -> string {
+    flowstudio_buf_start()
+    flowstudio_buf_put("F\n" + name + "\n")
+    flowstudio_buf_int(xs.len as i64)
+    for i in 0 to xs.len {
+        flowstudio_buf_f64(xs[i] as f64)
+    }
+    return flowstudio_buf_take()
+}
+
+export function flowstudio_arg_i64s(name: string, xs: span<i64>) -> string {
+    flowstudio_buf_start()
+    flowstudio_buf_put("I\n" + name + "\n")
+    flowstudio_buf_int(xs.len as i64)
+    for i in 0 to xs.len {
+        flowstudio_buf_int(xs[i])
+    }
+    return flowstudio_buf_take()
+}
+
+export function flowstudio_arg_i32s(name: string, xs: span<i32>) -> string {
+    flowstudio_buf_start()
+    flowstudio_buf_put("I\n" + name + "\n")
+    flowstudio_buf_int(xs.len as i64)
+    for i in 0 to xs.len {
+        flowstudio_buf_int(xs[i] as i64)
+    }
+    return flowstudio_buf_take()
+}
+
+export function flowstudio_arg_bools(name: string, xs: span<bool>) -> string {
+    flowstudio_buf_start()
+    flowstudio_buf_put("B\n" + name + "\n")
+    flowstudio_buf_int(xs.len as i64)
+    for i in 0 to xs.len {
+        flowstudio_buf_bool(xs[i])
+    }
+    return flowstudio_buf_take()
+}
+
+function fsblock_copy(t: ptr<u8>, start: i64, end: i64) -> string {
+    let text: string = malloc(end - start + 1)
+    let out: ptr<u8> = text as ptr<u8>
+    let mut k: i64 = start
+    while k < end {
+        out[k - start] = t[k]
+        k = k + 1
+    }
+    out[end - start] = 0
+    return text
+}
+
+function fsblock_starts_line(text: string) -> bool {
+    let t: ptr<u8> = text as ptr<u8>
+    return strlen(text) > 5 and t[0] == 108 and t[1] == 105 and t[2] == 110 and t[3] == 101 and t[4] == 32
+}
+
+# Runs one block and returns its value as text. What the block printed is
+# printed here. An error names the Flow line and stops the program.
+export function flowstudio_call(target: string, kind: string, line: i64, first: i64, code: string, args: string) -> string {
+    let mut language: string = "Python"
+    if target == "r" {
+        language = "R"
+    }
+    if fsblock_args_over or strlen(args) > FSBLOCK_LIMIT {
+        println("line " + fmt_int(line) + ": the values passed to this " + language + " block are larger than 128 KiB.")
+        exit(3)
+    }
+    let payload: string = "FSBLOCK 1\n" + kind + "\n" + fmt_int(line) + "\n" + fmt_int(first) + "\n" + args + "code\n" + code
+    let result: BridgeResult = bridge_request(target, "b", payload)
+    if result.ok == false {
+        if fsblock_starts_line(result.text) {
+            println(result.text)
+        } else {
+            println("line " + fmt_int(line) + ": " + language + " block: " + result.text)
+        }
+        exit(3)
+    }
+    let t: ptr<u8> = result.text as ptr<u8>
+    let total: i64 = strlen(result.text)
+    let mut at: i64 = 0
+    let mut printed: i64 = 0
+    while at < total and t[at] >= 48 and t[at] <= 57 {
+        printed = printed * 10 + ((t[at] as i64) - 48)
+        at = at + 1
+    }
+    if at >= total or t[at] != 10 or at + 1 + printed > total {
+        println("line " + fmt_int(line) + ": the " + language + " block sent a malformed reply.")
+        exit(3)
+    }
+    at = at + 1
+    if printed > 0 {
+        print(fsblock_copy(t, at, at + printed))
+    }
+    return fsblock_copy(t, at + printed, total)
+}
+
+export function flowstudio_f64(text: string) -> f64 {
+    return atof(text)
+}
+
+export function flowstudio_f32(text: string) -> f32 {
+    return atof(text) as f32
+}
+
+export function flowstudio_i64(text: string) -> i64 {
+    return atoll(text)
+}
+
+export function flowstudio_i32(text: string) -> i32 {
+    return atoll(text) as i32
+}
+
+export function flowstudio_bool(text: string) -> bool {
+    let t: ptr<u8> = text as ptr<u8>
+    return strlen(text) > 0 and t[0] == 49
+}
+
+function fsblock_line_end(t: ptr<u8>, total: i64, at: i64) -> i64 {
+    let mut k: i64 = at
+    while k < total and t[k] != 10 {
+        k = k + 1
+    }
+    return k
+}
+
+function fsblock_hex(c: u8) -> i64 {
+    if c >= 65 and c <= 70 {
+        return (c as i64) - 55
+    }
+    return hex_value(c)
+}
+
+function fsblock_unpercent(t: ptr<u8>, start: i64, end: i64) -> string {
+    let text: string = malloc(end - start + 1)
+    let out: ptr<u8> = text as ptr<u8>
+    let mut used: i64 = 0
+    let mut k: i64 = start
+    while k < end {
+        if t[k] == 37 and k + 2 < end + 1 and fsblock_hex(t[k + 1]) >= 0 and fsblock_hex(t[k + 2]) >= 0 {
+            out[used] = (fsblock_hex(t[k + 1]) * 16 + fsblock_hex(t[k + 2])) as u8
+            k = k + 3
+        } else {
+            out[used] = t[k]
+            k = k + 1
+        }
+        used = used + 1
+    }
+    out[used] = 0
+    return text
+}
+
+export function flowstudio_fill_f64s(text: string, out: span<mut f64>) -> void {
+    let t: ptr<u8> = text as ptr<u8>
+    let total: i64 = strlen(text)
+    let mut at: i64 = 0
+    for i in 0 to out.len {
+        let end: i64 = fsblock_line_end(t, total, at)
+        out[i] = atof(fsblock_copy(t, at, end))
+        at = end + 1
+    }
+}
+
+export function flowstudio_fill_f32s(text: string, out: span<mut f32>) -> void {
+    let t: ptr<u8> = text as ptr<u8>
+    let total: i64 = strlen(text)
+    let mut at: i64 = 0
+    for i in 0 to out.len {
+        let end: i64 = fsblock_line_end(t, total, at)
+        out[i] = atof(fsblock_copy(t, at, end)) as f32
+        at = end + 1
+    }
+}
+
+export function flowstudio_fill_i64s(text: string, out: span<mut i64>) -> void {
+    let t: ptr<u8> = text as ptr<u8>
+    let total: i64 = strlen(text)
+    let mut at: i64 = 0
+    for i in 0 to out.len {
+        let end: i64 = fsblock_line_end(t, total, at)
+        out[i] = atoll(fsblock_copy(t, at, end))
+        at = end + 1
+    }
+}
+
+export function flowstudio_fill_i32s(text: string, out: span<mut i32>) -> void {
+    let t: ptr<u8> = text as ptr<u8>
+    let total: i64 = strlen(text)
+    let mut at: i64 = 0
+    for i in 0 to out.len {
+        let end: i64 = fsblock_line_end(t, total, at)
+        out[i] = atoll(fsblock_copy(t, at, end)) as i32
+        at = end + 1
+    }
+}
+
+export function flowstudio_fill_bools(text: string, out: span<mut bool>) -> void {
+    let t: ptr<u8> = text as ptr<u8>
+    let total: i64 = strlen(text)
+    let mut at: i64 = 0
+    for i in 0 to out.len {
+        let end: i64 = fsblock_line_end(t, total, at)
+        out[i] = at < total and t[at] == 49
+        at = end + 1
+    }
+}
+
+# Strings come back one per line, percent-encoded. A generated helper
+# reads them in order: flowstudio_lines_start, then flowstudio_lines_next.
+let mut fsblock_lines: string = ""
+let mut fsblock_lines_at: i64 = 0
+
+export function flowstudio_lines_start(text: string) -> void {
+    fsblock_lines = text
+    fsblock_lines_at = 0
+}
+
+export function flowstudio_lines_next() -> string {
+    let t: ptr<u8> = fsblock_lines as ptr<u8>
+    let total: i64 = strlen(fsblock_lines)
+    let end: i64 = fsblock_line_end(t, total, fsblock_lines_at)
+    let item: string = fsblock_unpercent(t, fsblock_lines_at, end)
+    fsblock_lines_at = end + 1
+    if fsblock_lines_at > total {
+        fsblock_lines_at = total
+    }
+    return item
 }
 
 # ---- Plots -----------------------------------------------------------------

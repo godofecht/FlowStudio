@@ -35,6 +35,9 @@
 #if defined(__APPLE__) && !defined(_DARWIN_C_SOURCE)
 #define _DARWIN_C_SOURCE                   /* mkdtemp and O_NOFOLLOW */
 #endif
+#if !defined(__APPLE__) && !defined(_XOPEN_SOURCE)
+#define _XOPEN_SOURCE 700                  /* realpath */
+#endif
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>

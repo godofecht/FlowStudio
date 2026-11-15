@@ -51,6 +51,8 @@ struct pty_session {
 static struct pty_session sessions[PTY_MAX];
 static int next_session_id = 1;
 static int pty_last_status = 200;
+
+const char *fs_origin(void);
 static char pty_out[PTY_READ_LIMIT + 8];
 
 int fs_pty_status(void) { return pty_last_status; }
@@ -97,6 +99,49 @@ static int parse_size(const char *text, int *cols, int *rows)
     *cols = c;
     *rows = r;
     return 0;
+}
+
+/* Child side, before exec: give agent CLIs started in this terminal the
+ * FlowStudio MCP server. mcp/terminal/bin holds `claude` and `codex`
+ * wrappers that add the server to that one run and then exec the real
+ * binary, so the user's own config files are never touched. Login shells
+ * rebuild PATH from their startup files, so zsh and bash get small startup
+ * shims (mcp/terminal/zsh, mcp/terminal/bash) that run the user's own files
+ * first and put the wrappers back in front. Returns the bash rcfile to use,
+ * or NULL. */
+static const char *agent_environment(const char *shell_name, int *ready)
+{
+    static char root[1024], bin[1200], server[1200], shim[1200];
+    *ready = 0;
+    unsetenv("FLOWSTUDIO_TERMINAL_BIN");
+    unsetenv("FLOWSTUDIO_USER_ZDOTDIR");
+    if (!getcwd(root, sizeof(root))) return NULL;
+    snprintf(bin, sizeof(bin), "%s/mcp/terminal/bin", root);
+    snprintf(server, sizeof(server), "%s/mcp/flowstudio_mcp.py", root);
+    snprintf(shim, sizeof(shim), "%s/claude", bin);
+    if (access(shim, X_OK) != 0 || access(server, R_OK) != 0) return NULL;
+    setenv("FLOWSTUDIO_URL", fs_origin(), 1);
+    setenv("FLOWSTUDIO_MCP", server, 1);
+    setenv("FLOWSTUDIO_TERMINAL_BIN", bin, 1);
+    const char *old = getenv("PATH");
+    size_t len = strlen(bin) + (old ? strlen(old) : 0) + 2;
+    char *path = malloc(len);
+    if (path) {
+        snprintf(path, len, "%s%s%s", bin, old && *old ? ":" : "", old ? old : "");
+        setenv("PATH", path, 1);
+        free(path);
+    }
+    *ready = 1;
+    if (strcmp(shell_name, "zsh") == 0) {
+        snprintf(shim, sizeof(shim), "%s/mcp/terminal/zsh", root);
+        const char *user = getenv("ZDOTDIR");
+        if (user && *user && strcmp(user, shim) != 0) setenv("FLOWSTUDIO_USER_ZDOTDIR", user, 1);
+        setenv("ZDOTDIR", shim, 1);
+    } else if (strcmp(shell_name, "bash") == 0) {
+        snprintf(shim, sizeof(shim), "%s/mcp/terminal/bash/rc", root);
+        if (access(shim, R_OK) == 0) return shim;
+    }
+    return NULL;
 }
 
 static const char *open_session(const char *body)
@@ -150,8 +195,19 @@ static const char *open_session(const char *body)
         setenv("TERM_PROGRAM", "FlowStudio", 1);
         unsetenv("FLOWSTUDIO_PORT");
         const char *base = strrchr(shell, '/');
+        const char *name = base ? base + 1 : shell;
+        int agents = 0;
+        const char *bash_rc = agent_environment(name, &agents);
+        if (agents) {
+            static const char banner[] =
+                "\033[2mFlowStudio MCP tools are ready for claude and codex in this terminal.\033[0m\r\n";
+            ssize_t ignored = write(STDOUT_FILENO, banner, sizeof(banner) - 1);
+            (void)ignored;
+        }
+        /* A login bash ignores --rcfile; the rcfile runs the login files. */
+        if (bash_rc) execl(shell, "bash", "--rcfile", bash_rc, "-i", (char *)NULL);
         char argv0[256];
-        snprintf(argv0, sizeof(argv0), "-%s", base ? base + 1 : shell);   /* login shell */
+        snprintf(argv0, sizeof(argv0), "-%s", name);   /* login shell */
         execl(shell, argv0, (char *)NULL);
         execl("/bin/sh", "-sh", (char *)NULL);
         _exit(127);

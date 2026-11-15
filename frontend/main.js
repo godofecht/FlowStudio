@@ -24,7 +24,9 @@ import { createIcons, FolderOpen, FilePlus2, RotateCw, Play, Blocks, Files, List
 import { mountEditor } from './editor.js';
 import { registerCompletion } from './completion.js';
 import './workbench.css';
+import './polish.css';
 import { mountTerminalPanel } from './terminal_panel.js';
+import { mountPolish } from './polish.js';
 
 const icons = { FolderOpen, FilePlus2, RotateCw, Play, Blocks, Files, ListTree,
   ChartNoAxesCombined, Table2, Terminal, SlidersHorizontal, Search, Command,
@@ -77,6 +79,7 @@ document.getElementById('editorEngine').textContent = 'Monaco';
 registerCompletion(monaco, app);
 
 mountTerminalPanel();
+mountPolish();
 
 // The top bar command center, Ctrl+K and Ctrl+P open Search Everywhere
 // (web/ide_search_everywhere.js).

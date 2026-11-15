@@ -141,6 +141,9 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/ide_run_widget.js" {
         return StaticAsset { path: "web/ide_run_widget.js", mime: "text/javascript; charset=utf-8", found: true }
     }
+    if url == "/ide_flow_backend.js" {
+        return StaticAsset { path: "web/ide_flow_backend.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
     if url == "/ide_explorer.js" {
         return StaticAsset { path: "web/ide_explorer.js", mime: "text/javascript; charset=utf-8", found: true }
     }

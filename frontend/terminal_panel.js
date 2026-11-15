@@ -204,7 +204,10 @@ export function mountTerminalPanel() {
 
   const panel = {
     root, surface, instances: [], active: null, view: 'terminal', counter: 0,
-    show(view) {
+    // options.focus false shows the view without taking the keyboard, as
+    // on page load: the editor keeps focus until the user picks the terminal.
+    show(view, options = {}) {
+      const focus = options.focus !== false;
       if (!['terminal', 'console', 'debug'].includes(view)) view = 'terminal';
       this.view = view;
       const terminal = view === 'terminal';
@@ -219,22 +222,22 @@ export function mountTerminalPanel() {
       if (this.ready && globalThis.FlowStudioLayout && !globalThis.FlowStudioLayout.isVisible('dock')) globalThis.FlowStudioLayout.show('dock');
       try { localStorage.setItem('flowstudio.dock.view', view); } catch (_) {}
       if (terminal) {
-        if (!this.instances.length) this.create();
-        else this.select(this.active || this.instances[0]);
+        if (!this.instances.length) this.create(focus);
+        else this.select(this.active || this.instances[0], focus);
       }
     },
-    create() {
+    create(focus = true) {
       const instance = new ShellInstance(this, ++this.counter);
       this.instances.push(instance);
-      this.select(instance);
+      this.select(instance, focus);
       instance.start();
       return instance;
     },
-    select(instance) {
+    select(instance, focus = true) {
       this.active = instance;
       for (const item of this.instances) item.host.hidden = item !== instance;
       this.renderList();
-      requestAnimationFrame(() => { instance.fitNow(); instance.term.focus(); });
+      requestAnimationFrame(() => { instance.fitNow(); if (focus) instance.term.focus(); });
     },
     kill(instance) {
       const index = this.instances.indexOf(instance);
@@ -288,7 +291,7 @@ export function mountTerminalPanel() {
 
   let initial = 'terminal';
   try { initial = localStorage.getItem('flowstudio.dock.view') || 'terminal'; } catch (_) {}
-  panel.show(initial === 'console' ? 'console' : 'terminal');
+  panel.show(initial === 'console' ? 'console' : 'terminal', { focus: false });
   panel.debugRoot = debugRoot;
   panel.ready = true;
   globalThis.FlowStudioTerminal = panel;

@@ -1,0 +1,5 @@
+#!/bin/sh
+# FLOWSTUDIO-AGENT-WRAPPER
+# Runs the real codex with the FlowStudio MCP server. See ../agent_wrapper.sh.
+. "$(dirname "$0")/../agent_wrapper.sh"
+flowstudio_agent codex "$@"

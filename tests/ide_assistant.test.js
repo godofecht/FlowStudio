@@ -2,6 +2,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const assistant = require("../web/ide_assistant.js");
+const Diff = require("../web/ide_assistant_diff.js");
 
 /* ---------- a small DOM fake: enough for the panel ---------- */
 class Node_ {
@@ -62,6 +63,7 @@ function makeDoc() {
   doc.addEventListener = (name, fn) => { (doc.listeners[name] ||= []).push(fn); };
   doc.removeEventListener = (name, fn) => { doc.listeners[name] = (doc.listeners[name] || []).filter(item => item !== fn); };
   doc.key = event => { for (const fn of doc.listeners.keydown || []) fn(event); };
+  doc.fire = name => { for (const fn of doc.listeners[name] || []) fn({}); };
   return doc;
 }
 
@@ -148,7 +150,24 @@ async function until(check, ms = 2000) {
   while (Date.now() < end) { if (check()) return; await new Promise(resolve => setTimeout(resolve, 5)); }
   assert.fail("condition not reached");
 }
-function mountPanel(text = "function main() -> i32 {\n    return 0\n}\n", markers = []) {
+/* Stands in for web/ide_assistant_inline.js: records what the panel hands it. */
+function fakeInline(doc) {
+  const proposed = [];
+  let next = 1;
+  return { proposed,
+    propose(item) { const entry = { id: next++, ...item, hunks: [{ id: 1 }] }; proposed.push(entry); doc.fire("flowstudio:assistant-review"); return entry; },
+    list: () => proposed.filter(item => !item.done).map(item => ({ id: item.id, file: item.document.path || item.document.name, source: item.source,
+      label: item.label, pending: 1, total: 1, added: 1, removed: 1, active: false, waiting: false })),
+    finish(id, result) { const item = proposed.find(entry => entry.id === id); item.done = true; item.onFinish(result); doc.fire("flowstudio:assistant-review"); },
+    accept(id) { this.finish(id, { accepted: 1, rejected: 0, stale: 0, total: 1 }); return true; },
+    reject(id) { this.finish(id, { accepted: 0, rejected: 1, stale: 0, total: 1 }); return true; },
+    review(id) { this.reviewed = id; return true; } };
+}
+function memoryStorage() {
+  const map = new Map();
+  return { map, getItem: key => (map.has(key) ? map.get(key) : null), setItem: (key, value) => map.set(key, String(value)) };
+}
+function mountPanel(text = "function main() -> i32 {\n    return 0\n}\n", markers = [], extra = {}) {
   const doc = makeDoc();
   const host = doc.createElement("div");
   host.id = "assistantRoot";
@@ -160,10 +179,11 @@ function mountPanel(text = "function main() -> i32 {\n    return 0\n}\n", marker
   const shown = [];
   // Unref'd timers: a failed assertion never leaves the proposal poll holding the test runner open.
   const timer = (fn, ms) => { const handle = setTimeout(fn, ms); handle.unref(); return handle; };
+  const inline = fakeInline(doc);
   const panel = assistant.mount(doc, { host, app, editor, monaco, fetch: server.fetch, storage: null, pollMs: 5,
-    setTimeout: timer, clearTimeout, idleProposalMs: 20,
-    firstProposalPoll: 20, sidePanel: { show: name => shown.push(name) } });
-  return { doc, host, editor, monaco, app, server, panel, shown };
+    setTimeout: timer, clearTimeout, idleProposalMs: 20, inline, diff: Diff,
+    firstProposalPoll: 20, sidePanel: { show: name => shown.push(name) }, ...extra });
+  return { doc, host, editor, monaco, app, server, panel, shown, inline };
 }
 
 /* ---------- pure parts ---------- */
@@ -288,10 +308,11 @@ test("a prompt streams into the thread with tool lines, and the context is share
   const code = thread.querySelector(".as-code");
   assert.ok(code, "the code block renders");
   const buttons = code.querySelectorAll("button").map(button => button.textContent);
-  assert.deepEqual(buttons, ["Insert at cursor", "Replace selection", "Run"]);
-  code.querySelectorAll("button")[1].click();
-  assert.equal(editor.model.value, "function main() -> i32 {\n    function main() -> i32 {\n    return 0\n}\n\n}\n", "Replace selection edits through Monaco");
+  assert.deepEqual(buttons, ["Apply", "Copy", "Insert", "Run"]);
+  editor.select({ startLineNumber: 1, startColumn: 1, endLineNumber: 1, endColumn: 1 });
   code.querySelectorAll("button")[2].click();
+  assert.equal(editor.model.value, "function main() -> i32 {\n    return 0\n}\nfunction main() -> i32 {\n    return 0\n}\n", "Insert edits through Monaco");
+  code.querySelectorAll("button")[3].click();
   await until(() => code.querySelector(".as-run-output").textContent === "twice 21 = 42");
   assert.equal(host.querySelector("#assistantStop").hidden, true);
   panel.dispose();
@@ -321,39 +342,145 @@ test("actions refuse without what they need and never start a job", async () => 
   panel.dispose();
 });
 
-test("a proposal opens as a diff; Accept edits the file and is reported back", async () => {
-  const { server, panel, editor, monaco, app, doc } = mountPanel("a\nb\n");
+test("a proposal goes to inline review without switching tabs; decisions are reported back", async () => {
+  const { server, panel, app, host, inline } = mountPanel("a\nb\n");
   await panel.ready;
   server.state.proposals = [{ id: 4, proposal: { file: "demo/app.flow", mode: "replace", content: "a\nB\n", summary: "Fix b" } }];
-  await until(() => panel.showingProposal());
-  assert.deepEqual(app.activated, ["d1"]);
-  const dialog = doc.getElementById("assistantDiff");
-  assert.equal(dialog.open, true);
-  assert.equal(doc.getElementById("assistantDiffTitle").textContent, "Proposed edit to demo/app.flow");
-  assert.equal(doc.getElementById("assistantDiffSummary").textContent, "Fix b");
-  assert.deepEqual([monaco.diffs[0].model.original.value, monaco.diffs[0].model.modified.value], ["a\nb\n", "a\nB\n"]);
-  doc.getElementById("assistantAccept").click();
-  assert.equal(editor.model.value, "a\nB\n");
-  assert.equal(dialog.open, false);
+  await until(() => inline.proposed.length === 1);
+  assert.deepEqual(app.activated, [], "a proposal never switches the tab");
+  assert.equal(host.querySelector("#assistantDiff"), null, "no modal dialog");
+  const first = inline.proposed[0];
+  assert.equal(first.source, "proposal");
+  assert.equal(first.label, "Fix b");
+  assert.equal(first.after("a\nb\n"), "a\nB\n");
+  const review = host.querySelector("#assistantReview");
+  assert.equal(review.hidden, false);
+  assert.equal(review.querySelector(".as-review-file").textContent, "demo/app.flow");
+  review.querySelector(".as-review-file").click();
+  assert.equal(inline.reviewed, first.id, "the file name opens its diff");
+  review.querySelector(".as-review-accept").click();
   assert.deepEqual(panel.decisions(), [{ id: 4, file: "demo/app.flow", status: "accepted" }]);
+  assert.equal(review.hidden, true);
+  assert.match(host.querySelector("#assistantThread").textContent, /Accepted the edit to demo\/app\.flow/);
   await until(() => (server.state.contexts.at(-1).proposals || []).length === 1);
 
-  server.state.proposals = [{ id: 5, proposal: { file: "app.flow", mode: "insert", line: 1, content: "# top\n" } }];
-  await until(() => panel.showingProposal());
-  doc.getElementById("assistantReject").click();
-  assert.equal(editor.model.value, "a\nB\n", "Reject leaves the file alone");
-  assert.equal(panel.decisions()[1].status, "rejected");
-
-  server.state.proposals = [{ id: 6, proposal: { file: "app.flow", mode: "replace", content: "zzz" } }];
-  await until(() => panel.showingProposal());
-  editor.model.value = "edited meanwhile";
-  doc.getElementById("assistantAccept").click();
-  assert.equal(editor.model.value, "edited meanwhile", "a stale diff is never applied");
-  assert.match(panel.decisions()[2].status, /changed while the diff was open/);
+  server.state.proposals = [{ id: 5, proposal: { file: "app.flow", mode: "insert", line: 1, content: "# top\n" } },
+    { id: 6, proposal: { file: "fit.R", mode: "replace", content: "x <- 1\n" } }];
+  await until(() => inline.proposed.length === 3);
+  assert.equal(inline.proposed[1].after("a\nB\n"), "# top\na\nB\n");
+  assert.equal(inline.proposed[2].document.id, "d2", "the other file gets its own review");
+  assert.equal(host.querySelector("#assistantReview").querySelectorAll(".as-review-row").length, 2);
+  inline.finish(inline.proposed[1].id, { accepted: 1, rejected: 1, stale: 0, total: 2 });
+  inline.finish(inline.proposed[2].id, { accepted: 0, rejected: 0, stale: 1, total: 1 });
+  assert.deepEqual(panel.decisions().slice(1).map(item => item.status),
+    ["accepted 1 of 2 changes", "failed: the file changed while the diff was open"]);
 
   server.state.proposals = [{ id: 7, proposal: { file: "missing.flow", mode: "replace", content: "x" } }];
   await until(() => panel.decisions().length === 4);
   assert.equal(panel.decisions()[3].status, "file not open");
+  panel.dispose();
+});
+
+test("Apply on a code block hands the right file and region to inline review", async () => {
+  const { server, panel, host, inline, editor } = mountPanel("function f() -> i32 {\n    return 1\n}\n\nfunction main() -> i32 {\n    return f()\n}\n");
+  await panel.ready;
+  editor.select({ startLineNumber: 2, startColumn: 1, endLineNumber: 2, endColumn: 13 });
+  server.state.polls = ["exit 0\n" + line({ type: "assistant", message: { content: [{ type: "text",
+    text: "```flow\nfunction f() -> i32 {\n    return 5\n}\n```\n" }] } }) + line({ type: "result", is_error: false }) + "\x1e"];
+  await panel.send("ask", "make f return 5");
+  await until(() => !panel.busy());
+  const block = host.querySelector("#assistantThread").querySelector(".as-code");
+  assert.equal(block.querySelector(".as-code-lang").textContent, "flow");
+  block.querySelectorAll("button")[0].click();
+  assert.equal(inline.proposed.length, 1);
+  const item = inline.proposed[0];
+  assert.equal(item.source, "apply");
+  assert.equal(item.document.id, "d1");
+  assert.equal(item.after(editor.model.value), editor.model.value.replace("return 1", "return 5"), "only the matching function changes");
+  assert.match(host.querySelector("#assistantStatus").textContent, /Replaces the matching definitions/);
+  assert.equal(editor.model.value.includes("return 5"), false, "Apply edits nothing by itself");
+  panel.dispose();
+});
+
+test("chips: the file and selection go by default, can be removed, and @ adds more", async () => {
+  const { server, panel, host, editor } = mountPanel("function main() -> i32 {\n    return 0\n}\n",
+    [{ startLineNumber: 2, startColumn: 5, severity: 8, message: "bad return" }]);
+  await panel.ready;
+  editor.select({ startLineNumber: 2, startColumn: 5, endLineNumber: 2, endColumn: 13 });
+  panel.open(true);
+  const chipRow = () => host.querySelector("#assistantChips");
+  const chips = () => chipRow().querySelectorAll(".as-chip").map(chip => chip.dataset.key);
+  assert.deepEqual(chips(), ["file", "selection", "diagnostics"]);
+  chipRow().querySelectorAll(".as-chip")[0].querySelector(".as-chip-remove").click();
+  assert.deepEqual(chips(), ["selection", "diagnostics"], "the file chip is removed");
+  const input = host.querySelector("#assistantInput");
+  input.value = "compare with @fit";
+  input.dispatch("input");
+  const menu = host.querySelector("#assistantMentions");
+  assert.equal(menu.hidden, false);
+  assert.deepEqual(menu.querySelectorAll(".as-mention-label").map(node => node.textContent), ["fit.R"]);
+  input.dispatch("keydown", { key: "Enter" });
+  assert.equal(input.value, "compare with ");
+  assert.equal(menu.hidden, true);
+  assert.deepEqual(chips(), ["selection", "diagnostics", "mention"]);
+  input.value = "@";
+  input.dispatch("input");
+  assert.deepEqual(menu.querySelectorAll(".as-mention-label").map(node => node.textContent).slice(0, 2), ["Selection", "Current error"]);
+  input.dispatch("keydown", { key: "Escape" });
+  assert.equal(menu.hidden, true);
+  await panel.send("ask", "compare with");
+  const prompt = server.state.started[0];
+  assert.match(prompt, /File demo\/fit\.R:\n```r\nx <- c\(1, 2\)/, "the mentioned file goes with the message");
+  assert.match(prompt, /Selected lines 2 to 2/);
+  assert.match(prompt, /line 2, column 5: bad return/);
+  assert.doesNotMatch(prompt, /Text of demo\/app\.flow/, "the removed file chip stays out");
+  assert.match(host.querySelector("#assistantThread").querySelector(".as-user-context").textContent, /selection . error . fit\.R/);
+  assert.deepEqual(chips(), ["file", "selection", "diagnostics"], "chips reset after sending");
+  panel.dispose();
+});
+
+test("the chat is kept per project and comes back after a reload", async () => {
+  const storage = memoryStorage();
+  const first = mountPanel(undefined, [], { storage });
+  await first.panel.ready;
+  first.server.state.polls = ["exit 0\n" + line({ type: "assistant", message: { content: [{ type: "text", text: "Saved answer" }] } }) + "\x1e"];
+  await first.panel.send("ask", "remember me");
+  await until(() => !first.panel.busy());
+  first.panel.dispose();
+  assert.ok(storage.map.has("flowstudio.assistant.chat.scratch"));
+  const again = mountPanel(undefined, [], { storage });
+  await again.panel.ready;
+  const thread = again.host.querySelector("#assistantThread");
+  assert.match(thread.textContent, /remember me/);
+  assert.match(thread.textContent, /Saved answer/);
+  await again.panel.send("ask", "and now");
+  assert.match(again.server.state.started[0], /User: remember me\nAssistant: Saved answer/, "history goes into the next prompt");
+  await again.panel.stop();
+  await until(() => !again.panel.busy());
+  again.host.querySelector("#assistantNewChat").click();
+  assert.equal(JSON.parse(storage.map.get("flowstudio.assistant.chat.scratch")).length, 0, "New chat clears the saved chat");
+  again.panel.dispose();
+});
+
+test("runJob streams text to an inline edit and reports the end", async t => {
+  // The panel's timers are unref'd; this keeps the loop alive while the job polls.
+  const alive = setInterval(() => {}, 1000);
+  t.after(() => clearInterval(alive));
+  const { server, panel } = mountPanel();
+  await panel.ready;
+  const delta = text => line({ type: "stream_event", event: { type: "content_block_delta", delta: { type: "text_delta", text } } });
+  server.state.polls = ["running\n" + delta("```flow\nlet a"), "running\n" + delta(" = 2\n```\n"),
+    "exit 0\n" + line({ type: "assistant", message: { content: [{ type: "text", text: "```flow\nlet a = 2\n```\n" }] } }) + "\x1e"];
+  const seen = [];
+  const result = await new Promise(resolve => panel.runJob("FlowStudio inline edit.", { onText: text => seen.push(text), onDone: resolve }));
+  assert.deepEqual(seen, ["```flow\nlet a", "```flow\nlet a = 2\n```\n", "```flow\nlet a = 2\n```\n"]);
+  assert.equal(result.ok, true);
+  assert.equal(Diff.extractCode(result.text, true).code, "let a = 2\n");
+  assert.equal(panel.busy(), false, "an inline job does not hold the chat");
+  server.state.polls = [];
+  const stopped = new Promise(resolve => { const job = panel.runJob("x", { onDone: resolve }); setTimeout(() => job.cancel(), 20); });
+  assert.equal((await stopped).cancelled, true);
+  assert.deepEqual(server.state.cancelled, ["7"]);
   panel.dispose();
 });
 
@@ -364,8 +491,9 @@ test("Ctrl+I and Cmd+I open the Assistant and focus the input", async () => {
   doc.key({ key: "i", ctrlKey: true, preventDefault() { prevented = true; }, stopPropagation() {} });
   doc.key({ key: "I", metaKey: true, preventDefault() {}, stopPropagation() {} });
   doc.key({ key: "i", ctrlKey: true, shiftKey: true, preventDefault() { assert.fail("Ctrl+Shift+I is not ours"); } });
+  doc.key({ key: "l", ctrlKey: true, metaKey: true, preventDefault() {}, stopPropagation() {} });
   assert.equal(prevented, true);
-  assert.deepEqual(shown, ["assistant", "assistant"]);
+  assert.deepEqual(shown, ["assistant", "assistant", "assistant"], "Ctrl+L opens the chat too");
   assert.equal(doc.activeElement, host.querySelector("#assistantInput"));
   panel.dispose();
 });

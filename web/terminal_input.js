@@ -201,8 +201,8 @@ function createPrompt(doc, callbacks = {}) {
     get runtime() { return runtime; },
     paint,
     focus() { field.focus(); },
-    set(disabled) {
-      disabled = Boolean(disabled);
+    set(next) {
+      disabled = Boolean(next);
       field.disabled = disabled;
       node.classList.toggle("terminal-prompt-disabled", disabled);
     }

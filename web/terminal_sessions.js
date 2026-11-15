@@ -64,10 +64,15 @@ function exportTranscript(session) {
     if (!entry || typeof entry.kind !== "string" ||
         (entry.kind !== "fig" && typeof entry.text !== "string"))
       throw new Error("Invalid terminal entry for export.");
-    const content = entry.kind === "fig" ?
+    let content = entry.kind === "fig" ?
       "[Captured figure " + (Number.isSafeInteger(entry.figIndex) ?
         entry.figIndex : "?") + "; image data is not included]" :
-      cleanExportText(entry.text);
+      cleanExportText(entry.kind === "cmd" && typeof entry.label === "string" && entry.label ?
+        "> run " + entry.label : entry.text);
+    // A command's outcome lives on the entry; the export spells it out.
+    if (entry.kind === "cmd" && (entry.state === "error" || entry.state === "disconnected"))
+      content = content.replace(/\n+$/, "") + (entry.state === "error" ? "\n(failed" : "\n(request failed") +
+        (Number.isFinite(entry.ms) ? ", " + formatDuration(entry.ms) : "") + ")";
     if (!content) continue;
     const stamp = typeof entry.ts === "string" ?
       cleanExportText(entry.ts).slice(0, 32) : "--:--:--";
@@ -139,12 +144,6 @@ function create(options = {}) {
   function createFor(runtime) {
     const ordinal = listOf(runtime).length + 1;
     const session = makeSession(runtime, ordinal);
-    session.entries.push({ kind: "meta", text:
-      "Session " + ordinal + " opened for " + runtime +
-      " (" + (runtime === "flow" ?
-        "Flow compiles each program separately" :
-        "shares the persistent " + runtime + " interpreter with earlier sessions") + ").",
-      ts: nowIso(clock()) });
     notify();
     return session;
   }
@@ -217,33 +216,43 @@ function create(options = {}) {
     session.running = true;
     session.state = "running";
     session.lastCommandTs = clock();
-    push(session, { kind: "cmd", text: "> " + (session.pendingCode || ""),
-      ts: nowIso(session.lastCommandTs) });
+    // The command line carries the run's state and time; endRun updates it
+    // in place, so a run reads as the command, then its output.
+    const command = { kind: "cmd", text: "> " + (session.pendingCode || ""),
+      ts: nowIso(session.lastCommandTs), state: "running" };
+    if (session.pendingLabel) command.label = session.pendingLabel;
+    session.pendingLabel = null;
+    session.current = command;
+    push(session, command);
     notify();
     return session;
   }
 
   function recordCommand(session, code) { session.pendingCode = code; }
+  /* An editor run shows a label such as "untitled.flow" in place of code. */
+  function recordLabel(session, label) { session.pendingCode = ""; session.pendingLabel = String(label || ""); }
   function clearCommand(session) { delete session.pendingCode; }
 
   function endRun(session, outcome, durationMs) {
     session.running = false;
     session.pendingCode = null;
     session.lastDurationMs = durationMs;
+    const command = session.current;
+    session.current = null;
+    if (command) {
+      command.state = outcome === "ok" ? "ok" : outcome === "disconnected" ? "disconnected" : "error";
+      command.ms = durationMs;
+    }
     if (outcome === "ok") {
       session.state = "ready";
       session.lastStatusText =
         "exit ok · " + formatDuration(durationMs) + " · " + nowIso();
-      push(session, { kind: "meta", text: "↳ ok · " + formatDuration(durationMs), ts: nowIso() });
     } else if (outcome === "disconnected") {
       session.state = "disconnected";
       session.lastStatusText = "request failed";
-      push(session, { kind: "meta", text: "↳ request failed", ts: nowIso() });
     } else {
       session.state = "error";
       session.lastStatusText = "execution failed · " + formatDuration(durationMs);
-      push(session, { kind: "meta", text:
-        "↳ failed · " + formatDuration(durationMs), ts: nowIso() });
     }
     if (session !== activeSession) session.unread = true;
     notify();
@@ -268,7 +277,7 @@ function create(options = {}) {
     get: id => sessions.get(id) || null,
     active: () => activeSession,
     setActive, activateRuntime, createFor, listOf, findSession,
-    append, appendTo, appendFigure, beginRun, endRun, recordCommand, clearCommand,
+    append, appendTo, appendFigure, beginRun, endRun, recordCommand, recordLabel, clearCommand,
     clearVisible, plainText, exportTranscript, nowIso, formatDuration, STATE_LABELS
   });
   return api;

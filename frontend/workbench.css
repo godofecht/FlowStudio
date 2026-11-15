@@ -614,3 +614,49 @@ dialog.dg-dialog[open]{display:flex}
 .pk-tools .pk-name{font-size:11px;color:#7f8996}
 .pk-tools .pk-actions{display:flex}
 .pk-log{overflow-wrap:anywhere}
+
+/* ---- Console: the command, then its output ------------------------------
+ * A run is one command line (spinner while it runs, red prompt when it
+ * failed, time only past a second) and its output. Problems read as one
+ * marked line each; the raw log waits behind "Full log". */
+.terminal-transcript{padding:4px 0 0}
+.terminal-transcript>.terminal-entries{padding:0 12px}
+.term-line{padding:0}
+.term-run{display:flex;align-items:baseline;gap:7px;margin-top:8px}
+.terminal-entries>.term-run:first-child{margin-top:2px}
+.term-glyph{flex:none;font:700 12.5px/1.5 var(--mono);color:#5fdba7;white-space:pre;user-select:none}
+.term-run[data-state="error"] .term-glyph,.term-run[data-state="disconnected"] .term-glyph{color:#e5807a}
+.term-run .term-cmd{flex:1;min-width:0;white-space:pre-wrap;overflow-wrap:anywhere;color:#dce0e6}
+.term-run .term-label{color:#9aa4b0}
+.term-state{flex:none;display:inline-flex;align-items:center;gap:6px;font-size:10.5px;color:#5a647a;font-variant-numeric:tabular-nums}
+.term-run[data-state="running"] .term-state::after{content:"";width:9px;height:9px;border:1.5px solid #3a414b;border-top-color:#9cc6ae;border-radius:50%;animation:term-spin .7s linear infinite}
+.term-run[data-state="disconnected"] .term-state{color:#e5807a}
+@keyframes term-spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.term-run[data-state="running"] .term-state::after{animation-duration:2.4s}}
+.term-output{display:block;margin:2px 0 0}
+.term-output>.term-body{white-space:pre-wrap;overflow-wrap:anywhere}
+.term-msg{display:flex;align-items:baseline;gap:7px;white-space:pre-wrap;overflow-wrap:anywhere}
+.term-msg::before{flex:none;width:12px;text-align:center;font-size:11px}
+.term-error{color:#f08b84}
+.term-error::before{content:"\2715"}
+.term-warning{color:#e3c27c}
+.term-warning::before{content:"\26A0"}
+.term-dim{color:#6b7482;padding-left:19px}
+.term-dim::before{content:none}
+.term-where{flex:none;color:#8f98a4;font-size:11px}
+.term-jump{flex:none;padding:0;border:0;background:none;color:#8fb4e8;font:11px var(--mono);text-decoration:underline dotted;text-underline-offset:2px;cursor:pointer}
+.term-jump:hover,.term-jump:focus-visible{color:#b9d3f5;outline:0}
+.term-detail{margin:2px 0 0 19px;color:#6b7482;font-size:11px}
+.term-detail summary{cursor:pointer;width:max-content;list-style:none}
+.term-detail summary::-webkit-details-marker{display:none}
+.term-detail summary::before{content:"\25B8  "}
+.term-detail[open] summary::before{content:"\25BE  "}
+.term-detail pre{margin:4px 0 2px;padding:6px 8px;max-height:220px;overflow:auto;background:#101215;border:1px solid #23272e;border-radius:4px;white-space:pre-wrap;color:#8b94a1;font:11px/1.45 var(--mono)}
+.term-notice{color:#5f6977;font-size:11px}
+.term-meta{color:#5f6977;font-size:11px}
+/* One line tall, with no band of empty space under it. */
+.terminal-prompt-line{padding:6px 12px 6px;align-items:baseline}
+.terminal-inputwrap #consoleInput{min-height:0!important;flex-basis:auto!important;display:block}
+.terminal-prompt-glyph{line-height:1.5}
+.terminal-input-overlay{line-height:1.5}
+.terminal-head .terminal-state[hidden]{display:none}

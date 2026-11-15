@@ -256,6 +256,7 @@ jobs:
           done
           node tests/native_flow_session_ui.mjs
           node tests/native_lsp_ui.mjs
+          node tests/native_lsp_project_ui.mjs
           # The assistant suite starts its own server with the fake provider.
           env -u FLOWSTUDIO_URL -u FLOWSTUDIO_PORT node tests/native_assistant_ui.mjs
       - name: Package verified executable

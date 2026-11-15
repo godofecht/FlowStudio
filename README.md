@@ -226,6 +226,34 @@ When the typed name is not installed, the first row offers to install it
 whether the package is attached and offer load, update and remove; Python
 rows offer uninstall. Names are validated in the browser before any request.
 
+**Flow packages.** The Flow tab of Packages reads the `flow.toml` of a
+project folder you type (the browser cannot see the disk path of a folder it
+opened). It lists `[dependencies]` with what `flow.lock` pins and what is
+installed in `flow_packages/`. Buttons run `flow init`, `flow add` (a
+registry name, a git URL, or a local folder through `--path`) and
+`flow sync`, and show the command output. The Flow CLI has no remove
+command, so Remove deletes the entry from `flow.toml`, `flow.lock` and
+`flow_packages/`, then runs `flow sync`. All of it goes through
+`POST /api/packages/flow` (`src/flow_packages.py`) and nothing runs on page
+load.
+
+**Plots.** Flow, R and Python figures share one history in the Plots pane:
+back and forward, zoom, and saving as PNG or SVG. Flow draws its own figures
+with no Python or R involved:
+
+```flow
+import flowstudio { plot, scatter, hist, plot_title, plot_labels }
+
+let xs: array<f64, 5> = [1.0, 2.0, 3.0, 4.0, 5.0]
+let ys: array<f64, 5> = [1.0, 4.0, 9.0, 16.0, 25.0]
+plot_title("Squares")
+plot(xs, ys)
+```
+
+Each call prints one framed SVG line (at most 60000 bytes, series thinned
+to 1000 points, histograms up to 100 bins). Console entries and script runs
+move the figure to the pane and leave a note in the output.
+
 **Data.** Lists the data frames in the R and Python sessions with their
 shape, and the CSV and TSV files of the open folder. Either opens in a data
 grid with sorting, filtering, paging and CSV export. Folder files are read
@@ -430,6 +458,27 @@ Tests: `tests/test_flow_session.py` (offline and live),
 `tests/test_flow_quick_run.py`,
 `tests/ide_flow_session.test.js` and the browser acceptance
 `tests/native_flow_session_ui.mjs`.
+
+### Flow help and the data viewer
+
+F1 on a name in a Flow buffer opens the Help tab of the side panel on that
+name. Its search box looks up any name or guide topic. Help shows the Flow
+language server's hover for the cursor when `flow lsp` runs, then entries
+from `src/flow_help.py`: signatures and doc comments of the toolchain's
+`lib/stdlib`, the server's notes on built-ins and keywords, and sections and
+compiled examples of `docs/FLOW_FOR_AI.md`. On a narrow window Help opens
+as a dialog.
+
+In the Environment pane, the name of a Flow array or struct opens it in the
+data grid, like R's `View()`. Struct fields are columns (a nested field is
+`a.x`) and array elements are rows. The grid sorts, filters and exports. It
+holds at most 1,000 rows and 64 columns and says so when a value is larger.
+An array too large for the session to keep still shows its first 1,000
+elements.
+
+Tests: `tests/test_flow_help.py`, `tests/ide_flow_help.test.js`,
+`tests/ide_flow_data.test.js` and the browser acceptance
+`tests/native_flow_help_data_ui.mjs`.
 
 ## Flow, Python and R in one session
 

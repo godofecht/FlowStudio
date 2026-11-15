@@ -383,6 +383,7 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
 @media(max-width:680px){html{overflow-x:auto}.shell{min-width:680px}.ide-shell-width{width:max(100%,680px)}}
 </style>
 <link rel="stylesheet" href="/ui/workbench.css">
+<link rel="stylesheet" href="/ide_flow_help.css">
 </head>
 <body>
 <div class="shell" id="ideShell">
@@ -491,6 +492,7 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
     <div class="menu" id="menuHelp">
       <button class="menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="menuHelpPopup">Help</button>
       <div class="menu-popup" id="menuHelpPopup" role="menu" aria-label="Help" hidden>
+        <button type="button" role="menuitem" data-command="flowHelp">Flow help (F1)</button>
         <button type="button" role="menuitem" data-command="shortcuts">Show keyboard shortcuts</button>
         <button type="button" role="menuitem" data-command="about">About FlowStudio</button>
       </div>
@@ -602,7 +604,7 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
     </div>
     <div id="view-plots" class="body plots-body" role="tabpanel" aria-labelledby="tab-plots" hidden>
       <div id="mathFlowPlot" aria-live="polite" hidden></div>
-      <p class="muted hint">Figures captured by your Python and R runs land here automatically. This tab fills whenever a run opens a plot.</p>
+      <p class="muted hint">Figures from Flow, Python and R runs land here. Use the arrows to step through earlier plots.</p>
       <p class="muted hint">Need saved PNG files too? <a href="/plots" target="_blank" rel="noopener">Open the standalone plot page</a>.</p>
       <div id="plotFigures" aria-label="Captured figures" aria-live="polite"></div>
     </div>
@@ -639,6 +641,7 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
         <button type="button" role="tab" id="rpTab-preview" aria-controls="rpView-preview" aria-selected="false" tabindex="-1">Preview</button>
         <button type="button" role="tab" id="rpTab-environment" aria-controls="rpView-environment" aria-selected="true" tabindex="0">Environment</button>
         <button type="button" role="tab" id="rpTab-assistant" aria-controls="rpView-assistant" aria-selected="false" tabindex="-1" title="Assistant (Ctrl+I)">Assistant</button>
+        <button type="button" role="tab" id="rpTab-help" aria-controls="rpView-help" aria-selected="false" tabindex="-1" title="Flow help (F1)">Help</button>
       </div>
       <button type="button" id="rightPanelClose" class="rp-close" title="Hide side panel (Ctrl+Alt+B)" aria-label="Hide side panel"><svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
     </div>
@@ -670,6 +673,9 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
     </section>
     <section class="rp-view" id="rpView-assistant" role="tabpanel" aria-labelledby="rpTab-assistant" hidden>
       <div class="assistant-root" id="assistantRoot"></div>
+    </section>
+    <section class="rp-view" id="rpView-help" role="tabpanel" aria-labelledby="rpTab-help" hidden>
+      <div class="body flow-help" id="flowHelp"></div>
     </section>
   </aside>
 </div>
@@ -1954,7 +1960,9 @@ async function executeCode(code, label, languageOverride = null, options = {}) {
       headers: { "Content-Type": "text/plain; charset=utf-8", "X-FlowStudio-Intent": "run" },
       body: code
     });
-    const output = await response.text();
+    let output = await response.text();
+    if (executionLanguage === "flow" && globalThis.FlowStudioFlowPlots)
+      output = FlowStudioFlowPlots.take(output);
     ok = response.ok;
     writeConsole(output + "\n", executionLanguage);
     if (executionLanguage === "mathflow" && response.ok) {
@@ -2809,6 +2817,7 @@ const commands = Object.freeze({
   maximizeDock: () => { if (globalThis.FlowStudioLayout) globalThis.FlowStudioLayout.toggleDockMax(); },
   showPreview: () => { if (globalThis.FlowStudioSidePanel) globalThis.FlowStudioSidePanel.show("preview"); },
   showEnvironment: () => { if (globalThis.FlowStudioSidePanel) globalThis.FlowStudioSidePanel.show("environment"); },
+  flowHelp: () => globalThis.FlowStudioFlowHelp ? globalThis.FlowStudioFlowHelp.open("") : false,
   openAssistant: () => globalThis.FlowStudioAssistant ? globalThis.FlowStudioAssistant.open(true) : false,
   assistantExplain: () => globalThis.FlowStudioAssistant ? globalThis.FlowStudioAssistant.explain() : false,
   assistantFixErrors: () => globalThis.FlowStudioAssistant ? globalThis.FlowStudioAssistant.fixErrors() : false,
@@ -2837,6 +2846,8 @@ renderTabs();
 <script>FlowStudioWorkspaceTabs.mount();</script>
 <script src="/terminal_render.js"></script>
   <script src="/console.js"></script>
+  <script src="/plot_pane.js"></script>
+  <script src="/flow_plots.js"></script>
   <script src="/plot_figures.js"></script>
   <script src="/terminal_input.js"></script>
   <script src="/terminal_sessions.js"></script>
@@ -2859,8 +2870,11 @@ renderTabs();
 <script src="/ide_workspace.js"></script>
 <script src="/data_viewer.js"></script>
 <script src="/ide_data_view.js"></script>
+<script src="/ide_flow_packages.js"></script>
 <script src="/ide_packages_view.js"></script>
 <script src="/ide_side_panel.js"></script>
+<script src="/ide_flow_data.js"></script>
+<script src="/ide_flow_help.js"></script>
 <script src="/ide_assistant.js"></script>
 <script src="/ide_app_preview.js"></script>
 <script src="/ide_projects.js"></script>

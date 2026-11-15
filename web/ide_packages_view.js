@@ -1,4 +1,4 @@
-/* FlowStudio Packages view. One list per runtime (Python and R), filtered as
+/* FlowStudio Packages view. One list per runtime (Python, R and Flow), filtered as
  * you type; when the typed name is not installed the first row offers to
  * install it, the way VS Code's extension search does. R rows show whether
  * the package is attached and offer load, update and remove (remove only for
@@ -54,7 +54,7 @@ function mount(doc, options = {}) {
   seg.setAttribute("role", "tablist");
   seg.setAttribute("aria-label", "Runtime");
   const kinds = {};
-  for (const [key, label] of [["python", "Python"], ["r", "R"]]) {
+  for (const [key, label] of [["python", "Python"], ["r", "R"], ["flow", "Flow"]]) {
     const button = h("button", "pk-seg-btn", label);
     button.type = "button";
     button.id = "packagesKind-" + key;
@@ -88,7 +88,13 @@ function mount(doc, options = {}) {
   const log = h("pre", "pk-log");
   log.id = "packageLog";
   log.hidden = true;
-  view.append(bar, field, summary, list, log);
+  // Flow dependencies live in a project's flow.toml (web/ide_flow_packages.js).
+  const flow = root.FlowStudioFlowPackages ?
+    root.FlowStudioFlowPackages.create(doc, { summary, list, log, input }, { fetch: request }) : null;
+  if (!flow) kinds.flow.remove();
+  view.append(bar);
+  if (flow) view.append(flow.element);
+  view.append(field, summary, list, log);
 
   let kind = "python";
   const cache = { python: null, r: null };
@@ -101,16 +107,24 @@ function mount(doc, options = {}) {
       headers: { "Content-Type": "text/plain; charset=utf-8", "X-FlowStudio-Intent": "run" } });
     return { ok: response.ok, status: response.status, text: (await response.text()).slice(0, 200000) };
   }
+  function placeholder() {
+    input.placeholder = kind === "flow" && flow ? flow.placeholder :
+      kind === "r" ? "Search or install an R package" : "Search or install, e.g. numpy or numpy==2.1.0";
+  }
   function select(next) {
-    kind = next;
+    kind = next === "flow" && !flow ? "python" : next;
     for (const [key, button] of Object.entries(kinds)) button.setAttribute("aria-selected", String(key === kind));
-    input.placeholder = kind === "r" ? "Search or install an R package" : "Search or install, e.g. numpy or numpy==2.1.0";
+    placeholder();
     try { storage && storage.setItem("flowstudio.packages.kind", kind); } catch (_) {}
     log.hidden = true;
+    input.disabled = false;
+    if (kind === "flow") { flow.show(); return; }
+    if (flow) flow.hide();
     render();
     if (!cache[kind]) void load(kind, false);
   }
   async function load(which, explicit) {
+    if (which === "flow") return flow ? flow.load(explicit) : null;
     const mine = ++token;
     summary.textContent = "Reading installed " + (which === "r" ? "R" : "Python") + " packages...";
     try {
@@ -145,6 +159,7 @@ function mount(doc, options = {}) {
     }
   }
   function render() {
+    if (kind === "flow") { if (flow) flow.render(); return; }
     const packages = cache[kind];
     list.replaceChildren();
     if (!packages) return;
@@ -246,22 +261,26 @@ function mount(doc, options = {}) {
   input.addEventListener("keydown", event => {
     if (event.key !== "Enter") return;
     event.preventDefault();
+    if (kind === "flow") { if (flow) flow.enter(); return; }
     const { offer } = filterPackages(cache[kind] || [], input.value);
     if (offer && manager.validSpec(offer, kind)) void install(offer);
   });
   const tab = doc.getElementById("tab-packages");
   if (tab) tab.addEventListener("click", () => {
     const language = doc.getElementById("language");
-    const preferred = language && (language.value === "r" || language.value === "python") ? language.value : null;
-    if (preferred && preferred !== kind && !cache[preferred]) select(preferred);
+    const preferred = language && (language.value === "r" || language.value === "python" ||
+      (language.value === "flow" && flow)) ? language.value : null;
+    if (preferred && preferred !== kind && (preferred === "flow" || !cache[preferred])) select(preferred);
+    else if (kind === "flow") flow.show();
     else if (!cache[kind]) void load(kind, false);
   });
   let initial = "python";
   try { initial = (storage && storage.getItem("flowstudio.packages.kind")) || "python"; } catch (_) {}
-  kind = initial === "r" ? "r" : "python";
+  kind = initial === "r" ? "r" : initial === "flow" && flow ? "flow" : "python";
   for (const [key, button] of Object.entries(kinds)) button.setAttribute("aria-selected", String(key === kind));
-  input.placeholder = kind === "r" ? "Search or install an R package" : "Search or install, e.g. numpy or numpy==2.1.0";
-  return Object.freeze({ select, load, install, render, kind: () => kind, packages: () => cache[kind] });
+  placeholder();
+  if (kind === "flow") flow.element.hidden = false;
+  return Object.freeze({ select, load, install, render, flow, kind: () => kind, packages: () => cache[kind] });
 }
 
 const api = { mount, filterPackages, pythonUninstallCode };

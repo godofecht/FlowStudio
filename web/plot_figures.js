@@ -42,7 +42,7 @@ async function boundedText(response) {
   const reader = response.body && typeof response.body.getReader === "function"
     ? response.body.getReader() : null;
   if (!reader) {
-    // JS string length counts UTF-16 code units, not HTTP UTF-8 bytes.
+    // JS string length counts UTF-16 code units. The wire limit counts UTF-8 bytes.
     // Enforce the same wire-size ceiling as the streaming reader.
     const text = await response.text();
     if (typeof text !== "string" || text.length > MAX_RESPONSE_BYTES) return null;
@@ -145,7 +145,32 @@ function figureElement(doc, item, urlTarget) {
   return figure;
 }
 
+/* R and Python figures as Plots pane entries (web/plot_pane.js). */
+function paneEntries(pane, plots) {
+  return plots.map(validEntry).filter(Boolean).map(item => item.png ?
+    { kind: "png", data: item.png, label: pane.label("Python", "figure") } :
+    { kind: item.svg ? "svg" : "pdf", data: item.svg || item.pdf, label: pane.label("R") });
+}
+
+/* With the Plots pane loaded, figures join its shared history. */
+function paneAdapter(doc, host) {
+  const panes = global.FlowStudioPlotPane;
+  if (!panes || typeof panes.attach !== "function" || !host || host.id !== "plotFigures") return null;
+  const pane = panes.attach(doc);
+  if (!pane) return null;
+  return Object.freeze({
+    append(plots) {
+      if (!Array.isArray(plots) || plots.length > LIMIT) return 0;
+      return pane.add(paneEntries(pane, plots)).length;
+    },
+    clear: () => pane.clear(),
+    size: () => pane.size()
+  });
+}
+
 function create(doc, host) {
+  const adapter = paneAdapter(doc, host);
+  if (adapter) return adapter;
   const items = [];
   let renderedBlobs = [];
   function release() {

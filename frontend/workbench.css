@@ -607,3 +607,23 @@ dialog.dg-dialog[open]{display:flex}
 @media(max-width:1100px){#checkFlow{display:none}}
 @media(max-width:600px){.command-launcher{width:30px;justify-self:end;padding:0;justify-content:center}.command-launcher span,.command-launcher kbd{display:none}
   .run-more,.run-chip-caret,.run-chip-sub{display:none}.project-switcher{max-width:120px}.brand{gap:6px}}
+/* Plots pane history toolbar (web/plot_pane.js) */
+.plot-pane{display:flex;flex-direction:column;gap:8px;min-width:0}
+.plot-bar{display:flex;flex-wrap:wrap;align-items:center;gap:4px}
+.plot-btn{min-width:28px;height:26px;padding:0 8px;border:1px solid var(--line);border-radius:5px;background:var(--surface-2);color:var(--ink);font-size:12px;line-height:1}
+.plot-btn:hover:not(:disabled){background:#30343c}
+.plot-btn:disabled{opacity:.4}
+.plot-position{min-width:52px;text-align:center;font-size:12px;color:var(--muted)}
+.plot-gap{width:6px}
+.plot-stage{overflow:auto;max-height:calc(100vh - 220px);outline:none}
+.plot-stage:focus-visible{box-shadow:0 0 0 2px var(--accent)}
+.plots-body .plot-stage figure.captured-figure{display:inline-block;min-width:100%;box-sizing:border-box;margin:0}
+.plot-empty{margin:4px 0;font-size:12.5px}
+/* Flow project folder in the Packages view (web/ide_flow_packages.js) */
+.pk-folder{display:flex;gap:6px;margin:0 10px 8px 12px}
+.pk-folder[hidden]{display:none}
+.pk-folder input{flex:1;min-width:0;height:26px;padding:0 8px;background:#17191e;border:1px solid #32363f;border-radius:5px;color:var(--ink);font:12px var(--mono)}
+.pk-tools{border-top:1px solid var(--line)}
+.pk-tools .pk-name{font-size:11px;color:#7f8996}
+.pk-tools .pk-actions{display:flex}
+.pk-log{overflow-wrap:anywhere}

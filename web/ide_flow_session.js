@@ -37,6 +37,9 @@ function createClient(request) {
   return {
     async evaluate(code) {
       const result = await call("eval", code);
+      // Figures from plot() and friends go to the Plots pane (web/flow_plots.js).
+      if (result.data && typeof result.data.output === "string" && root.FlowStudioFlowPlots)
+        result.data.output = root.FlowStudioFlowPlots.take(result.data.output);
       if (result.data) publish(result.data.variables);
       return result;
     },
@@ -194,9 +197,14 @@ function scriptView(text, variables) {
   };
 }
 
-/* The Environment table for Flow variables. Values are text only. */
-function renderEnvironment(container, variables, doc) {
+/* The Environment table for Flow variables. The name of an array or struct
+ * is a button that opens it in the data viewer (web/ide_flow_data.js), or
+ * calls options.onView when given. */
+function renderEnvironment(container, variables, doc, options) {
   doc = doc || root.document;
+  const onView = options && typeof options.onView === "function" ? options.onView : name => {
+    if (root.FlowStudioFlowData && typeof root.FlowStudioFlowData.open === "function") root.FlowStudioFlowData.open(name);
+  };
   const list = Array.isArray(variables) ? variables : [];
   if (!list.length) {
     const empty = doc.createElement("p");
@@ -223,7 +231,18 @@ function renderEnvironment(container, variables, doc) {
     const row = doc.createElement("tr");
     row.dataset.name = variable.name;
     const name = doc.createElement("td");
-    name.textContent = variable.name + (variable.mutable ? " (mut)" : "");
+    if (variable.viewable === true) {
+      const button = doc.createElement("button");
+      button.type = "button";
+      button.className = "flow-env-view";
+      button.textContent = variable.name;
+      button.title = "View " + variable.name + " in the data viewer";
+      button.addEventListener("click", () => onView(variable.name));
+      name.append(button);
+      if (variable.mutable) name.append(doc.createTextNode(" (mut)"));
+    } else {
+      name.textContent = variable.name + (variable.mutable ? " (mut)" : "");
+    }
     const type = doc.createElement("td");
     type.textContent = String(variable.type || "unknown");
     const value = doc.createElement("td");

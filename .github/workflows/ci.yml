@@ -1,3 +1,4 @@
+# ACTIONS-INTENDED: public repository; its existing CI qualifies Linux and macOS builds.
 name: CI
 on:
   push:
@@ -208,6 +209,8 @@ jobs:
           node tests/native_panels_ui.mjs
           node tests/native_debugger_ui.mjs
           node tests/native_projects_ui.mjs
+          node tests/native_flow_help_data_ui.mjs
+          node tests/native_flow_plots_packages_ui.mjs
       - name: Package verified executable
         run: sh scripts/package.sh
       - name: Package holds every runtime file; quick console build

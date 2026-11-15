@@ -235,5 +235,146 @@ class LanguageServerBridgeTest(unittest.TestCase):
         self.assertEqual(json.loads(text)["id"], "abc")
 
 
+UTIL = (
+    "# Adds one.\n"
+    "export function add_one(x: i32) -> i32 {\n"
+    "    return x + 1\n"
+    "}\n"
+)
+MAIN = (
+    "import \"util.flow\"\n"
+    "\n"
+    "function main() -> i32 {\n"
+    "    let y: i32 = add_one(2)\n"
+    "    return y\n"
+    "}\n"
+)
+
+
+def unbound(name: str):
+    return lambda found: any(d["message"] == "unbound call '%s'" % name for d in found)
+
+
+@unittest.skipUnless(server_up(), "native FlowStudio server is not running at " + URL)
+class ProjectImportTest(unittest.TestCase):
+    """Two documents of one project, one importing the other by file name.
+
+    The browser never has a disk path for them. The bridge mirrors each
+    opened document into a private folder, so `flow lsp` resolves the
+    import there and answers with the browser's own URIs."""
+
+    def setUp(self) -> None:
+        self.root = "file:///flowstudio/import-test-%s/" % uuid.uuid4().hex[:8]
+        self.util = Client()
+        self.util.uri = self.root + "lib/util.flow"
+        self.main = Client()
+        self.main.uri = self.root + "lib/main.flow"
+        self.main.request("initialize", {"processId": None, "rootUri": None, "capabilities": {}})
+
+    def tearDown(self) -> None:
+        for client in (self.main, self.util):
+            post("/api/lsp/request", json.dumps({"jsonrpc": "2.0", "method": "textDocument/didClose",
+                                                 "params": {"textDocument": {"uri": client.uri}}}))
+        self.main.notify("flowstudio/forget", {"uri": self.root})
+
+    def test_hover_completion_definition_and_references_cross_files(self) -> None:
+        self.util.open(UTIL)
+        self.main.open(MAIN)
+        hover = self.main.request("textDocument/hover", self.main.at(3, 19))["result"]
+        self.assertIn("function add_one(x: i32) -> i32", hover["contents"]["value"])
+        self.assertIn("imported from:* `%s`" % self.util.uri, hover["contents"]["value"])
+
+        definition = self.main.request("textDocument/definition", self.main.at(3, 19))["result"]
+        self.assertEqual(definition["uri"], self.util.uri)
+        self.assertEqual(definition["range"]["start"], {"line": 1, "character": 16})
+
+        self.main.change(MAIN.replace("add_one(2)", "add_(2)"))
+        result = self.main.request("textDocument/completion", self.main.at(3, 21))["result"]
+        items = result if isinstance(result, list) else result["items"]
+        self.assertIn("add_one", [item["label"] for item in items])
+        self.main.change(MAIN)
+
+        params = self.util.at(1, 18)
+        params["context"] = {"includeDeclaration": True}
+        references = self.util.request("textDocument/references", params)["result"]
+        self.assertIn(self.main.uri, [item["uri"] for item in references])
+        self.assertIn(self.util.uri, [item["uri"] for item in references])
+
+    def test_import_diagnostics_follow_the_unsaved_text_of_the_other_file(self) -> None:
+        # Before util.flow exists the call is unbound.
+        self.main.open(MAIN)
+        self.main.diagnostics(unbound("add_one"))
+        # Opening util.flow puts it where the import looks.
+        self.util.open(UTIL)
+        self.main.change(MAIN)
+        self.main.diagnostics(lambda found: not unbound("add_one")(found))
+        # An unsaved rename in util.flow is what main.flow sees next.
+        self.util.change(UTIL.replace("add_one", "add_two"))
+        self.main.change(MAIN)
+        self.main.diagnostics(unbound("add_one"))
+        # forget removes the mirrored file.
+        self.util.change(UTIL)
+        self.main.notify("flowstudio/forget", {"uri": self.util.uri})
+        self.main.change(MAIN)
+        self.main.diagnostics(unbound("add_one"))
+
+    def test_untitled_buffers_resolve_their_imports(self) -> None:
+        # An untitled buffer is mirrored too, so its stdlib import is read
+        # and typechecked, and its own functions still answer.
+        scratch = Client()
+        scratch.uri = "file:///flowstudio/untitled/doc-%s/scratch.flow" % uuid.uuid4().hex[:6]
+        scratch.open(SOURCE.replace("function main", "import \"stdlib/math.flow\"\n\nfunction main", 1)
+                     .replace("    return z\n", "    let w: f32 = subtract(1.0, 2.0)\n    return z\n"))
+        try:
+            hover = scratch.request("textDocument/hover", scratch.at(9, 19))["result"]["contents"]["value"]
+            self.assertIn("function subtract(a: f32, b: f32) -> f32", hover)
+            self.assertIn("imported from", hover)
+            local = scratch.request("textDocument/hover", scratch.at(7, 18))["result"]["contents"]["value"]
+            self.assertIn("function add_one(x: i32) -> i32", local)
+        finally:
+            scratch.close()
+
+    def test_the_mirror_folder_never_reaches_the_browser(self) -> None:
+        self.util.open(UTIL)
+        self.main.open(MAIN)
+        texts = []
+        for method in ("textDocument/hover", "textDocument/definition"):
+            status_code, text = post("/api/lsp/request", json.dumps({"jsonrpc": "2.0", "id": 7, "method": method,
+                                                                     "params": self.main.at(3, 19)}))
+            self.assertEqual(status_code, 200, text)
+            texts.append(text)
+        # The server names the imported file by its mirror path; the browser
+        # gets the workspace URI in its place.
+        self.assertIn("imported from:* `%s`" % self.util.uri, json.loads(texts[0])["result"]["contents"]["value"])
+        self.assertEqual(json.loads(texts[1])["result"]["uri"], self.util.uri)
+        time.sleep(0.6)
+        texts.append(post("/api/lsp/events", "")[1])
+        for text in texts:
+            self.assertNotIn("flowstudio-lsp-", text)
+            self.assertNotIn(os.environ.get("TMPDIR", "/tmp").rstrip("/"), text)
+
+    def test_uris_outside_the_workspace_are_refused(self) -> None:
+        bad = [
+            "file:///etc/hosts",
+            "/etc/hosts",
+            "file:///flowstudio/../escape.flow",
+            "file:///flowstudio/a/%2e%2e/%2E%2E/escape.flow",
+            "file:///flowstudio/a//b.flow",
+            "file:///flowstudio/a/./b.flow",
+            "file:///flowstudio/a%00b.flow",
+            "file:///flowstudio/a%2f..%2f..%2fescape.flow",
+            "file:///flowstudio/a\\u002f..\\u002f..\\u002fescape.flow",
+        ]
+        for uri in bad:
+            # Build the body by hand so the escaped form reaches the bridge as written.
+            body = ('{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":'
+                    '{"uri":"%s","languageId":"flow","version":1,"text":"x"}}}' % uri)
+            status_code, text = post("/api/lsp/request", body)
+            self.assertEqual(status_code, 400, uri + ": " + text)
+            status_code, text = post("/api/lsp/request", json.dumps({"jsonrpc": "2.0", "method": "flowstudio/forget",
+                                                                     "params": {"uri": json.loads('"%s"' % uri)}}))
+            self.assertEqual(status_code, 400, uri + ": " + text)
+
+
 if __name__ == "__main__":
     unittest.main()

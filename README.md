@@ -321,15 +321,23 @@ compiler on demand and skips lines the server already marks. Without a
 `flow` binary the routes answer 503 and the editor keeps the lexical
 helpers described below.
 
-The server sees buffer text only. It does not read the project folder, so
-definitions in other files are found only when they are open, and imports
-of project files are not resolved. Positions assume one column per code
-point, which can drift on lines with characters outside the Basic
-Multilingual Plane.
+Imports between project files resolve. Project folders live in the browser,
+so the bridge keeps a private copy under `$TMPDIR/flowstudio-lsp-*`: every
+buffer the editor sends is written there under its `file:///flowstudio/`
+name, unsaved text included, and the editor also sends the project's other
+`.flow` files from the folder. Hover, completion, F12, references and
+diagnostics then follow imports such as `import "lib/util.flow"`. F12
+opens a file that has no tab yet. The copy's path never reaches the browser:
+server replies name it `file:///flowstudio/` again. The bridge refuses other file URIs and
+any path with an empty, `.` or `..` segment. The copy is removed when the
+server exits. References list uses in open tabs only. Positions assume one
+column per code point, which can drift on lines with characters outside the
+Basic Multilingual Plane.
 
 Tests: `node --test tests/ide_flow_lsp.test.js`, the live
 `python3 tests/test_lsp_bridge.py` and the Chromium acceptance
-`node tests/native_lsp_ui.mjs`. The live tests honour `FLOWSTUDIO_URL`.
+`node tests/native_lsp_ui.mjs` and `node tests/native_lsp_project_ui.mjs`.
+The live tests honour `FLOWSTUDIO_URL`.
 
 ## Browser Python/R symbol completion
 

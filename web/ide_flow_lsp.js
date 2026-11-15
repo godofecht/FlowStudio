@@ -8,6 +8,12 @@
  * code actions and diagnostics for language "flow", and the older lexical
  * Flow helpers step aside for every model it syncs (see handles()). When the
  * server is missing (503) nothing is registered and the older helpers stay.
+ *
+ * Documents are named file:///flowstudio/<path>, where <path> is the editor
+ * path (project folder name first) or untitled/<id>/<name>. The bridge mirrors
+ * every opened document into a private folder under those names, so imports
+ * between project files resolve. The project's other .flow files are opened
+ * in the background (see syncProject) so the server can read them too.
  */
 (function (global) {
 "use strict";
@@ -24,6 +30,12 @@ const CHANGE_DELAY_MS = 250;
 // whose answer depends on that analysis wait this long after the last change.
 const SETTLE_MS = 260;
 const POLL_AFTER_MS = [300, 800, 2000];
+// Other open documents are sent again this long after an edit, so their
+// imports and diagnostics follow it.
+const DEPENDENTS_DELAY_MS = 700;
+const SYNC_DELAY_MS = 800;
+const PROJECT_LIMITS = Object.freeze({ files: 400, depth: 8 });
+const SKIP_DIRS = new Set(["node_modules", "build", "target", "dist", "flow_packages", "__pycache__"]);
 const COMPLETION_KINDS = [null, "Text", "Method", "Function", "Constructor", "Field",
   "Variable", "Class", "Interface", "Module", "Property", "Unit", "Value", "Enum",
   "Keyword", "Snippet", "Color", "File", "Reference", "Folder", "EnumMember",
@@ -35,8 +47,37 @@ const ACTIONS = Object.freeze({
   format: "editor.action.formatDocument"
 });
 
+/* Percent-encoding as flow lsp writes paths in URIs (Path.as_uri): every
+ * byte outside A-Z a-z 0-9 _ . ~ - is escaped, so the URIs it returns for
+ * imported files equal the ones made here. */
+function encodeSegment(name) {
+  return encodeURIComponent(name).replace(/[!'()*]/g, c => "%" + c.charCodeAt(0).toString(16).toUpperCase());
+}
+
 function uriForPath(path) {
-  return URI_ROOT + String(path).split("/").filter(Boolean).map(encodeURIComponent).join("/");
+  return URI_ROOT + String(path).split("/").filter(Boolean).map(encodeSegment).join("/");
+}
+
+/* Every .flow file under a folder handle as [{ rel, handle }], sorted. */
+async function listFlowFiles(folder, limits = PROJECT_LIMITS) {
+  const files = [];
+  const queue = [{ handle: folder, rel: "", depth: 0 }];
+  while (queue.length && files.length < limits.files) {
+    const { handle, rel, depth } = queue.shift();
+    try {
+      for await (const [name, child] of handle.entries()) {
+        if (name.startsWith(".") || SKIP_DIRS.has(name)) continue;
+        const path = rel ? rel + "/" + name : name;
+        if (child.kind === "directory") {
+          if (depth + 1 < limits.depth) queue.push({ handle: child, rel: path, depth: depth + 1 });
+        } else if (child.kind === "file" && name.endsWith(".flow")) {
+          files.push({ rel: path, handle: child });
+          if (files.length >= limits.files) break;
+        }
+      }
+    } catch (_) { /* an unreadable folder is skipped */ }
+  }
+  return files.sort((a, b) => (a.rel < b.rel ? -1 : a.rel > b.rel ? 1 : 0));
 }
 
 /* LSP markup in its several shapes -> Monaco markdown strings. */
@@ -86,9 +127,32 @@ function create(options) {
   let generation = null;
   let chain = Promise.resolve();      // keeps bridge traffic in send order
   const synced = new Map();           // model -> sync entry
+  // Project .flow files with no editor model, opened on the server from disk:
+  // uri -> { uri, path, handle, text, modified, size, version, view, lastText, seen }
+  const background = new Map();
   const providers = [];
   const watchers = [];
   let pollTimers = [];
+  let project = null;                 // folder name the background files belong to
+  let contentEpoch = 0;               // counts text the server has not seen in every document
+  let dependentsTimer = null;
+  let syncTimer = null;
+  let syncing = null;
+  let syncAgain = false;
+
+  function workspace() {
+    const source = options.workspace || global.FlowStudioWorkspaceExplorer;
+    return source && typeof source.root === "function" && typeof source.rootName === "function" ? source : null;
+  }
+
+  /* A document's text went to the server. Other documents may import it,
+   * so they are behind until they are analysed again. */
+  function noteSent(entry, text) {
+    const changed = entry.lastText !== text;
+    if (changed) { contentEpoch++; entry.lastText = text; }
+    entry.seen = contentEpoch;
+    return changed;
+  }
 
   /* A Flow script without main() is what the console session runs. The
    * server only analyses code inside functions, so it gets a rearranged
@@ -124,8 +188,10 @@ function create(options) {
   }
   /* A server range in editor coordinates, or null inside generated lines. */
   function fromServer(model, range) {
+    return fromServerView(viewOf(model), range);
+  }
+  function fromServerView(view, range) {
     if (!range || !range.start || !range.end) return null;
-    const view = viewOf(model);
     if (!view) return toRange(range);
     const start = view.toReal(range.start.line), end = view.toReal(range.end.line);
     if (start === null || end === null) return null;
@@ -197,12 +263,17 @@ function create(options) {
     const text = model.getValue();
     if (text.length > MAX_TEXT) return;
     const entry = { uri: uriFor(model), version: 1, timer: null, changedAt: 0,
-      diagnostics: [], subscriptions: [], view: null };
+      diagnostics: [], subscriptions: [], view: null, lastText: null, seen: 0, refreshedAt: 0 };
     synced.set(model, entry);
     entry.subscriptions.push(model.onDidChangeContent(() => scheduleChange(model)));
     entry.subscriptions.push(model.onWillDispose(() => close(model)));
+    // The buffer now speaks for this file; the server replaces the disk copy.
+    const shadowed = background.get(entry.uri);
+    if (shadowed) { background.delete(entry.uri); entry.version = shadowed.version + 1; }
+    const sent = serverText(model, entry);
+    if (noteSent(entry, sent)) scheduleDependents();
     void notify("textDocument/didOpen", { textDocument: { uri: entry.uri, languageId: "flow",
-      version: entry.version, text: serverText(model, entry) } });
+      version: entry.version, text: sent } });
     schedulePolls();
   }
 
@@ -215,6 +286,8 @@ function create(options) {
     void notify("textDocument/didClose", { textDocument: { uri: entry.uri } });
     if (!(typeof model.isDisposed === "function" && model.isDisposed()))
       monaco.editor.setModelMarkers(model, OWNER, []);
+    // A project file goes back to its saved text on disk.
+    if (project && entry.uri.startsWith(uriForPath(project) + "/")) scheduleSync(0);
   }
 
   function scheduleChange(model) {
@@ -233,10 +306,14 @@ function create(options) {
     entry.changedAt = now();
     const uri = uriFor(model);
     const text = serverText(model, entry);
+    if (noteSent(entry, text)) scheduleDependents();
     let sent;
     if (uri !== entry.uri) {
-      // The document was renamed or saved under a new path.
+      // The document was renamed or saved under a new path. A file still at
+      // the old path comes back with the next project sync.
       void notify("textDocument/didClose", { textDocument: { uri: entry.uri } });
+      void notify("flowstudio/forget", { uri: entry.uri });
+      if (project) scheduleSync(SYNC_DELAY_MS);
       entry.uri = uri;
       sent = notify("textDocument/didOpen", { textDocument: { uri, languageId: "flow",
         version: entry.version, text } });
@@ -253,6 +330,11 @@ function create(options) {
     const entry = synced.get(model);
     if (!entry) return null;
     if (entry.timer !== null) await flushChange(model);
+    // Another file changed since this one was analysed: its imports may
+    // read differently now, so send it again and wait for the analysis.
+    if (entry.seen < contentEpoch) { await flushChange(model); settle = true; }
+    // Sent again for that reason a moment ago: the analysis is still due.
+    if (entry.refreshedAt + SETTLE_MS > now()) settle = true;
     if (settle) {
       const wait = entry.changedAt + SETTLE_MS - now();
       if (wait > 0) await new Promise(resolve => timers.setTimeout(resolve, wait));
@@ -267,12 +349,137 @@ function create(options) {
       void notify("textDocument/didOpen", { textDocument: { uri: entry.uri, languageId: "flow",
         version: entry.version, text: serverText(model, entry) } });
     }
+    for (const entry of background.values()) {
+      entry.version++;
+      void notify("textDocument/didOpen", { textDocument: { uri: entry.uri, languageId: "flow",
+        version: entry.version, text: backgroundText(entry) } });
+    }
     schedulePolls();
   }
 
   function modelForUri(uri) {
     for (const [model, entry] of synced) if (entry.uri === uri) return model;
     return null;
+  }
+
+  /* ---- Project files without an editor ---- */
+
+  function backgroundText(entry) {
+    entry.view = sessionView(entry.text);
+    return entry.view ? entry.view.text : entry.text;
+  }
+
+  /* Send every open document that is behind again, so diagnostics that
+   * depend on an edited import come back. */
+  function scheduleDependents() {
+    if (dependentsTimer !== null) timers.clearTimeout(dependentsTimer);
+    dependentsTimer = timers.setTimeout(() => { dependentsTimer = null; refreshBehind(); }, DEPENDENTS_DELAY_MS);
+  }
+
+  function refreshBehind() {
+    for (const [model, entry] of synced)
+      if (entry.seen < contentEpoch && entry.timer === null) {
+        entry.refreshedAt = now();
+        void flushChange(model);
+      }
+  }
+
+  function scheduleSync(delay) {
+    if (state !== "ready") return;
+    if (syncTimer !== null) timers.clearTimeout(syncTimer);
+    syncTimer = timers.setTimeout(() => { syncTimer = null; void syncProject(); }, delay);
+  }
+
+  function dropBackground(uri) {
+    background.delete(uri);
+    contentEpoch++;                   // files importing it read differently now
+    void notify("textDocument/didClose", { textDocument: { uri } });
+    void notify("flowstudio/forget", { uri });
+  }
+
+  async function readProject(name, folder) {
+    const files = await listFlowFiles(folder);
+    const present = new Set();
+    let sent = 0;
+    for (const file of files) {
+      if (state !== "ready" || project !== name) return sent;
+      const path = name + "/" + file.rel;
+      const uri = uriForPath(path);
+      present.add(uri);
+      if (modelForUri(uri)) continue;
+      let blob;
+      try { blob = await file.handle.getFile(); } catch (_) { continue; }
+      const old = background.get(uri);
+      if (old && old.modified === blob.lastModified && old.size === blob.size) { old.handle = file.handle; continue; }
+      if (blob.size > MAX_TEXT) { if (old) dropBackground(uri); continue; }
+      const text = await blob.text();
+      if (state !== "ready" || project !== name || modelForUri(uri)) continue;
+      const entry = old || { uri, version: 0, view: null, lastText: null, seen: 0 };
+      Object.assign(entry, { path, handle: file.handle, text, modified: blob.lastModified, size: blob.size });
+      entry.version++;
+      background.set(uri, entry);
+      const body = backgroundText(entry);
+      if (!noteSent(entry, body) && old) continue;
+      sent++;
+      if (old) void notify("textDocument/didChange", { textDocument: { uri, version: entry.version },
+        contentChanges: [{ text: body }] });
+      else void notify("textDocument/didOpen", { textDocument: { uri, languageId: "flow",
+        version: entry.version, text: body } });
+    }
+    for (const uri of [...background.keys()]) if (!present.has(uri)) { dropBackground(uri); sent++; }
+    return sent;
+  }
+
+  /* Open the project's .flow files on the server, so imports and go to
+   * definition reach files that have no tab. Files with a tab are sent by
+   * their buffer instead. A new project folder replaces the previous one. */
+  function syncProject() {
+    if (state !== "ready") return Promise.resolve(0);
+    if (syncing) { syncAgain = true; return syncing; }
+    syncing = (async () => {
+      const source = workspace();
+      const folder = source ? source.root() : null;
+      const name = folder ? source.rootName() : null;
+      if (project && project !== name) {
+        for (const uri of [...background.keys()]) {
+          background.delete(uri);
+          void notify("textDocument/didClose", { textDocument: { uri } });
+        }
+        void notify("flowstudio/forget", { uri: uriForPath(project) + "/" });
+        project = null;
+      }
+      if (!folder || !name) return 0;
+      project = name;
+      const sent = await readProject(name, folder);
+      if (sent) { refreshBehind(); schedulePolls(); }
+      await chain;                      // every notification has reached the bridge
+      return sent;
+    })().catch(() => 0).finally(() => {
+      syncing = null;
+      if (syncAgain) { syncAgain = false; scheduleSync(0); }
+    });
+    return syncing;
+  }
+
+  function monacoUri(uri) {
+    return monaco.Uri && typeof monaco.Uri.parse === "function" ? monaco.Uri.parse(uri) : uri;
+  }
+
+  function backgroundFor(resource) {
+    const wanted = String(resource);
+    for (const entry of background.values())
+      if (entry.uri === wanted || String(monacoUri(entry.uri)) === wanted) return entry;
+    return null;
+  }
+
+  function reveal(view, selection) {
+    if (selection && selection.startLineNumber) {
+      view.setSelection(selection);
+      view.revealRangeInCenterIfOutsideViewport(selection);
+    } else if (selection && selection.lineNumber) {
+      view.setPosition(selection);
+      view.revealPositionInCenterIfOutsideViewport(selection);
+    }
   }
 
   function severityOf(value) {
@@ -345,16 +552,24 @@ function create(options) {
 
   /* ---- Monaco providers ---- */
 
-  function locationsOf(result) {
+  /* Server locations as Monaco locations. With withProjectFiles, a project
+   * file that has no tab is kept too: the editor opener below opens it.
+   * Other targets (the standard library) have no buffer and are left out. */
+  function locationsOf(result, withProjectFiles) {
     const list = result == null ? [] : Array.isArray(result) ? result : [result];
     const out = [];
     for (const item of list) {
       const uri = item && (item.targetUri || item.uri);
+      const span = item && (item.targetSelectionRange || item.targetRange || item.range);
       const target = typeof uri === "string" ? modelForUri(uri) : null;
-      const range = fromServer(target, item && (item.targetSelectionRange || item.targetRange || item.range));
-      // Targets outside the open documents (files on disk, the standard
-      // library) have no buffer to show, so they are left out.
-      if (target && range) out.push({ uri: target.uri, range });
+      if (target) {
+        const range = fromServer(target, span);
+        if (range) out.push({ uri: target.uri, range });
+        continue;
+      }
+      const file = withProjectFiles && typeof uri === "string" ? background.get(uri) : null;
+      const range = file ? fromServerView(file.view, span) : null;
+      if (range) out.push({ uri: monacoUri(file.uri), range });
     }
     return out;
   }
@@ -438,7 +653,7 @@ function create(options) {
         const entry = await prepare(model, true);
         if (!entry) return null;
         return locationsOf(await request("textDocument/definition", {
-          textDocument: { uri: entry.uri }, position: toServer(model, position) }).catch(() => null));
+          textDocument: { uri: entry.uri }, position: toServer(model, position) }).catch(() => null), true);
       }
     }));
     providers.push(languages.registerReferenceProvider("flow", {
@@ -567,16 +782,20 @@ function create(options) {
         openCodeEditor(source, resource, selection) {
           let target = null;
           for (const model of synced.keys()) if (String(model.uri) === String(resource)) target = model;
-          const id = target ? documentIdFor(target) : null;
-          if (!id || typeof app.activateDocument !== "function" || !app.activateDocument(id)) return false;
           const view = editor || source;
-          if (selection && selection.startLineNumber) {
-            view.setSelection(selection);
-            view.revealRangeInCenterIfOutsideViewport(selection);
-          } else if (selection && selection.lineNumber) {
-            view.setPosition(selection);
-            view.revealPositionInCenterIfOutsideViewport(selection);
+          if (!target) {
+            // A project file without a tab: open it from the project folder.
+            const file = backgroundFor(resource);
+            if (!file || !file.handle || typeof app.openEditorHandle !== "function") return false;
+            return Promise.resolve(app.openEditorHandle(file.handle, file.path)).then(opened => {
+              if (!opened) return false;
+              reveal(view, selection);
+              return true;
+            }, () => false);
           }
+          const id = documentIdFor(target);
+          if (!id || typeof app.activateDocument !== "function" || !app.activateDocument(id)) return false;
+          reveal(view, selection);
           return true;
         }
       }));
@@ -633,7 +852,21 @@ function create(options) {
     register();
     watchModels();
     followSession();
+    followProject();
     return true;
+  }
+
+  /* Tabs open and close when the project folder changes, and files are
+   * saved, so the documents event is the cue to look at the folder again. */
+  function followProject() {
+    const target = options.events !== undefined ? options.events
+      : typeof global.document !== "undefined" ? global.document : null;
+    if (target && typeof target.addEventListener === "function") {
+      const listener = () => scheduleSync(SYNC_DELAY_MS);
+      target.addEventListener("flowstudio:documents", listener);
+      watchers.push({ dispose: () => target.removeEventListener("flowstudio:documents", listener) });
+    }
+    scheduleSync(0);
   }
 
   /* The server went away for good: hand everything back to the older helpers. */
@@ -644,6 +877,10 @@ function create(options) {
     for (const disposable of watchers.splice(0)) disposable.dispose();
     for (const timer of pollTimers) timers.clearTimeout(timer);
     pollTimers = [];
+    for (const timer of [dependentsTimer, syncTimer]) if (timer !== null) timers.clearTimeout(timer);
+    dependentsTimer = syncTimer = null;
+    background.clear();
+    project = null;
     for (const [model, entry] of synced) {
       if (entry.timer !== null) timers.clearTimeout(entry.timer);
       for (const subscription of entry.subscriptions) subscription.dispose();
@@ -674,8 +911,9 @@ function create(options) {
   }
 
   return Object.freeze({
-    start, stop, handles, run, coversLine, pollEvents, uriFor,
+    start, stop, handles, run, coversLine, pollEvents, uriFor, syncProject,
     hover: (model, position) => hoverAt(model, position),
+    projectFiles: () => [...background.keys()],
     flush: model => flushChange(model),
     state: () => state,
     capabilities: () => capabilities
@@ -696,7 +934,7 @@ function bindKeys(monaco, editor, app) {
   editor.addCommand(KeyMod.Shift | KeyMod.Alt | KeyCode.KeyF, command("formatDocument"));
 }
 
-const api = Object.freeze({ create, bindKeys, uriForPath, markdownOf, OWNER });
+const api = Object.freeze({ create, bindKeys, uriForPath, listFlowFiles, markdownOf, OWNER });
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 global.FlowStudioFlowLspClient = api;
 if (typeof document !== "undefined") document.addEventListener("DOMContentLoaded", () => {

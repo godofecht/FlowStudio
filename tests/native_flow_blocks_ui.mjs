@@ -160,14 +160,23 @@ assert.deepEqual(lspMarkers, []);
 
 // 3. Run from the editor.
 const transcript = () => page.evaluate(() => document.querySelector('.terminal-transcript').textContent);
-const runAndWait = async (click, expected) => {
+// Waits until the run this click starts has finished: a new command line in
+// the transcript that is no longer running, then the expected text after it.
+const runAndWait = async (click, expected, countRuns = true) => {
   const before = (await transcript()).length;
+  const runs = await page.evaluate(() => document.querySelectorAll('#console .term-run').length);
   await click();
-  await page.waitForFunction(([size, pattern]) => {
+  await page.waitForFunction(([size, count, pattern]) => {
+    const all = document.querySelectorAll('#console .term-run');
+    const last = all[all.length - 1];
+    if (count >= 0 && (all.length <= count || !last || last.dataset.state === 'running')) return false;
+    if (/^Running/.test(document.getElementById('resultStatus').textContent)) return false;
     const now = document.querySelector('.terminal-transcript').textContent;
-    return now.length > size && new RegExp(pattern).test(now.slice(size)) &&
-      !/^Running/.test(document.getElementById('resultStatus').textContent);
-  }, [before, expected], { timeout: 120000 });
+    return now.length > size && new RegExp(pattern).test(now.slice(size));
+  }, [before, countRuns ? runs : -1, expected], { timeout: 120000 }).catch(async error => {
+    const tail = (await transcript()).slice(before).slice(-1500);
+    throw new Error(error.message + '\nWaiting for ' + expected + '; the transcript has:\n' + tail);
+  });
   return (await transcript()).slice(before);
 };
 let output = await runAndWait(() => page.click('#run'), 'blocks: ');
@@ -207,7 +216,8 @@ await page.evaluate(() => FlowStudioTerminal.show('console'));
 const prompt = page.locator('.terminal-prompt-line textarea');
 await prompt.click();
 await prompt.fill('python(sorted, spread) -> f64 { sum(sorted) * spread }');
-output = await runAndWait(() => prompt.press('Enter'), '12\\.0');
+// The prompt is free only when no run is going, so its reply is enough.
+output = await runAndWait(() => prompt.press('Enter'), '12\\.0', false);
 assert.match(output, /12\.0/);
 
 // 5. Hover in a script: a session variable passed to a block.

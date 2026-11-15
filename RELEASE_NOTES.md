@@ -1,3 +1,96 @@
+# FlowStudio v0.2.0-alpha.3 developer preview
+
+An experimental Flow-native localhost scientific IDE. This preview makes Flow
+work the way R works in RStudio, and adds an AI assistant that edits in place.
+
+## Flow console session
+
+- Variables, functions, structs and imports persist between console entries.
+  A bare expression prints its value.
+- In a script without `main()`, Ctrl+Enter sends the statement or selection
+  under the cursor and moves to the next one. A file with `main()` runs whole.
+- An entry takes about half a second once the compiler is warm. Entries build
+  at `-O0` through `src/flow_quick_run.sh`; Run still uses `flow run` at `-O2`.
+- The Environment pane lists Flow variables. Arrays and structs open in the
+  data grid, which sorts, filters and exports.
+- Entries can call Python and R through `py()` and `r()`.
+
+## Console
+
+- A run reads as the command, then its output. A spinner shows while it runs,
+  a red prompt marks a failure, and the time appears past one second.
+- Compiler and runtime messages are cleaned: one located line per Flow error,
+  no temporary paths or build logs, Python tracebacks without FlowStudio's
+  own frames, marked R errors and warnings. The raw log stays behind Full log.
+  On a Run, line numbers jump to the editor.
+
+## Editor and language tools
+
+- `flow lsp` drives completion, hover, go to definition, references, rename,
+  formatting, quick fixes and diagnostics, across the files of a project and
+  in scripts that use session variables.
+- On a machine where `flow lsp` was never built, the first start compiles it.
+  FlowStudio now waits for that build.
+- Help pane: F1 on a Flow name, or search, shows its signature, comment and
+  examples.
+- Flow plots land in the Plots pane with history, zoom and SVG or PNG export.
+- The Packages view runs `flow init`, adds and removes Flow dependencies.
+- A C or MLIR backend menu shows whether MLIR is installed and remembers the
+  choice per project.
+
+## AI assistant
+
+- Uses the installed Claude Code, Codex or Ollama with the user's own login.
+  API key variables are removed from its environment.
+- Cmd/Ctrl+K edits in place: the change streams in as an inline diff with
+  Accept and Reject per change, and an accept is one undo step.
+- Chat streams as it arrives. Code blocks have Apply, Copy, Insert and Run.
+  The current file, selection and error go along as removable chips.
+- Edits the agent proposes open as inline diffs with a review list per file.
+- "Fix with Assistant" on Flow compiler errors.
+- `claude` and `codex` started in the Terminal get the FlowStudio MCP tools
+  without changes to global configuration.
+- New projects carry `AGENTS.md`, `CLAUDE.md` and `.mcp.json`.
+  `docs/FLOW_FOR_AI.md` is a Flow guide for agents whose examples are compiled
+  by tests.
+
+## Graphics Preview
+
+- Builds run in their own process, so the IDE keeps answering during a build.
+  The Preview shows the stage and elapsed time.
+- FlowStudio keeps its own Emscripten cache, so the slow first build happens
+  once per machine. Saving rebuilds; the dragged Preview width is kept per
+  project.
+
+## Fixes
+
+- Check Flow resolves `import flowstudio` and marks the editor again.
+- Check Flow and native runs work on any loopback port (`FLOWSTUDIO_PORT`).
+- The Linux build declares `realpath`.
+- A plot helper named `finite` clashed with glibc and broke every program that
+  imported `flowstudio` on Linux.
+- Debuggers accept a breakpoint update that arrives after the session ended.
+- The release archive now holds every file the server opens at run time. The
+  previous archive lacked the session helper, the Flow bridge module, the
+  Flow debugger and the MCP server.
+
+## Known limits
+
+- Values the session cannot rebuild (pointers, lists, maps, nested arrays,
+  arrays over 4,096 items) are listed as not kept.
+- CI has no `emcc`, so Preview checks run on macOS only. CI's Linux runner has
+  no MLIR.
+- The assistant suites use a fake command line tool. Claude Code passed one
+  live run and Codex one manual run on macOS. Ollama was not run.
+
+## Package
+
+Extract and run `./run.sh`. Requires Flow 2.0 as `flow`; Python 3 and R are
+optional. The server binds to localhost, port 8751 by default. This is not a
+sandbox: do not expose the server or run untrusted code.
+
+## Prior release
+
 # FlowStudio v0.2.0-alpha.2 developer preview
 
 An experimental Flow-native localhost scientific IDE with an HTML workspace.

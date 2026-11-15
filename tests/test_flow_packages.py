@@ -177,6 +177,20 @@ class Helper(unittest.TestCase):
         self.assertIn("already has a flow.toml", data["output"])
 
 
+class PlotModuleNames(unittest.TestCase):
+    def test_private_plot_names_cannot_clash_with_c_libraries(self):
+        """flowc emits module functions under their own names, so a helper
+        called finite() collided with glibc's math.h and broke every
+        program that imports flowstudio on Linux."""
+        with open(os.path.join(ROOT, "src", "flowstudio.flow"), encoding="utf-8") as handle:
+            source = handle.read()
+        plots = source[source.index("# ---- Plots"):]
+        private = re.findall(r"^(?:function|struct|let mut|const)\s+([A-Za-z_][A-Za-z0-9_]*)", plots, re.M)
+        self.assertTrue(private)
+        for name in private:
+            self.assertRegex(name, r"^(?:fsplot_|FsPlot|FSPLOT_)", name)
+
+
 REAL_FLOW = shutil.which("flow")
 
 

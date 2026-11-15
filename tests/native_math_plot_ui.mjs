@@ -2,6 +2,7 @@
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+const ORIGIN = (process.env.FLOWSTUDIO_URL || 'http://127.0.0.1:8751').replace(/\/+$/, '');
 
 
 // Compact executable Flow source without changing quoted strings. The native
@@ -111,7 +112,7 @@ try {
   const page = await browser.newPage();
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.goto('http://127.0.0.1:8751', { waitUntil: 'domcontentloaded' });
+  await page.goto(ORIGIN, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => Boolean(globalThis.FlowStudioEditor?.editor &&
     globalThis.FlowStudioMathPlots?.render));
   for (const [source, metric, other] of [

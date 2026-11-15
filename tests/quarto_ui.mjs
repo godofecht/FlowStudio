@@ -3,6 +3,7 @@
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+const ORIGIN = (process.env.FLOWSTUDIO_URL || 'http://127.0.0.1:8751').replace(/\/+$/, '');
 
 const fence = '`'.repeat(3);
 const browser = await chromium.launch({ headless: true });
@@ -12,10 +13,10 @@ try {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   page.on('response', response => {
-    if (response.status() >= 400 && response.url().startsWith('http://127.0.0.1:8751/'))
+    if (response.status() >= 400 && response.url().startsWith(ORIGIN + '/'))
       errors.push(`${response.status()} ${response.url()}`);
   });
-  await page.goto('http://127.0.0.1:8751/app/', { waitUntil: 'domcontentloaded' });
+  await page.goto(ORIGIN + '/app/', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => Boolean(globalThis.FlowStudioQuarto?.decode));
   const qmd = '---\ntitle: Example\nformat: html\n---\n\n' +
     fence + '{r}\n#| label: summary\nprint(42)\n' + fence + '\n';

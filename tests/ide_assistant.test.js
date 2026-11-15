@@ -462,7 +462,10 @@ test("the chat is kept per project and comes back after a reload", async () => {
   again.panel.dispose();
 });
 
-test("runJob streams text to an inline edit and reports the end", async () => {
+test("runJob streams text to an inline edit and reports the end", async t => {
+  // The panel's timers are unref'd; this keeps the loop alive while the job polls.
+  const alive = setInterval(() => {}, 1000);
+  t.after(() => clearInterval(alive));
   const { server, panel } = mountPanel();
   await panel.ready;
   const delta = text => line({ type: "stream_event", event: { type: "content_block_delta", delta: { type: "text_delta", text } } });

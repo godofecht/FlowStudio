@@ -1,18 +1,21 @@
-"""Flow apps in the browser: POST /api/app/build and GET /flowapp/<build>/<file>.
+"""Flow apps in the browser: POST /api/app/build, POST /api/app/start and
+GET /flowapp/<build>/<file>.
 
-Live: needs the native server on 127.0.0.1:8751 with flow and emcc on PATH.
+Live: needs the native server (FLOWSTUDIO_URL, default 127.0.0.1:8751) with
+flow and emcc on PATH.
 """
 from __future__ import annotations
 
 import json
 import os
 import shutil
+import time
 import unittest
 import urllib.error
 import urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-URL = "http://127.0.0.1:8751"
+URL = os.environ.get("FLOWSTUDIO_URL", "http://127.0.0.1:8751").rstrip("/")
 
 
 def server_up() -> bool:
@@ -31,6 +34,13 @@ def build(source: str) -> tuple[int, dict]:
             return response.status, json.loads(response.read())
     except urllib.error.HTTPError as error:
         return error.code, json.loads(error.read())
+
+
+def start(source: str) -> dict:
+    request = urllib.request.Request(URL + "/api/app/start", data=source.encode("utf-8"), method="POST",
+                                     headers={"X-FlowStudio-Intent": "run", "Content-Type": "text/plain"})
+    with urllib.request.urlopen(request, timeout=10) as response:
+        return json.loads(response.read())
 
 
 def get(path: str) -> tuple[int, str, bytes]:
@@ -73,6 +83,37 @@ class FlowAppTests(unittest.TestCase):
         # The /app/ scripts of the IDE are untouched by the app routes.
         self.assertEqual(get("/app/project_create.js")[0], 200)
         self.assertEqual(get("/app-host.html")[0], 200)
+
+    def test_background_build_reports_stages_and_keeps_the_server_responsive(self) -> None:
+        with open(os.path.join(ROOT, "examples/graphics/bouncing-tiles/app.flow"), encoding="utf-8") as handle:
+            source = handle.read() + "\n# background build %f\n" % time.time()
+        began = time.monotonic()
+        first = start(source)
+        self.assertLess(time.monotonic() - began, 2.0, "start returns before the build ends")
+        self.assertIn(first["state"], ("check", "wasm"), first)
+        build_number = first["build"]
+        began = time.monotonic()
+        code, _, body = get("/health")
+        self.assertEqual((code, body), (200, b"FlowStudio ready"))
+        self.assertLess(time.monotonic() - began, 1.0, "the server answers while emcc works")
+        self.assertEqual(start(source)["build"], build_number, "the same source joins the running build")
+        stages = set()
+        deadline = time.monotonic() + 240
+        while time.monotonic() < deadline:
+            code, kind, body = get(f"/flowapp/{build_number}/status")
+            self.assertEqual((code, kind), (200, "application/json; charset=utf-8"))
+            status = json.loads(body)
+            stages.add(status["state"])
+            if status["state"] in ("done", "failed"):
+                break
+            self.assertIsInstance(status["elapsed"], int)
+            time.sleep(0.05)
+        self.assertEqual(status["state"], "done", status)
+        self.assertTrue(status["ok"])
+        self.assertIn("wasm", stages)
+        self.assertEqual(get(f"/flowapp/{build_number}/app.wasm")[0], 200)
+        again = start(source)
+        self.assertEqual((again["build"], again["state"]), (build_number, "done"), "a kept good build is reused")
 
 
 if __name__ == "__main__":

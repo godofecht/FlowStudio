@@ -119,14 +119,25 @@ build in a frame. Keyboard and mouse go to the program after you click the
 canvas.
 
 With Hot reload on, an edit rebuilds the app after a short pause, about one
-second for the examples, and swaps the new build in once it has loaded. A
-build that fails leaves the last good build running and lists the compiler
-errors, each a link to its line. A reload restarts the program, so its state
-starts fresh. The Graphics examples are a starter app and three games from
+second for the examples, and saving (Ctrl+S or Cmd+S) rebuilds at once.
+Saving a graphics program while no app runs starts it. The new build is
+swapped in once it has drawn, so the Preview never goes blank, and the
+editor keeps the keyboard. A build that fails leaves the last good build
+running and lists the compiler errors, each a link to its line. A reload
+restarts the program, so its state starts fresh. The width you give the
+side panel is kept per project; a rebuild does not change it. The Graphics examples are a starter app and three games from
 the Flow repository: Pong, Snake and Falling sand.
 
-The first build on a machine also compiles the Flow runtime for WebAssembly,
-which takes about ten seconds. The Preview needs Emscripten (`emcc`) on the
+The first build on a machine also builds the Emscripten system libraries,
+which takes 15 to 30 seconds. The Preview shows each stage (checking Flow,
+building WebAssembly, starting the app) with the time so far, and says why
+the first build is slow. FlowStudio keeps those libraries in a cache of its
+own, `~/.cache/flowstudio/emscripten` (or `FLOWSTUDIO_EM_CACHE`), because
+Emscripten clears its shared cache whenever `emcc` runs with another
+configuration. Opening a graphics program starts its build in the
+background, and builds run in a child process so the IDE stays responsive
+(`POST /api/app/start`, then `GET /flowapp/<build>/status`). Later builds
+take about one second. The Preview needs Emscripten (`emcc`) on the
 server's PATH. Builds live in a private folder under the system temp folder,
 and the last four are kept. Code: `src/flow_app.c`, `web/app_host.html`,
 `web/ide_app_preview.js`. Tests: `tests/ide_app_preview.test.js`,

@@ -647,7 +647,7 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
         <span class="pv-dot" id="previewDot" data-state="idle" aria-hidden="true"></span>
         <span class="pv-title" id="previewTitle">No app running</span>
         <span class="pv-status" id="previewStatus" role="status" aria-live="polite"></span>
-        <label class="pv-hot" title="Rebuild and restart the app as you type"><input type="checkbox" id="previewHot" checked>Hot reload</label>
+        <label class="pv-hot" title="Rebuild and restart the app as you type and when you save"><input type="checkbox" id="previewHot" checked>Hot reload</label>
         <button type="button" id="previewRestart" class="pv-btn" title="Rebuild and restart" aria-label="Rebuild and restart" disabled><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.5-3.6"/><path d="M13 2.5v3h-3"/></svg></button>
         <button type="button" id="previewStop" class="pv-btn" title="Stop the app" aria-label="Stop the app" disabled><svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"><rect x="3" y="3" width="10" height="10" rx="1.5" fill="currentColor"/></svg></button>
       </div>
@@ -2153,6 +2153,7 @@ async function saveFile() {
     el("fileLabel").textContent = FlowStudioDocuments.label(doc);
     markDirty(false);
     status("Saved " + name, "ok");
+    document.dispatchEvent(new CustomEvent("flowstudio:saved", { detail: { id: doc.id } }));
   } catch (error) {
     if (error.name !== "AbortError") status(String(error), "error");
   }
@@ -2172,6 +2173,7 @@ async function saveFileAs() {
     el("fileLabel").textContent = handle.name;
     markDirty(false);
     status("Saved " + handle.name, "ok");
+    document.dispatchEvent(new CustomEvent("flowstudio:saved", { detail: { id: doc.id } }));
   } catch (error) {
     if (error.name !== "AbortError") status(String(error), "error");
   }

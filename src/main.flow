@@ -18,6 +18,7 @@ extern {
     function fs_body() -> string
     function fs_intent_allowed() -> i32
     function fs_reply(status: i32, content_type: string, body: string) -> void
+    function fs_static_fresh(path: string) -> i32
     function fs_write_temp_flow(code: string) -> string
     function fs_write_temp_flow_run(code: string) -> string
     function fs_write_temp_flow_check(code: string) -> string
@@ -866,7 +867,13 @@ function send_git_branch(kind: string, name: string) -> void {
 }
 
 function send_editor() -> void {
-    let page: FileRead = io_read_text("web/index.html")
+    # A reload revalidates with the ETag and gets 304 Not Modified.
+    if fs_static_fresh("web/index.html") == 1 {
+        return
+    }
+    # io_read_text validates every code point and took about 0.5 s for this
+    # file. The page is a trusted checked-in asset, like the bundles.
+    let page: FileRead = io_read_file("web/index.html")
     if page.ok {
         # Serve the same checked-in editor at / and /index.html. The page
         # loads its allowlisted scripts in dependency order.
@@ -902,6 +909,9 @@ function dispatch() -> void {
     if eq(method, "GET") {
         let asset: StaticAsset = data_route(path)
         if asset.found {
+            if fs_static_fresh(asset.path) == 1 {
+                return
+            }
             # These are trusted, checked-in assets. io_read_text validates each
             # code point with repeated length scans, which stalls large bundles.
             let file: FileRead = io_read_file(asset.path)

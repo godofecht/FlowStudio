@@ -212,6 +212,8 @@ jobs:
           node tests/native_flow_help_data_ui.mjs
           node tests/native_flow_plots_packages_ui.mjs
           node tests/native_workbench_polish_ui.mjs
+          node tests/layout_retina_ui.mjs
+          node tests/perf_load.mjs
           node tests/native_context_menus_ui.mjs
       # The first `flow lsp` builds the server from source, which takes about
       # 12 s on a 2-core Linux machine, longer than the bridge's 10 s

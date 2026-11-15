@@ -50,7 +50,51 @@ export function markRunBusy(doc = document) {
   sync();
 }
 
+// renderTabs rebuilds the whole strip, so a CSS animation on .doc-tab would
+// replay each time a keystroke flags a buffer dirty. Only a tab for a
+// document that was not in the strip before gets the entry animation.
+export function animateNewTabs(doc = document) {
+  const strip = doc.getElementById('docTabs');
+  if (!strip) return;
+  const ids = () => new Set(Array.from(strip.querySelectorAll('.doc-tab[data-doc-id]'), tab => tab.dataset.docId));
+  let known = ids();
+  new MutationObserver(() => {
+    const now = ids();
+    for (const tab of strip.querySelectorAll('.doc-tab[data-doc-id]')) {
+      if (known.has(tab.dataset.docId)) continue;
+      tab.classList.add('fs-enter');
+      tab.addEventListener('animationend', () => tab.classList.remove('fs-enter'), { once: true });
+    }
+    known = now;
+  }).observe(strip, { childList: true });
+}
+
+// A new status message rises in, so the eye catches it in the status bar.
+export function flashStatus(doc = document) {
+  const status = doc.getElementById('resultStatus');
+  if (!status) return;
+  let last = status.textContent;
+  new MutationObserver(() => {
+    if (status.textContent === last) return;
+    last = status.textContent;
+    const duration = motionMs(doc, '--dur-base');
+    if (duration && typeof status.animate === 'function')
+      status.animate([{ opacity: 0.2, transform: 'translateY(2px)' }, { opacity: 1, transform: 'none' }],
+        { duration, easing: 'cubic-bezier(.2,.8,.2,1)' });
+  }).observe(status, { childList: true, characterData: true, subtree: true });
+}
+
+// A motion token in milliseconds; 0 when reduced motion is on.
+export function motionMs(doc, name) {
+  const raw = getComputedStyle(doc.documentElement).getPropertyValue(name).trim();
+  const value = parseFloat(raw);
+  if (!Number.isFinite(value)) return 0;
+  return /ms$/.test(raw) ? value : value * 1000;
+}
+
 export function mountPolish(doc = document) {
+  animateNewTabs(doc);
+  flashStatus(doc);
   revealActiveTab(doc);
   markRunBusy(doc);
   focusEditorOnLoad(doc);

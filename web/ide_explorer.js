@@ -530,6 +530,8 @@ function mount(options) {
   }
   function noteRow(text, depth) {
     const li = el("li", "ex-note", text);
+    // A folder still loading shows a shimmer bar beside its note.
+    if (/^Loading/.test(text) && li.classList) li.classList.add("is-loading");
     li.setAttribute("role", "none");
     li.style.setProperty("--depth", String(depth));
     return li;

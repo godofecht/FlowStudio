@@ -17,7 +17,7 @@ test("both editor routes share the same source HTML", () => {
   const routes = read("src/data_routes.flow");
   assert.match(routes, /if url == "\/index\.html"/);
   assert.match(routes, /path: "web\/index\.html"/);
-  assert.match(read("src/main.flow"), /io_read_text\("web\/index\.html"\)/);
+  assert.match(read("src/main.flow"), /io_read_file\("web\/index\.html"\)/);
 });
 
 test("integrated console scripts load once, after workspace tabs", () => {

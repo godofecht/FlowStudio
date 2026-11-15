@@ -3,6 +3,7 @@
 Runs only where `flow` and LLDB with Python support are installed (macOS
 with Xcode tools). It speaks the helper's real framed protocol.
 """
+import importlib.util
 import json
 import os
 import shutil
@@ -28,6 +29,66 @@ function main() -> i32 {
     return 0
 }
 """
+
+GFX_SOURCE = """import "stdlib/gfx.flow"
+
+function main() -> i32 {
+    let w: i32 = 64
+    let h: i32 = 48
+    if w < 0 {
+        let g = gfx_open(w, h, "never opened")
+        gfx_close(g)
+    }
+    println("gfx size", w * h)
+    return 0
+}
+"""
+
+# What `flow debug` printed for a gfx program before the Flow fix.
+GFX_LINK_FAILURE = """Compiling main.flow (debug)...
+FLOW to C (debug): main.debug.c
+Undefined symbols for architecture arm64:
+  "_flow_gfx_blit_rgb", referenced from:
+      _gfx_blit_rgb in main-ef27f6.o
+  "_flow_gfx_clear", referenced from:
+      _gfx_clear in main-ef27f6.o
+ld: symbol(s) not found for architecture arm64
+clang: error: linker command failed with exit code 1 (use -v to see invocation)
+C compilation/linking failed
+"""
+
+
+def load_helper():
+    spec = importlib.util.spec_from_file_location("flow_debugger", ROOT / "src" / "flow_debugger.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class BuildFailureMessage(unittest.TestCase):
+    """The message for a failed build needs no LLDB, so it runs everywhere."""
+
+    def setUp(self):
+        self.helper = load_helper()
+
+    def test_gfx_link_failure_is_one_plain_message(self):
+        message = self.helper.build_failure_message(GFX_SOURCE, GFX_LINK_FAILURE)
+        self.assertIn("cannot build graphics programs for debugging", message)
+        self.assertIn("https://github.com/flooooooooooow/flow/pull/1702", message)
+        self.assertIn("Run works", message)
+        self.assertNotIn("flow_gfx_", message)
+        self.assertNotIn("ld:", message)
+
+    def test_unresolved_gfx_symbols_alone_are_recognised(self):
+        message = self.helper.build_failure_message("function main() -> i32 {\n    return 0\n}\n",
+                                                    GFX_LINK_FAILURE)
+        self.assertIn("cannot build graphics programs for debugging", message)
+
+    def test_gfx_program_with_a_flow_error_shows_the_error(self):
+        text = "main.flow:4: error: undefined name 'gfx_opne'\nFLOW compilation failed\n"
+        message = self.helper.build_failure_message(GFX_SOURCE, text)
+        self.assertTrue(message.startswith("Flow build failed:"), message)
+        self.assertIn("gfx_opne", message)
 
 
 def helper_command():
@@ -114,6 +175,19 @@ class FlowDebugger(unittest.TestCase):
                                                  "breakpoints": []}))
         self.assertFalse(ok)
         self.assertIn("Flow build failed", body["message"])
+
+    def test_gfx_program_debugs_or_says_why_not(self):
+        ok, body = self.request("B", json.dumps({"source": GFX_SOURCE, "breakpoints": [{"line": 10}]}))
+        self.assertNotIn("flow_gfx_", body["message"], "no linker output in the Debug Console")
+        if ok:
+            # This `flow debug` links the gfx backend: debugging proceeds.
+            self.assertEqual(self.frames(body), [("main", 10)])
+            ok, body = self.request("C")
+            self.assertEqual(body["state"], "done")
+            self.assertIn("gfx size 3072", body["output"])
+        else:
+            self.assertIn("cannot build graphics programs for debugging", body["message"])
+            self.assertIn("https://github.com/flooooooooooow/flow/pull/1702", body["message"])
 
 
 if __name__ == "__main__":

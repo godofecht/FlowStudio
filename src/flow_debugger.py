@@ -38,6 +38,35 @@ MAX_LOCALS = 40
 MAX_OUTPUT = 32768
 MAX_BREAKPOINTS = 64
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
+GFX_SOURCE = re.compile(r'import\s+"stdlib/gfx|\bgfx_open\w*\s*\(')
+GFX_UNRESOLVED = re.compile(r"\b_?flow_gfx_\w+")
+LINK_FAILED = re.compile(r"symbol\(s\) not found|undefined reference|Undefined symbols")
+FLOW_GFX_DEBUG_FIX = "https://github.com/flooooooooooow/flow/pull/1702"
+GFX_DEBUG_MESSAGE = (
+    "This Flow toolchain cannot build graphics programs for debugging.\n"
+    "The Flow fix is " + FLOW_GFX_DEBUG_FIX + "\n"
+    "Run works for this program.")
+
+
+def gfx_link_failed(source, text):
+    """True when a failed `flow debug` build is the missing gfx backend.
+
+    Older `flow debug` links without the native graphics backend, so every
+    flow_gfx_* symbol is unresolved. A toolchain that has the fix builds
+    the program and never reaches this check.
+    """
+    if not LINK_FAILED.search(text):
+        return False
+    return bool(GFX_UNRESOLVED.search(text) or GFX_SOURCE.search(source))
+
+
+def build_failure_message(source, text):
+    """The Debug Console message for a failed `flow debug` build."""
+    if gfx_link_failed(source, text):
+        return GFX_DEBUG_MESSAGE
+    lines = [line for line in text.splitlines() if line.strip() and "ensure_flowc" not in line
+             and not line.lstrip().startswith(("\u2139", "\u2705"))]
+    return "Flow build failed:\n" + "\n".join(lines[-30:])
 
 
 class Session(object):
@@ -100,9 +129,7 @@ class Session(object):
         text = ANSI.sub("", build.stdout + build.stderr)
         match = re.search(r"Built debug binary: (\S+)", text)
         if build.returncode != 0 or not match:
-            lines = [line for line in text.splitlines() if line.strip() and "ensure_flowc" not in line
-                     and not line.lstrip().startswith(("\u2139", "\u2705"))]
-            return self.fail("Flow build failed:\n" + "\n".join(lines[-30:]))
+            return self.fail(build_failure_message(source, text))
         binary = match.group(1)
 
         self.debugger = lldb.SBDebugger.Create()

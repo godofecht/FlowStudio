@@ -386,6 +386,7 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
 <link rel="stylesheet" href="/ui/workbench.css">
 <link rel="stylesheet" href="/ide_flow_help.css">
 <link rel="stylesheet" href="/ide_assistant.css">
+<link rel="stylesheet" href="/ide_context_menu.css">
 </head>
 <body>
 <div class="shell" id="ideShell">
@@ -1696,6 +1697,8 @@ function renderTabs() {
     });
     tab.append(close);
     tab.addEventListener("click", () => activateDocument(doc.id));
+    // Pinned tabs (web/ide_context_menus.js).
+    if (globalThis.FlowStudioEditorTabs) globalThis.FlowStudioEditorTabs.decorate(tab, doc);
     return tab;
   }));
 }
@@ -2912,6 +2915,8 @@ renderTabs();
 <script src="/ide_debugger.js"></script>
 <script src="/ide_symbols.js"></script>
 <script src="/ide_outline.js"></script>
+<script src="/ide_context_menu.js"></script>
+<script src="/ide_context_menus.js"></script>
 <script>
 "use strict";
 /* Outline panel: parses the active buffer and jumps the caret to a symbol. */

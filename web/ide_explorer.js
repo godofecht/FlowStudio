@@ -358,7 +358,8 @@ function mount(options) {
   let tree = null;
   let focusedRel = null;
   let editing = null;           // {mode:"new-file"|"new-folder"|"rename", folder, node}
-  let menu = null;
+  let selected = new Set();     // multi-selection (rels); the focused row is always in it
+  let anchorRel = null;         // Shift+click range start
   let typed = "", typedAt = 0;
   let dragRel = null;
   let renderToken = 0;
@@ -415,6 +416,7 @@ function mount(options) {
   const list = el("ul", "ex-tree");
   list.setAttribute("role", "tree");
   list.setAttribute("aria-label", "Project files");
+  list.setAttribute("aria-multiselectable", "true");
   list.tabIndex = 0;
   const empty = el("div", "ex-empty");
   const hint = el("div", "ex-typeahead");
@@ -465,7 +467,8 @@ function mount(options) {
       li.id = rowId(index);
       li.setAttribute("role", "treeitem");
       li.setAttribute("aria-level", String(node.depth));
-      li.setAttribute("aria-selected", String(node.rel === focusedRel));
+      li.setAttribute("aria-selected", String(node.rel === focusedRel || (selected.size > 1 && selected.has(node.rel))));
+      if (selected.size > 1 && selected.has(node.rel)) li.classList.add("is-multi");
       li.dataset.rel = node.rel;
       li.dataset.kind = node.kind;
       li.style.setProperty("--depth", String(node.depth - 1));
@@ -656,6 +659,7 @@ function mount(options) {
     if (!(await beforeRootChange(handle))) return false;
     tree = createTree(handle);
     focusedRel = null;
+    selected = new Set();
     editing = null;
     tree.loading = loadChildren(tree);
     render();
@@ -709,6 +713,7 @@ function mount(options) {
     if (!(await beforeRootChange(null))) return false;
     tree = null;
     focusedRel = null;
+    selected = new Set();
     editing = null;
     render();
     onRootChanged(null);
@@ -936,7 +941,7 @@ function mount(options) {
     onEntryMoved({ kind: node.kind, oldPath, newPath, handle: renamed ? renamed.handle : handle });
     status("Renamed to " + nextName, "ok");
   }
-  async function deleteNode(node) {
+  async function deleteNode(node, confirmed = false) {
     if (!node || node === tree) return false;
     const path = fullPath(node);
     const affected = openDocUnder(path);
@@ -952,7 +957,7 @@ function mount(options) {
         message = "Delete the folder \"" + node.name + "\" and its " + counts.files + (counts.capped ? "+" : "") +
           " files and " + counts.folders + " subfolders permanently? This cannot be undone.";
     }
-    if (!confirmChange(message)) return false;
+    if (!confirmed && !confirmChange(message)) return false;
     try {
       const rows = visibleRows(tree);
       const index = rows.indexOf(node);
@@ -1015,85 +1020,166 @@ function mount(options) {
     } catch (error) { report(error); }
   }
 
-  /* ---------- context menu ---------- */
+  /* ---------- context menu (web/ide_context_menu.js) ---------- */
 
-  function closeMenu() {
-    if (!menu) return;
-    menu.remove();
-    menu = null;
+  function contextMenu() { return global.FlowStudioContextMenu || null; }
+  function closeMenu() { const shared = contextMenu(); if (shared && shared.isOpen()) shared.close({ restoreFocus: false }); }
+  /* The rows a command applies to: the multi-selection when the clicked
+   * row is part of it, otherwise the clicked row alone. */
+  function targetsFor(node) {
+    if (!node) return [];
+    if (selected.size > 1 && selected.has(node.rel)) {
+      const nodes = visibleRows(tree).filter(row => selected.has(row.rel));
+      // A folder and something inside it: act on the folder only.
+      return nodes.filter(row => !nodes.some(other => other !== row && other.kind === "directory" &&
+        isInside(row.rel, other.rel) && row.rel !== other.rel));
+    }
+    return [node];
   }
+  function runnable(node) { return Boolean(node && node.kind === "file" && /\.(flow|py|r)$/i.test(node.name)); }
+  function app() { return global.FlowStudioApp || null; }
   function menuItems(node) {
     if (!tree) return [
-      ["Open folder...", () => void choose(), ""]
+      { label: "Open Folder...", run: () => choose() }
     ];
+    const targets = targetsFor(node);
+    const many = targets.length > 1;
+    const folder = node ? (node.kind === "directory" ? node : node.parent) : tree;
     const items = [];
-    if (node && node.kind === "file") items.push(["Open", () => void openNode(node), "Enter"], null);
-    items.push(["New file...", () => void beginCreate("new-file", node ? (node.kind === "directory" ? node : node.parent) : tree), ""]);
-    items.push(["New folder...", () => void beginCreate("new-folder", node ? (node.kind === "directory" ? node : node.parent) : tree), ""]);
+    if (node && node.kind === "file" && !many) {
+      items.push({ label: "Open", shortcut: "Enter", run: () => openNode(node) });
+      items.push({ label: "Open to the Side", shortcut: "Mod+Enter", run: () => openToSide(node),
+        disabled: !validFilename(node.name) ? "This file type does not open in the editor." :
+          !(global.FlowStudioSplitEditor && global.FlowStudioSplitEditor.available()) ? "The split editor needs the Monaco editor." : false });
+      if (runnable(node)) items.push({ label: "Run", run: () => runNode(node) });
+      items.push(null);
+    }
+    items.push({ label: "New File...", run: () => beginCreate("new-file", folder) });
+    items.push({ label: "New Folder...", run: () => beginCreate("new-folder", folder) });
+    items.push({ label: "Find in Folder...", run: () => findInFolder(folder) });
     if (node) {
       items.push(null);
-      items.push(["Copy path", () => void copyText(fullPath(node), "path"), ""]);
-      items.push(["Copy relative path", () => void copyText(node.rel, "relative path"), ""]);
+      items.push({ label: many ? "Copy Paths" : "Copy Path", shortcut: "Mod+Alt+C",
+        run: () => copyText(targets.map(fullPath).join("\n"), many ? targets.length + " paths" : "path") });
+      items.push({ label: many ? "Copy Relative Paths" : "Copy Relative Path", shortcut: "Mod+Shift+Alt+C",
+        run: () => copyText(targets.map(item => item.rel).join("\n"), many ? targets.length + " relative paths" : "relative path") });
       items.push(null);
-      items.push(["Rename...", () => beginRename(node), "F2"]);
-      items.push(["Delete", () => void deleteNode(node), "Del"]);
+      items.push({ label: "Duplicate", run: () => duplicateNodes(targets) });
+      items.push({ label: "Rename...", shortcut: "F2", run: () => beginRename(node),
+        disabled: many ? "Select one item to rename." : false });
+      // A Mac keyboard's delete key is Backspace; Cmd+Backspace deletes, as in VS Code.
+      const mac = contextMenu() ? contextMenu().isMacPlatform(global.navigator) : false;
+      items.push({ label: many ? "Delete " + targets.length + " Items" : "Delete", shortcut: mac ? "Mod+Backspace" : "Delete", danger: true,
+        run: () => (many ? deleteNodes(targets) : deleteNode(node)) });
     }
     items.push(null);
-    if (node && node.kind === "directory") items.push(["Collapse folder", () => void expand(node, false), ""]);
-    items.push(["Refresh", () => void refresh(), ""]);
-    items.push(["Collapse all folders", () => collapseAll(), ""]);
+    if (node && node.kind === "directory")
+      items.push({ label: node.expanded ? "Collapse Folder" : "Expand Folder", run: () => expand(node, !node.expanded) });
+    items.push({ label: "Refresh", run: () => refresh() });
+    items.push({ label: "Collapse All Folders", run: () => collapseAll() });
     items.push(null);
-    items.push(["Open another folder...", () => void choose(), ""]);
-    items.push(["Close folder", () => close(), ""]);
+    items.push({ label: "Open Another Folder...", run: () => choose() });
+    items.push({ label: "Close Folder", run: () => close() });
     return items;
   }
   function openMenu(node, anchor, point = null) {
-    closeMenu();
-    menu = el("div", "ex-menu");
-    menu.setAttribute("role", "menu");
-    menu.setAttribute("aria-label", node ? node.name + " actions" : "Explorer actions");
-    const buttons = [];
-    for (const item of menuItems(node)) {
-      if (!item) { if (menu.lastChild && menu.lastChild.tagName !== "HR") menu.append(el("hr")); continue; }
-      const [label, run, shortcut] = item;
-      const button = el("button", "ex-menu-item");
-      button.type = "button";
-      button.setAttribute("role", "menuitem");
-      button.tabIndex = -1;
-      button.append(el("span", "", label));
-      if (shortcut) button.append(el("kbd", "", shortcut));
-      button.addEventListener("click", event => {
-        event.stopPropagation();
-        closeMenu();
-        run();
-      });
-      buttons.push(button);
-      menu.append(button);
-    }
-    if (menu.lastChild && menu.lastChild.tagName === "HR") menu.lastChild.remove();
-    menu.addEventListener("keydown", event => {
-      const index = buttons.indexOf(doc.activeElement);
-      if (event.key === "ArrowDown") { event.preventDefault(); buttons[(index + 1) % buttons.length].focus(); }
-      else if (event.key === "ArrowUp") { event.preventDefault(); buttons[(index - 1 + buttons.length) % buttons.length].focus(); }
-      else if (event.key === "Home") { event.preventDefault(); buttons[0].focus(); }
-      else if (event.key === "End") { event.preventDefault(); buttons[buttons.length - 1].focus(); }
-      else if (event.key === "Escape" || event.key === "Tab") { event.preventDefault(); closeMenu(); list.focus(); }
+    const shared = contextMenu();
+    if (!shared) return null;
+    return shared.open({
+      doc, items: menuItems(node), label: node ? node.name + " actions" : "Explorer actions",
+      returnFocus: tree ? list : (doc.activeElement || null),
+      ...(point ? { x: point.x, y: point.y } : { anchor, keyboard: true })
     });
-    doc.body.append(menu);
-    let x, y;
-    if (point) { x = point.x; y = point.y; }
-    else {
-      const rect = anchor.getBoundingClientRect();
-      x = rect.left; y = rect.bottom + 2;
-    }
-    const width = global.innerWidth || 1024, height = global.innerHeight || 768;
-    const box = menu.getBoundingClientRect();
-    menu.style.left = Math.max(4, Math.min(x, width - box.width - 4)) + "px";
-    menu.style.top = Math.max(4, Math.min(y, height - box.height - 4)) + "px";
-    if (buttons[0]) buttons[0].focus();
   }
-  doc.addEventListener("mousedown", event => { if (menu && !menu.contains(event.target)) closeMenu(); }, true);
-  global.addEventListener && global.addEventListener("blur", closeMenu);
+  async function openToSide(node) {
+    const split = global.FlowStudioSplitEditor;
+    if (!split) return false;
+    return split.openHandle(node.handle, fullPath(node));
+  }
+  async function runNode(node) {
+    const host = app();
+    if (!host || !(await openNode(node))) return false;
+    const doc_ = listDocuments().find(item => item.path === fullPath(node));
+    if (!doc_) return false;
+    return host.commands.runDocument(doc_.id);
+  }
+  function findInFolder(folder) {
+    const include = doc.getElementById("projectInclude");
+    const tab = doc.getElementById("tab-search");
+    if (tab) tab.click();
+    if (include) include.value = folder && folder !== tree ? folder.rel + "/**" : "";
+    const query = doc.getElementById("projectSearch");
+    if (query) {
+      query.focus();
+      if (query.value.trim()) { const again = doc.getElementById("searchProject"); if (again) again.click(); }
+    }
+    status(folder && folder !== tree ? "Search in " + fullPath(folder) : "Search in " + tree.name, "ok");
+  }
+  /* VS Code names copies "name copy.ext", then "name copy 2.ext". */
+  function copyName(name, kind, taken) {
+    const dot = kind === "file" ? name.lastIndexOf(".") : -1;
+    const stem = dot > 0 ? name.slice(0, dot) : name;
+    const ext = dot > 0 ? name.slice(dot) : "";
+    for (let n = 1; n < 1000; n++) {
+      const candidate = stem + " copy" + (n > 1 ? " " + n : "") + ext;
+      if (!taken.has(candidate)) return candidate;
+    }
+    throw new Error("Too many copies of \"" + name + "\".");
+  }
+  async function duplicateNodes(nodes) {
+    let last = null;
+    for (const node of nodes) {
+      const parent = node.parent;
+      if (!parent.children) await loadChildren(parent);
+      const taken = new Set(parent.children.map(child => child.name));
+      const name = copyName(node.name, node.kind, taken);
+      if (node.kind === "file") {
+        const bytes = await readBytes(node.handle);
+        const target = await parent.handle.getFileHandle(name, { create: true });
+        const writer = await target.createWritable();
+        try { await writer.write(bytes); await writer.close(); }
+        catch (error) {
+          if (typeof writer.abort === "function") { try { await writer.abort(); } catch (_) { /* keep error */ } }
+          throw error;
+        }
+        if (!sameBytes(await readBytes(target), bytes)) throw new Error("The copy of \"" + node.name + "\" could not be verified.");
+      } else {
+        const created = await parent.handle.getDirectoryHandle(name, { create: true });
+        try { await copyFolderContents(node.handle, created, { entries: 0, bytes: 0 }); }
+        catch (error) {
+          try { await parent.handle.removeEntry(name, { recursive: true }); } catch (_) { /* report the copy failure */ }
+          throw error;
+        }
+      }
+      await loadChildren(parent);
+      last = parent.children.find(child => child.name === name) || last;
+    }
+    if (last) { focusedRel = last.rel; selected = new Set([last.rel]); }
+    saveExpanded();
+    render();
+    status(nodes.length > 1 ? "Duplicated " + nodes.length + " items" : "Duplicated as " + (last ? last.name : ""), "ok");
+    return true;
+  }
+  async function deleteNodes(nodes) {
+    const paths = nodes.map(fullPath);
+    if (nodes.some(node => openDocUnder(fullPath(node)).some(item => item.dirty))) {
+      status("Save or close the modified files before deleting.", "error");
+      return false;
+    }
+    if (!confirmChange("Delete " + nodes.length + " items permanently from this folder? This cannot be undone.\n\n" +
+      paths.slice(0, 12).join("\n") + (paths.length > 12 ? "\n..." : ""))) return false;
+    let removed = 0;
+    for (const node of nodes) if (await deleteNode(node, true)) removed++;
+    selected = new Set(focusedRel ? [focusedRel] : []);
+    render();
+    status("Deleted " + removed + " of " + nodes.length + " items", removed === nodes.length ? "ok" : "error");
+    return removed === nodes.length;
+  }
+
+  function removeTargets(node) {
+    const targets = targetsFor(node);
+    return targets.length > 1 ? deleteNodes(targets) : deleteNode(node);
+  }
 
   /* ---------- tree interaction ---------- */
 
@@ -1113,6 +1199,29 @@ function mount(options) {
   list.addEventListener("click", event => {
     const node = rowNode(event.target);
     if (!node) return;
+    /* Cmd or Ctrl+click toggles a row in the selection; Shift+click selects
+     * a range. Neither opens anything, as in VS Code. */
+    if (event.metaKey || event.ctrlKey) {
+      if (selected.size <= 1 && focusedRel && !selected.has(focusedRel)) selected.add(focusedRel);
+      if (selected.has(node.rel) && selected.size > 1) selected.delete(node.rel); else selected.add(node.rel);
+      focusedRel = node.rel;
+      anchorRel = node.rel;
+      render();
+      return;
+    }
+    if (event.shiftKey) {
+      const rows = visibleRows(tree);
+      const from = rows.findIndex(row => row.rel === (anchorRel || focusedRel));
+      const to = rows.indexOf(node);
+      if (from >= 0 && to >= 0) {
+        selected = new Set(rows.slice(Math.min(from, to), Math.max(from, to) + 1).map(row => row.rel));
+        focusedRel = node.rel;
+        render();
+        return;
+      }
+    }
+    selected = new Set([node.rel]);
+    anchorRel = node.rel;
     focusedRel = node.rel;
     if (node.kind === "directory") void expand(node, !node.expanded);
     else { render(); void openNode(node); }
@@ -1121,7 +1230,11 @@ function mount(options) {
     if (!tree) return;
     event.preventDefault();
     const node = rowNode(event.target);
-    if (node) { focusedRel = node.rel; render(); }
+    if (node) {
+      if (!(selected.size > 1 && selected.has(node.rel))) { selected = new Set([node.rel]); anchorRel = node.rel; }
+      focusedRel = node.rel;
+      render();
+    }
     openMenu(node, null, { x: event.clientX, y: event.clientY });
   });
   empty.addEventListener("contextmenu", event => { event.preventDefault(); openMenu(null, null, { x: event.clientX, y: event.clientY }); });
@@ -1139,6 +1252,8 @@ function mount(options) {
     const node = rows[index];
     const move = next => {
       focusedRel = rows[Math.max(0, Math.min(rows.length - 1, next))].rel;
+      selected = new Set([focusedRel]);
+      anchorRel = focusedRel;
       render();
       const row = list.querySelector('[data-rel="' + cssEscape(focusedRel) + '"]');
       if (row && typeof row.scrollIntoView === "function") row.scrollIntoView({ block: "nearest" });
@@ -1163,6 +1278,7 @@ function mount(options) {
         return;
       case "Enter":
         event.preventDefault();
+        if (mod && node.kind === "file") { void openToSide(node).catch(report); return; }
         if (node.kind === "directory") void expand(node, !node.expanded);
         else void openNode(node);
         return;
@@ -1173,8 +1289,8 @@ function mount(options) {
         else void openNode(node);
         return;
       case "F2": event.preventDefault(); beginRename(node); return;
-      case "Delete": event.preventDefault(); void deleteNode(node); return;
-      case "Backspace": if (mod) { event.preventDefault(); void deleteNode(node); return; } break;
+      case "Delete": event.preventDefault(); void removeTargets(node); return;
+      case "Backspace": if (mod) { event.preventDefault(); void removeTargets(node); return; } break;
       case "ContextMenu":
         event.preventDefault();
         openMenu(node, list.querySelector('[data-rel="' + cssEscape(node.rel) + '"]') || title);
@@ -1190,6 +1306,13 @@ function mount(options) {
         if (typed) { event.preventDefault(); typed = ""; hint.hidden = true; }
         return;
       default: break;
+    }
+    if (mod && event.altKey && (event.code === "KeyC" || event.key === "c" || event.key === "C")) {
+      event.preventDefault();
+      const targets = targetsFor(node);
+      void copyText(targets.map(item => event.shiftKey ? item.rel : fullPath(item)).join("\n"),
+        event.shiftKey ? "relative path" : "path");
+      return;
     }
     if (mod && event.altKey && (event.key === "n" || event.key === "N")) {
       event.preventDefault(); void beginCreate("new-file"); return;

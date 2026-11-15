@@ -27,6 +27,7 @@ import './workbench.css';
 import './polish.css';
 import { mountTerminalPanel } from './terminal_panel.js';
 import { mountPolish } from './polish.js';
+import { mountZoom } from './zoom.js';
 
 const icons = { FolderOpen, FilePlus2, RotateCw, Play, Blocks, Files, ListTree,
   ChartNoAxesCombined, Table2, Terminal, SlidersHorizontal, Search, Command,
@@ -77,6 +78,7 @@ globalThis.FlowStudioEditor = mountEditor(monaco, document.getElementById('sourc
   document.getElementById('monacoHost'), app, document.getElementById('language'));
 document.getElementById('editorEngine').textContent = 'Monaco';
 registerCompletion(monaco, app);
+globalThis.FlowStudioZoom = mountZoom({ editor: globalThis.FlowStudioEditor.editor });
 
 mountTerminalPanel();
 mountPolish();

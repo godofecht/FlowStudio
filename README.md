@@ -45,6 +45,13 @@ Run `npm test` for module tests and `python3 scripts/verify_native.py` for the r
 Flow build and HTTP checks. With the native server running, `npm run test:ui`
 exercises the Monaco workspace in headless Chromium. Install its browser with
 `npx playwright install chromium`. Captures go in `build/ui/`.
+`node tests/perf_load.mjs` prints load and interaction timings and checks
+them against budgets. `node tests/layout_retina_ui.mjs` checks every surface
+for clipped text and overlaps at three window sizes on a Retina screen.
+
+Text sizes are set for a 13 to 14 inch Retina Mac. View > Zoom in, Zoom out
+and Actual size (Cmd or Ctrl with +, - and 0) scale the interface and the
+editor together, and the level is remembered.
 
 The native build and HTTP checks pass locally. Browser verification remains
 pending because the local browser processes fail before loading the workspace.

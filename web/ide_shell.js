@@ -155,8 +155,20 @@ function mount(doc = document, options = {}) {
         dock: layout.dock, show: layout.show }));
     } catch (_) { /* Preferences are optional. */ }
   }
+  /* A pane that opens slides a few pixels in from its edge while it fades
+   * up (workbench.css, .fs-reveal-*). The pane is at full size at once, so
+   * nothing waits on the animation. */
+  function reveal(panel) {
+    const node = region(panel);
+    if (!node || !node.classList || typeof node.addEventListener !== "function") return;
+    const name = "fs-reveal-" + panel;
+    node.classList.remove(name);
+    node.classList.add(name);
+    node.addEventListener("animationend", () => node.classList.remove(name), { once: true });
+  }
   function setVisible(panel, visible) {
     if (!(panel in DEFAULT_SHOW)) return false;
+    const wasShown = Boolean(solved && solved.show[panel]);
     layout.show[panel] = Boolean(visible);
     if (panel === "dock" && !visible) layout.dockMax = false;
     /* Showing a pane the window had collapsed makes room for it by closing
@@ -168,6 +180,7 @@ function mount(doc = document, options = {}) {
     }
     applyLayout();
     saveLayout();
+    if (visible && !wasShown && solved && solved.show[panel]) reveal(panel);
     return true;
   }
   function toggle(panel) {
@@ -330,7 +343,10 @@ if (typeof document !== "undefined") {
   const start = () => {
     try { root.FlowStudioLayout = mount(document, {}); } catch (_) { /* Shell enhancement is optional. */ }
   };
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);
-  else start();
+  /* index.html loads this script after the shell markup, so the panes take
+   * their saved sizes now, before the editor bundle arrives, and do not
+   * move when it does. */
+  if (document.readyState !== "loading" || document.getElementById("ideShell")) start();
+  else document.addEventListener("DOMContentLoaded", start);
 }
 })(typeof globalThis !== "undefined" ? globalThis : this);

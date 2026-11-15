@@ -5,6 +5,7 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import '@xterm/xterm/css/xterm.css';
+import { codeFont } from './zoom.js';
 
 const THEME = {
   background: '#141619', foreground: '#d7dce2', cursor: '#9cc6ae', cursorAccent: '#141619',
@@ -36,10 +37,12 @@ class ShellInstance {
     this.host.className = 'xt-instance';
     this.host.hidden = true;
     panel.surface.append(this.host);
+    // The --text-code token and the View zoom set the size.
+    const font = codeFont();
     this.term = new Terminal({
       theme: THEME, cursorBlink: true, cursorStyle: 'bar', allowProposedApi: false,
-      fontFamily: '"SF Mono", Menlo, "JetBrains Mono", Consolas, "Liberation Mono", monospace',
-      fontSize: 12.5, lineHeight: 1.2, scrollback: 5000, macOptionIsMeta: true,
+      fontFamily: font.fontFamily, fontSize: font.fontSize, lineHeight: 1.25,
+      scrollback: 5000, macOptionIsMeta: true,
       drawBoldTextInBrightColors: false
     });
     this.fit = new FitAddon();
@@ -268,6 +271,14 @@ export function mountTerminalPanel() {
   };
 
   new ResizeObserver(() => panel.fit()).observe(surface);
+  // View zoom (frontend/zoom.js) resizes the terminal text with the editor.
+  document.addEventListener('flowstudio:zoom', event => {
+    for (const instance of panel.instances) {
+      instance.term.options.fontSize = event.detail.fontSize;
+      instance.term.options.fontFamily = event.detail.fontFamily;
+    }
+    requestAnimationFrame(() => panel.fit());
+  });
   // Closing or reloading the page ends its shells. keepalive lets the
   // request finish after the page is gone and still carries the intent header.
   window.addEventListener('pagehide', () => {

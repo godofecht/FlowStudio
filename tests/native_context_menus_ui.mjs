@@ -139,8 +139,14 @@ try {
   const corner = await menu().boundingBox();
   assert.ok(await inViewport(corner), 'menu clamped inside the window: ' + JSON.stringify(corner));
   assert.ok(corner.x + corner.width <= 1436 && corner.y + corner.height <= 892, 'flipped up and left of the pointer');
-  // Scrolling, a window resize or a click elsewhere closes it.
-  await page.evaluate(() => document.querySelector('.ex-tree, #explorer').dispatchEvent(new Event('scroll', { bubbles: false })));
+  // A pane the app scrolls by itself leaves it open; the wheel closes it.
+  await page.evaluate(() => document.querySelector('.terminal-transcript').dispatchEvent(new Event('scroll')));
+  assert.equal(await page.locator('.fs-cm').count(), 1, 'output scrolling a pane keeps the menu');
+  await page.mouse.move(700, 400);
+  await page.mouse.wheel(0, 120);
+  await page.waitForFunction(() => !document.querySelector('.fs-cm'));
+  // A click elsewhere closes it too.
+  await page.mouse.click(1436, 892, { button: 'right' });
   await page.mouse.click(700, 400);
   assert.equal(await page.locator('.fs-cm').count(), 0, 'outside click closes the menu');
 
@@ -413,7 +419,8 @@ try {
   // Keyboard: focus the transcript, Shift+F10, type-ahead, Escape returns focus.
   await page.locator('.terminal-transcript').focus();
   await page.keyboard.press('Shift+F10');
-  assert.equal(await page.locator('.fs-cm').count(), 1, 'Shift+F10 opens the console menu');
+  assert.equal(await page.locator('.fs-cm').count(), 1, 'Shift+F10 opens the console menu (focus: ' +
+    await page.evaluate(() => document.activeElement.className) + ')');
   await page.keyboard.type('r');
   assert.equal(await page.evaluate(() => document.activeElement.querySelector('.fs-cm-label').textContent), 'Run Again');
   await page.keyboard.press('Escape');

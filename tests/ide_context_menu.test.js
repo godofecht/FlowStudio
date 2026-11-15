@@ -276,7 +276,7 @@ test("only one menu is open at a time and an outside press closes it", () => {
 
 test("scroll, blur and resize close the menu", () => {
   for (const close of [
-    doc => { const page = doc.createElement("div"); doc.body.append(page); for (const fn of doc.listeners.scroll || []) fn({ target: page }); },
+    doc => { for (const fn of doc.listeners.scroll || []) fn({ type: "scroll", target: doc }); },
     doc => { for (const fn of doc.defaultView.listeners.blur || []) fn({}); },
     doc => { for (const fn of doc.defaultView.listeners.resize || []) fn({}); }
   ]) {
@@ -288,16 +288,15 @@ test("scroll, blur and resize close the menu", () => {
   }
 });
 
-test("scrolling another pane leaves the menu open, scrolling its own pane closes it", () => {
+test("the app scrolling a pane leaves the menu open, a wheel closes it", () => {
   const doc = makeDocument();
-  const pane = doc.createElement("div"), row = doc.createElement("div"), terminal = doc.createElement("div");
-  pane.append(row);
-  doc.body.append(pane, terminal);
-  menu.open({ doc, items: [{ label: "Copy" }], x: 10, y: 10, target: row });
-  for (const fn of doc.listeners.scroll || []) fn({ type: "scroll", target: terminal });
-  assert.equal(doc.menus().length, 1, "output scrolling elsewhere keeps the menu");
+  const pane = doc.createElement("div");
+  doc.body.append(pane);
+  menu.open({ doc, items: [{ label: "Copy" }], x: 10, y: 10 });
   for (const fn of doc.listeners.scroll || []) fn({ type: "scroll", target: pane });
-  assert.equal(doc.menus().length, 0, "the right-clicked row moved, so the menu closes");
+  assert.equal(doc.menus().length, 1, "output scrolling a pane keeps the menu");
+  for (const fn of doc.listeners.wheel || []) fn({ type: "wheel", target: pane });
+  assert.equal(doc.menus().length, 0, "the person scrolling closes it");
 });
 
 test("a keyboard-opened menu focuses its first row and sits under the anchor", () => {

@@ -458,8 +458,7 @@ function onKey(menu, level, event) {
 
 /* Opens a menu. spec: { items, x, y } for a pointer, or { anchor } (an
  * element or rect) for the keyboard; { keyboard: true } focuses the first
- * row; { returnFocus } is where focus goes on close (default: where it is);
- * { target } is the element the menu is for, so scrolling it closes the menu. */
+ * row; { returnFocus } is where focus goes on close (default: where it is). */
 function open(spec) {
   const doc = spec.doc || root.document;
   if (!doc || !doc.body) return null;
@@ -496,15 +495,15 @@ function open(spec) {
   /* Close on outside press, scroll, blur and resize. */
   const inside = target => menu.levels.some(item => item.element.contains(target)) || (menu.tip && menu.tip.contains(target));
   const onPointer = event => { if (!inside(event.target)) close({ restoreFocus: false }); };
-  /* Scrolling closes the menu when it moves what the menu belongs to: the
-   * page, or a scroller holding the right-clicked element. Output streaming
-   * into some other pane (a busy terminal) leaves it open. */
-  const owner = spec.target || null;
+  /* The person scrolling closes the menu: a wheel or touch outside it, or
+   * the page itself moving. A pane the app scrolls on its own (output
+   * arriving in the console or a busy terminal) leaves it open. Dragging a
+   * scrollbar is an outside press, which closes it too. */
   const onScroll = event => {
     const scrolled = event.target;
     if (inside(scrolled)) return;
-    if (event.type === "wheel" || !owner || scrolled === doc || scrolled === doc.documentElement ||
-        scrolled === doc.body || (scrolled && typeof scrolled.contains === "function" && scrolled.contains(owner)))
+    if (event.type === "wheel" || event.type === "touchmove" ||
+        scrolled === doc || scrolled === doc.documentElement || scrolled === doc.body)
       close({ restoreFocus: false });
   };
   const onBlur = () => close({ restoreFocus: false });
@@ -513,6 +512,7 @@ function open(spec) {
   doc.addEventListener("pointerdown", onPointer, true);
   doc.addEventListener("scroll", onScroll, true);
   doc.addEventListener("wheel", onScroll, { capture: true, passive: true });
+  doc.addEventListener("touchmove", onScroll, { capture: true, passive: true });
   doc.addEventListener("focusin", onFocus, true);
   win.addEventListener("blur", onBlur);
   win.addEventListener("resize", onResize);
@@ -520,6 +520,7 @@ function open(spec) {
     doc.removeEventListener("pointerdown", onPointer, true);
     doc.removeEventListener("scroll", onScroll, true);
     doc.removeEventListener("wheel", onScroll, { capture: true, passive: true });
+    doc.removeEventListener("touchmove", onScroll, { capture: true, passive: true });
     doc.removeEventListener("focusin", onFocus, true);
     win.removeEventListener("blur", onBlur);
     win.removeEventListener("resize", onResize);
@@ -610,7 +611,7 @@ function openFor(doc, target, event, keyboard) {
     label = surface.provider.label || (surface.provider.name ? surface.provider.name + " actions" : label);
   }
   if (!items) items = fallbackItems(doc);
-  const spec = { doc, items, label, keyboard, target };
+  const spec = { doc, items, label, keyboard };
   if (keyboard) {
     let anchor = surface && typeof surface.provider.anchor === "function" ? surface.provider.anchor(context) : null;
     if (!anchor) anchor = target && typeof target.getBoundingClientRect === "function" ? target : null;

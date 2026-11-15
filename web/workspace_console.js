@@ -241,6 +241,10 @@ function mount(doc = document, request = fetch) {
       if (line.kind === "out") { plain += line.text + "\n"; continue; }
       flush();
       const row = h(doc, "div", "term-msg term-" + line.kind);
+      // The context menu (web/ide_context_menus.js) reads these.
+      row.dataset.msgKind = line.kind;
+      if (line.line) { row.dataset.line = String(line.line); if (line.column) row.dataset.column = String(line.column); }
+      if (entry.source === "editor") row.dataset.source = "editor";
       if (line.line && entry.source === "editor") {
         const jump = h(doc, "button", "term-jump", "line " + line.line);
         jump.type = "button";
@@ -297,6 +301,7 @@ function mount(doc = document, request = fetch) {
   }
 
   const blobUrls = new Set();
+  const entryOf = new WeakMap();
   function renderEntries() {
     const session = sessions.active();
     const query = searchOpen ? searchInput.value.trim().toLowerCase() : "";
@@ -310,7 +315,11 @@ function mount(doc = document, request = fetch) {
         "… " + (visible.length - shown.length) + " earlier entries hidden (search narrows the view)");
       nodes.push(more);
     }
-    for (const entry of shown) nodes.push(entryNode(entry, session));
+    for (const entry of shown) {
+      const node = entryNode(entry, session);
+      entryOf.set(node, entry);
+      nodes.push(node);
+    }
     output.replaceChildren(...nodes);
     if (query) {
       searchCount.textContent = visible.length === 0 ? "no matches" :
@@ -718,6 +727,39 @@ function mount(doc = document, request = fetch) {
   paint();
   // The editor sends lines here with Ctrl+Enter.
   root.FlowStudioConsoleSubmit = (name, code) => submit(name, code);
+  /* What the context menu needs: the entry under a node, the run it
+   * belongs to (its command line and the output after it), and actions. */
+  function runOf(entry) {
+    const list = sessions.active().entries;
+    let at = list.indexOf(entry);
+    if (at < 0) return null;
+    while (at > 0 && list[at].kind !== "cmd") at--;
+    if (list[at].kind !== "cmd") return null;
+    const command = list[at];
+    const after = [];
+    for (let i = at + 1; i < list.length && list[i].kind !== "cmd"; i++) after.push(list[i]);
+    const code = command.label ? "" : command.text.replace(/^> /, "");
+    return { command, label: command.label || "", code, runtime: sessions.active().runtime,
+      output: after.filter(item => item.kind === "out").map(item => item.text).join(""), entries: [command, ...after] };
+  }
+  root.FlowStudioConsoleView = Object.freeze({
+    entryFor(node) {
+      for (let at = node; at && at !== output; at = at.parentElement) if (entryOf.has(at)) return entryOf.get(at);
+      return null;
+    },
+    runOf,
+    lastRun() {
+      const list = sessions.active().entries;
+      for (let i = list.length - 1; i >= 0; i--) if (list[i].kind === "cmd") return runOf(list[i]);
+      return null;
+    },
+    rerun(run) { return run && run.code ? submit(run.runtime, run.code) : Promise.resolve(false); },
+    clear() { sessions.clearVisible(sessions.active()); },
+    search() { openSearch(); },
+    goToLine,
+    runtime: () => sessions.active().runtime,
+    transcript: () => transcript
+  });
   return controller;
 }
 

@@ -177,6 +177,15 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/ide_assistant_inline.js" {
         return StaticAsset { path: "web/ide_assistant_inline.js", mime: "text/javascript; charset=utf-8", found: true }
     }
+    if url == "/ide_context_menu.js" {
+        return StaticAsset { path: "web/ide_context_menu.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/ide_context_menus.js" {
+        return StaticAsset { path: "web/ide_context_menus.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/ide_context_menu.css" {
+        return StaticAsset { path: "web/ide_context_menu.css", mime: "text/css; charset=utf-8", found: true }
+    }
     if url == "/ide_assistant.css" {
         return StaticAsset { path: "web/ide_assistant.css", mime: "text/css; charset=utf-8", found: true }
     }

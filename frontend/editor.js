@@ -19,16 +19,21 @@ export function mountEditor(monaco, source, host, app, language) {
     ariaLabel: 'Source code editor', fixedOverflowWidgets: true,
     wordBasedSuggestions: 'currentDocument', accessibilitySupport: 'auto'
   });
+  // One model per document, shared with the split editor (editor_context.js).
+  function ensureModel(doc) {
+    let model = models.get(doc.id);
+    if (!model) {
+      model = monaco.editor.createModel(doc.text, doc.language);
+      models.set(doc.id, model);
+      documentIds.set(model, doc.id);
+    }
+    return model;
+  }
   function activate(doc) {
     if (!doc) return;
     if (currentId !== doc.id) {
       if (currentId) views.set(currentId, editor.saveViewState());
-      let model = models.get(doc.id);
-      if (!model) {
-        model = monaco.editor.createModel(doc.text, doc.language);
-        models.set(doc.id, model);
-        documentIds.set(model, doc.id);
-      }
+      const model = ensureModel(doc);
       updating = true;
       editor.setModel(model);
       currentId = doc.id;
@@ -98,5 +103,5 @@ export function mountEditor(monaco, source, host, app, language) {
   host.hidden = false;
   return Object.freeze({ editor, activate,
     documentIdFor: model => documentIds.get(model) ?? null,
-    modelFor: id => models.get(id) ?? null });
+    modelFor: id => models.get(id) ?? null, ensureModel });
 }

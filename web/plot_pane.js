@@ -314,6 +314,19 @@ function create(doc, host, options = {}) {
     fit: () => setZoom(null),
     zoom: () => zoom,
     save,
+    /* The shown figure as an image Blob (SVG figures become PNG), for the
+     * clipboard and for opening in a new window. */
+    async imageBlob(format = "png") {
+      const item = history.current();
+      if (!item || item.kind === "pdf") return null;
+      if (format === "svg" && item.kind === "svg") return new Blob([item.data], { type: "image/svg+xml" });
+      if (item.kind === "png") {
+        const bytes = Uint8Array.from(atob(item.data), char => char.charCodeAt(0));
+        return new Blob([bytes], { type: "image/png" });
+      }
+      return pngBlob(item);
+    },
+    remove() { const removed = history.remove(); render(); return removed; },
     clear() { history.clear(); render(); },
     current: history.current,
     position: history.position,

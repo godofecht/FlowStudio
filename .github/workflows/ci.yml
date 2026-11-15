@@ -208,6 +208,7 @@ jobs:
           node tests/native_panels_ui.mjs
           node tests/native_debugger_ui.mjs
           node tests/native_projects_ui.mjs
+          node tests/native_flow_help_data_ui.mjs
       - name: Package verified executable
         run: sh scripts/package.sh
       - name: Package holds every runtime file; quick console build

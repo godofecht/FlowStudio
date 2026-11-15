@@ -171,6 +171,15 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/ide_debugger.js" {
         return StaticAsset { path: "web/ide_debugger.js", mime: "text/javascript; charset=utf-8", found: true }
     }
+    if url == "/ide_flow_help.js" {
+        return StaticAsset { path: "web/ide_flow_help.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/ide_flow_help.css" {
+        return StaticAsset { path: "web/ide_flow_help.css", mime: "text/css; charset=utf-8", found: true }
+    }
+    if url == "/ide_flow_data.js" {
+        return StaticAsset { path: "web/ide_flow_data.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
     if url == "/ide_data_view.js" {
         return StaticAsset { path: "web/ide_data_view.js", mime: "text/javascript; charset=utf-8", found: true }
     }

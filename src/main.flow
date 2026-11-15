@@ -575,6 +575,32 @@ function send_flow_session(op: string, code: string) -> void {
     }
 }
 
+# One Flow session variable as a table for the data viewer (flow_session.py view).
+function send_flow_session_view(name: string) -> void {
+    let result: ptr<ProcResult> = flow_session_helper("view", name, "")
+    if result.exit_code == 0 {
+        fs_reply(200, "application/json; charset=utf-8", result.stdout)
+    } elif result.exit_code == 2 {
+        fs_reply(404, "application/json; charset=utf-8", result.stdout)
+    } else {
+        fs_reply(503, "text/plain; charset=utf-8", "FlowStudio: the Flow session helper failed. " + result.stderr + result.error)
+    }
+}
+
+# Flow documentation for the Help pane (src/flow_help.py). It reads files only.
+function send_flow_help(query: string) -> void {
+    let command: ptr<ProcCmd> = proc_cmd("python3")
+    proc_arg(command, "src/flow_help.py")
+    proc_input(command, query)
+    proc_timeout_ms(command, 20000)
+    let result: ptr<ProcResult> = proc_run(command)
+    if result.exit_code != 0 or not eq(result.error, "") or result.timed_out {
+        fs_reply(503, "text/plain; charset=utf-8", "FlowStudio: the Flow help helper failed. " + result.stderr + result.error)
+        return
+    }
+    fs_reply(200, "application/json; charset=utf-8", result.stdout)
+}
+
 function send_flow_check(code: string) -> void {
     let result: ExecutionResult = execute("flow", code, true, "")
     fs_reply(result.status, "text/plain; charset=utf-8", result.output)
@@ -994,6 +1020,14 @@ function dispatch() -> void {
         }
         if eq(path, "/api/flow/session/reset") {
             send_flow_session("reset", "")
+            return
+        }
+        if eq(path, "/api/flow/session/view") {
+            send_flow_session_view(fs_body())
+            return
+        }
+        if eq(path, "/api/flow/help") {
+            send_flow_help(fs_body())
             return
         }
         if eq(path, "/api/check/flow") {

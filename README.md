@@ -420,6 +420,27 @@ Tests: `tests/test_flow_session.py` (offline and live),
 `tests/ide_flow_session.test.js` and the browser acceptance
 `tests/native_flow_session_ui.mjs`.
 
+### Flow help and the data viewer
+
+F1 on a name in a Flow buffer opens the Help tab of the side panel on that
+name. Its search box looks up any name or guide topic. Help shows the Flow
+language server's hover for the cursor when `flow lsp` runs, then entries
+from `src/flow_help.py`: signatures and doc comments of the toolchain's
+`lib/stdlib`, the server's notes on built-ins and keywords, and sections and
+compiled examples of `docs/FLOW_FOR_AI.md`. On a narrow window Help opens
+as a dialog.
+
+In the Environment pane, the name of a Flow array or struct opens it in the
+data grid, like R's `View()`. Struct fields are columns (a nested field is
+`a.x`) and array elements are rows. The grid sorts, filters and exports. It
+holds at most 1,000 rows and 64 columns and says so when a value is larger.
+An array too large for the session to keep still shows its first 1,000
+elements.
+
+Tests: `tests/test_flow_help.py`, `tests/ide_flow_help.test.js`,
+`tests/ide_flow_data.test.js` and the browser acceptance
+`tests/native_flow_help_data_ui.mjs`.
+
 ## Flow, Python and R in one session
 
 Flow programs, the Python session and the R session can call each other

@@ -13,6 +13,9 @@ The native server drives three steps:
               and prints the JSON reply for the console
     state     prints the variables and declarations as JSON
     reset     forgets everything
+    view      reads a variable name on stdin and prints that variable as a
+              table for the data viewer: struct fields are columns, array
+              elements are rows (table_view)
 
 The program runs between prepare and commit through the server's bridged
 runner, so `import flowstudio { py, r }` works from the console.
@@ -21,9 +24,11 @@ Types come from the Flow checker itself. prepare compiles a probe in which
 every new variable is assigned to a struct type it cannot match; the
 checker's "initialized with T" message names T. Values come back from a
 dump section appended to the program, framed so strings may hold any byte.
-Values the session cannot rebuild as literals (pointers, lists, maps,
-nested arrays, very large arrays, non-finite floats) are listed with their
-type and marked as not kept.
+Scalars, structs (nested up to STRUCT_DEPTH) and arrays of either are
+dumped. Values the session cannot rebuild as literals (pointers, lists,
+maps, nested arrays, very large arrays, non-finite floats) are marked as
+not kept. An array too large to keep still dumps its first VIEW_ROWS
+elements, so the Environment and the data viewer can show them.
 """
 from __future__ import annotations
 
@@ -42,6 +47,10 @@ PROBE_TYPE = "FlowStudioSessionProbe"
 VALUE_NAME = "flowstudio_value"
 SENTINEL = "\x1eFLOWSTUDIO-SESSION\x1e"
 ARRAY_LIMIT = 4096
+VIEW_ROWS = 1000      # rows the data viewer gets; a larger array dumps this many
+VIEW_COLUMNS = 64
+STRUCT_DEPTH = 4      # how deep the session follows nested structs
+DISPLAY_LIMIT = 2000
 ENTRY_LIMIT = 256 * 1024
 
 INTEGER_TYPES = {"i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "isize", "usize"}
@@ -226,7 +235,8 @@ def scalar_literal(kind: str, value) -> str | None:
 
 
 def struct_fields(state: dict, extra: list[str], name: str) -> list[tuple[str, str]] | None:
-    """Field names and types of a session struct whose fields are scalars."""
+    """Field names and types of a session struct. A field type is a single
+    name: a scalar or another struct. Arrays and pointers in fields give None."""
     for text in list(state["declarations"]) + extra:
         match = re.match(r"\s*(?:pub\s+)?struct\s+" + re.escape(name) + r"\s*\{(.*)\}\s*$", text, re.S)
         if not match:
@@ -236,47 +246,91 @@ def struct_fields(state: dict, extra: list[str], name: str) -> list[tuple[str, s
             part = strip_code(part).strip()
             if not part:
                 continue
-            field = re.match(r"([A-Za-z_][A-Za-z0-9_]*)\s*:\s*([A-Za-z0-9_]+)$", part)
-            if not field or field.group(2) not in SCALAR_TYPES:
+            field = re.match(r"([A-Za-z_][A-Za-z0-9_]*)\s*:\s*([A-Za-z_][A-Za-z0-9_]*)$", part)
+            if not field:
                 return None
             fields.append((field.group(1), field.group(2)))
         return fields or None
     return None
 
 
-def keepable(state: dict, extra: list[str], kind: str) -> bool:
+# A shape says how to dump, read, rebuild and show a value. It is a scalar
+# type name, ("struct", name, [(field, shape)]) or ("array", element, length).
+# Structs nest at most STRUCT_DEPTH deep; arrays hold scalars or structs.
+def element_shape(state: dict, extra: list[str], kind: str, depth: int = 0):
     if kind in SCALAR_TYPES:
-        return True
+        return kind
+    if depth >= STRUCT_DEPTH:
+        return None
+    fields = struct_fields(state, extra, kind)
+    if not fields:
+        return None
+    out = []
+    for field, field_kind in fields:
+        sub = element_shape(state, extra, field_kind, depth + 1)
+        if sub is None:
+            return None
+        out.append((field, sub))
+    return ("struct", kind, out)
+
+
+def value_shape(state: dict, extra: list[str], kind: str):
     array = ARRAY_TYPE.match(kind)
     if array:
-        return array.group(1) in SCALAR_TYPES and int(array.group(2)) <= ARRAY_LIMIT
-    return struct_fields(state, extra, kind) is not None
+        element = element_shape(state, extra, array.group(1))
+        return None if element is None else ("array", element, int(array.group(2)))
+    return element_shape(state, extra, kind)
+
+
+def is_array(shape) -> bool:
+    return isinstance(shape, tuple) and shape[0] == "array"
+
+
+def dump_count(shape) -> int:
+    """How many elements of an array the dump prints: all of them when the
+    session keeps the array, else the first VIEW_ROWS."""
+    return shape[2] if shape[2] <= ARRAY_LIMIT else min(shape[2], VIEW_ROWS)
+
+
+def keepable(state: dict, extra: list[str], kind: str) -> bool:
+    shape = value_shape(state, extra, kind)
+    return shape is not None and not (is_array(shape) and shape[2] > ARRAY_LIMIT)
+
+
+def dumpable(state: dict, extra: list[str], kind: str) -> bool:
+    """True when the value can be printed for display and the data viewer,
+    whether or not the session can rebuild it."""
+    return value_shape(state, extra, kind) is not None
 
 
 def dump_scalar(kind: str, expression: str) -> str:
     if kind in FLOAT_TYPES:
-        return f'    printf("%.17g\\n", {expression})'
+        return f'printf("%.17g\\n", {expression})'
     if kind == "string":
-        return f'    printf("%d:%s\\n", len({expression}), {expression})'
-    return f"    println({expression})"
+        return f'printf("%d:%s\\n", len({expression}), {expression})'
+    return f"println({expression})"
+
+
+def dump_shape(shape, expression: str, pad: str, counter: str) -> list[str]:
+    if isinstance(shape, str):
+        return [pad + dump_scalar(shape, expression)]
+    if shape[0] == "struct":
+        lines = []
+        for field, sub in shape[2]:
+            lines += dump_shape(sub, f"({expression}).{field}", pad, counter)
+        return lines
+    return [f"{pad}let mut {counter}: i32 = 0",
+            f"{pad}while {counter} < {dump_count(shape)} {{",
+            *dump_shape(shape[1], f"({expression})[{counter}]", pad + "    ", counter + "_"),
+            f"{pad}    {counter} = {counter} + 1",
+            f"{pad}}}"]
 
 
 def dump_lines(state: dict, extra: list[str], name: str, kind: str, expression: str = "") -> list[str]:
     lines = [f'    println("{SENTINEL}{name}")']
-    target = expression or name
-    array = ARRAY_TYPE.match(kind)
-    if kind in SCALAR_TYPES:
-        lines.append(dump_scalar(kind, target))
-    elif array:
-        counter = f"flowstudio_i_{name}"
-        lines += [f"    let mut {counter}: i32 = 0",
-                  f"    while {counter} < {array.group(2)} {{",
-                  "    " + dump_scalar(array.group(1), f"({target})[{counter}]"),
-                  f"        {counter} = {counter} + 1",
-                  "    }"]
-    else:
-        for field, field_kind in struct_fields(state, extra, kind) or []:
-            lines.append(dump_scalar(field_kind, f"({target}).{field}"))
+    shape = value_shape(state, extra, kind)
+    if shape is not None:
+        lines += dump_shape(shape, expression or name, "    ", f"flowstudio_i_{name}")
     return lines
 
 
@@ -312,28 +366,40 @@ class Reader:
         return int(text)
 
 
+def read_shape(reader: Reader, shape):
+    if isinstance(shape, str):
+        return reader.scalar(shape)
+    if shape[0] == "struct":
+        return {field: read_shape(reader, sub) for field, sub in shape[2]}
+    return [read_shape(reader, shape[1]) for _ in range(dump_count(shape))]
+
+
 def read_value(state: dict, extra: list[str], reader: Reader, kind: str):
-    array = ARRAY_TYPE.match(kind)
-    if kind in SCALAR_TYPES:
-        return reader.scalar(kind)
-    if array:
-        return [reader.scalar(array.group(1)) for _ in range(int(array.group(2)))]
-    return {field: reader.scalar(field_kind)
-            for field, field_kind in struct_fields(state, extra, kind) or []}
+    shape = value_shape(state, extra, kind)
+    if shape is None:
+        raise ValueError("no dump for " + kind)
+    return read_shape(reader, shape)
+
+
+def literal_shape(shape, value) -> str | None:
+    if isinstance(shape, str):
+        return scalar_literal(shape, value)
+    if shape[0] == "struct":
+        if not isinstance(value, dict):
+            return None
+        parts = [literal_shape(sub, value.get(field)) for field, sub in shape[2]]
+        if None in parts:
+            return None
+        return shape[1] + " { " + ", ".join(f"{field}: {part}" for (field, _), part in zip(shape[2], parts)) + " }"
+    if not isinstance(value, list) or len(value) != shape[2]:
+        return None
+    parts = [literal_shape(shape[1], item) for item in value]
+    return None if None in parts else "[" + ", ".join(parts) + "]"
 
 
 def literal(state: dict, extra: list[str], kind: str, value) -> str | None:
-    array = ARRAY_TYPE.match(kind)
-    if kind in SCALAR_TYPES:
-        return scalar_literal(kind, value)
-    if array:
-        parts = [scalar_literal(array.group(1), item) for item in value]
-        return None if None in parts else "[" + ", ".join(parts) + "]"
-    fields = struct_fields(state, extra, kind) or []
-    parts = [scalar_literal(field_kind, value.get(field)) for field, field_kind in fields]
-    if None in parts:
-        return None
-    return kind + " { " + ", ".join(f"{field}: {part}" for (field, _), part in zip(fields, parts)) + " }"
+    shape = value_shape(state, extra, kind)
+    return None if shape is None else literal_shape(shape, value)
 
 
 def display_scalar(kind: str, value) -> str:
@@ -349,18 +415,80 @@ def display_scalar(kind: str, value) -> str:
     return str(value)
 
 
+def display_shape(shape, value, limit: int) -> str:
+    if isinstance(shape, str):
+        return display_scalar(shape, value)
+    if shape[0] == "struct":
+        return shape[1] + " { " + ", ".join(
+            f"{field}: {display_shape(sub, value.get(field), limit)}" for field, sub in shape[2]) + " }"
+    items = [display_shape(shape[1], item, limit) for item in (value[:limit] if limit else value)]
+    if len(items) < shape[2]:
+        items.append(f"... {shape[2] - len(items)} more")
+    return "[" + ", ".join(items) + "]"
+
+
 def display(state: dict, extra: list[str], kind: str, value, limit: int = 0) -> str:
-    array = ARRAY_TYPE.match(kind)
-    if kind in SCALAR_TYPES:
-        return display_scalar(kind, value)
-    if array:
-        items = [display_scalar(array.group(1), item) for item in value]
-        if limit and len(items) > limit:
-            items = items[:limit] + [f"... {len(value) - limit} more"]
-        return "[" + ", ".join(items) + "]"
-    fields = struct_fields(state, extra, kind) or []
-    return kind + " { " + ", ".join(
-        f"{field}: {display_scalar(field_kind, value.get(field))}" for field, field_kind in fields) + " }"
+    shape = value_shape(state, extra, kind)
+    if shape is None:
+        return ""
+    text = display_shape(shape, value, limit)
+    return text if len(text) <= DISPLAY_LIMIT else text[:DISPLAY_LIMIT - 4] + " ..."
+
+
+# ---- the data viewer -----------------------------------------------------
+
+def leaf_columns(shape, prefix: str = "") -> list[tuple[str, str]]:
+    """(column name, scalar type) for each scalar reached through struct fields."""
+    if isinstance(shape, str):
+        return [(prefix or "value", shape)]
+    columns = []
+    for field, sub in shape[2]:
+        columns += leaf_columns(sub, prefix + "." + field if prefix else field)
+    return columns
+
+
+def leaf_values(shape, value) -> list:
+    if isinstance(shape, str):
+        return [value]
+    out = []
+    for field, sub in shape[2]:
+        out += leaf_values(sub, value.get(field) if isinstance(value, dict) else None)
+    return out
+
+
+def cell_text(kind: str, value) -> str:
+    if value is None:
+        return ""
+    if kind == "string":
+        return str(value)
+    return display_scalar(kind, value)
+
+
+def table_view(state: dict, name: str) -> dict:
+    """A variable as a table: struct fields are columns, array elements are
+    rows. At most VIEW_ROWS rows and VIEW_COLUMNS columns; `total` is the
+    real number of rows."""
+    variable = next((v for v in state["variables"] if v.get("name") == name), None)
+    if variable is None:
+        return {"ok": False, "error": f"There is no Flow variable named {name}."}
+    shape = value_shape(state, [], variable.get("type", ""))
+    if "value" not in variable or shape is None:
+        return {"ok": False, "error": f"FlowStudio has no table for {name} ({variable.get('type')})."}
+    value = variable["value"]
+    if is_array(shape):
+        element, total, items = shape[1], shape[2], list(value)
+    else:
+        element, total, items = shape, 1, [value]
+    columns = leaf_columns(element)
+    shown = columns[:VIEW_COLUMNS]
+    rows = []
+    for item in items[:VIEW_ROWS]:
+        cells = leaf_values(element, item)[:VIEW_COLUMNS]
+        rows.append([cell_text(kind, cell) for (_, kind), cell in zip(shown, cells)])
+    return {"ok": True, "name": name, "type": variable["type"],
+            "columns": [column for column, _ in shown], "kinds": [kind for _, kind in shown],
+            "rows": rows, "total": total, "truncated": total > len(rows),
+            "hiddenColumns": len(columns) - len(shown)}
 
 
 # ---- programs ------------------------------------------------------------
@@ -577,19 +705,24 @@ def prepare(directory: str, entry: str, check_only: bool = False) -> tuple[int, 
         if variable.get("kept"):
             dump += dump_lines(state, new_declarations, variable["name"], variable["type"])
             recorded.append({"name": variable["name"], "type": variable["type"],
-                             "mutable": variable.get("mutable", False)})
+                             "mutable": variable.get("mutable", False), "dumped": True})
     for name, mutable, _ in names:
         kind = types.get(name, "")
         record = {"name": name, "type": kind, "mutable": mutable}
-        if kind and keepable(state, new_declarations, kind):
+        # A value the session cannot rebuild is still dumped when it can be
+        # shown, so the Environment and the data viewer can show it.
+        if kind and dumpable(state, new_declarations, kind):
             dump += dump_lines(state, new_declarations, name, kind)
-        else:
+            record["dumped"] = True
+        if not (kind and keepable(state, new_declarations, kind)):
             record["kept"] = False
         recorded.append(record)
     if value_kind and value_kind != "void":
-        if keepable(state, new_declarations, value_kind):
+        dumped = dumpable(state, new_declarations, value_kind)
+        if dumped:
             dump += dump_lines(state, new_declarations, VALUE_NAME, value_kind, reference)
-        recorded.append({"name": VALUE_NAME, "type": value_kind, "mutable": False, "value": True})
+        recorded.append({"name": VALUE_NAME, "type": value_kind, "mutable": False, "value": True,
+                         "dumped": dumped})
     source, _ = program(imports, declarations, run_body + dump)
     state["pending"] = {"imports": imports, "declarations": declarations,
                         "new_declarations": new_declarations, "recorded": recorded}
@@ -609,7 +742,7 @@ def commit(directory: str, status: int, output: str) -> str:
         output = ""
     marker = output.find(SENTINEL)
     printed = output if marker < 0 else output[:marker]
-    expects_dump = any(record.get("kept") is not False for record in pending["recorded"])
+    expects_dump = any(record.get("dumped") for record in pending["recorded"])
     if status == 200 and marker < 0 and not expects_dump:
         marker = len(output)
     if status != 200 or marker < 0:
@@ -621,7 +754,7 @@ def commit(directory: str, status: int, output: str) -> str:
     values: dict[str, object] = {}
     try:
         for record in pending["recorded"]:
-            if record.get("kept") is False or not keepable(state, extra, record["type"]):
+            if not record.get("dumped"):
                 continue
             header = reader.line()
             if header != SENTINEL + record["name"]:
@@ -645,11 +778,16 @@ def commit(directory: str, status: int, output: str) -> str:
         variable = {"name": record["name"], "type": record["type"], "mutable": record["mutable"], "kept": False}
         if record["name"] in values:
             value = values[record["name"]]
-            text = literal(state, extra, record["type"], value)
+            text = literal(state, extra, record["type"], value) if record.get("kept") is not False else None
             if text is not None:
                 variable.update(kept=True, literal=text)
             variable["display"] = display(state, extra, record["type"], value, 12)
-            variable["size"] = len(value) if isinstance(value, list) else None
+            shape = value_shape(state, extra, record["type"])
+            variable["size"] = shape[2] if is_array(shape) else None
+            if isinstance(value, (list, dict)):
+                # Arrays and structs open in the data viewer (table_view).
+                variable["value"] = value
+                variable["viewable"] = True
         variables.append(variable)
     state["variables"] = variables
     state["entries"] += 1
@@ -661,7 +799,7 @@ def commit(directory: str, status: int, output: str) -> str:
 
 
 def variables_view(state: dict) -> list[dict]:
-    return [{key: variable.get(key) for key in ("name", "type", "mutable", "kept", "display", "size")}
+    return [{key: variable.get(key) for key in ("name", "type", "mutable", "kept", "display", "size", "viewable")}
             for variable in state["variables"]]
 
 
@@ -673,8 +811,8 @@ def state_reply(directory: str) -> str:
 
 
 def main(argv: list[str]) -> int:
-    if len(argv) < 2 or argv[1] not in ("prepare", "check", "commit", "state", "reset"):
-        print("usage: flow_session.py prepare|commit STATUS|state|reset", file=sys.stderr)
+    if len(argv) < 2 or argv[1] not in ("prepare", "check", "commit", "state", "reset", "view"):
+        print("usage: flow_session.py prepare|check|commit STATUS|state|reset|view", file=sys.stderr)
         return 64
     directory = state_dir()
     if argv[1] == "check":
@@ -691,6 +829,11 @@ def main(argv: list[str]) -> int:
         sys.stdout.write(reply)
         # 3 tells the server the entry failed.
         return 0 if json.loads(reply)["ok"] else 3
+    if argv[1] == "view":
+        # The variable named on stdin as a table, for the data viewer.
+        reply = table_view(load(directory), sys.stdin.read().strip()[:200])
+        sys.stdout.write(json.dumps(reply))
+        return 0 if reply["ok"] else 2
     if argv[1] == "reset":
         save(directory, empty_state())
         sys.stdout.write(json.dumps({"ok": True, "variables": []}))

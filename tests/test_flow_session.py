@@ -70,6 +70,53 @@ class Offline(unittest.TestCase):
         self.assertFalse(fs.keepable(state, [], "array<f64, 100000>"))
         self.assertFalse(fs.keepable(state, [], "ptr<Thing>"))
 
+    def test_arrays_of_structs_and_nested_structs(self) -> None:
+        state = fs.empty_state()
+        state["declarations"] = ["struct P {\n    x: f64\n    name: string\n}", "struct Seg { a: P, n: i32 }"]
+        self.assertTrue(fs.keepable(state, [], "array<P, 2>"))
+        self.assertTrue(fs.keepable(state, [], "Seg"))
+        value = [{"x": 1.5, "name": "a"}, {"x": -2.0, "name": "b\n"}]
+        self.assertEqual(fs.literal(state, [], "array<P, 2>", value),
+                         '[P { x: 1.5, name: "a" }, P { x: -2.0, name: "b\\n" }]')
+        nested = {"a": {"x": 0.5, "name": "q"}, "n": 3}
+        self.assertEqual(fs.literal(state, [], "Seg", nested), 'Seg { a: P { x: 0.5, name: "q" }, n: 3 }')
+        # The dump prints each field of each element, and the reader reads it back.
+        lines = fs.dump_lines(state, [], "ps", "array<P, 2>")
+        self.assertIn("    while flowstudio_i_ps < 2 {", lines)
+        self.assertIn('        printf("%.17g\\n", ((ps)[flowstudio_i_ps]).x)', lines)
+        reader = fs.Reader("1.5\n1:a\n-2\n2:b\n\n")
+        self.assertEqual(fs.read_value(state, [], reader, "array<P, 2>"), value)
+        # A struct that refers to itself stops at the depth limit.
+        state["declarations"].append("struct Loop { next: Loop }")
+        self.assertFalse(fs.dumpable(state, [], "Loop"))
+        self.assertFalse(fs.dumpable(state, [], "array<array<f64, 2>, 2>"))
+
+    def test_large_arrays_dump_a_prefix_without_being_kept(self) -> None:
+        state = fs.empty_state()
+        self.assertFalse(fs.keepable(state, [], "array<f64, 5000>"))
+        self.assertTrue(fs.dumpable(state, [], "array<f64, 5000>"))
+        self.assertIn("    while flowstudio_i_w < 1000 {", fs.dump_lines(state, [], "w", "array<f64, 5000>"))
+        self.assertEqual(fs.display(state, [], "array<f64, 5000>", [0.5] * 1000, 2), "[0.5, 0.5, ... 4998 more]")
+
+    def test_table_view_flattens_fields_and_caps_rows(self) -> None:
+        state = fs.empty_state()
+        state["declarations"] = ["struct P { x: f64, name: string }", "struct Seg { a: P, ok: bool }"]
+        state["variables"] = [
+            {"name": "segs", "type": "array<Seg, 2>", "value": [
+                {"a": {"x": 1.0, "name": "a"}, "ok": True}, {"a": {"x": 2.5, "name": "b c"}, "ok": False}]},
+            {"name": "w", "type": "array<f32, 5000>", "value": [0.25] * 1000},
+            {"name": "n", "type": "i32", "literal": "3"}]
+        view = fs.table_view(state, "segs")
+        self.assertEqual(view["columns"], ["a.x", "a.name", "ok"])
+        self.assertEqual(view["kinds"], ["f64", "string", "bool"])
+        self.assertEqual(view["rows"], [["1.0", "a", "true"], ["2.5", "b c", "false"]])
+        self.assertEqual((view["total"], view["truncated"]), (2, False))
+        wide = fs.table_view(state, "w")
+        self.assertEqual((wide["columns"], len(wide["rows"]), wide["total"], wide["truncated"]),
+                         (["value"], 1000, 5000, True))
+        self.assertFalse(fs.table_view(state, "n")["ok"])
+        self.assertFalse(fs.table_view(state, "missing")["ok"])
+
     def test_reader_handles_strings_with_newlines(self) -> None:
         sentinel = fs.SENTINEL
         text = f"{sentinel}s\n7:a\nb:c d\n{sentinel}n\n12\n"
@@ -110,6 +157,21 @@ class Live(unittest.TestCase):
         self.assertEqual(variables["xs"]["type"], "array<f64, 3>")
         self.assertEqual(self.evaluate("xs")["output"], "[1.0, 2.5, -3.0]\n")
         self.assertEqual(self.evaluate("p.b")["output"], '"tab\\there"\n')
+
+    def test_arrays_of_structs_persist_and_open_as_tables(self) -> None:
+        self.evaluate("struct City { name: string, lat: f64 }")
+        self.evaluate('let cities = [City { name: "Oslo", lat: 59.9 }, City { name: "Lima", lat: -12.0 }]')
+        variable = self.variables()["cities"]
+        self.assertEqual((variable["type"], variable["kept"], variable["viewable"], variable["size"]),
+                         ("array<City, 2>", True, True, 2))
+        self.assertEqual(self.evaluate("cities[1].name")["output"], '"Lima"\n')
+        status, table = call("view", "cities")
+        self.assertEqual(status, 200)
+        self.assertEqual(table["columns"], ["name", "lat"])
+        self.assertEqual(table["rows"], [["Oslo", "59.9"], ["Lima", "-12.0"]])
+        status, missing = call("view", "nothing_here")
+        self.assertEqual(status, 404)
+        self.assertFalse(missing["ok"])
 
     def test_inferred_float_products_keep_their_type(self) -> None:
         # flowc declares an unannotated `let v = p.x * 4.0` as int32_t in C.

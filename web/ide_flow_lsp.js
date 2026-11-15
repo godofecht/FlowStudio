@@ -428,14 +428,8 @@ function create(options) {
     }));
     providers.push(languages.registerHoverProvider("flow", {
       async provideHover(model, position) {
-        if (!handles(model)) return null;
-        const entry = await prepare(model, false);
-        if (!entry) return null;
-        const result = await request("textDocument/hover", {
-          textDocument: { uri: entry.uri }, position: toServer(model, position) }).catch(() => null);
-        const contents = result ? markdownOf(result.contents) : [];
-        if (!contents.length) return null;
-        return { contents, range: fromServer(model, result.range) || undefined };
+        const found = await hoverAt(model, position);
+        return found && { contents: found.contents, range: found.range };
       }
     }));
     providers.push(languages.registerDefinitionProvider("flow", {
@@ -588,6 +582,19 @@ function create(options) {
       }));
   }
 
+  /* The server's hover at a position: Monaco markdown strings and a range.
+   * The Help pane (web/ide_flow_help.js) shows the same text for F1. */
+  async function hoverAt(model, position) {
+    if (state !== "ready" || !handles(model)) return null;
+    const entry = await prepare(model, false);
+    if (!entry) return null;
+    const result = await request("textDocument/hover", {
+      textDocument: { uri: entry.uri }, position: toServer(model, position) }).catch(() => null);
+    const contents = result ? markdownOf(result.contents) : [];
+    if (!contents.length) return null;
+    return { contents, range: fromServer(model, result.range) || undefined };
+  }
+
   function watchModels() {
     const later = model => timers.setTimeout(() => open(model), 0);
     watchers.push(monaco.editor.onDidCreateModel(later));
@@ -668,6 +675,7 @@ function create(options) {
 
   return Object.freeze({
     start, stop, handles, run, coversLine, pollEvents, uriFor,
+    hover: (model, position) => hoverAt(model, position),
     flush: model => flushChange(model),
     state: () => state,
     capabilities: () => capabilities

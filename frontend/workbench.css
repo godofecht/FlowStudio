@@ -542,6 +542,19 @@ dialog.dg-dialog[open]{display:flex}
 .pv-empty-title{margin:0 0 6px;color:#e3e7ec;font-weight:600;font-size:13px}
 .pv-empty code{font:11.5px var(--mono);color:#cfd8cf;background:#1f2328;padding:1px 4px;border-radius:3px}
 .pv-primary{margin-top:8px;height:28px;padding:0 12px;background:#2f4a3b;border:1px solid #4b6b58;color:#d7e9dd;border-radius:6px}
+/* Preview build progress: stages, time so far, and a note on the first build. */
+.pv-progress{max-width:340px;margin:28px auto;padding:0 18px;color:#9aa2ad;font-size:12.5px;line-height:1.55}
+.pv-progress[hidden]{display:none}
+.pv-progress-title{margin:0 0 10px;color:#e3e7ec;font-weight:600;font-size:13px;overflow-wrap:anywhere}
+.pv-steps{list-style:none;margin:0 0 10px;padding:0;display:grid;gap:4px}
+.pv-steps li{display:flex;align-items:center;gap:8px;color:#6f7782}
+.pv-steps li::before{content:"";width:7px;height:7px;border-radius:50%;background:#3a3f47;flex:none}
+.pv-steps li[data-state="done"]{color:#9aa2ad}
+.pv-steps li[data-state="done"]::before{background:#8fd0a8}
+.pv-steps li[data-state="active"]{color:#e3e7ec}
+.pv-steps li[data-state="active"]::before{background:#e3c27c;animation:terminal-pulse 1s ease-in-out infinite}
+.pv-progress-time{margin:0;font:11.5px/1.5 var(--mono);color:#aab2bd;font-variant-numeric:tabular-nums}
+.pv-progress-note{margin:8px 0 0;color:#9aa2ad}
 
 /* ---- Run widget: Debug ------------------------------------------------- */
 .run-debug{color:#e8a49c}

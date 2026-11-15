@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import {runThreeSpeciesBrowser} from './native_three_species_browser.mjs';
 import {runThreeSpeciesRestartBrowser} from './native_three_species_restart_browser.mjs';
+const ORIGIN = (process.env.FLOWSTUDIO_URL || 'http://127.0.0.1:8751').replace(/\/+$/, '');
 
 const browser = await chromium.launch({ headless: true,
   ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}) });
@@ -16,7 +17,7 @@ try {
   page.on('response', response => {
     if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`);
   });
-  await page.goto('http://127.0.0.1:8751');
+  await page.goto(ORIGIN);
   await page.waitForFunction(() => globalThis.FlowStudioEditor?.editor);
   assert.equal(await page.locator('#source').isVisible(), false);
   assert.equal(await page.locator('.monaco-editor').isVisible(), true);
@@ -189,8 +190,8 @@ try {
   await page.waitForFunction(() => /Invalid or duplicate breakpoint line/.test(document.getElementById('debugConsoleOutput').textContent));
   assert.notEqual(await page.evaluate(() => document.getElementById('debugStatus').dataset.state), 'paused');
   // That 422 is the expected rejection; account for only this response.
-  assert.ok(errors.includes('422 http://127.0.0.1:8751/api/debug/python/start'));
-  assert.ok(errors.every(message => message === '422 http://127.0.0.1:8751/api/debug/python/start' ||
+  assert.ok(errors.includes('422 ' + ORIGIN + '/api/debug/python/start'));
+  assert.ok(errors.every(message => message === '422 ' + ORIGIN + '/api/debug/python/start' ||
     /Failed to load resource:.*422/.test(message)), JSON.stringify(errors));
   errors.length = 0;
 
@@ -284,9 +285,9 @@ try {
   // a console resource error for it; account for only this known response
   // without masking unrelated page errors from the rest of the acceptance.
   assert.ok(errors.some(message =>
-    message === '422 http://127.0.0.1:8751/api/check/flow'));
+    message === '422 ' + ORIGIN + '/api/check/flow'));
   assert.ok(errors.every(message =>
-    message === '422 http://127.0.0.1:8751/api/check/flow' ||
+    message === '422 ' + ORIGIN + '/api/check/flow' ||
     /Failed to load resource:.*422/.test(message)), JSON.stringify(errors));
   errors.length = 0;
 
@@ -405,7 +406,7 @@ try {
       if (request.method() === 'POST') notebookRequests.push(new URL(request.url()).pathname);
     });
     try {
-      const response = await notebookPage.goto('http://127.0.0.1:8751/app/', {
+      const response = await notebookPage.goto(ORIGIN + '/app/', {
         waitUntil:'domcontentloaded'
       });
       assert.equal(response.status(), 200);

@@ -4,9 +4,14 @@
  * The server starts one job per prompt (src/assistant_session.c) and this
  * file polls it, parses the stream into text and tool lines, and keeps the
  * editor snapshot fresh so the MCP tool flowstudio_editor_state can read
- * it. Edit proposals from flowstudio_propose_edit arrive by polling and
- * open as a Monaco diff with Accept and Reject. Nothing is written to a file
- * without the user accepting it.
+ * it. Edit proposals from flowstudio_propose_edit arrive by polling and open
+ * as inline diffs in the editor (web/ide_assistant_inline.js), listed under
+ * Changes to review. Code blocks have Apply, which turns them into the same
+ * inline diff. Nothing is written to a file without the user accepting it.
+ *
+ * Ctrl+L (Cmd+L) and Ctrl+I open the chat. The current file and selection go
+ * with each message as chips the user can remove; @ adds files, the
+ * selection or the current error. The chat is kept per project.
  */
 (function (root) {
 "use strict";
@@ -15,6 +20,8 @@ const LIMITS = Object.freeze({ active: 60000, other: 20000, total: 120000, conso
 const PROVIDER_KEY = "flowstudio.assistant.provider";
 const MODEL_KEY = "flowstudio.assistant.model";
 const RUNS_KEY = "flowstudio.assistant.runs";
+const CHAT_KEY = "flowstudio.assistant.chat.";
+const CHAT_TURNS = 40;
 
 /* ---------- prompts ---------- */
 const ACTIONS = Object.freeze({
@@ -43,7 +50,7 @@ function languageOfName(name) {
 
 /* The prompt for one job. Tool providers can read more through MCP;
  * Ollama has no tools, so it gets the whole active file. */
-function buildPrompt({ action = "ask", request = "", snapshot = null, include = {}, tools = true, history = [] }) {
+function buildPrompt({ action = "ask", request = "", snapshot = null, include = {}, tools = true, history = [], attachments = [] }) {
   const spec = ACTIONS[action] || ACTIONS.ask;
   const parts = [];
   const asked = String(request || "").trim();
@@ -80,6 +87,11 @@ function buildPrompt({ action = "ask", request = "", snapshot = null, include = 
   } else if (include.diagnostics !== false && snapshot && snapshot.diagnosticsText) {
     parts.push("Compiler output:");
     parts.push(fenceFor("text", snapshot.diagnosticsText.slice(0, 4000)));
+  }
+  for (const item of attachments) {
+    parts.push("");
+    parts.push(item.title + ":");
+    parts.push(fenceFor(item.language || "", String(item.text || "").slice(0, LIMITS.other)));
   }
   if (tools) parts.push("\nUse flowstudio_editor_state for the full editor, and check all Flow code before you show it.");
   return parts.join("\n");
@@ -222,12 +234,13 @@ function parsePoll(body) {
 /* Splits a reply into prose and fenced code. Rendering uses textContent. */
 function splitMarkdown(text) {
   const segments = [];
-  const pattern = /```([\w+-]*)[^\n]*\n([\s\S]*?)(?:```|$)/g;
+  const pattern = /```([\w+-]*)([^\n]*)\n([\s\S]*?)(?:```|$)/g;
   let last = 0, match;
   const source = String(text || "");
   while ((match = pattern.exec(source))) {
     if (match.index > last) segments.push({ type: "text", text: source.slice(last, match.index) });
-    segments.push({ type: "code", language: (match[1] || "").toLowerCase(), code: match[2], closed: match[0].endsWith("```") && match[0].length >= match[1].length + 7 });
+    segments.push({ type: "code", language: (match[1] || "").toLowerCase(), info: (match[1] + match[2]).trim(), code: match[3],
+      closed: match[0].endsWith("```") && match[0].length >= match[1].length + match[2].length + 7 });
     last = pattern.lastIndex;
     if (match[0].length === 0) break;
   }
@@ -282,6 +295,12 @@ function parseDiagnostics(text) {
     if (match) found.push({ line: Number(match[1]), column: Number(match[2]), severity: match[3].includes("warning") ? "warning" : "error", message: match[4].trim() });
   }
   return found;
+}
+
+/* Recent error lines from the console, for @error. */
+function consoleErrors(text, limit = 12) {
+  const lines = String(text || "").split("\n").slice(-200);
+  return lines.filter(line => /\b(error|exception|traceback|failed|panic)\b/i.test(line)).slice(-limit).join("\n");
 }
 
 function clip(text, limit) {
@@ -364,6 +383,8 @@ function make(doc, tag, className, text) {
   return node;
 }
 
+const TEXT_FILE = /\.(flow|py|r|md|txt|csv|json|toml|ya?ml|sh|c|h)$/i;
+
 function mount(doc, options = {}) {
   const host = options.host || doc.getElementById("assistantRoot");
   if (!host) return null;
@@ -371,11 +392,14 @@ function mount(doc, options = {}) {
   const editorApi = () => options.editor || (root.FlowStudioEditor && root.FlowStudioEditor.editor) || null;
   const monaco = () => options.monaco || root.FlowStudioMonaco || null;
   const sidePanel = () => options.sidePanel || root.FlowStudioSidePanel || null;
+  const inline = () => options.inline || root.FlowStudioInlineEdit || null;
+  const diffModel = () => options.diff || root.FlowStudioAssistantDiff || null;
   const fetcher = options.fetch || (typeof root.fetch === "function" ? root.fetch.bind(root) : null);
   const later = options.setTimeout || root.setTimeout.bind(root);
   const cancelLater = options.clearTimeout || root.clearTimeout.bind(root);
-  const pollMs = options.pollMs || 250;
+  const pollMs = options.pollMs || 100;
   const idleProposalMs = options.idleProposalMs || 2000;
+  const mac = /Mac|iPhone|iPad/.test((root.navigator && (root.navigator.platform || root.navigator.userAgent)) || "");
   let storage = options.storage;
   if (storage === undefined) { try { storage = root.localStorage; } catch (_) { storage = null; } }
   const remember = (key, value) => { try { if (storage) storage.setItem(key, value); } catch (_) { /* optional */ } };
@@ -385,12 +409,17 @@ function mount(doc, options = {}) {
   let serverInfo = null;   // { mcpServer, url } for project agent files
   let job = null;            // { id, provider, parser, message, tools, timer }
   let history = [];
+  let transcript = [];       // what the thread shows, kept per project
+  let projectKey = "";
   let decisions = [];        // proposal ids, files and the user's decision
   let proposalQueue = [];
-  let showing = null;
   let lastContext = "";
   let contextTimer = 0, proposalTimer = 0, chipTimer = 0;
+  // The current file, selection and errors go with each message unless the
+  // user removes their chip. Removing lasts for one message.
   const include = { file: true, selection: true, diagnostics: true };
+  let mentions = [];         // { kind: "file", name, path, id?, handle? } | { kind: "selection" } | { kind: "error" }
+  const colorCache = new Map();
 
   /* ---------- layout ---------- */
   host.replaceChildren();
@@ -411,6 +440,7 @@ function mount(doc, options = {}) {
   runsLabel.append(runsBox, doc.createTextNode("Runs"));
   const clearButton = make(doc, "button", "as-clear", "New chat");
   clearButton.type = "button";
+  clearButton.id = "assistantNewChat";
   bar.append(providerSelect, modelSelect, runsLabel, clearButton);
 
   const thread = make(doc, "div", "as-thread");
@@ -419,21 +449,25 @@ function mount(doc, options = {}) {
   thread.setAttribute("aria-live", "polite");
   const empty = make(doc, "div", "as-empty");
   empty.append(make(doc, "p", "as-empty-title", "Work on Flow with your own AI"));
-  empty.append(make(doc, "p", "", "The assistant uses Claude Code, Codex or a local Ollama model from this machine, with your own login. It reads the Flow guide and checks code with the Flow compiler before it shows it. Edits arrive as diffs for you to accept."));
+  empty.append(make(doc, "p", "", "The assistant uses Claude Code, Codex or a local Ollama model from this machine, with your own login. It reads the Flow guide and checks code with the Flow compiler before it shows it. Edits arrive as diffs in the editor for you to accept."));
+  const keys = make(doc, "ul", "as-empty-keys");
+  for (const [combo, what] of [[(mac ? "⌘" : "Ctrl+") + "K", "edit code in place"], [(mac ? "⌘" : "Ctrl+") + "L", "open this chat"], ["@", "add a file, the selection or the error"]]) {
+    const item = make(doc, "li");
+    item.append(make(doc, "kbd", "", combo), doc.createTextNode(" " + what));
+    keys.append(item);
+  }
+  empty.append(keys);
   thread.append(empty);
+
+  const review = make(doc, "div", "as-review");
+  review.id = "assistantReview";
+  review.hidden = true;
+  review.setAttribute("aria-label", "Changes to review");
 
   const composer = make(doc, "div", "as-composer");
   const chips = make(doc, "div", "as-chips");
-  chips.setAttribute("aria-label", "Context sent with the request");
-  const chipFile = make(doc, "button", "as-chip");
-  const chipSelection = make(doc, "button", "as-chip");
-  const chipErrors = make(doc, "button", "as-chip");
-  for (const [chip, key] of [[chipFile, "file"], [chipSelection, "selection"], [chipErrors, "diagnostics"]]) {
-    chip.type = "button";
-    chip.dataset.key = key;
-    chip.addEventListener("click", () => { include[key] = !include[key]; renderChips(); });
-    chips.append(chip);
-  }
+  chips.id = "assistantChips";
+  chips.setAttribute("aria-label", "Context sent with the message");
   const actions = make(doc, "div", "as-actions");
   for (const name of ["explain", "fix", "translate", "test"]) {
     const button = make(doc, "button", "as-action", ACTIONS[name].label);
@@ -446,8 +480,9 @@ function mount(doc, options = {}) {
   const input = make(doc, "textarea", "as-input");
   input.id = "assistantInput";
   input.rows = 3;
-  input.placeholder = "Ask about Flow, or describe a change. Enter sends.";
+  input.placeholder = "Ask about Flow, or describe a change. @ adds context. Enter sends.";
   input.setAttribute("aria-label", "Message to the assistant");
+  input.setAttribute("aria-autocomplete", "list");
   const sendButton = make(doc, "button", "as-send primary", "Ask");
   sendButton.type = "button";
   sendButton.id = "assistantSend";
@@ -456,11 +491,15 @@ function mount(doc, options = {}) {
   stopButton.id = "assistantStop";
   stopButton.hidden = true;
   row.append(input, sendButton, stopButton);
+  const menu = make(doc, "div", "as-mention-menu");
+  menu.id = "assistantMentions";
+  menu.setAttribute("role", "listbox");
+  menu.hidden = true;
   const note = make(doc, "p", "as-note");
   note.id = "assistantStatus";
   note.setAttribute("role", "status");
-  composer.append(chips, actions, row, note);
-  host.append(bar, thread, composer);
+  composer.append(menu, chips, actions, row, note);
+  host.append(bar, thread, review, composer);
 
   /* ---------- server calls ---------- */
   async function api(path, body = "") {
@@ -510,6 +549,9 @@ function mount(doc, options = {}) {
   providerSelect.addEventListener("change", () => { remember(PROVIDER_KEY, providerSelect.value); syncModels(); });
   modelSelect.addEventListener("change", () => remember(MODEL_KEY, modelSelect.value));
   runsBox.addEventListener("change", () => remember(RUNS_KEY, runsBox.checked ? "1" : "0"));
+  function startBody(provider, prompt) {
+    return provider.id + "\n" + (provider.id === "ollama" ? modelSelect.value : "") + "\n" + (runsBox.checked ? "1" : "0") + "\n" + prompt;
+  }
 
   /* ---------- context ---------- */
   function snapshot() {
@@ -531,19 +573,51 @@ function mount(doc, options = {}) {
     if (contextTimer) cancelLater(contextTimer);
     contextTimer = later(() => { contextTimer = 0; void pushContext(); renderChips(); }, delay);
   }
+  function errorCount(current) {
+    return current.diagnostics.length || (current.diagnosticsText ? 1 : 0) || (consoleErrors(current.console) ? 1 : 0);
+  }
+  function chip(label, title, key, onRemove) {
+    const node = make(doc, "span", "as-chip");
+    node.dataset.key = key;
+    node.title = title;
+    node.append(make(doc, "span", "as-chip-label", label));
+    const remove = make(doc, "button", "as-chip-remove", "×");
+    remove.type = "button";
+    remove.setAttribute("aria-label", "Remove " + label);
+    remove.addEventListener("click", () => { onRemove(); renderChips(); input.focus(); });
+    node.append(remove);
+    chips.append(node);
+    return node;
+  }
   function renderChips() {
     const current = snapshot();
     const active = current.active;
-    chipFile.hidden = !active;
-    chipFile.textContent = active ? active.name : "";
-    chipFile.title = active ? "Send " + (active.path || active.name) + " with the request" : "";
+    chips.replaceChildren();
+    const mentioned = kind => mentions.some(item => item.kind === kind);
+    if (active && include.file)
+      chip(active.name, "Sends " + (active.path || active.name) + " with the message", "file", () => { include.file = false; });
     const lines = current.selection ? current.selection.endLine - current.selection.startLine + 1 : 0;
-    chipSelection.hidden = !lines;
-    chipSelection.textContent = lines === 1 ? "Selection, 1 line" : "Selection, " + lines + " lines";
-    const errors = current.diagnostics.length || (current.diagnosticsText ? 1 : 0);
-    chipErrors.hidden = !errors;
-    chipErrors.textContent = errors === 1 ? "1 error" : errors + " errors";
-    for (const chip of [chipFile, chipSelection, chipErrors]) chip.setAttribute("aria-pressed", include[chip.dataset.key] ? "true" : "false");
+    if (lines && (include.selection || mentioned("selection")))
+      chip(lines === 1 ? "Selection, 1 line" : "Selection, " + lines + " lines", "Lines " + current.selection.startLine + " to " + current.selection.endLine,
+        "selection", () => { include.selection = false; mentions = mentions.filter(item => item.kind !== "selection"); });
+    const errors = errorCount(current);
+    if (errors && (include.diagnostics || mentioned("error")))
+      chip(current.diagnostics.length > 1 ? current.diagnostics.length + " errors" : "Current error", "Compiler and console errors",
+        "diagnostics", () => { include.diagnostics = false; mentions = mentions.filter(item => item.kind !== "error"); });
+    for (const item of mentions.filter(entry => entry.kind === "file"))
+      chip(item.name, "Sends " + (item.path || item.name) + " with the message", "mention", () => { mentions = mentions.filter(entry => entry !== item); });
+    const add = make(doc, "button", "as-chip-add", "@");
+    add.type = "button";
+    add.title = "Add context";
+    add.setAttribute("aria-label", "Add context");
+    add.addEventListener("click", () => {
+      const at = input.selectionStart === undefined ? input.value.length : input.selectionStart;
+      const before = input.value.slice(0, at);
+      input.value = before + (before && !/\s$/.test(before) ? " @" : "@") + input.value.slice(at);
+      input.focus();
+      updateMenu();
+    });
+    chips.append(add);
     return current;
   }
   function scheduleChips() {
@@ -551,31 +625,134 @@ function mount(doc, options = {}) {
     chipTimer = later(() => { chipTimer = 0; renderChips(); scheduleContext(); }, 300);
   }
 
+  /* ---------- @ mentions ---------- */
+  let menuItems = [], menuIndex = 0, workspaceFiles = null, workspaceRoot = null;
+  async function listWorkspace() {
+    const explorer = root.FlowStudioWorkspaceExplorer;
+    const handle = explorer && explorer.root ? explorer.root() : null;
+    if (!handle || typeof handle.entries !== "function") { workspaceFiles = []; workspaceRoot = null; return workspaceFiles; }
+    if (workspaceRoot === handle && workspaceFiles) return workspaceFiles;
+    workspaceFiles = [];
+    workspaceRoot = handle;
+    const found = [];
+    async function walk(dir, prefix, depth) {
+      for await (const [name, entry] of dir.entries()) {
+        if (found.length >= 400) return;
+        if (name.startsWith(".") || name === "node_modules" || name === "build") continue;
+        if (entry.kind === "directory" && depth < 4) await walk(entry, prefix + name + "/", depth + 1);
+        else if (entry.kind === "file" && TEXT_FILE.test(name)) found.push({ name, path: (explorer.rootName ? explorer.rootName() + "/" : "") + prefix + name, handle: entry });
+      }
+    }
+    try { await walk(handle, "", 0); } catch (_) { /* permission or a removed folder */ }
+    workspaceFiles = found;
+    return found;
+  }
+  function mentionQuery() {
+    const at = input.selectionStart === undefined ? input.value.length : input.selectionStart;
+    const match = /(^|\s)@([\w./-]*)$/.exec(input.value.slice(0, at));
+    return match ? { query: match[2].toLowerCase(), from: at - match[2].length - 1, to: at } : null;
+  }
+  function candidates(query) {
+    const current = snapshot();
+    const items = [];
+    if (current.selection) items.push({ kind: "selection", label: "Selection", detail: "lines " + current.selection.startLine + " to " + current.selection.endLine });
+    if (errorCount(current)) items.push({ kind: "error", label: "Current error", detail: current.diagnostics.length ? "line " + current.diagnostics[0].line : "console" });
+    const a = app();
+    const seen = new Set();
+    for (const item of a && a.documents ? a.documents.list() : []) {
+      seen.add(item.path || item.name);
+      items.push({ kind: "file", label: item.name, detail: item.path || "open", name: item.name, path: item.path || null, id: item.id });
+    }
+    for (const item of workspaceFiles || []) if (!seen.has(item.path))
+      items.push({ kind: "file", label: item.name, detail: item.path, name: item.name, path: item.path, handle: item.handle });
+    return items.filter(item => !query || item.label.toLowerCase().includes(query) || String(item.detail).toLowerCase().includes(query)).slice(0, 12);
+  }
+  function updateMenu() {
+    const found = mentionQuery();
+    if (!found) { closeMenu(); return; }
+    if (workspaceFiles === null) void listWorkspace().then(found => { if (found.length && !menu.hidden) updateMenu(); });
+    menuItems = candidates(found.query);
+    menuIndex = Math.min(menuIndex, Math.max(0, menuItems.length - 1));
+    menu.replaceChildren();
+    if (!menuItems.length) { menu.append(make(doc, "div", "as-mention-empty", "Nothing matches")); }
+    menuItems.forEach((item, index) => {
+      const option = make(doc, "div", "as-mention");
+      option.setAttribute("role", "option");
+      option.setAttribute("aria-selected", index === menuIndex ? "true" : "false");
+      option.append(make(doc, "span", "as-mention-label", item.label), make(doc, "span", "as-mention-detail", item.detail));
+      option.addEventListener("mousedown", event => { event.preventDefault(); pick(index); });
+      menu.append(option);
+    });
+    menu.hidden = false;
+  }
+  function closeMenu() { menu.hidden = true; menuItems = []; menuIndex = 0; }
+  function pick(index) {
+    const item = menuItems[index];
+    const found = mentionQuery();
+    if (!item || !found) { closeMenu(); return; }
+    input.value = input.value.slice(0, found.from) + input.value.slice(found.to);
+    if (input.setSelectionRange) input.setSelectionRange(found.from, found.from);
+    if (item.kind === "selection") include.selection = true;
+    if (item.kind === "error") include.diagnostics = true;
+    if (!mentions.some(entry => entry.kind === item.kind && (entry.kind !== "file" || entry.path === item.path && entry.name === item.name)))
+      mentions.push(item.kind === "file" ? { kind: "file", name: item.name, path: item.path, id: item.id, handle: item.handle } : { kind: item.kind });
+    closeMenu();
+    renderChips();
+    input.focus();
+  }
+  async function attachmentsFor(current) {
+    const out = [];
+    const a = app();
+    for (const item of mentions) {
+      if (item.kind !== "file") continue;
+      const open = a && a.documents ? a.documents.list().find(entry => entry.id === item.id || (item.path && entry.path === item.path)) : null;
+      if (current.active && open && current.active.name === open.name && (current.active.path || null) === (open.path || null) && include.file) continue;
+      let text = open ? String(open.text || "") : "";
+      if (!open && item.handle) { try { text = await (await item.handle.getFile()).text(); } catch (_) { text = ""; } }
+      out.push({ title: "File " + (item.path || item.name), language: languageOfName(item.name), text });
+    }
+    const errorsWanted = include.diagnostics || mentions.some(item => item.kind === "error");
+    const fromConsole = errorsWanted ? consoleErrors(current.console) : "";
+    if (fromConsole) out.push({ title: "Recent console errors", language: "text", text: fromConsole });
+    return out;
+  }
+
   /* ---------- the thread ---------- */
-  function scrollDown() { thread.scrollTop = thread.scrollHeight; }
-  function addUser(text) {
+  function scrollDown() {
+    // Follow the reply only while the user is at the bottom.
+    if (thread.scrollHeight - thread.scrollTop - (thread.clientHeight || 0) < 80 || !thread.clientHeight) thread.scrollTop = thread.scrollHeight;
+  }
+  function addUser(text, context = []) {
     empty.hidden = true;
     const node = make(doc, "div", "as-msg as-user");
-    node.textContent = text;
+    node.append(make(doc, "div", "as-user-text", text));
+    if (context.length) node.append(make(doc, "div", "as-user-context", context.join(" · ")));
     thread.append(node);
-    scrollDown();
+    thread.scrollTop = thread.scrollHeight;
+    return node;
   }
   function addAssistant() {
     empty.hidden = true;
     const node = make(doc, "div", "as-msg as-assistant");
+    node.dataset.state = "thinking";
+    const thinking = make(doc, "div", "as-thinking", "Thinking");
+    node.append(thinking);
     thread.append(node);
-    return { node, text: "", body: null };
+    scrollDown();
+    return { node, text: "", body: null, thinking, all: "", tools: [] };
   }
   function renderMessage(message) {
+    if (message.thinking) { message.thinking.remove(); message.thinking = null; }
     if (!message.body) { message.body = make(doc, "div", "as-body"); message.node.append(message.body); }
     message.body.replaceChildren();
     for (const segment of splitMarkdown(message.text)) {
       if (segment.type === "text") message.body.append(renderProse(doc, segment.text));
-      else message.body.append(codeBlock(segment));
+      else message.body.append(codeBlock(segment, message));
     }
     scrollDown();
   }
   function addTool(message, event) {
+    if (message.thinking) { message.thinking.remove(); message.thinking = null; }
     const line = make(doc, "div", "as-tool");
     line.dataset.state = "running";
     line.dataset.tool = toolShortName(event.name);
@@ -586,28 +763,61 @@ function mount(doc, options = {}) {
     scrollDown();
     return line;
   }
-  function codeBlock(segment) {
+  function highlight(node, code, language) {
+    const m = monaco();
+    const id = language === "py" ? "python" : language;
+    if (!id || !m || !m.editor || typeof m.editor.colorize !== "function") return;
+    const key = id + "\u0000" + code;
+    if (colorCache.has(key)) { node.innerHTML = colorCache.get(key); return; }
+    m.editor.colorize(code.replace(/\n$/, ""), id, { tabSize: 4 }).then(html => {
+      if (colorCache.size > 200) colorCache.clear();
+      colorCache.set(key, html);
+      if (node.isConnected !== false) node.innerHTML = html;
+    }, () => {});
+  }
+  function codeBlock(segment, message) {
     const wrap = make(doc, "div", "as-code");
     const pre = make(doc, "pre");
     const code = make(doc, "code", "", segment.code);
     if (segment.language) code.dataset.language = segment.language;
+    if (segment.closed !== false) highlight(code, segment.code, segment.language);
     pre.append(code);
     const tools = make(doc, "div", "as-code-actions");
+    const label = make(doc, "span", "as-code-lang", (diffModel() && diffModel().fenceFile(segment.info)) || segment.language || "text");
+    tools.append(label);
     const output = make(doc, "pre", "as-run-output");
     output.hidden = true;
-    const button = (label, handler) => {
-      const node = make(doc, "button", "", label);
+    const button = (text, title, handler) => {
+      const node = make(doc, "button", "", text);
       node.type = "button";
+      node.title = title;
       node.addEventListener("click", handler);
       tools.append(node);
+      return node;
     };
-    button("Insert at cursor", () => insertCode(segment.code, false));
-    button("Replace selection", () => insertCode(segment.code, true));
+    const ready = segment.closed !== false;
+    const applyButton = button("Apply", "Show this code as a diff in the editor", () => applyCode(segment, message));
+    applyButton.className = "as-apply";
+    applyButton.disabled = !ready;
+    const copyButton = button("Copy", "Copy to the clipboard", () => void copyCode(segment.code, copyButton));
+    copyButton.className = "as-copy";
+    button("Insert", "Insert at the cursor", () => insertCode(segment.code, false));
     const language = segment.language === "py" ? "python" : segment.language;
-    if (["flow", "python", "r"].includes(language) && segment.closed !== false)
-      button("Run", () => void runCode(language, segment.code, output));
+    if (["flow", "python", "r"].includes(language) && ready)
+      button("Run", "Run this code on the local server", () => void runCode(language, segment.code, output));
     wrap.append(tools, pre, output);
     return wrap;
+  }
+  async function copyCode(code, node) {
+    const clipboard = root.navigator && root.navigator.clipboard;
+    try {
+      if (!clipboard) throw new Error("no clipboard");
+      await clipboard.writeText(code);
+      node.textContent = "Copied";
+    } catch (_) {
+      node.textContent = "Copy failed";
+    }
+    later(() => { node.textContent = "Copy"; }, 1500);
   }
   function insertCode(code, replace) {
     const editor = editorApi();
@@ -623,6 +833,34 @@ function mount(doc, options = {}) {
     setNote(replace ? "Replaced the selection." : "Inserted at the cursor.");
     return true;
   }
+  /* Apply: the code block becomes an inline diff in the file it belongs to. */
+  function applyCode(segment, message = {}) {
+    const Diff = diffModel();
+    const controller = inline();
+    const a = app();
+    if (!Diff || !controller || !a) { setNote("The editor is not ready."); return false; }
+    const named = Diff.fenceFile(segment.info);
+    const docs = a.documents.list();
+    const target = (named && findDocument(a, named)) ||
+      (message.documentId && docs.find(item => item.id === message.documentId)) || a.documents.active();
+    if (!target) { setNote("Open the file to apply this to."); return false; }
+    if (named && !findDocument(a, named)) setNote(named + " is not open. Applying to " + target.name + ".");
+    if (a.documents.active() !== target && a.activateDocument) a.activateDocument(target.id);
+    const editor = editorApi();
+    const position = editor && editor.getPosition ? editor.getPosition() : null;
+    const selection = message.selection && message.documentId === target.id ? message.selection : null;
+    const plan = before => Diff.planApply(before, segment.code, { language: target.language, selection, cursorLine: position ? position.lineNumber : null });
+    const model = editor && editor.getModel ? editor.getModel() : null;
+    const how = plan(model && a.documents.active() === target ? model.getValue() : String(target.text || "")).how;
+    const started = controller.propose({ document: target, source: "apply", label: "Apply from chat",
+      after: before => plan(before).text,
+      onFinish: result => setNote(result.accepted ? "Applied to " + target.name + "." : result.stale ? "The file changed. Apply again." : "") });
+    if (started && !started.hunks.length) setNote("The file already has this code.");
+    else if (started) setNote({ file: "Replaces the whole file.", definitions: "Replaces the matching definitions.", append: "Adds new definitions at the end.",
+      selection: "Replaces the selection it was about.", cursor: "Inserts at the cursor." }[how] + " Review it in the editor.");
+    else setNote("Finish the open review in " + target.name + " first. This one waits.");
+    return true;
+  }
   async function runCode(language, code, output) {
     output.hidden = false;
     output.textContent = "Running...";
@@ -636,6 +874,50 @@ function mount(doc, options = {}) {
     }
   }
 
+  /* ---------- the chat, kept per project ---------- */
+  function keyOfProject() {
+    const projects = root.FlowStudioProjects;
+    const current = projects && projects.current ? projects.current() : null;
+    const explorer = root.FlowStudioWorkspaceExplorer;
+    const name = (current && current.name) || (explorer && explorer.rootName ? explorer.rootName() : null);
+    return name || "scratch";
+  }
+  function saveChat() {
+    if (!projectKey) return;
+    const kept = transcript.slice(-CHAT_TURNS).map(entry => ({ ...entry, text: String(entry.text || "").slice(0, 12000) }));
+    remember(CHAT_KEY + projectKey, JSON.stringify(kept));
+  }
+  function loadChat() {
+    if (job) return;
+    const key = keyOfProject();
+    if (key === projectKey) return;
+    projectKey = key;
+    for (const node of Array.from(thread.children)) if (node !== empty) node.remove();
+    transcript = [];
+    history = [];
+    try { transcript = JSON.parse(recall(CHAT_KEY + key) || "[]") || []; } catch (_) { transcript = []; }
+    if (!Array.isArray(transcript)) transcript = [];
+    empty.hidden = transcript.length > 0;
+    let pendingUser = null;
+    for (const entry of transcript) {
+      if (entry.role === "user") { addUser(entry.text, entry.context || []); pendingUser = entry.text; continue; }
+      const message = addAssistant();
+      message.node.dataset.state = entry.error ? "failed" : "done";
+      if (message.thinking) { message.thinking.remove(); message.thinking = null; }
+      for (const tool of entry.tools || []) {
+        const line = make(doc, "div", "as-tool", tool.text);
+        line.dataset.state = tool.state;
+        message.node.append(line);
+      }
+      message.text = entry.text || "";
+      if (message.text) renderMessage(message);
+      if (entry.error) message.node.append(make(doc, "div", "as-error", entry.error));
+      if (pendingUser !== null) { history.push({ user: pendingUser, assistant: entry.text || "" }); pendingUser = null; }
+    }
+    history = history.slice(-6);
+    thread.scrollTop = thread.scrollHeight;
+  }
+
   /* ---------- jobs ---------- */
   function setBusy(busy) {
     sendButton.hidden = busy;
@@ -645,15 +927,19 @@ function mount(doc, options = {}) {
   }
   function apply(events) {
     const message = job.message;
+    let dirty = false;
     for (const event of events) {
       if (event.kind === "text") {
         message.text = event.replace ? event.text : message.text + event.text;
         job.answer = event.replace ? job.answer.slice(0, job.answer.length - job.streamed.length) + event.text : job.answer + event.text;
         job.streamed = event.replace ? "" : job.streamed + event.text;
-        renderMessage(message);
+        message.node.dataset.state = "writing";
+        dirty = true;
       } else if (event.kind === "tool") {
+        if (dirty) { renderMessage(message); dirty = false; }
         job.streamed = "";
         job.tools.set(event.id, { line: addTool(message, event), event });
+        message.node.dataset.state = "working";
       } else if (event.kind === "tool-result") {
         const tool = job.tools.get(event.id);
         if (tool) {
@@ -663,10 +949,12 @@ function mount(doc, options = {}) {
           if (toolShortName(tool.event.name) === "propose_edit") pollProposals(0);
         }
       } else if (event.kind === "error") {
-        const line = make(doc, "div", "as-error", event.text);
-        message.node.append(line);
+        if (dirty) { renderMessage(message); dirty = false; }
+        job.error = event.text;
+        message.node.append(make(doc, "div", "as-error", event.text));
       }
     }
+    if (dirty) renderMessage(message);
   }
   async function send(action = "ask", request = "") {
     if (job) return false;
@@ -674,6 +962,7 @@ function mount(doc, options = {}) {
     if (!provider || !provider.available) { setNote("Choose an installed assistant first."); return false; }
     if (provider.id === "ollama" && !modelSelect.value) { setNote("Pull a model with ollama first."); return false; }
     const spec = ACTIONS[action] || ACTIONS.ask;
+    closeMenu();
     const current = await pushContext(true);
     if (spec.needs === "selection" && !(current.selection && current.selection.text)) { setNote("Select some code first."); return false; }
     if (spec.needs === "diagnostics" && !current.diagnostics.length && !current.diagnosticsText) {
@@ -682,25 +971,44 @@ function mount(doc, options = {}) {
     }
     if (spec.needs === "code" && !(current.active && current.active.text.trim())) { setNote("Open a file with code first."); return false; }
     if (action === "ask" && !String(request).trim()) { setNote("Type a question first."); return false; }
-    const prompt = buildPrompt({ action, request, snapshot: current, include, tools: provider.tools, history });
-    addUser(action === "ask" ? request : spec.label + (String(request).trim() ? ": " + request : ""));
+    const wanted = { file: include.file, selection: include.selection || mentions.some(item => item.kind === "selection"),
+      diagnostics: include.diagnostics || mentions.some(item => item.kind === "error") };
+    const attachments = await attachmentsFor(current);
+    const prompt = buildPrompt({ action, request, snapshot: current, include: wanted, tools: provider.tools, history, attachments });
+    const context = [];
+    if (current.active && wanted.file) context.push(current.active.name);
+    if (current.selection && wanted.selection) context.push("selection");
+    if (wanted.diagnostics && errorCount(current)) context.push("error");
+    for (const item of mentions) if (item.kind === "file") context.push(item.name);
+    const shown = action === "ask" ? request : spec.label + (String(request).trim() ? ": " + request : "");
+    addUser(shown, context);
+    transcript.push({ role: "user", text: shown, context });
     input.value = "";
+    mentions = [];
+    include.file = include.selection = include.diagnostics = true;
+    renderChips();
     const message = addAssistant();
+    const a = app();
+    const activeDoc = a && a.documents ? a.documents.active() : null;
+    message.documentId = activeDoc ? activeDoc.id : null;
+    message.selection = current.selection && wanted.selection ? { startLine: current.selection.startLine, endLine: current.selection.endLine } : null;
     setBusy(true);
-    setNote(provider.name + " is working.");
+    setNote("");
     let reply;
-    try {
-      reply = await api("/api/assistant/start", provider.id + "\n" + (provider.id === "ollama" ? modelSelect.value : "") + "\n" +
-        (runsBox.checked ? "1" : "0") + "\n" + prompt);
-    } catch (error) { reply = { status: 0, text: error.message || String(error) }; }
+    try { reply = await api("/api/assistant/start", startBody(provider, prompt)); }
+    catch (error) { reply = { status: 0, text: error.message || String(error) }; }
     if (reply.status !== 200) {
-      message.node.append(make(doc, "div", "as-error", reply.text || "The assistant did not start."));
+      const text = reply.text || "The assistant did not start.";
+      message.node.dataset.state = "failed";
+      if (message.thinking) { message.thinking.remove(); message.thinking = null; }
+      message.node.append(make(doc, "div", "as-error", text));
+      transcript.push({ role: "assistant", text: "", tools: [], error: text });
+      saveChat();
       setBusy(false);
-      setNote("");
       return false;
     }
     job = { id: reply.text.trim(), provider: provider.id, parser: createParser(provider.id), message,
-      tools: new Map(), answer: "", streamed: "", request: request || spec.label, polls: 0 };
+      tools: new Map(), answer: "", streamed: "", request: request || spec.label, polls: 0, error: "" };
     pollProposals(0);
     job.timer = later(poll, pollMs);
     return job.id;
@@ -715,37 +1023,118 @@ function mount(doc, options = {}) {
     if (reply.status !== 200) { finish(current, { state: "lost", output: "", stderr: reply.text }); return; }
     const result = parsePoll(reply.text);
     if (result.output) apply(current.parser.feed(result.output));
-    if (++current.polls % 6 === 0) void pushContext();
+    if (++current.polls % 15 === 0) void pushContext();
     if (result.finished) { apply(current.parser.end()); finish(current, result); return; }
     current.timer = later(poll, pollMs);
   }
   function finish(current, result) {
     const message = current.message;
+    if (message.thinking) { message.thinking.remove(); message.thinking = null; }
     let state = "";
     if (result.state === "cancelled") state = "Stopped.";
     else if (result.state === "timeout") state = "Stopped after the time limit.";
     else if (result.state === "lost") state = "Lost contact with the job.";
     else if (result.code !== 0) state = "The assistant exited with code " + result.code + ".";
+    let errorText = current.error || "";
     if (state) {
       const line = make(doc, "div", "as-error", state);
       const detail = String(result.stderr || "").trim();
       if (detail && result.state !== "cancelled") line.title = detail;
       if (detail && result.code) line.textContent = state + " " + detail.split("\n").slice(-3).join(" ").slice(0, 400);
       message.node.append(line);
+      errorText = line.textContent;
     }
-    if (!message.text.trim() && !current.tools.size && !state) message.node.append(make(doc, "div", "as-error", "No answer came back."));
+    if (!message.text.trim() && !current.tools.size && !state) {
+      message.node.append(make(doc, "div", "as-error", "No answer came back."));
+      errorText = "No answer came back.";
+    }
+    message.node.dataset.state = errorText ? "failed" : "done";
+    const tools = Array.from(current.tools.values()).map(tool => ({ text: tool.line.textContent, state: tool.line.dataset.state }));
+    transcript.push({ role: "assistant", text: current.answer, tools, error: errorText });
+    saveChat();
     history.push({ user: current.request, assistant: current.answer });
     history = history.slice(-6);
     job = null;
     setBusy(false);
     setNote("");
     pollProposals(0);
+    if (projectKey !== keyOfProject()) loadChat();
   }
   async function stop() {
     if (!job) return false;
     setNote("Stopping.");
     try { await api("/api/assistant/cancel", job.id); } catch (_) { /* the poll reports it */ }
     return true;
+  }
+
+  /* One background job for inline edits: its text goes to the handlers, not
+   * the thread. Returns { cancel() } at once. */
+  function runJob(prompt, handlers = {}) {
+    const control = { id: null, cancelled: false, done: false };
+    const done = result => { if (control.done) return; control.done = true; if (handlers.onDone) handlers.onDone(result); };
+    control.cancel = () => {
+      control.cancelled = true;
+      if (control.id) void api("/api/assistant/cancel", control.id).catch(() => {});
+      else done({ ok: false, cancelled: true, text: "" });
+    };
+    const provider = currentProvider();
+    if (!provider || !provider.available) {
+      later(() => done({ ok: false, error: "Choose an installed assistant in the Assistant panel." }), 0);
+      return control;
+    }
+    if (provider.id === "ollama" && !modelSelect.value) {
+      later(() => done({ ok: false, error: "Pull a model with ollama first." }), 0);
+      return control;
+    }
+    (async () => {
+      await pushContext(true);
+      if (control.cancelled) { done({ ok: false, cancelled: true, text: "" }); return; }
+      let reply;
+      try { reply = await api("/api/assistant/start", startBody(provider, prompt)); }
+      catch (error) { reply = { status: 0, text: error.message || String(error) }; }
+      if (reply.status !== 200) { done({ ok: false, error: reply.text || "The assistant did not start." }); return; }
+      control.id = reply.text.trim();
+      if (control.cancelled) void api("/api/assistant/cancel", control.id).catch(() => {});
+      const parser = createParser(provider.id);
+      let text = "", streamed = "", error = "";
+      const tools = new Map();
+      const take = events => {
+        let changed = false;
+        for (const event of events) {
+          if (event.kind === "text") {
+            text = event.replace ? text.slice(0, text.length - streamed.length) + event.text : text + event.text;
+            streamed = event.replace ? "" : streamed + event.text;
+            changed = true;
+          } else if (event.kind === "tool") {
+            streamed = "";
+            tools.set(event.id, event);
+            if (handlers.onTool) handlers.onTool(toolSummary(event.name, event.input, null, "") + "...");
+          } else if (event.kind === "tool-result") {
+            const tool = tools.get(event.id);
+            if (tool && handlers.onTool) handlers.onTool(toolSummary(tool.name, tool.input, event.ok, event.text));
+          } else if (event.kind === "error") error = event.text;
+        }
+        if (changed && handlers.onText) handlers.onText(text);
+      };
+      for (;;) {
+        await new Promise(resolve => later(resolve, pollMs));
+        let polled;
+        try { polled = await api("/api/assistant/poll", control.id); } catch (_) { polled = { status: 0, text: "" }; }
+        if (polled.status !== 200) { done({ ok: false, error: "Lost contact with the job.", text }); return; }
+        const result = parsePoll(polled.text);
+        if (result.output) take(parser.feed(result.output));
+        if (result.finished) {
+          take(parser.end());
+          const cancelled = result.state === "cancelled";
+          const failed = cancelled || result.state === "timeout" || result.code !== 0 || Boolean(error);
+          const detail = String(result.stderr || "").trim().split("\n").slice(-2).join(" ").slice(0, 300);
+          done({ ok: !failed, cancelled, text, error: error || (result.state === "timeout" ? "Stopped after the time limit." :
+            result.code ? "The assistant exited with code " + result.code + (detail ? ": " + detail : ".") : "") });
+          return;
+        }
+      }
+    })();
+    return control;
   }
 
   /* ---------- proposals ---------- */
@@ -758,9 +1147,9 @@ function mount(doc, options = {}) {
           const reply = await api("/api/assistant/proposals");
           if (reply.status === 200) for (const item of JSON.parse(reply.text)) proposalQueue.push(item);
         } catch (_) { /* retried */ }
-        if (!showing && proposalQueue.length) showProposal(proposalQueue.shift());
+        if (inline()) while (proposalQueue.length) showProposal(proposalQueue.shift());
       }
-      pollProposals(job ? 700 : idleProposalMs);
+      pollProposals(job ? 500 : idleProposalMs);
     }, delay === undefined ? 2000 : delay);
   }
   function record(item, status) {
@@ -774,88 +1163,71 @@ function mount(doc, options = {}) {
     thread.append(line);
     scrollDown();
   }
-  let dialog = null, diffEditor = null;
-  function ensureDialog() {
-    if (dialog) return dialog;
-    dialog = make(doc, "dialog", "as-diff-dialog");
-    dialog.id = "assistantDiff";
-    dialog.setAttribute("aria-label", "Proposed edit");
-    const head = make(doc, "div", "as-diff-head");
-    const title = make(doc, "h2", "as-diff-title");
-    title.id = "assistantDiffTitle";
-    const summary = make(doc, "p", "as-diff-summary");
-    summary.id = "assistantDiffSummary";
-    head.append(title, summary);
-    const diffHost = make(doc, "div", "as-diff-host");
-    diffHost.id = "assistantDiffHost";
-    const buttons = make(doc, "div", "as-diff-actions np-actions");
-    const reject = make(doc, "button", "", "Reject");
-    reject.type = "button";
-    reject.id = "assistantReject";
-    const accept = make(doc, "button", "primary", "Accept");
-    accept.type = "button";
-    accept.id = "assistantAccept";
-    buttons.append(reject, accept);
-    dialog.append(head, diffHost, buttons);
-    (doc.body || host).append(dialog);
-    dialog.addEventListener("cancel", event => { event.preventDefault(); decide(false); });
-    reject.addEventListener("click", () => decide(false));
-    accept.addEventListener("click", () => decide(true));
-    return dialog;
-  }
+  /* A proposal opens as an inline diff in its file. It never switches the
+   * tab or moves focus: other files wait in Changes to review. */
   function showProposal(item) {
     const proposal = item && item.proposal;
     if (!proposal || typeof proposal.content !== "string") return;
     const a = app();
     const target = findDocument(a, proposal.file);
     if (!target) { note_("The assistant proposed an edit to " + proposal.file + ", which is not open.", "error"); record(item, "file not open"); return; }
-    if (a.activateDocument) a.activateDocument(target.id);
     const editor = editorApi();
-    const model = editor && editor.getModel ? editor.getModel() : null;
-    const before = model ? model.getValue() : String(target.text || "");
-    const cursor = editor && editor.getPosition ? editor.getPosition() : null;
-    const after = applyProposal(before, proposal, cursor ? cursor.lineNumber : 1);
-    showing = { item, target, before, after };
-    const box = ensureDialog();
-    box.querySelector("#assistantDiffTitle").textContent = "Proposed edit to " + (target.path || target.name);
-    box.querySelector("#assistantDiffSummary").textContent = proposal.summary || (proposal.mode === "insert" ? "Insert lines" : "Replace the file");
-    if (typeof box.showModal === "function" && !box.open) box.showModal(); else box.setAttribute("open", "");
-    const m = monaco();
-    const diffHost = box.querySelector("#assistantDiffHost");
-    if (m && m.editor && m.editor.createDiffEditor) {
-      if (!diffEditor) diffEditor = m.editor.createDiffEditor(diffHost, { readOnly: true, originalEditable: false,
-        automaticLayout: true, theme: "flowstudio", renderSideBySide: true, minimap: { enabled: false }, scrollBeyondLastLine: false });
-      const old = diffEditor.getModel && diffEditor.getModel();
-      diffEditor.setModel({ original: m.editor.createModel(before, target.language), modified: m.editor.createModel(after, target.language) });
-      if (old) { if (old.original) old.original.dispose(); if (old.modified) old.modified.dispose(); }
-    } else {
-      diffHost.replaceChildren(make(doc, "pre", "as-diff-plain", after));
-    }
-    note_("Proposed edit to " + (target.path || target.name) + ". Review it in the diff.", "running");
+    const isActive = a.documents.active() && a.documents.active().id === target.id;
+    const cursor = isActive && editor && editor.getPosition ? editor.getPosition() : null;
+    const name = target.path || target.name;
+    inline().propose({ document: target, source: "proposal", label: proposal.summary || "", proposal: item,
+      after: before => applyProposal(before, proposal, cursor ? cursor.lineNumber : 1),
+      onFinish: result => {
+        let status = "rejected";
+        if (result.total === 0) status = "no change";
+        else if (result.accepted === result.total) status = "accepted";
+        else if (result.accepted) status = "accepted " + result.accepted + " of " + result.total + " changes";
+        else if (result.stale) status = "failed: the file changed while the diff was open";
+        note_((status.startsWith("accepted") ? "Accepted the edit to " : status === "rejected" ? "Rejected the edit to " :
+          status === "no change" ? "The edit matched " : "Could not apply the edit to ") + name +
+          (status.startsWith("failed") ? ": " + status.slice(8) : status.startsWith("accepted ") ? ", " + status.slice(9) + "." : "."),
+          status.startsWith("accepted") ? "ok" : "error");
+        record(item, status);
+      } });
+    note_("Proposed edit to " + name + (proposal.summary ? ": " + proposal.summary : "") + ". Review it in the editor.", "running");
   }
-  function decide(accepted) {
-    if (!showing) return;
-    const { item, target, before, after } = showing;
-    showing = null;
-    if (dialog) { if (typeof dialog.close === "function" && dialog.open) dialog.close(); else dialog.removeAttribute("open"); }
-    let status = accepted ? "accepted" : "rejected";
-    if (accepted) {
-      const a = app();
-      const current = a && a.documents.active();
-      const editor = editorApi();
-      const model = editor && editor.getModel ? editor.getModel() : null;
-      if (!current || current.id !== target.id || !model) status = "failed: the file is no longer active";
-      else if (model.getValue() !== before) status = "failed: the file changed while the diff was open";
-      else {
-        editor.pushUndoStop();
-        editor.executeEdits("flowstudio-assistant", [{ range: model.getFullModelRange(), text: after, forceMoveMarkers: true }]);
-        editor.pushUndoStop();
-      }
+  function renderReview() {
+    const controller = inline();
+    const list = controller ? controller.list().filter(item => item.source !== "inline") : [];
+    review.replaceChildren();
+    review.hidden = !list.length;
+    if (!list.length) return;
+    const head = make(doc, "div", "as-review-head");
+    head.append(make(doc, "span", "", list.length === 1 ? "1 file to review" : list.length + " files to review"));
+    if (list.length > 1) {
+      const rejectAll = make(doc, "button", "as-review-all", "Reject all");
+      rejectAll.type = "button";
+      rejectAll.addEventListener("click", () => { for (const item of controller.list()) if (item.source !== "inline") controller.reject(item.id); });
+      const acceptAll = make(doc, "button", "as-review-all primary", "Accept all");
+      acceptAll.type = "button";
+      acceptAll.addEventListener("click", () => { for (const item of controller.list()) if (item.source !== "inline") controller.accept(item.id); });
+      head.append(rejectAll, acceptAll);
     }
-    note_((status === "accepted" ? "Accepted the edit to " : status === "rejected" ? "Rejected the edit to " : "Could not apply the edit to ") +
-      (target.path || target.name) + (status.startsWith("failed") ? ": " + status.slice(8) : "."), status === "accepted" ? "ok" : "error");
-    record(item, status);
-    if (proposalQueue.length) showProposal(proposalQueue.shift());
+    review.append(head);
+    for (const item of list) {
+      const line = make(doc, "div", "as-review-row");
+      line.dataset.file = item.file;
+      const open = make(doc, "button", "as-review-file", item.file);
+      open.type = "button";
+      open.title = item.label || "Show the changes in the editor";
+      open.addEventListener("click", () => controller.review(item.id));
+      const stats = make(doc, "span", "as-review-stats");
+      if (item.waiting) stats.textContent = "waiting";
+      else stats.append(make(doc, "span", "as-add", "+" + item.added), make(doc, "span", "as-del", " -" + item.removed));
+      const reject = make(doc, "button", "as-review-reject", "Reject");
+      reject.type = "button";
+      reject.addEventListener("click", () => controller.reject(item.id));
+      const accept = make(doc, "button", "as-review-accept", "Accept");
+      accept.type = "button";
+      accept.addEventListener("click", () => controller.accept(item.id));
+      line.append(open, stats, reject, accept);
+      review.append(line);
+    }
   }
 
   /* ---------- wiring ---------- */
@@ -864,10 +1236,26 @@ function mount(doc, options = {}) {
   clearButton.addEventListener("click", () => {
     if (job) return;
     history = [];
+    transcript = [];
+    saveChat();
     for (const node of Array.from(thread.children)) if (node !== empty) node.remove();
     empty.hidden = false;
+    input.focus();
   });
+  input.addEventListener("input", updateMenu);
+  input.addEventListener("blur", () => later(closeMenu, 100));
   input.addEventListener("keydown", event => {
+    if (!menu.hidden && menuItems.length) {
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        menuIndex = (menuIndex + (event.key === "ArrowDown" ? 1 : -1) + menuItems.length) % menuItems.length;
+        updateMenu();
+        return;
+      }
+      if (event.key === "Enter" || event.key === "Tab") { event.preventDefault(); pick(menuIndex); return; }
+    }
+    if (!menu.hidden && event.key === "Escape") { event.preventDefault(); if (event.stopPropagation) event.stopPropagation(); closeMenu(); return; }
+    if (event.key === "Escape" && job) { event.preventDefault(); void stop(); return; }
     if (event.key === "Enter" && !event.shiftKey && !event.isComposing) { event.preventDefault(); void send("ask", input.value); }
   });
   function open(focus = true) {
@@ -878,42 +1266,56 @@ function mount(doc, options = {}) {
     return true;
   }
   function onKey(event) {
-    if ((event.ctrlKey || event.metaKey) && !event.shiftKey && !event.altKey && String(event.key).toLowerCase() === "i") {
-      event.preventDefault();
-      if (event.stopPropagation) event.stopPropagation();
-      open(true);
-    }
+    if (!(event.ctrlKey || event.metaKey) || event.shiftKey || event.altKey) return;
+    const key = String(event.key).toLowerCase();
+    if (key !== "i" && key !== "l") return;
+    // In the terminal Ctrl+L clears the screen.
+    if (key === "l" && event.ctrlKey && !mac && event.target && typeof event.target.closest === "function" && event.target.closest(".xterm")) return;
+    if (key === "l" && mac && !event.metaKey) return;
+    event.preventDefault();
+    if (event.stopPropagation) event.stopPropagation();
+    if (key === "l") { include.selection = true; include.file = true; }
+    open(true);
   }
   if (options.keyboard !== false) doc.addEventListener("keydown", onKey, true);
   doc.addEventListener("flowstudio:documents", scheduleChips);
+  doc.addEventListener("flowstudio:assistant-review", renderReview);
+  const onRoot = () => { workspaceFiles = null; later(loadChat, 0); };
+  doc.addEventListener("flowstudio:root", onRoot);
   const source = doc.getElementById("source");
   if (source) { source.addEventListener("input", scheduleChips); source.addEventListener("keyup", scheduleChips); }
+  let unwatchProjects = null;
+  if (root.FlowStudioProjects && root.FlowStudioProjects.onChange) unwatchProjects = root.FlowStudioProjects.onChange(onRoot);
 
+  loadChat();
   const ready = loadProviders().then(() => { renderChips(); void pushContext(true); });
   pollProposals(options.firstProposalPoll === undefined ? 1500 : options.firstProposalPoll);
 
   return Object.freeze({
-    ready, open, send, stop, loadProviders, pushContext, snapshot,
+    ready, open, send, stop, loadProviders, pushContext, snapshot, runJob, applyCode,
     info: () => (serverInfo ? { ...serverInfo } : null),
+    providerHasTools: () => { const provider = currentProvider(); return Boolean(provider && provider.tools); },
+    notify: text => setNote(text),
     explain: () => { open(false); return send("explain", ""); },
     fixErrors: () => { open(false); return send("fix", ""); },
     translate: () => { open(false); return send("translate", ""); },
     writeTest: () => { open(false); return send("test", ""); },
     busy: () => Boolean(job),
     decisions: () => decisions.slice(),
-    accept: () => decide(true),
-    reject: () => decide(false),
-    showingProposal: () => (showing ? { file: showing.target.path || showing.target.name, after: showing.after } : null),
+    transcript: () => transcript.map(entry => ({ ...entry })),
     dispose() {
       for (const timer of [contextTimer, proposalTimer, chipTimer, job && job.timer]) if (timer) cancelLater(timer);
       doc.removeEventListener("keydown", onKey, true);
       doc.removeEventListener("flowstudio:documents", scheduleChips);
+      doc.removeEventListener("flowstudio:assistant-review", renderReview);
+      doc.removeEventListener("flowstudio:root", onRoot);
+      if (unwatchProjects) unwatchProjects();
     }
   });
 }
 
 const api = Object.freeze({ mount, buildPrompt, createParser, parsePoll, splitMarkdown, toolSummary,
-  collectSnapshot, applyProposal, parseDiagnostics, findDocument, ACTIONS });
+  collectSnapshot, applyProposal, parseDiagnostics, findDocument, consoleErrors, ACTIONS });
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 root.FlowStudioAssistantModule = api;
 if (typeof document !== "undefined" && document.getElementById("assistantRoot")) {

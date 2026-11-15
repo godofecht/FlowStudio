@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 
 const example = name => readFileSync(new URL('../examples/' + name, import.meta.url), 'utf8').trimEnd();
-const origin = 'http://127.0.0.1:8751';
+const origin = (process.env.FLOWSTUDIO_URL || 'http://127.0.0.1:8751').replace(/\/+$/, '');
 const names = ['a', 'b', 'c'];
 const marker = 'FLOWSTUDIO_THREE_RESTART_V1 ';
 

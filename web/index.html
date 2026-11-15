@@ -384,6 +384,7 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
 </style>
 <link rel="stylesheet" href="/ui/workbench.css">
 <link rel="stylesheet" href="/ide_flow_help.css">
+<link rel="stylesheet" href="/ide_assistant.css">
 </head>
 <body>
 <div class="shell" id="ideShell">
@@ -650,7 +651,7 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
         <span class="pv-dot" id="previewDot" data-state="idle" aria-hidden="true"></span>
         <span class="pv-title" id="previewTitle">No app running</span>
         <span class="pv-status" id="previewStatus" role="status" aria-live="polite"></span>
-        <label class="pv-hot" title="Rebuild and restart the app as you type"><input type="checkbox" id="previewHot" checked>Hot reload</label>
+        <label class="pv-hot" title="Rebuild and restart the app as you type and when you save"><input type="checkbox" id="previewHot" checked>Hot reload</label>
         <button type="button" id="previewRestart" class="pv-btn" title="Rebuild and restart" aria-label="Rebuild and restart" disabled><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.5-3.6"/><path d="M13 2.5v3h-3"/></svg></button>
         <button type="button" id="previewStop" class="pv-btn" title="Stop the app" aria-label="Stop the app" disabled><svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"><rect x="3" y="3" width="10" height="10" rx="1.5" fill="currentColor"/></svg></button>
       </div>
@@ -2178,6 +2179,7 @@ async function saveFile() {
     el("fileLabel").textContent = FlowStudioDocuments.label(doc);
     markDirty(false);
     status("Saved " + name, "ok");
+    document.dispatchEvent(new CustomEvent("flowstudio:saved", { detail: { id: doc.id } }));
   } catch (error) {
     if (error.name !== "AbortError") status(String(error), "error");
   }
@@ -2197,6 +2199,7 @@ async function saveFileAs() {
     el("fileLabel").textContent = handle.name;
     markDirty(false);
     status("Saved " + handle.name, "ok");
+    document.dispatchEvent(new CustomEvent("flowstudio:saved", { detail: { id: doc.id } }));
   } catch (error) {
     if (error.name !== "AbortError") status(String(error), "error");
   }
@@ -2838,12 +2841,13 @@ const commands = Object.freeze({
   assistantFixErrors: () => globalThis.FlowStudioAssistant ? globalThis.FlowStudioAssistant.fixErrors() : false,
   assistantTranslate: () => globalThis.FlowStudioAssistant ? globalThis.FlowStudioAssistant.translate() : false,
   assistantWriteTest: () => globalThis.FlowStudioAssistant ? globalThis.FlowStudioAssistant.writeTest() : false,
+  assistantInlineEdit: () => globalThis.FlowStudioInlineEdit ? globalThis.FlowStudioInlineEdit.open() : false,
   newProject: template => globalThis.FlowStudioProjects ? globalThis.FlowStudioProjects.newProject(template) : false,
   closeProject: () => globalThis.FlowStudioProjects ? globalThis.FlowStudioProjects.closeProject() : false,
   startDebugging: () => globalThis.FlowStudioDebugger && globalThis.FlowStudioDebugger.instance ?
     globalThis.FlowStudioDebugger.instance.start() : false,
   refreshEnvironment: () => el("refreshPythonEnvironment").click(),
-  shortcuts: () => status("Ctrl+Enter run · Ctrl+Shift+Enter cell · Ctrl+S save · Ctrl+W close tab · Ctrl+Tab next tab · Ctrl+F find · Ctrl+H replace · Ctrl+Shift+O outline · Ctrl+I assistant · F12 definition · Shift+F12 references · F2 rename · Shift+Alt+F format", "ok"),    about: () => status("FlowStudio 0.2.0-alpha.1 · Flow-first local IDE · execution on 127.0.0.1:8751 only", "ok")
+  shortcuts: () => status("Ctrl+Enter run · Ctrl+Shift+Enter cell · Ctrl+S save · Ctrl+W close tab · Ctrl+Tab next tab · Ctrl+F find · Ctrl+H replace · Ctrl+Shift+O outline · Ctrl+K edit in place · Ctrl+L assistant · F12 definition · Shift+F12 references · F2 rename · Shift+Alt+F format", "ok"),    about: () => status("FlowStudio 0.2.0-alpha.1 · Flow-first local IDE · execution on 127.0.0.1:8751 only", "ok")
 });
 if (typeof window !== "undefined") {
   window.FlowStudioApp = Object.freeze({
@@ -2891,7 +2895,9 @@ renderTabs();
 <script src="/ide_side_panel.js"></script>
 <script src="/ide_flow_data.js"></script>
 <script src="/ide_flow_help.js"></script>
+<script src="/ide_assistant_diff.js"></script>
 <script src="/ide_assistant.js"></script>
+<script src="/ide_assistant_inline.js"></script>
 <script src="/ide_app_preview.js"></script>
 <script src="/ide_projects.js"></script>
 <script src="/ide_flow_backend.js"></script>

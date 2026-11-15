@@ -119,14 +119,25 @@ build in a frame. Keyboard and mouse go to the program after you click the
 canvas.
 
 With Hot reload on, an edit rebuilds the app after a short pause, about one
-second for the examples, and swaps the new build in once it has loaded. A
-build that fails leaves the last good build running and lists the compiler
-errors, each a link to its line. A reload restarts the program, so its state
-starts fresh. The Graphics examples are a starter app and three games from
+second for the examples, and saving (Ctrl+S or Cmd+S) rebuilds at once.
+Saving a graphics program while no app runs starts it. The new build is
+swapped in once it has drawn, so the Preview never goes blank, and the
+editor keeps the keyboard. A build that fails leaves the last good build
+running and lists the compiler errors, each a link to its line. A reload
+restarts the program, so its state starts fresh. The width you give the
+side panel is kept per project; a rebuild does not change it. The Graphics examples are a starter app and three games from
 the Flow repository: Pong, Snake and Falling sand.
 
-The first build on a machine also compiles the Flow runtime for WebAssembly,
-which takes about ten seconds. The Preview needs Emscripten (`emcc`) on the
+The first build on a machine also builds the Emscripten system libraries,
+which takes 15 to 30 seconds. The Preview shows each stage (checking Flow,
+building WebAssembly, starting the app) with the time so far, and says why
+the first build is slow. FlowStudio keeps those libraries in a cache of its
+own, `~/.cache/flowstudio/emscripten` (or `FLOWSTUDIO_EM_CACHE`), because
+Emscripten clears its shared cache whenever `emcc` runs with another
+configuration. Opening a graphics program starts its build in the
+background, and builds run in a child process so the IDE stays responsive
+(`POST /api/app/start`, then `GET /flowapp/<build>/status`). Later builds
+take about one second. The Preview needs Emscripten (`emcc`) on the
 server's PATH. Builds live in a private folder under the system temp folder,
 and the last four are kept. Code: `src/flow_app.c`, `web/app_host.html`,
 `web/ide_app_preview.js`. Tests: `tests/ide_app_preview.test.js`,
@@ -592,19 +603,31 @@ against an isolated temporary repository.
 The Assistant tab in the side panel lets you work on Flow with your own AI
 tool. FlowStudio finds Claude Code (`claude`), Codex (`codex`) and Ollama
 (`ollama`, with the models you have pulled) on this machine, and you pick
-one. Ctrl+I (Cmd+I on macOS) opens the tab with the current selection as
-context.
+one. Ctrl+I or Ctrl+L (Cmd+I or Cmd+L on macOS) opens the tab with the
+current selection as context.
 
 - Ask anything, or use the actions: Explain selection, Fix errors,
   Translate to Flow (from R or Python) and Write a Flow test. They are in the
   command palette too.
-- Chips show what is sent with a request: the active file, the selection
-  and the compiler errors. Click one to leave it out.
+- Chips show what is sent with a message: the active file, the selection
+  and the current error. Remove one with its x. Type @ to add an open or
+  project file, the selection or the current error.
 - Answers stream in. Tool calls show as short lines such as
-  "Checked flow code: ok". Code blocks have Insert at cursor, Replace
-  selection and Run. Stop ends the request.
-- When the assistant changes a file, the change opens as a diff with Accept
-  and Reject. Nothing is written until you accept, and Ctrl+Z undoes it.
+  "Checked flow code: ok". Code blocks are highlighted and have Apply, Copy,
+  Insert and Run. Stop (or Esc) ends the request. The chat is kept per
+  project.
+- Ctrl+K (Cmd+K on macOS) in the editor opens a prompt bar at the selection
+  or the cursor line. The reply streams in as an inline diff: removed lines
+  in red, new lines in green. Each change has Accept and Reject. Ctrl+Enter
+  or Tab accepts all, Esc rejects all. Ctrl+L (Cmd+L) opens the chat.
+- Edits the agent proposes, and code blocks you Apply, show the same inline
+  diff. Changes to review in the Assistant tab lists each file with Accept and
+  Reject. Ctrl+Enter accepts the file in view and Ctrl+Shift+Backspace rejects
+  it. A proposal never switches tabs or moves focus.
+- On a compiler error, the lightbulb (Ctrl+.) offers Fix with Assistant,
+  which opens the prompt bar on that function with the error filled in.
+- Nothing is written until you accept, an accept is one undo step, and a
+  change to lines you edited during review is skipped.
 
 AI models know little Flow, so every request carries the verified Flow guide
 ([docs/FLOW_FOR_AI.md](docs/FLOW_FOR_AI.md)) and the rules in

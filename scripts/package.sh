@@ -30,6 +30,8 @@ for file in src/*.py src/*.R src/*.sh src/flowstudio.flow; do
   cp "$file" "$stage/$name/$file"
 done
 cp mcp/*.py mcp/*.md "$stage/$name/mcp/"
+# The Terminal's claude and codex wrappers and their shell startup shims.
+cp -R mcp/terminal "$stage/$name/mcp/terminal"
 cp scripts/quarto_render.py "$stage/$name/scripts/quarto_render.py"
 cp VERSION README.md "$stage/$name/"
 if test -f LICENSE; then cp LICENSE "$stage/$name/"; fi

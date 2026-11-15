@@ -154,7 +154,7 @@ const EXAMPLES = [
     id: "flow-backend-mlir",
     category: "flow",
     title: "Flow with the MLIR backend",
-    description: "A Flow program compiled through the real MLIR/LLVM pipeline (choose Backend: MLIR next to Runtime). Falls back to the C backend message if this Flow build lacks LLVM.",
+    description: "A Flow program compiled through the real MLIR/LLVM pipeline (choose MLIR in the backend menu next to Run). Falls back to the C backend message if this Flow build lacks LLVM.",
     language: "flow",
     files: [
       { name: "pipeline.flow", language: "flow", text: FLOW_INTEROP }

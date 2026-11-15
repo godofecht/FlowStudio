@@ -32,7 +32,7 @@ test("sidebar panels load in dependency order behind the console stack", () => {
 test("every workspace script tag has an explicit allowlisted route", () => {
   for (const tag of ["/packages_panel.js", "/examples_gallery.js",
     "/debug_panel.js", "/workspace_panels.js", "/ide_completion_core.js",
-    "/terminal_render.js", "/ide_menubar.js", "/ide_run_widget.js",
+    "/terminal_render.js", "/ide_menubar.js", "/ide_run_widget.js", "/ide_flow_backend.js",
     "/ide_search_everywhere.js", "/ide_explorer.js", "/ide_workspace.js",
     "/app/project_create.js", "/app/project_rename.js"]) {
     assert.ok(routes.includes('if url == "' + tag + '"'), tag + " route allowlisted");

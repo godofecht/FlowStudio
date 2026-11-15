@@ -201,21 +201,22 @@ function mount(doc, app, Explorer, options = {}) {
     });
   });
 
-  /* Shortcuts: VS Code view switches, plus Alt+F1 (JetBrains "select in"). */
+  /* Shortcuts: VS Code view switches, plus Alt+F1 (JetBrains "select in").
+   * Capture phase, and the event stops here: Monaco swallowed Ctrl+Shift+E
+   * while the editor had focus, and the buffer's Ctrl+F handler took
+   * Ctrl+Shift+F, so neither shortcut worked from the editor. */
   doc.addEventListener("keydown", event => {
     const mod = event.ctrlKey || event.metaKey;
     const key = (event.key || "").toLowerCase();
-    if (mod && event.shiftKey && key === "e") {
-      event.preventDefault();
-      app.commands.showExplorer();
-    } else if (mod && event.shiftKey && key === "f") {
-      event.preventDefault();
-      app.commands.findInProject();
-    } else if (event.altKey && event.key === "F1") {
-      event.preventDefault();
-      app.commands.revealActiveFile();
-    }
-  });
+    let run = null;
+    if (mod && event.shiftKey && !event.altKey && key === "e") run = app.commands.showExplorer;
+    else if (mod && event.shiftKey && !event.altKey && key === "f") run = app.commands.findInProject;
+    else if (event.altKey && event.key === "F1") run = app.commands.revealActiveFile;
+    if (!run) return;
+    event.preventDefault();
+    if (typeof event.stopPropagation === "function") event.stopPropagation();
+    run();
+  }, true);
   renderBreadcrumb();
   return explorer;
 }

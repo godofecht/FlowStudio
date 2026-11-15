@@ -1,0 +1,15 @@
+# FlowStudio Terminal for bash. The pty starts `bash --rcfile <this> -i`,
+# because a login bash ignores --rcfile. This file does what a login shell
+# would, then puts the FlowStudio agent wrappers first on PATH.
+[ -r /etc/profile ] && . /etc/profile
+for _fs_profile in ~/.bash_profile ~/.bash_login ~/.profile; do
+  if [ -r "$_fs_profile" ]; then . "$_fs_profile"; break; fi
+done
+unset _fs_profile
+if [ -n "${FLOWSTUDIO_TERMINAL_BIN-}" ]; then
+  _fs_path=":$PATH:"
+  _fs_path=${_fs_path//:$FLOWSTUDIO_TERMINAL_BIN:/:}
+  _fs_path=${_fs_path#:}
+  PATH=$FLOWSTUDIO_TERMINAL_BIN:${_fs_path%:}
+  unset _fs_path
+fi

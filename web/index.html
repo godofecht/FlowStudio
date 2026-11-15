@@ -1951,8 +1951,9 @@ async function executeCode(code, label, languageOverride = null, options = {}) {
     globalThis.FlowStudioTerminal.show("console");
   status("Running " + executionLanguage + " …");
   const consoleIO = globalThis.FlowStudioConsoleIO;
-  const consoleRun = consoleIO && consoleIO.begin ? consoleIO.begin(executionLanguage, runLabel(label)) : null;
-  if (!consoleRun) writeConsole("\n> " + label + " (" + executionLanguage + ")\n", executionLanguage);
+  const backendNote = globalThis.FlowStudioFlowBackend ? FlowStudioFlowBackend.runNote(executionLanguage, el("flowBackend").value) : "";
+  const consoleRun = consoleIO && consoleIO.begin ? consoleIO.begin(executionLanguage, runLabel(label) + backendNote) : null;
+  if (!consoleRun) writeConsole("\n> " + label + backendNote + " (" + executionLanguage + ")\n", executionLanguage);
   let consoleOutput = "";
   const startedAt = Date.now();
   let ok = false;
@@ -2899,6 +2900,7 @@ renderTabs();
 <script src="/ide_assistant_inline.js"></script>
 <script src="/ide_app_preview.js"></script>
 <script src="/ide_projects.js"></script>
+<script src="/ide_flow_backend.js"></script>
 <script src="/ide_debugger.js"></script>
 <script src="/ide_symbols.js"></script>
 <script src="/ide_outline.js"></script>

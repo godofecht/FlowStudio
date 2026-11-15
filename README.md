@@ -191,6 +191,18 @@ terminals can run at once. Ctrl+P, Ctrl+K and quotes go to the shell.
 The shell runs with your user's permissions behind the same localhost
 intent gate as code execution. Shells left by a closed page are reclaimed.
 
+**FlowStudio MCP in the Terminal.** Type `claude` or `codex` in the
+Terminal and that agent has the FlowStudio MCP tools, from any folder,
+with no setup. The shell's PATH starts with `mcp/terminal/bin`, which
+holds small `claude` and `codex` wrappers. Each finds the real CLI further
+down PATH and runs it with the server added for that run only
+(`claude --mcp-config=...`, `codex -c mcp_servers.flowstudio...`). Your
+own Claude Code and Codex config files are never written. zsh and bash
+run your own startup files first, then put the wrappers back in front
+(`mcp/terminal/zsh`, `mcp/terminal/bash`). The shell also gets
+`FLOWSTUDIO_URL` and `FLOWSTUDIO_MCP` for any other MCP client. Tests use a
+fake CLI that records its arguments: `python3 tests/test_terminal_agents.py`.
+
 The **Console** tab beside it holds the language consoles. The native workspace console is a full terminal, not a form: runtime tabs
 (Flow, Python, R, plus explicit `+` sessions), a compact status row that only
 reports states the server actually produced (unknown at start, running,
@@ -212,8 +224,12 @@ localhost routes with the same headers and busy-locks as before; nothing was
 fabricated on top of the real kernels. The standalone `/console` page keeps
 its simpler form-based layout for scripting and accessibility use.
 
-**Flow MLIR backend.** The topbar has a **Backend** selector (next to
-Runtime). Running a Flow buffer with Backend set to MLIR sends the source
+**Flow MLIR backend.** The backend menu sits next to the run
+configuration and shows C or MLIR. It lists both backends with a one-line
+description, says whether MLIR tools exist on this machine
+(`GET /api/flow/backends`, which only looks for files), and remembers the
+choice per project. The Run tooltip and the console run line name the
+active backend. Running a Flow buffer with MLIR selected sends the source
 to the real `flow` process with `--backend=mlir`; the default backend keeps
 the documented C path. The server exposes this as
 `POST /api/run/flow-mlir` and always returns the compiler's own stdout and

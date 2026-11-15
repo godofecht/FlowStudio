@@ -1282,7 +1282,8 @@ function mount(options) {
     hasRoot: () => !!tree,
     setRoot: handle => setRoot(handle),
     recents: () => recents.slice(),
-    focus: () => list.focus()
+    /* With no folder open the empty state has the actions; focus its first. */
+    focus: () => { if (tree) list.focus(); else { const first = empty.querySelector("button"); if (first) first.focus(); } }
   });
 }
 

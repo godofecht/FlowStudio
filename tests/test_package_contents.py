@@ -31,6 +31,12 @@ def referenced() -> set[str]:
                         found.add(name)
     # The assistant finds the MCP server through the working directory.
     found.add("mcp/flowstudio_mcp.py")
+    # The Terminal finds its agent wrappers and shell shims the same way.
+    for path in glob.glob(os.path.join(ROOT, "mcp", "terminal", "**", "*"), recursive=True):
+        if os.path.isfile(path):
+            found.add(os.path.relpath(path, ROOT))
+    for path in glob.glob(os.path.join(ROOT, "mcp", "terminal", "zsh", ".z*")):
+        found.add(os.path.relpath(path, ROOT))
     return found
 
 
@@ -42,7 +48,8 @@ def newest_archive() -> str | None:
 class PackageContentsTest(unittest.TestCase):
     def test_sources_name_runtime_files(self) -> None:
         names = referenced()
-        for expected in ("src/flow_session.py", "src/flowstudio.flow", "src/flow_quick_run.sh", "src/python_kernel.py"):
+        for expected in ("src/flow_session.py", "src/flowstudio.flow", "src/flow_quick_run.sh", "src/python_kernel.py",
+                         "mcp/terminal/bin/claude", "mcp/terminal/bin/codex", "mcp/terminal/zsh/.zshrc"):
             self.assertIn(expected, names)
 
     @unittest.skipUnless(newest_archive(), "no archive in dist/; run sh scripts/package.sh first")

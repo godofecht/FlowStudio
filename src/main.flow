@@ -58,6 +58,7 @@ extern {
     function fs_py_reset() -> void
     function fs_pty(op: string, body: string) -> string
     function fs_pty_status() -> i32
+    function fs_flow_backends() -> string
     function fs_lsp(op: string, body: string) -> string
     function fs_lsp_status() -> i32
     function fs_assistant(op: string, body: string) -> string
@@ -885,6 +886,12 @@ function dispatch() -> void {
     }
     if eq(method, "GET") and eq(path, "/health") {
         fs_reply(200, "text/plain; charset=utf-8", "FlowStudio ready")
+        return
+    }
+    # Which Flow backends this machine can run (src/flow_backends.c). Only
+    # looks for files; nothing is compiled or run.
+    if eq(method, "GET") and eq(path, "/api/flow/backends") {
+        fs_reply(200, "application/json; charset=utf-8", fs_flow_backends())
         return
     }
     # Built Flow apps: a fixed set of file names inside numbered builds.

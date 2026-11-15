@@ -8,3 +8,7 @@ __pycache__/
 *.pyc
 data/
 Rplots.pdf
+# A Terminal shell killed during startup can leave zsh files in the shim folder.
+mcp/terminal/zsh/.zsh_history
+mcp/terminal/zsh/.zcompdump*
+mcp/terminal/zsh/.zsh_sessions/

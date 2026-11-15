@@ -576,19 +576,31 @@ against an isolated temporary repository.
 The Assistant tab in the side panel lets you work on Flow with your own AI
 tool. FlowStudio finds Claude Code (`claude`), Codex (`codex`) and Ollama
 (`ollama`, with the models you have pulled) on this machine, and you pick
-one. Ctrl+I (Cmd+I on macOS) opens the tab with the current selection as
-context.
+one. Ctrl+I or Ctrl+L (Cmd+I or Cmd+L on macOS) opens the tab with the
+current selection as context.
 
 - Ask anything, or use the actions: Explain selection, Fix errors,
   Translate to Flow (from R or Python) and Write a Flow test. They are in the
   command palette too.
-- Chips show what is sent with a request: the active file, the selection
-  and the compiler errors. Click one to leave it out.
+- Chips show what is sent with a message: the active file, the selection
+  and the current error. Remove one with its x. Type @ to add an open or
+  project file, the selection or the current error.
 - Answers stream in. Tool calls show as short lines such as
-  "Checked flow code: ok". Code blocks have Insert at cursor, Replace
-  selection and Run. Stop ends the request.
-- When the assistant changes a file, the change opens as a diff with Accept
-  and Reject. Nothing is written until you accept, and Ctrl+Z undoes it.
+  "Checked flow code: ok". Code blocks are highlighted and have Apply, Copy,
+  Insert and Run. Stop (or Esc) ends the request. The chat is kept per
+  project.
+- Ctrl+K (Cmd+K on macOS) in the editor opens a prompt bar at the selection
+  or the cursor line. The reply streams in as an inline diff: removed lines
+  in red, new lines in green. Each change has Accept and Reject. Ctrl+Enter
+  or Tab accepts all, Esc rejects all. Ctrl+L (Cmd+L) opens the chat.
+- Edits the agent proposes, and code blocks you Apply, show the same inline
+  diff. Changes to review in the Assistant tab lists each file with Accept and
+  Reject. Ctrl+Enter accepts the file in view and Ctrl+Shift+Backspace rejects
+  it. A proposal never switches tabs or moves focus.
+- On a compiler error, the lightbulb (Ctrl+.) offers Fix with Assistant,
+  which opens the prompt bar on that function with the error filled in.
+- Nothing is written until you accept, an accept is one undo step, and a
+  change to lines you edited during review is skipped.
 
 AI models know little Flow, so every request carries the verified Flow guide
 ([docs/FLOW_FOR_AI.md](docs/FLOW_FOR_AI.md)) and the rules in

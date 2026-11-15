@@ -384,6 +384,7 @@ svg{width:14px;height:14px;vertical-align:-2px;flex:none}
 </style>
 <link rel="stylesheet" href="/ui/workbench.css">
 <link rel="stylesheet" href="/ide_flow_help.css">
+<link rel="stylesheet" href="/ide_assistant.css">
 </head>
 <body>
 <div class="shell" id="ideShell">
@@ -2821,12 +2822,13 @@ const commands = Object.freeze({
   assistantFixErrors: () => globalThis.FlowStudioAssistant ? globalThis.FlowStudioAssistant.fixErrors() : false,
   assistantTranslate: () => globalThis.FlowStudioAssistant ? globalThis.FlowStudioAssistant.translate() : false,
   assistantWriteTest: () => globalThis.FlowStudioAssistant ? globalThis.FlowStudioAssistant.writeTest() : false,
+  assistantInlineEdit: () => globalThis.FlowStudioInlineEdit ? globalThis.FlowStudioInlineEdit.open() : false,
   newProject: template => globalThis.FlowStudioProjects ? globalThis.FlowStudioProjects.newProject(template) : false,
   closeProject: () => globalThis.FlowStudioProjects ? globalThis.FlowStudioProjects.closeProject() : false,
   startDebugging: () => globalThis.FlowStudioDebugger && globalThis.FlowStudioDebugger.instance ?
     globalThis.FlowStudioDebugger.instance.start() : false,
   refreshEnvironment: () => el("refreshPythonEnvironment").click(),
-  shortcuts: () => status("Ctrl+Enter run · Ctrl+Shift+Enter cell · Ctrl+S save · Ctrl+W close tab · Ctrl+Tab next tab · Ctrl+F find · Ctrl+H replace · Ctrl+Shift+O outline · Ctrl+I assistant · F12 definition · Shift+F12 references · F2 rename · Shift+Alt+F format", "ok"),    about: () => status("FlowStudio 0.2.0-alpha.1 · Flow-first local IDE · execution on 127.0.0.1:8751 only", "ok")
+  shortcuts: () => status("Ctrl+Enter run · Ctrl+Shift+Enter cell · Ctrl+S save · Ctrl+W close tab · Ctrl+Tab next tab · Ctrl+F find · Ctrl+H replace · Ctrl+Shift+O outline · Ctrl+K edit in place · Ctrl+L assistant · F12 definition · Shift+F12 references · F2 rename · Shift+Alt+F format", "ok"),    about: () => status("FlowStudio 0.2.0-alpha.1 · Flow-first local IDE · execution on 127.0.0.1:8751 only", "ok")
 });
 if (typeof window !== "undefined") {
   window.FlowStudioApp = Object.freeze({
@@ -2873,7 +2875,9 @@ renderTabs();
 <script src="/ide_side_panel.js"></script>
 <script src="/ide_flow_data.js"></script>
 <script src="/ide_flow_help.js"></script>
+<script src="/ide_assistant_diff.js"></script>
 <script src="/ide_assistant.js"></script>
+<script src="/ide_assistant_inline.js"></script>
 <script src="/ide_app_preview.js"></script>
 <script src="/ide_projects.js"></script>
 <script src="/ide_debugger.js"></script>

@@ -10,10 +10,16 @@ The prompt picks the behaviour:
   SLEEP     print the pid and sleep (cancel and timeout tests)
   ENV       report the argv flags, cwd and billing variables it can see
   PROPOSE   propose an edit to the active file through the MCP server
+  PROPOSE2  also propose an edit to the first other open file
+  FlowStudio inline edit.
+            an inline edit (Ctrl+K): reply with the selected lines in one
+            fenced block, with integer literals on `let` lines bumped by one,
+            or an undefined variable renamed when asked to fix that error
   anything  check a Flow program through MCP and answer with it
 """
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -40,6 +46,32 @@ def say(text, pause=0.05):
                                                 "delta": {"type": "text_delta", "text": word + " "}}})
         time.sleep(pause)
     emit({"type": "assistant", "message": {"content": [{"type": "text", "text": text + " "}]}})
+
+
+def stream_raw(text, pause=0.04):
+    """Stream text a few characters at a time, as a model writes."""
+    for start in range(0, len(text), 6):
+        emit({"type": "stream_event", "event": {"type": "content_block_delta", "index": 0,
+                                                "delta": {"type": "text_delta", "text": text[start:start + 6]}}})
+        time.sleep(pause)
+    emit({"type": "assistant", "message": {"content": [{"type": "text", "text": text}]}})
+
+
+def inline_edit(prompt):
+    match = re.search(r"Selected lines \d+ to \d+:\n```(\w*)\n(.*?)\n```", prompt, re.S)
+    language = match.group(1) if match else "flow"
+    lines = match.group(2).split("\n") if match else []
+    error = re.search(r"Undefined variable '(\w+)'", prompt)
+    if error:
+        names = [m.group(1) for m in (re.search(r"let (\w+)", line) for line in lines) if m]
+        if names:
+            lines = [re.sub(r"\b%s\b" % error.group(1), names[0], line) for line in lines]
+    else:
+        lines = [re.sub(r"\b\d+\b", lambda m: str(int(m.group(0)) + 1), line) if "let " in line else line
+                 for line in lines]
+    if not match:
+        lines = ["# inserted by the fake assistant"]
+    stream_raw("```" + language + "\n" + "\n".join(lines) + "\n```\n")
 
 
 def flag(name):
@@ -109,6 +141,13 @@ def main():
         say("ENVREPORT " + json.dumps(report), 0)
         emit({"type": "result", "subtype": "success", "is_error": False, "result": "done"})
         return 0
+    if "FlowStudio inline edit." in prompt:
+        mcp = Mcp()
+        mcp.call("flowstudio_check_code", {"language": "flow", "code": FLOW}, "i1")
+        mcp.close()
+        inline_edit(prompt)
+        emit({"type": "result", "subtype": "success", "is_error": False, "result": "done"})
+        return 0
     mcp = Mcp()
     say("Let me look at your editor.")
     state = mcp.call("flowstudio_editor_state", {}, "t1")
@@ -119,6 +158,12 @@ def main():
         mcp.call("flowstudio_propose_edit", {"file": active, "content": FLOW, "mode": "replace",
                                              "summary": "Replace with a checked program"}, "t3")
         say("I proposed a checked program for " + active + ".")
+        others = re.search(r"Other open files: (.*)", text)
+        if "PROPOSE2" in prompt and others:
+            other = others.group(1).split(", ")[0]
+            mcp.call("flowstudio_propose_edit", {"file": other, "content": "# reviewed by the assistant\n",
+                                                 "mode": "insert", "line": 1, "summary": "Add a header"}, "t4")
+            say("I also proposed a header for " + other + ".")
     verdict = "passed" if not checked.get("isError") else "failed"
     say("The check " + verdict + ". Here it is:\n\n```flow\n" + FLOW + "```\n")
     mcp.close()

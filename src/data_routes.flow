@@ -186,6 +186,15 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/ide_packages_view.js" {
         return StaticAsset { path: "web/ide_packages_view.js", mime: "text/javascript; charset=utf-8", found: true }
     }
+    if url == "/plot_pane.js" {
+        return StaticAsset { path: "web/plot_pane.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/flow_plots.js" {
+        return StaticAsset { path: "web/flow_plots.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/ide_flow_packages.js" {
+        return StaticAsset { path: "web/ide_flow_packages.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
     if url == "/ide_search_everywhere.js" {
         return StaticAsset { path: "web/ide_search_everywhere.js", mime: "text/javascript; charset=utf-8", found: true }
     }

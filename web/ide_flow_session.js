@@ -37,6 +37,9 @@ function createClient(request) {
   return {
     async evaluate(code) {
       const result = await call("eval", code);
+      // Figures from plot() and friends go to the Plots pane (web/flow_plots.js).
+      if (result.data && typeof result.data.output === "string" && root.FlowStudioFlowPlots)
+        result.data.output = root.FlowStudioFlowPlots.take(result.data.output);
       if (result.data) publish(result.data.variables);
       return result;
     },

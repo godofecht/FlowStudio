@@ -115,7 +115,7 @@ try {
 
   // ---- inline create: invalid name is refused, nested path is created --
   await row(page, 'src').click({ button: 'right' });
-  await page.locator('.ex-menu .ex-menu-item', { hasText: 'New file...' }).click();
+  await page.locator('.fs-cm .fs-cm-item', { hasText: 'New File...' }).click();
   const input = page.locator('#explorer .ex-input');
   await input.fill('bad?.flow');
   assert.match(await page.locator('#explorer .ex-input-error').textContent(), /characters/);
@@ -178,7 +178,7 @@ try {
   assert.deepEqual(await page.$$eval('#breadcrumbPath > *', nodes => nodes.filter(n => !n.classList.contains('crumb-sep')).map(n => n.textContent)),
     ['proj', 'src', 'lib', 'helper.flow'], 'breadcrumb shows the real path');
   await row(page, 'src/lib').click({ button: 'right' });
-  await page.locator('.ex-menu .ex-menu-item', { hasText: 'Rename...' }).click();
+  await page.locator('.fs-cm .fs-cm-item', { hasText: 'Rename...' }).click();
   await page.locator('#explorer .ex-input').fill('core');
   await page.locator('#explorer .ex-input').press('Enter');
   await page.waitForFunction(() => document.querySelector('#explorer .ex-row[data-rel="src/core/helper.flow"]'));
@@ -201,14 +201,14 @@ try {
 
   // ---- context menu delete with confirmation ----------------------------
   await row(page, 'README.md').click({ button: 'right' });
-  const menu = page.locator('.ex-menu');
+  const menu = page.locator('.fs-cm');
   assert.equal(await menu.getAttribute('role'), 'menu');
-  for (const label of ['Copy path', 'Copy relative path', 'Rename...', 'Delete'])
-    assert.equal(await menu.locator('.ex-menu-item', { hasText: label }).count(), 1, label + ' in context menu');
+  for (const label of ['Copy Path', 'Copy Relative Path', 'Rename...', 'Delete'])
+    assert.equal(await menu.locator('.fs-cm-item', { hasText: label }).count(), 1, label + ' in context menu');
   await page.keyboard.press('Escape');
   assert.equal(await menu.count(), 0, 'Escape closes the context menu');
   await row(page, 'README.md').click({ button: 'right' });
-  await page.locator('.ex-menu .ex-menu-item', { hasText: 'Delete' }).click();
+  await page.locator('.fs-cm .fs-cm-item', { hasText: 'Delete' }).click();
   await page.waitForFunction(() => !document.querySelector('#explorer .ex-row[data-rel="README.md"]'));
   assert.ok(!(await opfs.list(page)).includes('README.md'), 'deleted on disk');
 

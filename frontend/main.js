@@ -7,6 +7,7 @@ import 'monaco-editor/editor/contrib/wordHighlighter/browser/wordHighlighter.js'
 import 'monaco-editor/editor/contrib/suggest/browser/suggestController.js';
 import 'monaco-editor/editor/contrib/hover/browser/hoverContribution.js';
 import 'monaco-editor/editor/contrib/contextmenu/browser/contextmenu.js';
+import 'monaco-editor/editor/contrib/clipboard/browser/clipboard.js';
 // Language server features for Flow (web/ide_flow_lsp.js): go to definition,
 // references, rename, formatting, quick fixes and problem navigation.
 import 'monaco-editor/editor/contrib/gotoSymbol/browser/goToCommands.js';
@@ -27,6 +28,7 @@ import './workbench.css';
 import './polish.css';
 import { mountTerminalPanel } from './terminal_panel.js';
 import { mountPolish } from './polish.js';
+import { mountEditorContext } from './editor_context.js';
 
 const icons = { FolderOpen, FilePlus2, RotateCw, Play, Blocks, Files, ListTree,
   ChartNoAxesCombined, Table2, Terminal, SlidersHorizontal, Search, Command,
@@ -52,7 +54,11 @@ monaco.editor.defineTheme('flowstudio', {
     'editor.inactiveSelectionBackground': '#2B3335', 'editorCursor.foreground': '#A8C9B6',
     'editorIndentGuide.background1': '#282C33', 'editorIndentGuide.activeBackground1': '#454B53',
     'editorWidget.background': '#22252B', 'editorWidget.border': '#373C45',
-    'editorGutter.background': '#191B20', 'focusBorder': '#8BB79F'
+    'editorGutter.background': '#191B20', 'focusBorder': '#8BB79F',
+    // The editor's right-click menu matches web/ide_context_menu.css.
+    'menu.background': '#23262C', 'menu.foreground': '#D3D8DF', 'menu.border': '#3B414A',
+    'menu.selectionBackground': '#2F4A3C', 'menu.selectionForeground': '#F1F4F7',
+    'menu.separatorBackground': '#363B43'
   }
 });
 monaco.languages.register({ id: 'flow', extensions: ['.flow'] });
@@ -77,6 +83,7 @@ globalThis.FlowStudioEditor = mountEditor(monaco, document.getElementById('sourc
   document.getElementById('monacoHost'), app, document.getElementById('language'));
 document.getElementById('editorEngine').textContent = 'Monaco';
 registerCompletion(monaco, app);
+mountEditorContext(monaco, globalThis.FlowStudioEditor, app);
 
 mountTerminalPanel();
 mountPolish();

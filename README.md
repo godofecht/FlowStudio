@@ -173,6 +173,30 @@ move for user folders, so a folder rename or move copies the folder, checks
 every file, and then removes the original. Folders over 1,000 entries or
 64 MB are refused.
 
+### Context menus
+
+Right-click works on every surface, with one menu component
+(`web/ide_context_menu.js`):
+
+- Explorer: open, open to the side, run, new file or folder, find in folder,
+  copy path, duplicate, rename and delete. Cmd or Ctrl+click and Shift+click
+  select several items, and the menu then acts on all of them.
+- Editor tabs: close, close others, close to the right, close saved, close
+  all, copy path, reveal in Explorer, split right and pin.
+- Editor: Monaco's own menu, with run selection or line in the console,
+  definition, references, rename, Check Flow, the assistant, breakpoints,
+  cut, copy, paste and the command palette (Cmd or Ctrl+Shift+P).
+- Console: copy, copy a run's output or command, run again, search and
+  clear. An error line adds go to line and fix with the assistant.
+- Terminal: copy, paste, select all, clear, new and kill.
+- Environment: view data, copy value or name, and remove a Python or R
+  variable. Plots: copy image, save as PNG or SVG, open in a new window and
+  delete.
+
+Shift+F10 or the Menu key opens the menu at the focused item. Arrows, Home,
+End and typing move through it, Enter runs an item, and Escape returns focus.
+A disabled item says why on hover. Text fields keep the browser's own menu.
+
 The browser can open several source files at once as tabs, save them, choose a local project folder, lazily browse its source tree, create a source file in the project root, refresh the tree, search project files for literal text with exact match navigation, run the selected text or whole buffer as Flow, R or Python, and display captured stdout/stderr. Project operations use the browser File System Access API and are unavailable in browsers without folder-picker support. The native server retains separate Python and R interpreter processes between evaluations, with explicit reset controls. These are single-user localhost sessions, not restart-persistent or remotely isolated kernels.
 
 ### Editor find and replace

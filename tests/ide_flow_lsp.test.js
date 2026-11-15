@@ -56,6 +56,7 @@ function fakeModel(text, language = "flow") {
     getValueInRange(r) { return model.getLineContent(r.startLineNumber).slice(r.startColumn - 1, r.endColumn - 1); },
     onDidChangeContent(fn) { listeners.change.push(fn); return { dispose() { listeners.change = listeners.change.filter(f => f !== fn); } }; },
     onWillDispose(fn) { listeners.dispose.push(fn); return { dispose() {} }; },
+    dispose() { listeners.dispose.forEach(fn => fn()); model.disposed = true; },
     edit(next) { model.text = next; listeners.change.forEach(fn => fn()); },
     changeListeners: () => listeners.change.length
   };
@@ -137,13 +138,14 @@ function fakeBridge(answers = {}) {
     methods: () => sent.map(m => m.method) };
 }
 
-function setup({ answers, docs, models, fetch } = {}) {
+function setup({ answers, docs, models, fetch, workspace, session } = {}) {
   const time = clock();
   models = models || [fakeModel("function add_one(x: i32) -> i32 {\n    return x + 1\n}\n")];
   docs = docs || { [models[0].id]: { id: "doc-1", name: "main.flow", path: "src/main.flow" } };
   const monaco = fakeMonaco(models);
   const bridge = fakeBridge(answers);
   const activated = [];
+  const openedFiles = [];
   const editor = {
     model: models[0],
     getModel() { return this.model; },
@@ -158,11 +160,13 @@ function setup({ answers, docs, models, fetch } = {}) {
       activated.push(id);
       editor.model = models.find(m => docs[m.id] && docs[m.id].id === id);
       return true;
-    }
+    },
+    async openEditorHandle(handle, path) { openedFiles.push({ handle, path }); return true; }
   };
   const lsp = client.create({ monaco, editor, app, fetch: fetch || bridge.fetch, scheduler: time, now: time.now,
-    documentIdFor: model => docs[model.id] ? docs[model.id].id : null });
-  return { lsp, monaco, bridge, time, models, docs, editor, activated };
+    documentIdFor: model => docs[model.id] ? docs[model.id].id : null, workspace, events: null,
+    session: session || { scriptView: () => null } });
+  return { lsp, monaco, bridge, time, models, docs, editor, activated, openedFiles };
 }
 
 test("an unavailable server registers nothing and leaves the lexical helpers on", async () => {
@@ -183,6 +187,44 @@ test("a missing flow lsp is found by the start probe, with no failed request", a
   assert.equal(await f.lsp.start(), false);
   assert.equal(f.lsp.state(), "unavailable");
   assert.deepEqual(routes, ["/api/lsp/start"]);
+  assert.deepEqual(Object.keys(f.monaco.providers), []);
+});
+
+test("a first start that is still building is asked again until the server is ready", async () => {
+  const bridge = fakeBridge();
+  const routes = [];
+  let probes = 0;
+  const f = setup({ fetch: async (route, init) => {
+    routes.push(route);
+    if (route === "/api/lsp/start" && ++probes < 3)
+      return { status: 200, text: async () => JSON.stringify({ available: false, starting: true }) };
+    return bridge.fetch(route, init);
+  } });
+  const started = f.lsp.start();
+  await f.time.advance(0);
+  assert.equal(f.lsp.state(), "starting");
+  assert.deepEqual(routes, ["/api/lsp/start"]);
+  await f.time.advance(2000);
+  assert.deepEqual(routes, ["/api/lsp/start", "/api/lsp/start"]);
+  await f.time.advance(2000);
+  assert.equal(await started, true);
+  assert.equal(f.lsp.state(), "ready");
+  assert.deepEqual(routes.slice(0, 4), ["/api/lsp/start", "/api/lsp/start", "/api/lsp/start", "/api/lsp/request"]);
+  assert.equal(bridge.sent[0].method, "initialize");
+});
+
+test("a start that gives up while building leaves the lexical helpers on", async () => {
+  let probes = 0;
+  const f = setup({ fetch: async () => {
+    probes++;
+    const answer = probes === 1 ? { available: false, starting: true } : { available: false };
+    return { status: 200, text: async () => JSON.stringify(answer) };
+  } });
+  const started = f.lsp.start();
+  await f.time.advance(2000);
+  assert.equal(await started, false);
+  assert.equal(probes, 2);
+  assert.equal(f.lsp.state(), "unavailable");
   assert.deepEqual(Object.keys(f.monaco.providers), []);
 });
 
@@ -478,4 +520,197 @@ test("idle compiler checks keep running beside the language server without doubl
   } finally {
     delete globalThis.FlowStudioFlowLsp;
   }
+});
+
+/* ---- Project files and imports ---- */
+
+/* A folder handle over a plain object: strings are files, objects folders. */
+function fakeFolder(name, tree) {
+  const stamp = text => [...text].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
+  const file = (parent, key) => ({ kind: "file", name: key, async getFile() {
+    const text = parent[key];
+    if (typeof text !== "string") throw new Error("gone");
+    return { lastModified: stamp(text), size: text.length, text: async () => text };
+  } });
+  const folder = (folderName, node) => ({ kind: "directory", name: folderName,
+    async *entries() {
+      for (const key of Object.keys(node))
+        yield [key, typeof node[key] === "string" ? file(node, key) : folder(key, node[key])];
+    } });
+  return folder(name, tree);
+}
+
+function workspaceOf(folder) {
+  const source = { folder, root: () => source.folder, rootName: () => source.folder ? source.folder.name : null };
+  return source;
+}
+
+const UTIL = "export function add_one(x: i32) -> i32 {\n    return x + 1\n}\n";
+const MAIN = "import \"util.flow\"\n\nfunction main() -> i32 {\n    return add_one(2)\n}\n";
+const uriOf = message => message.params.uri || message.params.textDocument.uri;
+
+test("uris use the percent-encoding flow lsp writes for imported files", () => {
+  assert.equal(client.uriForPath("my proj/(draft)!/é*'.flow"),
+    "file:///flowstudio/my%20proj/%28draft%29%21/%C3%A9%2A%27.flow");
+  assert.equal(client.uriForPath("demo/lib/util_v2-a.b~.flow"), "file:///flowstudio/demo/lib/util_v2-a.b~.flow");
+});
+
+test("project files without a tab are opened on the server and follow the folder", async () => {
+  const tree = { "main.flow": MAIN, "util.flow": UTIL, "notes.md": "# no", ".git": { "x.flow": "" },
+    node_modules: { "y.flow": "" }, lib: { "deep.flow": "function deep() -> i32 {\n    return 1\n}\n" } };
+  const main = fakeModel(MAIN);
+  const workspace = workspaceOf(fakeFolder("demo", tree));
+  const f = setup({ models: [main], docs: { [main.id]: { id: "doc-1", name: "main.flow", path: "demo/main.flow" } },
+    workspace });
+  await f.lsp.start();
+  await f.time.advance(0);
+  await f.lsp.syncProject();
+  const opened = f.bridge.sent.filter(m => m.method === "textDocument/didOpen").map(uriOf);
+  assert.deepEqual(opened.sort(), ["file:///flowstudio/demo/lib/deep.flow", "file:///flowstudio/demo/main.flow",
+    "file:///flowstudio/demo/util.flow"]);
+  assert.deepEqual(f.lsp.projectFiles().sort(), ["file:///flowstudio/demo/lib/deep.flow",
+    "file:///flowstudio/demo/util.flow"], "main.flow has a tab, so its buffer speaks for it");
+  assert.equal(f.bridge.sent.find(m => m.method === "textDocument/didOpen" &&
+    uriOf(m) === "file:///flowstudio/demo/util.flow").params.textDocument.text, UTIL);
+
+  // Nothing changed: nothing is sent.
+  await f.time.advance(2000);
+  let before = f.bridge.sent.length;
+  await f.lsp.syncProject();
+  assert.equal(f.bridge.sent.length, before);
+
+  // A saved change goes over as a full didChange.
+  tree["util.flow"] = UTIL.replace("x + 1", "x + 2");
+  await f.lsp.syncProject();
+  // main.flow may import it, so it is sent again with the same text.
+  const change = f.bridge.sent.slice(before);
+  assert.deepEqual(change.map(m => [m.method, uriOf(m)]), [
+    ["textDocument/didChange", "file:///flowstudio/demo/util.flow"],
+    ["textDocument/didChange", "file:///flowstudio/demo/main.flow"]]);
+  assert.equal(change[0].params.contentChanges[0].text, tree["util.flow"]);
+  assert.equal(change[1].params.contentChanges[0].text, MAIN);
+
+  // A deleted file is closed and its mirrored copy dropped.
+  delete tree.lib["deep.flow"];
+  before = f.bridge.sent.length;
+  await f.lsp.syncProject();
+  assert.deepEqual(f.bridge.sent.slice(before).map(m => [m.method, uriOf(m)]), [
+    ["textDocument/didClose", "file:///flowstudio/demo/lib/deep.flow"],
+    ["flowstudio/forget", "file:///flowstudio/demo/lib/deep.flow"],
+    ["textDocument/didChange", "file:///flowstudio/demo/main.flow"]]);
+
+  // Another project folder replaces this one.
+  workspace.folder = fakeFolder("other", { "a.flow": UTIL });
+  before = f.bridge.sent.length;
+  await f.lsp.syncProject();
+  assert.deepEqual(f.bridge.sent.slice(before).map(m => [m.method, uriOf(m)]), [
+    ["textDocument/didClose", "file:///flowstudio/demo/util.flow"],
+    ["flowstudio/forget", "file:///flowstudio/demo/"],
+    ["textDocument/didOpen", "file:///flowstudio/other/a.flow"],
+    ["textDocument/didChange", "file:///flowstudio/demo/main.flow"]]);
+  assert.deepEqual(f.lsp.projectFiles(), ["file:///flowstudio/other/a.flow"]);
+});
+
+test("closing a project tab hands the file back to its saved text", async () => {
+  const util = fakeModel(UTIL.replace("x + 1", "x + 9"));
+  const f = setup({ models: [util], docs: { [util.id]: { id: "doc-1", name: "util.flow", path: "demo/util.flow" } },
+    workspace: workspaceOf(fakeFolder("demo", { "util.flow": UTIL })) });
+  await f.lsp.start();
+  await f.time.advance(0);
+  await f.lsp.syncProject();
+  assert.deepEqual(f.lsp.projectFiles(), []);
+  const before = f.bridge.sent.length;
+  util.dispose();
+  await f.time.advance(0);
+  await f.lsp.syncProject();
+  const after = f.bridge.sent.slice(before);
+  assert.deepEqual(after.map(m => [m.method, uriOf(m)]), [
+    ["textDocument/didClose", "file:///flowstudio/demo/util.flow"],
+    ["textDocument/didOpen", "file:///flowstudio/demo/util.flow"]]);
+  assert.equal(after[1].params.textDocument.text, UTIL);
+  assert.deepEqual(f.lsp.projectFiles(), ["file:///flowstudio/demo/util.flow"]);
+});
+
+test("an edit in one file sends the open files that may import it again", async () => {
+  const main = fakeModel(MAIN);
+  const util = fakeModel(UTIL);
+  const docs = { [main.id]: { id: "doc-1", name: "main.flow", path: "demo/main.flow" },
+    [util.id]: { id: "doc-2", name: "util.flow", path: "demo/util.flow" } };
+  const f = setup({ models: [main, util], docs,
+    answers: { "textDocument/hover": { contents: { kind: "markdown", value: "add_one" } } } });
+  await f.lsp.start();
+  await f.time.advance(2000);
+  const traffic = from => f.bridge.sent.slice(from).map(m => m.method + " " +
+    (m.params && m.params.textDocument ? m.params.textDocument.uri.split("/").pop() : ""));
+
+  // The dependent is sent again on its own after the edit settles.
+  let before = f.bridge.sent.length;
+  util.edit(UTIL.replace("add_one", "add_two"));
+  await f.time.advance(250);
+  assert.deepEqual(traffic(before), ["textDocument/didChange util.flow"]);
+  await f.time.advance(700);
+  assert.deepEqual(traffic(before), ["textDocument/didChange util.flow", "textDocument/didChange main.flow"]);
+  assert.equal(f.bridge.sent.at(-1).params.contentChanges[0].text, MAIN, "the same text, analysed again");
+
+  // A request on a file that is behind sends it first and waits for the analysis.
+  await f.time.advance(2000);
+  before = f.bridge.sent.length;
+  util.edit(UTIL);
+  await f.time.advance(250);
+  const pending = f.monaco.providers.hover.provideHover(main, { lineNumber: 4, column: 13 });
+  await f.time.advance(300);
+  await pending;
+  assert.deepEqual(traffic(before), ["textDocument/didChange util.flow", "textDocument/didChange main.flow",
+    "textDocument/hover main.flow"]);
+
+  // Nothing is behind now: a request sends only itself.
+  await f.time.advance(2000);
+  before = f.bridge.sent.length;
+  const again = f.monaco.providers.hover.provideHover(main, { lineNumber: 4, column: 13 });
+  await f.time.advance(10);
+  await again;
+  assert.deepEqual(traffic(before), ["textDocument/hover main.flow"]);
+});
+
+test("go to definition reaches a project file with no tab, through a script's line map", async () => {
+  // tools.flow has no main(): its top-level let moves into a generated main().
+  const TOOLS = "let k: i32 = 3\nfunction triple(x: i32) -> i32 {\n    return x * k\n}\nprintln(k)\n";
+  const session = require("../web/ide_flow_session.js");
+  const view = session.scriptView(TOOLS, null);
+  const virtualK = view.toVirtual(0);
+  assert.notEqual(virtualK, 0, "the fixture really is rearranged");
+  const main = fakeModel("import \"tools.flow\"\n\nfunction main() -> i32 {\n    return triple(k)\n}\n");
+  const folder = fakeFolder("demo", { "main.flow": main.text, "tools.flow": TOOLS });
+  const at = (line, a, b) => ({ start: { line, character: a }, end: { line, character: b } });
+  let answer = null;
+  const f = setup({ models: [main], docs: { [main.id]: { id: "doc-1", name: "main.flow", path: "demo/main.flow" } },
+    workspace: workspaceOf(folder), session, answers: { "textDocument/definition": () => answer } });
+  await f.lsp.start();
+  await f.time.advance(0);
+  await f.lsp.syncProject();
+  const sentTools = f.bridge.sent.find(m => m.method === "textDocument/didOpen" &&
+    uriOf(m) === "file:///flowstudio/demo/tools.flow");
+  assert.equal(sentTools.params.textDocument.text, view.text, "the server gets the generated main()");
+
+  answer = { uri: "file:///flowstudio/demo/tools.flow", range: at(virtualK, 4, 5) };
+  let pending = f.monaco.providers.definition.provideDefinition(main, { lineNumber: 4, column: 19 });
+  await f.time.advance(1000);
+  let locations = await pending;
+  assert.deepEqual(locations, [{ uri: "file:///flowstudio/demo/tools.flow",
+    range: { startLineNumber: 1, startColumn: 5, endLineNumber: 1, endColumn: 6 } }]);
+
+  answer = [{ uri: "file:///flowstudio/demo/tools.flow", range: at(1, 9, 15) },
+    { uri: "file:///elsewhere/lib/stdlib/math.flow", range: at(0, 0, 1) }];
+  pending = f.monaco.providers.definition.provideDefinition(main, { lineNumber: 4, column: 13 });
+  await f.time.advance(1000);
+  locations = await pending;
+  assert.equal(locations.length, 1, "files outside the project stay out");
+  assert.deepEqual(locations[0].range, { startLineNumber: 2, startColumn: 10, endLineNumber: 2, endColumn: 16 });
+
+  // The editor opener opens the file from the project folder, then selects.
+  const opened = await f.monaco.providers.opener.openCodeEditor(f.editor, locations[0].uri, locations[0].range);
+  assert.equal(opened, true);
+  assert.deepEqual(f.openedFiles.map(item => [item.path, item.handle.name]), [["demo/tools.flow", "tools.flow"]]);
+  assert.deepEqual(f.editor.selection, locations[0].range);
+  assert.equal(f.monaco.providers.opener.openCodeEditor(f.editor, "file:///flowstudio/demo/none.flow", null), false);
 });

@@ -9,16 +9,40 @@
  *            initialize is answered from the handshake the bridge performed.
  *   events   body ignored. Returns and clears queued server notifications
  *            (publishDiagnostics and flowstudio/serverStarted) as a JSON array.
- *   status   body ignored. {"running", "pid", "generation", "queued"}.
+ *   status   body ignored. {"running", "starting", "pid", "generation",
+ *            "queued"}.
+ *   start    body ignored. Starts the server. {"available"}, plus
+ *            "starting": true while a slow first start is still going.
+ *
+ * Workspace mirror. The browser holds project files (a folder handle or the
+ * origin private file system), so `flow lsp` cannot read them. The browser
+ * names documents file:///flowstudio/<project>/<path>. The bridge keeps a
+ * private directory under $TMPDIR and maps that prefix to it both ways:
+ * "uri" values in browser messages point into the directory, and the
+ * directory's URI and path in server messages become the virtual prefix
+ * again. The full text of every didOpen and didChange is written there
+ * first, so the server reads unsaved buffers when it resolves an import.
+ * The notification flowstudio/forget {uri} deletes a mirrored file, or a
+ * folder when the uri ends in "/". A "uri" outside file:///flowstudio/ or
+ * with an empty, "." or ".." segment is refused with 400.
  *
  * The HTTP loop is single-threaded, so every wait is bounded: 3 seconds per
- * request, 10 seconds for the startup handshake. A child that exits is
- * started again on the next request, and the browser learns of it through a
- * flowstudio/serverStarted event so it can reopen its documents.
+ * request, 10 seconds for the startup handshake. The first `flow lsp` on a
+ * machine builds the server from source, which can take longer than that.
+ * The child is then kept, and later calls finish the handshake, for up to
+ * LSP_BUILD_MS. A child that exits is started again on the next request, and
+ * the browser learns of it through a flowstudio/serverStarted event so it
+ * can reopen its documents.
  * fs_lsp_status() reports 200, 400, 503 (no server) or 504 (timeout).
  */
 #ifndef _POSIX_C_SOURCE
 #define _POSIX_C_SOURCE 200809L
+#endif
+#if defined(__APPLE__) && !defined(_DARWIN_C_SOURCE)
+#define _DARWIN_C_SOURCE                   /* mkdtemp and O_NOFOLLOW */
+#endif
+#if !defined(__APPLE__) && !defined(_XOPEN_SOURCE)
+#define _XOPEN_SOURCE 700                  /* realpath */
 #endif
 #include <errno.h>
 #include <fcntl.h>
@@ -29,10 +53,17 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <dirent.h>
+#include <limits.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
+
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
 
 enum {
     LSP_MESSAGE_MAX = 2 * 1024 * 1024,     /* larger server messages are skipped */
@@ -41,6 +72,8 @@ enum {
     LSP_QUEUE_BYTES = 4 * 1024 * 1024,     /* and their total size */
     LSP_REQUEST_MS = 3000,
     LSP_START_MS = 10000,
+    LSP_PENDING_MS = 250,                  /* wait per later call while starting */
+    LSP_BUILD_MS = 300000,                 /* give up on a start after this long */
     LSP_RETRY_MS = 10000                   /* after a failed start, wait this long */
 };
 
@@ -50,6 +83,8 @@ static int from_child = -1;
 static int generation = 0;
 static int lsp_last_status = 503;
 static int64_t failed_at = -1;
+static int handshake_pending;              /* initialize sent, no answer yet */
+static int64_t handshake_deadline;
 
 static char *inbuf;                        /* bytes read from the child, not yet framed */
 static size_t inlen;
@@ -64,6 +99,7 @@ static char *reply;                        /* last reply handed to Flow */
 static long next_id = 1;
 static long waiting_id = -1;               /* bridge id whose response is wanted */
 static char *waiting_response;
+static char *forwarded;                    /* browser message after URI mapping */
 
 int fs_lsp_status(void) { return lsp_last_status; }
 
@@ -186,6 +222,414 @@ static char *splice(const char *json, size_t length, const char *at, size_t old,
     return out;
 }
 
+/* ---- Workspace mirror ---- */
+
+static const char VIRTUAL_ROOT[] = "file:///flowstudio/";
+static char *mirror;                       /* real path of the private directory */
+static char *mirror_uri;                   /* its file:// form, as flow lsp writes it */
+static int mirror_failed;
+
+/* A growable byte buffer. */
+typedef struct { char *data; size_t length, room; int failed; } Buf;
+
+static void buf_put(Buf *b, const char *bytes, size_t n)
+{
+    if (b->failed) return;
+    if (b->length + n + 1 > b->room) {
+        size_t room = b->room ? b->room : 256;
+        while (b->length + n + 1 > room) room *= 2;
+        char *grown = realloc(b->data, room);
+        if (!grown) { b->failed = 1; return; }
+        b->data = grown;
+        b->room = room;
+    }
+    memcpy(b->data + b->length, bytes, n);
+    b->length += n;
+    b->data[b->length] = 0;
+}
+
+static void buf_str(Buf *b, const char *text) { buf_put(b, text, strlen(text)); }
+
+static char *buf_take(Buf *b)
+{
+    if (b->failed) { free(b->data); b->data = NULL; return NULL; }
+    if (!b->data) return strdup("");
+    return b->data;
+}
+
+static int hex_value(int c)
+{
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    return -1;
+}
+
+static int hex4(const char *p, unsigned *code)
+{
+    *code = 0;
+    for (int i = 0; i < 4; i++) {
+        int h = hex_value((unsigned char)p[i]);
+        if (h < 0) return 0;
+        *code = *code * 16 + (unsigned)h;
+    }
+    return 1;
+}
+
+/* The JSON string at [p, end), quotes included, decoded to UTF-8. NULL when
+ * it is malformed or holds a NUL character. */
+static char *json_string(const char *p, const char *end, size_t *out_length)
+{
+    if (end - p < 2 || *p != '"' || end[-1] != '"') return NULL;
+    Buf b = {0};
+    for (p++, end--; p < end; p++) {
+        if (*p != '\\') { buf_put(&b, p, 1); continue; }
+        if (++p >= end) { free(b.data); return NULL; }
+        if (*p != 'u') {
+            char c = *p == 'n' ? '\n' : *p == 't' ? '\t' : *p == 'r' ? '\r' :
+                     *p == 'b' ? '\b' : *p == 'f' ? '\f' : *p;
+            buf_put(&b, &c, 1);
+            continue;
+        }
+        unsigned code = 0, low = 0;
+        if (end - p < 5 || !hex4(p + 1, &code)) { free(b.data); return NULL; }
+        p += 4;
+        if (code >= 0xD800 && code <= 0xDBFF && end - p >= 7 && p[1] == '\\' && p[2] == 'u' &&
+            hex4(p + 3, &low) && low >= 0xDC00 && low <= 0xDFFF) {
+            code = 0x10000 + ((code - 0xD800) << 10) + (low - 0xDC00);
+            p += 6;
+        }
+        if (code == 0) { free(b.data); return NULL; }
+        char u[4];
+        size_t n;
+        if (code < 0x80) { u[0] = (char)code; n = 1; }
+        else if (code < 0x800) { u[0] = (char)(0xC0 | (code >> 6)); u[1] = (char)(0x80 | (code & 0x3F)); n = 2; }
+        else if (code < 0x10000) {
+            u[0] = (char)(0xE0 | (code >> 12)); u[1] = (char)(0x80 | ((code >> 6) & 0x3F));
+            u[2] = (char)(0x80 | (code & 0x3F)); n = 3;
+        } else {
+            u[0] = (char)(0xF0 | (code >> 18)); u[1] = (char)(0x80 | ((code >> 12) & 0x3F));
+            u[2] = (char)(0x80 | ((code >> 6) & 0x3F)); u[3] = (char)(0x80 | (code & 0x3F)); n = 4;
+        }
+        buf_put(&b, u, n);
+    }
+    size_t length = b.length;
+    char *out = buf_take(&b);
+    if (out && out_length) *out_length = length;
+    return out;
+}
+
+static void json_put_string(Buf *b, const char *text)
+{
+    buf_put(b, "\"", 1);
+    for (const unsigned char *p = (const unsigned char *)text; *p; p++) {
+        if (*p == '"' || *p == '\\') { char e[2] = { '\\', (char)*p }; buf_put(b, e, 2); }
+        else if (*p < 0x20) { char e[8]; snprintf(e, sizeof(e), "\\u%04x", *p); buf_str(b, e); }
+        else buf_put(b, (const char *)p, 1);
+    }
+    buf_put(b, "\"", 1);
+}
+
+/* The path under the mirror that a virtual URI names, percent-decoded the
+ * way flow lsp decodes it. NULL unless every segment is a plain name. With
+ * folder_ok a trailing "/" names a folder and "" names the whole mirror. */
+static char *virtual_path(const char *uri, int folder_ok)
+{
+    size_t root = sizeof(VIRTUAL_ROOT) - 1;
+    if (strncmp(uri, VIRTUAL_ROOT, root) != 0) return NULL;
+    const char *rest = uri + root;
+    size_t n = strlen(rest);
+    if (n > 2048) return NULL;
+    char *path = malloc(n + 1);
+    if (!path) return NULL;
+    size_t at = 0;
+    for (size_t i = 0; i < n; i++) {
+        int hi = -1, lo = -1;
+        if (rest[i] == '%' && i + 2 < n &&
+            (hi = hex_value((unsigned char)rest[i + 1])) >= 0 && (lo = hex_value((unsigned char)rest[i + 2])) >= 0) {
+            path[at++] = (char)(hi * 16 + lo);
+            i += 2;
+        } else path[at++] = rest[i];
+    }
+    path[at] = 0;
+    if (strlen(path) != at) { free(path); return NULL; }     /* a %00 */
+    size_t length = at;
+    if (folder_ok && length > 0 && path[length - 1] == '/') length--;
+    if (length == 0) {
+        if (folder_ok) return path;
+        free(path);
+        return NULL;
+    }
+    for (size_t start = 0; start <= length; ) {
+        size_t stop = start;
+        while (stop < length && path[stop] != '/') stop++;
+        size_t part = stop - start;
+        if (part == 0 || (part == 1 && path[start] == '.') ||
+            (part == 2 && path[start] == '.' && path[start + 1] == '.') ||
+            memchr(path + start, '\\', part)) {
+            free(path);
+            return NULL;
+        }
+        start = stop + 1;
+    }
+    return path;
+}
+
+static void remove_tree(const char *path)
+{
+    struct stat info;
+    if (lstat(path, &info) != 0) return;
+    if (!S_ISDIR(info.st_mode)) { unlink(path); return; }
+    DIR *dir = opendir(path);
+    if (dir) {
+        struct dirent *item;
+        while ((item = readdir(dir)) != NULL) {
+            if (strcmp(item->d_name, ".") == 0 || strcmp(item->d_name, "..") == 0) continue;
+            size_t size = strlen(path) + strlen(item->d_name) + 2;
+            char *inner = malloc(size);
+            if (!inner) continue;
+            snprintf(inner, size, "%s/%s", path, item->d_name);
+            remove_tree(inner);
+            free(inner);
+        }
+        closedir(dir);
+    }
+    rmdir(path);
+}
+
+static void remove_mirror(void)
+{
+    if (mirror) remove_tree(mirror);
+}
+
+/* Create the private directory once. Without it URIs pass through as before. */
+static int ensure_mirror(void)
+{
+    if (mirror) return 1;
+    if (mirror_failed) return 0;
+    mirror_failed = 1;
+    const char *tmp = getenv("TMPDIR");
+    if (!tmp || !*tmp) tmp = "/tmp";
+    size_t tmp_length = strlen(tmp);
+    while (tmp_length > 1 && tmp[tmp_length - 1] == '/') tmp_length--;
+    char pattern[PATH_MAX];
+    int n = snprintf(pattern, sizeof(pattern), "%.*s/flowstudio-lsp-XXXXXX", (int)tmp_length, tmp);
+    if (n < 0 || n >= (int)sizeof(pattern) || !mkdtemp(pattern)) return 0;
+    char *real = realpath(pattern, NULL);
+    if (!real) { rmdir(pattern); return 0; }
+    /* flow lsp leaves only these bytes unescaped in the URIs it writes, so
+     * any other byte would make its URIs differ from mirror_uri. */
+    for (const char *p = real; *p; p++) {
+        int c = (unsigned char)*p;
+        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+              c == '_' || c == '.' || c == '~' || c == '/' || c == '-')) {
+            rmdir(real);
+            free(real);
+            return 0;
+        }
+    }
+    size_t size = strlen(real) + 8;
+    mirror_uri = malloc(size);
+    if (!mirror_uri) { rmdir(real); free(real); return 0; }
+    snprintf(mirror_uri, size, "file://%s", real);
+    mirror = real;
+    mirror_failed = 0;
+    atexit(remove_mirror);
+    return 1;
+}
+
+static char *mirror_file(const char *relative)
+{
+    size_t size = strlen(mirror) + strlen(relative) + 2;
+    char *full = malloc(size);
+    if (full) snprintf(full, size, "%s/%s", mirror, relative);
+    return full;
+}
+
+/* Write text to mirror/relative, creating folders. Never follows a link. */
+static int mirror_write(const char *relative, const char *text, size_t length)
+{
+    char *full = mirror_file(relative);
+    if (!full) return 0;
+    for (char *slash = strchr(full + strlen(mirror) + 1, '/'); slash; slash = strchr(slash + 1, '/')) {
+        *slash = 0;
+        struct stat info;
+        if ((mkdir(full, 0700) != 0 && errno != EEXIST) || lstat(full, &info) != 0 || !S_ISDIR(info.st_mode)) {
+            free(full);
+            return 0;
+        }
+        *slash = '/';
+    }
+    int fd = open(full, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW | O_CLOEXEC, 0600);
+    free(full);
+    if (fd < 0) return 0;
+    size_t done = 0;
+    while (done < length) {
+        ssize_t put = write(fd, text + done, length - done);
+        if (put < 0 && errno == EINTR) continue;
+        if (put <= 0) break;
+        done += (size_t)put;
+    }
+    close(fd);
+    return done == length;
+}
+
+/* The decoded string value of member key of an object. */
+static char *member_string(const char *json, size_t length, const char *key, size_t *out_length)
+{
+    const char *v = NULL;
+    size_t n = 0;
+    if (!json || !json_member(json, length, key, &v, &n) || *v != '"') return NULL;
+    return json_string(v, v + n, out_length);
+}
+
+/* Write the full text of a didOpen or didChange before the server reads it. */
+static void mirror_document(const char *body, size_t length)
+{
+    int opening = method_is(body, length, "textDocument/didOpen");
+    if (!mirror || (!opening && !method_is(body, length, "textDocument/didChange"))) return;
+    const char *params = NULL, *document = NULL;
+    size_t params_length = 0, document_length = 0;
+    if (!json_member(body, length, "params", &params, &params_length) ||
+        !json_member(params, params_length, "textDocument", &document, &document_length)) return;
+    char *uri = member_string(document, document_length, "uri", NULL);
+    char *relative = uri ? virtual_path(uri, 0) : NULL;
+    free(uri);
+    if (!relative) return;
+    char *text = NULL;
+    size_t text_length = 0;
+    if (opening) text = member_string(document, document_length, "text", &text_length);
+    else {
+        const char *changes = NULL;
+        size_t changes_length = 0;
+        if (json_member(params, params_length, "contentChanges", &changes, &changes_length) && *changes == '[') {
+            const char *first = skip_ws(changes + 1, changes + changes_length);
+            const char *stop = skip_value(first, changes + changes_length);
+            const char *range = NULL;
+            size_t range_length = 0;
+            /* Only a whole-document change says what the file now holds. */
+            if (stop && *first == '{' && !json_member(first, (size_t)(stop - first), "range", &range, &range_length))
+                text = member_string(first, (size_t)(stop - first), "text", &text_length);
+        }
+    }
+    if (text) mirror_write(relative, text, text_length);
+    free(text);
+    free(relative);
+}
+
+/* flowstudio/forget {uri}: drop a mirrored file, or a folder's contents and
+ * the folder itself. 0 when the uri is not a workspace URI. */
+static int forget(const char *body, size_t length)
+{
+    const char *params = NULL;
+    size_t params_length = 0;
+    if (!json_member(body, length, "params", &params, &params_length)) return 0;
+    char *uri = member_string(params, params_length, "uri", NULL);
+    char *relative = uri ? virtual_path(uri, 1) : NULL;
+    free(uri);
+    if (!relative) return 0;
+    size_t n = strlen(relative);
+    if (n && relative[n - 1] == '/') relative[n - 1] = 0;
+    if (mirror && *relative) {
+        char *full = mirror_file(relative);
+        if (full) remove_tree(full);
+        free(full);
+    } else if (mirror) {
+        remove_tree(mirror);
+        mkdir(mirror, 0700);
+    }
+    free(relative);
+    return 1;
+}
+
+/* A browser message with each "uri" value moved into the mirror. NULL when
+ * a uri is neither a workspace URI nor untitled:. */
+static char *map_in(const char *json, size_t length)
+{
+    const char *end = json + length;
+    Buf b = {0};
+    int uri_value = 0;
+    for (const char *p = json; p < end; ) {
+        if (*p != '"') {
+            if (*p != ':' && *p != ' ' && *p != '\t' && *p != '\r' && *p != '\n') uri_value = 0;
+            buf_put(&b, p, 1);
+            p++;
+            continue;
+        }
+        const char *q = skip_string(p, end);
+        if (!q) { free(b.data); return NULL; }
+        const char *after = skip_ws(q, end);
+        if (after < end && *after == ':') {
+            uri_value = q - p == 5 && memcmp(p, "\"uri\"", 5) == 0;
+            buf_put(&b, p, (size_t)(q - p));
+            p = q;
+            continue;
+        }
+        if (uri_value) {
+            char *uri = json_string(p, q, NULL);
+            char *relative = uri ? virtual_path(uri, 1) : NULL;
+            if (!relative && !(uri && strncmp(uri, "untitled:", 9) == 0)) {
+                free(uri);
+                free(b.data);
+                return NULL;
+            }
+            if (relative && mirror) {
+                Buf mapped = {0};
+                buf_str(&mapped, mirror_uri);
+                buf_str(&mapped, "/");
+                buf_str(&mapped, uri + sizeof(VIRTUAL_ROOT) - 1);
+                char *text = buf_take(&mapped);
+                if (text) json_put_string(&b, text);
+                else b.failed = 1;
+                free(text);
+            } else buf_put(&b, p, (size_t)(q - p));
+            free(relative);
+            free(uri);
+        } else buf_put(&b, p, (size_t)(q - p));
+        uri_value = 0;
+        p = q;
+    }
+    return buf_take(&b);
+}
+
+static void replace_all(Buf *out, const char *text, const char *from, const char *to)
+{
+    size_t n = strlen(from);
+    for (const char *p = text; ; ) {
+        const char *hit = strstr(p, from);
+        if (!hit) { buf_str(out, p); return; }
+        buf_put(out, p, (size_t)(hit - p));
+        buf_str(out, to);
+        p = hit + n;
+    }
+}
+
+/* A server message with the mirror's URI and path made virtual again. */
+static char *map_out(char *message)
+{
+    if (!mirror || !strstr(message, mirror)) return message;
+    size_t size = strlen(mirror_uri) + 2;
+    char *from_uri = malloc(size), *from_path = malloc(size);
+    Buf first = {0}, second = {0};
+    char *step = NULL, *out = NULL;
+    if (from_uri && from_path) {
+        snprintf(from_uri, size, "%s/", mirror_uri);
+        snprintf(from_path, size, "%s/", mirror);
+        replace_all(&first, message, from_uri, VIRTUAL_ROOT);
+        step = buf_take(&first);
+        if (step) {
+            replace_all(&second, step, from_path, "/flowstudio/");
+            out = buf_take(&second);
+        }
+    }
+    free(from_uri);
+    free(from_path);
+    free(step);
+    if (!out) return message;
+    free(message);
+    return out;
+}
+
 /* ---- Notification queue ---- */
 
 static void drop_queued(int index)
@@ -245,6 +689,8 @@ static void stop_child(void)
     discard_left = 0;
     free(waiting_response);
     waiting_response = NULL;
+    waiting_id = -1;
+    handshake_pending = 0;
 }
 
 static int child_alive(void)
@@ -263,6 +709,8 @@ static int child_alive(void)
 /* Hand one complete message from the child to its destination. */
 static void dispatch(char *message, size_t length)
 {
+    message = map_out(message);
+    length = strlen(message);
     const char *id = NULL;
     size_t id_length = 0;
     int is_request = has_id(message, length, &id, &id_length);
@@ -409,8 +857,56 @@ static char *round_trip(const char *json, size_t length, const char *id_at, size
     return response;
 }
 
+/* Wait until wait_until for the answer to the bridge's initialize. 1 when the
+ * server is ready. 0 while it is still starting, or when the start failed. */
+static int finish_handshake(int64_t wait_until)
+{
+    int gone = 0;
+    while (!waiting_response) {
+        int64_t left = wait_until - now_ms();
+        if (left <= 0) break;
+        if (pump((int)left) < 0) { gone = 1; break; }
+    }
+    char *response = waiting_response;
+    waiting_response = NULL;
+    if (!response) {
+        if (!gone && child_alive() && now_ms() < handshake_deadline) return 0;
+        stop_child();
+        failed_at = now_ms();
+        return 0;
+    }
+    handshake_pending = 0;
+    waiting_id = -1;
+    const char *result = NULL;
+    size_t result_length = 0;
+    if (!json_member(response, strlen(response), "result", &result, &result_length)) {
+        free(response);
+        stop_child();
+        failed_at = now_ms();
+        return 0;
+    }
+    free(capabilities);
+    capabilities = malloc(result_length + 1);
+    if (capabilities) { memcpy(capabilities, result, result_length); capabilities[result_length] = 0; }
+    free(response);
+    const char *initialized = "{\"jsonrpc\":\"2.0\",\"method\":\"initialized\",\"params\":{}}";
+    send_message(initialized, strlen(initialized), now_ms() + LSP_REQUEST_MS);
+    failed_at = -1;
+    generation++;
+    char *started = malloc(96);
+    if (started) {
+        snprintf(started, 96, "{\"jsonrpc\":\"2.0\",\"method\":\"flowstudio/serverStarted\",\"params\":{\"generation\":%d}}", generation);
+        enqueue(started);
+    }
+    return 1;
+}
+
 static int start_child(void)
 {
+    if (handshake_pending) {
+        if (!child_alive()) { failed_at = now_ms(); return 0; }
+        return finish_handshake(now_ms() + LSP_PENDING_MS);
+    }
     if (child_alive()) return 1;
     if (failed_at >= 0 && now_ms() - failed_at < LSP_RETRY_MS) return 0;
     signal(SIGPIPE, SIG_IGN);
@@ -446,38 +942,31 @@ static int start_child(void)
     inlen = 0;
     discard_left = 0;
 
+    /* The answer may arrive after this call returns, so the id stays wanted
+     * until finish_handshake sees it. */
+    long mine = next_id++;
     char init[160];
     int init_length = snprintf(init, sizeof(init),
-        "{\"jsonrpc\":\"2.0\",\"id\":0,\"method\":\"initialize\",\"params\":"
-        "{\"processId\":%ld,\"rootUri\":null,\"capabilities\":{}}}", (long)getpid());
-    const char *id_at = strstr(init, "\"id\":0") + 5;
-    char *response = round_trip(init, (size_t)init_length, id_at, 1, now_ms() + LSP_START_MS);
-    const char *result = NULL;
-    size_t result_length = 0;
-    if (!response || !json_member(response, strlen(response), "result", &result, &result_length)) {
-        free(response);
+        "{\"jsonrpc\":\"2.0\",\"id\":%ld,\"method\":\"initialize\",\"params\":"
+        "{\"processId\":%ld,\"rootUri\":null,\"capabilities\":{}}}", mine, (long)getpid());
+    free(waiting_response);
+    waiting_response = NULL;
+    waiting_id = mine;
+    handshake_pending = 1;
+    handshake_deadline = now_ms() + LSP_BUILD_MS;
+    int64_t deadline = now_ms() + LSP_START_MS;
+    if (!send_message(init, (size_t)init_length, deadline)) {
         stop_child();
         failed_at = now_ms();
         return 0;
     }
-    free(capabilities);
-    capabilities = malloc(result_length + 1);
-    if (capabilities) { memcpy(capabilities, result, result_length); capabilities[result_length] = 0; }
-    free(response);
-    const char *initialized = "{\"jsonrpc\":\"2.0\",\"method\":\"initialized\",\"params\":{}}";
-    send_message(initialized, strlen(initialized), now_ms() + LSP_REQUEST_MS);
-    failed_at = -1;
-    generation++;
-    char *started = malloc(96);
-    if (started) {
-        snprintf(started, 96, "{\"jsonrpc\":\"2.0\",\"method\":\"flowstudio/serverStarted\",\"params\":{\"generation\":%d}}", generation);
-        enqueue(started);
-    }
-    return 1;
+    return finish_handshake(deadline);
 }
 
 static const char *unavailable(void)
 {
+    if (handshake_pending)
+        return fail(503, "The Flow language server is still starting. Its first start builds it from source.");
     return fail(503, "The Flow language server is unavailable. Install Flow 2.x so `flow lsp` is on PATH.");
 }
 
@@ -490,6 +979,19 @@ static const char *request(const char *body)
         return fail(400, "Expected one JSON-RPC message with a method.");
     if (method_is(body, length, "shutdown") || method_is(body, length, "exit"))
         return fail(400, "The language server is shared; FlowStudio manages its lifetime.");
+    ensure_mirror();
+    if (method_is(body, length, "flowstudio/forget")) {
+        if (has_id(body, length, NULL, NULL) || !forget(body, length))
+            return fail(400, "flowstudio/forget is a notification with a workspace uri.");
+        return set_reply(200, strdup("null"));
+    }
+    free(forwarded);
+    forwarded = map_in(body, length);
+    if (!forwarded)
+        return fail(400, "Document URIs must stay inside file:///flowstudio/.");
+    mirror_document(body, length);
+    body = forwarded;
+    length = strlen(body);
     const char *id = NULL;
     size_t id_length = 0;
     int is_request = has_id(body, length, &id, &id_length);
@@ -534,7 +1036,8 @@ static const char *request(const char *body)
 
 static const char *events(void)
 {
-    if (child > 0 && child_alive()) {
+    if (handshake_pending && child_alive()) (void)finish_handshake(now_ms());
+    if (!handshake_pending && child > 0 && child_alive()) {
         for (int rounds = 0; rounds < 64; rounds++)
             if (pump(0) <= 0) break;
     }
@@ -558,20 +1061,25 @@ static const char *events(void)
 
 static const char *status(void)
 {
-    int running = child_alive();
-    char *out = malloc(128);
+    int alive = child_alive();
+    int running = alive && !handshake_pending;
+    char *out = malloc(160);
     if (!out) return fail(503, "Out of memory.");
-    snprintf(out, 128, "{\"running\":%s,\"pid\":%ld,\"generation\":%d,\"queued\":%d}",
-             running ? "true" : "false", running ? (long)child : 0L, generation, queue_len);
+    snprintf(out, 160, "{\"running\":%s,\"starting\":%s,\"pid\":%ld,\"generation\":%d,\"queued\":%d}",
+             running ? "true" : "false", alive && handshake_pending ? "true" : "false",
+             alive ? (long)child : 0L, generation, queue_len);
     return set_reply(200, out);
 }
 
 /* Starts the server if it is not running. Always 200, so a browser that
- * only wants to know whether Flow has a language server logs no error. */
+ * only wants to know whether Flow has a language server logs no error.
+ * "starting" asks the browser to call again: the first start is still
+ * building the server. */
 static const char *start(void)
 {
-    int running = child_alive() || start_child();
-    return set_reply(200, strdup(running ? "{\"available\":true}" : "{\"available\":false}"));
+    if (start_child()) return set_reply(200, strdup("{\"available\":true}"));
+    if (handshake_pending) return set_reply(200, strdup("{\"available\":false,\"starting\":true}"));
+    return set_reply(200, strdup("{\"available\":false}"));
 }
 
 const char *fs_lsp(const char *op, const char *body)

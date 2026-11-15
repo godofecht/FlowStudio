@@ -79,10 +79,18 @@ assert.deepEqual(rows, [['x', 'i32', '41'], ['p', 'Point', 'Point { x: 1.5, y: -
 const prompt = page.locator('.terminal-prompt-line textarea');
 await prompt.click();
 await prompt.fill('p.x * 4.0');
-const before = (await transcript()).length;
+const before = await page.evaluate(() => document.querySelectorAll('#console .term-run').length);
 await prompt.press('Enter');
-await page.waitForFunction(size => document.querySelector('.terminal-transcript').textContent.length > size &&
-  /6\.0/.test(document.querySelector('.terminal-transcript').textContent.slice(size)), before, { timeout: 60000 });
+// The entry's command line finishes, and the output after it shows 6.0.
+await page.waitForFunction(count => {
+  const runs = document.querySelectorAll('#console .term-run');
+  const last = runs[runs.length - 1];
+  if (runs.length <= count || last.dataset.state === 'running') return false;
+  let after = '';
+  for (let node = last.nextElementSibling; node && !node.classList.contains('term-run'); node = node.nextElementSibling)
+    after += node.textContent;
+  return /6\.0/.test(after);
+}, before, { timeout: 60000 });
 
 // A selection runs just that text.
 await page.evaluate(() => {

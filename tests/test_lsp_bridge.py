@@ -8,7 +8,12 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import signal
+import socket
+import stat
+import subprocess
+import tempfile
 import time
 import unittest
 import urllib.error
@@ -16,6 +21,8 @@ import urllib.request
 import uuid
 
 URL = os.environ.get("FLOWSTUDIO_URL", "http://127.0.0.1:8751").rstrip("/")
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BINARY = os.path.join(ROOT, "build", "flowstudio")
 
 SOURCE = (
     "function add_one(x: i32) -> i32 {\n"
@@ -38,11 +45,11 @@ def server_up() -> bool:
         return False
 
 
-def post(path: str, body: str, intent: bool = True) -> tuple[int, str]:
+def post(path: str, body: str, intent: bool = True, base: str = "") -> tuple[int, str]:
     headers = {"Content-Type": "application/json"}
     if intent:
         headers["X-FlowStudio-Intent"] = "run"
-    request = urllib.request.Request(URL + path, data=body.encode("utf-8"), method="POST", headers=headers)
+    request = urllib.request.Request((base or URL) + path, data=body.encode("utf-8"), method="POST", headers=headers)
     try:
         with urllib.request.urlopen(request, timeout=15) as response:
             return response.status, response.read().decode("utf-8")
@@ -233,6 +240,227 @@ class LanguageServerBridgeTest(unittest.TestCase):
                                                           "params": self.client.at(5, 18)}))
         self.assertEqual(code, 200)
         self.assertEqual(json.loads(text)["id"], "abc")
+
+
+UTIL = (
+    "# Adds one.\n"
+    "export function add_one(x: i32) -> i32 {\n"
+    "    return x + 1\n"
+    "}\n"
+)
+MAIN = (
+    "import \"util.flow\"\n"
+    "\n"
+    "function main() -> i32 {\n"
+    "    let y: i32 = add_one(2)\n"
+    "    return y\n"
+    "}\n"
+)
+
+
+def unbound(name: str):
+    return lambda found: any(d["message"] == "unbound call '%s'" % name for d in found)
+
+
+@unittest.skipUnless(server_up(), "native FlowStudio server is not running at " + URL)
+class ProjectImportTest(unittest.TestCase):
+    """Two documents of one project, one importing the other by file name.
+
+    The browser never has a disk path for them. The bridge mirrors each
+    opened document into a private folder, so `flow lsp` resolves the
+    import there and answers with the browser's own URIs."""
+
+    def setUp(self) -> None:
+        self.root = "file:///flowstudio/import-test-%s/" % uuid.uuid4().hex[:8]
+        self.util = Client()
+        self.util.uri = self.root + "lib/util.flow"
+        self.main = Client()
+        self.main.uri = self.root + "lib/main.flow"
+        self.main.request("initialize", {"processId": None, "rootUri": None, "capabilities": {}})
+
+    def tearDown(self) -> None:
+        for client in (self.main, self.util):
+            post("/api/lsp/request", json.dumps({"jsonrpc": "2.0", "method": "textDocument/didClose",
+                                                 "params": {"textDocument": {"uri": client.uri}}}))
+        self.main.notify("flowstudio/forget", {"uri": self.root})
+
+    def test_hover_completion_definition_and_references_cross_files(self) -> None:
+        self.util.open(UTIL)
+        self.main.open(MAIN)
+        hover = self.main.request("textDocument/hover", self.main.at(3, 19))["result"]
+        self.assertIn("function add_one(x: i32) -> i32", hover["contents"]["value"])
+        self.assertIn("imported from:* `%s`" % self.util.uri, hover["contents"]["value"])
+
+        definition = self.main.request("textDocument/definition", self.main.at(3, 19))["result"]
+        self.assertEqual(definition["uri"], self.util.uri)
+        self.assertEqual(definition["range"]["start"], {"line": 1, "character": 16})
+
+        self.main.change(MAIN.replace("add_one(2)", "add_(2)"))
+        result = self.main.request("textDocument/completion", self.main.at(3, 21))["result"]
+        items = result if isinstance(result, list) else result["items"]
+        self.assertIn("add_one", [item["label"] for item in items])
+        self.main.change(MAIN)
+
+        params = self.util.at(1, 18)
+        params["context"] = {"includeDeclaration": True}
+        references = self.util.request("textDocument/references", params)["result"]
+        self.assertIn(self.main.uri, [item["uri"] for item in references])
+        self.assertIn(self.util.uri, [item["uri"] for item in references])
+
+    def test_import_diagnostics_follow_the_unsaved_text_of_the_other_file(self) -> None:
+        # Before util.flow exists the call is unbound.
+        self.main.open(MAIN)
+        self.main.diagnostics(unbound("add_one"))
+        # Opening util.flow puts it where the import looks.
+        self.util.open(UTIL)
+        self.main.change(MAIN)
+        self.main.diagnostics(lambda found: not unbound("add_one")(found))
+        # An unsaved rename in util.flow is what main.flow sees next.
+        self.util.change(UTIL.replace("add_one", "add_two"))
+        self.main.change(MAIN)
+        self.main.diagnostics(unbound("add_one"))
+        # forget removes the mirrored file.
+        self.util.change(UTIL)
+        self.main.notify("flowstudio/forget", {"uri": self.util.uri})
+        self.main.change(MAIN)
+        self.main.diagnostics(unbound("add_one"))
+
+    def test_untitled_buffers_resolve_their_imports(self) -> None:
+        # An untitled buffer is mirrored too, so its stdlib import is read
+        # and typechecked, and its own functions still answer.
+        scratch = Client()
+        scratch.uri = "file:///flowstudio/untitled/doc-%s/scratch.flow" % uuid.uuid4().hex[:6]
+        scratch.open(SOURCE.replace("function main", "import \"stdlib/math.flow\"\n\nfunction main", 1)
+                     .replace("    return z\n", "    let w: f32 = subtract(1.0, 2.0)\n    return z\n"))
+        try:
+            hover = scratch.request("textDocument/hover", scratch.at(9, 19))["result"]["contents"]["value"]
+            self.assertIn("function subtract(a: f32, b: f32) -> f32", hover)
+            self.assertIn("imported from", hover)
+            local = scratch.request("textDocument/hover", scratch.at(7, 18))["result"]["contents"]["value"]
+            self.assertIn("function add_one(x: i32) -> i32", local)
+        finally:
+            scratch.close()
+
+    def test_the_mirror_folder_never_reaches_the_browser(self) -> None:
+        self.util.open(UTIL)
+        self.main.open(MAIN)
+        texts = []
+        for method in ("textDocument/hover", "textDocument/definition"):
+            status_code, text = post("/api/lsp/request", json.dumps({"jsonrpc": "2.0", "id": 7, "method": method,
+                                                                     "params": self.main.at(3, 19)}))
+            self.assertEqual(status_code, 200, text)
+            texts.append(text)
+        # The server names the imported file by its mirror path; the browser
+        # gets the workspace URI in its place.
+        self.assertIn("imported from:* `%s`" % self.util.uri, json.loads(texts[0])["result"]["contents"]["value"])
+        self.assertEqual(json.loads(texts[1])["result"]["uri"], self.util.uri)
+        time.sleep(0.6)
+        texts.append(post("/api/lsp/events", "")[1])
+        for text in texts:
+            self.assertNotIn("flowstudio-lsp-", text)
+            self.assertNotIn(os.environ.get("TMPDIR", "/tmp").rstrip("/"), text)
+
+    def test_uris_outside_the_workspace_are_refused(self) -> None:
+        bad = [
+            "file:///etc/hosts",
+            "/etc/hosts",
+            "file:///flowstudio/../escape.flow",
+            "file:///flowstudio/a/%2e%2e/%2E%2E/escape.flow",
+            "file:///flowstudio/a//b.flow",
+            "file:///flowstudio/a/./b.flow",
+            "file:///flowstudio/a%00b.flow",
+            "file:///flowstudio/a%2f..%2f..%2fescape.flow",
+            "file:///flowstudio/a\\u002f..\\u002f..\\u002fescape.flow",
+        ]
+        for uri in bad:
+            # Build the body by hand so the escaped form reaches the bridge as written.
+            body = ('{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":'
+                    '{"uri":"%s","languageId":"flow","version":1,"text":"x"}}}' % uri)
+            status_code, text = post("/api/lsp/request", body)
+            self.assertEqual(status_code, 400, uri + ": " + text)
+            status_code, text = post("/api/lsp/request", json.dumps({"jsonrpc": "2.0", "method": "flowstudio/forget",
+                                                                     "params": {"uri": json.loads('"%s"' % uri)}}))
+            self.assertEqual(status_code, 400, uri + ": " + text)
+
+
+# The first `flow lsp` on a machine builds the server from source. On a
+# 2-core Linux runner that took about 12 s, past the bridge's 10 s handshake.
+SLOW_START_SECONDS = 13
+
+
+@unittest.skipUnless(os.path.exists(BINARY) and shutil.which("flow"),
+                     "needs build/flowstudio and flow on PATH")
+class SlowFirstStartTest(unittest.TestCase):
+    """A server that needs longer than the handshake allows still comes up.
+
+    A wrapper named flow sits first on PATH and sleeps before it runs the
+    real `flow lsp`, the way a first start does while it builds. Before the
+    fix the bridge killed it after 10 s, so the build never finished.
+    """
+
+    def setUp(self) -> None:
+        self.dir = tempfile.mkdtemp(prefix="flowstudio-slow-lsp-")
+        wrapper = os.path.join(self.dir, "flow")
+        with open(wrapper, "w") as handle:
+            handle.write("#!/bin/sh\n"
+                         "if [ \"$1\" = lsp ]; then sleep %d; fi\n"
+                         "exec '%s' \"$@\"\n" % (SLOW_START_SECONDS, shutil.which("flow")))
+        os.chmod(wrapper, os.stat(wrapper).st_mode | stat.S_IXUSR)
+        with socket.socket() as sock:
+            sock.bind(("127.0.0.1", 0))
+            port = sock.getsockname()[1]
+        self.base = "http://127.0.0.1:%d" % port
+        env = dict(os.environ, FLOWSTUDIO_PORT=str(port), PATH=self.dir + os.pathsep + os.environ["PATH"])
+        self.server = subprocess.Popen([BINARY], cwd=ROOT, env=env,
+                                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        for _ in range(100):
+            try:
+                with urllib.request.urlopen(self.base + "/health", timeout=1):
+                    break
+            except OSError:
+                time.sleep(0.1)
+
+    def tearDown(self) -> None:
+        self.server.terminate()
+        try:
+            self.server.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            self.server.kill()
+        shutil.rmtree(self.dir, ignore_errors=True)
+
+    def call(self, op: str) -> dict:
+        code, text = post("/api/lsp/" + op, "", base=self.base)
+        self.assertEqual(code, 200, text)
+        return json.loads(text)
+
+    def test_a_start_slower_than_the_handshake_finishes(self) -> None:
+        began = time.time()
+        self.assertEqual(self.call("start"), {"available": False, "starting": True})
+        self.assertLess(time.time() - began, 12.0)
+        state = self.call("status")
+        self.assertTrue(state["starting"])
+        self.assertFalse(state["running"])
+        pid = state["pid"]
+        # While it starts, other routes answer at once and the child is kept.
+        began = time.time()
+        with urllib.request.urlopen(self.base + "/health", timeout=2) as response:
+            self.assertEqual(response.status, 200)
+        self.assertLess(time.time() - began, 1.0)
+        answer = self.call("start")
+        while answer.get("starting") and time.time() - began < 30:
+            self.assertEqual(self.call("status")["pid"], pid)
+            time.sleep(0.5)
+            answer = self.call("start")
+        self.assertEqual(answer, {"available": True})
+        state = self.call("status")
+        self.assertTrue(state["running"])
+        self.assertEqual(state["pid"], pid)
+        self.assertEqual(state["generation"], 1)
+        code, text = post("/api/lsp/request", json.dumps({"jsonrpc": "2.0", "id": 7, "method": "initialize",
+                                                          "params": {"processId": None, "rootUri": None,
+                                                                     "capabilities": {}}}), base=self.base)
+        self.assertEqual(code, 200, text)
+        self.assertIn("hoverProvider", json.loads(text)["result"]["capabilities"])
 
 
 if __name__ == "__main__":

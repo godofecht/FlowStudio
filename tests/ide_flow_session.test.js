@@ -130,4 +130,11 @@ test("scriptView moves top-level statements into main() and maps lines both ways
 test("scriptView leaves whole programs and declaration-only files alone", () => {
   assert.equal(session.scriptView("function main() -> i32 {\n    return 0\n}\n", []), null);
   assert.equal(session.scriptView("function f() -> i32 {\n    return 1\n}\n", []), null);
+  // A module that other files import: exported declarations stay put.
+  const module = "# Adds one.\nexport function add_one(x: i32) -> i32 {\n    return x + 1\n}\n" +
+    "export struct Pair { a: i32, b: i32 }\nexport import \"other.flow\"\nexport add_one\n";
+  assert.equal(session.scriptView(module, []), null);
+  const script = session.scriptView("export function f() -> i32 {\n    return 1\n}\nprintln(f())\n", []);
+  assert.equal(script.toVirtual(1), 1, "an exported function keeps its line");
+  assert.notEqual(script.toVirtual(3), 3, "the statement still moves");
 });

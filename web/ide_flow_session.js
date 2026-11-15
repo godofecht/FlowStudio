@@ -10,7 +10,8 @@
 "use strict";
 
 const ROUTE = "/api/flow/session/";
-const DECLARATION = /^(?:pub\s+)?(?:function|struct|enum|import|extern|type|const|trait|impl|field)\b/;
+// `export function f`, `export import "x.flow"` and `export a, b` declare too.
+const DECLARATION = /^(?:pub\s+|export\s+)?(?:function|struct|enum|import|extern|type|const|trait|impl|field)\b|^export\b/;
 
 function createClient(request) {
   const listeners = new Set();

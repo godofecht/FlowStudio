@@ -121,16 +121,22 @@ try {
   const prompt = page.locator('.terminal-prompt-line textarea');
   const transcript = () => page.evaluate(() => document.querySelector('.terminal-transcript').textContent);
   const enter = async (line, expect) => {
-    // Each finished entry adds one "↳" status line. The prompt line is part
-    // of the transcript too, so lengths are not a reliable mark.
-    const before = (await transcript()).split('↳').length;
+    // Each entry is one command line whose data-state leaves "running" when
+    // it finishes; its output follows it in the transcript.
+    const before = await page.evaluate(() => document.querySelectorAll('#console .term-run').length);
     await prompt.click();
     await prompt.fill(line);
     await prompt.press('Enter');
     try {
       await page.waitForFunction(([count, text]) => {
-        const parts = document.querySelector('.terminal-transcript').textContent.split('↳');
-        return parts.length > count && (!text || parts.slice(count - 1).join('↳').includes(text));
+        const runs = document.querySelectorAll('#console .term-run');
+        if (runs.length <= count) return false;
+        const last = runs[runs.length - 1];
+        if (last.dataset.state === 'running') return false;
+        let after = '';
+        for (let node = last.nextElementSibling; node && !node.classList.contains('term-run'); node = node.nextElementSibling)
+          after += node.textContent;
+        return !text || after.includes(text);
       }, [before, expect], { timeout: 90000 });
     } catch (error) {
       console.error('Console transcript:\n' + (await transcript()).slice(-1500));

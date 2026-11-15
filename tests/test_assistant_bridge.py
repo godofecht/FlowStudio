@@ -118,7 +118,9 @@ def pid_alive(pid: int) -> bool:
 class AssistantBridge(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.server = Server()
+        # A real MCP check can take several seconds on a fresh CI runner.
+        # The timeout test below starts its own server with a short limit.
+        cls.server = Server(timeout_seconds=120)
 
     @classmethod
     def tearDownClass(cls) -> None:
@@ -219,10 +221,14 @@ class AssistantBridge(unittest.TestCase):
         self.assertEqual(self.server.post("/api/assistant/poll", job)[0], 404, "a finished job is released")
 
     def test_timeout_stops_a_slow_provider(self) -> None:
-        began = time.time()
-        state, _, _ = self.server.run_to_end(self.server.start("SLEEP"), 30)
-        self.assertEqual(state, "timeout")
-        self.assertLess(time.time() - began, 15)
+        server = Server(timeout_seconds=4)
+        try:
+            began = time.time()
+            state, _, _ = server.run_to_end(server.start("SLEEP"), 30)
+            self.assertEqual(state, "timeout")
+            self.assertLess(time.time() - began, 15)
+        finally:
+            server.stop()
 
     def test_bad_requests(self) -> None:
         self.assertEqual(self.server.post("/api/assistant/start", "nobody\n\n1\nhi")[0], 400)

@@ -112,7 +112,8 @@ test("mount builds tabs, honest status row and an inline transcript prompt", () 
   assert.ok(transcript.contains(app.el("consoleInput")),
     "the prompt is the next line of the transcript, not an anchored form");
   const status = panelKids(app).find(node => node.className === "terminal-status");
-  assert.match(status.textContent, /Ready/, "runtime honestly starts unknown");
+  // At rest the header says nothing; each run's line carries its outcome.
+  assert.equal(status.textContent.replace(/[\u2315\u22EF]/g, "").trim(), "", "a quiet header at rest");
   const menu = panelKids(app).find(node => node.attributes.id === "terminalMenu");
   assert.equal(menu.hidden, true, "secondary actions live in a collapsed menu");
 });
@@ -131,10 +132,11 @@ test("prompt keydown submits exact code; output and ready state follow", async (
   assert.equal(field.value, "");
   const transcriptHTML = app.el("console").innerHTML;
   assert.match(transcriptHTML, /term-cmd/);
-  assert.match(transcriptHTML, /&gt; [\s\S]*print[\s\S]*hello/);
+  assert.match(transcriptHTML, /python \u276F[\s\S]*print[\s\S]*hello/);
   assert.match(transcriptHTML, /ok/);
-  const status = panelKids(app).find(node => node.className === "terminal-status");
-  assert.match(status.textContent, /Last run succeeded/);
+  const runs = app.el("console").querySelectorAll(".term-run");
+  assert.equal(runs.length, 1);
+  assert.equal(runs[0].dataset.state, "ok");
 });
 
 test("runtime errors surface failure classes but keep the command in history", async () => {
@@ -143,11 +145,11 @@ test("runtime errors surface failure classes but keep the command in history", a
   field.value = "bad(";
   assert.equal(await app.controller.run(field), true);
   assert.deepEqual(Array.from(app.controller.history("python")), ["bad("]);
-  assert.match(app.el("console").innerHTML, /fs-error-line/);
   assert.match(app.el("console").innerHTML, /TypeError/);
   assert.equal(app.el("resultStatus").dataset.state, "error");
-  const status = panelKids(app).find(node => node.className === "terminal-status");
-  assert.match(status.textContent, /Last run failed/);
+  // The failed run's prompt turns red; the header stays quiet.
+  const runs = app.el("console").querySelectorAll(".term-run");
+  assert.equal(runs[runs.length - 1].dataset.state, "error");
 });
 
 test("console output is never interpreted as HTML", async () => {
@@ -284,8 +286,8 @@ test("new sessions add scrollbacks and flag unread output in background tabs", a
     .map(tab => tab.textContent);
   assert.ok(suffixes.some(text => /\bPython 2\b/.test(text)), suffixes.join("|"));
   const status = panelKids(app).find(node => node.className === "terminal-status");
-  assert.match(status.textContent, /Ready/,
-    "a fresh session reports unknown state, not the other session's status");
+  assert.equal(status.textContent.replace(/[\u2315\u22EF]/g, "").trim(), "",
+    "a fresh session shows no state carried over from the other session");
 });
 
 test("Ctrl+L clears visible output for the active session only", () => {

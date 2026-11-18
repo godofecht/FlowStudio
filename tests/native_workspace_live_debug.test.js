@@ -30,31 +30,21 @@ const paused = {state:"paused", ok:true, stack:[{
 }], output:"", message:"", exception:null};
 const done = {state:"done", ok:true, stack:[], output:"3\n", message:"", exception:null};
 
-test("native workspace routes reuse the real Flow-owned debugger transport", () => {
+test("native workspace debugger uses the real Flow-owned debug routes for Flow, Python and R", () => {
   const routes = read("src/data_routes.flow");
   const html = read("web/index.html");
-  const workspace = read("web/workspace_panels.js");
-  for (const [route, file] of [
-    ["/app/native_flow.js", "docs/app/native_flow.js"],
-    ["/app/python_debug_panel.js", "docs/app/python_debug_panel.js"]
-  ]) {
-    assert.ok(routes.includes('if url == "' + route + '"'));
-    assert.ok(routes.includes('path: "' + file + '"'));
-    const tag = '<script src="' + route + '"></script>';
-    assert.equal(html.split(tag).length - 1, 1);
-    assert.ok(html.indexOf(tag) < html.indexOf('<script src="/workspace_panels.js"></script>'));
-  }
-  for (const id of ["liveDebugStart","liveDebugStep","liveDebugNext",
-    "liveDebugFinish","liveDebugContinue","liveDebugRunToCursor","liveDebugStop","liveDebugStatus",
-    "liveDebugBreakpoints","liveDebugPauseException","liveDebugOutput"]) {
-    assert.ok(html.includes('id="' + id + '"'), id);
-    assert.ok(workspace.includes('el("' + id + '")'), id);
-  }
-  assert.match(workspace, /LivePython\.create\(/);
-  assert.match(workspace, /breakpoints\.lines\(activeDocumentId\(\)\)\.join\(","\)/);
-  assert.match(read("src/main.flow"), /send_python_debug\("start", fs_body\(\)\)/);
-  assert.match(read("src/main.flow"), /send_python_debug\("next", ""\)/);
-  assert.match(read("src/main.flow"), /send_python_debug\("run-to-line", fs_body\(\)\)/);
+  const debuggerSource = read("web/ide_debugger.js");
+  assert.ok(routes.includes('if url == "/ide_debugger.js"'));
+  assert.equal(html.split('<script src="/ide_debugger.js"></script>').length - 1, 1);
+  assert.match(html, /id="view-debug"/);
+  for (const route of ["/api/debug/flow/", "/api/debug/python/", "/api/debug/r/"])
+    assert.ok(debuggerSource.includes('route: "' + route + '"'), route);
+  const main = read("src/main.flow");
+  assert.match(main, /send_python_debug\("start", fs_body\(\)\)/);
+  assert.match(main, /send_python_debug\("next", ""\)/);
+  assert.match(main, /send_python_debug\("run-to-line", fs_body\(\)\)/);
+  for (const op of ["start", "step", "next", "finish", "continue", "pause", "stop", "status", "evaluate"])
+    assert.match(main, new RegExp('eq\\(path, "/api/debug/flow/' + op + '"\\)'), op);
 });
 
 test("live debugger executes actual HTTP start, step and continue with bounded conditions", async () => {

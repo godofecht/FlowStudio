@@ -1,0 +1,33 @@
+# Step 1 of 3, Flow: simulate an SIR epidemic for three contact rates and
+# hand every run to the Python session. Run project runs all three steps.
+import flowstudio { py, fmt }
+
+function simulate(beta: f64) -> string {
+    let gamma: f64 = 0.1
+    let mut s: f64 = 0.999
+    let mut i: f64 = 0.001
+    let mut series: string = ""
+    for day in 0 to 120 {
+        for k in 0 to 10 {
+            let infections: f64 = beta * s * i * 0.1
+            let recoveries: f64 = gamma * i * 0.1
+            s = s - infections
+            i = i + infections - recoveries
+        }
+        if day > 0 {
+            series = series + ","
+        }
+        series = series + fmt(i)
+    }
+    return series
+}
+
+function main() -> i32 {
+    py("runs = {}")
+    let betas: array<f64, 3> = [0.2, 0.3, 0.45]
+    for k in 0 to 3 {
+        py("runs[" + fmt(betas[k]) + "] = [" + simulate(betas[k]) + "]")
+    }
+    println("Flow sent " + py("len(runs)") + " runs of " + py("len(runs[0.2])") + " days to Python.")
+    return 0
+}

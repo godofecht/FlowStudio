@@ -1,0 +1,58 @@
+/* FlowStudio context menus (web/ide_context_menu.js) and the Monaco editor
+ * menu, styled as one family. 13px text on 28px rows, macOS-style shortcut
+ * column, a short fade and lift that switches off for reduced motion. */
+.fs-cm{position:fixed;z-index:2147483000;min-width:220px;max-width:min(420px,calc(100vw - 8px));padding:4px;
+  background:#23262c;border:1px solid #3b414a;border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,.45),0 2px 6px rgba(0,0,0,.3);
+  color:#d3d8df;font:13px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;user-select:none;
+  outline:none;overflow-x:hidden;overflow-y:auto;contain:layout paint}
+.fs-cm.fs-cm-in{animation:fs-cm-in .11s cubic-bezier(.2,.7,.3,1)}
+.fs-cm.fs-cm-still{animation:none}
+@keyframes fs-cm-in{from{opacity:0;transform:translateY(-3px) scale(.985)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.fs-cm.fs-cm-in{animation:none}}
+.fs-cm-item{display:flex;align-items:center;gap:8px;height:28px;padding:0 10px 0 4px;border-radius:5px;cursor:default;white-space:nowrap;outline:none}
+.fs-cm-item.fs-cm-active,.fs-cm-item:focus-visible{background:#2f4a3c;color:#f1f4f7}
+.fs-cm-item[aria-disabled="true"]{color:#6f7782}
+.fs-cm-item[aria-disabled="true"].fs-cm-active{background:#2b2f36;color:#8a929d}
+.fs-cm-item[aria-expanded="true"]{background:#2b2f36}
+.fs-cm-danger .fs-cm-label{color:#eba59d}
+.fs-cm-check{flex:none;width:14px;text-align:center;font-size:12px;color:var(--accent,#9cc6ae)}
+.fs-cm-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.fs-cm-key{flex:none;margin-left:24px;color:#8b939e;font:12px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;letter-spacing:.04em;font-variant-numeric:tabular-nums}
+.fs-cm-item.fs-cm-active .fs-cm-key{color:#c4ccd5}
+.fs-cm-arrow{font-size:15px;margin-left:16px;letter-spacing:0}
+.fs-cm-sep{height:1px;margin:4px 6px;background:#363b43}
+.fs-cm-tip{position:fixed;z-index:2147483001;max-width:260px;padding:6px 9px;background:#30343b;border:1px solid #474e58;border-radius:6px;
+  color:#dfe4ea;font:12px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;box-shadow:0 6px 18px rgba(0,0,0,.4);pointer-events:none}
+.fs-cm-tip[hidden]{display:none}
+
+/* Monaco's own menu, rendered in the light DOM (useShadowDOM: false). */
+.monaco-menu-container.monaco-menu-container,.context-view .monaco-menu-container{border-radius:8px}
+.context-view .monaco-menu{min-width:220px;padding:4px 0;background:#23262c;border:1px solid #3b414a;border-radius:8px;
+  box-shadow:0 12px 32px rgba(0,0,0,.45),0 2px 6px rgba(0,0,0,.3);font:13px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif}
+.context-view .monaco-menu .monaco-action-bar.vertical{padding:0 4px}
+.context-view .monaco-menu .monaco-action-bar.vertical .action-item{border-radius:5px}
+.context-view .monaco-menu .monaco-action-bar.vertical .action-menu-item{height:28px;border-radius:5px;color:#d3d8df}
+.context-view .monaco-menu .monaco-action-bar.vertical .action-label{font-size:13px;padding:0 6px 0 4px;line-height:28px}
+.context-view .monaco-menu .monaco-action-bar.vertical .keybinding{font-size:12px;line-height:28px;padding:0 6px 0 24px;color:#8b939e;opacity:1}
+.context-view .monaco-menu .monaco-action-bar.vertical .action-item.focused>.action-menu-item{background:#2f4a3c;color:#f1f4f7}
+.context-view .monaco-menu .monaco-action-bar.vertical .action-item.disabled .action-menu-item{color:#6f7782}
+.context-view .monaco-menu .monaco-action-bar.vertical .action-label.separator{margin:4px 6px;padding:0;border-bottom-color:#363b43;height:0}
+.context-view .monaco-menu .monaco-action-bar.vertical .submenu-indicator{line-height:28px}
+.context-view.monaco-component{animation:fs-cm-in .11s cubic-bezier(.2,.7,.3,1)}
+@media (prefers-reduced-motion:reduce){.context-view.monaco-component{animation:none}}
+
+/* Pinned editor tabs and the split editor (web/ide_context_menus.js). */
+.doc-tab.pinned{order:-1}
+.doc-tab-pin{display:inline-grid;place-items:center;width:19px;height:19px;padding:0;background:transparent;border:0;border-radius:4px;color:var(--muted,#929aa6)}
+.doc-tab-pin:hover{background:#33415a;color:#fff}
+.doc-tab-pin svg{width:12px;height:12px}
+.fs-split-row{display:flex;flex:1;min-height:0;min-width:0}
+.fs-split-row>#monacoHost{flex:1 1 0;min-width:0;width:auto}
+.fs-split-pane{flex:1 1 0;min-width:0;display:flex;flex-direction:column;border-left:1px solid var(--line,#2c3037)}
+.fs-split-head{display:flex;align-items:center;gap:8px;height:28px;padding:0 6px 0 12px;font-size:12px;color:var(--muted,#929aa6);border-bottom:1px solid var(--line,#2c3037)}
+.fs-split-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink,#dce0e6)}
+.fs-split-close{width:20px;height:20px;padding:0;line-height:1;background:transparent;border:0;border-radius:4px;color:var(--muted,#929aa6)}
+.fs-split-close:hover{background:#33415a;color:#fff}
+.fs-split-host{flex:1;min-height:0}
+.ex-row.is-multi{background:#26302b}
+@media (max-width:680px){.fs-split-pane{display:none}}

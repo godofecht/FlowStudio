@@ -17,12 +17,16 @@ TEMPERATURE: Dimension = (0, 0, 0, 1)
 UNITS: dict[str, Dimension] = {
     "m": LENGTH, "s": (0, 0, 1, 0), "kg": (0, 1, 0, 0),
     "Pa": (-1, 1, -2, 0), "K": TEMPERATURE,
+    "Hz": (0, 0, -1, 0), "N": (1, 1, -2, 0),
+    "J": (2, 1, -2, 0), "W": (2, 1, -3, 0),
+    "rad": DIMENSIONLESS, "sr": DIMENSIONLESS,
+    "Bq": (0, 0, -1, 0), "Gy": (2, 0, -2, 0), "Sv": (2, 0, -2, 0),
 }
 SUPERSCRIPT = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁻−", "0123456789--")
-_NUMBER = r"(?:10[⁻−-][⁰¹²³⁴⁵⁶⁷⁸⁹0-9]+|(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)"
-_UNIT = r"(?:kg|Pa|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)?(?:/(?:kg|Pa|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*))?"
-_TOKEN = re.compile(rf"(?P<space>\s+)|(?P<quantity>{_NUMBER}(?:{_UNIT})?)|(?P<name>∂ₓᵧ|∂ᵧₓ|∂ₓ²|∂ᵧ²|∂ₓ|∂ᵧ|∇²|∆|∫|∑|π|[A-Za-z_Α-Ωα-ορ-ω][A-Za-z_0-9Α-Ωα-ορ-ω]*)|(?P<postfix>[²³⁴⁵⁶⁷⁸])|(?P<op><->|->|==|!=|<=|>=|\*\*|&&|\|\||[+\-−*/×·÷√∛(),^|<>≤≥≠∧∨¬!⊻⇒⇔→↔])")
-_UNIT_PART = re.compile(r"(kg|Pa|m|s|K)([²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)\Z")
+_NUMBER = r"(?:10[⁻−-][⁰¹²³⁴⁵⁶⁷⁸⁹0-9]+|(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+\-−]?\d+)?)"
+_UNIT = r"(?:kg|rad|Pa|Hz|Bq|Gy|Sv|sr|N|J|W|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)?(?:/(?:kg|rad|Pa|Hz|Bq|Gy|Sv|sr|N|J|W|m|s|K)(?:[²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*))?"
+_TOKEN = re.compile(rf"(?P<space>\s+)|(?P<quantity>{_NUMBER}(?:{_UNIT})?)|(?P<name>∂ₓᵧ|∂ᵧₓ|∂ₓ²|∂ᵧ²|∂ₓ|∂ᵧ|∇²|∆|∫|∑|π|[A-Za-z_Α-Ωα-ορ-ω][A-Za-z_0-9Α-Ωα-ορ-ω]*)|(?P<postfix>[²³⁴⁵⁶⁷⁸])|(?P<op><->|->|==|!=|<=|>=|\*\*|&&|\|\||[+\-−*/×·⋅∗∙÷∕√∛(),^|<>≤≥≠∧∨¬!⊻⇒⇔→↔])")
+_UNIT_PART = re.compile(r"(kg|rad|Pa|Hz|Bq|Gy|Sv|sr|N|J|W|m|s|K)([²³⁻⁰¹⁴⁵⁶⁷⁸⁹]*)\Z")
 
 
 PREDICATE_OPERATORS = frozenset(("lt", "le", "gt", "ge", "eq", "ne", "and", "or", "xor", "implies", "iff", "not"))
@@ -53,15 +57,21 @@ def _quantity(raw: str) -> tuple[float, Dimension]:
     if match is None:
         raise ExpressionError(f"Invalid quantity {raw!r}")
     literal, unit = match.groups()
-    if literal.startswith("10") and any(c in literal for c in "⁻⁰¹²³⁴⁵⁶⁷⁸⁹"):
+    if re.fullmatch(r"10[⁻−-][⁰¹²³⁴⁵⁶⁷⁸⁹0-9]+", literal):
         exponent = int(literal[2:].translate(SUPERSCRIPT))
         if abs(exponent) > 300:
             raise ExpressionError("Power-of-ten exponent out of range")
         value = 10.0 ** exponent
     else:
-        value = float(literal)
+        value = float(literal.replace("−", "-"))
     if not math.isfinite(value):
         raise ExpressionError("Non-finite numerical literal")
+    # Do not silently turn a nonzero scientific literal into zero.
+    # This would invalidate small PDE coefficients and tolerances.
+    if value == 0.0 and re.search(r"[eE][+\-−]?\d+\Z", literal):
+        mantissa = re.split(r"[eE]", literal, maxsplit=1)[0]
+        if any(d != "0" for d in mantissa if d.isdigit()):
+            raise ExpressionError("Nonzero scientific literal underflows to zero")
     dim = DIMENSIONLESS
     if unit:
         for sign, part in ((1, unit.split("/")[0]), (-1, unit.split("/")[1] if "/" in unit else "")):
@@ -71,6 +81,8 @@ def _quantity(raw: str) -> tuple[float, Dimension]:
             if found is None:
                 raise ExpressionError(f"Invalid unit {part!r}")
             name, exponent = found.groups()
+            if exponent and not re.fullmatch(r"[⁻−]?[⁰¹²³⁴⁵⁶⁷⁸⁹]+", exponent):
+                raise ExpressionError(f"Malformed unit exponent {exponent!r}")
             power = int(exponent.translate(SUPERSCRIPT)) if exponent else 1
             if abs(power) > 16:
                 raise ExpressionError("Unit exponent out of range")
@@ -92,7 +104,7 @@ def tokenize(source: str) -> tuple[str, ...]:
             # followed by an identifier or a binary sign.
             suffix = source[match.end():]
             if suffix.startswith(("e", "E")) and (
-                len(suffix) == 1 or suffix[1] in "+-" or suffix[1].isdigit()
+                len(suffix) == 1 or suffix[1] in "+-−" or suffix[1].isdigit()
             ):
                 raise ExpressionError(
                     f"Malformed scientific exponent at offset {offset}"
@@ -162,7 +174,24 @@ class _Parser:
                 raise ExpressionError("where branches require matching physical dimensions")
             left = Expression("where", (predicate, when_true, when_false),
                               dimension=when_true.dimension)
-        elif first in ("min", "max", "atan2", "hypot"):
+        elif first == "clamp":
+            if self.take() != "(":
+                raise ExpressionError("Expected '(' after clamp")
+            argument = self.expression(0, depth + 1)
+            if self.take() != ",":
+                raise ExpressionError("clamp requires exactly three arguments")
+            lower = self.expression(0, depth + 1)
+            if self.take() != ",":
+                raise ExpressionError("clamp requires exactly three arguments")
+            upper = self.expression(0, depth + 1)
+            if self.take() != ")":
+                raise ExpressionError("clamp requires exactly three arguments")
+            if any(node.operator in PREDICATE_OPERATORS for node in (argument, lower, upper)):
+                raise ExpressionError("clamp arguments must be numerical expressions")
+            if argument.dimension != lower.dimension or argument.dimension != upper.dimension:
+                raise ExpressionError("clamp requires matching physical dimensions")
+            left = Expression("clamp", (argument, lower, upper), dimension=argument.dimension)
+        elif first in ("min", "max", "atan2", "hypot", "logaddexp"):
             if self.take() != "(":
                 raise ExpressionError(f"Expected '(' after {first}")
             first_arg = self.expression(0, depth + 1)
@@ -173,10 +202,12 @@ class _Parser:
                 raise ExpressionError(f"{first} requires exactly two arguments")
             if first_arg.dimension != second_arg.dimension:
                 raise ExpressionError(f"{first} requires matching physical dimensions")
+            if first == "logaddexp" and first_arg.dimension != DIMENSIONLESS:
+                raise ExpressionError("logaddexp requires dimensionless arguments")
             left = Expression(first, (first_arg, second_arg),
-                              dimension=DIMENSIONLESS if first == "atan2" else first_arg.dimension)
-        elif first in ("sin", "cos", "asin", "acos", "atan", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "ln", "log10", "log1p", "sqrt", "cbrt", "√", "∛", "tanh", "abs", "mean", "variance", "std", "rms", "integral", "∫", "sum", "∑", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∂ₓᵧ", "∂ᵧₓ", "∇²", "∆"):
-            if first in ("∇²", "∆", "√", "∛") and self.peek() != "(":
+                              dimension=DIMENSIONLESS if first in ("atan2", "logaddexp") else first_arg.dimension)
+        elif first in ("sin", "cos", "asin", "acos", "atan", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "ln", "log10", "log2", "log1p", "expm1", "sinc", "sqrt", "cbrt", "√", "∛", "tanh", "abs", "floor", "ceil", "sign", "mean", "variance", "std", "rms", "integral", "∫", "sum", "∑", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∂ₓᵧ", "∂ᵧₓ", "∇²", "∆"):
+            if first in ("∇²", "∆", "√", "∛", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∂ₓᵧ", "∂ᵧₓ") and self.peek() != "(":
                 # Prefix Unicode differential/radical operators bind more tightly than products.
                 arg = self.expression(30, depth + 1)
             else:
@@ -185,7 +216,7 @@ class _Parser:
                 arg = self.expression(0, depth + 1)
                 if self.take() != ")":
                     raise ExpressionError("Expected closing parenthesis")
-            if first in ("sin", "cos", "asin", "acos", "atan", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "ln", "log10", "log1p", "tanh") and arg.dimension != DIMENSIONLESS:
+            if first in ("sin", "cos", "asin", "acos", "atan", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "ln", "log10", "log2", "log1p", "expm1", "sinc", "tanh") and arg.dimension != DIMENSIONLESS:
                 raise ExpressionError(f"{first} requires a dimensionless argument")
             if first in ("sqrt", "√") and any(x % 2 for x in arg.dimension):
                 raise ExpressionError("sqrt requires even physical dimension exponents")
@@ -201,11 +232,13 @@ class _Parser:
                 dim = _minus(arg.dimension, (2, 0, 0, 0))
             elif first in ("∇²", "∆"):
                 dim = _minus(arg.dimension, (2, 0, 0, 0))
+            elif first == "sign":
+                dim = DIMENSIONLESS
             elif first == "variance":
                 dim = _plus(arg.dimension, arg.dimension)
             elif first in ("integral", "∫"):
                 dim = _plus(arg.dimension, (2, 0, 0, 0))
-            elif first in ("abs", "mean", "std", "rms", "sum", "∑"):
+            elif first in ("abs", "floor", "ceil", "mean", "std", "rms", "sum", "∑"):
                 dim = arg.dimension
             else:
                 dim = DIMENSIONLESS
@@ -242,9 +275,9 @@ class _Parser:
                 operator, precedence = "pow", 40
             elif nxt in ("+", "-", "−"):
                 operator, precedence = ("add" if nxt == "+" else "sub"), 10
-            elif nxt in ("*", "×", "·", "/", "÷"):
-                operator, precedence = ("div" if nxt in ("/", "÷") else "mul"), 20
-            elif nxt in ("(", "|", "π", "pi", "x", "y", "sin", "cos", "asin", "acos", "atan", "atan2", "hypot", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "ln", "log10", "log1p", "sqrt", "cbrt", "√", "∛", "tanh", "abs", "mean", "variance", "std", "rms", "integral", "∫", "sum", "∑", "min", "max", "where", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∂ₓᵧ", "∂ᵧₓ", "∇²", "∆") or nxt in self.symbols or re.fullmatch(rf"{_NUMBER}(?:{_UNIT})?", nxt):
+            elif nxt in ("*", "×", "·", "⋅", "∗", "∙", "/", "÷", "∕"):
+                operator, precedence = ("div" if nxt in ("/", "÷", "∕") else "mul"), 20
+            elif nxt in ("(", "|", "π", "pi", "x", "y", "sin", "cos", "asin", "acos", "atan", "atan2", "hypot", "logaddexp", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "ln", "log10", "log2", "log1p", "expm1", "sinc", "sqrt", "cbrt", "√", "∛", "tanh", "abs", "floor", "ceil", "sign", "mean", "variance", "std", "rms", "integral", "∫", "sum", "∑", "min", "max", "clamp", "where", "∂ₓ", "∂ᵧ", "∂ₓ²", "∂ᵧ²", "∂ₓᵧ", "∂ᵧₓ", "∇²", "∆") or nxt in self.symbols or re.fullmatch(rf"{_NUMBER}(?:{_UNIT})?", nxt):
                 operator, precedence = "mul", 20
             else:
                 break
@@ -266,7 +299,7 @@ class _Parser:
                 left = Expression("pow", (left, right),
                                   dimension=tuple(exponent * power for power in left.dimension))
                 continue
-            if nxt in ("+", "-", "−", "*", "**", "×", "·", "/", "÷", "<", "<=", "≤", ">", ">=", "≥", "==", "!=", "≠", "∧", "∨", "&&", "||", "⊻", "⇒", "→", "->", "⇔", "↔", "<->", "xor", "implies", "iff"):
+            if nxt in ("+", "-", "−", "*", "**", "×", "·", "⋅", "∗", "∙", "/", "÷", "∕", "<", "<=", "≤", ">", ">=", "≥", "==", "!=", "≠", "∧", "∨", "&&", "||", "⊻", "⇒", "→", "->", "⇔", "↔", "<->", "xor", "implies", "iff"):
                 self.take()
             right = self.expression(precedence if operator == "implies" else precedence + 1,
                                     depth + 1, stop_at_bar=stop_at_bar)
@@ -302,7 +335,7 @@ def parse_expression(source: str, *, symbols: dict[str, Dimension] | None = None
     if symbols:
         for name, dimension in symbols.items():
             if (not re.fullmatch(r"[A-Za-z_Α-Ωα-ορ-ω][A-Za-z_0-9Α-Ωα-ορ-ω]*", name)
-                    or name in ("x", "y", "pi", "sin", "cos", "asin", "acos", "atan", "atan2", "hypot", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "ln", "log10", "log1p", "sqrt", "cbrt", "tanh", "abs", "mean", "variance", "std", "rms", "integral", "sum", "min", "max", "where", "xor", "implies", "iff")
+                    or name in ("x", "y", "pi", "π", "sin", "cos", "asin", "acos", "atan", "atan2", "hypot", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "ln", "log10", "log2", "log1p", "expm1", "sinc", "sqrt", "cbrt", "tanh", "abs", "floor", "ceil", "sign", "mean", "variance", "std", "rms", "integral", "sum", "min", "max", "clamp", "where", "xor", "implies", "iff")
                     or len(dimension) != 4 or any(type(power) is not int for power in dimension)):
                 raise ExpressionError(f"Invalid typed symbol {name!r}")
     parser = _Parser(tokenize(source), symbols)
@@ -415,10 +448,10 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
         spacing_x = float(coordinates_x[1, 0] - coordinates_x[0, 0])
         spacing_y = float(coordinates_y[0, 1] - coordinates_y[0, 0])
         if (spacing_x <= 0 or spacing_y <= 0
-                or not np.allclose(coordinates_x, coordinates_x[:, :1], rtol=1e-12, atol=1e-12)
-                or not np.allclose(coordinates_y, coordinates_y[:1, :], rtol=1e-12, atol=1e-12)
-                or not np.allclose(np.diff(coordinates_x[:, 0]), spacing_x, rtol=1e-12, atol=1e-12)
-                or not np.allclose(np.diff(coordinates_y[0, :]), spacing_y, rtol=1e-12, atol=1e-12)):
+                or not np.allclose(coordinates_x, coordinates_x[:, :1], rtol=1e-12, atol=0)
+                or not np.allclose(coordinates_y, coordinates_y[:1, :], rtol=1e-12, atol=0)
+                or not np.allclose(np.diff(coordinates_x[:, 0]), spacing_x, rtol=1e-12, atol=0)
+                or not np.allclose(np.diff(coordinates_y[0, :]), spacing_y, rtol=1e-12, atol=0)):
             raise ExpressionError("Spatial derivatives require a uniformly spaced Cartesian grid")
         return coordinates_x.shape, spacing_x, spacing_y
 
@@ -596,14 +629,25 @@ def evaluate(expression: Expression, x, y, *, expected_dimension: Dimension | No
                 return np.divide(args[0], args[1])
         if node.operator == "neg": return -args[0]
         if node.operator == "pos": return args[0]
+        if node.operator == "clamp":
+            if np.any(np.asarray(args[1]) > np.asarray(args[2])):
+                raise ExpressionError("clamp lower bound exceeds upper bound")
+            return np.minimum(np.maximum(args[0], args[1]), args[2])
         if node.operator in ("min", "max"):
             return (np.minimum if node.operator == "min" else np.maximum)(args[0], args[1])
+        if node.operator == "logaddexp":
+            return np.logaddexp(args[0], args[1])
         if node.operator in ("atan2", "hypot"):
             if node.operator == "atan2" and np.any((np.asarray(args[0]) == 0) & (np.asarray(args[1]) == 0)):
                 raise ExpressionError("atan2 is undefined when both arguments are zero")
             with np.errstate(over="ignore", invalid="ignore"):
                 return (np.arctan2 if node.operator == "atan2" else np.hypot)(args[0], args[1])
-        if node.operator in ("sin", "cos", "asin", "acos", "atan", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "log10", "log1p", "sqrt", "cbrt", "tanh", "abs"):
+        if node.operator == "sinc":
+            # NumPy sinc is normalized as sin(pi*x)/(pi*x); mathematical
+            # Flow uses the unnormalized analytic sinc(x) = sin(x)/x.
+            with np.errstate(over="ignore", invalid="ignore"):
+                return np.sinc(np.asarray(args[0]) / np.pi)
+        if node.operator in ("sin", "cos", "asin", "acos", "atan", "sinh", "cosh", "asinh", "acosh", "atanh", "exp", "log", "log10", "log2", "log1p", "expm1", "sinc", "sqrt", "cbrt", "tanh", "abs", "floor", "ceil", "sign"):
             with np.errstate(over="ignore", divide="ignore", invalid="ignore"):
                 return getattr(np, {"asin": "arcsin", "acos": "arccos", "atan": "arctan", "asinh": "arcsinh", "acosh": "arccosh", "atanh": "arctanh"}.get(node.operator, node.operator))(args[0])
         raise ExpressionError(f"Unsupported operator {node.operator!r}")

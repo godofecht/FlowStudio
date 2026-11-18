@@ -1,31 +1,41 @@
+import { codeFont } from './zoom.js';
 /* Keep the existing document and execution controllers connected to Monaco. */
 export function mountEditor(monaco, source, host, app, language) {
   const nativeValue = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value');
   const models = new Map();
   const views = new Map();
+  // The Flow language server client names each model by its document.
+  const documentIds = new WeakMap();
   let currentId = null;
   let updating = false;
+  // Size, line height and family follow the --text-code and --font-mono
+  // tokens (frontend/workbench.css) and the View zoom.
   const editor = monaco.editor.create(host, {
-    theme: 'flowstudio', automaticLayout: true, fontSize: 13, lineHeight: 23,
-    fontFamily: '"SFMono-Regular", Consolas, "Liberation Mono", monospace',
+    theme: 'flowstudio', automaticLayout: true, ...codeFont(),
     minimap: { enabled: false }, padding: { top: 22, bottom: 24 },
     scrollBeyondLastLine: false, smoothScrolling: true, cursorBlinking: 'smooth',
-    renderLineHighlight: 'line', lineNumbersMinChars: 4, glyphMargin: false,
+    renderLineHighlight: 'line', lineNumbersMinChars: 3, glyphMargin: true,
     folding: true, roundedSelection: true, tabSize: 4, insertSpaces: true,
     overviewRulerBorder: false, hideCursorInOverviewRuler: true,
     scrollbar: { verticalScrollbarSize: 9, horizontalScrollbarSize: 9 },
     ariaLabel: 'Source code editor', fixedOverflowWidgets: true,
     wordBasedSuggestions: 'currentDocument', accessibilitySupport: 'auto'
   });
+  // One model per document, shared with the split editor (editor_context.js).
+  function ensureModel(doc) {
+    let model = models.get(doc.id);
+    if (!model) {
+      model = monaco.editor.createModel(doc.text, doc.language);
+      models.set(doc.id, model);
+      documentIds.set(model, doc.id);
+    }
+    return model;
+  }
   function activate(doc) {
     if (!doc) return;
     if (currentId !== doc.id) {
       if (currentId) views.set(currentId, editor.saveViewState());
-      let model = models.get(doc.id);
-      if (!model) {
-        model = monaco.editor.createModel(doc.text, doc.language);
-        models.set(doc.id, model);
-      }
+      const model = ensureModel(doc);
       updating = true;
       editor.setModel(model);
       currentId = doc.id;
@@ -93,5 +103,7 @@ export function mountEditor(monaco, source, host, app, language) {
   });
   source.hidden = true;
   host.hidden = false;
-  return Object.freeze({ editor, activate });
+  return Object.freeze({ editor, activate,
+    documentIdFor: model => documentIds.get(model) ?? null,
+    modelFor: id => models.get(id) ?? null, ensureModel });
 }

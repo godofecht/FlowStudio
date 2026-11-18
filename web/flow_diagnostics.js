@@ -87,6 +87,9 @@ function mount({editor, native, app, language, button, output, status, problems 
     problems.replaceChildren(...entries);
     problems.hidden = false;
   }
+  function languageServer() {
+    return global.FlowStudioFlowLsp || null;
+  }
   function available() {
     return language.value === "flow" && native.available() && !!editor.getModel();
   }
@@ -146,7 +149,10 @@ function mount({editor, native, app, language, button, output, status, problems 
     update();
     try {
       // This calls the existing strict, nonexecuting Flow 2.x compiler route.
-      const result = await native.checkSyntax(source);
+      // A script without main() is checked the way the console session runs it.
+      const session = global.FlowStudioFlowSession;
+      const result = session && session.client && !session.hasMain(source)
+        ? await session.client.check(source) : await native.checkSyntax(source);
       if (token !== generation || editor.getModel() !== model ||
           model.getVersionId() !== version ||
           app.documents.active()?.id !== documentId || !available()) return false;
@@ -168,7 +174,11 @@ function mount({editor, native, app, language, button, output, status, problems 
             hoverMessage:{value:diagnostic.message.slice(0, 512)}}
         });
       }
-      decorations.set(errors);
+      // Lines the language server already marks keep one marker.
+      const server = languageServer();
+      decorations.set(server?.coversLine
+        ? errors.filter(error => !server.coversLine(model, error.range.startLineNumber))
+        : errors);
       renderProblems(errors, model, version, documentId, token);
       show(result.output || (result.ok ? "Flow source passed compiler checking." :
         "Flow compiler rejected this source without a location."), result.ok);

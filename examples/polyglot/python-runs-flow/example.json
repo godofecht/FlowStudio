@@ -1,0 +1,11 @@
+{
+  "id": "polyglot-python-runs-flow",
+  "order": 4,
+  "title": "Python runs a Flow kernel",
+  "description": "fs.flow() compiles a Flow loop from Python. The kernel reads its input back from Python with py_int().",
+  "files": ["primes.py"],
+  "steps": [
+    "Press Run. Python compiles and runs the Flow kernel, then times a pure Python loop for comparison.",
+    "The Flow program's py_int(\"limit\") reads the Python variable while it runs."
+  ]
+}

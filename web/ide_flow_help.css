@@ -1,0 +1,59 @@
+/* Flow Help pane (web/ide_flow_help.js) and the Flow data viewer hooks
+ * (web/ide_flow_data.js). Colours come from the workbench tokens. */
+.rp-tabs{overflow-x:auto;scrollbar-width:none}
+.rp-tabs::-webkit-scrollbar{display:none}
+.rp-tabs [role="tab"]{flex:none}
+
+.flow-help{display:flex;flex-direction:column;gap:10px;padding:10px 12px}
+.fh-search{display:flex;gap:6px;flex:none}
+.fh-input{flex:1;min-width:0;height:28px;padding:0 9px;background:#1f2227;border:1px solid #32363f;border-radius:6px;color:var(--ink);font-size:var(--text-md)}
+.fh-input:focus{outline:0;border-color:#6f9c82}
+.fh-input::-webkit-search-cancel-button{display:none}
+.fh-go{flex:none;height:28px;padding:0 10px;font-size:var(--text-sm)}
+.fh-result{display:flex;flex-direction:column;gap:12px;min-width:0}
+.fh-empty{margin:0;color:var(--muted);font-size:var(--text-sm)}
+.fh-muted{color:var(--muted)}
+
+.fh-entry{display:flex;flex-direction:column;gap:6px;min-width:0;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.fh-hover{padding:8px 10px;border:1px solid #2f3a35;border-radius:6px;background:#1a201d}
+.fh-head{display:flex;align-items:baseline;gap:8px;min-width:0}
+.fh-name{margin:0;font:600 var(--text-code) var(--font-mono);color:#e3e7ec;overflow-wrap:anywhere}
+.fh-kind{flex:none;padding:0 6px;border-radius:3px;background:#ffffff0d;color:#9aa3ae;font-size:var(--text-xs);letter-spacing:.04em;text-transform:uppercase}
+.fh-source{margin:0;color:#7f8996;font-size:var(--text-sm);overflow-wrap:anywhere}
+.fh-signature,.fh-code,.fh-output{margin:0;padding:7px 9px;border-radius:5px;background:#111316;border:1px solid #262a30;font:var(--text-sm)/1.5 var(--font-mono);color:#d6dce4;overflow-x:auto;white-space:pre}
+.fh-signature{color:#b7d7c3}
+.fh-output{color:#aeb6c1;background:#15171a}
+.fh-output-label{color:#6f7884;font-size:var(--text-xs);letter-spacing:.06em;text-transform:uppercase}
+.fh-doc{display:flex;flex-direction:column;gap:6px;color:#cfd6df;font-size:var(--text-md);line-height:1.55}
+.fh-doc p{margin:0}
+.fh-doc code,.fh-usage code,.fh-summary code{font:var(--text-sm) var(--font-mono);color:#b7d7c3;background:#ffffff0a;padding:1px 4px;border-radius:3px}
+.fh-list{margin:0;padding-left:18px}
+.fh-list li{margin:2px 0}
+.fh-usage{margin:0;color:#9aa3ae;font-size:var(--text-sm)}
+.fh-subhead{margin:4px 0 0;color:#8f98a4;font-size:var(--text-xs);font-weight:600;letter-spacing:.07em;text-transform:uppercase}
+.fh-example{display:flex;flex-direction:column;gap:4px;margin:0}
+.fh-example figcaption{color:#7f8996;font-size:var(--text-sm)}
+.fh-related-list{display:flex;flex-direction:column;gap:2px;margin:0;padding:0;list-style:none}
+.fh-related-list li{display:flex;align-items:baseline;gap:8px;min-width:0}
+.fh-link{flex:none;height:auto;padding:1px 0;border:0;background:transparent;color:var(--accent);font:var(--text-sm) var(--font-mono);text-align:left;cursor:pointer}
+.fh-link:hover:not(:disabled){background:transparent;text-decoration:underline}
+.fh-summary{flex:1;min-width:0;color:#7f8996;font:var(--text-sm) var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+#pythonEnvironment .flow-env-view{height:auto;padding:0;border:0;background:transparent;color:var(--accent);font:inherit;text-align:left;cursor:pointer;text-decoration:underline;text-decoration-color:#9cc6ae55;text-underline-offset:2px}
+#pythonEnvironment .flow-env-view:hover:not(:disabled){background:transparent;text-decoration-color:currentColor}
+#pythonEnvironment .flow-env-view:focus-visible{outline:1px solid #6f9c82;outline-offset:1px}
+.dg-note{margin:0;padding:6px 16px;border-bottom:1px solid #2c3037;background:#2a2419;color:var(--warn);font-size:var(--text-sm)}
+
+/* Narrow windows: the side panel is hidden, so Help opens in a dialog. */
+dialog.fh-dialog{width:min(560px,100vw - 16px);max-height:calc(100vh - 32px);margin:16px auto 0;padding:0;display:none;flex-direction:column;background:var(--bg,#14161a);border:1px solid #3a4049;border-radius:10px;color:var(--ink);overflow:hidden}
+dialog.fh-dialog[open]{display:flex}
+dialog.fh-dialog::backdrop{background:#0009}
+.fh-dialog-head{display:flex;align-items:center;gap:8px;padding:8px 10px 8px 14px;border-bottom:1px solid var(--line)}
+.fh-dialog-title{flex:1;font-weight:600;font-size:var(--text-md);color:#e3e7ec}
+.fh-close{height:26px;padding:0 10px;font-size:var(--text-sm)}
+dialog.fh-dialog .flow-help{flex:1;min-height:0;overflow:auto}
+@media(max-width:600px){
+  .dg-head{flex-wrap:wrap;row-gap:6px}
+  .dg-title{flex-basis:100%;order:-1}
+  .dg-filter{flex:1;width:auto;min-width:0}
+}

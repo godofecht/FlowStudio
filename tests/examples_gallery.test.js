@@ -2,6 +2,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const path = require("node:path");
+const fs = require("node:fs");
 const root = path.join(__dirname, "..");
 const gallery = require(path.join(root, "web/examples_gallery.js"));
 
@@ -45,6 +46,12 @@ function buttonsIn(cardElement) {
   walk(cardElement);
   return found;
 }
+function find(node, predicate) {
+  const found = [];
+  const walk = item => { if (predicate(item)) found.push(item); for (const child of item.children || []) walk(child); };
+  walk(node);
+  return found;
+}
 function sectionOf(hostElement, className) {
   return (hostElement.children || []).find(child =>
     child.className && child.className.split(" ").includes(className)) || null;
@@ -79,7 +86,7 @@ test("gallery mounts example cards with open and demo actions", () => {
   // Click the first file button and the demo button found across cards.
   for (const button of buttons) button.listeners.click?.();
   assert.ok(opened.length >= 1, "open callback fired for file buttons");
-  assert.ok(demos.includes("python-r-handshake"), "one-shot demo wired");
+  assert.deepEqual(demos, [], "no example needs a server demo route");
 });
 
 test("primary open-project action loads every example file at once", () => {
@@ -95,12 +102,11 @@ test("primary open-project action loads every example file at once", () => {
   });
   const examples = gallery.examples();
   assert.equal(cards(hostElement).length, examples.length);
-  for (const card of cards(hostElement)) for (const child of card.children)
-    if (child.listeners) child.listeners.click?.();
+  for (const card of cards(hostElement))
+    for (const action of buttonsIn(card).filter(b => b.className === "primary")) action.listeners.click?.();
   const flowExample = examples.find(example => example.id === "flow-backend-mlir");
   assert.ok(opened.some(fired => fired[0] === "flow-backend-mlir" && fired[1] === "project"),
     "flow example exposes one-shot project open");
-  assert.ok(demos.includes("python-r-handshake"));
   const chips = doc.created.filter(node => node.className === "example-langs");
   assert.ok(chips.length >= 3, "every card shows language chips");
 });
@@ -143,8 +149,7 @@ test("opened projects appear as saved project files and reopen on demand", () =>
   forget.listeners.click?.();
   assert.deepEqual(forgotten, ["polyglot-pipeline"], "forget removes the saved project");
   assert.equal(cards(savedSection).length, 0, "saved section refreshes after forgetting");
-  assert.match(savedSection.children.find(node => node.className === "muted").textContent,
-    /saved on this device/);
+  assert.equal(savedSection.dataset.empty, "true", "an empty saved section hides itself");
 });
 
 test("upgradeFiles replaces only buffers holding the legacy Reader source", () => {
@@ -170,4 +175,77 @@ test("curated examples never contain the legacy Reader source", () => {
     for (const file of example.files)
       assert.ok(!file.text.includes("for row in Reader"),
         example.id + "/" + file.name + " is current source");
+});
+
+test("examples cover getting started, debugging and multi-language categories", () => {
+  const byCategory = {};
+  for (const example of gallery.examples()) (byCategory[example.category] ||= []).push(example.id);
+  assert.ok(byCategory.start.includes("flow-basics"));
+  assert.deepEqual(byCategory.debug.sort(), ["debug-flow", "debug-python", "debug-r"]);
+  for (const id of byCategory.debug) {
+    const example = gallery.examples().find(item => item.id === id);
+    assert.ok(example.breakpoints && Object.keys(example.breakpoints).length, id + " ships breakpoints");
+  }
+});
+
+test("validate rejects breakpoints outside the file", () => {
+  const example = gallery.examples().find(item => item.id === "debug-python");
+  const saved = example.breakpoints;
+  example.breakpoints = { "debug_me.py": [999] };
+  try { assert.equal(gallery.validate(), "bad breakpoint line"); }
+  finally { example.breakpoints = saved; }
+  assert.equal(gallery.validate(), null);
+});
+
+test("simulations come from the generated MathFlow catalog and run through MathFlow", () => {
+  const catalog = require(path.join(root, "web/examples_mathflow.js"));
+  assert.ok(catalog.length >= 30, "every examples/*.flow PDE program is listed");
+  const sims = gallery.simulations(catalog);
+  assert.ok(sims.every(item => item.category === "simulation" && item.runner === "mathflow"));
+  assert.ok(sims.every(item => /^\s*domain\s+\w+/m.test(item.files[0].text)));
+  assert.ok(sims.some(item => item.title === "Navier-Stokes: smoke"));
+});
+
+test("chips and search filter cards, and Debug opens the debugger callback", () => {
+  const doc = fakeDocument();
+  const hostElement = host();
+  const debugged = [];
+  const catalog = require(path.join(root, "web/examples_mathflow.js"));
+  const api = gallery.mount(doc, { host: hostElement, onOpen: () => {}, onOpenProject: () => {},
+    onDemo: () => {}, onDebug: example => debugged.push(example.id), simulations: catalog });
+  const visible = () => cards(hostElement).filter(card => !card.hidden && !card.className.includes("saved-project"));
+  assert.equal(visible().length, gallery.examples(catalog).length);
+  api.filter(null, "debug");
+  assert.deepEqual(visible().map(card => card.dataset.exampleId).sort(), ["debug-flow", "debug-python", "debug-r"]);
+  api.filter("robin", "simulation");
+  assert.ok(visible().length >= 2 && visible().every(card => /robin/.test(card.dataset.exampleId)));
+  api.filter("nothing-matches-this", "all");
+  assert.equal(visible().length, 0);
+  assert.equal(find(hostElement, node => node.className === "ex-empty muted")[0].hidden, false);
+  api.filter("", "all");
+  const debugButtons = find(hostElement, node => node.className === "ex-debug");
+  assert.equal(debugButtons.length, 3, "only examples with breakpoints offer Debug");
+  debugButtons[0].listeners.click();
+  assert.equal(debugged.length, 1);
+});
+
+test("polyglot examples come from examples/polyglot in run order and pass validation", () => {
+  const catalog = require(path.join(root, "web/examples_polyglot.js"));
+  assert.ok(catalog.length >= 5, "five polyglot examples are generated");
+  const merged = gallery.examples([], catalog).filter(example => example.category === "polyglot");
+  assert.deepEqual(merged.slice(0, catalog.length).map(example => example.id), catalog.map(example => example.id));
+  for (const example of catalog) {
+    const dir = path.join(root, "examples/polyglot");
+    const folder = fs.readdirSync(dir).find(name =>
+      JSON.parse(fs.readFileSync(path.join(dir, name, "example.json"), "utf8")).id === example.id);
+    assert.ok(folder, example.id + " has a source folder");
+    for (const file of example.files)
+      assert.equal(file.text, fs.readFileSync(path.join(dir, folder, file.name), "utf8"), "generated text is current");
+  }
+  const languages = new Set(catalog.flatMap(example => example.files.map(file => file.language)));
+  assert.deepEqual([...languages].sort(), ["flow", "python", "r"]);
+  assert.ok(catalog.some(example => example.runProject && example.files.length === 3), "the pipeline runs as a project");
+  globalThis.FlowStudioPolyglotExamples = catalog;
+  try { assert.equal(gallery.validate(), null); }
+  finally { delete globalThis.FlowStudioPolyglotExamples; }
 });

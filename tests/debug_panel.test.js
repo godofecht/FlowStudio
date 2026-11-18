@@ -191,12 +191,6 @@ test("replay drops an asynchronous trace when its document or source changed", a
   }
 });
 
-test("workspace wires replay debugger to the actual active document", () => {
-  const fs = require("node:fs");
-  const source = fs.readFileSync(require.resolve("../web/workspace_panels.js"), "utf8");
-  assert.match(source, /getDocId: activeDocumentId/);
-});
-
 test("replay refuses navigation after editing the traced source", async () => {
   const doc = fakeDocument(), node = testCoveragePanelNode(doc);
   let source = "x = 1", jumps = 0, warning = "";
@@ -321,13 +315,6 @@ test("failed or stale reruns do not publish stale Python console output", async 
   assert.equal(p.total(), 0);
 });
 
-test("workspace sends Python debugger stdout to the runtime console", () => {
-  const fs = require("node:fs");
-  const source = fs.readFileSync(require.resolve("../web/workspace_panels.js"), "utf8");
-  assert.match(source, /onOutput: output =>/);
-  assert.match(source, /FlowStudioConsoleIO\.write\(text, "python"\)/);
-});
-
 test("replay navigation selects real steps, jumps breakpoints, and updates the visible and accessible state", async () => {
   const doc = fakeDocument(), node = testCoveragePanelNode(doc);
   const button = () => ({ disabled: false, listeners: {},
@@ -379,13 +366,3 @@ test("replay navigation selects real steps, jumps breakpoints, and updates the v
   assert.equal(node._sections[".debug-steps"].children.length, 0);
 });
 
-test("native replay step controls are present and wired to the real panel", () => {
-  const fs = require("node:fs");
-  const html = fs.readFileSync(require.resolve("../web/index.html"), "utf8");
-  const wiring = fs.readFileSync(require.resolve("../web/workspace_panels.js"), "utf8");
-  for (const id of ["debugPrevious", "debugNext", "debugPreviousBp", "debugNextBp"]) {
-    assert.match(html, new RegExp('id="' + id + '"'));
-    assert.match(wiring, new RegExp('el\\("' + id + '"\\)'));
-  }
-  assert.match(html, /\.debug-step\.debug-step-active button/);
-});

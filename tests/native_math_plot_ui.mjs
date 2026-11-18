@@ -2,6 +2,7 @@
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+const ORIGIN = (process.env.FLOWSTUDIO_URL || 'http://127.0.0.1:8751').replace(/\/+$/, '');
 
 
 // Compact executable Flow source without changing quoted strings. The native
@@ -60,7 +61,47 @@ function compactNativeMathIdentifiers(source) {
     // Token-aware compression keeps all executable Flow bundles below the
     // existing 128 KiB HTTP limit without changing their numerical programs.
     operators: 'ops', positions: 'pos', instructions: 'insns',
-    remainder: 'remval', truncated: 'truncq', quotient: 'qval'
+    remainder: 'remval', truncated: 'truncq', quotient: 'qval' ,
+    expression_start: 'exprstart',
+    expression_length: 'exprlen',
+    expression_error: 'exprerr',
+    expected_dimension: 'expdim',
+    actual_dimension: 'actdim',
+    operand_value: 'opval',
+    result_value: 'resval',
+    dimension_index: 'didx',
+    constraint_index: 'cidx',
+    equation_index: 'eidx',
+    variable_index: 'vidx',
+    symbol_index: 'sidx',
+    left_value: 'lval',
+    right_value: 'rval',
+    numerator: 'numv',
+    denominator: 'denv',
+    expression_source: 'exprsrc',
+    operator_width: 'opwidth',
+    equality_width: 'eqwidth',
+    expression: 'exprv',
+    normalized: 'normv',
+    magnitude: 'magv',
+    // Shared internal compiler symbols dominate the actual SI HTTP bundles.
+    // Lexical rewriting leaves quoted mathematical source untouched.
+    infer_math_expression_source: 'imexprsrc',
+    infer_math_expression_source_with_bindings: 'imexprbind',
+    infer_math_equation_source: 'imeqsrc',
+    infer_math_equation_source_with_bindings: 'imeqbind',
+    parse_math_expression_with_bindings: 'pmexprbind',
+    parse_math_equation_with_bindings: 'pmeqbind',
+    evaluate_math_expression: 'evalmexpr',
+    CheckedQuantity: 'CQty',
+    MathEquationResult: 'MEqR',
+    MathProgram: 'MProg',
+    empty_math_bindings: 'emptyMB',
+    static_bounded_dimension: 'sbdim',
+    bounded_checked_value: 'bcval',
+    positive_square_root: 'psqrt',
+    length_dimension: 'lendim',
+    make_instruction: 'mkIns',
   };
   return source.replace(/"(?:\\.|[^"\\])*"|[A-Za-z_][A-Za-z0-9_]*/g,
     token => token.startsWith('"') ? token : (aliases[token] || token));
@@ -71,7 +112,7 @@ try {
   const page = await browser.newPage();
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.goto('http://127.0.0.1:8751', { waitUntil: 'domcontentloaded' });
+  await page.goto(ORIGIN, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => Boolean(globalThis.FlowStudioEditor?.editor &&
     globalThis.FlowStudioMathPlots?.render));
   for (const [source, metric, other] of [
@@ -106,6 +147,7 @@ try {
   ]) {
     await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
       readFileSync(source, 'utf8'));
+    await page.locator('#runMore').click();
     await page.locator('#runMathFlow').click();
     await page.waitForFunction(expected => {
       const plot = document.querySelector('#mathFlowPlot');
@@ -241,7 +283,12 @@ try {
   // compiler-generated RK4 for eight coupled reaction/diffusion states.
   // This deliberately exercises the actual browser interaction, not only
   // fetch() from the Playwright page or the separate mathematical frontend.
-  await page.locator('#language').selectOption('flow');
+  // The language select is driven by the run chip; set it the same way.
+  await page.evaluate(() => {
+    const select = document.getElementById('language');
+    select.value = 'flow';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  });
   await page.evaluate(text => globalThis.FlowStudioEditor.editor.setValue(text),
     readFileSync('examples/native_coupled_evolution2d.flow', 'utf8'));
   await page.locator('#run').click();

@@ -6,7 +6,7 @@ const {mount} = require("../web/workspace_tabs.js");
 function fixture(initial = null, unavailable = false) {
   const nodes = new Map();
   const focus = [];
-  for (const name of ["files", "outline", "plots", "data", "packages", "examples", "debug"]) {
+  for (const name of ["files", "search", "outline", "plots", "data", "packages", "examples", "debug"]) {
     const tab = {
       attributes: {}, tabIndex: 0, listeners: {},
       setAttribute(key, value) { this.attributes[key] = value; },
@@ -38,7 +38,7 @@ test("starts on files without loading plot or data frames", () => {
   assert.equal(f.nodes.get("tab-files").attributes["aria-selected"], "true");
 });
 
-test("switches tabs and lazy-loads the data frame exactly once", () => {
+test("switches tabs without loading any iframe; the Data view is native", () => {
   const f = fixture();
   const tabs = mount(f.doc, f.storage);
   f.nodes.get("tab-plots").listeners.click();
@@ -49,10 +49,10 @@ test("switches tabs and lazy-loads the data frame exactly once", () => {
   assert.equal(f.nodes.get("view-files").hidden, true);
   assert.equal(f.storage.saved, "plots");
   f.nodes.get("tab-data").listeners.click();
-  assert.equal(f.nodes.get("view-data").frame.getAttribute("src"), "/data");
+  assert.equal(f.nodes.get("view-data").hidden, false);
+  assert.equal(f.nodes.get("view-data").frame.getAttribute("src"), null);
   tabs.select("plots");
   assert.equal(f.nodes.get("view-plots").frame.getAttribute("src"), null);
-  assert.equal(f.nodes.get("view-data").frame.getAttribute("src"), "/data");
   assert.equal(tabs.select("unknown"), false);
 });
 
@@ -86,11 +86,35 @@ test("recovers from invalid and inaccessible session storage", () => {
   const tabs = mount(f.doc, f.storage);
   assert.equal(tabs.current(), "files");
   assert.equal(tabs.select("data"), true);
-  assert.equal(f.nodes.get("view-data").frame.getAttribute("src"), "/data");
+  assert.equal(f.nodes.get("view-data").hidden, false);
 });
 
 test("fails visibly when required tab controls are absent", () => {
   const f = fixture();
   f.nodes.delete("tab-plots");
   assert.throws(() => mount(f.doc, f.storage), /incomplete/);
+});
+
+test("vertical activity bar moves with ArrowDown/ArrowUp and titles the sidebar", () => {
+  const f = fixture();
+  const heading = {textContent: "Explorer"};
+  const getById = f.doc.getElementById;
+  f.doc.getElementById = key => key === "sidebarTitle" ? heading : getById(key);
+  for (const [name, title] of [["files", "Explorer"], ["search", "Search"], ["outline", "Outline"]]) {
+    const tab = f.nodes.get("tab-" + name);
+    tab.getAttribute = key => key === "data-title" ? title : null;
+  }
+  const tabs = mount(f.doc, f.storage);
+  let prevented = 0;
+  f.nodes.get("tab-files").listeners.keydown({key: "ArrowDown", preventDefault() {prevented++;}});
+  assert.equal(tabs.current(), "search");
+  assert.equal(heading.textContent, "Search");
+  assert.equal(f.nodes.get("view-search").hidden, false);
+  assert.equal(f.nodes.get("view-files").hidden, true);
+  f.nodes.get("tab-search").listeners.keydown({key: "ArrowDown", preventDefault() {prevented++;}});
+  assert.equal(tabs.current(), "outline");
+  assert.equal(heading.textContent, "Outline");
+  f.nodes.get("tab-outline").listeners.keydown({key: "ArrowUp", preventDefault() {prevented++;}});
+  assert.equal(tabs.current(), "search");
+  assert.equal(prevented, 3);
 });

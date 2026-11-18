@@ -2,7 +2,8 @@
 """Real native Flow HTTP compilation and execution of fd3/fd4 oracle cases."""
 from pathlib import Path
 
-from http_smoke import request, compact_native_math_identifiers
+from http_smoke import compact_native_math_identifiers
+from http_finite_difference_smoke import request
 from http_finite_difference_smoke import bundled_source
 from test_fd34_oracle import CASE_COUNT, inject_analytic_assertions
 

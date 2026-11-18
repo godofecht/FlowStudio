@@ -21,10 +21,17 @@ import sys
 import urllib.error
 import urllib.request
 
-SERVER_VERSION = "0.2.0"
+SERVER_VERSION = "0.3.0"
 PROTOCOL_VERSION = "2024-11-05"
 BASE_URL = os.environ.get("FLOWSTUDIO_URL", "http://127.0.0.1:8751").rstrip("/")
+ORIGIN = "/".join(BASE_URL.split("/")[:3])
 READ_TIMEOUT = float(os.environ.get("FLOWSTUDIO_MCP_TIMEOUT", "75"))
+# FlowStudio's own assistant starts this server with MODE=assistant. Then the
+# write tool is gone, and RUN=flow allows Flow runs only (RUN=none: no runs).
+ASSISTANT_MODE = os.environ.get("FLOWSTUDIO_MCP_MODE", "") == "assistant"
+ASSISTANT_RUNS = os.environ.get("FLOWSTUDIO_MCP_RUN", "flow") if ASSISTANT_MODE else "all"
+GUIDE_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "docs", "FLOW_FOR_AI.md")
+SNAPSHOT_FILE_LIMIT = 60000
 
 LANGUAGE_HINTS = {
     "flow": "flow",
@@ -49,7 +56,7 @@ RUN_ROUTES = {
 def post(path, body, language=None):
     headers = {
         "X-FlowStudio-Intent": "run",
-        "Origin": "http://127.0.0.1:8751",
+        "Origin": ORIGIN,
     }
     if language:
         headers["X-FlowStudio-Language"] = language
@@ -189,6 +196,58 @@ TOOLS = [
             "required": ["topic"],
         },
     },
+    {
+        "name": "flowstudio_flow_guide",
+        "description": (
+            "Return the verified Flow guide for AI models: syntax, types, "
+            "printing, arrays, strings, structs, the standard library, the "
+            "flowstudio Python and R bridge, graphics apps and common "
+            "compiler errors with fixes. Every example in it compiles. Read "
+            "it before writing Flow."
+        ),
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "flowstudio_editor_state",
+        "description": (
+            "What the user sees in FlowStudio right now: the active file "
+            "(path, language and text), the selection, the other open "
+            "files, compiler diagnostics, recent console output and the "
+            "status of earlier edit proposals. Read only."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "include_other_files": {
+                    "type": "boolean",
+                    "description": "Also return the text of the other open files (default false).",
+                },
+            },
+        },
+    },
+    {
+        "name": "flowstudio_propose_edit",
+        "description": (
+            "Propose a change to a file that is open in FlowStudio. The user "
+            "sees it as a diff and accepts or rejects it. Nothing is written "
+            "until they accept. mode 'replace' (default) replaces the whole "
+            "file with content. mode 'insert' inserts content before line "
+            "(1-based), or at the cursor when line is omitted. file is the "
+            "name or path shown by flowstudio_editor_state. Check Flow code "
+            "with flowstudio_check_code before proposing it."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "file": {"type": "string"},
+                "content": {"type": "string"},
+                "mode": {"type": "string", "enum": ["replace", "insert"]},
+                "line": {"type": "integer", "minimum": 1},
+                "summary": {"type": "string", "description": "One line saying what the change does."},
+            },
+            "required": ["file", "content"],
+        },
+    },
 ]
 
 
@@ -220,11 +279,26 @@ def tool_run_code(args):
             "content": [{"type": "text", "text": "Source exceeds the 128 KiB limit."}],
             "isError": True,
         }
+    refusal = assistant_run_refusal(language, code)
+    if refusal:
+        return {"content": [{"type": "text", "text": refusal}], "isError": True}
     if language == "flow-mlir":
         status, body = post("/api/run/flow-mlir", code)
     else:
         status, body = post(route, code, language=language)
     return short_text(status, body)
+
+
+def assistant_run_refusal(language, code):
+    if not ASSISTANT_MODE:
+        return None
+    if ASSISTANT_RUNS != "flow":
+        return "The user has not allowed the assistant to run code. Use flowstudio_check_code."
+    if language not in ("flow", "mathflow"):
+        return "The assistant may run Flow only. Python and R runs would change the user's live sessions."
+    if "gfx.flow" in code:
+        return "Graphics programs open a window. Check them with flowstudio_check_code instead of running them."
+    return None
 
 
 def tool_check_code(args):
@@ -239,6 +313,11 @@ def tool_check_code(args):
             "content": [{"type": "text", "text": "check supports 'flow' and 'mathflow'."}],
             "isError": True,
         }
+    if status == 200 and language == "flow":
+        # The compiler prints a build note when the Flow checkout has local edits. It is
+        # not a diagnostic, and models read it as one.
+        kept = [line for line in body.splitlines() if not line.startswith("ensure_flowc:")]
+        body = "\n".join(kept).strip() or "Flow compile check passed. The source was not executed."
     return short_text(status, body)
 
 
@@ -378,6 +457,124 @@ def tool_flow_help(args):
     return short_text(200, doc_text)
 
 
+def tool_flow_guide(_args):
+    try:
+        with open(GUIDE_PATH, encoding="utf-8") as handle:
+            return {"content": [{"type": "text", "text": handle.read()}]}
+    except OSError as error:
+        return {"content": [{"type": "text", "text": "Flow guide unavailable: %s" % error}], "isError": True}
+
+
+def read_snapshot():
+    status, body = post("/api/assistant/context/get", "")
+    if status != 200:
+        return None, "HTTP %s: %s" % (status, body)
+    try:
+        snapshot = json.loads(body)
+    except json.JSONDecodeError:
+        return None, "FlowStudio returned an unreadable editor snapshot."
+    if not isinstance(snapshot, dict) or snapshot.get("empty"):
+        return None, ("FlowStudio has not shared the editor yet. Open FlowStudio in the "
+                      "browser at %s." % BASE_URL)
+    return snapshot, None
+
+
+def fence(language, text):
+    return "```%s\n%s%s```" % (language or "", text, "" if text.endswith("\n") else "\n")
+
+
+def file_label(item):
+    return (item or {}).get("path") or (item or {}).get("name") or "untitled"
+
+
+def tool_editor_state(args):
+    snapshot, problem = read_snapshot()
+    if problem:
+        return {"content": [{"type": "text", "text": problem}], "isError": True}
+    lines = []
+    active = snapshot.get("active") or {}
+    if active:
+        lines.append("Active file: %s (%s%s)" % (file_label(active), active.get("language") or "text",
+                                                  ", unsaved changes" if active.get("dirty") else ""))
+        cursor = snapshot.get("cursor") or {}
+        if cursor:
+            lines.append("Cursor: line %s, column %s" % (cursor.get("line"), cursor.get("column")))
+        selection = snapshot.get("selection") or {}
+        if selection.get("text"):
+            lines.append("Selection: lines %s to %s" % (selection.get("startLine"), selection.get("endLine")))
+            lines.append(fence(active.get("language"), selection["text"]))
+        else:
+            lines.append("Selection: none")
+        lines.append("Text of %s:" % file_label(active))
+        lines.append(fence(active.get("language"), (active.get("text") or "")[:SNAPSHOT_FILE_LIMIT]))
+    else:
+        lines.append("No file is active.")
+    others = [item for item in snapshot.get("openFiles") or [] if not item.get("active")]
+    if others:
+        lines.append("Other open files: " + ", ".join(file_label(item) for item in others))
+        if args.get("include_other_files"):
+            for item in others:
+                if isinstance(item.get("text"), str):
+                    lines.append("Text of %s:" % file_label(item))
+                    lines.append(fence(item.get("language"), item["text"][:SNAPSHOT_FILE_LIMIT]))
+    diagnostics = snapshot.get("diagnostics") or []
+    if diagnostics:
+        lines.append("Diagnostics:")
+        for item in diagnostics[:50]:
+            lines.append("- line %s, column %s: %s" % (item.get("line"), item.get("column"), item.get("message")))
+    elif snapshot.get("diagnosticsText"):
+        lines.append("Compiler output:")
+        lines.append(fence("text", snapshot["diagnosticsText"]))
+    else:
+        lines.append("Diagnostics: none reported")
+    console = snapshot.get("console") or ""
+    if console.strip():
+        lines.append("Recent console output:")
+        lines.append(fence("text", console[-6000:]))
+    proposals = snapshot.get("proposals") or []
+    if proposals:
+        lines.append("Edit proposals: " + ", ".join(
+            "#%s %s %s" % (item.get("id"), item.get("file"), item.get("status")) for item in proposals[-10:]))
+    return {"content": [{"type": "text", "text": "\n".join(lines)}]}
+
+
+def refuse(text):
+    return {"content": [{"type": "text", "text": text}], "isError": True}
+
+
+def tool_propose_edit(args):
+    target = args.get("file")
+    content = args.get("content")
+    mode = args.get("mode") or "replace"
+    if not isinstance(target, str) or not target.strip():
+        return refuse("file is required.")
+    if not isinstance(content, str):
+        return refuse("content must be a string.")
+    if mode not in ("replace", "insert"):
+        return refuse("mode must be 'replace' or 'insert'.")
+    if len(content.encode("utf-8")) > 120000:
+        return refuse("content exceeds the 120 KB proposal limit.")
+    line = args.get("line")
+    if line is not None and (not isinstance(line, int) or isinstance(line, bool) or line < 1):
+        return refuse("line must be a positive integer.")
+    snapshot, _problem = read_snapshot()
+    if snapshot:
+        names = []
+        for item in snapshot.get("openFiles") or []:
+            names.extend(value for value in (item.get("path"), item.get("name")) if value)
+        if names and target not in names:
+            return refuse("No open file is called %s. Open files: %s." % (target, ", ".join(sorted(set(names)))))
+    proposal = {"file": target, "mode": mode, "content": content,
+                "summary": str(args.get("summary") or "")[:300]}
+    if line is not None:
+        proposal["line"] = line
+    status, body = post("/api/assistant/propose", json.dumps(proposal))
+    if status != 200:
+        return short_text(status, body)
+    return short_text(200, "Proposal %s sent. FlowStudio shows %s as a diff, and the user accepts or "
+                           "rejects it. flowstudio_editor_state reports the decision." % (body.strip(), target))
+
+
 HANDLERS = {
     "flowstudio_health": tool_health,
     "flowstudio_run_code": tool_run_code,
@@ -385,7 +582,19 @@ HANDLERS = {
     "flowstudio_read_workspace_file": tool_read_workspace_file,
     "flowstudio_write_workspace_file": tool_write_workspace_file,
     "flowstudio_flow_help": tool_flow_help,
+    "flowstudio_flow_guide": tool_flow_guide,
+    "flowstudio_editor_state": tool_editor_state,
+    "flowstudio_propose_edit": tool_propose_edit,
 }
+
+
+def visible_tools():
+    hidden = set()
+    if ASSISTANT_MODE:
+        hidden.add("flowstudio_write_workspace_file")
+        if ASSISTANT_RUNS != "flow":
+            hidden.add("flowstudio_run_code")
+    return [tool for tool in TOOLS if tool["name"] not in hidden]
 
 
 def reply(message, result):
@@ -440,7 +649,11 @@ def handle(message):
                 "machine (loopback only). Executions use your local user "
                 "permissions; do not run untrusted code. Flow for loops "
                 "iterate numeric ranges (`for i in 0 to n`); there is no "
-                "Reader iterator in Flow 2.0.0."
+                "Reader iterator in Flow 2.0.0. Before writing Flow, read "
+                "flowstudio_flow_guide. Check every Flow program with "
+                "flowstudio_check_code, run it with flowstudio_run_code "
+                "when it has a main function and opens no window, and fix "
+                "errors until both pass."
             ),
         })
         return
@@ -450,12 +663,13 @@ def handle(message):
         reply(message, {})
         return
     if method == "tools/list":
-        reply(message, {"tools": TOOLS})
+        reply(message, {"tools": visible_tools()})
         return
     if method == "tools/call":
         name = (message.get("params") or {}).get("name")
         arguments = (message.get("params") or {}).get("arguments") or {}
-        handler = HANDLERS.get(name)
+        visible = any(tool["name"] == name for tool in visible_tools())
+        handler = HANDLERS.get(name) if visible else None
         if not handler:
             write_message({
                 "jsonrpc": "2.0", "id": message_id,

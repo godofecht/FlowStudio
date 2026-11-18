@@ -1,5 +1,5 @@
 # Executable spatial moment reductions in a periodic Fourier-mode heat source.
-# The three coefficients are computed from the actual 2D grid, not substituted constants.
+# The three coefficients are computed from the actual 2D grid.
 domain ThermalDomain {
     grid       = 32 × 32
     extent     = 1m × 1m

@@ -1,0 +1,510 @@
+# flowstudio: call the live Python and R sessions from a Flow program.
+#
+#   import flowstudio { py, r, py_num, r_num, fmt }
+#
+# FlowStudio runs Flow programs with a bridge on fds 3 (requests) and 4
+# (replies). Each call sends source to the persistent Python or R session,
+# which evaluates it in the same namespace the editor and console use, and
+# returns the value of the last expression as text:
+#   a number or string as itself, a vector or list one item per line,
+#   a data frame as CSV with a header row.
+# A failed call prints the error and stops the program with exit code 3.
+#
+#   import flowstudio { plot, scatter, hist, plot_title, plot_labels }
+#
+# plot, scatter and hist draw an SVG figure in Flow itself and print it in a
+# frame that FlowStudio moves to the Plots pane. They need no Python or R.
+
+extern {
+    function fdopen(fd: i32, mode: string) -> ptr<u8>
+    function fwrite(data: string, size: i64, count: i64, stream: ptr<u8>) -> i64
+    function fread(data: string, size: i64, count: i64, stream: ptr<u8>) -> i64
+    function fflush(stream: ptr<u8>) -> i32
+    function malloc(n: i64) -> string
+    function strlen(s: string) -> i64
+    function snprintf(buf: string, n: i64, fmt: string, ...) -> i32
+    function atof(s: string) -> f64
+    function atoll(s: string) -> i64
+    function getenv(name: string) -> ptr<u8>
+    function exit(code: i32) -> void
+    function fprintf(stream: ptr<u8>, fmt: string, ...) -> i32
+    function floor(x: f64) -> f64
+    function ceil(x: f64) -> f64
+    function log10(x: f64) -> f64
+    function pow(x: f64, y: f64) -> f64
+}
+
+# The bridge streams open once; a second fdopen would lose read-ahead bytes.
+let mut bridge_out: ptr<u8> = null
+let mut bridge_in: ptr<u8> = null
+
+export struct BridgeResult {
+    ok: bool,
+    text: string
+}
+
+function hex_value(c: u8) -> i64 {
+    if c >= 48 and c <= 57 {
+        return (c as i64) - 48
+    }
+    if c >= 97 and c <= 102 {
+        return (c as i64) - 87
+    }
+    return -1
+}
+
+# One request and its reply: "Q" + 8 hex digits + target + format + code,
+# answered by "0" or "1" + 8 hex digits + text.
+export function bridge_call(target: string, code: string) -> BridgeResult {
+    if getenv("FLOWSTUDIO_BRIDGE") as i64 == 0 {
+        return BridgeResult { ok: false, text: "The FlowStudio bridge is only available when FlowStudio runs this program." }
+    }
+    if bridge_out as i64 == 0 {
+        bridge_out = fdopen(3, "wb")
+        bridge_in = fdopen(4, "rb")
+    }
+    if bridge_out as i64 == 0 or bridge_in as i64 == 0 {
+        return BridgeResult { ok: false, text: "The FlowStudio bridge is not connected." }
+    }
+    let out: ptr<u8> = bridge_out
+    let input: ptr<u8> = bridge_in
+    let body: string = target + "t" + code
+    let size: i64 = strlen(body)
+    let header: string = malloc(16)
+    snprintf(header, 16, "Q%08llx", size)
+    fwrite(header, 1, 9, out)
+    fwrite(body, 1, size, out)
+    fflush(out)
+    let reply: string = malloc(16)
+    if fread(reply, 1, 9, input) != 9 {
+        return BridgeResult { ok: false, text: "The FlowStudio bridge closed." }
+    }
+    let h: ptr<u8> = reply as ptr<u8>
+    let mut length: i64 = 0
+    let mut i: i32 = 1
+    while i < 9 {
+        let digit: i64 = hex_value(h[i])
+        if digit < 0 {
+            return BridgeResult { ok: false, text: "The FlowStudio bridge sent a malformed reply." }
+        }
+        length = length * 16 + digit
+        i = i + 1
+    }
+    let text: string = malloc(length + 1)
+    if length > 0 and fread(text, 1, length, input) != length {
+        return BridgeResult { ok: false, text: "The FlowStudio bridge closed mid-reply." }
+    }
+    let t: ptr<u8> = text as ptr<u8>
+    t[length] = 0
+    return BridgeResult { ok: h[0] == 48, text: text }
+}
+
+function must(language: string, result: BridgeResult) -> string {
+    if result.ok == false {
+        println(language + " error: " + result.text)
+        exit(3)
+    }
+    return result.text
+}
+
+# Evaluate Python source; returns the last expression's value as text.
+export function py(code: string) -> string {
+    return must("Python", bridge_call("p", code))
+}
+
+# Evaluate R source; returns the last expression's value as text.
+export function r(code: string) -> string {
+    return must("R", bridge_call("r", code))
+}
+
+export function py_num(code: string) -> f64 {
+    return atof(py(code))
+}
+
+export function r_num(code: string) -> f64 {
+    return atof(r(code))
+}
+
+export function py_int(code: string) -> i64 {
+    return atoll(py(code))
+}
+
+export function r_int(code: string) -> i64 {
+    return atoll(r(code))
+}
+
+# A number as text, with 15 significant digits.
+export function fmt(x: f64) -> string {
+    let buf: string = malloc(32)
+    snprintf(buf, 32, "%.15g", x)
+    return buf
+}
+
+export function fmt_int(x: i64) -> string {
+    let buf: string = malloc(24)
+    snprintf(buf, 24, "%lld", x)
+    return buf
+}
+
+# ---- Plots -----------------------------------------------------------------
+#
+#   let xs: array<f64, 5> = [1.0, 2.0, 3.0, 4.0, 5.0]
+#   let ys: array<f64, 5> = [1.0, 4.0, 9.0, 16.0, 25.0]
+#   plot_title("Squares")
+#   plot(xs, ys)
+#
+# Each figure is one line of output: a record separator, FLOWSTUDIO-PLOT,
+# another record separator, then the SVG. The SVG is at most FSPLOT_LIMIT
+# bytes. Longer series are thinned to FSPLOT_POINTS points. Points that are
+# not finite are skipped. A title or axis labels apply to the next figure.
+
+const FSPLOT_LIMIT: i64 = 60000
+const FSPLOT_POINTS: i64 = 1000
+const FSPLOT_BINS: i64 = 100
+const FSPLOT_LEFT: f64 = 64.0
+const FSPLOT_RIGHT: f64 = 620.0
+const FSPLOT_TOP: f64 = 40.0
+const FSPLOT_BOTTOM: f64 = 348.0
+
+let mut fsplot_title_text: string = ""
+let mut fsplot_x_text: string = ""
+let mut fsplot_y_text: string = ""
+let mut fsplot_svg_data: ptr<u8> = null
+let mut fsplot_svg_used: i64 = 0
+let mut fsplot_svg_full: bool = false
+
+# The title of the next figure.
+export function plot_title(text: string) -> void {
+    fsplot_title_text = text
+}
+
+# The axis labels of the next figure.
+export function plot_labels(x: string, y: string) -> void {
+    fsplot_x_text = x
+    fsplot_y_text = y
+}
+
+function fsplot_svg_start() -> void {
+    if fsplot_svg_data as i64 == 0 {
+        fsplot_svg_data = malloc(FSPLOT_LIMIT + 1) as ptr<u8>
+    }
+    fsplot_svg_used = 0
+    fsplot_svg_full = false
+}
+
+function fsplot_svg_put(text: string) -> void {
+    let n: i64 = strlen(text)
+    if fsplot_svg_full or fsplot_svg_used + n > FSPLOT_LIMIT {
+        fsplot_svg_full = true
+        return
+    }
+    let s: ptr<u8> = text as ptr<u8>
+    let out: ptr<u8> = fsplot_svg_data
+    let mut k: i64 = 0
+    while k < n {
+        out[fsplot_svg_used + k] = s[k]
+        k = k + 1
+    }
+    fsplot_svg_used = fsplot_svg_used + n
+}
+
+# Text inside an SVG element: markup characters become entities and
+# control characters are dropped. At most 200 bytes are kept.
+function fsplot_svg_text(text: string) -> void {
+    let s: ptr<u8> = text as ptr<u8>
+    let n: i64 = strlen(text)
+    let one: string = malloc(2)
+    let o: ptr<u8> = one as ptr<u8>
+    let mut k: i64 = 0
+    while k < n and k < 200 {
+        let c: u8 = s[k]
+        if c == 38 {
+            fsplot_svg_put("&amp;")
+        } elif c == 60 {
+            fsplot_svg_put("&lt;")
+        } elif c == 62 {
+            fsplot_svg_put("&gt;")
+        } elif c == 34 {
+            fsplot_svg_put("&quot;")
+        } elif c >= 32 {
+            o[0] = c
+            o[1] = 0
+            fsplot_svg_put(one)
+        }
+        k = k + 1
+    }
+}
+
+function fsplot_svg_num(x: f64) -> void {
+    let buf: string = malloc(32)
+    snprintf(buf, 32, "%.1f", x)
+    fsplot_svg_put(buf)
+}
+
+function fsplot_svg_label(x: f64) -> void {
+    let buf: string = malloc(32)
+    snprintf(buf, 32, "%.4g", x)
+    fsplot_svg_put(buf)
+}
+
+function fsplot_finite(x: f64) -> bool {
+    return x - x == 0.0
+}
+
+struct FsPlotRange {
+    low: f64,
+    high: f64
+}
+
+function fsplot_padded(low: f64, high: f64) -> FsPlotRange {
+    if low > high {
+        return FsPlotRange { low: 0.0, high: 1.0 }
+    }
+    if low == high {
+        let mut pad: f64 = 1.0
+        if low != 0.0 {
+            pad = low * 0.5
+            if pad < 0.0 {
+                pad = 0.0 - pad
+            }
+        }
+        return FsPlotRange { low: low - pad, high: high + pad }
+    }
+    # Four percent of air on each side, as R does.
+    let air: f64 = (high - low) * 0.04
+    return FsPlotRange { low: low - air, high: high + air }
+}
+
+function fsplot_nice_step(range: f64) -> f64 {
+    let raw: f64 = range / 5.0
+    let scale: f64 = pow(10.0, floor(log10(raw)))
+    let f: f64 = raw / scale
+    if f < 1.5 {
+        return scale
+    }
+    if f < 3.5 {
+        return 2.0 * scale
+    }
+    if f < 7.5 {
+        return 5.0 * scale
+    }
+    return 10.0 * scale
+}
+
+function fsplot_sx(x: f64, r: FsPlotRange) -> f64 {
+    return FSPLOT_LEFT + (x - r.low) / (r.high - r.low) * (FSPLOT_RIGHT - FSPLOT_LEFT)
+}
+
+function fsplot_sy(y: f64, r: FsPlotRange) -> f64 {
+    return FSPLOT_BOTTOM - (y - r.low) / (r.high - r.low) * (FSPLOT_BOTTOM - FSPLOT_TOP)
+}
+
+# The frame, grid, ticks, title and labels.
+function fsplot_svg_axes(xr: FsPlotRange, yr: FsPlotRange, kind: string) -> void {
+    fsplot_svg_start()
+    fsplot_svg_put("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"640\" height=\"400\" viewBox=\"0 0 640 400\" font-family=\"sans-serif\" font-size=\"12\" data-flow-plot=\"")
+    fsplot_svg_put(kind)
+    fsplot_svg_put("\"><rect width=\"640\" height=\"400\" fill=\"#ffffff\"/>")
+    if strlen(fsplot_title_text) > 0 {
+        fsplot_svg_put("<text x=\"342\" y=\"24\" text-anchor=\"middle\" font-size=\"15\" fill=\"#111111\">")
+        fsplot_svg_text(fsplot_title_text)
+        fsplot_svg_put("</text>")
+    }
+    let xstep: f64 = fsplot_nice_step(xr.high - xr.low)
+    let mut t: f64 = ceil(xr.low / xstep) * xstep
+    let mut count: i32 = 0
+    while t <= xr.high + xstep * 0.001 and count < 20 {
+        let px: f64 = fsplot_sx(t, xr)
+        fsplot_svg_put("<line x1=\"")
+        fsplot_svg_num(px)
+        fsplot_svg_put("\" x2=\"")
+        fsplot_svg_num(px)
+        fsplot_svg_put("\" y1=\"40\" y2=\"348\" stroke=\"#e5e7eb\"/><text x=\"")
+        fsplot_svg_num(px)
+        fsplot_svg_put("\" y=\"364\" text-anchor=\"middle\" fill=\"#333333\">")
+        fsplot_svg_label(t)
+        fsplot_svg_put("</text>")
+        t = t + xstep
+        count = count + 1
+    }
+    let ystep: f64 = fsplot_nice_step(yr.high - yr.low)
+    t = ceil(yr.low / ystep) * ystep
+    count = 0
+    while t <= yr.high + ystep * 0.001 and count < 20 {
+        let py: f64 = fsplot_sy(t, yr)
+        fsplot_svg_put("<line x1=\"64\" x2=\"620\" y1=\"")
+        fsplot_svg_num(py)
+        fsplot_svg_put("\" y2=\"")
+        fsplot_svg_num(py)
+        fsplot_svg_put("\" stroke=\"#e5e7eb\"/><text x=\"58\" y=\"")
+        fsplot_svg_num(py + 4.0)
+        fsplot_svg_put("\" text-anchor=\"end\" fill=\"#333333\">")
+        fsplot_svg_label(t)
+        fsplot_svg_put("</text>")
+        t = t + ystep
+        count = count + 1
+    }
+    fsplot_svg_put("<rect x=\"64\" y=\"40\" width=\"556\" height=\"308\" fill=\"none\" stroke=\"#333333\"/>")
+    if strlen(fsplot_x_text) > 0 {
+        fsplot_svg_put("<text x=\"342\" y=\"390\" text-anchor=\"middle\" fill=\"#111111\">")
+        fsplot_svg_text(fsplot_x_text)
+        fsplot_svg_put("</text>")
+    }
+    if strlen(fsplot_y_text) > 0 {
+        fsplot_svg_put("<text x=\"16\" y=\"194\" text-anchor=\"middle\" fill=\"#111111\" transform=\"rotate(-90 16 194)\">")
+        fsplot_svg_text(fsplot_y_text)
+        fsplot_svg_put("</text>")
+    }
+}
+
+function fsplot_svg_finish() -> void {
+    fsplot_svg_put("</svg>")
+    fsplot_title_text = ""
+    fsplot_x_text = ""
+    fsplot_y_text = ""
+    if fsplot_svg_full {
+        println("plot: the figure is larger than 60000 bytes and was not drawn.")
+        return
+    }
+    let out: ptr<u8> = fsplot_svg_data
+    out[fsplot_svg_used] = 0
+    println("\x1eFLOWSTUDIO-PLOT\x1e" + (fsplot_svg_data as string))
+}
+
+function fsplot_series_range(xs: span<f64>, ys: span<f64>, n: i64, want_x: bool) -> FsPlotRange {
+    let mut low: f64 = 0.0
+    let mut high: f64 = 0.0
+    let mut seen: bool = false
+    let mut i: i64 = 0
+    while i < n {
+        if fsplot_finite(xs[i]) and fsplot_finite(ys[i]) {
+            let mut v: f64 = ys[i]
+            if want_x {
+                v = xs[i]
+            }
+            if seen == false or v < low {
+                low = v
+            }
+            if seen == false or v > high {
+                high = v
+            }
+            seen = true
+        }
+        i = i + 1
+    }
+    if seen == false {
+        return FsPlotRange { low: 0.0, high: 1.0 }
+    }
+    return fsplot_padded(low, high)
+}
+
+function fsplot_draw_series(xs: span<f64>, ys: span<f64>, line: bool) -> void {
+    let mut n: i64 = xs.len
+    if ys.len < n {
+        n = ys.len
+    }
+    let xr: FsPlotRange = fsplot_series_range(xs, ys, n, true)
+    let yr: FsPlotRange = fsplot_series_range(xs, ys, n, false)
+    if line {
+        fsplot_svg_axes(xr, yr, "line")
+        fsplot_svg_put("<path fill=\"none\" stroke=\"#2563eb\" stroke-width=\"2\" stroke-linejoin=\"round\" d=\"")
+    } else {
+        fsplot_svg_axes(xr, yr, "scatter")
+        fsplot_svg_put("<path fill=\"none\" stroke=\"#2563eb\" stroke-width=\"6\" stroke-linecap=\"round\" d=\"")
+    }
+    let mut stride: i64 = 1
+    if n > FSPLOT_POINTS {
+        stride = (n + FSPLOT_POINTS - 1) / FSPLOT_POINTS
+    }
+    let mut pen: bool = false
+    let mut i: i64 = 0
+    while i < n {
+        if fsplot_finite(xs[i]) and fsplot_finite(ys[i]) {
+            if pen and line {
+                fsplot_svg_put("L")
+            } else {
+                fsplot_svg_put("M")
+            }
+            fsplot_svg_num(fsplot_sx(xs[i], xr))
+            fsplot_svg_put(" ")
+            fsplot_svg_num(fsplot_sy(ys[i], yr))
+            if line == false {
+                fsplot_svg_put("h0")
+            }
+            pen = true
+        } else {
+            pen = false
+        }
+        i = i + stride
+    }
+    fsplot_svg_put("\"/>")
+    fsplot_svg_finish()
+}
+
+# A line through the points (xs[i], ys[i]).
+export function plot(xs: span<f64>, ys: span<f64>) -> void {
+    fsplot_draw_series(xs, ys, true)
+}
+
+# A dot at each point (xs[i], ys[i]).
+export function scatter(xs: span<f64>, ys: span<f64>) -> void {
+    fsplot_draw_series(xs, ys, false)
+}
+
+# A histogram of the values in `bins` equal bins, 1 to 100.
+export function hist(values: span<f64>, bins: i32) -> void {
+    let mut nb: i64 = bins as i64
+    if nb < 1 {
+        nb = 1
+    }
+    if nb > FSPLOT_BINS {
+        nb = FSPLOT_BINS
+    }
+    let xr: FsPlotRange = fsplot_series_range(values, values, values.len, true)
+    let mut counts: array<i64, 100> = [0; 100]
+    let mut i: i64 = 0
+    while i < values.len {
+        let v: f64 = values[i]
+        if fsplot_finite(v) {
+            let mut b: i64 = floor((v - xr.low) / (xr.high - xr.low) * (nb as f64)) as i64
+            if b >= nb {
+                b = nb - 1
+            }
+            if b < 0 {
+                b = 0
+            }
+            counts[b] = counts[b] + 1
+        }
+        i = i + 1
+    }
+    let mut top: i64 = 0
+    i = 0
+    while i < nb {
+        if counts[i] > top {
+            top = counts[i]
+        }
+        i = i + 1
+    }
+    let yr: FsPlotRange = FsPlotRange { low: 0.0, high: fsplot_padded(0.0, top as f64).high }
+    fsplot_svg_axes(xr, yr, "hist")
+    let width: f64 = (xr.high - xr.low) / (nb as f64)
+    i = 0
+    while i < nb {
+        if counts[i] > 0 {
+            let left: f64 = fsplot_sx(xr.low + width * (i as f64), xr)
+            let right: f64 = fsplot_sx(xr.low + width * ((i + 1) as f64), xr)
+            let y: f64 = fsplot_sy(counts[i] as f64, yr)
+            fsplot_svg_put("<rect fill=\"#2563eb\" fill-opacity=\"0.85\" stroke=\"#ffffff\" x=\"")
+            fsplot_svg_num(left)
+            fsplot_svg_put("\" y=\"")
+            fsplot_svg_num(y)
+            fsplot_svg_put("\" width=\"")
+            fsplot_svg_num(right - left)
+            fsplot_svg_put("\" height=\"")
+            fsplot_svg_num(FSPLOT_BOTTOM - y)
+            fsplot_svg_put("\"/>")
+        }
+        i = i + 1
+    }
+    fsplot_svg_finish()
+}

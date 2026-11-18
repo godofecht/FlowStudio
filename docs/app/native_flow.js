@@ -13,13 +13,17 @@ function pythonLineCount(source) {
   const trailing = /(?:\r\n|[\n\r\v\f\u001c-\u001e\u0085\u2028\u2029])$/;
   return source.split(separators).length - (trailing.test(source) ? 1 : 0);
 }
+// Requests go to the page's own origin, and the native server checks Host
+// and Origin against its own port (FLOWSTUDIO_PORT, 8751 by default), so
+// any explicit loopback port is the FlowStudio server that served this page.
 function available(location = global.location) {
-  return !!location && location.protocol === "http:" &&
-    (location.hostname === "127.0.0.1" || location.hostname === "localhost") &&
-    location.port === "8751";
+  if (!location || location.protocol !== "http:") return false;
+  if (location.hostname !== "127.0.0.1" && location.hostname !== "localhost") return false;
+  const port = Number(location.port);
+  return /^[0-9]{4,5}$/.test(location.port) && port >= 1024 && port <= 65535;
 }
 async function request(endpoint, code, timeoutMs = 70000) {
-  if (!available()) throw new Error("Flow execution requires the native FlowStudio server on port 8751.");
+  if (!available()) throw new Error("Flow execution requires the native FlowStudio server on localhost.");
   if (typeof code !== "string" || new TextEncoder().encode(code).length > MAX_SOURCE_BYTES)
     throw new Error("Flow source exceeds the 64 KiB execution limit.");
   const controller = new AbortController();
@@ -190,14 +194,16 @@ async function checkRSyntax(code) {
   return {ok:false, output:response.output, diagnostics};
 }
 // The native C transport writes the checked buffer to a unique
-// /tmp/flowstudio-XXXXXX.flow path (mkstemps). The compiler can also report
+// /tmp/flowstudio-XXXXXX.flow path (mkstemps), or, for the strict check, to
+// prog.flow in a private /tmp/flowstudio-check-XXXXXX directory beside the
+// flowstudio bridge module, whose own locations are left out. The compiler can also report
 // locations in imported Flow files or its generated C output; those do not
 // belong to the current Monaco document and must never become editor markers.
 function parseFlowDiagnostics(output) {
   const diagnostics = [];
   const seen = new Set();
   for (const text of output.split(/\r?\n/)) {
-    const match = /^\s*\/tmp\/flowstudio-[A-Za-z0-9]{6}\.flow:([1-9][0-9]{0,6}):([1-9][0-9]{0,6}):\s*(.+)$/.exec(text);
+    const match = /^\s*\/tmp\/flowstudio-(?:[A-Za-z0-9]{6}\.flow|check-[A-Za-z0-9]{6}\/prog\.flow):([1-9][0-9]{0,6}):([1-9][0-9]{0,6}):\s*(.+)$/.exec(text);
     if (!match) continue;
     const line = Number(match[1]);
     const column = Number(match[2]);

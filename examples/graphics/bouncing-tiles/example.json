@@ -1,0 +1,12 @@
+{
+  "id": "graphics-bouncing-tiles",
+  "order": 1,
+  "title": "Bouncing tiles",
+  "description": "A Flow gfx app in the Preview panel. Change a colour or speed and it rebuilds in about a second.",
+  "files": ["app.flow"],
+  "steps": [
+    "Press Run. The program compiles to WebAssembly and opens in the Preview.",
+    "Edit SPEED_X or BALL_R. Hot reload rebuilds and restarts the app.",
+    "Click the canvas, then hold Space to pause the ball."
+  ]
+}

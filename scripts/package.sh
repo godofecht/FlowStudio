@@ -22,18 +22,16 @@ mkdir -p "$stage/$name/bin"
 cp build/flowstudio "$stage/$name/bin/flowstudio"
 cp -R web "$stage/$name/web"
 cp -R docs "$stage/$name/docs"
-mkdir -p "$stage/$name/src"
-cp src/python_kernel.py "$stage/$name/src/python_kernel.py"
-cp src/math_flow.py "$stage/$name/src/math_flow.py"
-cp src/math_flow_expr.py "$stage/$name/src/math_flow_expr.py"
-cp src/math_flow_equations.py "$stage/$name/src/math_flow_equations.py"
-cp src/math_flow_heat.py "$stage/$name/src/math_flow_heat.py"
-cp src/math_flow_spatial.py "$stage/$name/src/math_flow_spatial.py"
-cp src/python_trace.py "$stage/$name/src/python_trace.py"
-cp src/python_debugger.py "$stage/$name/src/python_debugger.py"
-cp src/r_kernel.R "$stage/$name/src/r_kernel.R"
-cp src/flowjit.R "$stage/$name/src/flowjit.R"
-mkdir -p "$stage/$name/scripts"
+# Everything the server opens at run time: the Python, R and shell helpers,
+# the Flow bridge module, the MCP server and its prompt, the Quarto script.
+# tests/test_package_contents.py checks the archive against the sources.
+mkdir -p "$stage/$name/src" "$stage/$name/mcp" "$stage/$name/scripts"
+for file in src/*.py src/*.R src/*.sh src/flowstudio.flow; do
+  cp "$file" "$stage/$name/$file"
+done
+cp mcp/*.py mcp/*.md "$stage/$name/mcp/"
+# The Terminal's claude and codex wrappers and their shell startup shims.
+cp -R mcp/terminal "$stage/$name/mcp/terminal"
 cp scripts/quarto_render.py "$stage/$name/scripts/quarto_render.py"
 cp VERSION README.md "$stage/$name/"
 if test -f LICENSE; then cp LICENSE "$stage/$name/"; fi

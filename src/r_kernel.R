@@ -1,6 +1,6 @@
 # FlowStudio native R kernel: length-framed, single-user persistent session.
 # This is not a sandbox. Evaluated R code inherits the local user's permissions.
-# stdin: E (execute), C (parse), I (inspect), T (table), P (plot), K (packages), L (load), N (install), V (update), U (remove), B (debug start), S (debug step), F (debug continue/target line), W (evaluate while paused), D (debug stop), Q (debug status) + 8 lowercase hex digits + UTF-8 payload.
+# stdin: E (execute), C (parse), I (inspect), T (table), P (plot), K (packages), L (load), N (install), V (update), U (remove), B (debug start), Y (bridge call from Python or Flow), S (debug step), F (debug continue/target line), W (evaluate while paused), D (debug stop), Q (debug status) + 8 lowercase hex digits + UTF-8 payload.
 # fd 3: 0/1 + 8 lowercase hex digits + bounded UTF-8 output.
 MAX_SOURCE <- 131072L
 MAX_OUTPUT <- 131072L
@@ -8,6 +8,8 @@ input <- file("stdin", open = "rb")
 protocol <- file("/dev/fd/3", open = "wb")
 flowjit_api <- new.env(parent = globalenv())
 sys.source("src/flowjit.R", envir = flowjit_api)
+# py(), py$name and flow() for user code; see src/flowstudio_bridge.R.
+sys.source("src/flowstudio_bridge.R", envir = flowjit_api)
 workspace <- new.env(parent = flowjit_api)
 # A cooperative top-level expression debugger. It never invokes browser(),
 # which would consume the framed IPC stdin and corrupt the persistent kernel.
@@ -552,7 +554,9 @@ plot_snapshot <- function() {
 # Read the real installed R package database without evaluating workspace code.
 # Return at most 1000 packages and 65 KiB of dependency-free JSON.
 package_snapshot <- function() {
-    matrix <- utils::installed.packages()[, c("Package", "Version"), drop = FALSE]
+    matrix <- utils::installed.packages()[, c("Package", "Version", "LibPath", "Priority"), drop = FALSE]
+    attached <- sub("^package:", "", grep("^package:", search(), value = TRUE))
+    user_lib <- tryCatch(normalizePath(user_library, mustWork = FALSE), error = function(e) "")
     if (nrow(matrix) > 1L) matrix <- matrix[order(matrix[, 1L]), , drop = FALSE]
     entries <- character(0)
     used <- 64L
@@ -568,8 +572,13 @@ package_snapshot <- function() {
             truncated <- TRUE
             next
         }
+        lib <- tryCatch(normalizePath(matrix[index, 3L], mustWork = FALSE), error = function(e) "")
+        priority <- matrix[index, 4L]
         entry <- paste0('{"name":', json_quote(name),
-                        ',"version":', json_quote(version), "}")
+                        ',"version":', json_quote(version),
+                        ',"attached":', if (name %in% attached) "true" else "false",
+                        ',"user":', if (nzchar(user_lib) && identical(lib, user_lib)) "true" else "false",
+                        ',"base":', if (!is.na(priority) && priority == "base") "true" else "false", "}")
         length_bytes <- nchar(entry, type = "bytes") + 1L
         if (used + length_bytes > 65000L) { truncated <- TRUE; break }
         entries <- c(entries, entry)
@@ -759,6 +768,17 @@ inspect_value <- function(name, value, depth, budget) {
         length(shape) <= 8L && all(!is.na(shape)) && all(shape >= 0L)) {
         dimensions <- paste0("[", paste(shape, collapse = ","), "]")
     }
+    # Data frames (tibbles included) read their shape from attributes, which
+    # never dispatches to user S3 methods.
+    if (inherits(value, "data.frame")) {
+        rows <- .row_names_info(value, 2L)
+        cols <- length(attr(value, "names", exact = TRUE))
+        kind <- "data.frame"
+        dimensions <- paste0("[", rows, ",", cols, "]")
+        fields <- paste0('"name":', json_quote(substr(name, 1L, 160L)),
+                         ',"type":"data.frame","size":null,"dimensions":', dimensions)
+        return(paste0("{", fields, "}"))
+    }
     fields <- paste0('"name":', json_quote(substr(name, 1L, 160L)),
                      ',"type":', json_quote(substr(kind, 1L, 100L)),
                      ',"size":', size, ',"dimensions":', dimensions)
@@ -866,8 +886,9 @@ table_snapshot <- function(query) {
         return(list(success = FALSE, payload = charToRaw("R table unavailable.")))
     }
     shape <- attr(value, "dim", exact = TRUE)
-    frame <- identical(typeof(value), "list") &&
-             identical(attr(value, "class", exact = TRUE), "data.frame")
+    # Plain data frames and subclasses such as tibbles; columns are read
+    # through unclass(), so no S3 method of the subclass runs.
+    frame <- identical(typeof(value), "list") && inherits(value, "data.frame")
     matrix <- !is.object(value) &&
               typeof(value) %in% c("logical", "integer", "double", "character") &&
               is.integer(shape) && length(shape) == 2L &&
@@ -971,7 +992,7 @@ repeat {
     header <- read_exact(9L)
     if (is.null(header)) break
     header_text <- rawToChar(header)
-    if (!grepl("^[ECITPKLNUVBSFDQW][0-9a-f]{8}$", header_text)) break
+    if (!grepl("^[ECITPKLNUVBSFDQWY][0-9a-f]{8}$", header_text)) break
     length_text <- substr(header_text, 2L, 9L)
     length_value <- strtoi(length_text, base = 16L)
     if (is.na(length_value) || length_value > MAX_SOURCE ||
@@ -1015,6 +1036,8 @@ repeat {
         debug_stop()
     } else if (substr(header_text, 1L, 1L) == "Q") {
         debug_reply()
+    } else if (substr(header_text, 1L, 1L) == "Y") {
+        flowjit_api$bridge_evaluate(source)
     } else if (substr(header_text, 1L, 1L) == "C") {
         check_source(source)
     } else if (substr(header_text, 1L, 1L) == "T") {

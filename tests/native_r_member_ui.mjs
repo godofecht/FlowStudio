@@ -1,13 +1,14 @@
 /* Real Chromium + native Flow/R acceptance for Monaco $ completion. */
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
+const ORIGIN = (process.env.FLOWSTUDIO_URL || 'http://127.0.0.1:8751').replace(/\/+$/, '');
 
 const browser = await chromium.launch({ headless: true });
 try {
   const page = await browser.newPage();
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.goto('http://127.0.0.1:8751', { waitUntil: 'domcontentloaded' });
+  await page.goto(ORIGIN, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => Boolean(globalThis.FlowStudioEditor?.editor));
   const run = await page.evaluate(async () => {
     const response = await fetch('/api/run/r', {
@@ -29,7 +30,10 @@ try {
   });
   assert.ok(inspection.variables.some(variable => variable.name === 'analysis'),
     'real R inspector did not expose the created list');
-  await page.locator('#language').selectOption('r');
+  // The language select is driven by the run configuration widget.
+  await page.locator('#runConfigChip').click();
+  await page.locator('#runConfigList .se-row[data-language="r"]').first().click();
+  await page.waitForFunction(() => document.getElementById('language').value === 'r');
   await page.evaluate(() => {
     const editor = globalThis.FlowStudioEditor.editor;
     editor.setValue('analysis$model$sc');

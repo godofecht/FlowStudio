@@ -1,0 +1,42 @@
+# Flow drives Python and R. Flow integrates an SIR epidemic quickly, then
+# hands the series to both sessions: R finds the peak and counts days,
+# Python formats a report. `import flowstudio` gives py(), r(), r_num()
+# and fmt(); each call returns the value of the last expression as text.
+import flowstudio { py, r, r_num, fmt, fmt_int }
+
+function main() -> i32 {
+    let beta: f64 = 0.32
+    let gamma: f64 = 0.1
+    let dt: f64 = 0.1
+    let mut s: f64 = 0.999
+    let mut i: f64 = 0.001
+    let mut series: string = ""
+    let mut day: i32 = 0
+    while day < 160 {
+        # Ten Euler steps per day; record the infected share once a day.
+        for k in 0 to 10 {
+            let infections: f64 = beta * s * i * dt
+            let recoveries: f64 = gamma * i * dt
+            s = s - infections
+            i = i + infections - recoveries
+        }
+        if day > 0 {
+            series = series + ","
+        }
+        series = series + fmt(i)
+        day = day + 1
+    }
+
+    # The same numbers now exist in both sessions.
+    r("infected <- c(" + series + ")")
+    py("infected = [" + series + "]")
+
+    let peak_day: f64 = r_num("which.max(infected)")
+    println("Flow simulated 160 days.")
+    println("R: peak on day " + fmt(peak_day) + ", " + r("round(100 * max(infected), 1)") + "% infected")
+    println("R: days above 10%: " + r("sum(infected > 0.10)"))
+    println("Python: " + py("f'mean infected share over the run {sum(infected) / len(infected):.1%}'"))
+    println(py("'sparkline: ' + ''.join(' .:-=+*#%@'[min(9, int(v * 40))] for v in infected[::4])"))
+    println("R0 = beta / gamma = " + fmt(beta / gamma) + ", " + fmt_int(160) + " points sent to each language")
+    return 0
+}

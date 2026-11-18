@@ -30,6 +30,9 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/data_page.js" {
         return StaticAsset { path: "web/data_page.js", mime: "text/javascript; charset=utf-8", found: true }
     }
+    if url == "/app-host.html" {
+        return StaticAsset { path: "web/app_host.html", mime: "text/html; charset=utf-8", found: true }
+    }
     if url == "/index.html" {
         return StaticAsset { path: "web/index.html", mime: "text/html; charset=utf-8", found: true }
     }
@@ -90,6 +93,9 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/terminal_input.js" {
         return StaticAsset { path: "web/terminal_input.js", mime: "text/javascript; charset=utf-8", found: true }
     }
+    if url == "/console_format.js" {
+        return StaticAsset { path: "web/console_format.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
     if url == "/terminal_sessions.js" {
         return StaticAsset { path: "web/terminal_sessions.js", mime: "text/javascript; charset=utf-8", found: true }
     }
@@ -108,6 +114,9 @@ export function data_route(url: string) -> StaticAsset {
     if url == "/workspace_panels.js" {
         return StaticAsset { path: "web/workspace_panels.js", mime: "text/javascript; charset=utf-8", found: true }
     }
+    if url == "/ide_flow_lsp.js" {
+        return StaticAsset { path: "web/ide_flow_lsp.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
     if url == "/flow_diagnostics.js" {
         return StaticAsset { path: "web/flow_diagnostics.js", mime: "text/javascript; charset=utf-8", found: true }
     }
@@ -125,6 +134,93 @@ export function data_route(url: string) -> StaticAsset {
     }
     if url == "/ide_shell.js" {
         return StaticAsset { path: "web/ide_shell.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/ide_menubar.js" {
+        return StaticAsset { path: "web/ide_menubar.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/ide_run_widget.js" {
+        return StaticAsset { path: "web/ide_run_widget.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/ide_flow_backend.js" {
+        return StaticAsset { path: "web/ide_flow_backend.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/ide_explorer.js" {
+        return StaticAsset { path: "web/ide_explorer.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/ide_workspace.js" {
+        return StaticAsset { path: "web/ide_workspace.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/examples_mathflow.js" {
+        return StaticAsset { path: "web/examples_mathflow.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/examples_graphics.js" {
+        return StaticAsset { path: "web/examples_graphics.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/examples_polyglot.js" {
+        return StaticAsset { path: "web/examples_polyglot.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/ide_app_preview.js" {
+        return StaticAsset { path: "web/ide_app_preview.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/ide_flow_session.js" {
+        return StaticAsset { path: "web/ide_flow_session.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/ide_side_panel.js" {
+        return StaticAsset { path: "web/ide_side_panel.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/ide_assistant.js" {
+        return StaticAsset { path: "web/ide_assistant.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/ide_assistant_diff.js" {
+        return StaticAsset { path: "web/ide_assistant_diff.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/ide_assistant_inline.js" {
+        return StaticAsset { path: "web/ide_assistant_inline.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/ide_context_menu.js" {
+        return StaticAsset { path: "web/ide_context_menu.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/ide_context_menus.js" {
+        return StaticAsset { path: "web/ide_context_menus.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/ide_context_menu.css" {
+        return StaticAsset { path: "web/ide_context_menu.css", mime: "text/css; charset=utf-8", found: true }
+    }
+    if url == "/ide_assistant.css" {
+        return StaticAsset { path: "web/ide_assistant.css", mime: "text/css; charset=utf-8", found: true }
+    }
+    if url == "/ide_projects.js" {
+        return StaticAsset { path: "web/ide_projects.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/ide_debugger.js" {
+        return StaticAsset { path: "web/ide_debugger.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/ide_flow_help.js" {
+        return StaticAsset { path: "web/ide_flow_help.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/ide_flow_help.css" {
+        return StaticAsset { path: "web/ide_flow_help.css", mime: "text/css; charset=utf-8", found: true }
+    }
+    if url == "/ide_flow_data.js" {
+        return StaticAsset { path: "web/ide_flow_data.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/ide_data_view.js" {
+        return StaticAsset { path: "web/ide_data_view.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/ide_packages_view.js" {
+        return StaticAsset { path: "web/ide_packages_view.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/plot_pane.js" {
+        return StaticAsset { path: "web/plot_pane.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/flow_plots.js" {
+        return StaticAsset { path: "web/flow_plots.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/ide_flow_packages.js" {
+        return StaticAsset { path: "web/ide_flow_packages.js", mime: "text/javascript; charset=utf-8", found: true }
+    }
+    if url == "/ide_search_everywhere.js" {
+        return StaticAsset { path: "web/ide_search_everywhere.js", mime: "text/javascript; charset=utf-8", found: true }
     }
     # Serve the same browser workspace under the native Flow-owned loopback server.
     # Every asset is allowlisted; URL paths are never used as filesystem paths.

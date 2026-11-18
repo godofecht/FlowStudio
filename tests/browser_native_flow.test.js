@@ -18,9 +18,12 @@ const localhost = new URL("http://127.0.0.1:8751/app/");
 test("native execution is limited to the exact loopback FlowStudio origin", async () => {
   assert.equal(native.available(localhost), true);
   assert.equal(native.available(new URL("http://localhost:8751/app/")), true);
+  // FLOWSTUDIO_PORT moves the server; the page talks to its own origin.
+  assert.equal(native.available(new URL("http://127.0.0.1:8779/app/")), true);
   for (const url of [
     "https://godofecht.github.io/FlowStudio/app/",
-    "http://localhost:8752/app/",
+    "http://localhost/app/",
+    "http://localhost:80/app/",
     "http://127.0.0.1.evil.invalid:8751/app/",
     "https://localhost:8751/app/"
   ]) assert.equal(native.available(new URL(url)), false, url);
@@ -120,6 +123,20 @@ test("Flow check retains multiple source-owned compiler locations and de-duplica
       {line:4,column:2,message:"type error: expected i32"}
     ]
   }));
+});
+
+test("Flow check maps the staged check source but not the bridge module beside it", async () => {
+  // The strict check stages prog.flow in a private directory next to
+  // flowstudio.flow, so `import flowstudio` resolves.
+  const output = [
+    "/tmp/flowstudio-check-Xy12Ab/prog.flow:2:12: parse error: unexpected token '?'",
+    "/tmp/flowstudio-check-Xy12Ab/flowstudio.flow:9:1: error: the bridge module",
+    "/tmp/flowstudio-check-Xy12Ab/prog.flow.c:3:1: error: not the source"
+  ].join("\n");
+  await withBrowser(localhost, async () => ({ok:false, status:422, headers:{get:()=>null}, text:async()=>output}),
+    async () => assert.deepEqual((await native.checkSyntax("bad source")).diagnostics, [
+      {line:2,column:12,message:"parse error: unexpected token '?'"}
+    ]));
 });
 
 test("Flow check never maps imported-file or generated-C errors into the current source", async () => {

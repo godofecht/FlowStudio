@@ -1,4 +1,4 @@
-"""Exercise the real Rscript-backed IPC transport, not a mocked interpreter."""
+"""Exercise the real Rscript-backed IPC transport against a live R interpreter."""
 from pathlib import Path
 import os
 import shutil
@@ -17,6 +17,8 @@ class NativeRSessionTest(unittest.TestCase):
             subprocess.run([
                 "cc", "-std=c11", "-Wall", "-Wextra", "-Werror", "-O2",
                 str(ROOT / "src/r_session.c"),
+                # The session relays bridge calls; link the bridge and the other session.
+                str(ROOT / "src/polyglot_bridge.c"), str(ROOT / "src/python_session.c"),
                 str(ROOT / "tests/r_session_harness.c"),
                 "-o", str(binary),
             ], cwd=ROOT, check=True, capture_output=True, text=True, timeout=30)
@@ -76,8 +78,8 @@ class NativeRSessionTest(unittest.TestCase):
             next_index = mirror / "PACKAGES.next"
             next_index.write_bytes((mirror / "PACKAGES").read_bytes())
             (mirror / "PACKAGES").write_bytes(first_index)
-            # Force available.packages(cacheOK=FALSE) to read the index switched
-            # by the harness, not a stale compressed index.
+            # Force available.packages(cacheOK=FALSE) to read the index the
+            # harness just switched. Stale compressed indexes are removed.
             for suffix in ("PACKAGES.gz", "PACKAGES.rds"):
                 (mirror / suffix).unlink(missing_ok=True)
             environment["FLOWSTUDIO_R_TEST_PACKAGES_NEXT"] = str(next_index)

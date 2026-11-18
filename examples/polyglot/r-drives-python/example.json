@@ -1,0 +1,12 @@
+{
+  "id": "polyglot-r-drives-python",
+  "order": 2,
+  "title": "R drives Python",
+  "description": "Python's re module parses raw log lines, R aggregates and plots them. py$name and py(\"...\") from inside an R script.",
+  "files": ["requests.R"],
+  "steps": [
+    "Press Run. The R script hands its log lines to Python with py$lines.",
+    "Python parses them; py$requests comes back as a data.frame.",
+    "R aggregates and draws a boxplot in the Plots view."
+  ]
+}

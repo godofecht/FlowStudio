@@ -17,6 +17,7 @@
 #include <string.h>
 #include <strings.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/time.h>
 #include <unistd.h>
 
@@ -26,6 +27,8 @@ static char fs_headers[FS_HEADER_LIMIT + 1];
 static char fs_payload[FS_BODY_LIMIT + 1];
 static char fs_http_method[12];
 static char fs_http_path[256];
+/* Validator for the static asset about to be sent; empty for API replies. */
+static char fs_etag[80];
 
 static int fs_write_all(int fd, const char *data, size_t n)
 {
@@ -40,13 +43,23 @@ static int fs_write_all(int fd, const char *data, size_t n)
     return 0;
 }
 
+void fs_reply_bytes(int code, const char *content_type, const char *body, size_t length);
+
 void fs_reply(int code, const char *content_type, const char *body)
 {
-    if (fs_client < 0) return;
     if (!body) body = "";
+    fs_reply_bytes(code, content_type, body, strlen(body));
+}
+
+/* Binary-safe reply: the body may hold NUL bytes (WebAssembly). */
+void fs_reply_bytes(int code, const char *content_type, const char *body, size_t length)
+{
+    if (fs_client < 0) return;
+    if (!body) { body = ""; length = 0; }
     if (!content_type) content_type = "text/plain; charset=utf-8";
 
     const char *reason = code == 200 ? "OK" :
+        code == 304 ? "Not Modified" :
         code == 400 ? "Bad Request" :
         code == 403 ? "Forbidden" :
         code == 404 ? "Not Found" :
@@ -55,23 +68,36 @@ void fs_reply(int code, const char *content_type, const char *body)
         code == 422 ? "Unprocessable Content" :
         code == 503 ? "Service Unavailable" :
         code == 504 ? "Gateway Timeout" : "Internal Server Error";
-    char header[1024];
+    /* Static assets carry an ETag and are revalidated on every use, so a
+       reload transfers only what changed. Everything else is never stored. */
+    int cached = fs_etag[0] && (code == 200 || code == 304);
+    char validator[112] = "";
+    if (cached) snprintf(validator, sizeof(validator), "ETag: %s\r\n", fs_etag);
+    /* A 304 has no body, and its headers update the stored response, so it
+       names no type or length of its own. */
+    char framing[160] = "";
+    if (code == 304) length = 0;
+    else snprintf(framing, sizeof(framing), "Content-Type: %s\r\nContent-Length: %zu\r\n",
+                  content_type, length);
+    char header[1200];
     int n = snprintf(header, sizeof(header),
         "HTTP/1.1 %d %s\r\n"
-        "Content-Type: %s\r\n"
-        "Content-Length: %zu\r\n"
-        "Cache-Control: no-store\r\n"
+        "%s"
+        "Cache-Control: %s\r\n"
+        "%s"
         "X-Content-Type-Options: nosniff\r\n"
         "X-Frame-Options: SAMEORIGIN\r\n"
         "Content-Security-Policy: frame-ancestors 'self'\r\n"
         "Referrer-Policy: no-referrer\r\n"
         "Connection: close\r\n\r\n",
-        code, reason, content_type, strlen(body));
+        code, reason, framing,
+        cached ? "no-cache" : "no-store", validator);
+    fs_etag[0] = 0;
 
     if (n > 0 && (size_t)n < sizeof(header))
     {
         (void)fs_write_all(fs_client, header, (size_t)n);
-        (void)fs_write_all(fs_client, body, strlen(body));
+        (void)fs_write_all(fs_client, body, length);
     }
     /* Early rejection can leave unread request bytes in the socket. Drain
        already-buffered bytes after shutting down writes, avoiding an RST
@@ -81,6 +107,36 @@ void fs_reply(int code, const char *content_type, const char *body)
     while (recv(fs_client, discard, sizeof(discard), MSG_DONTWAIT) > 0) {}
     close(fs_client);
     fs_client = -1;
+}
+
+/* The loopback port: FLOWSTUDIO_PORT when set to 1024..65535, else 8751.
+ * The Host and Origin checks below follow it. */
+static int fs_port_value = 0;
+static char fs_host_ip[32], fs_host_name[32], fs_origin_ip[48], fs_origin_name[48];
+
+int fs_port(void)
+{
+    if (fs_port_value) return fs_port_value;
+    int port = 8751;
+    const char *raw = getenv("FLOWSTUDIO_PORT");
+    if (raw && *raw)
+    {
+        char *end = NULL;
+        long value = strtol(raw, &end, 10);
+        if (end && *end == 0 && value >= 1024 && value <= 65535) port = (int)value;
+    }
+    fs_port_value = port;
+    snprintf(fs_host_ip, sizeof(fs_host_ip), "127.0.0.1:%d", port);
+    snprintf(fs_host_name, sizeof(fs_host_name), "localhost:%d", port);
+    snprintf(fs_origin_ip, sizeof(fs_origin_ip), "http://127.0.0.1:%d", port);
+    snprintf(fs_origin_name, sizeof(fs_origin_name), "http://localhost:%d", port);
+    return port;
+}
+
+const char *fs_origin(void)
+{
+    (void)fs_port();
+    return fs_origin_ip;
 }
 
 int fs_listen(int port)
@@ -165,8 +221,8 @@ int fs_intent_allowed(void)
        this server never grants cross-origin requests. */
     if (!fs_header_equals("X-FlowStudio-Intent", "run", 0)) return 0;
     if (fs_header_value("Origin") &&
-        !fs_header_equals("Origin", "http://127.0.0.1:8751", 0) &&
-        !fs_header_equals("Origin", "http://localhost:8751", 0))
+        !fs_header_equals("Origin", fs_origin_ip, 0) &&
+        !fs_header_equals("Origin", fs_origin_name, 0))
         return 0;
     return 1;
 }
@@ -182,6 +238,7 @@ int fs_read_request(int listener)
     memset(fs_payload, 0, sizeof(fs_payload));
     memset(fs_http_method, 0, sizeof(fs_http_method));
     memset(fs_http_path, 0, sizeof(fs_http_path));
+    fs_etag[0] = 0;
 
     int n = 0;
     while (n < FS_HEADER_LIMIT)
@@ -206,8 +263,9 @@ int fs_read_request(int listener)
 
     /* DNS rebinding defence: never serve executable endpoints under an
        arbitrary Host header, even if DNS resolves that host to loopback. */
-    if ((!fs_header_equals("Host", "127.0.0.1:8751", 1) &&
-         !fs_header_equals("Host", "localhost:8751", 1)) ||
+    (void)fs_port();
+    if ((!fs_header_equals("Host", fs_host_ip, 1) &&
+         !fs_header_equals("Host", fs_host_name, 1)) ||
         fs_header_count("Host") != 1)
     {
         fs_reply(403, "text/plain", "Invalid Host header");
@@ -264,6 +322,35 @@ const char *fs_method(void) { return fs_http_method; }
 const char *fs_path(void) { return fs_http_path; }
 const char *fs_body(void) { return fs_payload; }
 
+/* Conditional GET for a checked-in static asset. The validator is the file's
+ * size, inode and modification time, so a revalidation reads no file.
+ * Returns 1 after replying 304 Not Modified. Otherwise it keeps the ETag for
+ * the 200 reply that follows and returns 0. */
+int fs_static_fresh(const char *path)
+{
+    struct stat info;
+    fs_etag[0] = 0;
+    if (!path || stat(path, &info) != 0 || !S_ISREG(info.st_mode)) return 0;
+#if defined(__APPLE__)
+    long nsec = (long)info.st_mtimespec.tv_nsec;
+#else
+    long nsec = (long)info.st_mtim.tv_nsec;
+#endif
+    snprintf(fs_etag, sizeof(fs_etag), "\"%llx-%llx-%llx-%lx\"",
+        (unsigned long long)info.st_size, (unsigned long long)info.st_ino,
+        (unsigned long long)info.st_mtime, (unsigned long)nsec);
+    const char *sent = fs_header_value("If-None-Match");
+    if (!sent) return 0;
+    size_t n = strlen(fs_etag);
+    const char *end = strstr(sent, "\r\n");
+    if (end && (size_t)(end - sent) == n && strncmp(sent, fs_etag, n) == 0)
+    {
+        fs_reply_bytes(304, "text/plain; charset=utf-8", "", 0);
+        return 1;
+    }
+    return 0;
+}
+
 /* A unique, pre-created compiler output path; never execute generated C. */
 const char *fs_make_temp_c(void)
 {
@@ -315,6 +402,7 @@ const char *fs_write_temp_flow(const char *code)
  * then bundle from the compiler's own lib/stdlib fallback. Returns the
  * program path, or "" after cleaning up the half-built directory. */
 static char fs_last_run_dir[64];
+void fs_clean_run_dir(void);
 
 const char *fs_write_temp_flow_run(const char *code)
 {
@@ -385,16 +473,54 @@ const char *fs_write_temp_flow_run(const char *code)
     return prog;
 }
 
-/* Remove the staging directory of the last backend run; a no-op when the
- * flat /tmp file path was used (its file is unlinked from Flow). */
+/* Stage a source for the strict compile check in a private directory with
+ * the bridge module beside it, the same layout a bridged run uses, so
+ * `import flowstudio { ... }` resolves during the check. Returns the program
+ * path, or "" after cleaning up. fs_clean_run_dir removes the directory. */
+const char *fs_write_temp_flow_check(const char *code)
+{
+    static char prog[96];
+    char library[96];
+    strcpy(fs_last_run_dir, "/tmp/flowstudio-check-XXXXXX");
+    if (mkdtemp(fs_last_run_dir) == NULL)
+    {
+        fs_last_run_dir[0] = 0;
+        return "";
+    }
+    snprintf(prog, sizeof(prog), "%s/prog.flow", fs_last_run_dir);
+    snprintf(library, sizeof(library), "%s/flowstudio.flow", fs_last_run_dir);
+    FILE *in = fopen("src/flowstudio.flow", "rb");
+    FILE *out = in ? fopen(library, "wb") : NULL;
+    int ok = in && out;
+    char buffer[8192];
+    size_t n;
+    while (ok && (n = fread(buffer, 1, sizeof(buffer), in)) > 0)
+        ok = fwrite(buffer, 1, n, out) == n;
+    if (in) fclose(in);
+    if (out && fclose(out) != 0) ok = 0;
+    FILE *source = ok ? fopen(prog, "wb") : NULL;
+    if (!source || fputs(code, source) < 0) ok = 0;
+    if (source && fclose(source) != 0) ok = 0;
+    if (!ok)
+    {
+        fs_clean_run_dir();
+        return "";
+    }
+    return prog;
+}
+
+/* Remove the staging directory of the last backend run or check; a no-op
+ * when the flat /tmp file path was used (its file is unlinked from Flow). */
 void fs_clean_run_dir(void)
 {
     if (fs_last_run_dir[0] == 0) return;
-    char prog[96], toml[96];
+    char prog[96], toml[96], library[96];
     snprintf(prog, sizeof(prog), "%s/prog.flow", fs_last_run_dir);
     snprintf(toml, sizeof(toml), "%s/flow.toml", fs_last_run_dir);
+    snprintf(library, sizeof(library), "%s/flowstudio.flow", fs_last_run_dir);
     unlink(prog);
     unlink(toml);
+    unlink(library);
     rmdir(fs_last_run_dir);
     fs_last_run_dir[0] = 0;
 }

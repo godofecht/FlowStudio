@@ -1,0 +1,12 @@
+{
+  "id": "graphics-pong",
+  "order": 2,
+  "title": "Pong",
+  "description": "First to seven against a tracking AI. Ball angle depends on where it meets the paddle.",
+  "files": ["app.flow"],
+  "steps": [
+    "Press Run. It compiles to WebAssembly and plays in the Preview.",
+    "Click the canvas to give it the keyboard. W/S or the arrow keys move your paddle. Space serves.",
+    "Edit a colour or constant and the Preview rebuilds as you type."
+  ]
+}

@@ -26,6 +26,9 @@ static int kernel_in = -1;
 static int kernel_out = -1;
 static int last_status = 503;
 static int kernel_ever_responded = 0;
+static int busy = 0;
+const char *fs_bridge_dispatch(char caller, const char *payload, size_t length, int *ok);
+int fs_bridge_reply(int fd, int ok, const char *text);
 static char result[FS_R_MAX + 1];
 
 static int64_t milliseconds(void)
@@ -131,7 +134,16 @@ static int decode_hex(const char *digits, size_t *value)
     return 1;
 }
 
+static const char *request_r_inner(char operation, const char *code);
 static const char *request_r(char operation, const char *code)
+{
+    busy = 1;
+    const char *reply = request_r_inner(operation, code);
+    busy = 0;
+    return reply;
+}
+
+static const char *request_r_inner(char operation, const char *code)
 {
     result[0] = 0;
     last_status = 503;
@@ -154,8 +166,23 @@ static const char *request_r(char operation, const char *code)
     if (!io_exact(kernel_in, header, 9, 1, deadline) ||
         !io_exact(kernel_in, (char *)code, source_length, 1, deadline)) goto failed;
     char response_header[9];
-    if (!io_exact(kernel_out, response_header, 9, 0, deadline)) goto failed;
-    kernel_ever_responded = 1;
+    /* While the code runs it may call another language: relay each "Q"
+     * request frame through the bridge and answer it on the kernel's stdin. */
+    for (;;)
+    {
+        if (!io_exact(kernel_out, response_header, 9, 0, deadline)) goto failed;
+        kernel_ever_responded = 1;
+        if (response_header[0] != 'Q') break;
+        size_t request_size = 0;
+        if (!decode_hex(response_header + 1, &request_size) || request_size > FS_R_MAX + 2) goto failed;
+        char *request = malloc(request_size + 1);
+        if (!request) goto failed;
+        if (!io_exact(kernel_out, request, request_size, 0, deadline)) { free(request); goto failed; }
+        int bridge_ok = 0;
+        const char *reply = fs_bridge_dispatch('r', request, request_size, &bridge_ok);
+        free(request);
+        if (!fs_bridge_reply(kernel_in, bridge_ok, reply)) goto failed;
+    }
     size_t size = 0;
     if ((response_header[0] != '0' && response_header[0] != '1') ||
         !decode_hex(response_header + 1, &size) || size > FS_R_MAX) goto failed;
@@ -191,3 +218,8 @@ const char *fs_r_install_package(const char *name) { return request_r('N', name)
 const char *fs_r_remove_package(const char *name) { return request_r('U', name); }
 const char *fs_r_update_package(const char *name) { return request_r('V', name); }
 int fs_r_status(void) { return last_status; }
+
+/* Bridge entry points: request is a format char followed by source. */
+const char *fs_r_bridge_eval(const char *request) { return request_r('Y', request); }
+int fs_r_bridge_ok(void) { return last_status == 200; }
+int fs_r_busy(void) { return busy; }

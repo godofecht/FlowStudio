@@ -14,6 +14,8 @@ const TERMINAL = (typeof module !== "undefined" && module.exports) ?
 const SESSION_MODULE = root.FlowStudioTerminalSessions;
 const INPUT_MODULE = root.FlowStudioTerminalInput;
 const PLOT_MODULE = root.FlowStudioPlotFigures;
+const FORMAT = (typeof module !== "undefined" && module.exports) ?
+  require("./console_format.js") : (root.FlowStudioConsoleFormat || null);
 
 const DOM_NODES_MAX = 800;   // painted nodes; older output collapses to a divider
 const NEAR_BOTTOM_PX = 48;
@@ -23,6 +25,32 @@ function h(doc, tag, className, text) {
   if (className) node.className = className;
   if (text !== undefined) node.textContent = text;
   return node;
+}
+
+/* The Flow console accepts bare statements. Top-level declarations
+ * (function, struct, enum, import, extern, type, const) stay at file scope;
+ * every other line becomes the body of a generated main(). A snippet that
+ * already defines main() is sent unchanged. */
+const FLOW_DECLARATION = /^(?:pub\s+)?(?:function|struct|enum|import|extern|type|const|trait|impl)\b/;
+function flowSnippetProgram(code) {
+  const source = String(code || "");
+  if (/(^|\n)\s*(?:pub\s+)?function\s+main\s*\(/.test(source)) return source;
+  const declarations = [];
+  const body = [];
+  let depth = 0;
+  let inDeclaration = false;
+  for (const line of source.split("\n")) {
+    if (depth === 0) inDeclaration = FLOW_DECLARATION.test(line.trimStart()) && line === line.trimStart();
+    (inDeclaration ? declarations : body).push(line);
+    for (const char of line.replace(/"(?:[^"\\]|\\.)*"/g, '""').replace(/#.*$/, "")) {
+      if (char === "{") depth++;
+      else if (char === "}") depth = Math.max(0, depth - 1);
+    }
+  }
+  if (!body.some(line => line.trim())) return source;
+  const indented = body.map(line => line.trim() ? "    " + line : line);
+  return (declarations.length ? declarations.join("\n") + "\n\n" : "") +
+    "function main() -> i32 {\n" + indented.join("\n") + "\n    return 0\n}\n";
 }
 
 function mount(doc = document, request = fetch) {
@@ -147,18 +175,114 @@ function mount(doc = document, request = fetch) {
         session.state === "error" ? "warn" :
         session.state === "disconnected" ? "bad" :
         session.state === "running" ? "live" : "");
-    stateText.textContent = SESSION_MODULE.STATE_LABELS[session.state] || session.state;
+    // The transcript shows each run's outcome; the header only speaks up
+    // while something runs or when the server stops answering.
+    stateText.textContent = session.state === "running" || session.state === "disconnected" ?
+      (SESSION_MODULE.STATE_LABELS[session.state] || session.state) : "";
+    stateNode.hidden = !stateText.textContent;
     stateNode.title = stateText.textContent;
-    runtimeLabel.textContent = session.runtime + " · session " + session.ordinal +
-      (session.runtime === "flow" ? "" : " · shared interpreter");
-    durationNode.textContent =
-      session.running && session.lastCommandTs ?
-        "running " + SESSION_MODULE.formatDuration(Date.now() - session.lastCommandTs) :
-        session.state !== "running" && session.lastDurationMs !== null ?
-          "last " + SESSION_MODULE.formatDuration(session.lastDurationMs) : "";
+    runtimeLabel.textContent = "";
+    statusRow.title = session.runtime + " session " + session.ordinal +
+      (session.runtime === "flow" ? "" : ", shared interpreter");
+    durationNode.textContent = "";
+  }
+
+  /* A run reads as the command, then its output. The command line carries
+   * the state: a spinner while it runs, a red prompt when it failed, and the
+   * time only when the run took a second or more. Clock times live in the
+   * tooltip. */
+  function commandNode(entry, session) {
+    const line = h(doc, "div", "term-line term-run");
+    line.dataset.kind = "cmd";
+    line.dataset.state = entry.state || "ok";
+    const label = typeof entry.label === "string" && entry.label;
+    const glyph = h(doc, "span", "term-glyph", label ? "\u25B6" : promptGlyph(session.runtime));
+    glyph.setAttribute("aria-hidden", "true");
+    const body = h(doc, "span", "term-body term-cmd" + (label ? " term-label" : ""));
+    if (label) body.textContent = label;
+    else body.innerHTML = INPUT_MODULE.highlight(entry.text.replace(/^> /, ""), session.runtime);
+    const state = h(doc, "span", "term-state");
+    if (entry.state === "running") state.setAttribute("aria-label", "running");
+    else if (entry.state === "error") state.setAttribute("aria-label", "failed");
+    else if (entry.state === "disconnected") state.textContent = "no reply from the server";
+    if (entry.state !== "running" && Number.isFinite(entry.ms) && entry.ms >= 1000)
+      state.append(h(doc, "span", "term-time", SESSION_MODULE.formatDuration(entry.ms)));
+    line.title = [entry.ts, Number.isFinite(entry.ms) ? SESSION_MODULE.formatDuration(entry.ms) : "",
+      entry.state === "error" ? "failed" : ""].filter(Boolean).join(" \u00B7 ");
+    line.append(glyph, body, state);
+    return line;
+  }
+
+  function promptGlyph(runtime) { return (runtime === "r" ? "r" : runtime) + " \u276F"; }
+
+  /* Output, cleaned by console_format.js: program output as it was printed,
+   * problems as one marked line each, the raw log behind a toggle. */
+  function outputNode(entry, session) {
+    const block = h(doc, "div", "term-line term-output");
+    block.dataset.kind = "out";
+    if (entry.ts) block.title = entry.ts;
+    const formatted = FORMAT && entry.formatted !== false ?
+      FORMAT.format(session.runtime, entry.text, entry.ok !== false) : null;
+    if (!formatted) {
+      const body = h(doc, "span", "term-body");
+      body.innerHTML = TERMINAL.render(entry.text);
+      block.append(body);
+      return block;
+    }
+    let plain = "";
+    const flush = () => {
+      if (!plain) return;
+      const body = h(doc, "div", "term-body");
+      body.innerHTML = TERMINAL.render(plain);
+      block.append(body);
+      plain = "";
+    };
+    for (const line of formatted.lines) {
+      if (line.kind === "out") { plain += line.text + "\n"; continue; }
+      flush();
+      const row = h(doc, "div", "term-msg term-" + line.kind);
+      // The context menu (web/ide_context_menus.js) reads these.
+      row.dataset.msgKind = line.kind;
+      if (line.line) { row.dataset.line = String(line.line); if (line.column) row.dataset.column = String(line.column); }
+      if (entry.source === "editor") row.dataset.source = "editor";
+      if (line.line && entry.source === "editor") {
+        const jump = h(doc, "button", "term-jump", "line " + line.line);
+        jump.type = "button";
+        jump.title = "Go to line " + line.line + " in the editor";
+        jump.addEventListener("click", () => goToLine(line.line, line.column));
+        row.append(jump);
+      } else if (line.line && line.kind !== "dim" && entryLines(entry) > 1) {
+        row.append(h(doc, "span", "term-where", "line " + line.line));
+      }
+      row.append(h(doc, "span", "term-text", line.kind === "dim" && line.line ? line.text.replace(/^line \d+, /, "") : line.text));
+      block.append(row);
+    }
+    flush();
+    if (formatted.detail) {
+      const details = h(doc, "details", "term-detail");
+      details.append(h(doc, "summary", "", "Full log"), h(doc, "pre", "", formatted.detail.replace(/\s+$/, "")));
+      block.append(details);
+    }
+    return block;
+  }
+
+  function entryLines(entry) {
+    const command = entry.command;
+    return typeof command === "string" ? command.split("\n").length : 1;
+  }
+
+  function goToLine(line, column) {
+    const editor = root.FlowStudioEditor && root.FlowStudioEditor.editor;
+    if (!editor) return;
+    const position = { lineNumber: line, column: column || 1 };
+    editor.setPosition(position);
+    editor.revealLineInCenter(line);
+    editor.focus();
   }
 
   function entryNode(entry, session) {
+    if (entry.kind === "cmd") return commandNode(entry, session);
+    if (entry.kind === "out") return outputNode(entry, session);
     const line = h(doc, "div", "term-line");
     line.dataset.kind = entry.kind;
     if (entry.kind === "fig") {
@@ -167,19 +291,17 @@ function mount(doc = document, request = fetch) {
       line.dataset.figPending = "1";
       return line;
     }
-    if (entry.ts) line.append(h(doc, "span", "term-ts", entry.ts));
+    if (entry.ts) line.title = entry.ts;
     const body = h(doc, "span", "term-body" +
-      (entry.kind === "cmd" ? " term-cmd" :
-        entry.kind === "meta" ? " term-meta" :
+      (entry.kind === "meta" ? " term-meta" :
         entry.kind === "notice" ? " term-notice" : ""));
-    body.innerHTML = entry.kind === "cmd" ?
-      "&gt; " + INPUT_MODULE.highlight(entry.text.replace(/^> /, ""), session.runtime) :
-      TERMINAL.render(entry.text);
+    body.innerHTML = TERMINAL.render(entry.text);
     line.append(body);
     return line;
   }
 
   const blobUrls = new Set();
+  const entryOf = new WeakMap();
   function renderEntries() {
     const session = sessions.active();
     const query = searchOpen ? searchInput.value.trim().toLowerCase() : "";
@@ -193,7 +315,11 @@ function mount(doc = document, request = fetch) {
         "… " + (visible.length - shown.length) + " earlier entries hidden (search narrows the view)");
       nodes.push(more);
     }
-    for (const entry of shown) nodes.push(entryNode(entry, session));
+    for (const entry of shown) {
+      const node = entryNode(entry, session);
+      entryOf.set(node, entry);
+      nodes.push(node);
+    }
     output.replaceChildren(...nodes);
     if (query) {
       searchCount.textContent = visible.length === 0 ? "no matches" :
@@ -275,7 +401,7 @@ function mount(doc = document, request = fetch) {
     result.dataset.state = kind;
   }
 
-  /* ---------- execution path (unchanged semantics, session-aware) ---------- */
+  /* ---------- execution path (session-aware) ---------- */
   async function submit(name, code) {
     if ((editorRun && editorRun.disabled) || (editorCell && editorCell.disabled)) {
       status("Wait for editor execution to finish.", "error");
@@ -286,6 +412,8 @@ function mount(doc = document, request = fetch) {
     const active = sessions.active();
     const session = active.runtime === name ? active :
       (sessions.findSession(name) || sessions.createFor(name));
+    // The command moves into the transcript the moment it is sent.
+    if (prompt.value === code) prompt.value = "";
     sessions.recordCommand(session, code);
     sessions.beginRun(name, session);
     const startedAt = Date.now();
@@ -294,20 +422,33 @@ function mount(doc = document, request = fetch) {
     prompt.set(true);
     status("Running " + name + " …");
     try {
-      const response = await request("/api/run/" + name, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain; charset=utf-8",
-          "X-FlowStudio-Intent": "run" },
-        body: code
-      });
-      const text = await response.text();
-      sessions.appendTo(session, text + (text.endsWith("\n") ? "" : "\n"), "out");
+      // Flow entries join the persistent Flow session when it is loaded.
+      const flowSession = name === "flow" && root.FlowStudioFlowSession &&
+        root.FlowStudioFlowSession.client;
+      let response, text, reported = null;
+      if (flowSession) {
+        const result = await flowSession.evaluate(code);
+        response = { ok: result.ok, status: result.status };
+        if (result.data && typeof result.data.ok === "boolean") reported = result.data.ok;
+        text = result.data && typeof result.data.output === "string" ? result.data.output : result.text;
+      } else {
+        response = await request("/api/run/" + name, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain; charset=utf-8",
+            "X-FlowStudio-Intent": "run" },
+          body: name === "flow" ? flowSnippetProgram(code) : code
+        });
+        text = await response.text();
+      }
+      const succeeded = reported === null ? response.ok : response.ok && reported;
+      if (text) sessions.appendTo(session, text + (text.endsWith("\n") ? "" : "\n"), "out",
+        { ok: succeeded, command: code, source: "console" });
       status(response.ok ? "Finished" :
         response.status === 422 ? "Execution failed" :
         response.status === 503 ? "Interpreter unavailable" :
         response.status === 504 ? "Execution timed out" :
         "HTTP error " + response.status, response.ok ? "ok" : "error");
-      sessions.endRun(session, response.ok ? "ok" : "error", Date.now() - startedAt);
+      sessions.endRun(session, succeeded ? "ok" : "error", Date.now() - startedAt);
       if (response.ok && (name === "r" || name === "python")) {
         try { await inlineFigures(name, session); } catch (_) {}
       }
@@ -316,8 +457,10 @@ function mount(doc = document, request = fetch) {
       draftsBySession.set(session.id, "");
       return true;
     } catch (error) {
-      sessions.appendTo(session, String(error) + "\n", "out");
+      sessions.appendTo(session, String(error) + "\n", "out", { formatted: false });
       sessions.endRun(session, "disconnected", Date.now() - startedAt);
+      // Nothing ran, so give the command back.
+      if (!prompt.value) prompt.value = code;
       status("Execution request failed", "error");
       return false;
     } finally {
@@ -348,6 +491,21 @@ function mount(doc = document, request = fetch) {
         sessions.append(typeof runtime === "string" ? runtime : null, text,
           kind === "cmd" || kind === "meta" || kind === "notice" ? kind : "out");
       },
+      /* An editor run: one "▶ label" line whose state follows the run,
+       * then the cleaned output. Diagnostics link to editor lines. */
+      begin(runtime, label) {
+        if (!SESSION_MODULE.RUNTIMES.includes(runtime)) return null;
+        const session = sessions.findSession(runtime) || sessions.createFor(runtime);
+        sessions.recordLabel(session, label);
+        sessions.beginRun(runtime, session);
+        return { session, startedAt: Date.now() };
+      },
+      finish(run, ok, output) {
+        if (!run || !run.session) return;
+        if (output) sessions.appendTo(run.session, output.endsWith("\n") ? output : output + "\n", "out",
+          { ok: Boolean(ok), source: "editor" });
+        sessions.endRun(run.session, ok ? "ok" : "error", Date.now() - run.startedAt);
+      },
       clear() { sessions.clearVisible(sessions.active()); }
     });
   }
@@ -376,7 +534,7 @@ function mount(doc = document, request = fetch) {
   exportItem.setAttribute("role", "menuitem");
   exportItem.id = "terminalMenuExport";
   exportItem.textContent = "Download this session transcript (.txt)";
-  exportItem.title = "Includes commands and output, which may contain secrets. Figures are referenced, not embedded.";
+  exportItem.title = "Includes commands and output, which may contain secrets. Figures are included as references.";
 
   const resetItem = h(doc, "button", "terminal-menuitem");
   resetItem.type = "button";
@@ -384,7 +542,7 @@ function mount(doc = document, request = fetch) {
   resetItem.id = "terminalMenuReset";
   resetItem.textContent = "Reset interpreter state…";
   resetItem.disabled = true;
-  resetItem.title = "Python and R only; Flow compiles each program from scratch.";
+  resetItem.title = "Clears the variables and definitions of this runtime's session.";
 
   const rememberLabel = h(doc, "label", "terminal-menuitem terminal-menu-flag");
   rememberLabel.id = "consoleRememberHistory";
@@ -422,12 +580,12 @@ function mount(doc = document, request = fetch) {
   async function doReset() {
     const session = sessions.active();
     const name = session.runtime;
-    if (name !== "python" && name !== "r") return;
+    if (name !== "python" && name !== "r" && name !== "flow") return;
     if (!resetArmed) { armToggle(); return; }
     disarmReset();
     hideMenu();
     try {
-      const response = await request("/api/reset/" + name, {
+      const response = await request(name === "flow" ? "/api/flow/session/reset" : "/api/reset/" + name, {
         method: "POST",
         headers: { "Content-Type": "text/plain; charset=utf-8",
           "X-FlowStudio-Intent": "run" },
@@ -497,7 +655,7 @@ function mount(doc = document, request = fetch) {
   });
   menuButton.addEventListener("click", () => {
     const runtime = sessions.active().runtime;
-    resetItem.disabled = !(runtime === "python" || runtime === "r");
+    resetItem.disabled = !(runtime === "python" || runtime === "r" || runtime === "flow");
     menu.hidden = !menu.hidden;
     menuButton.setAttribute("aria-expanded", String(!menu.hidden));
     if (!menu.hidden) { disarmReset(); newSessionItem.focus(); }
@@ -509,7 +667,10 @@ function mount(doc = document, request = fetch) {
     if (!menu.hidden && !menu.contains(event.target) && event.target !== menuButton)
       hideMenu();
   });
-  panel.append(menu, tabbar, statusRow, searchbar, transcript);
+  /* Session tabs and status share one header row. */
+  const head = h(doc, "div", "terminal-head");
+  head.append(tabbar, statusRow);
+  panel.append(menu, head, searchbar, transcript);
 
   /* ---------- search ---------- */
   let searchOpen = false;
@@ -553,9 +714,7 @@ function mount(doc = document, request = fetch) {
   });
 
   /* ---------- editor runtime selector → sessions ---------- */
-  const intro = "FlowStudio terminal ready. Enter runs the command; " +
-    "Shift+Enter adds a newline. Python and R keep session state; Flow " +
-    "compiles each command as a program.\n";
+  const intro = "Enter runs. Shift+Enter adds a line. \u2191 brings back earlier commands.\n";
   sessions.append(sessions.active().runtime, intro, "notice");
   if (language) {
     language.addEventListener("change", () => {
@@ -566,10 +725,45 @@ function mount(doc = document, request = fetch) {
   }
   prompt.setRuntime(sessions.active().runtime);
   paint();
+  // The editor sends lines here with Ctrl+Enter.
+  root.FlowStudioConsoleSubmit = (name, code) => submit(name, code);
+  /* What the context menu needs: the entry under a node, the run it
+   * belongs to (its command line and the output after it), and actions. */
+  function runOf(entry) {
+    const list = sessions.active().entries;
+    let at = list.indexOf(entry);
+    if (at < 0) return null;
+    while (at > 0 && list[at].kind !== "cmd") at--;
+    if (list[at].kind !== "cmd") return null;
+    const command = list[at];
+    const after = [];
+    for (let i = at + 1; i < list.length && list[i].kind !== "cmd"; i++) after.push(list[i]);
+    const code = command.label ? "" : command.text.replace(/^> /, "");
+    return { command, label: command.label || "", code, runtime: sessions.active().runtime,
+      output: after.filter(item => item.kind === "out").map(item => item.text).join(""), entries: [command, ...after] };
+  }
+  root.FlowStudioConsoleView = Object.freeze({
+    entryFor(node) {
+      for (let at = node; at && at !== output; at = at.parentElement) if (entryOf.has(at)) return entryOf.get(at);
+      return null;
+    },
+    runOf,
+    lastRun() {
+      const list = sessions.active().entries;
+      for (let i = list.length - 1; i >= 0; i--) if (list[i].kind === "cmd") return runOf(list[i]);
+      return null;
+    },
+    rerun(run) { return run && run.code ? submit(run.runtime, run.code) : Promise.resolve(false); },
+    clear() { sessions.clearVisible(sessions.active()); },
+    search() { openSearch(); },
+    goToLine,
+    runtime: () => sessions.active().runtime,
+    transcript: () => transcript
+  });
   return controller;
 }
 
-const api = Object.freeze({ mount, DOM_NODES_MAX });
+const api = Object.freeze({ mount, DOM_NODES_MAX, flowSnippetProgram });
 root.FlowStudioWorkspaceConsole = Object.freeze({ mount });
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 if (typeof document !== "undefined" && document.getElementById("console") &&

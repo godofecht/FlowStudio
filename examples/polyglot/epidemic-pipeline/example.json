@@ -1,0 +1,14 @@
+{
+  "id": "polyglot-epidemic-pipeline",
+  "order": 5,
+  "title": "Flow, Python and R pipeline",
+  "description": "Three files, three languages, no data files: Flow simulates, Python reshapes, R models and plots. Run runs all three in order.",
+  "files": ["1_simulate.flow", "2_wrangle.py", "3_model.R"],
+  "runProject": true,
+  "steps": [
+    "Press Run. Run project executes the three files in order.",
+    "1_simulate.flow fills the Python variable runs.",
+    "2_wrangle.py builds tidy rows and sends them to R as epidemic and peaks.",
+    "3_model.R fits early growth rates, checks them with Python, and plots all runs."
+  ]
+}

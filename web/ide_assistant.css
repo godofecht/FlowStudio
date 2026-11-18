@@ -1,0 +1,77 @@
+/* Inline diffs, the Ctrl+K prompt bar and the chat additions for the
+ * Assistant (web/ide_assistant_inline.js, web/ide_assistant.js). */
+
+/* ---------- inline diff in Monaco ---------- */
+.monaco-editor .fs-diff-del{background:#d9645a29}
+.monaco-editor .fs-diff-del.fs-diff-streaming{background:#d9645a1a}
+.monaco-editor .fs-diff-del-gutter{border-left:3px solid #d9645a;margin-left:3px}
+.monaco-editor .fs-diff-add{background:#5fb87a24;box-shadow:inset 3px 0 0 #5fb87a;white-space:pre;color:#cdd1d8;overflow:hidden}
+.monaco-editor .fs-diff-add.fs-diff-streaming{background:#5fb87a18}
+.monaco-editor .fs-diff-add-code{padding-left:0}
+.monaco-editor .fs-diff-add-code br{display:block}
+.monaco-editor .fs-diff-add-margin{background:#5fb87a24;box-shadow:inset -3px 0 0 #5fb87a}
+.monaco-editor .fs-inline-region{background:#5b93ff0d}
+
+.fs-hunk-bar{position:absolute;display:flex;gap:2px;z-index:5;padding:1px;border-radius:5px;background:#22252b;border:1px solid #373c45;box-shadow:0 2px 8px #0006}
+.fs-hunk-bar button{height:19px;padding:0 7px;border:0;border-radius:4px;font:var(--text-sm) var(--font-ui);cursor:pointer;background:transparent;color:#c9cfd8}
+.fs-hunk-bar .fs-hunk-accept{background:#2f6b47;color:#e6f4ea}
+.fs-hunk-bar .fs-hunk-accept:hover{background:#3a8257}
+.fs-hunk-bar .fs-hunk-reject:hover{background:#4a2b2b;color:#ffd3cd}
+
+.fs-review-bar{display:flex;align-items:center;gap:8px;margin:0 18px 12px 0;padding:5px 6px 5px 10px;border-radius:8px;background:#22252b;border:1px solid #3a3f48;box-shadow:0 6px 20px #0008;font:var(--text-sm) var(--font-ui);color:#c9cfd8;white-space:nowrap}
+.fs-review-bar button{height:24px;padding:0 10px;border-radius:5px;font-size:var(--text-sm)}
+.fs-review-label{max-width:260px;overflow:hidden;text-overflow:ellipsis}
+.fs-review-keys{color:#7d8591;font-size:var(--text-sm)}
+.fs-add,.as-add{color:#7fd39a}
+.fs-del,.as-del{color:#f08f86}
+
+/* ---------- the Ctrl+K prompt bar ---------- */
+.fs-inline-bar{position:absolute;display:flex;align-items:flex-start;gap:6px;box-sizing:border-box;padding:6px 30px 6px 8px;border:1px solid #3d4552;border-radius:8px;background:#20232a;box-shadow:0 6px 18px #0007;font:var(--text-sm) var(--font-ui);color:#c9cfd8;z-index:6}
+.fs-inline-bar[data-state="review"]{border-color:#3f6a51}
+.fs-inline-bar[data-state="failed"]{border-color:#7a4540}
+.fs-inline-input{flex:1;min-width:0;height:28px;max-height:96px;resize:none;padding:5px 8px;border:1px solid #333a45;border-radius:5px;background:#17191d;color:#e7edf8;font:var(--text-md)/1.4 var(--font-ui);outline:none}
+.fs-inline-input:focus{border-color:#5b93ff}
+.fs-inline-status{flex:none;align-self:center;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#9aa2ad;font-size:var(--text-sm)}
+.fs-inline-bar[data-state="failed"] .fs-inline-status{color:#ffb4a8;white-space:normal}
+.fs-inline-bar[data-state="thinking"] .fs-inline-status::after,.fs-inline-bar[data-state="writing"] .fs-inline-status::after,
+.as-thinking::after{content:"";display:inline-block;width:1.2em;text-align:left;animation:fs-dots 1.2s steps(4,end) infinite}
+@keyframes fs-dots{0%{content:""}25%{content:"."}50%{content:".."}75%{content:"..."}}
+.fs-inline-actions{display:flex;gap:4px;flex:none}
+.fs-inline-actions button{height:28px;padding:0 10px;border-radius:5px;font-size:var(--text-sm)}
+.fs-inline-close{position:absolute;top:6px;right:6px;width:20px;height:20px;padding:0;border:0;border-radius:4px;background:transparent;color:#8d95a1;font-size:var(--text-xl);line-height:18px;cursor:pointer}
+.fs-inline-bar.fs-inline-narrow{flex-wrap:wrap}
+.fs-inline-bar.fs-inline-narrow .fs-inline-input{flex-basis:100%}
+.fs-inline-bar.fs-inline-narrow .fs-inline-status{flex:1}
+.fs-inline-close:hover{background:#2c3038;color:#e7edf8}
+
+/* ---------- chat ---------- */
+.as-empty-keys{margin:8px 0 0;padding:0;list-style:none;display:grid;gap:4px}
+.as-empty-keys kbd{display:inline-block;min-width:34px;padding:0 5px;border:1px solid #3a3f47;border-radius:4px;background:#1f2228;color:#c9cfd8;font:var(--text-xs) var(--mono, monospace);text-align:center}
+.as-user-context{margin-top:4px;font-size:var(--text-sm);color:#9fb3a4}
+.as-thinking{font-size:var(--text-sm);color:#9aa2ad}
+.as-assistant[data-state="failed"] .as-body{opacity:.85}
+.as-chip{display:inline-flex;align-items:center;gap:2px;height:22px;padding:0 2px 0 8px;border-radius:11px;font-size:var(--text-sm);border:1px solid #4b6b5a;background:var(--accent-dim, #22385f);color:#dfe8e1}
+.as-chip-label{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.as-chip-remove{width:18px;height:18px;padding:0;border:0;border-radius:9px;background:transparent;color:#aab4c0;font-size:var(--text-md);line-height:16px;cursor:pointer}
+.as-chip-remove:hover{background:#ffffff1a;color:#fff}
+.as-chip-add{height:22px;min-width:24px;padding:0 6px;border-radius:11px;font-size:var(--text-sm);border:1px dashed #4a505a;background:transparent;color:#9aa2ad}
+.as-composer{position:relative}
+.as-mention-menu{position:absolute;left:8px;right:8px;bottom:100%;margin-bottom:4px;max-height:240px;overflow:auto;padding:4px;border:1px solid #3a3f48;border-radius:7px;background:#20232a;box-shadow:0 8px 24px #0009;z-index:20}
+.as-mention{display:flex;gap:8px;align-items:baseline;padding:4px 8px;border-radius:5px;cursor:pointer;font-size:var(--text-sm)}
+.as-mention[aria-selected="true"],.as-mention:hover{background:var(--accent-dim, #22385f)}
+.as-mention-label{color:#e7edf8;white-space:nowrap}
+.as-mention-detail{color:#8d95a1;font-size:var(--text-sm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.as-mention-empty{padding:4px 8px;color:#8d95a1;font-size:var(--text-sm)}
+.as-code-actions{align-items:center}
+.as-code-lang{margin-right:auto;color:#8d95a1;font:var(--text-sm) var(--mono, monospace)}
+.as-code-actions .as-apply{background:#2f4f7d;border-color:#41679c;color:#e7edf8}
+.as-code pre code{font-family:var(--mono, monospace)}
+.as-review{flex:none;border-top:1px solid var(--line, #283344);padding:6px 8px;display:flex;flex-direction:column;gap:4px;max-height:180px;overflow:auto;font-size:var(--text-sm)}
+.as-review-head{display:flex;align-items:center;gap:6px;color:#9aa2ad;font-size:var(--text-sm)}
+.as-review-head span{margin-right:auto}
+.as-review-row{display:flex;align-items:center;gap:6px}
+.as-review-file{flex:1;min-width:0;height:24px;padding:0 6px;border:0;background:transparent;color:#e7edf8;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;border-radius:4px}
+.as-review-file:hover{background:#ffffff0f}
+.as-review-stats{font:var(--text-sm) var(--mono, monospace);color:#9aa2ad}
+.as-review-row button:not(.as-review-file),.as-review-all{height:22px;padding:0 8px;font-size:var(--text-sm)}
+.as-review-accept{background:#2f6b47;border-color:#3f8a5c;color:#e6f4ea}

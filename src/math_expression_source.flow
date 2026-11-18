@@ -484,7 +484,7 @@ function make_instruction(opcode: i32, value: Quantity, start: i32, end: i32) ->
 # complete, explicitly recognized Unicode White_Space code points; do not
 # normalize invisible format controls such as U+200B or U+2060.
 # Return UTF-8 byte width so source diagnostics remain byte-accurate.
-function math_space_width(bytes: ptr<u8>, position: i32, length: i32) -> i32 {
+export function math_space_width(bytes: ptr<u8>, position: i32, length: i32) -> i32 {
     if str_is_ascii_ws(bytes[position]) { return 1 }
     if position + 1 < length and bytes[position] == 194 {
         if bytes[position + 1] == 133 { return 2 } # U+0085 NEXT LINE

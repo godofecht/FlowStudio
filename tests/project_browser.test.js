@@ -24,8 +24,9 @@ function dir(name, initial = []) {
   return {
     kind: "directory", name,
     async *entries() { yield* entries.entries(); },
-    async getFileHandle(filename, { create }) {
+    async getFileHandle(filename, { create } = {}) {
       if (!entries.has(filename) && create) entries.set(filename, file(filename));
+      if (!entries.has(filename)) throw Object.assign(new Error("File missing"), { name: "NotFoundError" });
       return entries.get(filename);
     },
   };

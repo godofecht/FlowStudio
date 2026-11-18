@@ -154,6 +154,14 @@ function createPrompt(doc, callbacks = {}) {
   }
   field.addEventListener("keydown", event => {
     if (event.isComposing) return;
+    if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey &&
+        (event.key || "").toLowerCase() === "r" && callbacks.onHistorySearch) {
+      event.preventDefault();
+      event.stopPropagation?.();
+      callbacks.onHistorySearch(field);
+      paint();
+      return;
+    }
     if ((event.ctrlKey || event.metaKey) &&
         ["f", "h", "s"].includes((event.key || "").toLowerCase())) {
       event.stopPropagation();

@@ -1,0 +1,442 @@
+[
+ {
+  "name": "multi-line python with a let annotation",
+  "source": "function main() -> i32 {\n    let xs: array<f64, 3> = [1.0, 2.0, 3.0]\n    let m: f64 = python(xs) {\n        import numpy as np\n        d = {\"a\": 1}\n        np.mean(xs)\n    }\n    return 0\n}\n",
+  "blocks": [
+   {
+    "language": "python",
+    "line": 2,
+    "column": 17,
+    "endLine": 6,
+    "endColumn": 4,
+    "inline": false,
+    "arguments": [
+     {
+      "name": "xs",
+      "expression": "xs",
+      "column": 24
+     }
+    ],
+    "result": "f64",
+    "code": "import numpy as np\nd = {\"a\": 1}\nnp.mean(xs)",
+    "firstLine": 4
+   }
+  ]
+ },
+ {
+  "name": "one-line r block without a type returns text",
+  "source": "let fit = r(df) { lm(y ~ x, data = df) }\n",
+  "blocks": [
+   {
+    "language": "r",
+    "line": 0,
+    "column": 10,
+    "endLine": 0,
+    "endColumn": 39,
+    "inline": true,
+    "arguments": [
+     {
+      "name": "df",
+      "expression": "df",
+      "column": 12
+     }
+    ],
+    "result": "string",
+    "code": "lm(y ~ x, data = df)",
+    "firstLine": 1
+   }
+  ]
+ },
+ {
+  "name": "explicit array result and a named argument",
+  "source": "let ys: array<f64, 3> = python(xs, k = scale(n, 2)) -> array<f64, 3> { [v * k for v in xs] }\n",
+  "blocks": [
+   {
+    "language": "python",
+    "line": 0,
+    "column": 24,
+    "endLine": 0,
+    "endColumn": 91,
+    "inline": true,
+    "arguments": [
+     {
+      "name": "xs",
+      "expression": "xs",
+      "column": 31
+     },
+     {
+      "name": "k",
+      "expression": "scale(n, 2)",
+      "column": 39
+     }
+    ],
+    "result": "array<f64, 3>",
+    "code": "[v * k for v in xs]",
+    "firstLine": 1
+   }
+  ]
+ },
+ {
+  "name": "a block used as a statement returns nothing",
+  "source": "python(m) {\n    print(\"m is\", m)\n}\n",
+  "blocks": [
+   {
+    "language": "python",
+    "line": 0,
+    "column": 0,
+    "endLine": 2,
+    "endColumn": 0,
+    "inline": false,
+    "arguments": [
+     {
+      "name": "m",
+      "expression": "m",
+      "column": 7
+     }
+    ],
+    "result": "void",
+    "code": "print(\"m is\", m)",
+    "firstLine": 2
+   }
+  ]
+ },
+ {
+  "name": "a block word inside a Flow string is text",
+  "source": "let s: string = \"python(x) { 1 }\"\nprintln(s)\n",
+  "blocks": []
+ },
+ {
+  "name": "a block word inside a comment is ignored",
+  "source": "# python(x) {\nlet n: i32 = 1\n",
+  "blocks": []
+ },
+ {
+  "name": "if r(x) { calls a function r",
+  "source": "if r(x) {\n    println(\"yes\")\n}\n",
+  "blocks": []
+ },
+ {
+  "name": "a function named r is a declaration",
+  "source": "function r(x: f64) -> f64 {\n    return x\n}\n",
+  "blocks": []
+ },
+ {
+  "name": "a method named python is not a block",
+  "source": "let v = obj.python(x) { 1 }\n",
+  "blocks": []
+ },
+ {
+  "name": "a block nested in a function and a loop",
+  "source": "function f(n: i32) -> f64 {\n    let mut t: f64 = 0.0\n    for i in 0 to n {\n        t = t + python(i) -> f64 {\n            i * 0.5\n        }\n    }\n    return t\n}\n",
+  "blocks": [
+   {
+    "language": "python",
+    "line": 3,
+    "column": 16,
+    "endLine": 5,
+    "endColumn": 8,
+    "inline": false,
+    "arguments": [
+     {
+      "name": "i",
+      "expression": "i",
+      "column": 23
+     }
+    ],
+    "result": "f64",
+    "code": "i * 0.5",
+    "firstLine": 5
+   }
+  ]
+ },
+ {
+  "name": "a more indented } inside the body does not close the block",
+  "source": "let d: string = python() {\n    x = {\n        \"a\": 1\n    }\n    str(x)\n}\n",
+  "blocks": [
+   {
+    "language": "python",
+    "line": 0,
+    "column": 16,
+    "endLine": 5,
+    "endColumn": 0,
+    "inline": false,
+    "arguments": [],
+    "result": "string",
+    "code": "x = {\n    \"a\": 1\n}\nstr(x)",
+    "firstLine": 2
+   }
+  ]
+ },
+ {
+  "name": "R braces and Flow-looking strings stay in the code",
+  "source": "let n: i64 = r(xs) {\n    f <- function(v) {\n        sum(v) # \"quoted\" } brace\n    }\n    f(xs)\n}\n",
+  "blocks": [
+   {
+    "language": "r",
+    "line": 0,
+    "column": 13,
+    "endLine": 5,
+    "endColumn": 0,
+    "inline": false,
+    "arguments": [
+     {
+      "name": "xs",
+      "expression": "xs",
+      "column": 15
+     }
+    ],
+    "result": "i64",
+    "code": "f <- function(v) {\n    sum(v) # \"quoted\" } brace\n}\nf(xs)",
+    "firstLine": 2
+   }
+  ]
+ },
+ {
+  "name": "text after the closing brace is Flow again",
+  "source": "let y: f64 = python(xs) -> f64 {\n    sum(xs)\n} * 2.0\n",
+  "blocks": [
+   {
+    "language": "python",
+    "line": 0,
+    "column": 13,
+    "endLine": 2,
+    "endColumn": 0,
+    "inline": false,
+    "arguments": [
+     {
+      "name": "xs",
+      "expression": "xs",
+      "column": 20
+     }
+    ],
+    "result": "f64",
+    "code": "sum(xs)",
+    "firstLine": 2
+   }
+  ]
+ },
+ {
+  "name": "a second block on the closing line",
+  "source": "println(python() -> f64 {\n    1.0\n}, r() -> f64 { 2 })\n",
+  "blocks": [
+   {
+    "language": "python",
+    "line": 0,
+    "column": 8,
+    "endLine": 2,
+    "endColumn": 0,
+    "inline": false,
+    "arguments": [],
+    "result": "f64",
+    "code": "1.0",
+    "firstLine": 2
+   },
+   {
+    "language": "r",
+    "line": 2,
+    "column": 3,
+    "endLine": 2,
+    "endColumn": 18,
+    "inline": true,
+    "arguments": [],
+    "result": "f64",
+    "code": "2",
+    "firstLine": 3
+   }
+  ]
+ },
+ {
+  "name": "return with a block",
+  "source": "function g(xs: span<f64>) -> f64 {\n    return python(xs) -> f64 { float(sum(xs)) }\n}\n",
+  "blocks": [
+   {
+    "language": "python",
+    "line": 1,
+    "column": 11,
+    "endLine": 1,
+    "endColumn": 46,
+    "inline": true,
+    "arguments": [
+     {
+      "name": "xs",
+      "expression": "xs",
+      "column": 18
+     }
+    ],
+    "result": "f64",
+    "code": "float(sum(xs))",
+    "firstLine": 2
+   }
+  ]
+ },
+ {
+  "name": "tabs and a block without parentheses",
+  "source": "function main() -> i32 {\n\tpython {\n\t\tprint(\"hi\")\n\t}\n\treturn 0\n}\n",
+  "blocks": [
+   {
+    "language": "python",
+    "line": 1,
+    "column": 1,
+    "endLine": 3,
+    "endColumn": 1,
+    "inline": false,
+    "arguments": [],
+    "result": "void",
+    "code": "print(\"hi\")",
+    "firstLine": 3
+   }
+  ]
+ },
+ {
+  "name": "a comment after the opening brace",
+  "source": "let s = r() { # a comment\n    1\n}\n",
+  "blocks": [
+   {
+    "language": "r",
+    "line": 0,
+    "column": 8,
+    "endLine": 2,
+    "endColumn": 0,
+    "inline": false,
+    "arguments": [],
+    "result": "string",
+    "code": "1",
+    "firstLine": 2
+   }
+  ]
+ },
+ {
+  "name": "an if condition never holds a block, even after ==",
+  "source": "if x == r(y) {\n    println(\"a\")\n} elif ok and python(z) {\n    println(\"b\")\n}\n",
+  "blocks": []
+ },
+ {
+  "name": "a block after and",
+  "source": "let both: bool = ready and python(xs) -> bool { all(v > 0 for v in xs) }\n",
+  "blocks": [
+   {
+    "language": "python",
+    "line": 0,
+    "column": 27,
+    "endLine": 0,
+    "endColumn": 71,
+    "inline": true,
+    "arguments": [
+     {
+      "name": "xs",
+      "expression": "xs",
+      "column": 34
+     }
+    ],
+    "result": "bool",
+    "code": "all(v > 0 for v in xs)",
+    "firstLine": 1
+   }
+  ]
+ },
+ {
+  "name": "a block inside a call keeps the call's closing parenthesis",
+  "source": "println(r(xs) {\n    paste(xs, collapse = \",\")\n})\n",
+  "blocks": [
+   {
+    "language": "r",
+    "line": 0,
+    "column": 8,
+    "endLine": 2,
+    "endColumn": 0,
+    "inline": false,
+    "arguments": [
+     {
+      "name": "xs",
+      "expression": "xs",
+      "column": 10
+     }
+    ],
+    "result": "string",
+    "code": "paste(xs, collapse = \",\")",
+    "firstLine": 2
+   }
+  ]
+ },
+ {
+  "name": "error: no closing brace",
+  "source": "let m: f64 = python(xs) {\n    sum(xs)\n",
+  "error": {
+   "line": 1,
+   "column": 25,
+   "message": "this python block has no closing }. Put } on its own line, indented like the line that opens the block."
+  }
+ },
+ {
+  "name": "error: closing brace indented differently",
+  "source": "function main() -> i32 {\n    let m: f64 = python(xs) {\n        sum(xs)\n}\n    return 0\n}\n",
+  "error": {
+   "line": 2,
+   "column": 29,
+   "message": "this python block has no closing }. Put } on its own line, indented like the line that opens the block."
+  }
+ },
+ {
+  "name": "error: one-line block without }",
+  "source": "let m: f64 = python(xs) { sum(xs)\n",
+  "error": {
+   "line": 1,
+   "column": 25,
+   "message": "this one-line python block has no closing } on its line. A block on several lines opens with { at the end of its first line."
+  }
+ },
+ {
+  "name": "error: a string is not an argument",
+  "source": "let s = r(\"x\") { 1 }\n",
+  "error": {
+   "line": 1,
+   "column": 11,
+   "message": "a r block argument is a Flow name, or name = expression."
+  }
+ },
+ {
+  "name": "error: a name passed twice",
+  "source": "let s = python(a, a) { 1 }\n",
+  "error": {
+   "line": 1,
+   "column": 19,
+   "message": "'a' is passed to this python block twice."
+  }
+ },
+ {
+  "name": "error: a Python keyword as a name",
+  "source": "let s = python(lambda) { 1 }\n",
+  "error": {
+   "line": 1,
+   "column": 16,
+   "message": "'lambda' is a Python keyword. Pass it as another name: other = lambda."
+  }
+ },
+ {
+  "name": "error: an R reserved word as a name",
+  "source": "let s = r(TRUE = flag) { 1 }\n",
+  "error": {
+   "line": 1,
+   "column": 11,
+   "message": "'TRUE' is reserved in R. Pass it as another name: other = TRUE."
+  }
+ },
+ {
+  "name": "error: an unsupported result type",
+  "source": "let p: Point = python() { 1 }\n",
+  "error": {
+   "line": 1,
+   "column": 8,
+   "message": "a python block cannot return Point. It returns f64, f32, i64, i32, bool, string or an array of those. Write -> string to get the value as text."
+  }
+ },
+ {
+  "name": "error: an empty argument",
+  "source": "let s = python(a, , b) { 1 }\n",
+  "error": {
+   "line": 1,
+   "column": 19,
+   "message": "an empty argument in this python block."
+  }
+ }
+]

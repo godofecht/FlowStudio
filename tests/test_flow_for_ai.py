@@ -8,8 +8,9 @@ teaches a wrong program. Block kinds, by fence info string:
               next block is an `output` block, stdout must match it exactly.
   flow check  needs FlowStudio or a window. The strict emitter must accept
               it, with src/flowstudio.flow staged beside it the way the
-              server stages checks. With FLOWSTUDIO_URL reachable, bridge
-              programs also run through the live server.
+              server stages checks. Python and R blocks are rewritten first,
+              as the server does (src/flow_blocks.py). With FLOWSTUDIO_URL
+              reachable, bridge programs also run through the live server.
   flow error  must fail the strict check (or the build), and the next
               `error` block must appear in the compiler output.
 
@@ -30,6 +31,9 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+
+import flow_blocks  # noqa: E402
 GUIDE = ROOT / "docs" / "FLOW_FOR_AI.md"
 BRIDGE = ROOT / "src" / "flowstudio.flow"
 URL = os.environ.get("FLOWSTUDIO_URL", "http://127.0.0.1:8751").rstrip("/")
@@ -119,11 +123,19 @@ def verify(block: dict) -> str | None:
             return "%s printed\n%r\nbut the guide shows\n%r" % (where, output, block["expect"])
         return None
     if kind == "check":
-        code, log = strict_check(source)
+        has_blocks = flow_blocks.has_blocks(source)
+        if has_blocks:
+            try:
+                text, _, _ = flow_blocks.expand(source)
+            except flow_blocks.BlockError as error:
+                return "%s has a block FlowStudio cannot read: %s" % (where, error.text())
+            code, log = strict_check(flow_blocks.finish(text, flow_blocks.struct_fields(source)))
+        else:
+            code, log = strict_check(source)
         if code != 0:
             return "%s failed the strict check:\n%s" % (where, log[-2500:])
         live = os.environ.get("FLOW_FOR_AI_LIVE", "1") != "0" and server_up()
-        if live and "import flowstudio" in source:
+        if live and ("import flowstudio" in source or has_blocks):
             status, output = live_run(source)
             if status != 200:
                 return "%s failed on the live FlowStudio server (HTTP %d):\n%s" % (where, status, output[-2500:])

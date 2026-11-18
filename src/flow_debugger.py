@@ -113,8 +113,20 @@ class Session(object):
                 raise ValueError("At most 64 breakpoints.")
         except (ValueError, KeyError, TypeError) as error:
             return self.fail(str(error))
+        # Python and R blocks become bridge calls on the same lines, so
+        # breakpoints and stops keep their Flow line numbers.
+        line_count = len(source.splitlines())
+        try:
+            import flow_blocks
+            text, _, blocks = flow_blocks.expand(source)
+            if blocks:
+                source = flow_blocks.finish(text, flow_blocks.struct_fields(source))
+        except ImportError:
+            pass
+        except flow_blocks.BlockError as error:
+            return self.fail(error.text())
         self.cleanup()
-        self.line_count = len(source.splitlines())
+        self.line_count = line_count
         self.workdir = tempfile.mkdtemp(prefix="flowstudio-debug-")
         path = os.path.join(self.workdir, self.source_name)
         with open(path, "w") as handle:

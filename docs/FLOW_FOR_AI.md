@@ -500,25 +500,76 @@ Other modules: `std.string` (parsing and formatting), `std.process`
 `import std.io { io_read_text }`. Older code imports by path:
 `import "stdlib/gfx.flow"`.
 
-## FlowStudio: calling Python and R
+## FlowStudio: Python and R blocks
 
-In FlowStudio, a Flow program can call the live Python and R sessions.
-Each call returns the value of the last expression as text: one item per
-line, a data frame as CSV.
+In FlowStudio, a Flow program can run Python and R code in the live
+sessions. Write the code in a block. The names in parentheses are Flow
+values, sent under the same names; the block's last value comes back as a
+Flow type. No import is needed.
+
+```flow check
+struct Reading {
+    dose: f64,
+    response: f64,
+    plate: string
+}
+
+function main() -> i32 {
+    let doses: array<f64, 5> = [0.5, 1.0, 2.0, 4.0, 8.0]
+    let responses: array<f64, 5> = [0.9, 2.1, 3.8, 8.2, 15.9]
+    let slope: f64 = r(doses, responses) {
+        fit <- lm(responses ~ doses)
+        unname(coef(fit)[2])
+    }
+    let ratio: f64 = python(responses) {
+        import statistics
+        max(responses) / statistics.fmean(responses)
+    }
+    let scaled: array<f64, 5> = python(doses, k = slope) -> array<f64, 5> { [d * k for d in doses] }
+    let rows: array<Reading, 2> = [Reading { dose: 1.0, response: 2.1, plate: "A" }, Reading { dose: 2.0, response: 3.8, plate: "B" }]
+    let plates: string = r(rows) { paste(unique(rows$plate), collapse = "+") }
+    let count: i64 = python(rows) -> i64 { len(rows) }
+    python(slope) {
+        print(f"slope from R: {slope:.3f}")
+    }
+    printf("ratio %.2f, scaled %.2f, plates %s, rows %lld\n", ratio, scaled[4], plates, count)
+    return 0
+}
+```
+
+- `python(a, b) { code }` and `r(a, b) { code }`. Each argument is a Flow
+  name, or `name = expression`. Inside the block it is a Python or R
+  variable of that name. After the block, a session variable with that
+  name is back as it was; other names the block assigns stay.
+- Values in: numbers, bools and strings; arrays (numpy arrays or R
+  vectors); a struct (dict or named list); an array of structs (a pandas
+  DataFrame or R data frame, with the struct's fields as columns). Without
+  pandas, an array of structs is a list of row dicts, and `rows["field"]`
+  gives a column.
+- The result type is the one after `->`, or the `let` annotation when the
+  block is the whole initializer. It is `f64`, `f32`, `i64`, `i32`, `bool`,
+  `string`, or `array<T, N>` of those. A block used as a statement returns
+  nothing. Anywhere else without a type, it returns text.
+- A block whose `{` ends its line ends at the first line that starts with
+  `}` indented like the opening line. A one-line block ends at the last `}`
+  on its line.
+- A wrong result stops the program and names the line:
+  `line 12: the Python block returned str 'x'; f64 needs a number.`
+  Python and R errors name the Flow line inside the block.
+- Never put a block in an `if` or `while` condition. Assign it to a
+  variable first.
+- Blocks only run when FlowStudio runs the program. The check treats each
+  block as a call of its result type.
+
+The older string calls still work. They return text, and values cross as
+source text:
 
 ```flow check
 import flowstudio { py, r, py_num, r_num, py_int, fmt, fmt_int }
 
 function main() -> i32 {
-    let mut series: string = ""
-    for day in 0 to 5 {
-        if day > 0 {
-            series = series + ","
-        }
-        series = series + fmt((day * day) as f64)
-    }
-    r("x <- c(" + series + ")")
-    py("x = [" + series + "]")
+    r("x <- c(0, 1, 4, 9, 16)")
+    py("x = [0, 1, 4, 9, 16]")
     let mean: f64 = r_num("mean(x)")
     let count: i64 = py_int("len(x)")
     println("R mean " + fmt(mean) + ", Python count " + fmt_int(count))
@@ -530,9 +581,6 @@ function main() -> i32 {
 - `py(code)` and `r(code)` return text. `py_num`, `r_num` return `f64`.
   `py_int`, `r_int` return `i64`. `fmt(f64)` and `fmt_int(i64)` turn
   numbers into short strings.
-- Values cross as source text, so build a vector by joining numbers with
-  commas, as above.
-- This only works when FlowStudio runs the program.
 
 ## FlowStudio: graphics apps
 

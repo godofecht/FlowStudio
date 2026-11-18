@@ -121,7 +121,8 @@ function mount(doc = document, request = fetch) {
     initialRuntime: sessions.active().runtime,
     onExecute(field) { void controller.run(field); },
     onHistoryUp(field) { historyRecall(field, -1); },
-    onHistoryDown(field) { historyRecall(field, 1); }
+    onHistoryDown(field) { historyRecall(field, 1); },
+    onHistorySearch(field) { controller.reverseSearch(field); }
   });
   transcript.append(prompt.node);
 

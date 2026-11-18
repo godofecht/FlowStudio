@@ -2,7 +2,10 @@
 """Run a real Flow compiler and compare its complete field arrays to an independent oracle.
 
 Usage: python3 scripts/verify_native_field_arrays.py --flow /path/to/flow
-Requires a compiler supporting the upstream Field DSL. No simulated Flow execution.
+The strict emitter produces C, the host C compiler links it, and only the
+resulting program's stdout is parsed. --executable accepts a native fixture
+that has already been compiled. The supplied compiler must support Field DSL
+multiplier lowering.
 """
 from __future__ import annotations
 
@@ -13,6 +16,7 @@ from pathlib import Path
 import resource
 import re
 import signal
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -75,17 +79,15 @@ def expected_output() -> list[float]:
     return v + q
 
 
-def run_flow(binary: Path, timeout: float) -> bytes:
-    if not binary.is_file() or not os.access(binary, os.X_OK):
-        raise ValueError(f"Flow binary not executable: {binary}")
+def run_command(argv: list[str], timeout: float, *, file_limit: int = MAX_OUTPUT + 1) -> bytes:
     # File-backed streams avoid unbounded PIPE buffering on compiler errors.
     # RLIMIT_FSIZE applies to both stdout and stderr on Linux/macOS.
     with tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as errors:
         def limit_output() -> None:
-            resource.setrlimit(resource.RLIMIT_FSIZE, (MAX_OUTPUT + 1, MAX_OUTPUT + 1))
+            resource.setrlimit(resource.RLIMIT_FSIZE, (file_limit, file_limit))
 
         process = subprocess.Popen(
-            [str(binary), "run", str(FIXTURE)],
+            argv,
             cwd=ROOT, stdin=subprocess.DEVNULL, stdout=output,
             stderr=errors, start_new_session=True, preexec_fn=limit_output,
         )
@@ -108,12 +110,53 @@ def run_flow(binary: Path, timeout: float) -> bytes:
             raise ValueError("Flow stderr exceeded 16 KiB")
         if process.returncode != 0:
             errors.seek(0)
+            output.seek(0)
             raise ValueError(
                 f"Flow returned {process.returncode}: "
                 + errors.read(2048).decode("utf-8", errors="replace")
+                + output.read(2048).decode("utf-8", errors="replace")
             )
         output.seek(0)
         return output.read()
+
+
+def run_executable(binary: Path, timeout: float) -> bytes:
+    if not binary.is_file() or not os.access(binary, os.X_OK):
+        raise ValueError(f"Flow binary not executable: {binary}")
+    return run_command([str(binary)], timeout)
+
+
+def compile_and_run(binary: Path, fixture: Path, timeout: float) -> bytes:
+    """Use the public strict emitter, link its C, then read only program stdout."""
+    if not binary.is_file() or not os.access(binary, os.X_OK):
+        raise ValueError(f"Flow binary not executable: {binary}")
+    deadline = time.monotonic() + timeout
+
+    def remaining() -> float:
+        value = deadline - time.monotonic()
+        if value <= 0:
+            raise ValueError("Flow compiler/runtime timed out")
+        return value
+
+    with tempfile.TemporaryDirectory(prefix="flow-field-native-") as directory:
+        generated = Path(directory) / "program.c"
+        executable = Path(directory) / "program"
+        # Compiler artifacts need a larger file budget than runtime logs.
+        # Captured stdout and stderr retain the independent 16 KiB limits.
+        run_command([str(binary), "tool", "compiler/scripts/flowc_emit.flow", "--strict",
+                     str(fixture.resolve()), str(generated)], remaining(), file_limit=64 * 1024 * 1024)
+        if not generated.is_file() or generated.stat().st_size == 0:
+            raise ValueError("Flow compiler produced no C artifact")
+        cc = shlex.split(os.environ.get("CC", "cc"))
+        if not cc:
+            raise ValueError("CC must name a C compiler")
+        run_command([*cc, "-std=c11", "-O2", str(generated), "-lm", "-o", str(executable)],
+                    remaining(), file_limit=64 * 1024 * 1024)
+        return run_executable(executable, remaining())
+
+
+def run_flow(binary: Path, timeout: float) -> bytes:
+    return compile_and_run(binary, FIXTURE, timeout)
 
 
 def verify(actual: list[float], expected: list[float], tolerance: float = 1e-9) -> None:
@@ -132,7 +175,9 @@ def verify(actual: list[float], expected: list[float], tolerance: float = 1e-9) 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--flow", type=Path, required=True)
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--flow", type=Path, help="Flow CLI used for strict compilation")
+    source.add_argument("--executable", type=Path, help="already compiled native fixture")
     parser.add_argument("--timeout", type=float, default=60.0)
     parser.add_argument("--repeats", type=int, default=2,
                         help="independent production executions; 1-5 (default: 2)")
@@ -153,7 +198,8 @@ def main() -> int:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 raise ValueError("cumulative Flow compiler/runtime timeout exceeded")
-            output = run_flow(args.flow.resolve(), min(args.timeout, remaining))
+            runner = run_flow if args.flow else run_executable
+            output = runner((args.flow or args.executable).resolve(), min(args.timeout, remaining))
             actual = parse_output(output)
             verify(actual, reference)
             if first_output is not None and output != first_output:

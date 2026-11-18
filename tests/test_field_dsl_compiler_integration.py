@@ -6,15 +6,20 @@ Without a compiler, this test is explicitly SKIPPED, never counted as qualificat
 import math
 import os
 import shutil
-import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 from test_field_dsl_multistep_oracle import evolve
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from scripts.verify_native_field_arrays import compile_and_run
 
 
-SOURCE = """const alpha: f64 = 0.3
+SOURCE = """extern {
+    function printf(format: string, ...) -> i32
+}
+const alpha: f64 = 0.3
 field V : f64[8] on Line
 V evolves as laplacian(V) * alpha
 boundary V { left = 0.5 right = 1.5 }
@@ -54,12 +59,12 @@ function main() -> i32 {
     Q_field_step(q6, q7, 0.1)
     let mut j: i32 = 0
     while j < 8 {
-        println(v7[j])
+        printf("%.17g\\n", v7[j])
         j = j + 1
     }
     j = 0
     while j < 8 {
-        println(q7[j])
+        printf("%.17g\\n", q7[j])
         j = j + 1
     }
     println("field-multistep-ok")
@@ -78,15 +83,9 @@ class FieldDslCompilerIntegration(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="flow-field-") as directory:
             source = Path(directory) / "field_multistep.flow"
             source.write_text(SOURCE, encoding="utf-8")
-            completed = subprocess.run(
-                [compiler, "run", str(source)],
-                cwd=directory, capture_output=True, text=True, timeout=30,
-                check=False,
-            )
-        self.assertEqual(completed.returncode, 0,
-                         f"compiler failed: {completed.stderr[-4000:]}")
-        lines = completed.stdout.strip().splitlines()
-        self.assertEqual(len(lines), 17, completed.stdout[-4000:])
+            output = compile_and_run(Path(compiler), source, 30).decode("utf-8")
+        lines = output.strip().splitlines()
+        self.assertEqual(len(lines), 17, output[-4000:])
         self.assertEqual(lines[-1], "field-multistep-ok")
         actual = [float(value) for value in lines[:16]]
         self.assertTrue(all(math.isfinite(value) for value in actual))

@@ -10,6 +10,17 @@
 "use strict";
 
 const ROUTE = "/api/flow/session/";
+/* Python and R blocks (web/flow_blocks.js): their code is not Flow, so the
+ * structure of a script is read from a copy with the blocks rewritten. */
+let requiredBlocks;
+function flowBlocks() {
+  if (root.FlowStudioFlowBlocks) return root.FlowStudioFlowBlocks;
+  if (requiredBlocks === undefined) {
+    try { requiredBlocks = typeof require === "function" ? require("./flow_blocks.js") : null; }
+    catch (_) { requiredBlocks = null; }
+  }
+  return requiredBlocks;
+}
 // `export function f`, `export import "x.flow"` and `export a, b` declare too.
 const DECLARATION = /^(?:pub\s+|export\s+)?(?:function|struct|enum|import|extern|type|const|trait|impl|field)\b|^export\b/;
 
@@ -92,9 +103,11 @@ function codeOnly(line) {
  * end exclusive). An `else` or `elif` line joins the item before it. */
 function items(text) {
   const lines = String(text || "").split("\n");
+  const blocks = flowBlocks();
+  const structure = blocks ? blocks.mask(String(text || "")).split("\n") : lines;
   const found = [];
   let depth = 0, start = -1;
-  lines.forEach((line, index) => {
+  structure.forEach((line, index) => {
     const code = codeOnly(line);
     if (start < 0) {
       if (!code.trim()) return;
@@ -118,7 +131,7 @@ function items(text) {
   return found.map(item => ({
     start: item.start, end: item.end,
     code: lines.slice(item.start, item.end).join("\n"),
-    declaration: DECLARATION.test(lines[item.start])
+    declaration: DECLARATION.test(structure[item.start])
   }));
 }
 
@@ -159,8 +172,41 @@ function hasMain(text) {
  * change; toVirtual and toReal map lines (toReal is null for generated
  * lines). Returns null for a whole program or a file of declarations. */
 const TYPE_TEXT = /^[A-Za-z_][A-Za-z0-9_<>, ]*$/;
+/* Python and R blocks first become calls of extern functions on the same
+ * lines (FlowStudioFlowBlocks.view), so a program with main() that holds
+ * blocks gets a view too. toVirtualPosition and toRealPosition map
+ * positions, columns included. */
 function scriptView(text, variables) {
-  const source = String(text || "");
+  const original = String(text || "");
+  const blocks = flowBlocks();
+  const blockView = blocks ? blocks.view(original) : null;
+  const arranged = arrange(blockView ? blockView.text : original, variables, blockView ? blockView.lineCount : null);
+  if (!blockView) return arranged;
+  if (!arranged) return blockView;
+  return {
+    text: arranged.text,
+    toVirtual: line => arranged.toVirtual(line),
+    toReal: line => {
+      const real = arranged.toReal(line);
+      return real === null ? null : blockView.toReal(real);
+    },
+    toVirtualPosition: (line, character) => {
+      const point = blockView.toVirtualPosition(line, character);
+      return { line: arranged.toVirtual(point.line), character: point.character };
+    },
+    toRealPosition: (line, character) => {
+      const real = arranged.toReal(line);
+      return real === null ? null : blockView.toRealPosition(real, character);
+    }
+  };
+}
+
+/* The session arrangement of a script without main(). lineCount limits the
+ * lines read as the script when a block view appended declarations. */
+function arrange(text, variables, lineCount) {
+  const full = String(text || "");
+  const source = lineCount == null ? full : full.split("\n").slice(0, lineCount).join("\n");
+  const appended = lineCount == null ? [] : full.split("\n").slice(lineCount);
   if (hasMain(source)) return null;
   const list = items(source);
   const statements = list.filter(item => !item.declaration);
@@ -188,13 +234,16 @@ function scriptView(text, variables) {
     variable.type + " = flowstudio_session_" + index + "()"));
   for (const item of statements)
     for (let line = item.start; line < item.end; line++) { toVirtualLines[line] = out.length; out.push(lines[line]); }
-  out.push("    return 0", "}", "");
+  out.push("    return 0", "}", ...appended, "");
   const toRealLines = new Map();
   toVirtualLines.forEach((virtual, real) => toRealLines.set(virtual, real));
   return {
     text: out.join("\n"),
     toVirtual: line => line >= 0 && line < toVirtualLines.length ? toVirtualLines[line] : line,
-    toReal: line => toRealLines.has(line) ? toRealLines.get(line) : null
+    toReal: line => toRealLines.has(line) ? toRealLines.get(line) : null,
+    toVirtualPosition: (line, character) => ({
+      line: line >= 0 && line < toVirtualLines.length ? toVirtualLines[line] : line, character }),
+    toRealPosition: (line, character) => toRealLines.has(line) ? { line: toRealLines.get(line), character } : null
   };
 }
 

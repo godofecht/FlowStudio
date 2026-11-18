@@ -1,0 +1,49 @@
+# Python and R blocks inside Flow. Flow lays out a dose-response plate,
+# R fits a Hill curve with nls(), and Python summarises each plate. The
+# blocks take Flow values by name and return Flow types: no strings to
+# build, nothing to parse.
+struct Well {
+    dose: f64,
+    response: f64,
+    plate: string
+}
+
+function main() -> i32 {
+    # Flow: twelve wells, doses doubling from 1/16, responses on a Hill
+    # curve with a little deterministic noise.
+    let mut wells: array<Well, 12> = [Well { dose: 0.0, response: 0.0, plate: "" }]
+    for i in 0 to 12 {
+        let dose: f64 = pow(2.0, (i as f64) - 4.0)
+        let noise: f64 = sin((i as f64) * 1.7) * 0.02
+        let plate: string = if i % 2 == 0 { "A" } else { "B" }
+        wells[i] = Well { dose: dose, response: 1.0 / (1.0 + pow(0.8 / dose, 1.4)) + noise, plate: plate }
+    }
+
+    # R: the wells arrive as a data frame with columns dose, response, plate.
+    let ec50: f64 = r(wells) {
+        fit <- nls(response ~ 1 / (1 + (ec50 / dose)^hill), data = wells,
+                   start = list(ec50 = 1, hill = 1))
+        unname(coef(fit)["ec50"])
+    }
+
+    # Python: the same wells as a DataFrame (or a dict of columns without
+    # pandas), and the EC50 R found, as a float.
+    let summary: string = python(wells, ec50) {
+        import statistics
+        plates = {}
+        for plate, response in zip(wells["plate"], wells["response"]):
+            plates.setdefault(plate, []).append(response)
+        means = ", ".join(f"plate {p} mean {statistics.fmean(v):.3f}" for p, v in sorted(plates.items()))
+        f"{means}; EC50 {ec50:.3f}"
+    }
+
+    # A typed array comes back: four predictions from the fitted curve.
+    let predicted: array<f64, 4> = python(ec50, hill = 1.4) -> array<f64, 4> {
+        [1 / (1 + (ec50 / d) ** hill) for d in (0.25, 0.5, 1.0, 2.0)]
+    }
+
+    printf("EC50 from R: %.3f\n", ec50)
+    println(summary)
+    printf("predicted at 0.25, 0.5, 1, 2: %.3f %.3f %.3f %.3f\n", predicted[0], predicted[1], predicted[2], predicted[3])
+    return 0
+}

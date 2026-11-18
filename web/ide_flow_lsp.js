@@ -176,17 +176,25 @@ function create(options) {
     const entry = model ? synced.get(model) : null;
     return entry ? entry.view || null : null;
   }
+  /* A view moves lines (the session arrangement) and, on lines holding a
+   * Python or R block, columns too (toVirtualPosition, toRealPosition). */
+  function pointToServer(view, point) {
+    if (!view) return point;
+    if (typeof view.toVirtualPosition === "function") return view.toVirtualPosition(point.line, point.character);
+    return { line: view.toVirtual(point.line), character: point.character };
+  }
+  function pointFromServer(view, point) {
+    if (typeof view.toRealPosition === "function") return view.toRealPosition(point.line, point.character);
+    const line = view.toReal(point.line);
+    return line === null ? null : { line, character: point.character };
+  }
   function toServer(model, position) {
-    const point = fromPosition(position);
-    const view = viewOf(model);
-    if (view) point.line = view.toVirtual(point.line);
-    return point;
+    return pointToServer(viewOf(model), fromPosition(position));
   }
   function rangeToServer(model, range) {
     const lsp = fromRange(range);
     const view = viewOf(model);
-    if (view) { lsp.start.line = view.toVirtual(lsp.start.line); lsp.end.line = view.toVirtual(lsp.end.line); }
-    return lsp;
+    return { start: pointToServer(view, lsp.start), end: pointToServer(view, lsp.end) };
   }
   /* A server range in editor coordinates, or null inside generated lines. */
   function fromServer(model, range) {
@@ -195,10 +203,9 @@ function create(options) {
   function fromServerView(view, range) {
     if (!range || !range.start || !range.end) return null;
     if (!view) return toRange(range);
-    const start = view.toReal(range.start.line), end = view.toReal(range.end.line);
+    const start = pointFromServer(view, range.start), end = pointFromServer(view, range.end);
     if (start === null || end === null) return null;
-    return toRange({ start: { line: start, character: range.start.character },
-      end: { line: end, character: range.end.character } });
+    return toRange({ start, end });
   }
 
   function post(route, body) {

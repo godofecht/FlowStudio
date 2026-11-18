@@ -137,10 +137,231 @@ print.flowstudio_python <- function(x, ...) {
 
 # ---- Requests from other languages ---------------------------------------
 
+# ---- Typed blocks from Flow ----------------------------------------------
+#
+# A Flow program sends an r(...) { ... } block as format "b" (the request
+# layout is in src/flowstudio.flow). The values it passes are assigned in the
+# workspace under their Flow names while the block runs, the code is parsed
+# with its Flow line numbers, and the last value comes back as the Flow type
+# the block asked for, or as an error that names the Flow line.
+
+.block_scalar <- function(tag, text) {
+    if (identical(tag, "f")) {
+        value <- suppressWarnings(as.numeric(text))
+        if (is.na(value)) {
+            low <- tolower(text)
+            value <- if (low %in% c("inf", "+inf", "infinity")) Inf else if (low %in% c("-inf", "-infinity")) -Inf else NaN
+        }
+        return(value)
+    }
+    if (identical(tag, "i")) {
+        value <- as.numeric(text)
+        return(if (abs(value) <= .Machine$integer.max) as.integer(value) else value)
+    }
+    if (identical(tag, "b")) return(identical(text, "1"))
+    if (identical(tag, "s")) {
+        value <- utils::URLdecode(text)
+        Encoding(value) <- "UTF-8"
+        return(value)
+    }
+    stop("unknown value kind ", tag)
+}
+
+.block_vector <- function(tag, items) {
+    if (identical(tag, "S")) return(as.character(unlist(items)))
+    if (!length(items)) return(switch(tag, F = numeric(0), I = integer(0), B = logical(0)))
+    if (identical(tag, "I") && any(vapply(items, is.double, logical(1)))) return(as.numeric(unlist(items)))
+    unlist(items)
+}
+
+.block_describe <- function(value) {
+    if (is.null(value)) return("NULL")
+    if (is.data.frame(value)) return(sprintf("a data frame with %d rows", nrow(value)))
+    shown <- if (is.atomic(value) && length(value) >= 1L) {
+        text <- paste(utils::head(format(value), 3L), collapse = ", ")
+        if (nchar(text) > 50L) text <- paste0(substr(text, 1L, 47L), "...")
+        paste0(" (", text, if (length(value) > 3L) ", ..." else "", ")")
+    } else ""
+    sprintf("%s of length %d%s", paste(class(value), collapse = "/"), length(value), shown)
+}
+
+.block_items <- function(element, value) {
+    if (is.factor(value)) value <- as.character(value)
+    ok <- switch(element,
+        f64 = , f32 = is.numeric(value),
+        i64 = , i32 = is.numeric(value) && all(!is.na(value) & value == round(value)) &&
+            all(abs(value) <= if (identical(element, "i32")) 2147483647 else 9.2e18),
+        bool = is.logical(value) && !anyNA(value),
+        string = is.character(value) && !anyNA(value),
+        FALSE)
+    if (!isTRUE(ok)) return(NULL)
+    switch(element,
+        f64 = , f32 = {
+            out <- sprintf("%.17g", as.numeric(value))
+            out[is.nan(value)] <- "nan"
+            out[is.na(value) & !is.nan(value)] <- "nan"
+            out[!is.na(value) & is.infinite(value) & value > 0] <- "inf"
+            out[!is.na(value) & is.infinite(value) & value < 0] <- "-inf"
+            out
+        },
+        i64 = , i32 = sprintf("%.0f", as.numeric(value)),
+        bool = ifelse(value, "1", "0"),
+        string = value)
+}
+
+.block_need <- function(element) {
+    switch(element, f64 = , f32 = "numbers", i64 = , i32 = "whole numbers that fit in the type",
+           bool = "TRUE or FALSE without NA", string = "strings without NA")
+}
+
+.block_value <- function(kind, value, line) {
+    if (identical(kind, "void")) return("")
+    if (identical(kind, "string")) return(.to_text(value))
+    array <- regmatches(kind, regexec("^(f64|f32|i64|i32|bool|string)\\[([0-9]+)\\]$", kind))[[1]]
+    if (length(array)) {
+        element <- array[2L]
+        size <- as.integer(array[3L])
+        wanted <- sprintf("array<%s, %d>", element, size)
+        if (!is.atomic(value) || is.null(value) || !is.null(dim(value)))
+            stop(sprintf("line %d: the R block returned %s; %s needs a vector of %d values.",
+                         line, .block_describe(value), wanted, size), call. = FALSE)
+        if (length(value) != size)
+            stop(sprintf("line %d: the R block returned %d values; %s needs %d.",
+                         line, length(value), wanted, size), call. = FALSE)
+        items <- .block_items(element, value)
+        if (is.null(items))
+            stop(sprintf("line %d: the R block returned %s; %s needs %s.",
+                         line, .block_describe(value), wanted, .block_need(element)), call. = FALSE)
+        if (identical(element, "string"))
+            items <- vapply(items, function(item) utils::URLencode(enc2utf8(item), reserved = TRUE),
+                            character(1), USE.NAMES = FALSE)
+        return(paste(items, collapse = "\n"))
+    }
+    items <- if (is.atomic(value) && length(value) == 1L && is.null(dim(value))) .block_items(kind, value) else NULL
+    if (is.null(items)) {
+        need <- switch(kind, f64 = , f32 = "a number", i64 = , i32 = "a whole number that fits in the type",
+                       bool = "TRUE or FALSE", "a value FlowStudio knows")
+        stop(sprintf("line %d: the R block returned %s; %s needs %s.", line, .block_describe(value), kind, need),
+             call. = FALSE)
+    }
+    items[[1L]]
+}
+
+# Reads the request, assigns the values, runs the code and returns the
+# reply list the kernel sends.
+.bridge_block <- function(request) {
+    fail <- function(text) list(success = FALSE, payload = charToRaw(enc2utf8(text)))
+    lines <- strsplit(request, "\n", fixed = TRUE)[[1]]
+    at <- 1L
+    take <- function() {
+        if (at > length(lines)) stop("the request ends early", call. = FALSE)
+        item <- lines[[at]]
+        at <<- at + 1L
+        item
+    }
+    parsed <- tryCatch({
+        if (!identical(take(), "FSBLOCK 1")) stop("unknown block request version", call. = FALSE)
+        kind <- take()
+        line <- as.integer(take())
+        first <- as.integer(take())
+        values <- list()
+        repeat {
+            tag <- take()
+            if (identical(tag, "code")) break
+            name <- take()
+            if (tag %in% c("f", "i", "b", "s")) {
+                values[[name]] <- .block_scalar(tag, take())
+            } else if (tag %in% c("F", "I", "B", "S")) {
+                count <- as.integer(take())
+                items <- lapply(seq_len(count), function(i) .block_scalar(tolower(tag), take()))
+                values[[name]] <- .block_vector(tag, items)
+            } else if (identical(tag, "d")) {
+                count <- as.integer(take())
+                specs <- lapply(seq_len(count), function(i) c(take(), take()))
+                record <- list()
+                for (spec in specs) record[[spec[2L]]] <- .block_scalar(spec[1L], take())
+                values[[name]] <- record
+            } else if (identical(tag, "R")) {
+                rows <- as.integer(take())
+                count <- as.integer(take())
+                specs <- lapply(seq_len(count), function(i) c(take(), take()))
+                columns <- lapply(specs, function(spec) vector("list", rows))
+                for (row in seq_len(rows))
+                    for (k in seq_along(specs)) columns[[k]][[row]] <- .block_scalar(specs[[k]][1L], take())
+                frame <- lapply(seq_along(specs), function(k)
+                    .block_vector(toupper(specs[[k]][1L]), columns[[k]]))
+                names(frame) <- vapply(specs, function(spec) spec[2L], character(1))
+                values[[name]] <- as.data.frame(frame, stringsAsFactors = FALSE, optional = TRUE)
+            } else {
+                stop("unknown value kind ", tag, call. = FALSE)
+            }
+        }
+        code <- if (at <= length(lines)) paste(lines[at:length(lines)], collapse = "\n") else ""
+        list(kind = kind, line = line, first = first, values = values, code = code)
+    }, error = function(error) error)
+    if (inherits(parsed, "error"))
+        return(fail(paste0("FlowStudio could not read the block request: ", conditionMessage(parsed), ".")))
+    # Blank lines in front give every expression its Flow line number.
+    text <- paste0(strrep("\n", max(0L, parsed$first - 1L)), parsed$code)
+    expressions <- tryCatch(parse(text = text, keep.source = TRUE, srcfile = srcfilecopy("<flow>", text)),
+                            error = function(error) error)
+    if (inherits(expressions, "error")) {
+        message <- conditionMessage(expressions)
+        where <- regmatches(message, regexec("<flow>:([0-9]+):[0-9]+: ([^\n]*)", message))[[1]]
+        if (length(where)) return(fail(sprintf("line %s: R syntax error: %s", where[2L], where[3L])))
+        return(fail(sprintf("line %d: R syntax error: %s", parsed$line, message)))
+    }
+    # The passed values exist while the block runs. A workspace variable of
+    # the same name comes back afterwards; other names the block assigns stay.
+    saved <- lapply(names(parsed$values), function(name)
+        if (exists(name, envir = workspace, inherits = FALSE)) list(get(name, envir = workspace)) else NULL)
+    names(saved) <- names(parsed$values)
+    on.exit(for (name in names(saved)) {
+        if (is.null(saved[[name]])) {
+            if (exists(name, envir = workspace, inherits = FALSE)) rm(list = name, envir = workspace)
+        } else assign(name, saved[[name]][[1L]], envir = workspace)
+    }, add = TRUE)
+    for (name in names(parsed$values)) assign(name, parsed$values[[name]], envir = workspace)
+    references <- attr(expressions, "srcref")
+    current <- parsed$line
+    value <- NULL
+    warned <- character(0)
+    printed_lines <- character(0)
+    connection <- textConnection("printed_lines", "w", local = TRUE)
+    sink(connection)
+    failure <- tryCatch(withCallingHandlers({
+        for (index in seq_along(expressions)) {
+            if (!is.null(references) && length(references) >= index) current <- references[[index]][1L]
+            value <- eval(expressions[[index]], envir = workspace)
+        }
+        NULL
+    }, warning = function(warning) {
+        warned <<- c(warned, sprintf("line %d: R warning: %s", current, conditionMessage(warning)))
+        invokeRestart("muffleWarning")
+    }), error = function(error) conditionMessage(error))
+    sink()
+    close(connection)
+    printed <- paste0(if (length(printed_lines)) paste0(paste(printed_lines, collapse = "\n"), "\n") else "",
+                      if (length(warned)) paste0(paste(warned, collapse = "\n"), "\n") else "")
+    if (!is.null(failure)) return(fail(sprintf("%sline %d: R error: %s", printed, current, failure)))
+    result <- tryCatch(.block_value(parsed$kind, value, parsed$line), error = function(error) error)
+    if (inherits(result, "error")) return(fail(paste0(printed, conditionMessage(result))))
+    printed_raw <- charToRaw(enc2utf8(printed))
+    if (length(printed_raw) > 32768L) {
+        printed_raw <- c(printed_raw[seq_len(32768L)],
+                         charToRaw("\n[FlowStudio: the rest of the block's output was cut]\n"))
+    }
+    value_raw <- charToRaw(enc2utf8(result))
+    if (length(printed_raw) + length(value_raw) > 120L * 1024L)
+        return(fail(sprintf("line %d: the R block's value is larger than 120 KiB.", parsed$line)))
+    list(success = TRUE, payload = c(charToRaw(paste0(length(printed_raw), "\n")), printed_raw, value_raw))
+}
+
 # request: format character then source. Runs in the user workspace.
 bridge_evaluate <- function(request) {
     format <- substr(request, 1L, 1L)
     source <- substr(request, 2L, nchar(request))
+    if (identical(format, "b")) return(.bridge_block(source))
     value <- NULL
     failure <- NULL
     output <- tryCatch(utils::capture.output({

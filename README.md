@@ -547,6 +547,7 @@ files are needed.
 | Python | `fs.flow("kernel.flow")` or `fs.flow(source)` | what the Flow program printed |
 | R | `py("...")`, `py$name`, `py$name <- value` | R values; a list of dicts or a Frame is a data.frame |
 | R | `flow("kernel.flow")` | what the Flow program printed |
+| Flow | a `python(xs) { ... }` or `r(df) { ... }` block | the last value as the Flow type the block names (see below) |
 | Flow | `import flowstudio { py, r, py_num, r_num, py_int, r_int, fmt, fmt_int }` | the last value as text: one item per line, a data frame as CSV |
 
 Each call evaluates in the same namespace as the editor and console, so
@@ -562,7 +563,81 @@ reply back (`src/polyglot_bridge.c`). Flow programs get the channel on fds 3
 and 4, and `src/flowstudio.flow` sits next to every run so the import
 resolves. Python sends values to R as R source, R sends them back as JSON.
 
-The Examples view's Polyglot category has five worked examples, generated
+### Python and R blocks in Flow
+
+Flow code can hold Python or R code as a block. The names in parentheses
+are Flow values. Each one is set in the session under the same name while
+the block runs, and the block's last value comes back as a Flow type. A
+session variable with that name comes back after the block; other names the
+block assigns, such as an import, stay in the session.
+
+```flow
+struct Obs {
+    x: f64,
+    y: f64
+}
+
+function main() -> i32 {
+    let xs: array<f64, 4> = [1.0, 2.0, 3.0, 4.0]
+    let obs: array<Obs, 3> = [Obs { x: 1.0, y: 2.1 }, Obs { x: 2.0, y: 3.9 }, Obs { x: 3.0, y: 6.2 }]
+    let m: f64 = python(xs) {
+        import numpy as np
+        np.mean(xs)
+    }
+    let slope: f64 = r(obs) { unname(coef(lm(y ~ x, data = obs))[2]) }
+    let scaled: array<f64, 4> = python(xs, k = slope) -> array<f64, 4> { [v * k for v in xs] }
+    printf("%.2f %.2f %.2f\n", m, slope, scaled[3])
+    return 0
+}
+```
+
+- Values in: numbers, bools and strings as scalars; arrays as numpy arrays
+  (lists without numpy) or R vectors; a struct as a dict or named list; an
+  array of structs as a pandas DataFrame or an R data frame. Without pandas
+  it is a list of row dicts, where `rows["field"]` gives a column.
+  `name = expression` passes an expression.
+- Value out: the type after `->`, or the `let` annotation when the block is
+  the whole initializer: `f64`, `f32`, `i64`, `i32`, `bool`, `string`, or
+  an array of those with a size. A block used as a statement returns
+  nothing. A value that does not fit stops the program with its line, for
+  example `line 9: the Python block returned str 'x'; f64 needs a number.`
+- Errors name the Flow line inside the block:
+  `line 14: Python error: ZeroDivisionError: division by zero`, or
+  `line 22: R error: object 'fit' not found`.
+- A block that opens with `{` at the end of a line ends at the first line
+  starting with `}` indented like the opening line. A one-line block ends
+  at the last `}` on its line. A block cannot sit in an `if` or `while`
+  condition; assign it to a variable first.
+
+Why blocks: Julia's RCall and PyCall use string macros (`R"..."`,
+`py"..."`) with `$x` interpolation. They read well, but the code is still a
+string to the editor. Quarto and R Markdown keep each language in its own
+chunk and share values through the session, which separates the code from
+the Flow that uses it. A block keeps the Python or R code where the Flow
+value is used, lets Monaco highlight it as Python or R, and makes the
+values crossing the boundary explicit and typed, the way Rcpp's typed
+signatures do.
+
+How it works: Flow's compiler never sees a block. `src/flow_blocks.py`
+rewrites each one into a call of the bridge functions in
+`src/flowstudio.flow`, keeping every line where it was, so compiler errors,
+breakpoints and the debugger keep their line numbers. The types of the
+passed values come from one probe run of the strict checker. Run, Check
+Flow, the console session, the debugger and `fs.flow()` from Python all use
+the same rewrite. The editor reads blocks with `web/flow_blocks.js`, which
+follows the same rules (`tests/fixtures/flow_blocks_cases.json` holds both
+to them), gives Flow's language server a copy in which each block is a
+typed call, and maps positions both ways, so hover on a passed value still
+works. Requests and replies stay within the bridge's 128 KiB limit.
+
+The old string calls `py("...")` and `r("...")` still work.
+
+Tests: `tests/test_flow_blocks.py` (rules, rewrite, the Python side, and
+every path on a live server), `tests/flow_blocks.test.js` (the editor side)
+and `tests/native_flow_blocks_ui.mjs` (Chromium: highlighting, Run, the
+console and hover).
+
+The Examples view's Polyglot category has six worked examples, generated
 from `examples/polyglot/`:
 
 - Python drives R: mtcars from R, grouped in Python, `lm()` in R.
@@ -570,6 +645,8 @@ from `examples/polyglot/`:
 - Flow drives Python and R: a compiled SIR model queried from both sessions.
 - Python runs a Flow kernel: `fs.flow()` with input read back through `py_int()`.
 - Flow, Python and R pipeline: three files run in order with Run project.
+- Python and R blocks in Flow: R fits a dose-response curve with `nls()`,
+  Python summarises the plates, and typed values pass both ways.
 
 Tests: `tests/test_polyglot_bridge.py` covers the conversions offline and
 runs every polyglot example against the live server.

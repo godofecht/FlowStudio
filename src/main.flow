@@ -87,9 +87,87 @@ struct ExecutionResult {
     output: string
 }
 
+function identifier_byte(c: u8) -> bool {
+    return (c >= 48 and c <= 57) or (c >= 65 and c <= 90) or (c >= 97 and c <= 122) or c == 95
+}
+
+# True when the source may hold a python(...) { } or r(...) { } block: the
+# word python or r followed by (, { or ->. Only such sources pay for the
+# block helper; it decides exactly.
+function block_candidate(code: string) -> bool {
+    let s: ptr<u8> = code as ptr<u8>
+    let n: i64 = strlen(code)
+    let mut i: i64 = 0
+    while i < n {
+        let c: u8 = s[i]
+        let mut fresh: bool = i == 0
+        if i > 0 {
+            fresh = not identifier_byte(s[i - 1]) and s[i - 1] != 46
+        }
+        if fresh and (c == 114 or c == 112) {
+            let mut k: i64 = i + 1
+            if c == 112 {
+                k = i + 6
+                if k > n or s[i + 1] != 121 or s[i + 2] != 116 or s[i + 3] != 104 or s[i + 4] != 111 or s[i + 5] != 110 {
+                    k = n + 1
+                }
+            }
+            if k < n and not identifier_byte(s[k]) {
+                while k < n and (s[k] == 32 or s[k] == 9) {
+                    k = k + 1
+                }
+                if k < n and (s[k] == 40 or s[k] == 123 or s[k] == 45) {
+                    return true
+                }
+            }
+        }
+        i = i + 1
+    }
+    return false
+}
+
+# Python and R blocks (src/flow_blocks.py). op is "expand", which prints the
+# program to run, or "check", which runs the strict check itself.
+function flow_blocks_helper(op: string, code: string) -> ptr<ProcResult> {
+    let command: ptr<ProcCmd> = proc_cmd("python3")
+    proc_arg(command, "src/flow_blocks.py")
+    proc_arg(command, op)
+    proc_input(command, code)
+    proc_timeout_ms(command, 60000)
+    return proc_run(command)
+}
+
 # backend selects the compiler backend for Flow runs: "" uses the default
 # C backend, "mlir" passes --backend=mlir to the real flow process.
-function execute(language: string, code: string, check_only: bool, backend: string) -> ExecutionResult {
+function execute(language: string, source: string, check_only: bool, backend: string) -> ExecutionResult {
+    let mut code: string = source
+    if eq(language, "flow") and block_candidate(source) {
+        if check_only {
+            let checked: ptr<ProcResult> = flow_blocks_helper("check", source)
+            if checked.exit_code == 0 and eq(checked.error, "") and not checked.timed_out {
+                let mut passed: string = checked.stdout
+                if eq(passed, "") {
+                    passed = "Flow compile check passed; source was not executed."
+                }
+                return ExecutionResult { status: 200, output: passed }
+            }
+            if checked.exit_code == 1 {
+                return ExecutionResult { status: 422, output: checked.stdout + "\nProcess exited unsuccessfully." }
+            }
+            return ExecutionResult { status: 503, output: "FlowStudio: the Flow block helper failed. " + checked.stdout + checked.stderr + checked.error }
+        }
+        let expanded: ptr<ProcResult> = flow_blocks_helper("expand", source)
+        if expanded.exit_code == 2 {
+            return ExecutionResult { status: 422, output: expanded.stdout }
+        }
+        if expanded.exit_code != 0 or not eq(expanded.error, "") or expanded.timed_out {
+            return ExecutionResult { status: 503, output: "FlowStudio: the Flow block helper failed. " + expanded.stderr + expanded.error }
+        }
+        if not eq(backend, "") and not eq(expanded.stdout, source) {
+            return ExecutionResult { status: 422, output: "Python and R blocks run on the C backend, which carries the bridge to the sessions." }
+        }
+        code = expanded.stdout
+    }
     # C backend runs carry the polyglot bridge: the program can import
     # flowstudio and call the live Python and R sessions while it runs.
     if eq(language, "flow") and not check_only and eq(backend, "") {

@@ -263,6 +263,7 @@ jobs:
           done
           node tests/native_flow_session_ui.mjs
           node tests/native_flow_blocks_ui.mjs
+          node tests/native_console_history_search_ui.mjs
           node tests/native_lsp_ui.mjs
           node tests/native_lsp_project_ui.mjs
           # The assistant suite starts its own server with the fake provider.

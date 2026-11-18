@@ -168,7 +168,7 @@ class NativeFieldArrayVerifierTests(unittest.TestCase):
         executable = shutil.which("true")
         self.assertIsNotNone(executable)
         result = subprocess.run(
-            [sys.executable, str(verifier), "--flow", executable,
+            [sys.executable, str(verifier), "--executable", executable,
              "--repeats", "1", "--timeout", "2", "--total-timeout", "3"],
             stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
             stderr=subprocess.PIPE, timeout=8, check=False,
@@ -182,7 +182,7 @@ class NativeFieldArrayVerifierTests(unittest.TestCase):
         executable = shutil.which("false")
         self.assertIsNotNone(executable)
         result = subprocess.run(
-            [sys.executable, str(verifier), "--flow", executable,
+            [sys.executable, str(verifier), "--executable", executable,
              "--repeats", "1", "--timeout", "2", "--total-timeout", "3"],
             stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
             stderr=subprocess.PIPE, timeout=8, check=False,
@@ -193,14 +193,14 @@ class NativeFieldArrayVerifierTests(unittest.TestCase):
 
     def test_cli_enforces_real_process_wall_clock_timeout(self):
         # Exercise process-group termination using a genuine long-lived OS
-        # subprocess; this is a negative resource test, not Flow qualification.
+        # subprocess. This negative test checks resource limits.
         verifier = Path(__file__).with_name("verify_native_field_arrays.py")
         with tempfile.TemporaryDirectory() as directory:
             executable = Path(directory) / "long_running"
             executable.write_text("#!/bin/sh\nsleep 5\n")
             executable.chmod(0o700)
             result = subprocess.run(
-                [sys.executable, str(verifier), "--flow", str(executable),
+                [sys.executable, str(verifier), "--executable", str(executable),
                  "--repeats", "1", "--timeout", "0.1", "--total-timeout", "1"],
                 stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE, timeout=8, check=False,
@@ -217,7 +217,7 @@ class NativeFieldArrayVerifierTests(unittest.TestCase):
         if executable is None:
             self.skipTest("system yes utility unavailable")
         result = subprocess.run(
-            [sys.executable, str(verifier), "--flow", executable,
+            [sys.executable, str(verifier), "--executable", executable,
              "--repeats", "1", "--timeout", "2", "--total-timeout", "3"],
             stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
             stderr=subprocess.PIPE, timeout=8, check=False,
@@ -239,7 +239,7 @@ class NativeFieldArrayVerifierTests(unittest.TestCase):
             )
             executable.chmod(0o700)
             result = subprocess.run(
-                [sys.executable, str(verifier), "--flow", str(executable),
+                [sys.executable, str(verifier), "--executable", str(executable),
                  "--repeats", "1", "--timeout", "2",
                  "--total-timeout", "3"],
                 stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
@@ -251,7 +251,7 @@ class NativeFieldArrayVerifierTests(unittest.TestCase):
 
     def test_cli_rejects_nondeterministic_real_process_output(self):
         # This is a negative CLI contract test. It deliberately uses an OS
-        # executable, not the Flow compiler; production qualification is separate.
+        # executable. Production compiler qualification has its own gate.
         verifier = Path(__file__).with_name("verify_native_field_arrays.py")
         with tempfile.TemporaryDirectory() as directory:
             state = Path(directory) / "counter"
@@ -273,7 +273,7 @@ class NativeFieldArrayVerifierTests(unittest.TestCase):
             )
             executable.chmod(0o700)
             result = subprocess.run(
-                [sys.executable, str(verifier), "--flow", str(executable),
+                [sys.executable, str(verifier), "--executable", str(executable),
                  "--repeats", "2", "--timeout", "2", "--total-timeout", "5"],
                 stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE, timeout=8, check=False,
@@ -296,7 +296,7 @@ class NativeFieldArrayVerifierTests(unittest.TestCase):
             )
             executable.chmod(0o700)
             result = subprocess.run(
-                [sys.executable, str(verifier), "--flow", str(executable),
+                [sys.executable, str(verifier), "--executable", str(executable),
                  "--repeats", "5", "--timeout", "2", "--total-timeout", "0.5"],
                 stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE, timeout=8, check=False,
@@ -341,7 +341,7 @@ class NativeFieldArrayVerifierTests(unittest.TestCase):
                 )
                 executable.chmod(0o700)
                 result = subprocess.run(
-                    [sys.executable, str(verifier), "--flow", str(executable),
+                    [sys.executable, str(verifier), "--executable", str(executable),
                      "--repeats", "1", "--timeout", "2",
                      "--total-timeout", "3"],
                     stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,

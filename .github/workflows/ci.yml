@@ -38,6 +38,9 @@ jobs:
         run: |
           python3 -m py_compile scripts/*.py tests/*.py src/math_flow.py
           python3 -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Field output oracle and verifier regression tests
+        run: |
+          python3 -m unittest scripts.test_field_multiplier_oracle scripts.test_native_field_array_output scripts.test_native_field_array_verifier -v
       - name: Real C transport tests
         run: |
           python3 tests/transport_smoke.py

@@ -159,7 +159,9 @@ const lspMarkers = await page.evaluate(() => FlowStudioMonaco.editor.getModelMar
 assert.deepEqual(lspMarkers, []);
 
 // 3. Run from the editor.
-const transcript = () => page.evaluate(() => document.querySelector('.terminal-transcript').textContent);
+// The prompt's highlighted draft changes length during execution. Count only
+// committed console entries when separating new output from earlier commands.
+const transcript = () => page.evaluate(() => document.querySelector('#console').textContent);
 // Waits until the run this click starts has finished: a new command line in
 // the transcript that is no longer running, then the expected text after it.
 const runAndWait = async (click, expected, countRuns = true) => {
@@ -171,7 +173,7 @@ const runAndWait = async (click, expected, countRuns = true) => {
     const last = all[all.length - 1];
     if (count >= 0 && (all.length <= count || !last || last.dataset.state === 'running')) return false;
     if (/^Running/.test(document.getElementById('resultStatus').textContent)) return false;
-    const now = document.querySelector('.terminal-transcript').textContent;
+    const now = document.querySelector('#console').textContent;
     return now.length > size && new RegExp(pattern).test(now.slice(size));
   }, [before, countRuns ? runs : -1, expected], { timeout: 120000 }).catch(async error => {
     const tail = (await transcript()).slice(before).slice(-1500);
@@ -185,7 +187,7 @@ assert.match(output, /blocks: 2\.50 1\.95 7\.80/);
 // A Python error names the Flow line inside the block.
 await setText(PROGRAM.replace('statistics.fmean(xs)', 'statistics.fmean(xs) / 0'));
 output = await runAndWait(() => page.click('#run'), 'line 12');
-assert.match(output, /line 12: Python error: ZeroDivisionError: float division by zero/);
+assert.match(output, /line 12: Python error: ZeroDivisionError: (?:float )?division by zero/);
 
 // 4. The console session: Ctrl+Enter sends a statement holding a block.
 const SCRIPT = [

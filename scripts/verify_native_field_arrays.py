@@ -36,6 +36,8 @@ def parse_output(data: bytes) -> list[float]:
         decoded = data.decode("utf-8", errors="strict")
     except UnicodeDecodeError as exc:
         raise ValueError("Flow emitted non-UTF-8 output") from exc
+    if not decoded:
+        raise ValueError("expected 16 numerical values and success marker, got 0 lines")
     # splitlines() accepts CR, VT and Unicode separators, hiding malformed
     # transport records. The compiler contract requires LF-only framing.
     if not decoded.endswith("\n") or any(ch in decoded for ch in ("\r", "\v", "\f", "\x85", "\u2028", "\u2029")):
@@ -157,8 +159,8 @@ def main() -> int:
             if first_output is not None and output != first_output:
                 raise ValueError(f"nondeterministic Flow output on execution {repetition + 1}")
             first_output = output
-            # Include parsing, independent oracle evaluation and comparison in
-            # the global budget, not just time spent waiting for subprocesses.
+            # The global budget includes parsing, independent oracle evaluation,
+            # comparison and subprocess execution.
             if time.monotonic() > deadline:
                 raise ValueError("cumulative Flow compiler/runtime timeout exceeded")
     except (ValueError, OSError) as exc:

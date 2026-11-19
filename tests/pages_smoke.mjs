@@ -58,7 +58,7 @@ try {
     ['import std.math { sqrt }\nfunction main() -> i32 { println(sqrt(81.0)); return 0 }', true, /9/],
     ['function main() -> i32 { println(missing_symbol); return 0 }', false, /missing_symbol|undeclared|unresolved|unknown/i],
     ['function main() -> i32 { return 7 }', false, /code 7/],
-    ['extern { function malloc(n: i64) -> ptr<u8> }\nfunction main() -> i32 { let p: ptr<u8> = malloc(2147483647); if p != null { return 1 }; println("allocation-bounded"); return 0 }', true, /allocation-bounded/],
+    ['extern { function malloc(n: i64) -> ptr<u8> }\nfunction main() -> i32 { let p: ptr<u8> = malloc(805306368); if p != null { return 1 }; println("allocation-bounded"); return 0 }', true, /allocation-bounded/],
     ['function main() -> i32 { while true { println("bounded-output") }; return 0 }', false, /output exceeds/],
     ['function main() -> i32 { while true {} return 0 }', false, /timed out/],
     ['function main() -> i32 { println("recovered-after-timeout"); return 0 }', true, /recovered-after-timeout/]

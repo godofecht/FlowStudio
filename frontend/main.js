@@ -38,7 +38,7 @@ const icons = { FolderOpen, FilePlus2, RotateCw, Play, Blocks, Files, ListTree,
   Octagon, Download, List, CircleCheck, Ellipsis };
 createIcons({ icons, attrs: { 'aria-hidden': 'true', 'stroke-width': 1.6 } });
 globalThis.MonacoEnvironment = {
-  getWorker: () => new Worker('/ui/editor.worker.js', { name: 'flowstudio-editor' })
+  getWorker: () => new Worker(new URL('ui/editor.worker.js', document.baseURI), { name: 'flowstudio-editor' })
 };
 monaco.editor.defineTheme('flowstudio', {
   base: 'vs-dark', inherit: true,

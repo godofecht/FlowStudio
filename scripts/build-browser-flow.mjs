@@ -6,6 +6,8 @@ import { execFileSync } from 'node:child_process';
 const lock = JSON.parse(await readFile('scripts/browser-flow/toolchain.lock.json', 'utf8'));
 const cache = resolve('build/browser-flow');
 const digest = data => createHash('sha256').update(data).digest('hex');
+const shim = await readFile('scripts/browser-flow/write-shim.c');
+export const browserFlowToolchain = digest(JSON.stringify(lock) + shim.toString());
 async function download(url, path, expected) {
   try { if (digest(await readFile(path)) === expected) return; } catch {}
   const response = await fetch(url, { signal: AbortSignal.timeout(120000) });
@@ -25,8 +27,7 @@ export async function buildBrowserFlow(target) {
   }
   await Promise.all(Array.from({ length: 8 }, async () => { while (jobs.length) await jobs.shift()(); }));
   await mkdir(`${cache}/compiler`, { recursive: true });
-  const shim = await readFile('scripts/browser-flow/write-shim.c');
-  const key = digest(JSON.stringify(lock) + shim.toString());
+  const key = browserFlowToolchain;
   let built = false;
   try {
     const saved = JSON.parse(await readFile(`${cache}/compiler/build.json`, 'utf8'));

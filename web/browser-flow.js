@@ -6,7 +6,9 @@
     if (new TextEncoder().encode(source).length > 131072) return Promise.resolve({ ok: false, output: 'Flow source exceeds 128 KiB.' });
     if (active) return Promise.resolve({ ok: false, output: 'A Flow program is already running.' });
     return new Promise(resolve => {
-      const worker = new Worker(new URL('./browser-flow-worker.js', document.baseURI));
+      const workerURL = new URL('./browser-flow-worker.js', document.baseURI);
+      workerURL.searchParams.set('v', document.querySelector('meta[name="flowstudio-revision"]')?.content || '');
+      const worker = new Worker(workerURL);
       let timer;
       let settled = false;
       function finish(result) {

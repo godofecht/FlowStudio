@@ -8,6 +8,8 @@ WASI WebAssembly program, which executes in the same worker.
 The first run downloads about 65 MB of compiler and runtime assets. Later runs
 use the browser HTTP cache. Submitted source stays in the browser. GitHub Pages
 serves static files and receives no execution requests.
+The page versions its scripts by commit and addresses the compiler assets by
+their toolchain fingerprint, keeping cached releases separate.
 
 The backend menu calls this path "C to WebAssembly". MLIR execution needs a
 browser build of the MLIR lowering toolchain and is unavailable in this build.

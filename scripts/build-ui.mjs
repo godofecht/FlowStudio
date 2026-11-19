@@ -2,26 +2,31 @@ import { build } from 'esbuild';
 import { mkdir, writeFile, readFile, readdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-await mkdir('web/ui', { recursive: true });
+const pages = process.argv.includes('--pages');
+const ui = pages ? 'build/pages/ui' : 'web/ui';
+await mkdir(ui, { recursive: true });
 // Monaco includes a vendored sanitizer. Use the patched, pinned package in both bundles.
 const shared = { bundle: true, minify: true, target: 'es2022', legalComments: 'linked',
   plugins: [{ name: 'patched-sanitizer', setup(build) {
+    build.onResolve({ filter: /^\/ide_completion_core\.js$/ }, () => ({
+      path: pages ? '../ide_completion_core.js' : '/ide_completion_core.js', external: true
+    }));
     build.onResolve({ filter: /dompurify\/dompurify\.js$/ }, () => ({
       path: resolve('node_modules/dompurify/dist/purify.es.mjs')
     }));
   } }] };
-await build({ ...shared, entryPoints: ['frontend/main.js'], outfile: 'web/ui/workbench.js',
+await build({ ...shared, entryPoints: ['frontend/main.js'], outfile: `${ui}/workbench.js`,
   format: 'esm', loader: { '.ttf': 'dataurl' },
   // Served at runtime by the native server's allowlisted static routes.
-  external: ['/ide_completion_core.js'] });
+});
 await build({ ...shared,
   entryPoints: ['node_modules/monaco-editor/esm/vs/editor/editor.worker.js'],
-  outfile: 'web/ui/editor.worker.js', format: 'iife' });
+  outfile: `${ui}/editor.worker.js`, format: 'iife' });
 const notices = await Promise.all([
   ['monaco-editor', 'LICENSE'], ['lucide', 'LICENSE'], ['dompurify', 'LICENSE'],
   ['@xterm/xterm', 'LICENSE'], ['@xterm/addon-fit', 'LICENSE'], ['@xterm/addon-web-links', 'LICENSE']
 ].map(async ([name, file]) => `${name}\n${await readFile(`node_modules/${name}/${file}`, 'utf8')}`));
-await writeFile('web/ui/THIRD_PARTY_LICENSES.txt', notices.join('\n\n'));
+await writeFile(`${ui}/THIRD_PARTY_LICENSES.txt`, notices.join('\n\n'));
 // The Examples view lists every executable MathFlow program in examples/.
 // Each becomes a catalog entry: title from the file name, description from
 // its leading comment, source verbatim.

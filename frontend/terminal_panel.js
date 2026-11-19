@@ -302,6 +302,7 @@ export function mountTerminalPanel() {
 
   let initial = 'terminal';
   try { initial = localStorage.getItem('flowstudio.dock.view') || 'terminal'; } catch (_) {}
+  if (globalThis.FlowStudioPages) initial = 'console';
   panel.show(initial === 'console' ? 'console' : 'terminal', { focus: false });
   panel.debugRoot = debugRoot;
   panel.ready = true;

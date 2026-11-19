@@ -6,6 +6,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  actions: read
   pages: write
   id-token: write
 concurrency:
@@ -14,7 +15,7 @@ concurrency:
 jobs:
   deploy:
     if: >-
-      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
       (github.event.workflow_run.conclusion == 'success' &&
        github.event.workflow_run.event == 'push' &&
        github.event.workflow_run.head_branch == 'main' &&
@@ -28,16 +29,34 @@ jobs:
         uses: actions/checkout@v7
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - name: Require qualified current main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          git fetch origin main
+          test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
+          gh run list --workflow ci.yml --commit "$(git rev-parse HEAD)" --json conclusion \
+            --jq 'any(.[]; .conclusion == "success")' | grep -qx true
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: Build the current workbench for Pages
+        run: |
+          npm ci
+          npm run build:pages
+          npx playwright install --with-deps chromium
+          npm run test:pages
       - name: Confirm the static site entry points exist
         run: |
           set -eu
-          test -s docs/index.html
-          test -s docs/app/index.html
-          test -s docs/app/mixed.html
+          test -s build/pages/index.html
+          test -s build/pages/app/index.html
+          test -s build/pages/browser/index.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: docs
+          path: build/pages
       - id: deployment
         uses: actions/deploy-pages@v4
       - name: Verify the public site serves the expected HTML
@@ -51,8 +70,9 @@ jobs:
             if curl --fail --silent --show-error --location \
                 --connect-timeout 10 --max-time 20 \
                 "$site" --output /tmp/flowstudio-pages.html &&
-               grep -Fq '<title>FlowStudio: Flow-first scientific IDE</title>' /tmp/flowstudio-pages.html; then
-              echo "Verified public FlowStudio documentation: $site"
+               grep -Fq "content=\"$(git rev-parse HEAD)\"" /tmp/flowstudio-pages.html &&
+               grep -Fq 'src="./ui/workbench.js"' /tmp/flowstudio-pages.html; then
+              echo "Verified public FlowStudio workbench: $site"
               exit 0
             fi
             echo "Pages endpoint not ready (attempt $attempt/12)"

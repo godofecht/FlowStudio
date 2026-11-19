@@ -41,6 +41,10 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
+      - name: Install pinned browser compiler SDK
+        uses: emscripten-core/setup-emsdk@6ab9eb1bda2574c4ddb79809fc9247783eaf9021 # v14
+        with:
+          version: '5.0.0'
       - name: Build the current workbench for Pages
         run: |
           npm ci
@@ -71,7 +75,7 @@ jobs:
                 --connect-timeout 10 --max-time 20 \
                 "$site" --output /tmp/flowstudio-pages.html &&
                grep -Fq "content=\"$(git rev-parse HEAD)\"" /tmp/flowstudio-pages.html &&
-               grep -Fq 'src="./ui/workbench.js"' /tmp/flowstudio-pages.html; then
+               grep -Fq 'src="./ui/workbench.js?v=' /tmp/flowstudio-pages.html; then
               echo "Verified public FlowStudio workbench: $site"
               exit 0
             fi

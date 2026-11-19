@@ -13,8 +13,8 @@
 
 const KEY = "flowstudio.flowBackend.v1";
 const BACKENDS = Object.freeze([
-  Object.freeze({ id: "c", value: "", short: "C", label: "C backend",
-    description: "Default. Compiles Flow to C. Programs can import flowstudio to call live Python and R." }),
+  Object.freeze({ id: "c", value: "", short: root.FlowStudioPages ? "Wasm" : "C", label: root.FlowStudioPages ? "C to WebAssembly" : "C backend",
+    description: root.FlowStudioPages ? "Compiles and runs Flow in this browser using the Flow compiler and Clang/LLD in WebAssembly." : "Default. Compiles Flow to C. Programs can import flowstudio to call live Python and R." }),
   Object.freeze({ id: "mlir", value: "mlir", short: "MLIR", label: "MLIR backend",
     description: "Experimental. Compiles Flow through MLIR and LLVM." })
 ]);

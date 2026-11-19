@@ -7,7 +7,8 @@ const lock = JSON.parse(await readFile('scripts/browser-flow/toolchain.lock.json
 const cache = resolve('build/browser-flow');
 const digest = data => createHash('sha256').update(data).digest('hex');
 const shim = await readFile('scripts/browser-flow/write-shim.c');
-export const browserFlowToolchain = digest(JSON.stringify(lock) + shim.toString());
+const recipe = await readFile(new URL(import.meta.url));
+export const browserFlowToolchain = digest(JSON.stringify(lock) + shim.toString() + recipe.toString());
 async function download(url, path, expected) {
   try { if (digest(await readFile(path)) === expected) return; } catch {}
   const response = await fetch(url, { signal: AbortSignal.timeout(120000) });
